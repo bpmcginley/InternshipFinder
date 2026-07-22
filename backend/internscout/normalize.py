@@ -6,7 +6,7 @@ from .classify import classify, is_internship
 from .geo import evaluate_locations
 
 _SEASON_RE = re.compile(r"\b(summer|fall|winter|spring)\b", re.I)
-_YEAR_RE = re.compile(r"\b(20\d\d)\b")
+_YEAR_RE = re.compile(r"\b(20[2-3]\d)\b")  # 2020-2039, avoids matching job-id digits
 
 
 def parse_term_from_text(text: str):
@@ -67,13 +67,13 @@ def normalize(raw: dict) -> dict | None:
     year = raw.get("year")
     # A year/season stated in the posting title is authoritative for that posting and
     # overrides the source's default cycle mapping (e.g. title "Summer 2026" beats 2027).
+    # Precedence for term: an explicit season/year in the TITLE is most authoritative,
+    # then the apply URL (many ATS slugs encode e.g. "2026-Summer-Intern"), then the
+    # source's default cycle mapping.
     ps, py_ = parse_term_from_text(f"{title} {raw.get('description','') or ''}")
-    if ps:
-        season = ps
-    if py_:
-        year = py_
-    season = season or raw.get("season")
-    year = year or raw.get("year")
+    us, uy = parse_term_from_text(raw.get("apply_url") or raw.get("url") or "")
+    season = ps or us or season or raw.get("season")
+    year = py_ or uy or year or raw.get("year")
     term = f"{season} {year}".strip() if season else None
 
     return {
