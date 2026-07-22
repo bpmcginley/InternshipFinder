@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>InternScout</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{--bg:#0f1116;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;--txt:#e6e9ef;--mut:#98a2b3;--acc:#5b8cff;--good:#2ecc71;--warn:#f5a623;--bad:#ff5c5c;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  h1{font-size:18px;margin:0;letter-spacing:.3px}
+  .sub{color:var(--mut);font-size:12.5px}
+  .wrap{padding:18px 22px;max-width:1500px;margin:0 auto}
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:120px}
+  .card .n{font-size:22px;font-weight:600}
+  .card .l{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  input,select,button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+  button{cursor:pointer}
+  input[type=text]{min-width:240px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;user-select:none}
+  tr:hover td{background:#1b1f28}
+  .co{font-weight:600}
+  .badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:11px;border:1px solid var(--line);margin-right:4px;color:var(--mut)}
+  .tag{background:#22314f;border-color:#2c4373;color:#bcd0ff}
+  .tag.quant{background:#3a2b12;border-color:#6b4d18;color:#ffd79a}
+  .score{font-variant-numeric:tabular-nums;font-weight:600}
+  .pill{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--line)}
+  .open{color:var(--good);border-color:#1f5c39}
+  .closed{color:var(--bad);border-color:#5c2222}
+  .new{background:var(--acc);color:#fff;border-radius:20px;font-size:10px;padding:1px 6px;margin-left:6px}
+  a.apply{color:var(--acc);text-decoration:none;font-weight:600}
+  a.apply:hover{text-decoration:underline}
+  select.state{padding:4px 6px;font-size:12px}
+  .muted{color:var(--mut)}
+  .empty{padding:40px;text-align:center;color:var(--mut)}
+  .loc-city{color:var(--good)} .loc-remote{color:#9ad0ff} .loc-radius{color:var(--txt)}
+  code{background:#222836;padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo} = React;
+// Static build: read committed JSON produced by the GitHub Actions ingester.
+const DATA = "./data/";
+const LS_KEY = "internscout.appstate.v1";
+const STATES=["none","interested","applied","interviewing","rejected","offer"];
+
+function loadStates(){ try{return JSON.parse(localStorage.getItem(LS_KEY))||{}}catch(e){return {}} }
+function saveStates(m){ localStorage.setItem(LS_KEY, JSON.stringify(m)); }
+
+function Stat({n,l}){return <div className="card"><div className="n">{n}</div><div className="l">{l}</div></div>;}
+
+function LocationCell({r}){
+  if(/boston|cambridge/i.test(r.location_raw||"")) return <span className="loc-city">{r.location_raw}</span>;
+  if(r.within_radius) return <span className="loc-radius">{r.location_raw}{r.distance_miles!=null?` · ${Math.round(r.distance_miles)}mi`:""}</span>;
+  if(r.is_remote) return <span className="loc-remote">Remote</span>;
+  return <span className="muted">{r.location_raw||"—"}</span>;
+}
+
+function Row({r,state,onState}){
+  return (
+    <tr>
+      <td className="score">{r.relevance_score}</td>
+      <td>
+        <div className="co">{r.company_name}{r.is_new&&<span className="new">NEW</span>}</div>
+        <div className="muted" style={{fontSize:12}}>{r.title}</div>
+      </td>
+      <td>{(r.field_tags||[]).map(t=><span key={t} className={"badge tag"+(t==="quant"?" quant":"")}>{t}</span>)}</td>
+      <td><LocationCell r={r}/></td>
+      <td>{r.term||<span className="muted">—</span>}</td>
+      <td><span className={"pill "+r.status}>{r.status}</span></td>
+      <td>
+        <select className="state" value={state} onChange={e=>onState(r.id,e.target.value)}>
+          {STATES.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+      </td>
+      <td>{r.apply_url?<a className="apply" href={r.apply_url} target="_blank" rel="noopener">Apply ↗</a>:<span className="muted">—</span>}
+        <div className="muted" style={{fontSize:11}}>{(r.sources||[]).map(s=>s.source).join(", ")}</div>
+      </td>
+    </tr>
+  );
+}
+
+function App(){
+  const [all,setAll]=useState([]);
+  const [meta,setMeta]=useState(null);
+  const [err,setErr]=useState(null);
+  const [states,setStates]=useState(loadStates);
+  const [f,setF]=useState({q:"",field:"",location:"",status:"open",app_state:"",new_only:false,sort:"score"});
+
+  useEffect(()=>{
+    Promise.all([
+      fetch(DATA+"listings.json").then(r=>r.json()),
+      fetch(DATA+"stats.json").then(r=>r.json())
+    ]).then(([ls,st])=>{setAll(ls);setMeta(st)}).catch(e=>setErr(String(e)));
+  },[]);
+
+  const setState=(id,v)=>{
+    setStates(m=>{const n={...m,[id]:v}; if(v==="none")delete n[id]; saveStates(n); return n;});
+  };
+  const upd=(k,v)=>setF(s=>({...s,[k]:v}));
+  const st=id=>states[id]||"none";
+
+  const rows=useMemo(()=>{
+    let r=all.slice();
+    if(f.q){const q=f.q.toLowerCase(); r=r.filter(x=>x.company_name.toLowerCase().includes(q)||x.title.toLowerCase().includes(q));}
+    if(f.field) r=r.filter(x=>(x.field_tags||[]).includes(f.field));
+    if(f.status) r=r.filter(x=>x.status===f.status);
+    if(f.new_only) r=r.filter(x=>x.is_new);
+    if(f.location==="remote") r=r.filter(x=>x.is_remote);
+    else if(f.location==="radius") r=r.filter(x=>x.within_radius);
+    else if(f.location==="in_city") r=r.filter(x=>/boston|cambridge/i.test(x.location_raw||""));
+    if(f.app_state) r=r.filter(x=>st(x.id)===f.app_state);
+    if(f.sort==="score") r.sort((a,b)=>b.relevance_score-a.relevance_score||(b.first_seen||"").localeCompare(a.first_seen||""));
+    else if(f.sort==="new") r.sort((a,b)=>(b.first_seen||"").localeCompare(a.first_seen||""));
+    else if(f.sort==="company") r.sort((a,b)=>a.company_name.localeCompare(b.company_name));
+    return r;
+  },[all,f,states]);
+
+  const stats=useMemo(()=>{
+    const applied=all.filter(x=>st(x.id)==="applied").length;
+    return meta?{...meta,applied}:{total:0,open:0,new:0,applied};
+  },[all,meta,states]);
+
+  const gen = meta&&meta.generated_at? new Date(meta.generated_at).toLocaleString():"never (run the ingester)";
+
+  return (
+    <div>
+      <header>
+        <h1>InternScout</h1>
+        <span className="sub">{meta? `${meta.profile.name} · within ${meta.profile.radius_miles}mi of ${meta.profile.center_city}${meta.profile.include_remote?" · remote incl.":""} · updated ${gen}`:"loading…"}</span>
+      </header>
+      <div className="wrap">
+        <div className="cards">
+          <Stat n={stats.total} l="Listings"/>
+          <Stat n={stats.open} l="Open"/>
+          <Stat n={stats.new} l="New"/>
+          <Stat n={stats.applied} l="Applied"/>
+        </div>
+        <div className="controls">
+          <input type="text" placeholder="Search company or title…" value={f.q} onChange={e=>upd("q",e.target.value)}/>
+          <select value={f.field} onChange={e=>upd("field",e.target.value)}>
+            <option value="">All fields</option>
+            {["swe","quant","data","ml","hardware","pm","security"].map(x=><option key={x} value={x}>{x}</option>)}
+          </select>
+          <select value={f.location} onChange={e=>upd("location",e.target.value)}>
+            <option value="">Any location</option>
+            <option value="in_city">Boston/Cambridge</option>
+            <option value="radius">Within radius</option>
+            <option value="remote">Remote</option>
+          </select>
+          <select value={f.status} onChange={e=>upd("status",e.target.value)}>
+            <option value="">Any status</option><option value="open">Open</option><option value="closed">Closed</option>
+          </select>
+          <select value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
+            <option value="">Any app state</option>
+            {STATES.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <label className="muted"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New only</label>
+          <select value={f.sort} onChange={e=>upd("sort",e.target.value)}>
+            <option value="score">Sort: score</option><option value="new">Sort: newest</option><option value="company">Sort: company</option>
+          </select>
+        </div>
+        {err? <div className="empty">Couldn't load data: {err}</div> :
+         all.length===0? <div className="empty">No listings yet. The GitHub Action will populate <code>docs/data/listings.json</code> on its first run (or run <code>python -m internscout.run_ingest --export docs/data</code> locally and push).</div> :
+        <table>
+          <thead><tr>
+            <th onClick={()=>upd("sort","score")}>Score</th><th>Company / Role</th><th>Field</th>
+            <th>Location</th><th>Term</th><th>Status</th><th>My state</th><th>Apply</th>
+          </tr></thead>
+          <tbody>{rows.map(r=><Row key={r.id} r={r} state={st(r.id)} onState={setState}/>)}</tbody>
+        </table>}
+        <div className="muted" style={{marginTop:12,fontSize:12}}>{rows.length} shown · your application statuses are saved in this browser</div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
