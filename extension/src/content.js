@@ -133,12 +133,35 @@
     return (t.why || "").replaceAll("{{company}}", companyName());
   }
 
+  function getQuestionText(el) {
+    let t = fieldLabelText(el);
+    if (t && t.length >= 8) return t;
+    const card = el.closest("li, .application-question, .field, .form-field, [class*='question']");
+    if (card) {
+      const lab = card.querySelector(".application-label, label, .text, legend, strong");
+      if (lab && lab.textContent.trim().length >= 3) return lab.textContent.replace(/\s+/g, " ").trim();
+    }
+    // previous sibling text (Lever/Greenhouse sometimes render the prompt as a preceding node)
+    let prev = el.previousElementSibling;
+    while (prev) { const tx = (prev.textContent || "").trim(); if (tx.length >= 8) return tx.slice(0, 200); prev = prev.previousElementSibling; }
+    return t || "this application question";
+  }
+
+  function isDraftableTextarea(el) {
+    if (el.tagName !== "TEXTAREA") return false;
+    if (el.disabled || el.readOnly) return false;
+    if (el.offsetParent === null) return false;                 // hidden
+    const nm = (el.name || "") + " " + (el.id || "");
+    if (/recaptcha|captcha/i.test(nm)) return false;
+    return true;
+  }
+
   function addAiButtons(store) {
     document.querySelectorAll("textarea").forEach((ta) => {
       if (ta.dataset.isAi) return;
-      const label = fieldLabelText(ta);
-      if (!looksLikeQuestion(label)) return;
+      if (!isDraftableTextarea(ta)) return;
       ta.dataset.isAi = "1";
+      const question = () => getQuestionText(ta);
       const bar = document.createElement("div"); bar.className = "is-ai-bar";
       const gen = document.createElement("button");
       gen.type = "button"; gen.className = "is-ai-btn";
@@ -146,7 +169,8 @@
       gen.addEventListener("click", async () => {
         gen.disabled = true; const old = gen.textContent; gen.textContent = "… thinking";
         try {
-          const text = store.ai.apiKey ? await requestAi(label, store) : template(label, store.profile);
+          const q = question();
+          const text = store.ai.apiKey ? await requestAi(q, store) : template(q, store.profile);
           if (text) setNative(ta, text);
         } catch (e) { toast("AI error: " + e.message); }
         finally { gen.disabled = false; gen.textContent = old; }
@@ -156,9 +180,9 @@
         const re = document.createElement("button");
         re.type = "button"; re.className = "is-ai-btn is-ghost"; re.textContent = "↻ Regenerate";
         re.addEventListener("click", async () => {
-          aiCache.delete(label + "|" + companyName());
+          aiCache.delete(question() + "|" + companyName());
           re.disabled = true; re.textContent = "…";
-          try { const text = await requestAi(label, store); if (text) setNative(ta, text); }
+          try { const text = await requestAi(question(), store); if (text) setNative(ta, text); }
           catch (e) { toast("AI error: " + e.message); }
           finally { re.disabled = false; re.textContent = "↻ Regenerate"; }
         });
