@@ -4,8 +4,9 @@ Chrome/Edge extension that fills **Greenhouse** and **Lever** internship applica
 profile you save once, and drafts answers to open-ended questions with the Anthropic API.
 It **never submits** — it fills, highlights what's left, and you review.
 
-The fill logic was built and tested against a **live Greenhouse application form** (Anduril's
-2027 SWE Intern posting), including Greenhouse's react-select dropdowns.
+The fill logic was built and tested against **live application forms on both platforms** —
+Greenhouse (Anduril's 2027 SWE Intern posting, including its react-select dropdowns) and Lever
+(standard named inputs + native selects, which fill reliably).
 
 ## Install (unpacked)
 1. `chrome://extensions` (or `edge://extensions`) → enable **Developer mode**.
