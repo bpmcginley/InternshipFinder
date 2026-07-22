@@ -1,42 +1,51 @@
-# InternScout Autofill (browser extension, v1)
+# InternScout Autofill (browser extension)
 
-A Chrome/Edge extension that autofills **Greenhouse** and **Lever** job applications from a
-profile you save once — plus an optional **AI button** that drafts answers to open-ended
-questions ("Why do you want to work here?") using the job description on the page and your
-background. It **never submits** a form; it fills, you review.
+Chrome/Edge extension that fills **Greenhouse** and **Lever** internship applications from a
+profile you save once, and drafts answers to open-ended questions with the Anthropic API.
+It **never submits** — it fills, highlights what's left, and you review.
 
-## Install (unpacked, for personal use)
-1. Open `chrome://extensions` (or `edge://extensions`).
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select this `extension/` folder.
-4. Click the extension → **Edit profile & AI settings**, fill in your details, Save.
+The fill logic was built and tested against a **live Greenhouse application form** (Anduril's
+2027 SWE Intern posting), including Greenhouse's react-select dropdowns.
+
+## Install (unpacked)
+1. `chrome://extensions` (or `edge://extensions`) → enable **Developer mode**.
+2. **Load unpacked** → select this `extension/` folder.
+3. Click the extension → **Edit profile & AI settings** → fill in details (and paste your
+   resume text + Anthropic API key for AI answers) → Save.
 
 ## Use
-- Open any application page on `job-boards.greenhouse.io`, `boards.greenhouse.io`, or
-  `jobs.lever.co`.
-- A small **InternScout** panel appears bottom-right → **Autofill this page** fills the
-  structured fields (name, email, school, work authorization, etc.).
-- Open-ended text boxes get a **✨ button**:
-  - With an API key set → **Draft answer** (tailored, editable draft via Anthropic).
-  - Without a key → **Insert template** (your saved canned text, with `{{company}}` filled in).
-- Review everything, attach your resume manually, then submit yourself.
+Open an application on `job-boards.greenhouse.io`, `boards.greenhouse.io`, or
+`jobs.lever.co`. A bottom-right **InternScout** panel appears → **Autofill**:
 
-## AI answers (optional)
-Add an Anthropic API key in Options (stored only in your browser). Calls go directly from the
-extension to `api.anthropic.com` with your key — nothing passes through any InternScout server.
-Default model `claude-haiku-4-5-20251001` (fast/cheap); change it in Options.
+- **Filled automatically** (verified reliable): first/last name, email, phone, LinkedIn,
+  GitHub, website, GPA, and other plain text/number fields.
+- **Highlighted for you** (dashed amber outline): resume/cover-letter file uploads (browsers
+  block scripted file selection) and searchable dropdowns like school, country, and location
+  preference — one click each.
+- **Yes/No dropdowns** (e.g. work authorization, sponsorship): attempted automatically, but
+  only kept if the committed value verifies. If a synthetic selection doesn't register, the
+  field is highlighted instead of left wrong — deliberately, so a critical answer like work
+  authorization is never mis-set.
 
-## What v1 does / doesn't
-- ✅ Greenhouse + Lever structured autofill · ✅ AI or template answers · ✅ label-based
-  matching (resilient to minor DOM changes) · ✅ never auto-submits.
-- ⛔ No resume auto-upload (file inputs need manual selection) · ⛔ Workday/Ashby (v2) ·
-  ⛔ no auto-navigation between multi-step pages.
+### AI answers
+Open-ended boxes ("Why do you want to work here?", cover letter) get a **✨ Draft answer**
+button. It sends the question + the job description on the page + your resume/background to
+Anthropic (your key, stored only in your browser) and inserts an editable draft. **↻ Regenerate**
+gets a fresh take; answers are cached per question so you're not billed twice. Without a key,
+the button inserts your saved template with `{{company}}` filled in.
+
+## Design choices / honest limits
+- **Never auto-submits**, never uploads files, never overrides a verified-wrong dropdown.
+- react-select automation is timing-sensitive; the verify-or-highlight approach means the
+  worst case is "you pick a couple dropdowns yourself," never a wrong answer.
+- Covers Greenhouse + Lever. **Workday/Ashby are not yet supported** (v2) — several large
+  employers host on Workday.
+- Selector rules live in `src/matcher.js`; the react-select handling in `src/content.js`.
 
 ## Files
-`manifest.json` · `src/profile.js` (schema+storage) · `src/matcher.js` (label→field rules) ·
-`src/content.js` (fill + AI buttons + panel) · `src/background.js` (Anthropic call) ·
-`options/` (profile & key) · `popup/` (quick fill).
+`manifest.json` · `src/profile.js` · `src/matcher.js` · `src/content.js` (fill + AI + panel) ·
+`src/background.js` (Anthropic call) · `options/` (profile, resume, key) · `popup/`.
 
-## Notes
-Personal-use tool. Respect each site's terms; keep a human in the loop. Selectors may need
-occasional updates as ATS UIs change — rules live in `src/matcher.js`.
+## Privacy
+Everything is stored locally in your browser. The only network calls are the AI drafts you
+trigger, sent directly to `api.anthropic.com` with your key — nothing passes through any server.

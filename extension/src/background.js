@@ -15,7 +15,10 @@ async function handleAi({ question, company, jd, profile, ai }) {
 Question: ${question}
 
 Candidate background:
-${profile.background || `${profile.degree || ""} student. ${profile.major || ""}.`}
+${profile.background || ""}
+
+Resume:
+${(profile.resume_text || "").slice(0, 3000) || `${profile.degree || ""} in ${profile.major || ""}.`}
 
 Role / job description (excerpt):
 ${(jd || "").slice(0, 4000)}`;

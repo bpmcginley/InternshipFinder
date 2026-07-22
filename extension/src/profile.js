@@ -7,6 +7,8 @@ const DEFAULT_PROFILE = {
   email: "",
   phone: "",
   city: "",              // e.g. "Boston, MA"
+  country: "United States",
+  resume_text: "",       // paste resume text; grounds AI answers
   linkedin: "",
   github: "",
   website: "",

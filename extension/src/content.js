@@ -1,67 +1,136 @@
-// Content script: injects a panel, fills structured fields, and adds AI buttons to
-// open-ended questions. Never submits the form.
+// Content script: fills Greenhouse/Lever applications from your saved profile and adds
+// AI-draft buttons to open-ended questions. Never submits. React-select handling and the
+// native-setter trick were verified against a live Greenhouse form.
 (function () {
   const ATS = location.hostname.includes("lever.co") ? "lever" : "greenhouse";
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const aiCache = new Map();
 
-  function setNativeValue(el, value) {
+  function setNative(el, value) {
     const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
-    setter.call(el, value);
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  function fillSelect(el, value) {
+  function isReactSelectInput(el) {
+    return (el.classList && el.classList.contains("select__input")) || !!(el.closest && el.closest(".select-shell"));
+  }
+
+  // Proven method: focus -> ArrowDown to open -> type to filter -> Enter to choose.
+  // Best-effort combobox fill via keyboard (focus -> open -> type -> Enter). Returns the
+  // committed value string (or "" if nothing committed) so the caller can verify before
+  // trusting it. Synthetic events are timing-sensitive; we never leave an unverified pick.
+  async function fillReactSelect(input, value) {
+    const c = input.closest(".select-shell") || input.closest('[class*="container"]');
+    if (!c) return "";
+    input.focus(); await sleep(60);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await sleep(140);
+    setNative(input, value); await sleep(240);
+    ["keydown", "keypress", "keyup"].forEach((t) =>
+      input.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })));
+    await sleep(160);
+    const shown = ((c.querySelector(".select__single-value") || {}).textContent || "").trim();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    return shown;
+  }
+
+  function highlightNeedsInput(el) {
+    const box = el.closest(".select-shell") || el.closest(".field, .application-field") || el;
+    box.style.outline = "2px dashed #f5a623"; box.style.outlineOffset = "2px";
+  }
+
+  function fillNativeSelect(el, value) {
     const want = String(value).toLowerCase();
     for (const opt of el.options) {
       if (opt.text.toLowerCase().includes(want) || opt.value.toLowerCase() === want) {
-        el.value = opt.value;
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-        return true;
+        el.value = opt.value; el.dispatchEvent(new Event("change", { bubbles: true })); return true;
       }
     }
     return false;
   }
 
-  function fillAll(profile) {
-    const fields = document.querySelectorAll("input, textarea, select");
-    let filled = 0;
-    fields.forEach((el) => {
-      if (el.type === "hidden" || el.type === "file" || el.type === "submit" || el.disabled) return;
+  async function fillField(el, value) {
+    if (el.tagName === "SELECT") return fillNativeSelect(el, value);
+    if (el.type === "checkbox" || el.type === "radio") return false;
+    setNative(el, value);
+    return true;
+  }
+
+  function highlightFiles() {
+    let any = false;
+    document.querySelectorAll('input[type="file"]').forEach((f) => {
+      f.style.outline = "2px dashed #f5a623"; f.style.outlineOffset = "2px"; any = true;
+    });
+    return any;
+  }
+
+  const SAFE_RS_KEYS = new Set(["work_authorized", "needs_sponsorship"]);
+
+  async function fillAll(profile) {
+    const els = [...document.querySelectorAll("input, select, textarea")];
+    let filled = 0, flagged = 0;
+    const binaryRS = [];
+    for (const el of els) {
+      if (["hidden", "file", "submit", "button", "search"].includes(el.type) || el.disabled) continue;
       const label = fieldLabelText(el);
       let key = matchProfileKey(label);
-      // full name fallback
       if (key === "full_name" && !profile.full_name && (profile.first_name || profile.last_name)) {
-        if (setValue(el, `${profile.first_name} ${profile.last_name}`.trim())) filled++;
-        return;
+        if (await fillField(el, `${profile.first_name} ${profile.last_name}`.trim())) filled++;
+        continue;
       }
-      if (key && profile[key]) {
-        if (setValue(el, profile[key])) filled++;
+      if (!key || !profile[key]) continue;
+      if (isReactSelectInput(el)) {
+        if (SAFE_RS_KEYS.has(key)) binaryRS.push([el, profile[key]]);
+        else { highlightNeedsInput(el); flagged++; }   // big typeaheads (country/school) -> user picks
+        continue;
       }
-    });
-    toast(`Filled ${filled} field${filled === 1 ? "" : "s"}. Review everything before submitting.`);
+      try { if (await fillField(el, profile[key])) filled++; } catch (e) { /* continue */ }
+    }
+    // Binary Yes/No comboboxes: attempt, but only trust a verified commit.
+    for (const [el, val] of binaryRS) {
+      let ok = false;
+      try {
+        const shown = await fillReactSelect(el, val);
+        ok = shown.toLowerCase() === String(val).toLowerCase() || shown.toLowerCase().includes(String(val).toLowerCase());
+      } catch (e) { ok = false; }
+      if (ok) filled++; else { highlightNeedsInput(el); flagged++; }
+    }
+    const files = highlightFiles();
+    let msg = `Filled ${filled} field${filled === 1 ? "" : "s"}.`;
+    if (flagged || files) msg += ` ${flagged + (files ? 1 : 0)} highlighted for you to complete (dropdowns/files).`;
+    msg += " Review before submitting.";
+    toast(msg);
   }
 
-  function setValue(el, value) {
-    if (el.tagName === "SELECT") return fillSelect(el, value);
-    if (el.type === "checkbox" || el.type === "radio") return false; // skip; user handles
-    if (!el.value) { setNativeValue(el, value); return true; }
-    setNativeValue(el, value); return true;
-  }
-
-  // ---- AI buttons on open-ended textareas ----
-  function jobDescription() {
-    const sel = ATS === "lever" ? ".posting-page, .section-wrapper" : ".job__description, #content, main";
+  // ---------- AI answers ----------
+  function jobText() {
+    const sel = ATS === "lever" ? ".posting-page, .section-wrapper, main" : ".job__description, #content, main, body";
     const node = document.querySelector(sel) || document.body;
     return (node.innerText || "").slice(0, 6000);
   }
   function companyName() {
-    if (ATS === "lever") {
-      const m = location.pathname.split("/").filter(Boolean)[0];
-      return (m || "this company").replace(/-/g, " ");
-    }
     const seg = location.pathname.split("/").filter(Boolean);
-    return (seg[0] || "this company").replace(/-/g, " ");
+    return (seg[0] || document.title.split(" at ").pop() || "this company").replace(/-/g, " ");
+  }
+  function requestAi(question, store) {
+    const cacheKey = question + "|" + companyName();
+    if (aiCache.has(cacheKey)) return Promise.resolve(aiCache.get(cacheKey));
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: "ai", question, company: companyName(), jd: jobText(), profile: store.profile, ai: store.ai },
+        (resp) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          if (!resp || resp.error) return reject(new Error(resp ? resp.error : "no response"));
+          aiCache.set(cacheKey, resp.text); resolve(resp.text);
+        });
+    });
+  }
+  function template(label, profile) {
+    const t = profile.templates || {};
+    for (const k of Object.keys(t)) if (label.includes(k)) return t[k].replaceAll("{{company}}", companyName());
+    return (t.why || "").replaceAll("{{company}}", companyName());
   }
 
   function addAiButtons(store) {
@@ -70,75 +139,60 @@
       const label = fieldLabelText(ta);
       if (!looksLikeQuestion(label)) return;
       ta.dataset.isAi = "1";
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "is-ai-btn";
-      btn.textContent = store.ai.apiKey ? "✨ Draft answer" : "✨ Insert template";
-      btn.addEventListener("click", async () => {
-        btn.disabled = true; btn.textContent = "…thinking";
+      const bar = document.createElement("div"); bar.className = "is-ai-bar";
+      const gen = document.createElement("button");
+      gen.type = "button"; gen.className = "is-ai-btn";
+      gen.textContent = store.ai.apiKey ? "✨ Draft answer" : "✨ Insert template";
+      gen.addEventListener("click", async () => {
+        gen.disabled = true; const old = gen.textContent; gen.textContent = "… thinking";
         try {
-          let text;
-          if (store.ai.apiKey) {
-            text = await requestAi(label, companyName(), jobDescription(), store);
-          } else {
-            text = template(label, store.profile, companyName());
-          }
-          if (text) { setNativeValue(ta, text); }
-        } catch (e) {
-          toast("AI error: " + e.message);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = store.ai.apiKey ? "✨ Draft answer" : "✨ Insert template";
-        }
+          const text = store.ai.apiKey ? await requestAi(label, store) : template(label, store.profile);
+          if (text) setNative(ta, text);
+        } catch (e) { toast("AI error: " + e.message); }
+        finally { gen.disabled = false; gen.textContent = old; }
       });
-      ta.insertAdjacentElement("afterend", btn);
+      bar.appendChild(gen);
+      if (store.ai.apiKey) {
+        const re = document.createElement("button");
+        re.type = "button"; re.className = "is-ai-btn is-ghost"; re.textContent = "↻ Regenerate";
+        re.addEventListener("click", async () => {
+          aiCache.delete(label + "|" + companyName());
+          re.disabled = true; re.textContent = "…";
+          try { const text = await requestAi(label, store); if (text) setNative(ta, text); }
+          catch (e) { toast("AI error: " + e.message); }
+          finally { re.disabled = false; re.textContent = "↻ Regenerate"; }
+        });
+        bar.appendChild(re);
+      }
+      ta.insertAdjacentElement("afterend", bar);
     });
   }
 
-  function template(label, profile, company) {
-    const t = profile.templates || {};
-    for (const k of Object.keys(t)) if (label.includes(k)) return t[k].replaceAll("{{company}}", company);
-    return (t.why || "").replaceAll("{{company}}", company);
-  }
-
-  function requestAi(question, company, jd, store) {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(
-        { type: "ai", question, company, jd, profile: store.profile, ai: store.ai },
-        (resp) => {
-          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-          if (!resp || resp.error) return reject(new Error(resp ? resp.error : "no response"));
-          resolve(resp.text);
-        }
-      );
-    });
-  }
-
-  // ---- UI ----
+  // ---------- UI ----------
   function toast(msg) {
     let t = document.getElementById("is-toast");
     if (!t) { t = document.createElement("div"); t.id = "is-toast"; document.body.appendChild(t); }
     t.textContent = msg; t.classList.add("show");
-    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 4000);
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 5000);
   }
 
-  async function mountPanel() {
+  async function mount() {
     const store = await loadStore();
-    const panel = document.createElement("div");
-    panel.id = "is-panel";
-    panel.innerHTML = `<span class="is-logo">InternScout</span>
-      <button id="is-fill" type="button">Autofill this page</button>
-      <span class="is-hint">${ATS}</span>`;
-    document.body.appendChild(panel);
-    document.getElementById("is-fill").addEventListener("click", () => fillAll(store.profile));
+    if (!document.getElementById("is-panel")) {
+      const panel = document.createElement("div");
+      panel.id = "is-panel";
+      panel.innerHTML = `<span class="is-logo">InternScout</span>
+        <button id="is-fill" type="button">Autofill</button>
+        <span class="is-hint">${ATS}${store.ai.apiKey ? " · AI on" : ""}</span>`;
+      document.body.appendChild(panel);
+      document.getElementById("is-fill").addEventListener("click", () => fillAll(store.profile));
+    }
     addAiButtons(store);
-    // re-scan for late-rendered questions
     const mo = new MutationObserver(() => addAiButtons(store));
     mo.observe(document.body, { childList: true, subtree: true });
-
     chrome.runtime.onMessage.addListener((m) => { if (m.type === "fill") fillAll(store.profile); });
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountPanel);
-  else mountPanel();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
+  else mount();
 })();

@@ -37,9 +37,10 @@ const RULES = [
   [/graduat/, "grad_term"],
   [/gpa/, "gpa"],
   [/city|current location|where are you (based|located)|location/, "city"],
-  [/authoriz.*(work|employ)|legally authorized|eligible to work/, "work_authorized"],
+  [/authoriz.*(work|employ)|(work|employ).*authoriz|legally authorized|eligible to work/, "work_authorized"],
   [/sponsor/, "needs_sponsorship"],
-  [/how did you hear|referral source|how you heard/, "how_heard"]
+  [/how did you hear|referral source|how you heard/, "how_heard"],
+  [/country|nationality/, "country"]
 ];
 
 function matchProfileKey(labelText) {
