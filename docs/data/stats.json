@@ -1,1 +1,15 @@
-{"total":0,"open":0,"new":0,"generated_at":null,"profile":{"name":"CS/Quant · Summer 2027 · Boston","center_city":"Boston, MA","radius_miles":30.0,"include_remote":true,"terms":["Summer 2027"]}}
+{
+  "total": 7,
+  "open": 4,
+  "new": 7,
+  "generated_at": "2026-07-22T21:08:36.729046+00:00",
+  "profile": {
+    "name": "CS/Quant \u00b7 Summer 2027 \u00b7 Boston",
+    "center_city": "Boston, MA",
+    "radius_miles": 30.0,
+    "include_remote": true,
+    "terms": [
+      "Summer 2027"
+    ]
+  }
+}
