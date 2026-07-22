@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "InternScout Autofill",
+  "version": "0.1.0",
+  "description": "Rule-based autofill for Greenhouse/Lever job applications, with optional AI-drafted answers for free-text questions.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://boards.greenhouse.io/*",
+    "https://job-boards.greenhouse.io/*",
+    "https://*.greenhouse.io/*",
+    "https://jobs.lever.co/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": { "service_worker": "src/background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://boards.greenhouse.io/*",
+        "https://job-boards.greenhouse.io/*",
+        "https://*.greenhouse.io/*",
+        "https://jobs.lever.co/*"
+      ],
+      "js": ["src/profile.js", "src/matcher.js", "src/content.js"],
+      "css": ["src/inject.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options/options.html",
+  "action": { "default_popup": "popup/popup.html", "default_title": "InternScout Autofill" },
+  "icons": { "128": "icons/icon128.png" }
+}

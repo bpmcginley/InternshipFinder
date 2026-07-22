@@ -1,0 +1,49 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>InternScout Autofill — Options</title>
+<style>
+body{background:#0f1116;color:#e6e9ef;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:28px;max-width:760px}
+h1{font-size:20px;margin:0 0 4px} .sub{color:#98a2b3;margin-bottom:20px}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#98a2b3;margin:22px 0 10px;border-bottom:1px solid #2a2f3a;padding-bottom:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:12px;color:#98a2b3;margin-bottom:4px}
+input,select,textarea{width:100%;background:#1e222b;color:#e6e9ef;border:1px solid #2a2f3a;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box}
+textarea{min-height:80px;resize:vertical}
+.full{grid-column:1/3}
+button{background:#5b8cff;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;margin-top:18px}
+.saved{color:#2ecc71;margin-left:12px}
+.note{color:#98a2b3;font-size:12px;margin-top:6px}
+a{color:#5b8cff}
+</style></head><body>
+<h1>InternScout Autofill</h1>
+<div class="sub">Saved locally in your browser. Nothing is sent anywhere except AI calls you trigger (to Anthropic, with your key).</div>
+
+<h2>Profile</h2>
+<div class="grid">
+  <div><label>First name</label><input id="first_name"></div>
+  <div><label>Last name</label><input id="last_name"></div>
+  <div><label>Email</label><input id="email"></div>
+  <div><label>Phone</label><input id="phone"></div>
+  <div><label>City</label><input id="city" placeholder="Boston, MA"></div>
+  <div><label>LinkedIn URL</label><input id="linkedin"></div>
+  <div><label>GitHub URL</label><input id="github"></div>
+  <div><label>Website / portfolio</label><input id="website"></div>
+  <div><label>School</label><input id="school"></div>
+  <div><label>Degree</label><input id="degree" placeholder="B.S. Computer Science"></div>
+  <div><label>Major</label><input id="major"></div>
+  <div><label>Graduation</label><input id="grad_term" placeholder="May 2027"></div>
+  <div><label>GPA</label><input id="gpa"></div>
+  <div><label>Authorized to work in US?</label><select id="work_authorized"><option>Yes</option><option>No</option></select></div>
+  <div><label>Require sponsorship?</label><select id="needs_sponsorship"><option>No</option><option>Yes</option></select></div>
+  <div><label>How did you hear about us?</label><input id="how_heard"></div>
+  <div class="full"><label>Background (used to ground AI answers — 3–6 sentences)</label><textarea id="background"></textarea></div>
+</div>
+
+<h2>AI answers (optional)</h2>
+<div class="grid">
+  <div class="full"><label>Anthropic API key (leave blank to use canned templates only)</label><input id="apiKey" type="password" placeholder="sk-ant-..."></div>
+  <div><label>Model</label><input id="model" placeholder="claude-haiku-4-5-20251001"></div>
+</div>
+<div class="note">Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Stored only in this browser. Without a key, the ✨ button inserts your saved template instead.</div>
+
+<div><button id="save">Save</button><span class="saved" id="saved"></span></div>
+<script src="options.js"></script>
+</body></html>
