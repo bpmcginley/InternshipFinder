@@ -2,7 +2,8 @@
 // AI-draft buttons to open-ended questions. Never submits. React-select handling and the
 // native-setter trick were verified against a live Greenhouse form.
 (function () {
-  const ATS = location.hostname.includes("lever.co") ? "lever" : "greenhouse";
+  const ATS = location.hostname.includes("myworkdayjobs.com") ? "workday"
+    : location.hostname.includes("lever.co") ? "lever" : "greenhouse";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const aiCache = new Map();
 
@@ -192,6 +193,18 @@
     });
   }
 
+  async function runFill(profile) {
+    if (ATS === "workday" && typeof fillWorkday === "function") {
+      const r = await fillWorkday(profile);
+      const files = highlightFiles();
+      let msg = `Filled ${r.filled} field${r.filled === 1 ? "" : "s"}.`;
+      if (r.flagged || files) msg += ` ${r.flagged + (files ? 1 : 0)} highlighted to complete.`;
+      toast(msg + " Review before submitting.");
+      return;
+    }
+    return fillAll(profile);
+  }
+
   // ---------- UI ----------
   function toast(msg) {
     let t = document.getElementById("is-toast");
@@ -209,12 +222,12 @@
         <button id="is-fill" type="button">Autofill</button>
         <span class="is-hint">${ATS}${store.ai.apiKey ? " · AI on" : ""}</span>`;
       document.body.appendChild(panel);
-      document.getElementById("is-fill").addEventListener("click", () => fillAll(store.profile));
+      document.getElementById("is-fill").addEventListener("click", () => runFill(store.profile));
     }
     addAiButtons(store);
     const mo = new MutationObserver(() => addAiButtons(store));
     mo.observe(document.body, { childList: true, subtree: true });
-    chrome.runtime.onMessage.addListener((m) => { if (m.type === "fill") fillAll(store.profile); });
+    chrome.runtime.onMessage.addListener((m) => { if (m.type === "fill") runFill(store.profile); });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);

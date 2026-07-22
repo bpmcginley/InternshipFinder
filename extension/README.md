@@ -15,8 +15,8 @@ Greenhouse (Anduril's 2027 SWE Intern posting, including its react-select dropdo
    resume text + Anthropic API key for AI answers) → Save.
 
 ## Use
-Open an application on `job-boards.greenhouse.io`, `boards.greenhouse.io`, or
-`jobs.lever.co`. A bottom-right **InternScout** panel appears → **Autofill**:
+Open an application on `job-boards.greenhouse.io`, `boards.greenhouse.io`,
+`jobs.lever.co`, or `*.myworkdayjobs.com`. A bottom-right **InternScout** panel appears → **Autofill**:
 
 - **Filled automatically** (verified reliable): first/last name, email, phone, LinkedIn,
   GitHub, website, GPA, and other plain text/number fields.
@@ -39,8 +39,10 @@ the button inserts your saved template with `{{company}}` filled in.
 - **Never auto-submits**, never uploads files, never overrides a verified-wrong dropdown.
 - react-select automation is timing-sensitive; the verify-or-highlight approach means the
   worst case is "you pick a couple dropdowns yourself," never a wrong answer.
-- Covers Greenhouse + Lever. **Workday/Ashby are not yet supported** (v2) — several large
-  employers host on Workday.
+- Covers Greenhouse + Lever (verified live). **Workday is experimental** — it targets
+  Workday's stable `data-automation-id` fields on the "My Information" step (name, contact,
+  address, source), but Workday forms sit behind an account login and vary by tenant, so
+  verify per employer. **Ashby is not yet supported.**
 - Selector rules live in `src/matcher.js`; the react-select handling in `src/content.js`.
 
 ## Files

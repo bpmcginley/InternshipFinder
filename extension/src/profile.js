@@ -8,6 +8,10 @@ const DEFAULT_PROFILE = {
   phone: "",
   city: "",              // e.g. "Boston, MA"
   country: "United States",
+  address_line1: "",
+  city_only: "",
+  state: "",
+  postal_code: "",
   resume_text: "",       // paste resume text; grounds AI answers
   linkedin: "",
   github: "",

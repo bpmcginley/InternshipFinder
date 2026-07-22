@@ -1,4 +1,4 @@
-const PROFILE_FIELDS = ["first_name","last_name","email","phone","city","linkedin","github","website","school","degree","major","grad_term","gpa","work_authorized","needs_sponsorship","how_heard","background","country","resume_text"];
+const PROFILE_FIELDS = ["first_name","last_name","email","phone","city","linkedin","github","website","school","degree","major","grad_term","gpa","work_authorized","needs_sponsorship","how_heard","background","country","resume_text","address_line1","state","postal_code"];
 function load(){
   chrome.storage.local.get(["internscout","ai"],(d)=>{
     const p=d.internscout||{}, ai=d.ai||{};
