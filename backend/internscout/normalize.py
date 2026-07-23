@@ -58,7 +58,7 @@ def normalize(raw: dict) -> dict | None:
     if not is_internship(title, raw.get("employment_type", "")):
         return None
 
-    tags = classify(title, raw.get("description", ""))
+    tags = classify(title)  # title-only: avoids off-target tags from JD boilerplate
     if not tags:
         return None
 

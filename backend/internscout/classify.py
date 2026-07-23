@@ -17,7 +17,8 @@ RULES = [
     ("pm", r"product manager|\bpm\b|program manager|product management"),
 ]
 
-INTERN_RE = re.compile(r"intern|co-?op|new ?grad|university|campus|early career|apprentic", re.I)
+INTERN_RE = re.compile(r"\b(intern|internship|co-?op|new ?grad|early career|apprentice)\b", re.I)
+_NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b", re.I)
 
 
 def classify(title: str, description: str = "") -> list[str]:
@@ -33,4 +34,10 @@ def classify(title: str, description: str = "") -> list[str]:
 
 
 def is_internship(title: str, employment_type: str = "") -> bool:
-    return bool(INTERN_RE.search(f"{title} {employment_type or ''}"))
+    t = f"{title} {employment_type or ''}"
+    if not INTERN_RE.search(t):
+        return False
+    # e.g. "University Recruiter", "Intern Manager" are not internships
+    if _NON_INTERN_RE.search(title) and not re.search(r"\bintern(ship)?\b", title, re.I):
+        return False
+    return True
