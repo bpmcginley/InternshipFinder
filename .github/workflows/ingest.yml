@@ -35,7 +35,8 @@ jobs:
         working-directory: backend
         env:
           INTERNSCOUT_DB: ${{ github.workspace }}/internscout.db
-          INTERNSCOUT_GEOCODE: "1"     # resolve non-metro City,ST via OpenStreetMap
+          # Offline metro gazetteer (Boston + NYC/Chicago/Miami) keeps runs fast & reliable.
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}   # optional: enables Google Jobs search layer
         run: |
           python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data"
 
