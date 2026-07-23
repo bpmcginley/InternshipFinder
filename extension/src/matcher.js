@@ -37,8 +37,11 @@ const RULES = [
   [/graduat/, "grad_term"],
   [/gpa/, "gpa"],
   [/city|current location|where are you (based|located)|location/, "city"],
-  [/authoriz.*(work|employ)|(work|employ).*authoriz|legally authorized|eligible to work/, "work_authorized"],
+  // Order matters: check sponsorship FIRST — labels like "require work authorization
+  // sponsorship" contain both words, and the sponsorship answer (usually No) differs from
+  // the work-authorization answer (usually Yes). Mis-mapping here gives a wrong, harmful answer.
   [/sponsor/, "needs_sponsorship"],
+  [/authoriz.*(work|employ)|(work|employ).*authoriz|legally authorized|eligible to work/, "work_authorized"],
   [/how did you hear|referral source|how you heard/, "how_heard"],
   [/country|nationality/, "country"]
 ];
