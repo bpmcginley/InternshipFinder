@@ -12,6 +12,7 @@ from functools import lru_cache
 from .config import PROFILE
 
 REMOTE_RE = re.compile(r"\b(remote|anywhere|work from home|wfh)\b", re.I)
+IN_CITY = {"boston", "cambridge", "new york", "manhattan", "brooklyn", "chicago", "miami"}
 
 # Towns within ~30 mi of downtown Boston (approx coords). Used for the radius test
 # without needing a live geocoder.
@@ -44,6 +45,11 @@ US_CITIES = {
     "philadelphia": (39.9526, -75.1652), "houston": (29.7604, -95.3698),
     "san jose": (37.3382, -121.8863), "manchester": (42.9956, -71.4548),
     "nashua": (42.7654, -71.4676), "worcester": (42.2626, -71.8023),
+    "miami": (25.7617, -80.1918), "coral gables": (25.7215, -80.2684),
+    "jersey city": (40.7178, -74.0431), "brooklyn": (40.6782, -73.9442),
+    "stamford": (41.0534, -73.5387), "greenwich": (41.0262, -73.6282),
+    "evanston": (42.0451, -87.6877), "hoboken": (40.7439, -74.0324),
+    "manhattan": (40.7831, -73.9712),
 }
 
 
@@ -91,37 +97,38 @@ def _nominatim(loc: str):
 
 
 def evaluate_locations(locations: list[str]):
-    """Given raw location strings, return dict describing geo relevance vs. profile.
-
-    Keys: is_remote, within_radius, best_distance, lat, lng, in_city, location_raw
-    """
+    """Return geo relevance vs. the profile's metros (Boston + quant hubs)."""
     locations = locations or []
     joined = "; ".join(locations)
     is_remote = any(REMOTE_RE.search(l) for l in locations) or bool(REMOTE_RE.search(joined))
 
-    best = None  # (distance, lat, lng, in_city)
+    metros = getattr(PROFILE, "metros", (("Boston", PROFILE.center_lat, PROFILE.center_lng, PROFILE.radius_miles),))
+    best = None  # (distance, lat, lng, in_city, metro_name)
     for loc in locations:
         coords = geocode(loc)
         if not coords:
             continue
-        d = haversine_miles(PROFILE.center_lat, PROFILE.center_lng, coords[0], coords[1])
-        in_city = _city_key(loc) in {"boston", "cambridge"}
-        if best is None or d < best[0]:
-            best = (d, coords[0], coords[1], in_city)
+        for (mname, mlat, mlng, mrad) in metros:
+            d = haversine_miles(mlat, mlng, coords[0], coords[1])
+            within = d <= mrad
+            in_city = _city_key(loc) in IN_CITY
+            cand = (d, coords[0], coords[1], in_city, mname, within)
+            if best is None or d < best[0]:
+                best = cand
 
     within = False
     dist = lat = lng = None
     in_city = False
+    metro = None
     if best:
-        dist, lat, lng, in_city = best
-        within = dist <= PROFILE.radius_miles
+        dist, lat, lng, in_city, metro, within = best
     return {
         "is_remote": is_remote,
         "within_radius": within,
         "best_distance": dist,
-        "lat": lat,
-        "lng": lng,
+        "lat": lat, "lng": lng,
         "in_city": in_city,
+        "metro": metro,
         "location_raw": joined,
     }
 

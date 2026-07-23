@@ -137,7 +137,7 @@ function App(){
     <div>
       <header>
         <h1>InternScout</h1>
-        <span className="sub">{meta? `${meta.profile.name} · within ${meta.profile.radius_miles}mi of ${meta.profile.center_city}${meta.profile.include_remote?" · remote incl.":""} · updated ${gen}`:"loading…"}</span>
+        <span className="sub">{meta? `${meta.profile.name} · ${(meta.profile.metros&&meta.profile.metros.length)?meta.profile.metros.join(", "):meta.profile.center_city}${meta.profile.include_remote?" + remote":""} · updated ${gen}`:"loading…"}</span>
       </header>
       <div className="wrap">
         <div className="cards">

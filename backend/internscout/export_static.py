@@ -55,6 +55,7 @@ def export(out_dir: str) -> dict:
                 "radius_miles": PROFILE.radius_miles,
                 "include_remote": PROFILE.include_remote,
                 "terms": [f"{s} {y}" for s, y in PROFILE.terms],
+                "metros": [m[0] for m in getattr(PROFILE, "metros", [])],
             },
         }
     with open(os.path.join(out_dir, "listings.json"), "w") as f:

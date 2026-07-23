@@ -19,6 +19,8 @@ GREENHOUSE = [
     {"name": "PDT Partners", "ats_token": "pdtpartners", "is_quant_target": True},
     {"name": "TransMarket Group", "ats_token": "transmarketgroup", "is_quant_target": True},
     {"name": "Vatic Labs", "ats_token": "vaticlabs", "is_quant_target": True},
+    {"name": "Walleye Capital", "ats_token": "walleyecapital-external-students", "is_quant_target": True},
+    {"name": "Weiss Asset Management", "ats_token": "weissassetmanagement", "is_quant_target": True},
 
     # ---- Boston-area / tech (verified live) ----
     {"name": "Datadog", "ats_token": "datadog", "is_quant_target": False},
