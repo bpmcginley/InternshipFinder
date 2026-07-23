@@ -96,13 +96,18 @@ function App(){
   const [err,setErr]=useState(null);
   const [states,setStates]=useState(loadStates);
   const [f,setF]=useState({q:"",field:"",location:"",status:"open",app_state:"",new_only:false,sort:"score"});
+  const [token,setToken]=useState(()=>{try{return localStorage.getItem("internscout.gh_token")||""}catch(e){return ""}});
+  const [busy,setBusy]=useState("");
 
-  useEffect(()=>{
-    Promise.all([
-      fetch(DATA+"listings.json").then(r=>r.json()),
-      fetch(DATA+"stats.json").then(r=>r.json())
-    ]).then(([ls,st])=>{setAll(ls);setMeta(st)}).catch(e=>setErr(String(e)));
-  },[]);
+  const RAW="https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/";
+  const loadData=(fromRaw)=>{
+    const base=fromRaw?RAW:DATA, bust="?t="+Date.now();
+    return Promise.all([
+      fetch(base+"listings.json"+bust).then(r=>r.json()),
+      fetch(base+"stats.json"+bust).then(r=>r.json())
+    ]).then(([ls,st])=>{setAll(ls);setMeta(st)});
+  };
+  useEffect(()=>{loadData().catch(e=>setErr(String(e)))},[]);
 
   const setState=(id,v)=>{
     setStates(m=>{const n={...m,[id]:v}; if(v==="none")delete n[id]; saveStates(n); return n;});
@@ -130,6 +135,39 @@ function App(){
     const applied=all.filter(x=>st(x.id)==="applied").length;
     return meta?{...meta,applied}:{total:0,open:0,new:0,applied};
   },[all,meta,states]);
+
+  const REPO="bpmcginley/InternshipFinder", WF="ingest.yml";
+  async function refresh(){
+    let t=token;
+    if(!t){
+      t=(window.prompt("Paste your GitHub fine-grained token (Actions: Read and write on InternshipFinder). It's stored only in this browser and sent only to github.com.")||"").trim();
+      if(!t) return;
+      localStorage.setItem("internscout.gh_token",t); setToken(t);
+    }
+    const H={Authorization:"Bearer "+t,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};
+    try{
+      setBusy("Starting scrape…");
+      const before=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=1`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
+      const beforeId=(before.workflow_runs&&before.workflow_runs[0])?before.workflow_runs[0].id:0;
+      const disp=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/dispatches`,{method:"POST",headers:H,body:JSON.stringify({ref:"main"})});
+      if(disp.status===401){localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token rejected — click Refresh to re-enter it.");return;}
+      if(disp.status!==204){setBusy("Couldn't start (HTTP "+disp.status+"). Check the token's permissions.");return;}
+      setBusy("Scraping… 1–2 min.");
+      for(let i=0;i<60;i++){
+        await new Promise(r=>setTimeout(r,5000));
+        const runs=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=5`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
+        const run=(runs.workflow_runs||[]).find(x=>x.id>beforeId);
+        if(!run) continue;
+        if(run.status!=="completed"){setBusy("Scraping… ("+String(run.status).replace("_"," ")+")");continue;}
+        if(run.conclusion!=="success"){setBusy("Run finished: "+run.conclusion+" — see the Actions tab.");return;}
+        setBusy("Loading fresh results…");
+        await new Promise(r=>setTimeout(r,3000));
+        await loadData(true);
+        setBusy("Updated ✓"); setTimeout(()=>setBusy(""),4000); return;
+      }
+      setBusy("Still running — hit your browser Reload in a minute.");
+    }catch(e){setBusy("Error: "+e.message);}
+  }
 
   const gen = meta&&meta.generated_at? new Date(meta.generated_at).toLocaleString():"never (run the ingester)";
 
@@ -169,6 +207,9 @@ function App(){
           <select value={f.sort} onChange={e=>upd("sort",e.target.value)}>
             <option value="score">Sort: score</option><option value="new">Sort: newest</option><option value="company">Sort: company</option>
           </select>
+          <button onClick={refresh} disabled={!!busy} title="Run the scraper now (triggers the GitHub Action)">⟳ Refresh listings</button>
+          {token&&<button onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token cleared.");}} title="Forget saved token" style={{opacity:.7}}>⨯ token</button>}
+          {busy&&<span className="muted" style={{fontSize:12}}>{busy}</span>}
         </div>
         {err? <div className="empty">Couldn't load data: {err}</div> :
          all.length===0? <div className="empty">No listings yet. The GitHub Action will populate <code>docs/data/listings.json</code> on its first run (or run <code>python -m internscout.run_ingest --export docs/data</code> locally and push).</div> :
