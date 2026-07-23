@@ -20,6 +20,10 @@ const DEFAULT_PROFILE = {
   degree: "",            // e.g. "B.S. Computer Science"
   major: "",
   grad_term: "",         // e.g. "May 2027"
+  edu_start_month: "",   // education start, e.g. "September"
+  edu_start_year: "",    // e.g. "2025"
+  edu_end_month: "",     // education end / graduation, e.g. "May"
+  edu_end_year: "",      // e.g. "2028"
   gpa: "",
   work_authorized: "Yes",     // authorized to work in the US?
   needs_sponsorship: "No",    // require visa sponsorship?

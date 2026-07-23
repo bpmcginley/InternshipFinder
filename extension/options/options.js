@@ -1,4 +1,4 @@
-const PROFILE_FIELDS = ["first_name","last_name","email","phone","city","linkedin","github","website","school","degree","major","grad_term","gpa","work_authorized","needs_sponsorship","how_heard","background","country","resume_text","address_line1","state","postal_code"];
+const PROFILE_FIELDS = ["first_name","last_name","email","phone","city","linkedin","github","website","school","degree","major","grad_term","edu_start_month","edu_start_year","edu_end_month","edu_end_year","gpa","work_authorized","needs_sponsorship","how_heard","background","country","resume_text","address_line1","state","postal_code"];
 
 function getStored(keys){ return new Promise(res=>chrome.storage.local.get(keys, res)); }
 function readFile(inputEl){
