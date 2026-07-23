@@ -49,6 +49,13 @@ a{color:#5b8cff}
 </div>
 <div class="note">Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Stored only in this browser. Without a key, the ✨ button inserts your saved template instead.</div>
 
+<h2>Documents (auto-attach)</h2>
+<div class="grid">
+  <div class="full"><label>Résumé — auto-attached to resume/CV upload fields</label><input id="resume_file" type="file" accept=".pdf,.doc,.docx,.txt,.rtf"><div class="note" id="resume_status"></div></div>
+  <div class="full"><label>Transcript — auto-attached to transcript / GPA upload fields</label><input id="transcript_file" type="file" accept=".pdf,.doc,.docx,.txt,.rtf"><div class="note" id="transcript_status"></div></div>
+</div>
+<div class="note">Files are stored only in this browser. On an application page, Autofill sets them on matching upload fields; if a site blocks scripted uploads, the field is highlighted so you attach it manually.</div>
+
 <div><button id="save">Save</button><span class="saved" id="saved"></span></div>
 <script src="options.js"></script>
 </body></html>

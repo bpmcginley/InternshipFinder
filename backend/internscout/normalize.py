@@ -18,6 +18,30 @@ def parse_term_from_text(text: str):
     year = int(y.group(1)) if y else None
     return season, year
 
+_SALARY_RE = re.compile(
+    r'\$\s?\d[\d,]*(?:\.\d+)?\s?[kK]?'
+    r'(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?'
+    r'(?:\s?(?:/|per\s)?\s?(?:hour|hr|year|yr|annum|annually|month|mo|week|wk|day))?',
+    re.I)
+_DURATION_RE = re.compile(r'\b(\d{1,2})\s?[-\u2013]?\s?week', re.I)
+
+
+def extract_salary(text: str):
+    text = text or ""
+    for m in _SALARY_RE.finditer(text):
+        val = re.sub(r"\s+", " ", m.group(0)).strip()
+        low = val.lower()
+        has_unit = any(u in low for u in ("hour", "hr", "year", "yr", "annum", "month", "mo", "week", "wk", "day", "k"))
+        digits = re.sub(r"[^\d]", "", val.split("-")[0])
+        if has_unit or (digits.isdigit() and int(digits) >= 1000):
+            return val[:120]
+    return None
+
+
+def extract_duration(text: str):
+    m = _DURATION_RE.search(text or "")
+    return f"{m.group(1)} weeks" if m else None
+
 _WS = re.compile(r"\s+")
 _NOISE = re.compile(r"[\(\)\[\]\-–—:,/|]+")
 _SUFFIX = re.compile(
@@ -62,6 +86,7 @@ def normalize(raw: dict) -> dict | None:
     if not tags:
         return None
 
+    _blob = f"{title} {raw.get('description','') or ''}"
     geo = evaluate_locations(raw.get("locations") or [])
     season = raw.get("season")
     year = raw.get("year")
@@ -85,6 +110,8 @@ def normalize(raw: dict) -> dict | None:
         "year": year,
         "term": term,
         "employment_type": "internship",
+        "salary": raw.get("salary") or extract_salary(_blob),
+        "duration": extract_duration(_blob),
         "locations": raw.get("locations") or [],
         "geo": geo,
         "location_raw": geo["location_raw"],

@@ -35,6 +35,8 @@ class Listing(Base):
     year: Mapped[int | None] = mapped_column(Integer)
     term: Mapped[str | None] = mapped_column(String(32), index=True)   # "Summer 2027"
     employment_type: Mapped[str | None] = mapped_column(String(32), default="internship")
+    salary: Mapped[str | None] = mapped_column(String(120))
+    duration: Mapped[str | None] = mapped_column(String(60))
     location_raw: Mapped[str | None] = mapped_column(String(400))
     lat: Mapped[float | None] = mapped_column(Float)
     lng: Mapped[float | None] = mapped_column(Float)

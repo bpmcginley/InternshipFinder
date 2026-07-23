@@ -35,10 +35,11 @@ const AI_DEFAULTS = { apiKey: "", model: "claude-haiku-4-5-20251001", provider: 
 
 function loadStore() {
   return new Promise((res) => {
-    chrome.storage.local.get(["internscout", "ai"], (d) => {
+    chrome.storage.local.get(["internscout", "ai", "files"], (d) => {
       res({
         profile: Object.assign({}, DEFAULT_PROFILE, d.internscout || {}),
-        ai: Object.assign({}, AI_DEFAULTS, d.ai || {})
+        ai: Object.assign({}, AI_DEFAULTS, d.ai || {}),
+        files: d.files || {}
       });
     });
   });
