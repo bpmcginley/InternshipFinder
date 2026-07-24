@@ -22,7 +22,7 @@ function fieldLabelText(el) {
 }
 
 // Ordered rules: first match wins. Returns a profile key or null.
-const RULES = [
+var RULES = [
   [/first name|given name/, "first_name"],
   [/last name|family name|surname/, "last_name"],
   [/full name|^name$|\byour name\b|legal name/, "full_name"],

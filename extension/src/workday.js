@@ -6,7 +6,7 @@
 // fill text via the native-setter trick, best-effort the dropdowns, and highlight anything
 // consequential (Yes/No radios, work auth) for the user.
 
-const WD_RULES = [
+var WD_RULES = [
   { re: /firstName/i, key: "first_name", kind: "text" },
   { re: /lastName/i, key: "last_name", kind: "text" },
   { re: /(^|-)email/i, key: "email", kind: "text" },
@@ -19,7 +19,7 @@ const WD_RULES = [
   { re: /source/i, key: "how_heard", kind: "dropdown" },
 ];
 
-const wdSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var wdSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function wdSet(el, value) {
   const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

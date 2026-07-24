@@ -1,6 +1,6 @@
 // Default profile schema. Edit values in the extension's Options page.
 // Stored in chrome.storage.local under key "internscout".
-const DEFAULT_PROFILE = {
+var DEFAULT_PROFILE = {
   first_name: "",
   last_name: "",
   full_name: "",
@@ -35,7 +35,7 @@ const DEFAULT_PROFILE = {
     "why": "I'm excited about {{company}} because the work aligns closely with my background in software and quantitative problem-solving, and I'm eager to contribute and learn from a strong team."
   }
 };
-const AI_DEFAULTS = { apiKey: "", model: "claude-haiku-4-5-20251001", provider: "anthropic" };
+var AI_DEFAULTS = { apiKey: "", model: "claude-haiku-4-5-20251001", provider: "anthropic" };
 
 function loadStore() {
   return new Promise((res) => {
