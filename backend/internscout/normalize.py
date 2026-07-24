@@ -50,15 +50,35 @@ _SUFFIX = re.compile(
 )
 
 
+# Strip legal-entity suffixes and program words so company-name variants collapse
+# ("Walleye Capital", "Walleye Capital, LLC", "Walleye Capital Internships" -> "walleye capital").
+_COMPANY_STRIP = re.compile(
+    r"\b(l\.?l\.?c\.?|inc\.?|incorporated|corp\.?|corporation|ltd\.?|"
+    r"limited partnership|limited|l\.?p\.?|plc|gmbh|internships?|internship program|"
+    r"careers|external students|students)\b", re.I)
+# Trailing location on titles ("... Intern Boston, MA" / "... United States").
+_TITLE_TAILS = re.compile(r"[\s,]*(united states|u\.?s\.?a?\.?)\s*$", re.I)
+_TITLE_LOC = re.compile(r"[\s,]*[a-z][a-z]+(?:\s[a-z]+){0,2},\s*[a-z]{2}\s*$", re.I)
+
+
+def normalize_company(name: str) -> str:
+    n = (name or "").lower()
+    n = _COMPANY_STRIP.sub(" ", n)
+    n = re.sub(r"[^a-z0-9 ]+", " ", n)
+    return re.sub(r"\s+", " ", n).strip()
+
+
 def normalize_title(title: str) -> str:
     t = title.lower()
+    t = _TITLE_TAILS.sub(" ", t)
+    t = _TITLE_LOC.sub(" ", t)
     t = _SUFFIX.sub(" ", t)
     t = _NOISE.sub(" ", t)
     return _WS.sub(" ", t).strip()
 
 
 def make_dedupe_key(company: str, title: str, season: str | None, year: int | None) -> str:
-    return f"{company.strip().lower()}|{normalize_title(title)}|{(season or '').lower()}|{year or ''}"
+    return f"{normalize_company(company)}|{normalize_title(title)}|{(season or '').lower()}|{year or ''}"
 
 
 def _to_dt(ts):
