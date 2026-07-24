@@ -263,6 +263,68 @@
     return fillAll(profile);
   }
 
+  // ---------- AI form mapping (works on ANY site) ----------
+  // Scan the DOM for fillable fields, send their labels/types/options to Claude, and apply
+  // the returned mapping. No per-site programming needed.
+  function collectFields() {
+    const fields = [];
+    let idx = 0;
+    for (const el of document.querySelectorAll("input, select, textarea")) {
+      if (["hidden", "submit", "button", "file", "image", "reset", "search", "password"].includes(el.type) || el.disabled) continue;
+      if (el.offsetParent === null) continue;                 // not visible
+      if (el.type === "checkbox" || el.type === "radio") continue;
+      el.setAttribute("data-is-idx", String(idx));
+      let options = null;
+      if (el.tagName === "SELECT") options = [...el.options].map((o) => o.text.trim()).filter(Boolean).slice(0, 50);
+      fields.push({
+        idx, tag: el.tagName.toLowerCase(), type: el.type || "",
+        label: getQuestionText(el).slice(0, 140), name: (el.name || "").slice(0, 40),
+        isSelect: el.tagName === "SELECT" || isReactSelectInput(el),
+        options, filled: !!el.value
+      });
+      idx++;
+    }
+    return fields;
+  }
+
+  async function applyFills(fills) {
+    let filled = 0, flagged = 0;
+    for (const item of fills) {
+      const el = document.querySelector(`[data-is-idx="${item.idx}"]`);
+      const value = item && item.value;
+      if (!el || !value) continue;
+      try {
+        if (el.tagName === "SELECT") {
+          if (fillNativeSelect(el, value)) filled++; else { highlightNeedsInput(el); hintChip(el, value); flagged++; }
+        } else if (isReactSelectInput(el)) {
+          const shown = await fillReactSelect(el, value);
+          const ok = shown && (shown.toLowerCase().includes(String(value).toLowerCase()) || String(value).toLowerCase().includes(shown.toLowerCase()));
+          if (ok) filled++; else { highlightNeedsInput(el); hintChip(el, value); flagged++; }
+        } else {
+          setNative(el, value); filled++;
+        }
+      } catch (e) { /* continue */ }
+    }
+    return { filled, flagged };
+  }
+
+  async function aiFill(store) {
+    if (!store.ai.apiKey) { toast("Add your Anthropic API key in Options to use AI Autofill."); return; }
+    toast("AI scanning the form…");
+    const fields = collectFields();
+    if (!fields.length) { toast("No fillable fields found on this page."); return; }
+    let resp;
+    try {
+      resp = await new Promise((res, rej) => chrome.runtime.sendMessage(
+        { type: "map_fields", fields, profile: store.profile, ai: store.ai },
+        (r) => { if (chrome.runtime.lastError) rej(new Error(chrome.runtime.lastError.message)); else res(r); }));
+    } catch (e) { toast("AI error: " + e.message); return; }
+    if (!resp || resp.error) { toast("AI error: " + ((resp && resp.error) || "no response")); return; }
+    const { filled, flagged } = await applyFills(resp.fills || []);
+    const f = attachFiles({ files: (STORE && STORE.files) || {} });
+    toast(`AI filled ${filled + f.attached} field(s).${(flagged + f.missing) ? " " + (flagged + f.missing) + " highlighted (pick suggested / attach files)." : ""} Review before submitting.`);
+  }
+
   // ---------- UI ----------
   function toast(msg) {
     let t = document.getElementById("is-toast");
@@ -272,23 +334,34 @@
   }
 
   async function mount() {
+    if (window.__internscoutMounted) return;      // guard against double injection
+    window.__internscoutMounted = true;
     const store = await loadStore();
     STORE = store;
+    const known = /greenhouse\.io|lever\.co|myworkdayjobs\.com/.test(location.hostname);
     if (!document.getElementById("is-panel")) {
       const panel = document.createElement("div");
       panel.id = "is-panel";
+      const aiBtn = store.ai.apiKey ? `<button id="is-aifill" type="button">🧠 AI Autofill</button>` : "";
       panel.innerHTML = `<span class="is-logo">InternScout</span>
-        <button id="is-fill" type="button">Autofill</button>
-        <span class="is-hint">${ATS}${store.ai.apiKey ? " · AI on" : ""}</span>`;
+        ${known ? `<button id="is-fill" type="button">Autofill</button>` : ""}
+        ${aiBtn}
+        <span class="is-hint">${known ? ATS : "any site"}${store.ai.apiKey ? " · AI on" : ""}</span>`;
       document.body.appendChild(panel);
-      document.getElementById("is-fill").addEventListener("click", () => runFill(store.profile));
+      const fb = document.getElementById("is-fill");
+      if (fb) fb.addEventListener("click", () => runFill(store.profile));
+      const ab = document.getElementById("is-aifill");
+      if (ab) ab.addEventListener("click", () => aiFill(store));
     }
     addAiButtons(store);
     const mo = new MutationObserver(() => addAiButtons(store));
     mo.observe(document.body, { childList: true, subtree: true });
     // Backstop: catch dynamically-revealed textareas (e.g. cover letter "Enter manually").
     document.addEventListener("focusin", (e) => { if (e.target && e.target.tagName === "TEXTAREA") addAiButtons(store); });
-    chrome.runtime.onMessage.addListener((m) => { if (m.type === "fill") runFill(store.profile); });
+    chrome.runtime.onMessage.addListener((m) => {
+      if (m.type === "fill") runFill(store.profile);
+      if (m.type === "aifill") aiFill(store);
+    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
