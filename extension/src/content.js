@@ -328,9 +328,27 @@
   // ---------- UI ----------
   function toast(msg) {
     let t = document.getElementById("is-toast");
-    if (!t) { t = document.createElement("div"); t.id = "is-toast"; document.body.appendChild(t); }
+    if (!t) { t = document.createElement("div"); t.id = "is-toast"; (document.documentElement || document.body).appendChild(t); }
     t.textContent = msg; t.classList.add("show");
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 6000);
+  }
+
+  // Build/re-attach the panel. Attaches to <html> (outside <body>) so the site's React
+  // re-renders can't remove it; re-created by the observer if it ever goes missing.
+  function ensurePanel(store, known) {
+    if (document.getElementById("is-panel")) return;
+    const panel = document.createElement("div");
+    panel.id = "is-panel";
+    const aiBtn = store.ai.apiKey ? `<button id="is-aifill" type="button">🧠 AI Autofill</button>` : "";
+    panel.innerHTML = `<span class="is-logo">InternScout</span>
+      ${known ? `<button id="is-fill" type="button">Autofill</button>` : ""}
+      ${aiBtn}
+      <span class="is-hint">${known ? ATS : "any site"}${store.ai.apiKey ? " · AI on" : ""}</span>`;
+    (document.documentElement || document.body).appendChild(panel);
+    const fb = panel.querySelector("#is-fill");
+    if (fb) fb.addEventListener("click", () => runFill(store.profile));
+    const ab = panel.querySelector("#is-aifill");
+    if (ab) ab.addEventListener("click", () => aiFill(store));
   }
 
   async function mount() {
@@ -339,24 +357,15 @@
     const store = await loadStore();
     STORE = store;
     const known = /greenhouse\.io|lever\.co|myworkdayjobs\.com/.test(location.hostname);
-    if (!document.getElementById("is-panel")) {
-      const panel = document.createElement("div");
-      panel.id = "is-panel";
-      const aiBtn = store.ai.apiKey ? `<button id="is-aifill" type="button">🧠 AI Autofill</button>` : "";
-      panel.innerHTML = `<span class="is-logo">InternScout</span>
-        ${known ? `<button id="is-fill" type="button">Autofill</button>` : ""}
-        ${aiBtn}
-        <span class="is-hint">${known ? ATS : "any site"}${store.ai.apiKey ? " · AI on" : ""}</span>`;
-      document.body.appendChild(panel);
-      const fb = document.getElementById("is-fill");
-      if (fb) fb.addEventListener("click", () => runFill(store.profile));
-      const ab = document.getElementById("is-aifill");
-      if (ab) ab.addEventListener("click", () => aiFill(store));
-    }
+    ensurePanel(store, known);
     addAiButtons(store);
-    const mo = new MutationObserver(() => addAiButtons(store));
-    mo.observe(document.body, { childList: true, subtree: true });
-    // Backstop: catch dynamically-revealed textareas (e.g. cover letter "Enter manually").
+    // Re-attach the panel and (re)scan textareas whenever the page mutates (React re-renders).
+    let scheduled = false;
+    const mo = new MutationObserver(() => {
+      if (scheduled) return; scheduled = true;
+      setTimeout(() => { scheduled = false; ensurePanel(store, known); addAiButtons(store); }, 300);
+    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
     document.addEventListener("focusin", (e) => { if (e.target && e.target.tagName === "TEXTAREA") addAiButtons(store); });
     chrome.runtime.onMessage.addListener((m) => {
       if (m.type === "fill") runFill(store.profile);
