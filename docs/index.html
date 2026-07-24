@@ -9,162 +9,191 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   :root{
-    --bg:#0d1117; --surface:#161b22; --surface2:#0f141a; --line:#30363d; --line2:#21262d;
-    --txt:#e6edf3; --mut:#8b949e; --dim:#6e7681;
-    --accent:#2f81f7; --green:#3fb950; --red:#f85149; --amber:#d29922; --violet:#a371f7;
-    --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
-    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --bg:#0a0c0f; --surface:#0f1216; --surface2:#0c0e12; --line:#1c2127; --line2:#161a1f;
+    --txt:#dfe4ea; --mut:#828b96; --dim:#5a626c;
+    --accent:#d8a657; --accent2:#7aa2c9; --green:#7fb069; --red:#d16a63;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
-  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  a{color:var(--accent2);text-decoration:none} a:hover{color:var(--accent)}
+  button{font-family:var(--sans)}
 
-  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface2)}
-  header .brand{font-weight:700;font-size:15px;letter-spacing:.5px}
-  header .brand b{color:var(--accent)}
-  header .meta{color:var(--mut);font:11.5px/1.4 var(--mono)}
-  .wrap{padding:16px 20px;max-width:1560px;margin:0 auto}
+  header{display:flex;align-items:center;gap:20px;padding:0 20px;height:48px;border-bottom:1px solid var(--line);background:var(--surface2)}
+  .brand{font-weight:600;font-size:14px;letter-spacing:2px;text-transform:uppercase}
+  .brand b{color:var(--accent);font-weight:600}
+  .meta{color:var(--dim);font:11px/1.4 var(--mono);letter-spacing:.3px}
 
-  .cards{display:flex;gap:1px;margin-bottom:16px;border:1px solid var(--line);background:var(--line);width:fit-content}
-  .card{background:var(--surface);padding:10px 18px;min-width:96px}
-  .card .n{font:600 20px/1 var(--mono);letter-spacing:-.5px}
-  .card .l{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.8px;margin-top:5px}
+  .wrap{padding:0}
+  .statbar{display:flex;border-bottom:1px solid var(--line);background:var(--surface2)}
+  .stat{padding:10px 20px;border-right:1px solid var(--line)}
+  .stat .n{font:600 18px/1 var(--mono);letter-spacing:-.5px}
+  .stat .l{color:var(--dim);font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;margin-top:5px}
 
-  .controls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-  input,select,button{background:var(--surface);color:var(--txt);border:1px solid var(--line);border-radius:2px;
-    padding:6px 9px;font-size:12.5px;font-family:var(--sans);height:30px}
-  input:focus,select:focus{outline:none;border-color:var(--accent)}
-  input[type=text]{min-width:230px}
-  button{cursor:pointer;background:var(--surface);color:var(--txt)}
-  button:hover:not(:disabled){border-color:var(--dim);background:#1c2128}
-  button:disabled{opacity:.55;cursor:default}
-  button.primary{background:#1f6feb;border-color:#1f6feb;color:#fff;font-weight:600}
-  button.primary:hover:not(:disabled){background:#388bfd}
-  label.chk{color:var(--mut);display:inline-flex;align-items:center;gap:5px;font-size:12px}
+  .controls{display:flex;gap:0;align-items:stretch;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+  .ctl{border-right:1px solid var(--line);display:flex;align-items:center;position:relative}
+  .ctl input,.ctl select{background:transparent;color:var(--txt);border:0;padding:0 12px;height:38px;font-size:12.5px;font-family:var(--sans);outline:none}
+  .ctl input::placeholder{color:var(--dim)}
+  .ctl select{cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:26px}
+  .ctl.sel::after{content:"\25BE";position:absolute;right:9px;color:var(--dim);font-size:10px;pointer-events:none}
+  .ctl.grow{flex:1;min-width:180px}
+  .chk{display:inline-flex;align-items:center;gap:6px;color:var(--mut);font-size:12px;padding:0 12px;cursor:pointer}
+  .btn{background:transparent;border:0;color:var(--txt);height:38px;padding:0 14px;font-size:12px;cursor:pointer;font-weight:500}
+  .btn:hover:not(:disabled){background:#141922} .btn:disabled{opacity:.5;cursor:default}
+  .btn.go{color:var(--accent);font-weight:600}
+  .status{color:var(--accent);font:11px/1 var(--mono);padding:0 12px;white-space:nowrap}
 
-  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);font-size:12.5px}
-  thead th{position:sticky;top:0;background:var(--surface2);color:var(--dim);font-size:10px;text-transform:uppercase;
-    letter-spacing:.7px;font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
-  tbody td{padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:top}
-  tbody tr:nth-child(even){background:#0f141a}
-  tbody tr:hover td{background:#182029}
+  /* multiselect */
+  .ms{min-width:210px}
+  .ms .box{display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:5px 10px;min-height:38px;cursor:text;width:100%}
+  .ms input{background:transparent;border:0;outline:none;color:var(--txt);font-size:12.5px;min-width:70px;flex:1;height:24px}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:#171d25;border:1px solid var(--line);color:var(--txt);
+    font:11px/1 var(--mono);padding:3px 6px;white-space:nowrap}
+  .chip b{cursor:pointer;color:var(--dim)} .chip b:hover{color:var(--red)}
+  .ph{color:var(--dim);font-size:12.5px}
+  .drop{position:absolute;top:100%;left:0;z-index:50;min-width:100%;max-height:260px;overflow:auto;
+    background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .opt{padding:7px 12px;font-size:12.5px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line2)}
+  .opt:hover,.opt.act{background:#141922;color:var(--accent)}
+  .opt .c{color:var(--dim);font:10px/1 var(--mono);float:right;margin-left:16px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{position:sticky;top:0;background:var(--surface2);color:var(--dim);font-size:9.5px;text-transform:uppercase;
+    letter-spacing:1px;font-weight:600;text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--line2);vertical-align:top}
+  tbody tr:hover td{background:#11151b}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-  .co{font-weight:600;color:var(--txt)}
-  .role{color:var(--mut);font-size:11.5px;margin-top:2px}
-  .posted{color:var(--dim);font:11px/1 var(--mono);margin-top:3px}
-
+  .co{font-weight:600} .role{color:var(--mut);font-size:11.5px;margin-top:2px}
+  .posted{color:var(--dim);font:10.5px/1 var(--mono);margin-top:3px}
   .score{font:600 13px/1 var(--mono)}
-  .score.hi{color:var(--green)} .score.mid{color:var(--amber)} .score.lo{color:var(--dim)}
-
-  .tag{display:inline-block;padding:1px 6px;margin:0 3px 2px 0;border:1px solid var(--line);border-radius:2px;
-    font:10px/1.5 var(--mono);color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
-  .tag.quant{border-color:#9e6a03;color:var(--amber);background:rgba(210,153,34,.08)}
-  .tag.swe{border-color:#1f6feb;color:#79c0ff;background:rgba(47,129,247,.08)}
-
-  .pill{font:10px/1.6 var(--mono);padding:1px 7px;border:1px solid var(--line);border-radius:2px;text-transform:uppercase;letter-spacing:.5px}
-  .pill.open{color:var(--green);border-color:#1f6f3f} .pill.closed{color:var(--red);border-color:#6f2723}
-  .new{background:var(--accent);color:#fff;font:9px/1.4 var(--mono);padding:1px 5px;margin-left:6px;border-radius:2px;letter-spacing:.5px}
-
-  .loc-city{color:var(--green)} .loc-remote{color:#79c0ff} .loc-dist{color:var(--txt)}
-  .comp{font-family:var(--mono);color:var(--green)} .comp-none{color:var(--dim)}
-  .dur{color:var(--dim);font:10.5px/1 var(--mono);margin-top:2px}
-  .term{font-family:var(--mono);font-size:11.5px}
-
-  select.state{height:26px;padding:2px 6px;font-size:11.5px}
-  .apply{font-weight:600} .src{color:var(--dim);font:10px/1.3 var(--mono);margin-top:3px}
-  .foot{color:var(--dim);margin-top:12px;font:11.5px/1.4 var(--mono)}
-  .empty{padding:48px;text-align:center;color:var(--mut);border:1px solid var(--line);background:var(--surface)}
-  .status{font:11.5px/1 var(--mono);color:var(--amber)}
-  code{background:var(--surface2);border:1px solid var(--line);padding:1px 5px;border-radius:2px;font-size:11px}
+  .score.hi{color:var(--green)} .score.mid{color:var(--accent)} .score.lo{color:var(--dim)}
+  .tag{display:inline-block;padding:1px 5px;margin:0 3px 2px 0;border:1px solid var(--line);font:9.5px/1.5 var(--mono);
+    color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .tag.quant{border-color:#6b5320;color:var(--accent)} .tag.swe{border-color:#3a5573;color:var(--accent2)}
+  .pill{font:9.5px/1.6 var(--mono);padding:1px 6px;border:1px solid var(--line);text-transform:uppercase;letter-spacing:.5px}
+  .pill.open{color:var(--green);border-color:#3a5a2e} .pill.closed{color:var(--red);border-color:#5f2b28}
+  .new{background:var(--accent);color:#0a0c0f;font:9px/1.4 var(--mono);padding:1px 4px;margin-left:6px;font-weight:700;letter-spacing:.4px}
+  .loc-city{color:var(--green)} .loc-remote{color:var(--accent2)}
+  .comp{font-family:var(--mono);color:var(--green)} .none{color:var(--dim)}
+  .dur{color:var(--dim);font:10px/1 var(--mono);margin-top:2px}
+  select.state{background:transparent;color:var(--txt);border:1px solid var(--line);height:24px;font:11px/1 var(--mono);padding:0 4px}
+  .foot{color:var(--dim);padding:12px 20px;font:11px/1.4 var(--mono)}
+  .empty{padding:60px;text-align:center;color:var(--mut)}
+  code{background:var(--surface2);border:1px solid var(--line);padding:1px 5px;font-size:11px}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useMemo} = React;
-const DATA = "./data/";
+const {useState,useEffect,useMemo,useRef} = React;
+const DATA="./data/";
 const RAW="https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/";
-const LS_KEY = "internscout.appstate.v1";
+const LS_KEY="internscout.appstate.v1";
 const STATES=["none","interested","applied","interviewing","rejected","offer"];
+const loadStates=()=>{try{return JSON.parse(localStorage.getItem(LS_KEY))||{}}catch(e){return {}}};
+const saveStates=m=>localStorage.setItem(LS_KEY,JSON.stringify(m));
+const shortDate=iso=>{if(!iso)return null;const d=new Date(iso);return isNaN(d)?null:d.toLocaleDateString(undefined,{month:"short",day:"numeric"})};
 
-function loadStates(){ try{return JSON.parse(localStorage.getItem(LS_KEY))||{}}catch(e){return {}} }
-function saveStates(m){ localStorage.setItem(LS_KEY, JSON.stringify(m)); }
-function shortDate(iso){ if(!iso) return null; const d=new Date(iso); if(isNaN(d)) return null;
-  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+function MultiSelect({placeholder, options, selected, onChange}){
+  const [q,setQ]=useState(""); const [open,setOpen]=useState(false); const [act,setAct]=useState(0);
+  const ref=useRef();
+  useEffect(()=>{
+    const h=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h);
+  },[]);
+  const avail=options.filter(o=>!selected.includes(o.value));
+  const filtered=(q?avail.filter(o=>o.value.toLowerCase().includes(q.toLowerCase())):avail).slice(0,40);
+  const add=v=>{ onChange([...selected,v]); setQ(""); setAct(0); };
+  const rm=v=>onChange(selected.filter(x=>x!==v));
+  const onKey=e=>{
+    if(e.key==="Enter" && filtered[act]){ add(filtered[act].value); e.preventDefault(); }
+    else if(e.key==="ArrowDown"){ setAct(a=>Math.min(a+1,filtered.length-1)); e.preventDefault(); }
+    else if(e.key==="ArrowUp"){ setAct(a=>Math.max(a-1,0)); e.preventDefault(); }
+    else if(e.key==="Backspace" && !q && selected.length){ rm(selected[selected.length-1]); }
+  };
+  return (
+    <div className="ctl ms grow" ref={ref}>
+      <div className="box" onClick={()=>{setOpen(true);}}>
+        {selected.map(s=><span key={s} className="chip">{s}<b onClick={e=>{e.stopPropagation();rm(s)}}>×</b></span>)}
+        <input value={q} placeholder={selected.length?"":placeholder}
+          onChange={e=>{setQ(e.target.value);setOpen(true);setAct(0)}} onFocus={()=>setOpen(true)} onKeyDown={onKey}/>
+      </div>
+      {open && filtered.length>0 &&
+        <div className="drop">
+          {filtered.map((o,i)=>
+            <div key={o.value} className={"opt"+(i===act?" act":"")} onMouseDown={e=>{e.preventDefault();add(o.value)}} onMouseEnter={()=>setAct(i)}>
+              {o.value}{o.count!=null&&<span className="c">{o.count}</span>}
+            </div>)}
+        </div>}
+    </div>
+  );
+}
 
-function Stat({n,l}){return <div className="card"><div className="n">{n}</div><div className="l">{l}</div></div>;}
-
-function Location({r}){
-  if(/boston|cambridge|new york|chicago|miami/i.test(r.location_raw||"")){
-    const city=(r.location_raw||"").split(";")[0];
-    return <span className="loc-city">{city}</span>;
-  }
-  if(r.within_radius) return <span className="loc-dist">{(r.location_raw||"").split(";")[0]}{r.distance_miles!=null?` · ${Math.round(r.distance_miles)}mi`:""}</span>;
+function Loc({r}){
+  const first=(r.location_raw||"").split(";")[0];
+  if(/boston|cambridge|new york|chicago|miami/i.test(r.location_raw||"")) return <span className="loc-city">{first}</span>;
+  if(r.within_radius) return <span className="num">{first}{r.distance_miles!=null?` · ${Math.round(r.distance_miles)}mi`:""}</span>;
   if(r.is_remote) return <span className="loc-remote">Remote</span>;
-  return <span className="num" style={{color:"var(--dim)"}}>{(r.location_raw||"—").split(";")[0]}</span>;
+  return <span className="none">{first||"—"}</span>;
 }
 
 function Row({r,state,onState}){
-  const sc=r.relevance_score, cls=sc>=85?"hi":sc>=70?"mid":"lo";
+  const cls=r.relevance_score>=85?"hi":r.relevance_score>=70?"mid":"lo";
   return (
     <tr>
-      <td><span className={"score "+cls}>{sc}</span></td>
+      <td><span className={"score "+cls}>{r.relevance_score}</span></td>
       <td>
         <div className="co">{r.company_name}{r.is_new&&<span className="new">NEW</span>}</div>
         <div className="role">{r.title}</div>
         {shortDate(r.posted_at)&&<div className="posted">posted {shortDate(r.posted_at)}</div>}
       </td>
       <td>{(r.field_tags||[]).map(t=><span key={t} className={"tag "+t}>{t}</span>)}</td>
-      <td><Location r={r}/></td>
-      <td>
-        <span className="term">{r.term||"—"}</span>
-        {r.duration&&<div className="dur">{r.duration}</div>}
-      </td>
-      <td>{r.salary? <span className="comp">{r.salary}</span> : <span className="comp-none">—</span>}</td>
+      <td><Loc r={r}/></td>
+      <td><span className="num" style={{fontSize:11.5}}>{r.term||"—"}</span>{r.duration&&<div className="dur">{r.duration}</div>}</td>
+      <td>{r.salary?<span className="comp">{r.salary}</span>:<span className="none">—</span>}</td>
       <td><span className={"pill "+r.status}>{r.status}</span></td>
-      <td>
-        <select className="state" value={state} onChange={e=>onState(r.id,e.target.value)}>
-          {STATES.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-      </td>
-      <td>{r.apply_url?<a className="apply" href={r.apply_url} target="_blank" rel="noopener">Apply ↗</a>:<span className="comp-none">—</span>}
-        <div className="src">{(r.sources||[]).map(s=>s.source).join(", ")}</div>
-      </td>
+      <td><select className="state" value={state} onChange={e=>onState(r.id,e.target.value)}>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</select></td>
+      <td>{r.apply_url?<a className="num" href={r.apply_url} target="_blank" rel="noopener" style={{fontWeight:600}}>Apply ↗</a>:<span className="none">—</span>}
+        <div className="posted">{(r.sources||[]).map(s=>s.source).join(", ")}</div></td>
     </tr>
   );
 }
 
 function App(){
-  const [all,setAll]=useState([]);
-  const [meta,setMeta]=useState(null);
-  const [err,setErr]=useState(null);
+  const [all,setAll]=useState([]); const [meta,setMeta]=useState(null); const [err,setErr]=useState(null);
   const [states,setStates]=useState(loadStates);
-  const [f,setF]=useState({q:"",field:"",location:"",status:"open",app_state:"",new_only:false,sort:"score"});
+  const [f,setF]=useState({q:"",fields:[],cities:[],status:"open",app_state:"",new_only:false,sort:"score"});
   const [token,setToken]=useState(()=>{try{return localStorage.getItem("internscout.gh_token")||""}catch(e){return ""}});
   const [busy,setBusy]=useState("");
 
-  const loadData=(fromRaw)=>{
-    const base=fromRaw?RAW:DATA, bust="?t="+Date.now();
-    return Promise.all([
-      fetch(base+"listings.json"+bust).then(r=>r.json()),
-      fetch(base+"stats.json"+bust).then(r=>r.json())
-    ]).then(([ls,st])=>{setAll(ls);setMeta(st)});
-  };
+  const loadData=fromRaw=>{const base=fromRaw?RAW:DATA,b="?t="+Date.now();
+    return Promise.all([fetch(base+"listings.json"+b).then(r=>r.json()),fetch(base+"stats.json"+b).then(r=>r.json())])
+      .then(([ls,st])=>{setAll(ls);setMeta(st)});};
   useEffect(()=>{loadData().catch(e=>setErr(String(e)))},[]);
 
-  const setState=(id,v)=>{ setStates(m=>{const n={...m,[id]:v}; if(v==="none")delete n[id]; saveStates(n); return n;}); };
-  const upd=(k,v)=>setF(s=>({...s,[k]:v}));
-  const st=id=>states[id]||"none";
+  const setState=(id,v)=>setStates(m=>{const n={...m,[id]:v};if(v==="none")delete n[id];saveStates(n);return n;});
+  const upd=(k,v)=>setF(s=>({...s,[k]:v})); const st=id=>states[id]||"none";
+
+  const cityOpts=useMemo(()=>{
+    const m=new Map();
+    all.forEach(x=>{ (x.location_raw||"").split(";").forEach(l=>{const c=l.trim();
+      if(c && !/^remote|anywhere|united states|^usa?$/i.test(c)) m.set(c,(m.get(c)||0)+1);});
+      if(x.is_remote) m.set("Remote",(m.get("Remote")||0)+1); });
+    return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([value,count])=>({value,count}));
+  },[all]);
+  const fieldOpts=useMemo(()=>{
+    const m=new Map(); all.forEach(x=>(x.field_tags||[]).forEach(t=>m.set(t,(m.get(t)||0)+1)));
+    return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([value,count])=>({value,count}));
+  },[all]);
 
   const rows=useMemo(()=>{
     let r=all.slice();
-    if(f.q){const q=f.q.toLowerCase(); r=r.filter(x=>x.company_name.toLowerCase().includes(q)||x.title.toLowerCase().includes(q));}
-    if(f.field) r=r.filter(x=>(x.field_tags||[]).includes(f.field));
+    if(f.q){const q=f.q.toLowerCase();r=r.filter(x=>x.company_name.toLowerCase().includes(q)||x.title.toLowerCase().includes(q));}
+    if(f.fields.length) r=r.filter(x=>(x.field_tags||[]).some(t=>f.fields.includes(t)));
+    if(f.cities.length) r=r.filter(x=>f.cities.some(c=> c==="Remote"?x.is_remote:(x.location_raw||"").toLowerCase().includes(c.toLowerCase())));
     if(f.status) r=r.filter(x=>x.status===f.status);
     if(f.new_only) r=r.filter(x=>x.is_new);
-    if(f.location==="remote") r=r.filter(x=>x.is_remote);
-    else if(f.location==="radius") r=r.filter(x=>x.within_radius);
-    else if(f.location==="in_city") r=r.filter(x=>/boston|cambridge|new york|chicago|miami/i.test(x.location_raw||""));
     if(f.app_state) r=r.filter(x=>st(x.id)===f.app_state);
     if(f.sort==="score") r.sort((a,b)=>b.relevance_score-a.relevance_score||(b.first_seen||"").localeCompare(a.first_seen||""));
     else if(f.sort==="new") r.sort((a,b)=>(b.first_seen||"").localeCompare(a.first_seen||""));
@@ -173,101 +202,71 @@ function App(){
     return r;
   },[all,f,states]);
 
-  const stats=useMemo(()=>{
-    const applied=all.filter(x=>st(x.id)==="applied").length;
-    return meta?{...meta,applied}:{total:0,open:0,new:0,applied};
-  },[all,meta,states]);
+  const stats=useMemo(()=>{const applied=all.filter(x=>st(x.id)==="applied").length;return meta?{...meta,applied}:{total:0,open:0,new:0,applied};},[all,meta,states]);
+  const gen=meta&&meta.generated_at?new Date(meta.generated_at).toLocaleString():"never";
+  const metros=meta&&meta.profile.metros&&meta.profile.metros.length?meta.profile.metros.join(" · "):(meta&&meta.profile.center_city);
 
-  const gen = meta&&meta.generated_at? new Date(meta.generated_at).toLocaleString():"never";
-
-  const REPO="bpmcginley/InternshipFinder", WF="ingest.yml";
+  const REPO="bpmcginley/InternshipFinder",WF="ingest.yml";
   async function refresh(){
     let t=token;
-    if(!t){
-      t=(window.prompt("Paste your GitHub fine-grained token (Actions: Read and write on InternshipFinder). Stored only in this browser; sent only to github.com.")||"").trim();
-      if(!t) return; localStorage.setItem("internscout.gh_token",t); setToken(t);
-    }
+    if(!t){t=(window.prompt("Paste your GitHub fine-grained token (Actions: Read and write). Stored only in this browser; sent only to github.com.")||"").trim();if(!t)return;localStorage.setItem("internscout.gh_token",t);setToken(t);}
     const H={Authorization:"Bearer "+t,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};
     try{
-      setBusy("starting scrape…");
+      setBusy("starting…");
       const before=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=1`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
       const beforeId=(before.workflow_runs&&before.workflow_runs[0])?before.workflow_runs[0].id:0;
       const disp=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/dispatches`,{method:"POST",headers:H,body:JSON.stringify({ref:"main"})});
-      if(disp.status===401){localStorage.removeItem("internscout.gh_token");setToken("");setBusy("token rejected — click Refresh to re-enter");return;}
-      if(disp.status!==204){setBusy("couldn't start (HTTP "+disp.status+") — check token permissions");return;}
+      if(disp.status===401){localStorage.removeItem("internscout.gh_token");setToken("");setBusy("token rejected");return;}
+      if(disp.status!==204){setBusy("failed (HTTP "+disp.status+")");return;}
       setBusy("scraping… 1–2 min");
-      for(let i=0;i<60;i++){
-        await new Promise(r=>setTimeout(r,5000));
+      for(let i=0;i<60;i++){await new Promise(r=>setTimeout(r,5000));
         const runs=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=5`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
-        const run=(runs.workflow_runs||[]).find(x=>x.id>beforeId);
-        if(!run) continue;
+        const run=(runs.workflow_runs||[]).find(x=>x.id>beforeId); if(!run)continue;
         if(run.status!=="completed"){setBusy("scraping… ("+String(run.status).replace("_"," ")+")");continue;}
-        if(run.conclusion!=="success"){setBusy("run "+run.conclusion+" — see Actions tab");return;}
-        setBusy("loading fresh results…");
-        await new Promise(r=>setTimeout(r,3000)); await loadData(true);
-        setBusy("updated ✓"); setTimeout(()=>setBusy(""),4000); return;
-      }
+        if(run.conclusion!=="success"){setBusy("run "+run.conclusion);return;}
+        setBusy("loading…");await new Promise(r=>setTimeout(r,3000));await loadData(true);setBusy("updated ✓");setTimeout(()=>setBusy(""),4000);return;}
       setBusy("still running — reload shortly");
     }catch(e){setBusy("error: "+e.message);}
   }
-
-  const metros = meta&&meta.profile.metros&&meta.profile.metros.length? meta.profile.metros.join(" · "):(meta&&meta.profile.center_city);
 
   return (
     <div>
       <header>
         <span className="brand">Intern<b>Scout</b></span>
-        <span className="meta">{meta? `${(meta.profile.terms||[]).join(", ")}  ·  ${metros}${meta.profile.include_remote?" · remote":""}  ·  updated ${gen}`:"loading…"}</span>
+        <span className="meta">{meta?`${(meta.profile.terms||[]).join(", ")}   ${metros}${meta.profile.include_remote?" + remote":""}   updated ${gen}`:"loading…"}</span>
       </header>
-      <div className="wrap">
-        <div className="cards">
-          <Stat n={stats.total} l="Listings"/>
-          <Stat n={stats.open} l="Open"/>
-          <Stat n={stats.new} l="New"/>
-          <Stat n={stats.applied} l="Applied"/>
-        </div>
-        <div className="controls">
-          <input type="text" placeholder="Search company or title…" value={f.q} onChange={e=>upd("q",e.target.value)}/>
-          <select value={f.field} onChange={e=>upd("field",e.target.value)}>
-            <option value="">All fields</option>
-            {["swe","quant","data","ml","hardware","pm","security"].map(x=><option key={x} value={x}>{x}</option>)}
-          </select>
-          <select value={f.location} onChange={e=>upd("location",e.target.value)}>
-            <option value="">Any location</option>
-            <option value="in_city">In a hub city</option>
-            <option value="radius">Within radius</option>
-            <option value="remote">Remote</option>
-          </select>
-          <select value={f.status} onChange={e=>upd("status",e.target.value)}>
-            <option value="">Any status</option><option value="open">Open</option><option value="closed">Closed</option>
-          </select>
-          <select value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
-            <option value="">Any state</option>
-            {STATES.map(s=><option key={s} value={s}>{s}</option>)}
-          </select>
-          <label className="chk"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New only</label>
-          <select value={f.sort} onChange={e=>upd("sort",e.target.value)}>
-            <option value="score">Sort: score</option><option value="new">Sort: newest</option>
-            <option value="company">Sort: company</option><option value="comp">Sort: has comp</option>
-          </select>
-          <button className="primary" onClick={refresh} disabled={!!busy} title="Run the scraper now (GitHub Action)">⟳ Refresh</button>
-          {token&&<button onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("token cleared");}} title="Forget saved token">⨯</button>}
-          {busy&&<span className="status">{busy}</span>}
-        </div>
-        {err? <div className="empty">Couldn't load data: {err}</div> :
-         all.length===0? <div className="empty">No listings yet. Click <b>⟳ Refresh</b>, or run <code>python -m internscout.run_ingest --export docs/data</code> locally.</div> :
-        <table>
-          <thead><tr>
-            <th onClick={()=>upd("sort","score")}>Score</th>
-            <th onClick={()=>upd("sort","company")}>Company / Role</th>
-            <th>Field</th><th>Location</th><th>Term</th>
-            <th onClick={()=>upd("sort","comp")}>Comp</th>
-            <th>Status</th><th>State</th><th>Apply</th>
-          </tr></thead>
-          <tbody>{rows.map(r=><Row key={r.id} r={r} state={st(r.id)} onState={setState}/>)}</tbody>
-        </table>}
-        <div className="foot">{rows.length} shown · statuses saved in this browser</div>
+      <div className="statbar">
+        <div className="stat"><div className="n">{stats.total}</div><div className="l">Listings</div></div>
+        <div className="stat"><div className="n">{stats.open}</div><div className="l">Open</div></div>
+        <div className="stat"><div className="n">{stats.new}</div><div className="l">New</div></div>
+        <div className="stat"><div className="n">{stats.applied}</div><div className="l">Applied</div></div>
       </div>
+      <div className="controls">
+        <div className="ctl grow"><input type="text" placeholder="Search company or title…" value={f.q} onChange={e=>upd("q",e.target.value)}/></div>
+        <MultiSelect placeholder="Fields…" options={fieldOpts} selected={f.fields} onChange={v=>upd("fields",v)}/>
+        <MultiSelect placeholder="Cities…" options={cityOpts} selected={f.cities} onChange={v=>upd("cities",v)}/>
+        <div className="ctl sel"><select value={f.status} onChange={e=>upd("status",e.target.value)}>
+          <option value="">Any status</option><option value="open">Open</option><option value="closed">Closed</option></select></div>
+        <div className="ctl sel"><select value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
+          <option value="">Any state</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+        <div className="ctl"><label className="chk"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New</label></div>
+        <div className="ctl sel"><select value={f.sort} onChange={e=>upd("sort",e.target.value)}>
+          <option value="score">Score</option><option value="new">Newest</option><option value="company">Company</option><option value="comp">Has comp</option></select></div>
+        <button className="btn go" onClick={refresh} disabled={!!busy}>⟳ Refresh</button>
+        {token&&<button className="btn" onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("token cleared");}} title="Forget token">✕</button>}
+        {busy&&<span className="status">{busy}</span>}
+      </div>
+      {err? <div className="empty">Couldn't load data: {err}</div> :
+       all.length===0? <div className="empty">No listings yet. Click <b>Refresh</b>.</div> :
+      <table>
+        <thead><tr>
+          <th onClick={()=>upd("sort","score")}>Score</th><th onClick={()=>upd("sort","company")}>Company / Role</th>
+          <th>Field</th><th>Location</th><th>Term</th><th onClick={()=>upd("sort","comp")}>Comp</th>
+          <th>Status</th><th>State</th><th>Apply</th>
+        </tr></thead>
+        <tbody>{rows.map(r=><Row key={r.id} r={r} state={st(r.id)} onState={setState}/>)}</tbody>
+      </table>}
+      <div className="foot">{rows.length} shown · statuses saved in this browser</div>
     </div>
   );
 }
