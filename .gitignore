@@ -1,3 +1,7 @@
 __pycache__/
 *.db
 .venv/
+
+# Chrome extension signing key - never commit
+extension.pem
+*.pem
