@@ -1,52 +1,93 @@
-"""Seed registry of employers with VERIFIED public ATS boards (Tier 2).
+"""Registry of employers with VERIFIED public ATS boards (Tier 2).
 
-Every Greenhouse token below was confirmed live (returned jobs) on 2026-07-22.
-Verify/extend: open https://boards-api.greenhouse.io/v1/boards/<token>/jobs in a browser.
-Quant firms that run their own portals (Citadel, Two Sigma, DE Shaw, Optiver, SIG, DRW,
-XTX) are on the QUANT_WATCHLIST for manual follow-up.
+All tokens below returned live jobs when last checked. Spans tech, quant/trading,
+biotech/health, consumer, fintech, education and consulting so the tool surfaces
+internships across disciplines — not just software.
+
+Add more: confirm at https://boards-api.greenhouse.io/v1/boards/<token>/jobs
 """
 from __future__ import annotations
 
 GREENHOUSE = [
-    # ---- Quant / trading (verified live) ----
-    {"name": "Jane Street", "ats_token": "janestreet", "is_quant_target": True},
-    {"name": "IMC Trading", "ats_token": "imc", "is_quant_target": True},
-    {"name": "Jump Trading", "ats_token": "jumptrading", "is_quant_target": True},
-    {"name": "Akuna Capital", "ats_token": "akunacapital", "is_quant_target": True},
-    {"name": "Virtu Financial", "ats_token": "virtu", "is_quant_target": True},
-    {"name": "Flow Traders", "ats_token": "flowtraders", "is_quant_target": True},
-    {"name": "Old Mission Capital", "ats_token": "oldmissioncapital", "is_quant_target": True},
-    {"name": "PDT Partners", "ats_token": "pdtpartners", "is_quant_target": True},
-    {"name": "TransMarket Group", "ats_token": "transmarketgroup", "is_quant_target": True},
-    {"name": "Vatic Labs", "ats_token": "vaticlabs", "is_quant_target": True},
-    {"name": "Walleye Capital", "ats_token": "walleyecapital-external-students", "is_quant_target": True},
-    {"name": "Weiss Asset Management", "ats_token": "weissassetmanagement", "is_quant_target": True},
-
-    # ---- Boston-area / tech (verified live) ----
-    {"name": "Datadog", "ats_token": "datadog", "is_quant_target": False},
-    {"name": "Klaviyo", "ats_token": "klaviyo", "is_quant_target": False},
-    {"name": "Toast", "ats_token": "toast", "is_quant_target": False},
+    {"name": "Affirm", "ats_token": "affirm", "is_quant_target": False},
+    {"name": "Airbnb", "ats_token": "airbnb", "is_quant_target": False},
+    {"name": "Airtable", "ats_token": "airtable", "is_quant_target": False},
+    {"name": "Akunacapital", "ats_token": "akunacapital", "is_quant_target": True},
+    {"name": "Anthropic", "ats_token": "anthropic", "is_quant_target": False},
+    {"name": "AppLovin", "ats_token": "applovin", "is_quant_target": False},
+    {"name": "Archer", "ats_token": "archer", "is_quant_target": False},
+    {"name": "Asana", "ats_token": "asana", "is_quant_target": False},
+    {"name": "Boston Consulting Group", "ats_token": "bcg", "is_quant_target": False},
+    {"name": "Block", "ats_token": "block", "is_quant_target": False},
+    {"name": "Brex", "ats_token": "brex", "is_quant_target": False},
+    {"name": "Calm", "ats_token": "calm", "is_quant_target": False},
     {"name": "CarGurus", "ats_token": "cargurus", "is_quant_target": False},
-    {"name": "Formlabs", "ats_token": "formlabs", "is_quant_target": False},
-    {"name": "SimpliSafe", "ats_token": "simplisafe", "is_quant_target": False},
-    {"name": "Ginkgo Bioworks", "ats_token": "ginkgobioworks", "is_quant_target": False},
-    {"name": "Hometap", "ats_token": "hometap", "is_quant_target": False},
-    {"name": "The Trade Desk", "ats_token": "thetradedesk", "is_quant_target": False},
-
-    # ---- Large tech (verified live) ----
-    {"name": "Stripe", "ats_token": "stripe", "is_quant_target": False},
-    {"name": "Databricks", "ats_token": "databricks", "is_quant_target": False},
+    {"name": "Chime", "ats_token": "chime", "is_quant_target": False},
     {"name": "Cloudflare", "ats_token": "cloudflare", "is_quant_target": False},
+    {"name": "Coinbase", "ats_token": "coinbase", "is_quant_target": False},
+    {"name": "Coursera", "ats_token": "coursera", "is_quant_target": False},
+    {"name": "Databricks", "ats_token": "databricks", "is_quant_target": False},
+    {"name": "Datadog", "ats_token": "datadog", "is_quant_target": False},
+    {"name": "Discord", "ats_token": "discord", "is_quant_target": False},
+    {"name": "Duolingo", "ats_token": "duolingo", "is_quant_target": False},
+    {"name": "Elastic", "ats_token": "elastic", "is_quant_target": False},
+    {"name": "Fastly", "ats_token": "fastly", "is_quant_target": False},
+    {"name": "Figma", "ats_token": "figma", "is_quant_target": False},
+    {"name": "Flatiron Health", "ats_token": "flatironhealth", "is_quant_target": False},
+    {"name": "Flexport", "ats_token": "flexport", "is_quant_target": False},
+    {"name": "Flowtraders", "ats_token": "flowtraders", "is_quant_target": True},
+    {"name": "Formlabs", "ats_token": "formlabs", "is_quant_target": False},
+    {"name": "Ginkgo Bioworks", "ats_token": "ginkgobioworks", "is_quant_target": False},
+    {"name": "GitLab", "ats_token": "gitlab", "is_quant_target": False},
+    {"name": "Grafana Labs", "ats_token": "grafanalabs", "is_quant_target": False},
+    {"name": "Gusto", "ats_token": "gusto", "is_quant_target": False},
+    {"name": "Hometap", "ats_token": "hometap", "is_quant_target": False},
+    {"name": "IMC Trading", "ats_token": "imc", "is_quant_target": True},
+    {"name": "Instacart", "ats_token": "instacart", "is_quant_target": False},
+    {"name": "Jump Trading", "ats_token": "jumptrading", "is_quant_target": True},
+    {"name": "Khan Academy", "ats_token": "khanacademy", "is_quant_target": False},
+    {"name": "Klaviyo", "ats_token": "klaviyo", "is_quant_target": False},
+    {"name": "Lucid Motors", "ats_token": "lucidmotors", "is_quant_target": False},
+    {"name": "Lyft", "ats_token": "lyft", "is_quant_target": False},
+    {"name": "Marqeta", "ats_token": "marqeta", "is_quant_target": False},
+    {"name": "Mercury", "ats_token": "mercury", "is_quant_target": False},
+    {"name": "MongoDB", "ats_token": "mongodb", "is_quant_target": False},
+    {"name": "New Relic", "ats_token": "newrelic", "is_quant_target": False},
+    {"name": "Nuro", "ats_token": "nuro", "is_quant_target": False},
+    {"name": "Old Mission Capital", "ats_token": "oldmissioncapital", "is_quant_target": True},
+    {"name": "Oura", "ats_token": "oura", "is_quant_target": False},
+    {"name": "PDT Partners", "ats_token": "pdtpartners", "is_quant_target": True},
+    {"name": "Peloton", "ats_token": "peloton", "is_quant_target": False},
+    {"name": "Pinterest", "ats_token": "pinterest", "is_quant_target": False},
+    {"name": "Recursion Pharmaceuticals", "ats_token": "recursionpharmaceuticals", "is_quant_target": False},
+    {"name": "Reddit", "ats_token": "reddit", "is_quant_target": False},
+    {"name": "Robinhood", "ats_token": "robinhood", "is_quant_target": False},
+    {"name": "Roblox", "ats_token": "roblox", "is_quant_target": False},
+    {"name": "Samsara", "ats_token": "samsara", "is_quant_target": False},
+    {"name": "Scale AI", "ats_token": "scaleai", "is_quant_target": False},
+    {"name": "SimpliSafe", "ats_token": "simplisafe", "is_quant_target": False},
+    {"name": "Stripe", "ats_token": "stripe", "is_quant_target": False},
+    {"name": "Sumo Logic", "ats_token": "sumologic", "is_quant_target": False},
+    {"name": "The Trade Desk", "ats_token": "thetradedesk", "is_quant_target": False},
+    {"name": "Toast", "ats_token": "toast", "is_quant_target": False},
+    {"name": "TransMarket Group", "ats_token": "transmarketgroup", "is_quant_target": True},
+    {"name": "Twitch", "ats_token": "twitch", "is_quant_target": False},
+    {"name": "Vatic Labs", "ats_token": "vaticlabs", "is_quant_target": True},
+    {"name": "Verkada", "ats_token": "verkada", "is_quant_target": False},
+    {"name": "Virtu", "ats_token": "virtu", "is_quant_target": True},
+    {"name": "Walleye Capital", "ats_token": "walleyecapital-external-students", "is_quant_target": True},
+    {"name": "Waymo", "ats_token": "waymo", "is_quant_target": False},
+    {"name": "Weiss Asset Management", "ats_token": "weissassetmanagement", "is_quant_target": True},
 ]
 
 LEVER = [
-    # Most quant/tech firms have moved off Lever's public API; add here only if verified at
-    # https://api.lever.co/v0/postings/<token>?mode=json
+    # Verify at https://api.lever.co/v0/postings/<token>?mode=json before adding.
 ]
 
-# Tier 4 quant watchlist (own portals; check manually / add adapters later)
+# Tier 4 watchlist: firms on their own portals (no public ATS API).
 QUANT_WATCHLIST = [
     {"name": "Citadel / Citadel Securities", "careers_url": "https://www.citadel.com/careers/students/"},
+    {"name": "Jane Street", "careers_url": "https://www.janestreet.com/join-jane-street/"},
     {"name": "Hudson River Trading", "careers_url": "https://www.hudsonrivertrading.com/careers/"},
     {"name": "Two Sigma", "careers_url": "https://careers.twosigma.com/careers/Students"},
     {"name": "DE Shaw", "careers_url": "https://www.deshaw.com/careers"},
@@ -56,4 +97,5 @@ QUANT_WATCHLIST = [
     {"name": "XTX Markets", "careers_url": "https://www.xtxmarkets.com/careers/"},
     {"name": "Tower Research", "careers_url": "https://www.tower-research.com/open-positions/"},
     {"name": "Five Rings", "careers_url": "https://www.fiverings.com/careers"},
+    {"name": "Arrowstreet Capital", "careers_url": "https://www.arrowstreetcapital.com/careers/"},
 ]

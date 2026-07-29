@@ -26,6 +26,8 @@ def _term_ok(season, year) -> bool:
 
 
 def _field_ok(tags) -> bool:
+    if not PROFILE.fields:      # empty tuple = accept every discipline
+        return True
     return any(t in PROFILE.fields for t in tags)
 
 

@@ -1,8 +1,8 @@
 {
-  "total": 88,
-  "open": 84,
-  "new": 88,
-  "generated_at": "2026-07-29T13:45:41.894147+00:00",
+  "total": 189,
+  "open": 163,
+  "new": 189,
+  "generated_at": "2026-07-29T17:37:21.314807+00:00",
   "profile": {
     "name": "CS/Quant \u00b7 Summer 2027 \u00b7 Boston",
     "center_city": "Boston, MA",
@@ -15,7 +15,23 @@
       "Boston",
       "New York",
       "Chicago",
-      "Miami"
+      "Miami",
+      "San Francisco",
+      "Seattle",
+      "Austin",
+      "Los Angeles",
+      "Washington DC",
+      "Philadelphia",
+      "Atlanta",
+      "Denver",
+      "Pittsburgh",
+      "Dallas",
+      "Houston",
+      "San Diego",
+      "Raleigh",
+      "Minneapolis",
+      "Phoenix",
+      "Detroit"
     ]
   }
 }

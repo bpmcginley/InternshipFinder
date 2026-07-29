@@ -12,7 +12,37 @@ from functools import lru_cache
 from .config import PROFILE
 
 REMOTE_RE = re.compile(r"\b(remote|anywhere|work from home|wfh)\b", re.I)
-IN_CITY = {"boston", "cambridge", "new york", "manhattan", "brooklyn", "chicago", "miami"}
+_US_STATES = {"al","ak","az","ar","ca","co","ct","de","fl","ga","hi","id","il","in","ia",
+ "ks","ky","la","me","md","ma","mi","mn","ms","mo","mt","ne","nv","nh","nj","nm","ny","nc",
+ "nd","oh","ok","or","pa","ri","sc","sd","tn","tx","ut","vt","va","wa","wv","wi","wy","dc"}
+_US_STATE_NAMES = re.compile(
+ r"\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|"
+ r"hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|"
+ r"michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|"
+ r"new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|"
+ r"south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|"
+ r"wisconsin|wyoming|united states|u\.s\.a?\.?|\busa\b)\b", re.I)
+_NON_US = re.compile(r"\b(london|dublin|ireland|amsterdam|netherlands|canada|toronto|vancouver|"
+ r"india|bangalore|singapore|australia|sydney|germany|berlin|france|paris|japan|tokyo|china|"
+ r"shanghai|israel|tel aviv|mexico|brazil|spain|madrid|poland|warsaw|uk|united kingdom)\b", re.I)
+
+
+def looks_us(loc: str) -> bool:
+    """True if a location string appears to be in the US (state abbrev/name or country)."""
+    if not loc:
+        return False
+    if _NON_US.search(loc):
+        return False
+    parts = [p.strip().lower() for p in loc.split(",")]
+    if any(p in _US_STATES for p in parts):
+        return True
+    return bool(_US_STATE_NAMES.search(loc))
+
+
+IN_CITY = {"boston", "cambridge", "new york", "manhattan", "brooklyn", "chicago", "miami",
+           "san francisco", "seattle", "austin", "los angeles", "washington", "philadelphia",
+           "atlanta", "denver", "pittsburgh", "dallas", "houston", "san diego", "raleigh",
+           "minneapolis", "phoenix", "detroit"}
 
 # Towns within ~30 mi of downtown Boston (approx coords). Used for the radius test
 # without needing a live geocoder.
@@ -50,6 +80,28 @@ US_CITIES = {
     "stamford": (41.0534, -73.5387), "greenwich": (41.0262, -73.6282),
     "evanston": (42.0451, -87.6877), "hoboken": (40.7439, -74.0324),
     "manhattan": (40.7831, -73.9712),
+    "pittsburgh": (40.4406, -79.9959), "san jose": (37.3382, -121.8863),
+    "palo alto": (37.4419, -122.1430), "mountain view": (37.3861, -122.0839),
+    "sunnyvale": (37.3688, -122.0363), "santa clara": (37.3541, -121.9552),
+    "redwood city": (37.4852, -122.2364), "menlo park": (37.4530, -122.1817),
+    "oakland": (37.8044, -122.2712), "berkeley": (37.8715, -122.2730),
+    "bellevue": (47.6101, -122.2015), "redmond": (47.6740, -122.1215),
+    "arlington": (38.8816, -77.0910), "reston": (38.9586, -77.3570),
+    "mclean": (38.9339, -77.1773), "bethesda": (38.9847, -77.0947),
+    "raleigh": (35.7796, -78.6382), "durham": (35.9940, -78.8986),
+    "san diego": (32.7157, -117.1611), "irvine": (33.6846, -117.8265),
+    "costa mesa": (33.6411, -117.9187), "santa monica": (34.0195, -118.4912),
+    "minneapolis": (44.9778, -93.2650), "phoenix": (33.4484, -112.0740),
+    "detroit": (42.3314, -83.0458), "ann arbor": (42.2808, -83.7430),
+    "columbus": (39.9612, -82.9988), "charlotte": (35.2271, -80.8431),
+    "nashville": (36.1627, -86.7816), "salt lake city": (40.7608, -111.8910),
+    "frisco": (33.1507, -96.8236), "plano": (33.0198, -96.6989),
+    "boulder": (40.0150, -105.2705), "madison": (43.0731, -89.4012),
+    "princeton": (40.3573, -74.6672), "hartford": (41.7658, -72.6734),
+    "new haven": (41.3083, -72.9279), "portland": (45.5152, -122.6784),
+    "st louis": (38.6270, -90.1994), "kansas city": (39.0997, -94.5786),
+    "tampa": (27.9506, -82.4572), "orlando": (28.5383, -81.3792),
+    "sunnyvale ca": (37.3688, -122.0363),
 }
 
 
@@ -122,8 +174,11 @@ def evaluate_locations(locations: list[str]):
     metro = None
     if best:
         dist, lat, lng, in_city, metro, within = best
+    # US location we couldn't place precisely -> still worth surfacing (filter in the UI)
+    us_elsewhere = (not within) and any(looks_us(l) for l in locations)
     return {
         "is_remote": is_remote,
+        "us_elsewhere": us_elsewhere,
         "within_radius": within,
         "best_distance": dist,
         "lat": lat, "lng": lng,
@@ -137,5 +192,9 @@ def passes_location_filter(geo: dict) -> bool:
     if geo["within_radius"]:
         return True
     if geo["is_remote"] and PROFILE.include_remote:
+        return True
+    # Keep other US locations so nothing is silently lost; they score lower and can be
+    # filtered by city in the dashboard.
+    if geo.get("us_elsewhere") and getattr(PROFILE, "include_other_us", True):
         return True
     return False

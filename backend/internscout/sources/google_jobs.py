@@ -12,16 +12,35 @@ from .base import client
 URL = "https://serpapi.com/search.json"
 
 
-def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None) -> list[dict]:
+def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
+                      max_searches: int | None = None) -> list[dict]:
+    """Query Google Jobs. Stays inside the SerpApi quota by capping searches per run and
+    rotating which queries are used (day-based offset), so all disciplines get covered
+    across runs instead of always hitting the same few."""
+    import datetime
     api_key = api_key or os.environ.get("SERPAPI_KEY")
     if not api_key:
         print("[google_jobs] no SERPAPI_KEY set; skipping")
         return []
+    if max_searches is None:
+        max_searches = int(os.environ.get("SERPAPI_MAX_SEARCHES", "12"))
+    # rotate the query window each day so coverage spreads over time
+    per_loc = max(1, max_searches // max(1, len(locations)))
+    day = datetime.date.today().toordinal()
+    start = (day * per_loc) % max(1, len(queries))
+    rotated = queries[start:] + queries[:start]
+    picked = rotated[:per_loc]
+    print(f"[google_jobs] {len(picked)} quer(ies) x {len(locations)} location(s) "
+          f"= {len(picked) * len(locations)} searches (cap {max_searches})")
     out: list[dict] = []
     seen = set()
+    used = 0
     with client() as c:
         for loc in locations:
-            for q in queries:
+            for q in picked:
+                if used >= max_searches:
+                    break
+                used += 1
                 try:
                     r = c.get(URL, params={
                         "engine": "google_jobs", "q": q, "location": loc,

@@ -11,7 +11,7 @@ import argparse
 from .sources import fetch_github_lists, fetch_greenhouse, fetch_lever, fetch_google_jobs
 from .sources.github_lists import parse_fixture
 from .companies_seed import GREENHOUSE, LEVER
-from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS
+from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, GOOGLE_JOBS_MAX_SEARCHES
 from .pipeline import run
 
 
@@ -36,7 +36,7 @@ def main():
             raw += fetch_greenhouse(GREENHOUSE)
             raw += fetch_lever(LEVER)
         if args.google or do_all:
-            raw += fetch_google_jobs(GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS)
+            raw += fetch_google_jobs(GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, max_searches=GOOGLE_JOBS_MAX_SEARCHES)
 
     run(raw)
     if args.export:
