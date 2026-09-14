@@ -4,9 +4,14 @@
 // invalidated"): it answers every request with {error:"reload_page"} and tells the page once.
 (function () {
   const alive = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; } };
-  if (!alive()) return;
-  const VERSION = chrome.runtime.getManifest().version;
-  document.documentElement.dataset.internscout = VERSION;
+  // getManifest() can still throw "Extension context invalidated" even right after alive() returns
+  // true: invalidation isn't atomic, so a reload/update can land between the two calls. Guard both.
+  let VERSION;
+  try {
+    if (!alive()) return;
+    VERSION = chrome.runtime.getManifest().version;
+    document.documentElement.dataset.internscout = VERSION;
+  } catch (e) { return; }
   let port = null, dead = false;
 
   function gone() {
