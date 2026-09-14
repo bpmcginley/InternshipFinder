@@ -1,7 +1,12 @@
 {
 "00052 - new york corporate buying office|NY":null,
 "02784 - pennsylvania cvs pharmacy|PA":null,
+"1177 avenue of the americas-new york|NY":null,
 "130 north 18th street - one logan square|PA":null,
+"300 creekview ave|NJ":null,
+"3001 archer dr|PA":null,
+"399 park avenue-new york|NY":null,
+"900 river rd|PA":null,
 "ambler|PA":[
 40.1545,
 -75.2222
@@ -30,6 +35,10 @@
 43.1587,
 -76.3327
 ],
+"bedford|PA":[
+40.0187,
+-78.5039
+],
 "bedminster|NJ":[
 40.6811,
 -74.6443
@@ -41,6 +50,10 @@
 "bethlehem|PA":[
 40.6179,
 -75.3787
+],
+"blauvelt|NY":[
+41.0634,
+-73.9576
 ],
 "blue bell|PA":[
 40.1523,
@@ -125,6 +138,10 @@
 40.9732,
 -73.9615
 ],
+"coaldale|PA":[
+40.825,
+-75.9085
+],
 "coeymans|NY":[
 42.474,
 -73.7923
@@ -201,6 +218,10 @@
 42.1404,
 -74.2124
 ],
+"elmira|NY":[
+42.0898,
+-76.8077
+],
 "englewood|NJ":[
 40.8929,
 -73.9727
@@ -229,6 +250,10 @@
 40.7247,
 -73.7048
 ],
+"florence|NJ":[
+39.7343,
+-74.9182
+],
 "flourtown|PA":[
 40.1029,
 -75.2128
@@ -240,6 +265,10 @@
 "fort washington|PA":[
 40.1378,
 -75.2118
+],
+"fredonia|NY":[
+42.44,
+-79.3315
 ],
 "gettysburg|PA":[
 39.8309,
@@ -257,6 +286,11 @@
 "glens falls|NY":[
 43.3099,
 -73.6444
+],
+"gloucester county|NJ":null,
+"greencastle|PA":[
+39.7904,
+-77.7278
 ],
 "greensburg|PA":[
 40.3025,
@@ -322,6 +356,11 @@
 40.1784,
 -75.1285
 ],
+"hudson rbt|NY":null,
+"hudson|NY":[
+42.2529,
+-73.791
+],
 "jackson township|NJ":[
 40.1152,
 -74.3648
@@ -333,6 +372,10 @@
 "kearny|NJ":[
 40.7684,
 -74.1454
+],
+"kingston|NY":[
+41.9288,
+-74.0024
 ],
 "lake grove|NY":[
 40.8529,
@@ -350,9 +393,17 @@
 40.2877,
 -74.7123
 ],
+"lawrence|PA":[
+40.3062,
+-80.1206
+],
 "lehighton|PA":[
 40.834,
 -75.7136
+],
+"lewisburg|PA":[
+40.9645,
+-76.8848
 ],
 "linden|NJ":[
 40.622,
@@ -411,6 +462,7 @@
 40.4335,
 -79.7606
 ],
+"montgomery county|PA":null,
 "montoursville|PA":[
 41.2495,
 -76.9267
@@ -428,6 +480,10 @@
 -74.4811
 ],
 "morristown-re|NJ":null,
+"mount pleasant|PA":[
+40.1487,
+-79.5421
+],
 "mt laurel township|NJ":[
 39.934,
 -74.891
@@ -444,6 +500,7 @@
 41.147,
 -73.9903
 ],
+"new cumberland-pennsylvania-united states of america|PA":null,
 "new hope|PA":[
 40.3643,
 -74.9513
@@ -461,6 +518,8 @@
 -74.0238
 ],
 "new york - 104 w 40th|NY":null,
+"new york - 1166|NY":null,
+"new york - 499 park|NY":null,
 "new york - new york|NY":[
 40.7127,
 -74.006
@@ -492,11 +551,24 @@
 "nj - hoboken|NJ":null,
 "nj - lumberton|NJ":null,
 "nj - manalapan|NJ":null,
+"nj - morristown|NJ":null,
+"nj - wayne|NJ":[
+40.8997,
+-74.2474
+],
 "nj - west orange|NJ":null,
 "nj-florham park|NJ":null,
 "nj-jersey city|NJ":null,
 "nj-parsippany|NJ":null,
 "nj-swedesboro|NJ":null,
+"north tonawanda|NY":[
+43.0408,
+-78.8661
+],
+"northeast philadelphia|PA":[
+40.0368,
+-75.0407
+],
 "ny - brockport|NY":null,
 "ny - goshen|NY":null,
 "ny - new york (10173|NY":null,
@@ -524,6 +596,10 @@
 "orchard park|NY":[
 42.767,
 -78.7436
+],
+"orwigsburg|PA":[
+40.6549,
+-76.1007
 ],
 "pa - allentown|PA":null,
 "pa - bensalem|PA":null,
@@ -562,6 +638,7 @@
 -75.1502
 ],
 "pa-pittsburgh|PA":null,
+"pa-west chester - dunwoody dr|PA":null,
 "painted post|NY":[
 42.162,
 -77.0941
@@ -574,12 +651,17 @@
 40.9168,
 -74.1718
 ],
+"pa|PA":null,
 "pennsylvania - king of prussia|PA":null,
 "pennsylvania|PA":[
 40.0117,
 -75.1844
 ],
 "philadelphia clinic|PA":null,
+"phillipsburg|NJ":[
+40.6916,
+-75.1953
+],
 "phoenixville|PA":[
 40.1339,
 -75.5173
@@ -600,6 +682,14 @@
 "pottstown|PA":[
 40.2453,
 -75.6496
+],
+"quakertown|PA":[
+40.4418,
+-75.3416
+],
+"queensbury|NY":[
+43.3619,
+-73.6652
 ],
 "radnor|PA":[
 40.0463,
@@ -625,6 +715,10 @@
 39.8812,
 -75.3238
 ],
+"robbinsville|NJ":[
+40.2163,
+-74.6198
+],
 "rochelle park|NJ":[
 40.9093,
 -74.0733
@@ -642,15 +736,27 @@
 43.0259,
 -77.7453
 ],
+"sellersville|PA":[
+40.3543,
+-75.305
+],
 "seneca falls|NY":[
 42.9107,
 -76.7968
+],
+"shippingport|PA":[
+40.632,
+-80.414
 ],
 "shirley|NY":[
 40.8013,
 -72.8676
 ],
 "somerset county|NJ":null,
+"south philadelphia|PA":[
+39.9255,
+-75.1695
+],
 "south plainfield|NJ":[
 40.5793,
 -74.4115
@@ -658,6 +764,10 @@
 "spring house|PA":[
 40.1854,
 -75.2277
+],
+"springville|NY":[
+42.5087,
+-78.6667
 ],
 "stanhope|NJ":[
 40.9029,
@@ -678,6 +788,10 @@
 "tarentum|PA":[
 40.6021,
 -79.7545
+],
+"titusville|NJ":[
+40.3096,
+-74.8804
 ],
 "tonawanda plant|NY":[
 43.0484,
@@ -700,6 +814,7 @@
 -74.0238
 ],
 "united states - new jersey - parsippany|NJ":null,
+"united states of america|NJ":null,
 "united states of america|NY":null,
 "university park|PA":[
 34.7406,
@@ -720,6 +835,7 @@
 "usa - new york - malta|NY":null,
 "usa - new york - new york|NY":null,
 "usa - ny (remote|NY":null,
+"usa - pennsylvania - king of prussia|PA":null,
 "usa - pennsylvania - philadelphia|PA":null,
 "usa - pennsylvania - pittsburgh|PA":null,
 "usa - pennsylvania - west point|PA":null,
