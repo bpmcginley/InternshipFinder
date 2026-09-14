@@ -150,12 +150,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "AtomicSemi": {
-   "name": "Atomic Semi",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "auctor": {
    "name": "Auctor",
    "quant": false,
@@ -328,12 +322,6 @@
    "name": "ConductorAI",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "conductorone": {
-   "name": "ConductorOne",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "confluent": {
@@ -672,12 +660,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "genesis-therapeutics": {
-   "name": "Genesis Therapeutics",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "genmd": {
    "name": "GenMD",
    "quant": false,
@@ -846,12 +828,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "iacollaborative": {
-   "name": "IA Collaborative",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "ibotta": {
    "name": "ibotta",
    "quant": false,
@@ -886,12 +862,6 @@
    "name": "Insitro",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "inspiration-commerce-group": {
-   "name": "Inspiration Commerce Group",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "interplay": {
@@ -978,22 +948,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "latitude": {
-   "name": "Latitude.io",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "leland": {
    "name": "Leland",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "lindy": {
-   "name": "Lindy",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "linear": {
@@ -1030,12 +988,6 @@
    "name": "m13",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "mach": {
-   "name": "Mach Industries",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "Marathon%20Fusion": {
@@ -1098,12 +1050,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "mentis": {
-   "name": "Mentis AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "mercor": {
    "name": "Mercor",
    "quant": false,
@@ -1144,12 +1090,6 @@
    "name": "Monogram",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "mtesting.ai": {
-   "name": "Mistral AI",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "MUBI": {
@@ -1260,12 +1200,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "odin-dynamics": {
-   "name": "Odin Dynamics, Inc",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "odys-aviation": {
    "name": "Odys Aviation",
    "quant": false,
@@ -1312,12 +1246,6 @@
    "name": "Orbital Industries",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "orbitalmaterials": {
-   "name": "Orbital Materials",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "osmo": {
@@ -1794,12 +1722,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "tandem": {
-   "name": "Tandem",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "telus-digital": {
    "name": "TELUS Digital",
    "quant": false,
@@ -1884,12 +1806,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "tuesday-lab": {
-   "name": "Tuesday Lab",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "turion-space": {
    "name": "Turion Space",
    "quant": false,
@@ -1968,12 +1884,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "veeda-labs": {
-   "name": "Veeda AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "vega": {
    "name": "Vega Investment Technologies",
    "quant": false,
@@ -2044,12 +1954,6 @@
    "name": "WebAI",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "whatnot": {
-   "name": "WhatNot",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "windborne-systems": {
@@ -2210,12 +2114,6 @@
    "name": "10Beauty",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "10xgenomics": {
-   "name": "10x Genomics",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "1800contacts": {
@@ -2398,12 +2296,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "appliedintuition": {
-   "name": "Applied Intuition",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "applovin": {
    "name": "AppLovin",
    "quant": false,
@@ -2426,12 +2318,6 @@
    "name": "Aquatic Capital",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "arcellx": {
-   "name": "Arcellx",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "arcesiumllc": {
@@ -2462,12 +2348,6 @@
    "name": "Argmax",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "arine": {
-   "name": "Arine",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "armada": {
@@ -2650,12 +2530,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "bitgointernships": {
-   "name": "BitGo",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "blackedgecapital": {
    "name": "BlackEdge Capital",
    "quant": false,
@@ -2786,18 +2660,6 @@
    "name": "Calyxo",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "campusopportunities": {
-   "name": "Withum",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "capitalrx": {
-   "name": "Capital Rx",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "cargurus": {
@@ -3148,12 +3010,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "dustyrobotics": {
-   "name": "Dusty Robotics",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "dvtrading": {
    "name": "DV Group",
    "quant": false,
@@ -3340,12 +3196,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "fireworksai": {
-   "name": "Fireworks AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "fiveringsllc": {
    "name": "Five Rings",
    "quant": false,
@@ -3392,12 +3242,6 @@
    "name": "Foley Hoag",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "forerunner": {
-   "name": "Forerunner",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "formic": {
@@ -3464,12 +3308,6 @@
    "name": "Galaxy",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "galileofinancialtechnologies": {
-   "name": "Galileo Financial Technologies",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "gallup": {
@@ -3574,12 +3412,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "glossgenius": {
-   "name": "GlossGenius",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "glossier": {
    "name": "Glossier",
    "quant": false,
@@ -3650,12 +3482,6 @@
    "name": "Gusto",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "haizelabs": {
-   "name": "Haize Labs",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "harbingermotors": {
@@ -3748,22 +3574,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "ibkr": {
-   "name": "Interactive Brokers",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "idmeuniversityrecruiting": {
    "name": "ID.me",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "iherb": {
-   "name": "iHerb",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "imc": {
@@ -3787,7 +3601,7 @@
   "impiricus": {
    "name": "Impiricus",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "incidentiq": {
@@ -4090,12 +3904,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "loop": {
-   "name": "Loop",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "lucidbots": {
    "name": "Lucid Bots",
    "quant": false,
@@ -4132,28 +3940,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "maintainx": {
-   "name": "MaintainX",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "markforged": {
    "name": "Markforged",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "marqeta": {
-   "name": "Marqeta",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "matx": {
-   "name": "MatX",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "mavensecuritiesholdingltd": {
@@ -4190,12 +3980,6 @@
    "name": "MEMIC",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "memphismeats": {
-   "name": "Memphis Meats",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "mercury": {
@@ -4256,12 +4040,6 @@
    "name": "Meridian Partners",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "mqreferrals": {
-   "name": "Marqeta",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "msfcareers": {
@@ -4412,12 +4190,6 @@
    "name": "Onapsis",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "optirtc": {
-   "name": "OptiRTC",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "optiverprivate": {
@@ -4882,12 +4654,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "seamlessai": {
-   "name": "Seamless.AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "seatgeek": {
    "name": "SeatGeek",
    "quant": false,
@@ -5258,12 +5024,6 @@
    "name": "Optiver",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "transcarent": {
-   "name": "Transcarent",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "transmarketgroup": {
@@ -6378,12 +6138,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "sanctuary": {
-   "name": "Sanctuary AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "saronic": {
    "name": "Saronic",
    "quant": false,
@@ -6447,13 +6201,7 @@
   "spotify": {
    "name": "Spotify",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13"
-  },
-  "SprinterHealth": {
-   "name": "Sprinter Health",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "standtogether": {
@@ -6624,12 +6372,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "Xpansiv": {
-   "name": "Xpansiv",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "xsolla": {
    "name": "Xsolla",
    "quant": false,
@@ -6695,7 +6437,7 @@
   "ecge.fa.us2.oraclecloud.com|CX_1003": {
    "name": "Blue Shield of California",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-14"
   },
   "ecnf.fa.us2.oraclecloud.com|CX": {
@@ -6821,7 +6563,7 @@
   "egug.fa.us2.oraclecloud.com|CX_1": {
    "name": "American Express",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-14"
   },
   "egup.fa.us2.oraclecloud.com|CX": {
@@ -6857,7 +6599,7 @@
   "ehzq.fa.us2.oraclecloud.com|CX_1": {
    "name": "Grant Thornton",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-14"
   },
   "ejhp.fa.us6.oraclecloud.com|CX_2": {
@@ -7001,7 +6743,7 @@
   "eoje.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Black Box",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-14"
   },
   "eppr.fa.us2.oraclecloud.com|CX_2": {
@@ -7389,7 +7131,7 @@
   "acretrader-jobs": {
    "name": "AcreTrader",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-14"
   },
   "amika-careers": {
@@ -7527,7 +7269,7 @@
   "etg": {
    "name": "Exploration Technology Corp.",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-14"
   },
   "fluidai-medical-careers": {
@@ -8925,7 +8667,7 @@
   "accenture|wd103|AccentureCareers": {
    "name": "Accenture",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "accenture|wd103|AvanadeCareers": {
@@ -8974,24 +8716,6 @@
    "name": "American Cancer Society",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "activision|wd1|Blizzard_External_Careers": {
-   "name": "Blizzard Entertainment",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "activision|wd1|External": {
-   "name": "Activision-Blizzard",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "activision|wd1|King_External_Careers": {
-   "name": "King",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "acushnetgolf|wd12|ACU": {
@@ -9060,12 +8784,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "aig|wd1|aig": {
-   "name": "AIG",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "aig|wd1|early_careers": {
    "name": "AIG",
    "quant": false,
@@ -9081,7 +8799,7 @@
   "airliquidehr|wd3|airgasexternalcareer": {
    "name": "Airgas",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "airliquidehr|wd3|AirLiquideExternalCareer": {
@@ -9274,12 +8992,6 @@
    "name": "AMN Healthcare",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "amplify|wd1|Amplify_Careers": {
-   "name": "Amplify",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "amynta|wd5|global": {
@@ -9573,7 +9285,7 @@
   "aveva|wd3|AVEVA_careers": {
    "name": "AVEVA",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "aveva|wd3|RIB_Careers": {
@@ -9599,6 +9311,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "awepeople|wd3|Grad_Careers": {
+   "name": "AWE",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "awg|wd3|AW": {
    "name": "Anglian Water",
@@ -9903,7 +9621,7 @@
   "blackstone|wd1|bx_external_site": {
    "name": "Blackstone",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "bloomberg|wd1|Bloombergindustrygroup_External_Career_Site": {
@@ -9939,13 +9657,13 @@
   "bmo|wd3|Campus": {
    "name": "BMO ",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "bmo|wd3|External": {
    "name": "Bank of Montreal",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "bmo|wd3|Privileged": {
@@ -9968,12 +9686,6 @@
   },
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
-   "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "boeing|wd1|external_subsidiary": {
-   "name": "The Boeing Company",
    "quant": false,
    "fails": 3,
    "added": "2026-09-13"
@@ -10017,7 +9729,7 @@
   "bpinternational|wd3|bpCareers": {
    "name": "BP",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "bpinternational|wd3|bpEarlyCareers": {
@@ -10101,13 +9813,13 @@
   "caci|wd1|external": {
    "name": "CACI",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cadence|wd1|external_careers": {
    "name": "Cadence",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cadence|wd1|OpenEye_Careers": {
@@ -10143,31 +9855,25 @@
   "calibercollision|wd1|caliber": {
    "name": "Caliber",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "calibercollision|wd1|protech": {
    "name": "Protech Automotive Solutions",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "calix|wd1|External": {
    "name": "Calix",
    "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "cambiahealth|wd1|External": {
-   "name": "Cambia Health Solutions",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cambiumlearning|wd1|camb": {
    "name": "Cambium Learning Group",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cambridgeassociates|wd5|Cambridge_Associates": {
@@ -10209,7 +9915,7 @@
   "capgroup|wd1|capitalgroupcareers": {
    "name": "Capital Group",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "capitalauto|wd3|capitalautogroupcareers": {
@@ -10227,13 +9933,13 @@
   "cardinalhealth|wd1|EXT": {
    "name": "Cardinal Health",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "caresource|wd1|caresource": {
    "name": "CareSource",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cartech|wd5|CTCExternal": {
@@ -10245,7 +9951,7 @@
   "carters|wd1|CartersCareers": {
    "name": "Carter's",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cat|wd5|CaterpillarCareers": {
@@ -10332,12 +10038,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "cff|wd1|explore-career-opportunities": {
-   "name": "Cystic Fibrosis Foundation",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "cgg|wd103|viridiencareers": {
    "name": "Viridien",
    "quant": false,
@@ -10353,7 +10053,7 @@
   "championx|wd1|championx_external": {
    "name": "ChampionX",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "charlottenc|wd12|citgov": {
@@ -10419,7 +10119,7 @@
   "cigna|wd5|cignacareers": {
    "name": "Cigna Group",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cincinnatichildrens|wd5|careersatcincinnatichildrens": {
@@ -10443,7 +10143,7 @@
   "cisco|wd5|cisco_careers": {
    "name": "Cisco",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cisecurity|wd1|CIS_External_Career_Site": {
@@ -10461,13 +10161,13 @@
   "citi|wd5|2": {
    "name": "Citi",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "citi|wd5|Citi_Early_Careers_Events_Site": {
    "name": "Citi",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cityofvancouver|wd5|COV": {
@@ -10479,7 +10179,7 @@
   "clarios|wd5|clarioscareers": {
    "name": "Clarios",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "clarivate|wd3|Clarivate_Careers": {
@@ -10503,13 +10203,7 @@
   "clearwateranalytics|wd1|Clearwater_Analytics_Careers": {
    "name": "CWAN",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "cliftonlarsonallen|wd1|CLA": {
-   "name": "CliftonLarsonAllen",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "clio|wd3|ClioCareerSite": {
@@ -10527,7 +10221,7 @@
   "clr|wd5|CLR_Careers": {
    "name": "Continental Resources",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cmcmarkets|wd3|CMC_Markets_Careers": {
@@ -10542,22 +10236,16 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "cmu|wd5|cmu": {
-   "name": "Carnegie Mellon University",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "cna|wd1|CNA_Careers": {
    "name": "CNA Insurance",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cnoinc|wd5|careers": {
    "name": "CNO Financial Group",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cogeco|wd3|Cogeco_Careers": {
@@ -10575,13 +10263,13 @@
   "cohesity|wd5|Cohesity_Careers": {
    "name": "Cohesity",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "coke|wd1|coca-cola-careers": {
    "name": "The Coca-Cola Company",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "colliers|wd3|Colliers-External-Career-Site": {
@@ -10590,34 +10278,28 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "comcast|wd5|Comcast_Careers": {
-   "name": "Comcast",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "commercebank|wd1|CommerceJobs": {
    "name": "Commerce Bank",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "compassion|wd5|compassioncareers": {
    "name": "Compassion International",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "compassion|wd5|CompassionCareersPrivateLink": {
    "name": "Compassion International",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "conagrabrands|wd1|Careers_US": {
    "name": "Conagra Brands",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "conehealth|wd12|cone_health-careers": {
@@ -10635,7 +10317,7 @@
   "cooperstandard|wd1|CooperStandard": {
    "name": "Cooper Standard",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "coorstek|wd1|CoorsTekCareers": {
@@ -10653,19 +10335,19 @@
   "copeland|wd5|copeland_external_careers_page": {
    "name": "Copeland",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "coreandmain|wd1|coreandmain": {
    "name": "Core & Main",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "corebridgefinancial|wd1|CorebridgeFinancial": {
    "name": "Corebridge Financial",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "corpay|wd103|ext_001": {
@@ -10677,7 +10359,7 @@
   "corteva|wd5|corteva": {
    "name": "Corteva",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "costar|wd1|Costar_Campus": {
@@ -10689,7 +10371,7 @@
   "costar|wd1|CoStarCareers": {
    "name": "CoStar Group",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "countryfinancial|wd5|COUNTRYCorporateExternal": {
@@ -10701,7 +10383,7 @@
   "countryfinancial|wd5|COUNTRYCorporateInternships": {
    "name": "COUNTRY Financial",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "covestro|wd3|cov_external": {
@@ -10719,25 +10401,25 @@
   "cox|wd1|Cox_External_Career_Site_1": {
    "name": "Cox",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cranecompany|wd5|Careers": {
    "name": "Crane Co.",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "creationtech|wd1|Creation": {
    "name": "Creation Technologies",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "creditacceptance|wd5|Credit_Acceptance": {
    "name": "Credit Acceptance Careers",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "crestnicholson|wd103|CN": {
@@ -10755,7 +10437,7 @@
   "crowdstrike|wd5|crowdstrikecareers": {
    "name": "Crowdstrike",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "crowe|wd12|external_careers": {
@@ -10773,31 +10455,31 @@
   "csl|wd1|CSL_External": {
    "name": "CSL",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cswg|wd1|cs_careers": {
    "name": "C&S Wholesale Grocers",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cubic|wd1|cubic_global_careers": {
    "name": "Cubic",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cubic|wd1|cubic_USA_careers": {
    "name": "Cubic",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "curtisswright|wd1|cw_external_career_site": {
    "name": "Curtiss-Wright Corporation",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "customersbank|wd1|customersbankcareers": {
@@ -10809,13 +10491,13 @@
   "cvshealth|wd1|CVS_Health_Careers": {
    "name": "CVS Health",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cvshealth|wd1|Private_Postings_Intern_Conversion_ONLY": {
    "name": "CVS Health",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "cws|wd3|cws_jobs": {
@@ -10827,37 +10509,37 @@
   "cw|wd1|external": {
    "name": "Cushman & Wakefield",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "dairynet|wd1|DPCcareers": {
    "name": "Dairyland Power Cooperative",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "dallascollege|wd1|Dallas_College_Careers": {
    "name": "Dallas College",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "danaher|wd1|DanaherJobs": {
    "name": "Danaher Corporation",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "datarobot|wd1|DataRobot_External_Careers": {
    "name": "DataRobot",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "datasite|wd1|datasite": {
    "name": "Datasite",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "deckers|wd5|Deckers": {
@@ -10878,12 +10560,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "dell|wd1|External": {
-   "name": "Dell Technologies",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "deluxe|wd5|USA_CAN": {
    "name": "Deluxe",
    "quant": false,
@@ -10899,7 +10575,7 @@
   "denver|wd1|CCD-denver-denvergov-CSC_Jobs-Civil_service_jobs-Police_Jobs-Fire_Jobs": {
    "name": "Denver",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "desjardins|wd10|Desjardins": {
@@ -10917,7 +10593,7 @@
   "dickssportinggoods|wd1|DSG": {
    "name": "Dick's Sporting Goods",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "dimensional|wd5|dfa_careers": {
@@ -10941,13 +10617,7 @@
   "disney|wd5|disneycareer": {
    "name": "The Walt Disney Company",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "disney|wd5|disneycareerdc": {
-   "name": "The Walt Disney Company",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "dmainc|wd5|dma": {
@@ -10959,13 +10629,7 @@
   "dollartree|wd5|dollartreeus": {
    "name": "Dollar Tree",
    "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "donaldson|wd5|donaldsoncareers": {
-   "name": "Donaldson Company",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "doterra|wd1|doTERRACareers": {
@@ -10989,7 +10653,7 @@
   "dow|wd1|ExternalCareers": {
    "name": "Dow Chemical Company",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "draftkings|wd1|Campus_Career_Portal": {
@@ -11007,19 +10671,19 @@
   "draper|wd5|draper_careers": {
    "name": "Draper",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "driscolls|wd5|driscolls": {
    "name": "Driscoll's",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "drivetime|wd1|DriveTime": {
    "name": "DriveTime",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "dtna|wd5|dtna_affiliate": {
@@ -11031,7 +10695,7 @@
   "dxctechnology|wd1|dxcjobs": {
    "name": "DXC Technology",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "dyson|wd3|dyson_careers": {
@@ -11043,31 +10707,31 @@
   "echo|wd1|Echo_Logistics": {
    "name": "Echo Global Logistics",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ecolab|wd1|ecolab_external": {
    "name": "Ecolab",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "edwards|wd5|edwardscareers": {
    "name": "Edwards Lifesciences",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "eisneramper|wd1|EisnerAmperEarlyCareers": {
    "name": "EisnerAmper",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "elanco|wd5|External_Career": {
    "name": "Elanco",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "elekta|wd3|Elekta_Careers": {
@@ -11085,19 +10749,19 @@
   "elevancehealth|wd1|ANT": {
    "name": "CareBridge",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "elevancehealth|wd1|ELV-ET": {
    "name": "Elevance Health",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "elkay|wd1|Elkay_External": {
    "name": "Zurn Elkay Water Solutions",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "emcins|wd5|EMC_Careers": {
@@ -11127,43 +10791,31 @@
   "energynorthwest|wd1|External": {
    "name": "Energy Northwest",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "enovis|wd5|enovis": {
    "name": "ENOVIS",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ensemblehp|wd5|ensemblehealthpartnerscareers": {
    "name": "Ensemble Health Partners",
    "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "entegris|wd1|entegriscareers": {
-   "name": "Entegris",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "entrust|wd1|entrustcareers": {
-   "name": "Entrust",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "envista|wd1|envistacareers": {
    "name": "Envista",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "epicorsoftware|wd5|epicorjobs": {
    "name": "Epicor",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "epiqsystems|wd503|Epiq_Careers": {
@@ -11181,7 +10833,7 @@
   "equinix|wd1|External": {
    "name": "Equinix",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ercot|wd1|ercot_careers": {
@@ -11199,19 +10851,19 @@
   "etsy|wd5|Etsy_Careers": {
    "name": "Etsy",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "evercommerce|wd1|evercommerce_careers": {
    "name": "EverCommerce",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "everestre|wd5|careers": {
    "name": "Everest",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "evergreenix|wd1|external-careers2": {
@@ -11223,7 +10875,7 @@
   "eversource|wd1|ExternalSite": {
    "name": "Eversource Energy",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "evolito|wd3|Evolito_Career_Site": {
@@ -11236,12 +10888,6 @@
    "name": "Evonik",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "evrazna|wd5|EVRAZ": {
-   "name": "Orion Steel Group",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "exactsciences|wd1|Exact_Sciences": {
@@ -11271,25 +10917,25 @@
   "faithtechnologies|wd1|FTI_Engineering": {
    "name": "Faith Technologies",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fanniemae|wd1|FannieMaeCareers": {
    "name": "Fannie Mae",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fau|wd1|FAU": {
    "name": "Florida Atlantic University",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fenwick|wd1|Fenwick_External_Careers": {
    "name": "Fenwick & West",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fermilab|wd5|FermilabCareers": {
@@ -11307,13 +10953,13 @@
   "ffin|wd1|First_Financial_Bank": {
    "name": "First Financial ",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ffive|wd5|f5jobs": {
    "name": "F5",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fhlbi|wd1|FHLBI_Careers": {
@@ -11325,13 +10971,13 @@
   "fhlbny|wd1|FHLBNY": {
    "name": "Federal Home Loan Bank of New York",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fhlbtopeka|wd1|FHLBT": {
    "name": "FHLBank Topeka",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fifththird|wd5|53careers": {
@@ -11361,19 +11007,19 @@
   "finra|wd1|FINRA": {
    "name": "Finra",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "firstam|wd1|fctcareers": {
    "name": "First Canadian Title",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "firstam|wd1|firstamericancareers": {
    "name": "First American",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "firstnational|wd12|fnbocareers": {
@@ -11385,13 +11031,13 @@
   "firstquality|wd5|firstquality": {
    "name": "First Quality",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fiserv|wd5|EXT": {
    "name": "Fiserv",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fivebelow|wd1|fivebelowcareers": {
@@ -11409,43 +11055,31 @@
   "flextronics|wd1|Careers": {
    "name": "Flextronics International",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "flir|wd1|flircareers": {
    "name": "Teledyne Technologies Incorporated",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "floridatech|wd5|FloridaTechCareers": {
    "name": "Florida Institute of Technology",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "flowserve|wd1|applied": {
    "name": "Flowserve",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "fmc|wd12|FMC": {
    "name": "FMC Corporation",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "fmr|wd1|fidelitycareers": {
-   "name": "Fidelity Investments",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "fmr|wd1|targeted": {
-   "name": "Fidelity Investments",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "fnbcorp|wd501|FNBCORP": {
@@ -11463,13 +11097,13 @@
   "fortrea|wd1|Fortrea": {
    "name": "Fortrea",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fox|wd1|Domestic": {
    "name": "FOX",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "franklintempleton|wd5|invitation-only": {
@@ -11493,7 +11127,7 @@
   "freese|wd1|Freese_Nichols_External": {
    "name": "Freese and Nichols",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "freseniusglobal|wd3|FK_Careers": {
@@ -11529,7 +11163,7 @@
   "fticonsulting|wd108|FTIConsultingCareers": {
    "name": "FTI Consulting",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "fticonsulting|wd108|FTIConsultingCareersPrivate": {
@@ -11541,7 +11175,7 @@
   "fullsteam|wd1|external": {
    "name": "Fullsteam",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gables|wd5|Gables_Careers": {
@@ -11553,37 +11187,37 @@
   "gafsgi|wd5|GAF_Careers": {
    "name": "GAF",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gaig|wd1|GAIG_External": {
    "name": "Great American Insurance Company",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gaig|wd1|National_Interstate_External": {
    "name": "National Interstate Insurance",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gartner|wd5|EXT": {
    "name": "Gartner",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gcu|wd1|GCU": {
    "name": "Grand Canyon University",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gdit|wd5|external_career_site": {
    "name": "General Dynamics Information Technology",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gdit|wd5|gdit_earlytalent": {
@@ -11595,7 +11229,7 @@
   "geaerospace|wd5|ge_externalsite": {
    "name": "GE Aerospace",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "geha|wd5|GEHACareers": {
@@ -11607,31 +11241,31 @@
   "gehc|wd5|GEHC_ExternalSite": {
    "name": "GE Healthcare",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "geico|wd1|External": {
    "name": "Geico",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "geisinger|wd5|geisingerexternal": {
    "name": "Geisinger",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "generac|wd5|external": {
    "name": "Generac",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "generalmotors|wd5|Careers_GM": {
    "name": "General Motors",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "genmab|wd3|Genmab_Careers_Site": {
@@ -11643,7 +11277,7 @@
   "genpt|wd1|Careers": {
    "name": "Genuine Parts Company",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gensler|wd1|genslercareers": {
@@ -11655,7 +11289,7 @@
   "gentex|wd5|Gentex": {
    "name": "Gentex Corporation",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gen|wd1|careers": {
@@ -11667,31 +11301,25 @@
   "gevernova|wd5|only_confidential_executive_recruiting": {
    "name": "GE Vernova",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "gevernova|wd5|vernova_externalsite": {
-   "name": "GE Vernova",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gfs|wd5|usjobs-gen-gfs": {
    "name": "Gordon Food Service",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gfs|wd5|usprivate-gfs": {
    "name": "Gordon Food Service",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ghr|wd1|us-emplsv": {
    "name": "Bank of America",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gia|wd1|GIA": {
@@ -11700,22 +11328,16 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "gilead|wd1|gileadcareers": {
-   "name": "Gilead Sciences",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "gilead|wd1|kitepharmacareers": {
    "name": "Kite Pharma",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gi|wd1|Global_Infrastructure": {
    "name": "Global Infrastructure",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "glencorecorp|wd3|External": {
@@ -11727,31 +11349,31 @@
   "globalfoundries|wd1|External": {
    "name": "GlobalFoundries",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "globalhr|wd5|Private_Posting_No_TMP": {
    "name": "RTX",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "globalhr|wd5|rec_rtx_ext_gateway": {
    "name": "RTX",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "global|wd1|globalpartnerscareers": {
    "name": "Global Partners",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "globusmedical|wd5|GMED_Careers": {
    "name": "Globus Medical",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gnw|wd1|GNW": {
@@ -11781,7 +11403,7 @@
   "goto|wd5|GoToCareers": {
    "name": "GoTo Group",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "graco|wd501|Graco_Careers": {
@@ -11793,13 +11415,13 @@
   "granite|wd1|careers": {
    "name": "Granite Construction",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "graybar|wd1|Careers": {
    "name": "Graybar",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "greatamerica|wd12|greatamericacareers": {
@@ -11820,12 +11442,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "greystar|wd1|External": {
-   "name": "Greystar Worldwide",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "group1001wd|wd5|careers": {
    "name": "Group 1001",
    "quant": false,
@@ -11835,25 +11451,19 @@
   "gsk|wd5|GSKCareers": {
    "name": "GSK",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "gtsgbu|wd3|Careers": {
-   "name": "Hitachi",
-   "quant": false,
    "fails": 3,
    "added": "2026-09-13"
   },
   "gtweed|wd1|Careers": {
    "name": "Greene Tweed",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "guardianlife|wd5|guardian-life-careers": {
    "name": "Guardian Life",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "guggenheiminvestment|wd5|External": {
@@ -11865,19 +11475,19 @@
   "guidehouse|wd1|external": {
    "name": "Guidehouse",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "guidestone|wd1|guidestone": {
    "name": "GuideStone",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "guidewire|wd5|external": {
    "name": "Guidewire",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "gunvor|wd3|Gunvor_Careers": {
@@ -11901,7 +11511,7 @@
   "hancockwhitney|wd5|Careers": {
    "name": "Hancock Whitney",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "harman|wd3|HARMAN": {
@@ -11916,12 +11526,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "hbfuller|wd1|Careers": {
-   "name": "H.B. Fuller",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "hcad|wd5|HCADCareers": {
    "name": "Harris Central Appraisal District",
    "quant": false,
@@ -11931,25 +11535,19 @@
   "hcsc|wd1|HCSC_External": {
    "name": "HCSC",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "hdsupply|wd1|External": {
-   "name": "HD Supply",
-   "quant": false,
    "fails": 3,
    "added": "2026-09-13"
   },
   "healthfirst|wd1|healthfirst": {
    "name": "Healthfirst",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "hec|wd5|hilcorp_energy_company": {
    "name": "Hilcorp",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "heidelbergmaterials|wd3|global_hm_career_site": {
@@ -11961,7 +11559,7 @@
   "heinz|wd1|KraftHeinz_Careers": {
    "name": "Kraft Heinz",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "heinz|wd1|KraftHeinz_Careers_UR": {
@@ -11973,19 +11571,19 @@
   "hendrick|wd5|HMSCareers": {
    "name": "Hendrick Motorsports",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "henryschein|wd1|External_Careers": {
    "name": "Henry Schein",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "hilbgroup|wd5|HG-Careers": {
    "name": "Hilb Group",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "hiscox|wd3|Hiscox_External_Site": {
@@ -11997,7 +11595,7 @@
   "hitachi|wd1|hitachi": {
    "name": "Hitachi",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "hmhw|wd12|hmh_careers": {
@@ -12006,16 +11604,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "hntb|wd5|hntb_careers": {
-   "name": "HNTB",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "hntb|wd5|hntb_university_careers": {
    "name": "HNTB",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "holmanautogroup|wd1|HolmanEnterprisesCareers": {
@@ -12024,16 +11616,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "homedepot|wd5|careerdepot": {
-   "name": "The Home Depot",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "homedepot|wd5|CareerDepotCanada": {
    "name": "The Home Depot",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "howard|wd1|HU": {
@@ -12042,28 +11628,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "hpe|wd5|acjobsite": {
-   "name": "Hewlett Packard Enterprise",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "hpe|wd5|Jobsathpe": {
-   "name": "Hewlett Packard Enterprise",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "hp|wd5|externalcareersite": {
-   "name": "Hewlett Packard (HP)",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "hp|wd5|EXTEU-AC-CareerSite": {
    "name": "Hewlett Packard (HP)",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "hq|wd12|Securian_External": {
@@ -12081,25 +11649,19 @@
   "hubinternational|wd1|HUBInternational": {
    "name": "HUB",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "humana|wd5|Humana_External_Career_Site": {
    "name": "Humana",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "huntington|wd12|HNBcareers": {
    "name": "Huntington Bancshares",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "huron|wd1|huroncareers": {
-   "name": "Huron",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "hyperiongrp|wd3|Hyperion_External": {
@@ -12111,7 +11673,7 @@
   "hyvee|wd1|HyVeeCareers": {
    "name": "Hy-Vee",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "iatinsurancegroup|wd1|iat": {
@@ -12135,19 +11697,13 @@
   "icf|wd5|ICFExternal_Career_Site": {
    "name": "ICF",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "idexcorp|wd5|idex_careers": {
    "name": "IDEX",
    "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "idexx|wd1|IDEXX": {
-   "name": "IDEXX",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "igsenergy|wd1|IGS": {
@@ -12159,13 +11715,13 @@
   "iheartmedia|wd5|External_iHM": {
    "name": "iHeartMedia",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "ijm|wd5|careers-ijm": {
    "name": "IJM",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "iko|wd3|iko_careers": {
@@ -12207,13 +11763,13 @@
   "ingrammicro|wd5|IngramMicro": {
    "name": "Ingram Micro",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "ingredion|wd1|IngredionCareers": {
    "name": "Ingredion",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ing|wd3|icsgblcor": {
@@ -12225,13 +11781,7 @@
   "inmar|wd1|inmarcareers": {
    "name": "Inmar Intelligence",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "insmed|wd5|EXTERNAL": {
-   "name": "Insmed",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "insperity|wd12|NSP": {
@@ -12243,7 +11793,7 @@
   "insulet|wd5|insuletcareers": {
    "name": "Insulet Corporation",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "intactfc|wd3|intactfc": {
@@ -12279,7 +11829,7 @@
   "intel|wd1|External": {
    "name": "Intel",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "interac|wd3|Interac": {
@@ -12300,12 +11850,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "interpublic|wd5|omc": {
-   "name": "Omnicom Group",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "invesco|wd1|IVZ": {
    "name": "Invesco",
    "quant": false,
@@ -12324,22 +11868,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "iqvia|wd1|IQVIA": {
-   "name": "IQVIA",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "irhythmtech|wd5|irhythm": {
    "name": "iRhythm Technologies",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "ironmountain|wd5|iron-mountain-jobs": {
-   "name": "Iron Mountain",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "isu|wd1|IowaStateJobs": {
@@ -12357,7 +11889,7 @@
   "itron|wd5|Itron": {
    "name": "Itron",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ivytech|wd1|ivy_tech_careers": {
@@ -12369,7 +11901,7 @@
   "jabil|wd5|Jabil_Careers": {
    "name": "Jabil",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "jackson|wd1|jackson_campus": {
@@ -12387,22 +11919,16 @@
   "jadeglobal|wd5|jade_careers": {
    "name": "Jade Global",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "jainglobal|wd5|ExternalSite": {
    "name": "Jain Global",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "jci|wd5|JCI": {
-   "name": "Johnson Controls",
-   "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "jci|wd5|JCI_Confidential": {
    "name": "Johnson Controls",
    "quant": false,
    "fails": 3,
@@ -12414,28 +11940,22 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "jeffersonhealth|wd5|ThomasJeffersonExternal": {
-   "name": "Jefferson Health",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "jefferson|wd5|external": {
    "name": "Jefferson County Colorado",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "jj|wd5|JJ": {
    "name": "Johnson & Johnson",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "jll|wd1|jllcareers": {
    "name": "Jones Lang LaSalle (JLL)",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "jlp|wd3|JLPjobs_careers": {
@@ -12459,7 +11979,7 @@
   "johnsonbrothers|wd5|johnsonbrothers": {
    "name": "Johnson Brothers Liquor Company",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "johnsonelectric|wd3|Career_JE": {
@@ -12472,24 +11992,6 @@
    "name": "Julius Baer",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "justfab|wd1|fabletics": {
-   "name": "Fabletics",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "justfab|wd1|savagex": {
-   "name": "Savage X Fenty",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "kar|wd1|OPENLANE_Careers": {
-   "name": "OPENLANE",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "kbr|wd5|Frazer_Nash_Careers": {
@@ -12507,7 +12009,7 @@
   "kcura|wd1|External_Career_Site": {
    "name": "Relativity",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "kengarff|wd1|external_site": {
@@ -12519,31 +12021,31 @@
   "keybank|wd5|External_Career_Site": {
    "name": "KeyBank",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "kiongroup|wd3|KION_SCS": {
    "name": "KION Group",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "kiongroup|wd3|kiongroup": {
    "name": "KION Group",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "kla|wd1|AnnArbor": {
    "name": "KLA",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "kla|wd1|UR": {
    "name": "KLA",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "kokosing|wd5|Kokosing_External_Career_Site": {
@@ -12573,13 +12075,13 @@
   "kyndryl|wd5|KyndrylProfessionalCareers": {
    "name": "Kyndryl",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "labcorp|wd1|external": {
    "name": "LabCorp",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "lambweston|wd1|CTE": {
@@ -12591,13 +12093,13 @@
   "lambweston|wd1|lamb_external": {
    "name": "Lamb Weston",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "landolakes|wd1|landolakes": {
    "name": "Land O'Lakes",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "largo|wd1|external": {
@@ -12648,22 +12150,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "lilly|wd5|CMP": {
-   "name": "Lilly USA",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "littelfuse|wd1|Littelfuse-Careers": {
    "name": "Littelfuse",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "livenation|wd503|en": {
-   "name": "Ticketmaster",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "livenation|wd503|InsomniacExternalSite": {
@@ -12675,13 +12165,13 @@
   "livenation|wd503|LNExternalSite": {
    "name": "Live Nation Entertainment",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "livenation|wd503|TMExternalSite": {
    "name": "Ticketmaster",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "liveoakbancshares|wd1|Live_Oak": {
@@ -12723,7 +12213,7 @@
   "lplfinancial|wd1|External": {
    "name": "LPL Financial Holdings",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "lplfinancial|wd1|university": {
@@ -12765,7 +12255,7 @@
   "lumentum|wd5|LITE": {
    "name": "Lumentum",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "lumeris|wd1|LC": {
@@ -12813,7 +12303,7 @@
   "manulife|wd3|MFCJH_Jobs": {
    "name": "Manulife Financial",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "maricopa|wd1|MC_External": {
@@ -12849,7 +12339,7 @@
   "marvell|wd1|MarvellCareers": {
    "name": "Marvell",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "marvell|wd1|MarvellCareers2": {
@@ -12870,18 +12360,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "masco|wd1|Masco": {
-   "name": "Masco",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "massgeneralbrigham|wd1|mgbexternal": {
-   "name": "Mass General Brigham",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "massmutual|wd1|MMAscendCareers": {
    "name": "MassMutual Ascend",
    "quant": false,
@@ -12897,7 +12375,7 @@
   "mastercard|wd1|CorporateCareers": {
    "name": "Mastercard",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "mastercard|wd1|Public_Posting_Site": {
@@ -12945,13 +12423,7 @@
   "medtronic|wd1|medtroniccareers": {
    "name": "Medtronic",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "medtronic|wd1|redeploymentmedtroniccareers": {
-   "name": "Medtronic",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "meijer|wd5|Meijer": {
@@ -12975,7 +12447,7 @@
   "merceruniversity|wd1|student": {
    "name": "Mercer University",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "meredith|wd5|EXT": {
@@ -12987,7 +12459,7 @@
   "mfs|wd1|MFS-Careers": {
    "name": "MFS",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "mgic|wd5|mgic": {
@@ -13017,7 +12489,7 @@
   "micron|wd1|External": {
    "name": "Micron Technology",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "mii|wd5|MiTek": {
@@ -13026,16 +12498,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "milestone|wd1|Milestone_External": {
-   "name": "Legrand",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "millerknoll|wd1|MillerKnoll": {
    "name": "MillerKnoll",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "miqdigital|wd3|MiQ_Careers": {
@@ -13047,13 +12513,13 @@
   "mizuho|wd1|Mizuho_Confidential": {
    "name": "Mizuho Securities USA",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "mksinst|wd1|MKSCareersUniversity": {
    "name": "MKS Instruments",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "mlse|wd3|MLSE": {
@@ -13062,16 +12528,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "mmc|wd1|mmc": {
-   "name": "Marsh",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "modernatx|wd1|M_tx": {
    "name": "Moderna",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "modmed|wd501|ModMed12": {
@@ -13083,7 +12543,7 @@
   "momentive|wd1|MC": {
    "name": "Momentive",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "monolithicpower|wd12|MPS_Careers": {
@@ -13107,13 +12567,13 @@
   "mosscm|wd1|moss_careers": {
    "name": "Moss & Associates",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "motorolasolutions|wd5|Careers": {
    "name": "Motorola",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "mrisoftware|wd501|External_CareerSite": {
@@ -13143,12 +12603,6 @@
   "multco|wd1|multco_jobs": {
    "name": "Multnomah County",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "multicare|wd1|multicare": {
-   "name": "MultiCare Health System",
-   "quant": false,
    "fails": 3,
    "added": "2026-09-13"
   },
@@ -13161,7 +12615,7 @@
   "musc|wd1|MUSC": {
    "name": "Medical University of South Carolina",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "my7elevenhr|wd12|Careers": {
@@ -13179,7 +12633,7 @@
   "myhrhome|wd1|OneMainCareers": {
    "name": "OneMain Financial",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "mymvw|wd5|mvw": {
@@ -13209,13 +12663,13 @@
   "nationwidechildrens|wd5|NCHCareers": {
    "name": "Nationwide Children's Hospital",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "nationwide|wd1|Nationwide_Career": {
    "name": "Nationwide",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "navcanada|wd10|NAV_Careers": {
@@ -13278,24 +12732,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "netflix|wd1|Netflix": {
-   "name": "Netflix",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "newbalance|wd1|careers": {
-   "name": "New Balance",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "newrez|wd1|NRZ": {
-   "name": "Newrez",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "newschool|wd1|external": {
    "name": "The New School",
    "quant": false,
@@ -13305,16 +12741,10 @@
   "nexstar|wd5|nexstar": {
    "name": "Nexstar",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ngc|wd1|northrop_grumman_external_site": {
-   "name": "Northrop Grumman",
-   "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "ngc|wd1|northrop_grumman_restricted_site": {
    "name": "Northrop Grumman",
    "quant": false,
    "fails": 3,
@@ -13326,40 +12756,16 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "nike|wd1|nke": {
-   "name": "Nike",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "nio|wd3|NIO_Careers": {
-   "name": "Nio",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "nisource|wd1|NiSource": {
-   "name": "NiSource",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "njm|wd1|njm": {
    "name": "NJM Insurance Group",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "nordsonhcm|wd501|nordsoncareers": {
    "name": "Nordson",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "northeastern|wd1|careers": {
-   "name": "Northeastern University",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "northwesternmutual|wd5|corporate-careers": {
@@ -13371,7 +12777,7 @@
   "northwest|wd1|Northwest_Careers": {
    "name": "Northwest Bank",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "novanta|wd5|Novanta-Careers": {
@@ -13398,58 +12804,34 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "nreca|wd1|external": {
-   "name": "NRECA International",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "nrel|wd5|NLR": {
    "name": "National Laboratory of the Rockies",
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
   },
-  "nrel|wd5|nrel": {
-   "name": "National Renewable Energy Laboratory",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "nshe|wd1|UNR-external": {
-   "name": "University of Nevada, Reno",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "nshs|wd1|ns-eeh": {
-   "name": "Endeavor Health",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "ntrs|wd1|northerntrust": {
    "name": "Northern Trust",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ntst|wd1|careers": {
    "name": "Netsmart",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "nvent|wd5|nVent": {
    "name": "nVent",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "nvidia|wd5|NVIDIAExternalCareerSite": {
    "name": "NVIDIA",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "nwis|wd12|NW": {
@@ -13485,7 +12867,7 @@
   "okgov|wd1|okgovjobs": {
    "name": "Oklahoma State Government",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "olatheks|wd1|olatheks": {
@@ -13533,7 +12915,7 @@
   "oregon|wd5|sor_external_career_site": {
    "name": "Oregon State Government",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "oreillyauto|wd1|oreilly": {
@@ -13551,49 +12933,13 @@
   "oshkoshcorporation|wd5|Oshkosh": {
    "name": "Oshkosh",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "osu|wd1|OSUCareers": {
    "name": "Ohio State University",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "osv-cci|wd1|CCICareers": {
-   "name": "Castleton Commodities International",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "osv-chegg|wd5|Chegg": {
-   "name": "Chegg",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "osv-edf|wd5|Confidential": {
-   "name": "Environmental Defense Fund",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "osv-rubicon|wd5|MagniteCareers": {
-   "name": "Magnite",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "osv-tifec|wd5|fanthreesixty": {
-   "name": "FanThreeSixty",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "otis|wd5|REC_Ext_Gateway": {
-   "name": "Otis",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "otppb|wd3|OntarioTeachers_Careers": {
@@ -13611,31 +12957,31 @@
   "oxy|wd5|Corporate": {
    "name": "Occidental Petroleum",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "oxy|wd5|UniversityRelations": {
    "name": "Occidental Petroleum Corporation (Oxy)",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "pae|wd1|amentum_careers": {
    "name": "Amentum",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "paloaltonetworks|wd5|panwexternalcareers": {
    "name": "Palo Alto Networks",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "papajohns|wd1|papajohnscareers": {
    "name": "Papa John's",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "pattersoncompanies|wd501|PDCO": {
@@ -13677,7 +13023,7 @@
   "pfizer|wd1|PfizerCareers": {
    "name": "Pfizer",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "pg|wd5|1000": {
@@ -13707,7 +13053,7 @@
   "pimco|wd1|pimco-careers": {
    "name": "PIMCO",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "pipersandler|wd501|Piper_Sandler_Careers": {
@@ -13720,12 +13066,6 @@
    "name": "Pitney Bowes",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "plexus|wd5|Plexus_Careers": {
-   "name": "Plexus",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "plugpower|wd5|Plug_Power_Inc": {
@@ -13743,13 +13083,13 @@
   "pnc|wd5|External": {
    "name": "PNC Financial Services",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "poet|wd1|POET": {
    "name": "POET",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "polaris|wd5|PolarisJobs": {
@@ -13773,19 +13113,13 @@
   "premierinc|wd1|external_professional": {
    "name": "Premier",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "primerica|wd1|pri": {
    "name": "Primerica",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "procasemanagement|wd1|PCM": {
-   "name": "Professional Case Management",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "progyny|wd5|progyny": {
@@ -13804,12 +13138,6 @@
    "name": "ProPharma Group",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "pru|wd5|Careers": {
-   "name": "Prudential Financial",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "pru|wd5|pgim_careers": {
@@ -13833,19 +13161,19 @@
   "psu|wd1|PSU_Staff": {
    "name": "PennState University",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ptc|wd1|ptc": {
    "name": "PTC",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "pwc|wd3|Global_Campus_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "pwc|wd3|Global_Experienced_Careers": {
@@ -13857,7 +13185,7 @@
   "pwc|wd3|US_Entry_Level_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "qtsdatacenters|wd5|qts": {
@@ -13869,7 +13197,7 @@
   "quickenloans|wd5|rocket_careers": {
    "name": "Rocket Companies",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "radiancetech|wd12|Radiance_External": {
@@ -13905,7 +13233,7 @@
   "rangersmlb|wd5|Rangers": {
    "name": "Texas Rangers",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "raymondjames|wd1|RaymondJamesEarlyCareers": {
@@ -13923,7 +13251,7 @@
   "rbc|wd3|RBCEARLYTALENT1": {
    "name": "Royal Bank of Canada",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "rbc|wd3|rbcglobal1": {
@@ -13995,7 +13323,7 @@
   "relx|wd3|relx": {
    "name": "RELX",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "relx|wd3|RiskSolutions": {
@@ -14220,12 +13548,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "sallie-mae|wd5|Careers": {
-   "name": "Sallie Mae",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "sandvik|wd3|sandvik-jobs": {
    "name": "Sandvik",
    "quant": false,
@@ -14313,7 +13635,7 @@
   "sedgwick|wd1|Sedgwick": {
    "name": "Sedgwick Claims Management Services",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "seic|wd1|SEI_Global_Services": {
@@ -14355,7 +13677,7 @@
   "sentara|wd1|SCS": {
    "name": "Sentara Health",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "sentryinsurance|wd1|SentryCareers": {
@@ -14433,7 +13755,7 @@
   "situsamc|wd1|SitusAMC": {
    "name": "SitusAMC",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "skechers|wd5|One-career-site": {
@@ -14451,7 +13773,7 @@
   "sluhn|wd1|SLUHN": {
    "name": "St. Luke's University Health Network",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "slu|wd5|Careers": {
@@ -14463,7 +13785,7 @@
   "smithfieldfoods|wd1|Careers": {
    "name": "Smithfield Foods",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "smithnephew|wd5|External": {
@@ -14487,7 +13809,7 @@
   "snc|wd1|snc_external_career_site": {
    "name": "Sierra Nevada Corporation",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "snhu|wd503|External_Career_Site": {
@@ -14502,16 +13824,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "solenis|wd1|Solenis": {
-   "name": "Solenis",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "sonoco|wd1|CorporateCareers": {
    "name": "Sonoco",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "sonos|wd1|Sonos": {
@@ -14523,7 +13839,7 @@
   "sonyglobal|wd1|SonyGlobalCareers": {
    "name": "Sony",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "son|wd108|NebraskaStateCareers": {
@@ -14559,7 +13875,7 @@
   "spectrumcontrol|wd1|spectrumcontrol": {
    "name": "Spectrum Control",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "spectrumhealth|wd5|CorewellHealthCareers": {
@@ -14577,7 +13893,7 @@
   "spe|wd1|SonyPicturesEntertainment": {
    "name": "Sony Pictures Entertainment",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "spgi|wd5|aM_Careers": {
@@ -14601,13 +13917,7 @@
   "sprinklr|wd1|careers": {
    "name": "Sprinklr",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "ssctech|wd1|ssctechnologies": {
-   "name": "SS&C",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "standoutforgood|wd12|StandOutForGood": {
@@ -14625,7 +13935,7 @@
   "starrcompanies|wd1|careers": {
    "name": "Starr Insurance",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "starz|wd5|Starz": {
@@ -14635,12 +13945,6 @@
    "added": "2026-09-13"
   },
   "statestreet|wd1|equest": {
-   "name": "State Street",
-   "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "statestreet|wd1|Global": {
    "name": "State Street",
    "quant": false,
    "fails": 3,
@@ -14661,7 +13965,7 @@
   "stewart|wd1|External": {
    "name": "Stewart",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "stoneridge|wd5|careers": {
@@ -14679,7 +13983,7 @@
   "strideinc|wd1|SK": {
    "name": "Stride",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "strsoh|wd1|STRS_Jobs": {
@@ -14688,16 +13992,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "stryker|wd1|StrykerCareers": {
-   "name": "Stryker",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "suncor|wd1|Suncor_External": {
    "name": "Suncor",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "sunlife|wd3|Campus": {
@@ -14709,13 +14007,7 @@
   "swa|wd1|external": {
    "name": "Southwest Airlines",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13"
-  },
-  "swbc|wd1|swbccareers": {
-   "name": "SWBC",
-   "quant": false,
-   "fails": 3,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "swib|wd12|ext": {
@@ -14728,12 +14020,6 @@
    "name": "Swift",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "symbotic|wd1|Symbotic": {
-   "name": "Symbotic",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "symbotic|wd504|Symbotic": {
@@ -14764,12 +14050,6 @@
    "name": "TD Synnex",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "takeda|wd3|external": {
-   "name": "Takeda",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "talentmanagementsolution|wd3|JonasSoftwareCanada": {
@@ -15045,7 +14325,7 @@
   "trimble|wd1|TrimbleCareers": {
    "name": "Trimble",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "troweprice|wd5|TRowePrice": {
@@ -15057,7 +14337,7 @@
   "truist|wd1|Careers": {
    "name": "Truist Bank",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "trumpf|wd3|TRUMPF_Students": {
@@ -15087,13 +14367,13 @@
   "ttc|wd1|Toro_External_Careers": {
    "name": "The Toro Company",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "tti|wd1|tti_pe": {
    "name": "Techtronic Industries",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "tutorperini|wd12|external": {
@@ -15105,7 +14385,7 @@
   "tysonfoods|wd5|TSN": {
    "name": "Tyson Foods",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "uasys|wd5|UAF_External_Career_Site": {
@@ -15117,7 +14397,7 @@
   "uasys|wd5|uasys": {
    "name": "University of Arkansas",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "ubc|wd10|ubcstaffjobs": {
@@ -15135,13 +14415,13 @@
   "uchicago|wd5|External": {
    "name": "University of Chicago",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "uhaul|wd1|UhaulJobs": {
    "name": "Uhaul",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "uhyus|wd12|uhy": {
@@ -15153,7 +14433,7 @@
   "uline|wd1|Uline_Careers": {
    "name": "Uline",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ulse|wd5|ulricareers": {
@@ -15165,7 +14445,7 @@
   "ulse|wd5|ulsecareers": {
    "name": "UL Standards & Engagement",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ultra|wd3|uiccareers": {
@@ -15183,7 +14463,7 @@
   "umb|wd1|UMBExternal": {
    "name": "UMB",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "umd|wd1|UMCP": {
@@ -15225,7 +14505,7 @@
   "usaa|wd1|USAAJOBSWD": {
    "name": "USAA",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "usacs|wd1|usacscareers": {
@@ -15237,7 +14517,7 @@
   "usbank|wd1|US_Bank_Careers": {
    "name": "U.S. Bank",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "usertesting|wd12|UserTesting": {
@@ -15249,37 +14529,37 @@
   "usfoods|wd1|usfoodscareersExternal": {
    "name": "US Foods",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "usnh|wd5|Careers": {
    "name": "University System of New Hampshire",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "usventure|wd1|usvexternal": {
    "name": "U.S. Venture",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "utaustin|wd1|UTstaff": {
    "name": "University of Texas - Austin",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "utaustin|wd1|utstudent": {
    "name": "University of Texas at Austin",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "uva|wd1|uvastudentjobs": {
    "name": "University of Virginia",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "valeo|wd3|valeo_jobs": {
@@ -15309,7 +14589,7 @@
   "vanguard|wd5|vanguard_external": {
    "name": "Vanguard",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "vantagedc|wd1|Vantage": {
@@ -15363,49 +14643,13 @@
   "vermeer|wd5|externalcareersite": {
    "name": "Vermeer",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "vfc|wd5|vfc_careers": {
    "name": "VF",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13"
-  },
-  "vhr-epri|wd1|epricareers": {
-   "name": "EPRI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "vhr-genband|wd1|ribboncareers": {
-   "name": "Ribbon",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "vhr-otsuka|wd1|External": {
-   "name": " Otsuka Pharmaceutical",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "vhr-otsuka|wd1|RecorExternal": {
-   "name": "ReCor Medical",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "vhr-pbs|wd5|PBSCareers": {
-   "name": "PBS",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
-  "vhr-unither|wd5|External": {
-   "name": "United Therapeutics Corporation",
-   "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "viatris|wd5|External": {
@@ -15429,7 +14673,7 @@
   "visa|wd5|Visa": {
    "name": "Visa",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "vishay|wd3|VishayCareers": {
@@ -15510,16 +14754,10 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "walmart|wd5|WalmartExternal": {
-   "name": "Walmart",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13"
-  },
   "warnerbros|wd5|global": {
    "name": "Warner Bros.",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "washpost|wd5|washingtonpostcareers": {
@@ -15531,7 +14769,7 @@
   "wattswater|wd5|external": {
    "name": "Watts Water",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "wattswater|wd5|Intern-External": {
@@ -15591,7 +14829,7 @@
   "wgu|wd5|External": {
    "name": "WGU",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "wilburellis|wd12|wilbur-ellis": {
@@ -15603,19 +14841,13 @@
   "williams|wd5|External": {
    "name": "Williams",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "winlandfoods|wd1|external": {
    "name": "Winland Foods",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
-  },
-  "wmeimg|wd1|ENDEAVOR": {
-   "name": "Endeavor",
-   "quant": false,
-   "fails": 3,
    "added": "2026-09-13"
   },
   "wonder|wd1|WG": {
@@ -15627,13 +14859,13 @@
   "woodward|wd5|woodward": {
    "name": "Woodward Governor",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "woundedwarriorproject|wd5|wwp": {
    "name": "Wounded Warrior Project",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "wpi|wd5|WPI_External_Career_Site": {
@@ -15651,13 +14883,13 @@
   "wwecorp|wd5|tko": {
    "name": "TKO Group Holdings, Inc",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "wwecorp|wd5|wwecorp": {
    "name": "WWE",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "xcelenergy|wd1|External": {
@@ -15669,19 +14901,19 @@
   "xenergy|wd5|X-energyUS": {
    "name": "X-energy",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "xylem|wd5|xylem-careers": {
    "name": "Xylem",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "yai|wd5|careers": {
    "name": "Yai",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ymcaatlanta|wd1|ymca-careers": {
@@ -15699,7 +14931,7 @@
   "zeissgroup|wd3|External": {
    "name": "Zeiss",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "zendesk|wd1|zendesk": {
@@ -15711,25 +14943,25 @@
   "zillow|wd5|Zillow_Group_External": {
    "name": "Zillow",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "zoetis|wd5|zoetis": {
    "name": "Zoetis",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "zoll|wd5|ZOLLMedicalCorp": {
    "name": "ZOLL Medical Corporation",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "zoom|wd5|zoom": {
    "name": "Zoom",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-13"
   }
  }
