@@ -4,6 +4,7 @@ Open/closed tracking: any listing whose dedupe_key is not seen in a run of a giv
 source set is marked closed (if it was previously sourced there).
 """
 from __future__ import annotations
+from collections import Counter
 from datetime import datetime, timezone
 from sqlalchemy import select
 from .db import SessionLocal, init_db
@@ -11,7 +12,7 @@ from .models import Listing, SourceLink, Company, Application
 from .config import PROFILE
 from .normalize import normalize
 from .dedupe import merge_batch
-from .geo import passes_location_filter
+from .discover import ats_of
 from .score import score_listing
 
 
@@ -42,7 +43,7 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             continue
         if not _term_ok(n["season"], n["year"]):
             continue
-        if not passes_location_filter(n["geo"]):
+        if not n["geo"]["in_region"]:
             continue
         # carry quant-target flag from ATS payloads
         n["is_quant_target"] = raw.get("_is_quant_target", False)
@@ -76,6 +77,9 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.is_remote = it["is_remote"]
             row.within_radius = it["within_radius"]
             row.distance_miles = it["distance_miles"]
+            row.state = it["geo"]["state"]
+            row.region_locations = it["geo"]["region_locations"]
+            row.ats = ats_of(it["apply_url"])[0]
             row.salary = it.get("salary")
             row.duration = it.get("duration")
             row.apply_url = it["apply_url"]
@@ -111,4 +115,6 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
 
     if verbose:
         print(f"[pipeline] {stats}")
+        print("[pipeline] by state:", dict(Counter(it["geo"]["state"] for it in merged.values()).most_common()))
+        print("[pipeline] by source:", dict(Counter(s for it in merged.values() for s, _ in it["_sources"]).most_common()))
     return stats

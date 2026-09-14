@@ -1,44 +1,90 @@
 """CLI: run the ingestion pipeline against live sources.
 
 Usage:
-  python -m internscout.run_ingest              # all tiers
-  python -m internscout.run_ingest --lists      # Tier 1 only (GitHub lists)
-  python -m internscout.run_ingest --ats        # Tier 2 only (Greenhouse/Lever)
+  python -m internscout.run_ingest              # all sources
+  python -m internscout.run_ingest --lists      # GitHub lists only (still grows the registry)
+  python -m internscout.run_ingest --ats        # registered ATS boards only
+  python -m internscout.run_ingest --google     # Google Jobs (SerpApi) only
   python -m internscout.run_ingest --fixture path.json --source vanshb03
 """
 from __future__ import annotations
 import argparse
-from .sources import fetch_github_lists, fetch_greenhouse, fetch_lever, fetch_google_jobs
+import time
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from .sources import fetch_github_lists, fetch_google_jobs, BOARD_FETCHERS
+from .sources.base import client
 from .sources.github_lists import parse_fixture
-from .companies_seed import GREENHOUSE, LEVER
-from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, GOOGLE_JOBS_MAX_SEARCHES
+from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS
+from .discover import load_registry, save_registry, seed_registry, discover, boards, record_result, prune
+from .geo import save_cache
 from .pipeline import run
+
+
+def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -> list[dict]:
+    """Fetch every registered board in parallel; records success/failure in the registry."""
+    todo = [(ats, tok, e) for ats, tok, e in boards(reg) if ats in BOARD_FETCHERS]
+    out: list[dict] = []
+    per_ats, failed = Counter(), Counter()
+    t0 = time.monotonic()
+    with client() as c, ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {
+            ex.submit(BOARD_FETCHERS[ats], c,
+                      {"name": e["name"], "ats_token": tok, "is_quant_target": e.get("quant", False)}): (ats, tok)
+            for ats, tok, e in todo
+        }
+        for f in as_completed(futs):
+            ats, tok = futs[f]
+            try:
+                items = f.result()
+                record_result(reg, ats, tok, True)
+                out += items
+                per_ats[ats] += len(items)
+            except Exception:
+                record_result(reg, ats, tok, False)
+                failed[ats] += 1
+    if verbose:
+        print(f"[boards] {len(todo)} boards in {time.monotonic() - t0:.0f}s; "
+              f"intern postings {dict(per_ats)}; failed boards {dict(failed)}")
+    return out
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--lists", action="store_true", help="Tier 1 GitHub lists only")
-    ap.add_argument("--ats", action="store_true", help="Tier 2 ATS boards only")
+    ap.add_argument("--lists", action="store_true", help="GitHub lists only")
+    ap.add_argument("--ats", action="store_true", help="registered ATS boards only")
     ap.add_argument("--google", action="store_true", help="Google Jobs (SerpApi) only")
     ap.add_argument("--fixture", help="parse a local listings.json instead of fetching")
     ap.add_argument("--source", default="vanshb03")
     ap.add_argument("--export", metavar="DIR", help="also write static JSON for GitHub Pages")
+    ap.add_argument("--workers", type=int, default=FETCH_WORKERS)
     args = ap.parse_args()
 
     raw: list[dict] = []
     if args.fixture:
         raw += parse_fixture(args.fixture, source=args.source)
     else:
-        do_all = not (args.lists or args.ats)
+        do_all = not (args.lists or args.ats or args.google)
+        reg = load_registry()
+        seeded = seed_registry(reg)
+        found = 0
         if args.lists or do_all:
-            raw += fetch_github_lists()
-        if args.ats or do_all:
-            raw += fetch_greenhouse(GREENHOUSE)
-            raw += fetch_lever(LEVER)
+            items = fetch_github_lists()
+            found += discover(reg, items)
+            raw += items
         if args.google or do_all:
-            raw += fetch_google_jobs(GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, max_searches=GOOGLE_JOBS_MAX_SEARCHES)
+            items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, max_searches=GOOGLE_JOBS_MAX_SEARCHES)
+            found += discover(reg, items)
+            raw += items
+        if args.ats or do_all:
+            raw += scan_boards(reg, args.workers)
+        dropped = prune(reg)
+        save_registry(reg)
+        print(f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead; "
+              f"{ {a: len(b) for a, b in reg.items()} }")
 
     run(raw)
+    save_cache()
     if args.export:
         from .export_static import export
         export(args.export)

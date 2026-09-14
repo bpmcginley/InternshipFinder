@@ -78,6 +78,32 @@ GREENHOUSE = [
     {"name": "Walleye Capital", "ats_token": "walleyecapital-external-students", "is_quant_target": True},
     {"name": "Waymo", "ats_token": "waymo", "is_quant_target": False},
     {"name": "Weiss Asset Management", "ats_token": "weissassetmanagement", "is_quant_target": True},
+    # Northeast additions (verified live 2026-09)
+    {"name": "DRW", "ats_token": "drweng", "is_quant_target": True},
+    {"name": "Point72", "ats_token": "point72", "is_quant_target": True},
+    {"name": "Jane Street", "ats_token": "janestreet", "is_quant_target": True},
+    {"name": "Tower Research Capital", "ats_token": "towerresearchcapital", "is_quant_target": True},
+    {"name": "AQR", "ats_token": "aqr", "is_quant_target": True},
+    {"name": "Schonfeld", "ats_token": "schonfeld", "is_quant_target": True},
+    {"name": "Squarespace", "ats_token": "squarespace", "is_quant_target": False},
+    {"name": "Betterment", "ats_token": "betterment", "is_quant_target": False},
+    {"name": "Oscar Health", "ats_token": "oscar", "is_quant_target": False},
+    {"name": "FanDuel", "ats_token": "fanduel", "is_quant_target": False},
+    {"name": "Justworks", "ats_token": "justworks", "is_quant_target": False},
+    {"name": "Cockroach Labs", "ats_token": "cockroachlabs", "is_quant_target": False},
+    {"name": "Yext", "ats_token": "yext", "is_quant_target": False},
+    {"name": "Zocdoc", "ats_token": "zocdoc", "is_quant_target": False},
+    {"name": "Harry's", "ats_token": "harrys", "is_quant_target": False},
+    {"name": "Glossier", "ats_token": "glossier", "is_quant_target": False},
+    {"name": "SeatGeek", "ats_token": "seatgeek", "is_quant_target": False},
+    {"name": "Attentive", "ats_token": "attentive", "is_quant_target": False},
+    {"name": "CLEAR", "ats_token": "clear", "is_quant_target": False},
+    {"name": "C3 AI", "ats_token": "c3iot", "is_quant_target": False},
+    {"name": "PathAI", "ats_token": "pathai", "is_quant_target": False},
+    {"name": "Markforged", "ats_token": "markforged", "is_quant_target": False},
+    {"name": "Harvard Business School", "ats_token": "hbs", "is_quant_target": False},
+    {"name": "Tripadvisor", "ats_token": "tripadvisor", "is_quant_target": False},
+    {"name": "Cybereason", "ats_token": "cybereason", "is_quant_target": False},
 ]
 
 LEVER = [
@@ -98,4 +124,34 @@ QUANT_WATCHLIST = [
     {"name": "Tower Research", "careers_url": "https://www.tower-research.com/open-positions/"},
     {"name": "Five Rings", "careers_url": "https://www.fiverings.com/careers"},
     {"name": "Arrowstreet Capital", "careers_url": "https://www.arrowstreetcapital.com/careers/"},
+]
+
+
+# Ashby / Workday / SmartRecruiters seeds. Discovery (discover.py) adds hundreds more
+# from apply URLs automatically; these just guarantee a few boards from day one.
+ASHBY = [
+    {"name": "Ramp", "ats_token": "ramp", "is_quant_target": False},
+    {"name": "OpenAI", "ats_token": "openai", "is_quant_target": False},
+    {"name": "Notion", "ats_token": "notion", "is_quant_target": False},
+    {"name": "Linear", "ats_token": "linear", "is_quant_target": False},
+    {"name": "Hex", "ats_token": "hex", "is_quant_target": False},
+    {"name": "Plaid", "ats_token": "plaid", "is_quant_target": False},
+    {"name": "Cursor", "ats_token": "cursor", "is_quant_target": False},
+    {"name": "Replit", "ats_token": "replit", "is_quant_target": False},
+    {"name": "Vanta", "ats_token": "vanta", "is_quant_target": False},
+    {"name": "Modal", "ats_token": "modal", "is_quant_target": False},
+    {"name": "Perplexity", "ats_token": "perplexity", "is_quant_target": False},
+    {"name": "Cohere", "ats_token": "cohere", "is_quant_target": False},
+    {"name": "Sierra", "ats_token": "sierra", "is_quant_target": False},
+    {"name": "Harvey", "ats_token": "harvey", "is_quant_target": False},
+    {"name": "Runway", "ats_token": "runway", "is_quant_target": False},
+    {"name": "ElevenLabs", "ats_token": "elevenlabs", "is_quant_target": False},
+    {"name": "Benchling", "ats_token": "benchling", "is_quant_target": False},
+    {"name": "Watershed", "ats_token": "watershed", "is_quant_target": False},
+]
+WORKDAY = [
+    {"name": "Moderna", "ats_token": "modernatx|wd1|M_tx", "is_quant_target": False},
+]
+SMARTRECRUITERS = [
+    {"name": "Bosch", "ats_token": "BoschGroup", "is_quant_target": False},
 ]

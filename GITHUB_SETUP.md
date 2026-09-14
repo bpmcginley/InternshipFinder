@@ -59,12 +59,20 @@ cd .. && git add docs/data && git commit -m "seed data" && git push
 ```
 
 ## Customizing the search
-Edit `backend/internscout/config.py` (fields, term, Boston radius, source repos) and
-`backend/internscout/companies_seed.py` (ATS company tokens). Commit and push — the next
-Action run picks up the changes.
+Edit `backend/internscout/config.py` (fields, terms, `REGION`, source repos) and
+`backend/internscout/companies_seed.py` (seed ATS boards). Commit and push. The next
+Action run picks up the changes. Each run also commits `backend/data/` (discovered boards
+and the geocode cache), so pull before editing.
+
+Optional: add a `SERPAPI_KEY` secret (Settings → Secrets and variables → Actions) for Google Jobs.
+
+## Auto-Apply
+Install the extension (see `extension/README.md`), then reload the Pages site. The
+extension works on `https://bpmcginley.github.io/InternshipFinder/*`. If your Pages URL is
+different, add it to `content_scripts.matches` in `extension/manifest.json`.
 
 ## Notes
-- The scrapers hit documented public APIs (GitHub lists, Greenhouse, Lever). Do **not** add
-  LinkedIn scraping — it's against their ToS and is blocked.
+- The scrapers hit documented public APIs (GitHub lists, Greenhouse, Lever, Ashby, Workday,
+  SmartRecruiters). Do **not** add LinkedIn scraping. It's against their ToS and is blocked.
 - `docs/.nojekyll` is included so GitHub Pages serves the files as-is.
 - Keep the repo public for free Pages + Actions, or use a paid plan for private.

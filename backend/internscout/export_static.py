@@ -7,12 +7,15 @@ The static site reads these directly; no backend needed.
 """
 from __future__ import annotations
 import json
+from collections import Counter
 import os
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from .db import SessionLocal, init_db
 from .models import Listing, Application
-from .config import PROFILE
+from .config import PROFILE, REGION
+
+DESC_CHARS = 1500
 
 
 def _listing_dict(row: Listing) -> dict:
@@ -29,7 +32,12 @@ def _listing_dict(row: Listing) -> dict:
         "is_remote": row.is_remote,
         "within_radius": row.within_radius,
         "distance_miles": round(row.distance_miles, 1) if row.distance_miles is not None else None,
+        "state": row.state,
+        "region_locations": row.region_locations or [],
+        "ats": row.ats,
         "apply_url": row.apply_url,
+        # trimmed JD: the Auto-Apply agent uses it to tailor answers
+        "description": (row.description or "")[:DESC_CHARS] if row.status == "open" else None,
         "status": row.status,
         "relevance_score": row.relevance_score,
         "is_new": row.is_new,
@@ -58,13 +66,17 @@ def export(out_dir: str) -> dict:
                 "radius_miles": PROFILE.radius_miles,
                 "include_remote": PROFILE.include_remote,
                 "terms": [f"{s} {y}" for s, y in PROFILE.terms],
-                "metros": [m[0] for m in getattr(PROFILE, "metros", [])],
+                "region": REGION.name,
+                "states": sorted(REGION.states),
+                "nyc_radius_miles": REGION.nyc_radius_miles,
             },
+            "by_state": dict(Counter(r.state for r in rows if r.status == "open").most_common()),
+            "by_ats": dict(Counter(r.ats for r in rows if r.status == "open").most_common()),
         }
-    with open(os.path.join(out_dir, "listings.json"), "w") as f:
-        json.dump(listings, f, indent=None, separators=(",", ":"))
-    with open(os.path.join(out_dir, "stats.json"), "w") as f:
-        json.dump(stats, f, indent=2)
+    with open(os.path.join(out_dir, "listings.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(listings, f, indent=None, separators=(",", ":"), ensure_ascii=False)
+    with open(os.path.join(out_dir, "stats.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(stats, f, indent=2, ensure_ascii=False)
     print(f"[export] wrote {len(listings)} listings to {out_dir}")
     return stats
 

@@ -1,15 +1,41 @@
-const S = document.getElementById("s");
-document.getElementById("fill").addEventListener("click", () => {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const tab = tabs[0];
-    if (!tab || !/^https?:/.test(tab.url || "")) { S.textContent = "Open a job application page first."; return; }
-    S.textContent = "Injecting…";
-    chrome.scripting.executeScript(
-      { target: { tabId: tab.id }, files: ["src/profile.js", "src/matcher.js", "src/workday.js", "src/content.js"] },
-      () => {
-        if (chrome.runtime.lastError) { S.textContent = "Can't run on this page."; return; }
-        chrome.tabs.sendMessage(tab.id, { type: "aifill" }, () => { window.close(); });
-      });
-  });
+import { loadStore, hasKey } from "../lib/store.js";
+
+const DASHBOARD = "https://bpmcginley.github.io/InternshipFinder/";
+const $ = (id) => document.getElementById(id);
+$("ver").textContent = "v" + chrome.runtime.getManifest().version;
+
+(async () => {
+  const s = await loadStore();
+  if (!s.settings.onboarded || !hasKey(s)) {
+    $("note").hidden = false;
+    $("note").textContent = "Finish the Deep Dive to turn on Auto-Apply.";
+    $("dive").textContent = "Start Deep Dive";
+    $("dive").classList.add("primary");
+    $("queue").classList.remove("primary");
+    return;
+  }
+  const q = (await chrome.storage.local.get("queue")).queue || { jobs: {} };
+  const jobs = Object.values(q.jobs);
+  const set = (id, n) => { $(id).textContent = n; $(id).parentElement.classList.toggle("zero", !n); };
+  set("n-need", jobs.filter((j) => j.status === "needs_you").length);
+  set("n-ready", jobs.filter((j) => j.status === "ready_to_submit").length);
+  set("n-work", jobs.filter((j) => j.status === "working" || j.status === "queued").length);
+  $("figs").hidden = false;
+})();
+
+$("queue").addEventListener("click", async () => {
+  const win = await chrome.windows.getCurrent();
+  try { await chrome.sidePanel.open({ windowId: win.id }); }
+  catch (e) { await chrome.tabs.create({ url: chrome.runtime.getURL("sidepanel/sidepanel.html") }); }
+  window.close();
 });
-document.getElementById("opt").addEventListener("click", (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+
+$("dash").addEventListener("click", async () => {
+  await chrome.tabs.create({ url: DASHBOARD });
+  window.close();
+});
+
+$("dive").addEventListener("click", async () => {
+  await chrome.runtime.sendMessage({ type: "open_deep_dive" });
+  window.close();
+});

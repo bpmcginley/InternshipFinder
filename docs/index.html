@@ -4,96 +4,190 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>InternScout</title>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet"/>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
 <style>
   :root{
-    --bg:#0a0c0f; --surface:#0f1216; --surface2:#0c0e12; --line:#1c2127; --line2:#161a1f;
-    --txt:#dfe4ea; --mut:#828b96; --dim:#5a626c;
-    --accent:#d8a657; --accent2:#7aa2c9; --green:#7fb069; --red:#d16a63;
-    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
-    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
+    --ink:#17191c; --ink2:#4b5058; --ink3:#868b92;
+    --rule:#e2ded4; --rule2:#ece9e1;
+    --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8;
+    --blue:#2b5aa0; --amber:#9a6412; --amber-soft:#f6ecd9; --green:#1f7a4d; --red:#a8362c;
+    --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    color-scheme:light;
   }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
+    --ink:#ecebe6; --ink2:#b3b1aa; --ink3:#7d7c77;
+    --rule:#2c2d31; --rule2:#232427;
+    --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24;
+    --blue:#8fb2e8; --amber:#e0b25e; --amber-soft:#2e2717; --green:#7cc3a1; --red:#e48a80;
+    color-scheme:dark;
+  }}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
-  a{color:var(--accent2);text-decoration:none} a:hover{color:var(--accent)}
-  button{font-family:var(--sans)}
+  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  button,input,select{font-family:var(--sans)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .wrap{max-width:1320px;margin:0 auto;padding:0 28px}
 
-  header{display:flex;align-items:center;gap:20px;padding:0 20px;height:48px;border-bottom:1px solid var(--line);background:var(--surface2)}
-  .brand{font-weight:600;font-size:14px;letter-spacing:2px;text-transform:uppercase}
-  .brand b{color:var(--accent);font-weight:600}
-  .meta{color:var(--dim);font:11px/1.4 var(--mono);letter-spacing:.3px}
+  header.top{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap;padding:30px 0 16px;border-bottom:1px solid var(--ink)}
+  .mark{font:600 32px/1 var(--serif);letter-spacing:-.6px;margin:0}
+  .sub{color:var(--ink2);margin-top:8px;font-size:13.5px}
+  .top-r{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 
-  .wrap{padding:0}
-  .statbar{display:flex;border-bottom:1px solid var(--line);background:var(--surface2)}
-  .stat{padding:10px 20px;border-right:1px solid var(--line)}
-  .stat .n{font:600 18px/1 var(--mono);letter-spacing:-.5px}
-  .stat .l{color:var(--dim);font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;margin-top:5px}
+  .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
+  .btn:hover:not(:disabled){border-color:var(--ink3)}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.primary:hover:not(:disabled){filter:brightness(1.1)}
+  .btn.quiet{border-color:transparent;background:transparent;color:var(--ink2);padding:0 8px}
+  .btn.quiet:hover:not(:disabled){color:var(--ink);border-color:transparent}
+  .count{font:500 11px/1 var(--mono);background:var(--amber-soft);color:var(--amber);padding:4px 6px;border-radius:4px}
+  .count.ok{background:var(--accent-soft);color:var(--green)}
+  .busy{color:var(--ink3);font:12px var(--mono);margin-right:4px}
 
-  .controls{display:flex;gap:0;align-items:stretch;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
-  .ctl{border-right:1px solid var(--line);display:flex;align-items:center;position:relative}
-  .ctl input,.ctl select{background:transparent;color:var(--txt);border:0;padding:0 12px;height:38px;font-size:12.5px;font-family:var(--sans);outline:none}
-  .ctl input::placeholder{color:var(--dim)}
-  .ctl select{cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:26px}
-  .ctl.sel::after{content:"\25BE";position:absolute;right:9px;color:var(--dim);font-size:10px;pointer-events:none}
-  .ctl.grow{flex:1;min-width:180px}
-  .chk{display:inline-flex;align-items:center;gap:6px;color:var(--mut);font-size:12px;padding:0 12px;cursor:pointer}
-  .btn{background:transparent;border:0;color:var(--txt);height:38px;padding:0 14px;font-size:12px;cursor:pointer;font-weight:500}
-  .btn:hover:not(:disabled){background:#141922} .btn:disabled{opacity:.5;cursor:default}
-  .btn.go{color:var(--accent);font-weight:600}
-  .status{color:var(--accent);font:11px/1 var(--mono);padding:0 12px;white-space:nowrap}
+  .figures{display:flex;gap:44px;flex-wrap:wrap;padding:22px 0;border-bottom:1px solid var(--rule)}
+  .fig .n{font:600 36px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
+  .fig .l{color:var(--ink3);font-size:12.5px;margin-top:7px}
+  .fig.states{margin-left:auto;align-self:flex-end;color:var(--ink2);font-size:12.5px;max-width:480px;text-align:right;line-height:1.7}
+  .fig.states b{font:500 12px var(--mono);color:var(--ink)}
+  .updated{color:var(--ink3)}
 
-  /* multiselect */
-  .ms{min-width:210px}
-  .ms .box{display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:5px 10px;min-height:38px;cursor:text;width:100%}
-  .ms input{background:transparent;border:0;outline:none;color:var(--txt);font-size:12.5px;min-width:70px;flex:1;height:24px}
-  .chip{display:inline-flex;align-items:center;gap:5px;background:#171d25;border:1px solid var(--line);color:var(--txt);
-    font:11px/1 var(--mono);padding:3px 6px;white-space:nowrap}
-  .chip b{cursor:pointer;color:var(--dim)} .chip b:hover{color:var(--red)}
-  .ph{color:var(--dim);font-size:12.5px}
-  .drop{position:absolute;top:100%;left:0;z-index:50;min-width:100%;max-height:260px;overflow:auto;
-    background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.5)}
-  .opt{padding:7px 12px;font-size:12.5px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line2)}
-  .opt:hover,.opt.act{background:#141922;color:var(--accent)}
-  .opt .c{color:var(--dim);font:10px/1 var(--mono);float:right;margin-left:16px}
+  .notice{margin:16px 0 0;padding:12px 16px;background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:4px;color:var(--ink2)}
+  .notice b{color:var(--ink)}
+  .notice a{color:var(--accent);font-weight:500}
+  .notice code{font:12px var(--mono);background:var(--sunk);padding:1px 5px;border-radius:3px}
 
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  thead th{position:sticky;top:0;background:var(--surface2);color:var(--dim);font-size:9.5px;text-transform:uppercase;
-    letter-spacing:1px;font-weight:600;text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
-  tbody td{padding:9px 14px;border-bottom:1px solid var(--line2);vertical-align:top}
-  tbody tr:hover td{background:#11151b}
-  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-  .co{font-weight:600} .role{color:var(--mut);font-size:11.5px;margin-top:2px}
-  .posted{color:var(--dim);font:10.5px/1 var(--mono);margin-top:3px}
-  .score{font:600 13px/1 var(--mono)}
-  .score.hi{color:var(--green)} .score.mid{color:var(--accent)} .score.lo{color:var(--dim)}
-  .tag{display:inline-block;padding:1px 5px;margin:0 3px 2px 0;border:1px solid var(--line);font:9.5px/1.5 var(--mono);
-    color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
-  .tag.quant{border-color:#6b5320;color:var(--accent)} .tag.swe{border-color:#3a5573;color:var(--accent2)}
-  .pill{font:9.5px/1.6 var(--mono);padding:1px 6px;border:1px solid var(--line);text-transform:uppercase;letter-spacing:.5px}
-  .pill.open{color:var(--green);border-color:#3a5a2e} .pill.closed{color:var(--red);border-color:#5f2b28}
-  .new{background:var(--accent);color:#0a0c0f;font:9px/1.4 var(--mono);padding:1px 4px;margin-left:6px;font-weight:700;letter-spacing:.4px}
-  .loc-city{color:var(--green)} .loc-remote{color:var(--accent2)}
-  .comp{font-family:var(--mono);color:var(--green)} .none{color:var(--dim)}
-  .dur{color:var(--dim);font:10px/1 var(--mono);margin-top:2px}
-  select.state{background:transparent;color:var(--txt);border:1px solid var(--line);height:24px;font:11px/1 var(--mono);padding:0 4px}
-  .foot{color:var(--dim);padding:12px 20px;font:11px/1.4 var(--mono)}
-  .empty{padding:60px;text-align:center;color:var(--mut)}
-  code{background:var(--surface2);border:1px solid var(--line);padding:1px 5px;font-size:11px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:18px 0 14px}
+  .field{position:relative;display:flex;align-items:center;min-height:34px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
+  .field:focus-within{border-color:var(--ink3)}
+  .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:13px;height:32px;padding:0 10px;outline:none}
+  .field select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer}
+  .field select option{background:var(--panel);color:var(--ink)}
+  .field.sel::after{content:"";position:absolute;right:12px;top:12px;width:5px;height:5px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg);pointer-events:none}
+  .field.search{flex:1 1 240px;min-width:200px}
+  .field.search input{width:100%}
+  .field.toggle{gap:7px;padding:0 12px;cursor:pointer;color:var(--ink2);font-size:13px}
+  .spacer{flex:1}
+
+  .ms{min-width:160px}
+  .ms .box{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 6px;width:100%;cursor:text}
+  .ms input{flex:1;min-width:60px;height:24px;border:0;outline:none;background:transparent;color:var(--ink);font-size:13px;padding:0 4px}
+  .chip{display:inline-flex;gap:2px;align-items:center;background:var(--sunk);border-radius:4px;padding:2px 2px 2px 7px;font-size:12px;color:var(--ink)}
+  .chip button{border:0;background:none;color:var(--ink3);cursor:pointer;font:15px/1 var(--sans);padding:0 4px}
+  .chip button:hover{color:var(--red)}
+  .drop{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:100%;max-height:280px;overflow:auto;background:var(--panel);border:1px solid var(--rule);border-radius:6px;box-shadow:0 12px 32px rgba(20,20,20,.12);padding:4px}
+  .opt{display:flex;justify-content:space-between;gap:18px;padding:6px 8px;border-radius:4px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .opt.act{background:var(--sunk)}
+  .opt .c{color:var(--ink3);font:11.5px var(--mono)}
+
+  .sheet{background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:var(--panel);text-align:left;font:500 12px var(--sans);color:var(--ink3);padding:12px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
+  thead th.sort{cursor:pointer;user-select:none}
+  thead th.sort:hover,thead th.on{color:var(--ink)}
+  thead th.on::after{content:" \2193"}
+  tbody td{padding:13px 14px;border-bottom:1px solid var(--rule2);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:color-mix(in srgb,var(--sunk) 50%,transparent)}
+  tbody tr.sel td{background:var(--accent-soft)}
+  input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:2px 0 0;cursor:pointer}
+  .c-co{min-width:250px}
+  .co{font-weight:600}
+  .role{color:var(--ink2);margin-top:1px}
+  .meta{color:var(--ink3);font-size:12px;margin-top:3px}
+  .new{color:var(--accent);font:600 11.5px var(--sans);margin-left:8px}
+  .closed{color:var(--red)}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+  .muted{color:var(--ink3)}
+  .score{display:inline-flex;align-items:center;gap:8px}
+  .score .bar{width:34px;height:4px;background:var(--rule2);border-radius:2px;overflow:hidden}
+  .score .bar i{display:block;height:100%;background:var(--ink3)}
+  .score.hi .bar i{background:var(--green)} .score.mid .bar i{background:var(--amber)}
+  select.mine{font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:5px;height:28px;padding:0 4px;cursor:pointer}
+  .st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:7px;color:var(--ink2);white-space:nowrap;cursor:default}
+  .st::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink3)}
+  .st.working::before{background:var(--blue)}
+  .st.needs_you{color:var(--amber)} .st.needs_you::before{background:var(--amber)}
+  .st.ready_to_submit,.st.submitted{color:var(--green)} .st.ready_to_submit::before,.st.submitted::before{background:var(--green)}
+  .st.failed{color:var(--red)} .st.failed::before{background:var(--red)}
+  .open-link{font-weight:500;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px;white-space:nowrap}
+  .open-link:hover{text-decoration-color:var(--ink)}
+  .rowbtn{margin-top:7px;font:500 12.5px var(--sans);color:var(--accent);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
+  .rowbtn:hover{text-decoration:underline;text-underline-offset:3px}
+  footer{color:var(--ink3);font-size:12.5px;padding:14px 0 48px}
+  .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
+  @media (max-width:760px){
+    .wrap{padding:0 16px}
+    .figures{gap:26px}
+    .fig .n{font-size:28px}
+    .fig.states{margin-left:0;text-align:left}
+    .top-r{margin-left:0}
+  }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useMemo,useRef} = React;
+const {useState,useEffect,useMemo,useRef,useCallback} = React;
 const DATA="./data/";
 const RAW="https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/";
 const LS_KEY="internscout.appstate.v1";
 const STATES=["none","interested","applied","interviewing","rejected","offer"];
+const STATE_LABEL={none:"Not started",interested:"Interested",applied:"Applied",interviewing:"Interviewing",rejected:"Rejected",offer:"Offer"};
+const NEW_ENGLAND=["MA","CT","RI","NH","VT","ME"];
+const JOB_LABEL={queued:"Queued",working:"Agent working",needs_you:"Needs you",ready_to_submit:"Ready to submit",submitted:"Submitted",failed:"Failed"};
+const ATS={greenhouse:"Greenhouse",lever:"Lever",ashby:"Ashby",workday:"Workday",smartrecruiters:"SmartRecruiters",icims:"iCIMS",oracle:"Oracle",bamboohr:"BambooHR",workable:"Workable",taleo:"Taleo"};
+const ACTIVE=["queued","working","needs_you","ready_to_submit"];
 const loadStates=()=>{try{return JSON.parse(localStorage.getItem(LS_KEY))||{}}catch(e){return {}}};
-const saveStates=m=>localStorage.setItem(LS_KEY,JSON.stringify(m));
+const saveStates=m=>{try{localStorage.setItem(LS_KEY,JSON.stringify(m))}catch(e){}};
 const shortDate=iso=>{if(!iso)return null;const d=new Date(iso);return isNaN(d)?null:d.toLocaleDateString(undefined,{month:"short",day:"numeric"})};
+const fmtTag=t=>t.length<=3?t.toUpperCase():t[0].toUpperCase()+t.slice(1);
+
+// ---- extension bridge (content script bridge/bridge.js relays window messages) ----
+const ext=(()=>{
+  let n=0; const waiting=new Map(); const subs=new Set();
+  window.addEventListener("message",e=>{
+    if(e.source!==window||!e.data||!e.data.__internscout)return;
+    const d=e.data;
+    if(d.__internscout==="res"&&waiting.has(d.id)){waiting.get(d.id)(d.result);waiting.delete(d.id);}
+    else if(d.__internscout==="push"||d.__internscout==="hello") subs.forEach(f=>f(d));
+  });
+  return {
+    present:()=>!!document.documentElement.dataset.internscout,
+    call:(msg,timeout=5000)=>new Promise(res=>{
+      const id=++n; waiting.set(id,res);
+      window.postMessage({__internscout:"req",id,msg},location.origin);
+      setTimeout(()=>{if(waiting.has(id)){waiting.delete(id);res({error:"no_extension"});}},timeout);
+    }),
+    on:f=>{subs.add(f);return ()=>subs.delete(f);},
+  };
+})();
+
+function useExtension(){
+  const [info,setInfo]=useState({checked:false,installed:false});
+  const [queue,setQueue]=useState({order:[],jobs:{}});
+  const ping=useCallback(async()=>{
+    const r=await ext.call({type:"ping"},1500);
+    if(r&&r.ok){setInfo({checked:true,installed:true,...r});const q=await ext.call({type:"get_queue"});if(q&&q.queue)setQueue(q.queue);}
+    else setInfo({checked:true,installed:false});
+  },[]);
+  useEffect(()=>{
+    const off=ext.on(d=>{if(d.__internscout==="push"&&d.queue)setQueue(d.queue); if(d.__internscout==="hello")ping();});
+    ping();
+    const t=setInterval(()=>{if(document.visibilityState==="visible")ping();},20000);
+    return ()=>{off();clearInterval(t);};
+  },[ping]);
+  return {info,queue,ping};
+}
 
 function MultiSelect({placeholder, options, selected, onChange}){
   const [q,setQ]=useState(""); const [open,setOpen]=useState(false); const [act,setAct]=useState(0);
@@ -110,12 +204,13 @@ function MultiSelect({placeholder, options, selected, onChange}){
     if(e.key==="Enter" && filtered[act]){ add(filtered[act].value); e.preventDefault(); }
     else if(e.key==="ArrowDown"){ setAct(a=>Math.min(a+1,filtered.length-1)); e.preventDefault(); }
     else if(e.key==="ArrowUp"){ setAct(a=>Math.max(a-1,0)); e.preventDefault(); }
+    else if(e.key==="Escape"){ setOpen(false); }
     else if(e.key==="Backspace" && !q && selected.length){ rm(selected[selected.length-1]); }
   };
   return (
-    <div className="ctl ms grow" ref={ref}>
-      <div className="box" onClick={()=>{setOpen(true);}}>
-        {selected.map(s=><span key={s} className="chip">{s}<b onClick={e=>{e.stopPropagation();rm(s)}}>×</b></span>)}
+    <div className="field ms" ref={ref}>
+      <div className="box" onClick={()=>setOpen(true)}>
+        {selected.map(s=><span key={s} className="chip">{s}<button aria-label={"Remove "+s} onClick={e=>{e.stopPropagation();rm(s)}}>×</button></span>)}
         <input value={q} placeholder={selected.length?"":placeholder}
           onChange={e=>{setQ(e.target.value);setOpen(true);setAct(0)}} onFocus={()=>setOpen(true)} onKeyDown={onKey}/>
       </div>
@@ -123,7 +218,7 @@ function MultiSelect({placeholder, options, selected, onChange}){
         <div className="drop">
           {filtered.map((o,i)=>
             <div key={o.value} className={"opt"+(i===act?" act":"")} onMouseDown={e=>{e.preventDefault();add(o.value)}} onMouseEnter={()=>setAct(i)}>
-              {o.value}{o.count!=null&&<span className="c">{o.count}</span>}
+              <span>{o.value}</span>{o.count!=null&&<span className="c">{o.count}</span>}
             </div>)}
         </div>}
     </div>
@@ -131,31 +226,43 @@ function MultiSelect({placeholder, options, selected, onChange}){
 }
 
 function Loc({r}){
-  const first=(r.location_raw||"").split(";")[0];
-  if(/boston|cambridge|new york|chicago|miami/i.test(r.location_raw||"")) return <span className="loc-city">{first}</span>;
-  if(r.within_radius) return <span className="num">{first}{r.distance_miles!=null?` · ${Math.round(r.distance_miles)}mi`:""}</span>;
-  if(r.is_remote) return <span className="loc-remote">Remote</span>;
-  return <span className="none">{first||"—"}</span>;
+  const locs=r.region_locations&&r.region_locations.length?r.region_locations:(r.location_raw||"").split(";");
+  const first=(locs[0]||"").trim()||(r.state==="Remote"?"Remote":"—");
+  const inCity=/boston|cambridge|new york|nyc|manhattan|brooklyn/i.test(first);
+  const sub=r.state==="Remote"?"Remote":[r.state,r.distance_miles!=null&&!inCity?`${Math.round(r.distance_miles)} mi`:null].filter(Boolean).join(" · ");
+  return <>
+    <div>{first}{locs.length>1&&<span className="muted"> +{locs.length-1}</span>}</div>
+    {sub&&sub!==first&&<div className="meta">{sub}</div>}
+  </>;
 }
 
-function Row({r,state,onState}){
+function Row({r,state,onState,job,checked,onCheck,canAuto,onAuto}){
   const cls=r.relevance_score>=85?"hi":r.relevance_score>=70?"mid":"lo";
+  const active=job&&ACTIVE.includes(job.status);
+  const meta=[shortDate(r.posted_at)&&`Posted ${shortDate(r.posted_at)}`, r.ats&&r.ats!=="other"&&(ATS[r.ats]||r.ats)].filter(Boolean).join(" · ");
+  const tags=r.field_tags||[];
   return (
-    <tr>
-      <td><span className={"score "+cls}>{r.relevance_score}</span></td>
-      <td>
-        <div className="co">{r.company_name}{r.is_new&&<span className="new">NEW</span>}</div>
+    <tr className={checked?"sel":""}>
+      {canAuto&&<td><input type="checkbox" aria-label={"Select "+r.company_name} checked={checked}
+        disabled={!r.apply_url||active||(job&&job.status==="submitted")} onChange={e=>onCheck(r.id,e.target.checked)}/></td>}
+      <td className="c-co">
+        <div className="co">{r.company_name}{r.is_new&&<span className="new">New</span>}</div>
         <div className="role">{r.title}</div>
-        {shortDate(r.posted_at)&&<div className="posted">posted {shortDate(r.posted_at)}</div>}
+        {(meta||r.status==="closed")&&<div className="meta">{meta}{r.status==="closed"&&<span className="closed">{meta?" · ":""}Closed</span>}</div>}
       </td>
-      <td>{(r.field_tags||[]).map(t=><span key={t} className={"tag "+t}>{t}</span>)}</td>
+      <td>{tags.length?tags.map(fmtTag).join(", "):<span className="muted">—</span>}</td>
       <td><Loc r={r}/></td>
-      <td><span className="num" style={{fontSize:11.5}}>{r.term||"—"}</span>{r.duration&&<div className="dur">{r.duration}</div>}</td>
-      <td>{r.salary?<span className="comp">{r.salary}</span>:<span className="none">—</span>}</td>
-      <td><span className={"pill "+r.status}>{r.status}</span></td>
-      <td><select className="state" value={state} onChange={e=>onState(r.id,e.target.value)}>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</select></td>
-      <td>{r.apply_url?<a className="num" href={r.apply_url} target="_blank" rel="noopener" style={{fontWeight:600}}>Apply ↗</a>:<span className="none">—</span>}
-        <div className="posted">{(r.sources||[]).map(s=>s.source).join(", ")}</div></td>
+      <td>{r.term||<span className="muted">—</span>}{r.duration&&<div className="meta">{r.duration}</div>}</td>
+      <td>{r.salary?<span className="num">{r.salary}</span>:<span className="muted">—</span>}</td>
+      <td><span className={"score "+cls} title={`Match score ${r.relevance_score} of 100`}><span className="num">{r.relevance_score}</span><span className="bar"><i style={{width:Math.max(4,Math.min(100,r.relevance_score))+"%"}}/></span></span></td>
+      <td>
+        <select className="mine" aria-label="Your status" value={state} onChange={e=>onState(r.id,e.target.value)}>{STATES.map(s=><option key={s} value={s}>{STATE_LABEL[s]}</option>)}</select>
+        {job&&<div><span className={"st "+job.status} title={job.reason||job.question||job.summary||""}>{JOB_LABEL[job.status]||job.status}</span></div>}
+      </td>
+      <td>
+        {r.apply_url?<a className="open-link" href={r.apply_url} target="_blank" rel="noopener">Open posting</a>:<span className="muted">—</span>}
+        {!job&&canAuto&&r.apply_url&&<div><button className="rowbtn" onClick={()=>onAuto([r])}>Auto-Apply</button></div>}
+      </td>
     </tr>
   );
 }
@@ -163,23 +270,31 @@ function Row({r,state,onState}){
 function App(){
   const [all,setAll]=useState([]); const [meta,setMeta]=useState(null); const [err,setErr]=useState(null);
   const [states,setStates]=useState(loadStates);
-  const [f,setF]=useState({q:"",fields:[],cities:[],status:"open",app_state:"",new_only:false,sort:"score"});
+  const [f,setF]=useState({q:"",fields:[],states:[],region:"",status:"open",app_state:"",new_only:false,sort:"score"});
   const [token,setToken]=useState(()=>{try{return localStorage.getItem("internscout.gh_token")||""}catch(e){return ""}});
   const [busy,setBusy]=useState("");
+  const [sel,setSel]=useState(()=>new Set());
+  const [note,setNote]=useState("");
+  const {info,queue}=useExtension();
 
   const loadData=fromRaw=>{const base=fromRaw?RAW:DATA,b="?t="+Date.now();
     return Promise.all([fetch(base+"listings.json"+b).then(r=>r.json()),fetch(base+"stats.json"+b).then(r=>r.json())])
       .then(([ls,st])=>{setAll(ls);setMeta(st)});};
   useEffect(()=>{loadData().catch(e=>setErr(String(e)))},[]);
 
-  const setState=(id,v)=>setStates(m=>{const n={...m,[id]:v};if(v==="none")delete n[id];saveStates(n);return n;});
+  const setState=useCallback((id,v)=>setStates(m=>{const n={...m,[id]:v};if(v==="none")delete n[id];saveStates(n);return n;}),[]);
   const upd=(k,v)=>setF(s=>({...s,[k]:v})); const st=id=>states[id]||"none";
 
-  const cityOpts=useMemo(()=>{
-    const m=new Map();
-    all.forEach(x=>{ (x.location_raw||"").split(";").forEach(l=>{const c=l.trim();
-      if(c && !/^remote|anywhere|united states|^usa?$/i.test(c)) m.set(c,(m.get(c)||0)+1);});
-      if(x.is_remote) m.set("Remote",(m.get("Remote")||0)+1); });
+  // latest job per listing
+  const jobs=useMemo(()=>{
+    const m={}; Object.values(queue.jobs||{}).forEach(j=>{if(j.listingId==null)return; const k=String(j.listingId); if(!m[k]||m[k].updated<j.updated)m[k]=j;});
+    return m;
+  },[queue]);
+  // submitted by the extension → mark applied
+  useEffect(()=>{Object.entries(jobs).forEach(([id,j])=>{if(j.status==="submitted"&&(states[id]||"none")==="none")setState(id,"applied");});},[jobs]);
+
+  const stateOpts=useMemo(()=>{
+    const m=new Map(); all.forEach(x=>{if(x.state)m.set(x.state,(m.get(x.state)||0)+1);});
     return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([value,count])=>({value,count}));
   },[all]);
   const fieldOpts=useMemo(()=>{
@@ -191,20 +306,50 @@ function App(){
     let r=all.slice();
     if(f.q){const q=f.q.toLowerCase();r=r.filter(x=>x.company_name.toLowerCase().includes(q)||x.title.toLowerCase().includes(q));}
     if(f.fields.length) r=r.filter(x=>(x.field_tags||[]).some(t=>f.fields.includes(t)));
-    if(f.cities.length) r=r.filter(x=>f.cities.some(c=> c==="Remote"?x.is_remote:(x.location_raw||"").toLowerCase().includes(c.toLowerCase())));
+    if(f.states.length) r=r.filter(x=>f.states.includes(x.state));
+    if(f.region==="ne") r=r.filter(x=>NEW_ENGLAND.includes(x.state));
+    else if(f.region==="nyc") r=r.filter(x=>x.state==="NY"||x.state==="NJ"||(x.within_radius&&!NEW_ENGLAND.includes(x.state)&&x.state!=="Remote"));
+    else if(f.region==="remote") r=r.filter(x=>x.state==="Remote"||x.is_remote);
+    else if(f.region==="onsite") r=r.filter(x=>x.state!=="Remote");
     if(f.status) r=r.filter(x=>x.status===f.status);
     if(f.new_only) r=r.filter(x=>x.is_new);
-    if(f.app_state) r=r.filter(x=>st(x.id)===f.app_state);
+    if(f.app_state==="auto") r=r.filter(x=>jobs[String(x.id)]);
+    else if(f.app_state) r=r.filter(x=>st(x.id)===f.app_state);
     if(f.sort==="score") r.sort((a,b)=>b.relevance_score-a.relevance_score||(b.first_seen||"").localeCompare(a.first_seen||""));
-    else if(f.sort==="new") r.sort((a,b)=>(b.first_seen||"").localeCompare(a.first_seen||""));
+    else if(f.sort==="new") r.sort((a,b)=>(b.posted_at||b.first_seen||"").localeCompare(a.posted_at||a.first_seen||""));
     else if(f.sort==="company") r.sort((a,b)=>a.company_name.localeCompare(b.company_name));
     else if(f.sort==="comp") r.sort((a,b)=>(b.salary?1:0)-(a.salary?1:0));
     return r;
-  },[all,f,states]);
+  },[all,f,states,jobs]);
 
   const stats=useMemo(()=>{const applied=all.filter(x=>st(x.id)==="applied").length;return meta?{...meta,applied}:{total:0,open:0,new:0,applied};},[all,meta,states]);
-  const gen=meta&&meta.generated_at?new Date(meta.generated_at).toLocaleString():"never";
-  const metros=meta&&meta.profile.metros&&meta.profile.metros.length?meta.profile.metros.join(" · "):(meta&&meta.profile.center_city);
+  const gen=meta&&meta.generated_at?new Date(meta.generated_at).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"never";
+  const region=meta&&meta.profile?(meta.profile.region||meta.profile.center_city):"";
+  const jobCounts=useMemo(()=>{const c={};Object.values(queue.jobs||{}).forEach(j=>{c[j.status]=(c[j.status]||0)+1;});return c;},[queue]);
+
+  const canAuto=info.installed;
+  const check=useCallback((id,on)=>setSel(s=>{const n=new Set(s);on?n.add(id):n.delete(id);return n;}),[]);
+  const selectable=rows.filter(r=>r.apply_url&&!jobs[String(r.id)]);
+  const allChecked=selectable.length>0&&selectable.every(r=>sel.has(r.id));
+
+  async function autoApply(list){
+    if(!info.installed){setNote("Install the InternScout extension first.");return;}
+    const payload=list.filter(r=>r.apply_url).slice(0,100).map(r=>({
+      id:r.id, apply_url:r.apply_url, company:r.company_name, title:r.title,
+      location:(r.region_locations||[]).join("; ")||r.location_raw||"", description:r.description||"",
+    }));
+    if(!payload.length)return;
+    setNote("Adding to the queue…");
+    const res=await ext.call({type:"enqueue",jobs:payload});
+    if(res.error==="setup_required"){setNote("Finish the Deep Dive first. It just opened in a new tab.");return;}
+    if(res.error){setNote("Couldn't queue: "+res.error);return;}
+    setSel(new Set());
+    const added=(res.added||[]).length, skipped=(res.skipped||[]).length;
+    setNote(`Queued ${added} application${added===1?"":"s"}${skipped?` (${skipped} already queued)`:""}. Each one is filled in and left for you to submit.`);
+    list.forEach(r=>{if(st(r.id)==="none")setState(r.id,"interested");});
+    ext.call({type:"open_panel"});
+    setTimeout(()=>setNote(""),9000);
+  }
 
   const REPO="bpmcginley/InternshipFinder",WF="ingest.yml";
   async function refresh(){
@@ -212,61 +357,91 @@ function App(){
     if(!t){t=(window.prompt("Paste your GitHub fine-grained token (Actions: Read and write). Stored only in this browser; sent only to github.com.")||"").trim();if(!t)return;localStorage.setItem("internscout.gh_token",t);setToken(t);}
     const H={Authorization:"Bearer "+t,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};
     try{
-      setBusy("starting…");
+      setBusy("Starting…");
       const before=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=1`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
       const beforeId=(before.workflow_runs&&before.workflow_runs[0])?before.workflow_runs[0].id:0;
       const disp=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/dispatches`,{method:"POST",headers:H,body:JSON.stringify({ref:"main"})});
-      if(disp.status===401){localStorage.removeItem("internscout.gh_token");setToken("");setBusy("token rejected");return;}
-      if(disp.status!==204){setBusy("failed (HTTP "+disp.status+")");return;}
-      setBusy("scraping… 1–2 min");
-      for(let i=0;i<60;i++){await new Promise(r=>setTimeout(r,5000));
+      if(disp.status===401){localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token rejected");return;}
+      if(disp.status!==204){setBusy("Failed (HTTP "+disp.status+")");return;}
+      setBusy("Scanning, 4–6 min");
+      for(let i=0;i<120;i++){await new Promise(r=>setTimeout(r,5000));
         const runs=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=5`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
         const run=(runs.workflow_runs||[]).find(x=>x.id>beforeId); if(!run)continue;
-        if(run.status!=="completed"){setBusy("scraping… ("+String(run.status).replace("_"," ")+")");continue;}
-        if(run.conclusion!=="success"){setBusy("run "+run.conclusion);return;}
-        setBusy("loading…");await new Promise(r=>setTimeout(r,3000));await loadData(true);setBusy("updated ✓");setTimeout(()=>setBusy(""),4000);return;}
-      setBusy("still running — reload shortly");
-    }catch(e){setBusy("error: "+e.message);}
+        if(run.status!=="completed"){setBusy("Scanning ("+String(run.status).replace("_"," ")+")");continue;}
+        if(run.conclusion!=="success"){setBusy("Scan "+run.conclusion);return;}
+        setBusy("Loading…");await new Promise(r=>setTimeout(r,3000));await loadData(true);setBusy("Updated");setTimeout(()=>setBusy(""),4000);return;}
+      setBusy("Still running, reload shortly");
+    }catch(e){setBusy("Error: "+e.message);}
   }
 
+  const byState=meta&&meta.by_state?Object.entries(meta.by_state).sort((a,b)=>b[1]-a[1]):[];
+  const terms=meta&&meta.profile?(meta.profile.terms||[]).join(", "):"";
+  const sortTh=(key,label)=><th className={"sort"+(f.sort===key?" on":"")} onClick={()=>upd("sort",key)}>{label}</th>;
+
   return (
-    <div>
-      <header>
-        <span className="brand">Intern<b>Scout</b></span>
-        <span className="meta">{meta?`${(meta.profile.terms||[]).join(", ")}   ${metros}${meta.profile.include_remote?" + remote":""}   updated ${gen}`:"loading…"}</span>
+    <div className="wrap">
+      <header className="top">
+        <div>
+          <h1 className="mark">InternScout</h1>
+          <div className="sub">{meta?`${terms} internships in ${region||"the Northeast"}${meta.profile.include_remote?", plus US remote":""}`:"Loading listings…"}</div>
+        </div>
+        <div className="top-r">
+          {busy&&<span className="busy">{busy}</span>}
+          <button className="btn quiet" onClick={refresh} disabled={!!busy} title="Run the scanner on GitHub now">Rescan</button>
+          {token&&<button className="btn quiet" onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token cleared");}} title="Forget the saved GitHub token">Forget token</button>}
+          {info.installed&&<button className="btn quiet" onClick={()=>ext.call({type:"open_deep_dive"})}>{info.onboarded?"Deep Dive":"Start Deep Dive"}</button>}
+          {info.installed&&<button className="btn" onClick={()=>ext.call({type:"open_panel"})}>Queue
+            {jobCounts.needs_you?<span className="count">{jobCounts.needs_you} need you</span>:null}
+            {jobCounts.ready_to_submit?<span className="count ok">{jobCounts.ready_to_submit} ready</span>:null}</button>}
+        </div>
       </header>
-      <div className="statbar">
-        <div className="stat"><div className="n">{stats.total}</div><div className="l">Listings</div></div>
-        <div className="stat"><div className="n">{stats.open}</div><div className="l">Open</div></div>
-        <div className="stat"><div className="n">{stats.new}</div><div className="l">New</div></div>
-        <div className="stat"><div className="n">{stats.applied}</div><div className="l">Applied</div></div>
+
+      <section className="figures">
+        <div className="fig"><div className="n">{stats.open}</div><div className="l">Open now</div></div>
+        <div className="fig"><div className="n">{stats.new}</div><div className="l">New this scan</div></div>
+        <div className="fig"><div className="n">{stats.applied}</div><div className="l">You applied</div></div>
+        <div className="fig"><div className="n">{stats.total}</div><div className="l">Tracked</div></div>
+        <div className="fig states">
+          {byState.slice(0,9).map(([s,n],i)=><span key={s}>{i?" · ":""}{s} <b>{n}</b></span>)}
+          <div className="updated">Updated {gen}</div>
+        </div>
+      </section>
+
+      {info.checked&&!info.installed&&<div className="notice"><b>Auto-Apply needs the InternScout extension.</b> Download the repo, open <code>chrome://extensions</code>, turn on Developer mode, choose <b>Load unpacked</b> and pick the <code>extension</code> folder, then reload this page. <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/extension" target="_blank" rel="noopener">Setup guide</a></div>}
+      {info.installed&&!info.onboarded&&<div className="notice"><b>One step left:</b> do the Deep Dive so the agent knows your background. <a href="#" onClick={e=>{e.preventDefault();ext.call({type:"open_deep_dive"});}}>Start the Deep Dive</a></div>}
+      {note&&<div className="notice">{note}</div>}
+
+      <div className="filters">
+        <div className="field search"><input type="text" aria-label="Search" placeholder="Search company or role" value={f.q} onChange={e=>upd("q",e.target.value)}/></div>
+        <MultiSelect placeholder="Field" options={fieldOpts} selected={f.fields} onChange={v=>upd("fields",v)}/>
+        <div className="field sel"><select aria-label="Region" value={f.region} onChange={e=>upd("region",e.target.value)}>
+          <option value="">Whole region</option><option value="ne">New England</option><option value="nyc">NYC metro</option><option value="onsite">In person</option><option value="remote">Remote</option></select></div>
+        <MultiSelect placeholder="State" options={stateOpts} selected={f.states} onChange={v=>upd("states",v)}/>
+        <div className="field sel"><select aria-label="Posting status" value={f.status} onChange={e=>upd("status",e.target.value)}>
+          <option value="">Open or closed</option><option value="open">Open</option><option value="closed">Closed</option></select></div>
+        <div className="field sel"><select aria-label="Your status" value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
+          <option value="">Any progress</option>{STATES.map(s=><option key={s} value={s}>{STATE_LABEL[s]}</option>)}<option value="auto">In Auto-Apply queue</option></select></div>
+        <label className="field toggle"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New only</label>
+        <div className="field sel"><select aria-label="Sort" value={f.sort} onChange={e=>upd("sort",e.target.value)}>
+          <option value="score">Best match</option><option value="new">Newest</option><option value="company">Company A–Z</option><option value="comp">Pay listed</option></select></div>
+        <span className="spacer"/>
+        {canAuto&&<button className="btn primary" disabled={!sel.size} onClick={()=>autoApply(all.filter(r=>sel.has(r.id)))}>Auto-Apply{sel.size?` ${sel.size} selected`:""}</button>}
       </div>
-      <div className="controls">
-        <div className="ctl grow"><input type="text" placeholder="Search company or title…" value={f.q} onChange={e=>upd("q",e.target.value)}/></div>
-        <MultiSelect placeholder="Fields…" options={fieldOpts} selected={f.fields} onChange={v=>upd("fields",v)}/>
-        <MultiSelect placeholder="Cities…" options={cityOpts} selected={f.cities} onChange={v=>upd("cities",v)}/>
-        <div className="ctl sel"><select value={f.status} onChange={e=>upd("status",e.target.value)}>
-          <option value="">Any status</option><option value="open">Open</option><option value="closed">Closed</option></select></div>
-        <div className="ctl sel"><select value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
-          <option value="">Any state</option>{STATES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-        <div className="ctl"><label className="chk"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New</label></div>
-        <div className="ctl sel"><select value={f.sort} onChange={e=>upd("sort",e.target.value)}>
-          <option value="score">Score</option><option value="new">Newest</option><option value="company">Company</option><option value="comp">Has comp</option></select></div>
-        <button className="btn go" onClick={refresh} disabled={!!busy}>⟳ Refresh</button>
-        {token&&<button className="btn" onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("token cleared");}} title="Forget token">✕</button>}
-        {busy&&<span className="status">{busy}</span>}
-      </div>
-      {err? <div className="empty">Couldn't load data: {err}</div> :
-       all.length===0? <div className="empty">No listings yet. Click <b>Refresh</b>.</div> :
-      <table>
+
+      {err? <div className="sheet empty">Couldn't load listings: {err}</div> :
+       all.length===0? <div className="sheet empty">No listings yet. Press <b>Rescan</b> to run the scanner.</div> :
+       rows.length===0? <div className="sheet empty">Nothing matches these filters.</div> :
+      <div className="sheet"><div className="tablewrap"><table>
         <thead><tr>
-          <th onClick={()=>upd("sort","score")}>Score</th><th onClick={()=>upd("sort","company")}>Company / Role</th>
-          <th>Field</th><th>Location</th><th>Term</th><th onClick={()=>upd("sort","comp")}>Comp</th>
-          <th>Status</th><th>State</th><th>Apply</th>
+          {canAuto&&<th><input type="checkbox" aria-label="Select all shown" checked={allChecked} disabled={!selectable.length}
+            onChange={e=>setSel(s=>{const n=new Set(s);selectable.slice(0,100).forEach(r=>e.target.checked?n.add(r.id):n.delete(r.id));return n;})}/></th>}
+          {sortTh("company","Company and role")}<th>Field</th><th>Location</th><th>Term</th>
+          {sortTh("comp","Pay")}{sortTh("score","Match")}<th>Your status</th><th></th>
         </tr></thead>
-        <tbody>{rows.map(r=><Row key={r.id} r={r} state={st(r.id)} onState={setState}/>)}</tbody>
-      </table>}
-      <div className="foot">{rows.length} shown · statuses saved in this browser</div>
+        <tbody>{rows.map(r=><Row key={r.id} r={r} state={st(r.id)} onState={setState} job={jobs[String(r.id)]}
+          checked={sel.has(r.id)} onCheck={check} canAuto={canAuto} onAuto={autoApply}/>)}</tbody>
+      </table></div></div>}
+      <footer>{rows.length} of {all.length} shown. Your progress is saved in this browser.{canAuto?" Auto-Apply never presses Submit; you do.":""}</footer>
     </div>
   );
 }

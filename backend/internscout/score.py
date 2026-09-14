@@ -5,9 +5,9 @@ from .config import PROFILE
 
 W = {"field": 35, "location": 20, "freshness": 15, "employer": 15, "openness": 10, "source": 5}
 SOURCE_CONFIDENCE = {  # 0..1
-    "greenhouse": 1.0, "lever": 1.0, "ashby": 1.0, "company": 1.0,
-    "adzuna": 0.6, "usajobs": 0.7,
-    "vanshb03": 0.5, "speedyapply": 0.5, "github": 0.5,
+    "greenhouse": 1.0, "lever": 1.0, "ashby": 1.0, "workday": 1.0, "company": 1.0,
+    "smartrecruiters": 0.9, "adzuna": 0.6, "usajobs": 0.7,
+    "vanshb03": 0.5, "simplify": 0.5, "speedyapply": 0.5, "github": 0.5, "google_jobs": 0.5,
 }
 
 
@@ -30,7 +30,7 @@ def score_listing(*, field_tags, geo, first_seen, status, is_quant_target, sourc
     else:
         field = 0.0
 
-    # location
+    # location: Boston/NYC proper > rest of New England + NYC metro > US-remote
     if geo.get("in_city"):
         location = 1.0
     elif geo.get("within_radius"):

@@ -1,35 +1,43 @@
-"""Tier 2: Lever public postings API."""
+"""Lever public postings API."""
 from __future__ import annotations
 from .base import client
+from .common import board_item
+from ..classify import is_internship
 
 URL = "https://api.lever.co/v0/postings/{token}?mode=json"
+
+
+def parse_lever(payload: list, co: dict) -> list[dict]:
+    out = []
+    for j in payload or []:
+        cats = j.get("categories") or {}
+        title = j.get("text", "")
+        if not is_internship(title, cats.get("commitment") or ""):
+            continue
+        locs = list(dict.fromkeys([cats.get("location")] + list(cats.get("allLocations") or [])))
+        if (j.get("workplaceType") == "remote") and not any("remote" in (l or "").lower() for l in locs):
+            locs.append("Remote" if (j.get("country") or "US").upper() == "US" else f"Remote - {j.get('country')}")
+        created = j.get("createdAt")
+        out.append(board_item(co, source="lever", title=title, locations=locs,
+                              url=j.get("hostedUrl"), apply_url=j.get("applyUrl") or j.get("hostedUrl"),
+                              posted_at=created / 1000 if created else None,
+                              description=j.get("descriptionPlain") or "",
+                              employment_type=cats.get("commitment") or ""))
+    return out
+
+
+def fetch_lever_board(c, co: dict) -> list[dict]:
+    resp = c.get(URL.format(token=co["ats_token"]))
+    resp.raise_for_status()
+    return parse_lever(resp.json(), co)
 
 
 def fetch_lever(companies: list[dict]) -> list[dict]:
     out: list[dict] = []
     with client() as c:
         for co in companies:
-            token = co["ats_token"]
             try:
-                resp = c.get(URL.format(token=token))
-                resp.raise_for_status()
-                for j in resp.json():
-                    cats = j.get("categories") or {}
-                    loc = cats.get("location")
-                    out.append({
-                        "company_name": co["name"],
-                        "title": j.get("text", ""),
-                        "locations": [loc] if loc else [],
-                        "season": None, "year": None,
-                        "url": j.get("hostedUrl"),
-                        "apply_url": j.get("applyUrl") or j.get("hostedUrl"),
-                        "posted_at": (j.get("createdAt") or 0) / 1000 or None,
-                        "description": (j.get("descriptionPlain") or "")[:4000],
-                        "active": True,
-                        "source": "lever",
-                        "source_url": j.get("hostedUrl"),
-                        "_is_quant_target": co.get("is_quant_target", False),
-                    })
+                out += fetch_lever_board(c, co)
             except Exception as e:
-                print(f"[lever] {co['name']} ({token}) failed: {e}")
+                print(f"[lever] {co['name']} ({co['ats_token']}) failed: {e}")
     return out

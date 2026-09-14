@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Profile:
     """The configurable search: field, term, location."""
-    name: str = "CS/Quant · Summer 2027 · Boston"
+    name: str = "All fields · Summer 2027 · New England + NYC"
     # field tags we keep (see classify.py for the tag vocabulary)
     # Accept every discipline the classifier knows (filter in the dashboard instead of
     # dropping at ingest). Narrow this tuple to restrict what gets collected.
@@ -16,44 +16,34 @@ class Profile:
     core_fields: tuple[str, ...] = ("swe", "quant")
     # term(s) to keep, as (season, year)
     terms: tuple[tuple[str, int], ...] = (("Summer", 2027),)
-    # geo
-    center_city: str = "Boston, MA"
-    center_lat: float = 42.3601
-    center_lng: float = -71.0589
-    radius_miles: float = 30.0
+    # shown by the API/dashboard; the actual geo rule lives in REGION below
+    center_city: str = "New England + NYC metro"
+    radius_miles: float = 50.0
     include_remote: bool = True
-    include_other_us: bool = True   # keep US roles outside the metros (filter in the UI)
-    # Metro areas to accept (name, lat, lng, radius_miles). Boston is home; NYC/Chicago/Miami
-    # are the quant hubs. Trim this list to narrow the search.
-    metros: tuple = (
-        ("Boston", 42.3601, -71.0589, 40.0),
-        ("New York", 40.7128, -74.0060, 40.0),
-        ("Chicago", 41.8781, -87.6298, 40.0),
-        ("Miami", 25.7617, -80.1918, 40.0),
-        ("San Francisco", 37.7749, -122.4194, 45.0),
-        ("Seattle", 47.6062, -122.3321, 35.0),
-        ("Austin", 30.2672, -97.7431, 35.0),
-        ("Los Angeles", 34.0522, -118.2437, 45.0),
-        ("Washington DC", 38.9072, -77.0369, 40.0),
-        ("Philadelphia", 39.9526, -75.1652, 35.0),
-        ("Atlanta", 33.7490, -84.3880, 35.0),
-        ("Denver", 39.7392, -104.9903, 35.0),
-        ("Pittsburgh", 40.4406, -79.9959, 30.0),
-        ("Dallas", 32.7767, -96.7970, 40.0),
-        ("Houston", 29.7604, -95.3698, 40.0),
-        ("San Diego", 32.7157, -117.1611, 35.0),
-        ("Raleigh", 35.7796, -78.6382, 35.0),
-        ("Minneapolis", 44.9778, -93.2650, 35.0),
-        ("Phoenix", 33.4484, -112.0740, 35.0),
-        ("Detroit", 42.3314, -83.0458, 35.0),
-    )
 
+
+@dataclass(frozen=True)
+class Region:
+    """Where roles must be: New England states, within N miles of Midtown, or US-remote."""
+    name: str = "New England + NYC metro"
+    states: frozenset = frozenset({"ME", "NH", "VT", "MA", "RI", "CT"})
+    nyc_center: tuple = (40.7580, -73.9855)
+    nyc_radius_miles: float = 50.0
+    include_remote: bool = True
+    hubs: tuple = (("Boston", 42.3601, -71.0589), ("New York", 40.7580, -73.9855))
+
+
+REGION = Region()
 
 # Active profile (edit here or override via the API /profile endpoint later).
 PROFILE = Profile()
 
 DB_PATH = os.environ.get("INTERNSCOUT_DB", os.path.join(os.path.dirname(os.path.dirname(__file__)), "internscout.db"))
 DB_URL = f"sqlite:///{DB_PATH}"
+# Committed, auto-growing data: ATS board registry + geocode cache
+DATA_DIR = os.environ.get("INTERNSCOUT_DATA", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
+# Parallel board fetches per ingest run
+FETCH_WORKERS = int(os.environ.get("INTERNSCOUT_WORKERS", "16"))
 
 # Network etiquette
 HTTP_TIMEOUT = 25.0
@@ -64,6 +54,12 @@ GITHUB_LISTS = [
     {
         "source": "vanshb03",
         "url": "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/.github/scripts/listings.json",
+        "cycle_years": {"Summer": 2027, "Fall": 2026, "Winter": 2027, "Spring": 2027},
+    },
+    {
+        # SimplifyJobs' master list (the Summer2026 repo's file carries every current term)
+        "source": "simplify",
+        "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json",
         "cycle_years": {"Summer": 2027, "Fall": 2026, "Winter": 2027, "Spring": 2027},
     },
 ]
@@ -119,8 +115,10 @@ GOOGLE_JOBS_QUERIES = [
 GOOGLE_JOBS_LOCATIONS = [
     "Boston, Massachusetts",
     "New York, New York",
-    "Chicago, Illinois",
-    "United States",          # broad sweep catches everything else
+    "Hartford, Connecticut",
+    "Providence, Rhode Island",
+    "Manchester, New Hampshire",
+    "Portland, Maine",
 ]
 
 # SerpApi free tier = 100 searches/month. Each run uses at most this many searches;

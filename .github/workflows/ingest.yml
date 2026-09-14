@@ -7,7 +7,7 @@ on:
   workflow_dispatch:            # manual "Run workflow" button
   push:
     branches: [main]
-    paths: ["backend/**", ".github/workflows/ingest.yml"]
+    paths: ["backend/**", "!backend/data/**", ".github/workflows/ingest.yml"]
 
 permissions:
   contents: write               # allow committing the data back
@@ -19,6 +19,7 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +36,8 @@ jobs:
         working-directory: backend
         env:
           INTERNSCOUT_DB: ${{ github.workspace }}/internscout.db
-          # Offline metro gazetteer (Boston + NYC/Chicago/Miami) keeps runs fast & reliable.
+          # Look up unknown NY/NJ/PA towns once (cached in backend/data/geocache.json)
+          INTERNSCOUT_GEOCODE: "1"
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}   # optional: enables Google Jobs search layer
         run: |
           python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data"
@@ -44,7 +46,7 @@ jobs:
         run: |
           git config user.name  "internscout-bot"
           git config user.email "actions@github.com"
-          git add docs/data/listings.json docs/data/stats.json
+          git add docs/data/listings.json docs/data/stats.json backend/data/ats_registry.json backend/data/geocache.json
           if git diff --staged --quiet; then
             echo "No changes."
           else

@@ -7,7 +7,7 @@ if os.path.exists(os.environ["INTERNSCOUT_DB"]):
 from internscout.sources.github_lists import parse_fixture
 from internscout.pipeline import run
 from internscout.classify import classify, is_internship
-from internscout.geo import evaluate_locations
+from internscout.region import evaluate_locations
 from internscout.normalize import normalize, normalize_title, parse_term_from_text
 
 HERE = os.path.dirname(__file__)
@@ -32,11 +32,11 @@ def test_geo():
     g = evaluate_locations(["Boston, MA"])
     assert g["within_radius"] and g["in_city"]
     g2 = evaluate_locations(["Remote in USA"])
-    assert g2["is_remote"] and not g2["within_radius"]
+    assert g2["is_remote"] and not g2["within_radius"] and g2["in_region"]
     g3 = evaluate_locations(["San Francisco, CA"])
-    assert g3["within_radius"] and g3["metro"] == "San Francisco"   # now a supported metro
-    g4 = evaluate_locations(["Boise, ID"])
-    assert not g4["within_radius"]                                  # outside all metros
+    assert not g3["in_region"]                                      # outside the Northeast
+    g4 = evaluate_locations(["Hoboken, NJ"])
+    assert g4["within_radius"] and g4["state"] == "NJ"              # NYC metro
 
 
 def test_dedupe_title():
@@ -62,7 +62,7 @@ def test_full_pipeline():
         assert "Jane Street" in names
         assert "HRT" in names
         assert "Acme Cloud" in names
-        assert "FarCorp" in names            # SF is now a supported metro
+        assert "FarCorp" not in names        # SF is outside New England + NYC
         assert "OldCo" not in names          # wrong year
         assert "BioLab" in names             # marketing is a supported discipline now
         assert "FullTimeCo" not in names     # not an internship
@@ -72,6 +72,7 @@ def test_full_pipeline():
         assert js.relevance_score > acme.relevance_score
         # Jane Street seen from 2 sources -> deduped to 1 with 2 source links
         assert len(js.source_links) == 2  # vanshb03 + speedyapply, deduped
+        assert js.state in ("NY", "MA") and set(js.region_locations) >= {"New York, NY", "Boston, MA"}
     print("ALL PIPELINE ASSERTIONS PASSED")
 
 

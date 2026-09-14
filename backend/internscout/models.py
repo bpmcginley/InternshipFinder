@@ -43,6 +43,9 @@ class Listing(Base):
     is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
     within_radius: Mapped[bool] = mapped_column(Boolean, default=False)
     distance_miles: Mapped[float | None] = mapped_column(Float)
+    state: Mapped[str | None] = mapped_column(String(24), index=True)        # "MA", "NY", "Remote"
+    region_locations: Mapped[list | None] = mapped_column(JSON, default=list)
+    ats: Mapped[str | None] = mapped_column(String(24))                       # greenhouse|workday|...|other
     apply_url: Mapped[str | None] = mapped_column(String(1024))
     posted_at: Mapped[datetime | None] = mapped_column(DateTime)
     first_seen: Mapped[datetime] = mapped_column(DateTime, default=_now)

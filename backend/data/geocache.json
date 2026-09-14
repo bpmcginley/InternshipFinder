@@ -1,0 +1,566 @@
+{
+"130 north 18th street - one logan square|PA":null,
+"ambler|PA":[
+40.1545,
+-75.2222
+],
+"ardmore|PA":[
+40.0079,
+-75.2911
+],
+"atlantic city|NJ":[
+39.3643,
+-74.4229
+],
+"auburn|NY":[
+42.932,
+-76.5672
+],
+"bala cynwyd|PA":[
+40.0086,
+-75.2356
+],
+"baldwinsville|NY":[
+43.1587,
+-76.3327
+],
+"bedminster|NJ":[
+40.6811,
+-74.6443
+],
+"berwyn|PA":[
+40.0478,
+-75.4421
+],
+"bethlehem|PA":[
+40.6179,
+-75.3787
+],
+"bohemia|NY":[
+40.7693,
+-73.1151
+],
+"boston|NY":[
+42.629,
+-78.7376
+],
+"branchville|NJ":[
+41.1464,
+-74.7524
+],
+"bridgewater township|NJ":[
+40.5931,
+-74.605
+],
+"bristol|PA":[
+40.1229,
+-74.8645
+],
+"brooklawn|NJ":[
+39.8783,
+-75.1205
+],
+"canandaigua|NY":[
+42.8507,
+-77.3191
+],
+"canonsburg|PA":[
+40.2588,
+-80.1867
+],
+"canton|PA":[
+41.6565,
+-76.8533
+],
+"carlisle|PA":[
+40.2015,
+-77.1891
+],
+"carnegie|PA":[
+40.4087,
+-80.0834
+],
+"chalfont|PA":[
+40.287,
+-75.2088
+],
+"charleroi|PA":[
+40.1378,
+-79.8981
+],
+"cheektowaga|NY":[
+42.9034,
+-78.7548
+],
+"chester|PA":[
+39.8496,
+-75.3557
+],
+"chicago|NY":null,
+"clarion|PA":[
+41.2149,
+-79.3857
+],
+"clifton park|NY":[
+42.863,
+-73.7748
+],
+"clifton|NJ":[
+40.8584,
+-74.1638
+],
+"cohoes|NY":[
+42.7742,
+-73.7001
+],
+"concordville|PA":[
+39.8852,
+-75.5202
+],
+"corning|NY":[
+42.1435,
+-77.0543
+],
+"cranberry township|PA":[
+40.7099,
+-80.1061
+],
+"cranberry twp|PA":[
+40.7099,
+-80.1061
+],
+"de witt|NY":null,
+"delanco|NJ":[
+40.0507,
+-74.9535
+],
+"dresher|PA":[
+40.1409,
+-75.1668
+],
+"east brunswick|NJ":[
+40.4279,
+-74.416
+],
+"east syracuse|NY":[
+43.0653,
+-76.0785
+],
+"easton|PA":[
+40.6916,
+-75.21
+],
+"eatontown|NJ":[
+40.2962,
+-74.051
+],
+"englewood|NJ":[
+40.8929,
+-73.9727
+],
+"erie|PA":[
+42.1295,
+-80.0853
+],
+"exton|PA":[
+40.029,
+-75.6208
+],
+"findlay township|PA":[
+40.4786,
+-80.2806
+],
+"fishkill|NY":[
+41.5356,
+-73.8987
+],
+"floral park|NY":[
+40.7247,
+-73.7048
+],
+"flushing|NY":[
+40.7654,
+-73.8174
+],
+"fort washington|PA":[
+40.1378,
+-75.2118
+],
+"gettysburg|PA":[
+39.8309,
+-77.231
+],
+"getzville|NY":[
+43.0243,
+-78.7678
+],
+"glenolden|PA":[
+39.9,
+-75.2892
+],
+"greensburg|PA":[
+40.3025,
+-79.5443
+],
+"grove city|PA":[
+41.1579,
+-80.0887
+],
+"hamilton township|NJ":[
+40.2113,
+-74.6858
+],
+"hamilton|NJ":[
+40.5062,
+-74.6202
+],
+"hamilton|NY":[
+42.8269,
+-75.5444
+],
+"hanover|NJ":[
+40.8174,
+-74.3954
+],
+"harrisburg|PA":[
+40.2663,
+-76.8861
+],
+"harrison|NJ":[
+40.7465,
+-74.1563
+],
+"hermitage|PA":[
+41.2334,
+-80.4487
+],
+"hershey|PA":[
+40.2855,
+-76.6506
+],
+"homer|NY":[
+42.6369,
+-76.1788
+],
+"hopewell junction|NY":[
+41.584,
+-73.8087
+],
+"hopewell township|NJ":[
+40.3435,
+-74.8166
+],
+"horsham|PA":[
+40.1784,
+-75.1285
+],
+"jackson township|NJ":[
+40.1152,
+-74.3648
+],
+"kearny|NJ":[
+40.7684,
+-74.1454
+],
+"lake grove|NY":[
+40.8529,
+-73.1151
+],
+"lancaster|PA":[
+40.038,
+-76.3057
+],
+"latham|NY":[
+42.7444,
+-73.7616
+],
+"lawrence township|NJ":[
+40.2877,
+-74.7123
+],
+"linden|NJ":[
+40.622,
+-74.2446
+],
+"little falls|NJ":[
+40.8814,
+-74.2282
+],
+"livingston|NJ":[
+40.7959,
+-74.3149
+],
+"long island|NY":null,
+"lyndhurst|NJ":[
+40.8123,
+-74.1247
+],
+"madison|PA":[
+40.2473,
+-79.6773
+],
+"malta|NY":[
+42.9712,
+-73.7929
+],
+"manhasset|NY":[
+40.7957,
+-73.6989
+],
+"mckeesport|PA":[
+40.3478,
+-79.8642
+],
+"mechanicsburg|PA":[
+40.2102,
+-77.0047
+],
+"middlesex|NJ":[
+40.5735,
+-74.494
+],
+"middletown township|NJ":[
+40.3843,
+-74.0899
+],
+"middletown|PA":[
+40.1701,
+-74.8852
+],
+"monroeville|PA":[
+40.4335,
+-79.7606
+],
+"moon twp|PA":[
+40.5061,
+-80.2082
+],
+"morris plains|NJ":[
+40.8221,
+-74.4811
+],
+"morristown-re|NJ":null,
+"mt laurel township|NJ":[
+39.934,
+-74.891
+],
+"new city|NY":[
+41.147,
+-73.9903
+],
+"new hope|PA":[
+40.3643,
+-74.9513
+],
+"new jersey|NJ":[
+40.5353,
+-74.3456
+],
+"new windsor|NY":[
+41.4768,
+-74.0238
+],
+"new york city office|NY":null,
+"new york office|NY":null,
+"newburgh|NY":[
+41.5001,
+-74.0098
+],
+"newtown|PA":[
+40.2294,
+-74.9365
+],
+"niagara falls|NY":[
+43.0844,
+-79.0615
+],
+"niskayuna|NY":[
+42.8154,
+-73.8929
+],
+"nj-jersey city|NJ":null,
+"nj-parsippany|NJ":null,
+"ny-new york|NY":[
+40.6379,
+-74.1856
+],
+"orchard park|NY":[
+42.767,
+-78.7436
+],
+"pa-philadelphia|PA":[
+39.9407,
+-75.1502
+],
+"painted post|NY":[
+42.162,
+-77.0941
+],
+"parsippany-troy hills|NJ":[
+40.8647,
+-74.4158
+],
+"paterson|NJ":[
+40.9168,
+-74.1718
+],
+"pennsylvania|PA":[
+40.0117,
+-75.1844
+],
+"phoenixville|PA":[
+40.1339,
+-75.5173
+],
+"pine brook|NJ":[
+40.8604,
+-74.3404
+],
+"plainview|NY":[
+40.7765,
+-73.467
+],
+"pottstown|PA":[
+40.2453,
+-75.6496
+],
+"radnor|PA":[
+40.0463,
+-75.3595
+],
+"raritan|NJ":[
+40.5671,
+-74.6347
+],
+"ravena|NY":[
+42.4684,
+-73.8162
+],
+"reading|PA":[
+40.3353,
+-75.9279
+],
+"reedsville|PA":[
+40.664,
+-77.5958
+],
+"ridley park|PA":[
+39.8812,
+-75.3238
+],
+"rome|NY":[
+43.2102,
+-75.4584
+],
+"saddle brook|NJ":[
+40.899,
+-74.0926
+],
+"san francisco|NY":null,
+"seneca falls|NY":[
+42.9107,
+-76.7968
+],
+"shirley|NY":[
+40.8013,
+-72.8676
+],
+"somerset county|NJ":null,
+"south plainfield|NJ":[
+40.5793,
+-74.4115
+],
+"spring house|PA":[
+40.1854,
+-75.2277
+],
+"stanhope|NJ":[
+40.9029,
+-74.7091
+],
+"state college|PA":[
+40.7945,
+-77.8616
+],
+"tarentum|PA":[
+40.6021,
+-79.7545
+],
+"tredyffrin township|PA":[
+40.0687,
+-75.4621
+],
+"trevose|PA":[
+40.1393,
+-74.981
+],
+"union city|NJ":[
+40.7795,
+-74.0238
+],
+"university park|PA":[
+34.7406,
+-86.623
+],
+"upper gwynedd township|PA":[
+40.2142,
+-75.3042
+],
+"usa - ny (remote|NY":null,
+"usa|NJ":[
+40.603,
+-74.6874
+],
+"villanova|PA":[
+40.0412,
+-75.3311
+],
+"wappingers falls|NY":[
+41.5971,
+-73.917
+],
+"warminster|PA":[
+40.2068,
+-75.0996
+],
+"waterford|NY":[
+42.7924,
+-73.681
+],
+"wayne|NJ":[
+40.9492,
+-74.2377
+],
+"webster|NY":[
+43.2123,
+-77.43
+],
+"west chester|PA":[
+39.9597,
+-75.6045
+],
+"west conshohocken|PA":[
+40.0698,
+-75.3163
+],
+"west point|PA":[
+40.2068,
+-75.2993
+],
+"wilkes-barre|PA":[
+41.2465,
+-75.8817
+],
+"williamsville|NY":[
+42.9638,
+-78.7377
+],
+"williston park|NY":[
+40.7565,
+-73.6449
+],
+"york|PA":[
+39.9625,
+-76.7277
+]
+}

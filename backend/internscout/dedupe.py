@@ -21,4 +21,9 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
                     cur[f] = it[f]
             if not cur.get("apply_url") and it.get("apply_url"):
                 cur["apply_url"] = it["apply_url"]
+            if not cur.get("description") and it.get("description"):
+                cur["description"] = it["description"]
+            # region locations can differ per source: keep the union
+            g = cur["geo"] = dict(cur["geo"])
+            g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
     return out

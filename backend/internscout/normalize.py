@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from .classify import classify, is_internship
-from .geo import evaluate_locations
+from .region import evaluate_locations
 
 _SEASON_RE = re.compile(r"\b(summer|fall|winter|spring)\b", re.I)
 _YEAR_RE = re.compile(r"\b(20[2-3]\d)\b")  # 2020-2039, avoids matching job-id digits
@@ -85,8 +85,21 @@ def _to_dt(ts):
     if ts is None:
         return None
     if isinstance(ts, (int, float)):
+        if ts > 1e11:  # milliseconds
+            ts = ts / 1000
         return datetime.fromtimestamp(ts, tz=timezone.utc)
-    return ts
+    if isinstance(ts, datetime):
+        return ts
+    if isinstance(ts, str) and ts.strip():
+        s = ts.strip().replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(s)
+        except ValueError:
+            try:
+                return datetime.fromisoformat(s[:10])
+            except ValueError:
+                return None
+    return None
 
 
 def normalize(raw: dict) -> dict | None:

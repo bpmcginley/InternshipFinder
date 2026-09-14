@@ -1,14 +1,30 @@
 <!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../lib/theme.css">
 <style>
-body{width:250px;background:#0d1117;color:#e6edf3;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:14px}
-h1{font-size:14px;margin:0 0 8px}
-button{width:100%;background:#1f6feb;color:#fff;border:0;border-radius:2px;padding:9px;font-weight:600;cursor:pointer;margin-bottom:8px}
-a{display:block;color:#2f81f7;text-align:center;font-size:12px;margin-top:4px}
-.s{color:#8b949e;font-size:11px;margin-bottom:10px}
+body{width:300px}
+.head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 16px 11px;border-bottom:1px solid var(--ink)}
+.mark{font:600 20px/1 var(--serif);letter-spacing:-.3px}
+.ver{color:var(--ink3);font:11px var(--mono)}
+.figs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule)}
+.fig{padding:14px 14px 12px}
+.fig+.fig{border-left:1px solid var(--rule)}
+.fig .n{font:600 26px/1 var(--serif);font-variant-numeric:tabular-nums}
+.fig .l{color:var(--ink3);font-size:11.5px;margin-top:6px}
+.fig.warn .n{color:var(--amber)} .fig.good .n{color:var(--green)} .fig.zero .n{color:var(--ink3)}
+.note{padding:14px 16px 0;color:var(--ink2);font-size:12.5px}
+.actions{padding:14px 16px 16px;display:grid;gap:8px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 </style></head><body>
-<h1>InternScout Autofill</h1>
-<div class="s" id="s">Works on any application page. Greenhouse/Lever/Workday also autofill automatically.</div>
-<button id="fill">🧠 AI Autofill this page</button>
-<a href="#" id="opt">Edit profile, documents & AI key</a>
-<script src="popup.js"></script>
+<div class="head"><span class="mark">InternScout</span><span class="ver" id="ver"></span></div>
+<div class="figs" id="figs" hidden>
+  <div class="fig warn"><div class="n" id="n-need">0</div><div class="l">Need you</div></div>
+  <div class="fig good"><div class="n" id="n-ready">0</div><div class="l">Ready</div></div>
+  <div class="fig"><div class="n" id="n-work">0</div><div class="l">In progress</div></div>
+</div>
+<div class="note" id="note" hidden></div>
+<div class="actions">
+  <button class="btn primary" id="queue">Open queue</button>
+  <div class="pair"><button class="btn" id="dash">Dashboard</button><button class="btn" id="dive">Deep Dive</button></div>
+</div>
+<script type="module" src="popup.js"></script>
 </body></html>
