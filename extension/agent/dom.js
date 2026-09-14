@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 2; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 3; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -79,10 +79,7 @@
   function valueOf(el, kind) {
     switch (kind) {
       case "select": return el.selectedIndex > 0 || (el.value && el.selectedIndex >= 0) ? norm(el.options[el.selectedIndex].text) : "";
-      case "react_select": {
-        const c = el.closest('.select-shell, [class*="select__container"], [class*="-container"]') || el.parentElement;
-        return txt(c && c.querySelector('[class*="single-value"], [class*="singleValue"], [class*="multi-value"]'));
-      }
+      case "react_select": return A.reactSelectValue(el);
       case "listbox": { const t = txt(el); return /^select one$|^select\b/i.test(t) ? "" : t; }
       case "checkbox": return el.type === "checkbox" ? el.checked : el.getAttribute("aria-checked") === "true";
       case "file": {
@@ -146,6 +143,11 @@
           const q = fs && txt(fs.querySelector("legend, label"));
           if (q && q !== rec.label) rec.question = cut(q, 300);
         }
+        if (kind === "react_select") {
+          const o = A.reactSelectOptions(el);
+          if (o.options.length) rec.options = o.options.slice(0, 80);
+          if (o.searchable) rec.searchable = true;
+        }
         if (kind === "select") rec.options = [...el.options].map((o) => norm(o.text)).filter((t) => t && !/^(select|choose|--|please select)/i.test(t)).slice(0, 80);
         rec.value = valueOf(el, kind);
         rec.required = el.required || el.getAttribute("aria-required") === "true" || /\*\s*$|\(required\)/i.test(rec.label);
@@ -157,7 +159,7 @@
       const ref = refOf(rec.el);
       refs.set(ref, rec);
       elements.push({ ref, kind, type: rec.type, label: rec.label, question: rec.question, required: !!rec.required,
-        value: rec.value, options: rec.options, maxlength: rec.maxlength, error: rec.error || undefined });
+        value: rec.value, options: rec.options, searchable: rec.searchable || undefined, maxlength: rec.maxlength, error: rec.error || undefined });
     }
     return elements;
   }

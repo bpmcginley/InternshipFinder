@@ -22,8 +22,9 @@ export async function getJob(id) { return (await read()).jobs[id]; }
 
 export function publicJob(j) {
   if (!j) return null;
-  const { pending, fastDone, ...rest } = j;
-  return { ...rest, waiting: !!(pending && pending.waitId) };
+  const { pending, fastDone, tailored, ...rest } = j;
+  const t = tailored && { ...tailored, file: tailored.file ? { name: tailored.file.name, size: tailored.file.size } : null };
+  return { ...rest, tailored: t || null, waiting: !!(pending && pending.waitId) };
 }
 export function publicQueue(q) {
   return { order: q.order, jobs: Object.fromEntries(Object.entries(q.jobs).map(([k, v]) => [k, publicJob(v)])) };

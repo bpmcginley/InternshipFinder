@@ -20,7 +20,8 @@ def _freshness(first_seen: datetime | None) -> float:
     return max(0.0, 1.0 - age_days / 21.0)  # linear decay over ~3 weeks
 
 
-def score_listing(*, field_tags, geo, first_seen, status, is_quant_target, sources) -> float:
+def score_parts(*, field_tags, geo, first_seen, status, is_quant_target, sources) -> dict:
+    """Points earned per component (each out of W[component]); the total is their sum."""
     # field fit
     core = set(PROFILE.core_fields)
     if any(t in core for t in field_tags):
@@ -40,13 +41,16 @@ def score_listing(*, field_tags, geo, first_seen, status, is_quant_target, sourc
     else:
         location = 0.2
 
-    fresh = _freshness(first_seen)
-    employer = 1.0 if is_quant_target else 0.3
-    openness = 1.0 if status == "open" else 0.0
-    src = max((SOURCE_CONFIDENCE.get(s, 0.4) for s in (sources or ["github"])), default=0.4)
+    values = {
+        "field": field,
+        "location": location,
+        "freshness": _freshness(first_seen),
+        "employer": 1.0 if is_quant_target else 0.3,
+        "openness": 1.0 if status == "open" else 0.0,
+        "source": max((SOURCE_CONFIDENCE.get(s, 0.4) for s in (sources or ["github"])), default=0.4),
+    }
+    return {k: round(W[k] * v, 1) for k, v in values.items()}
 
-    total = (
-        W["field"] * field + W["location"] * location + W["freshness"] * fresh
-        + W["employer"] * employer + W["openness"] * openness + W["source"] * src
-    )
-    return round(total, 1)
+
+def score_listing(**kw) -> float:
+    return round(sum(score_parts(**kw).values()), 1)

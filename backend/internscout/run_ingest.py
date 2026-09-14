@@ -17,6 +17,7 @@ from .sources.base import client
 from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS
 from .discover import load_registry, save_registry, seed_registry, discover, boards, record_result, prune
+from .probe import probe_boards
 from .geo import save_cache
 from .pipeline import run
 
@@ -76,6 +77,10 @@ def main():
             items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, max_searches=GOOGLE_JOBS_MAX_SEARCHES)
             found += discover(reg, items)
             raw += items
+        if raw:
+            probed = probe_boards(reg, raw)
+            found += probed
+            print(f"[probe] +{probed} boards guessed from company names", flush=True)
         if args.ats or do_all:
             raw += scan_boards(reg, args.workers)
         dropped = prune(reg)

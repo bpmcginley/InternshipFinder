@@ -1,4 +1,5 @@
 import { loadStore, updateStore, hasKey } from "../lib/store.js";
+import { spend, perApplication, money } from "../lib/usage.js";
 
 const main = document.getElementById("main");
 let tab = "queue";
@@ -23,13 +24,19 @@ document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click
 }));
 
 function jobCard(j) {
-  let h = `<div class="card ${j.status}" data-id="${j.id}"><div class="top"><span class="dot"></span><span class="co">${esc(j.company)}</span><span class="st">${LABEL[j.status] || j.status}</span></div><div class="title">${esc(j.title)}${j.location ? " · " + esc(j.location) : ""}</div>`;
+  let h = `<div class="card ${j.status}" data-id="${j.id}"><div class="top"><span class="dot"></span><span class="co">${esc(j.company)}</span><span class="st">${LABEL[j.status] || j.status}${j.cost_usd ? " · " + money(j.cost_usd) : ""}</span></div><div class="title">${esc(j.title)}${j.location ? " · " + esc(j.location) : ""}</div>`;
   const btns = [];
   if (j.status === "working") {
     h += `<div class="msg small">${esc(j.activity || "Working…")} (step ${j.steps || 0})</div>`;
     btns.push(["pause", "Pause"], ["takeover", "Take over"], ["focus", "Show tab"]);
   } else if (j.status === "needs_you") {
-    if (j.question) {
+    const t = j.tailored;
+    if (t && t.status === "pending") {
+      h += `<div class="q">Tailored resume ready for review</div>${t.summary ? `<div class="msg small"><b>Summary:</b> ${esc(t.summary)}</div>` : ""}`;
+      if (t.changes && t.changes.length) h += `<ul>${t.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>`;
+      if (t.diff && t.diff.length) h += `<details><summary>Before → after (${t.diff.length})</summary>${t.diff.map((d) => `<div class="small" style="margin:6px 0"><s>${esc(d.before)}</s><br>${esc(d.after)}</div>`).join("")}</details>`;
+      btns.push(["preview_tailored", "Preview PDF"], ["approve_tailored", "Use tailored", "primary"], ["skip_tailored", "Use my original"]);
+    } else if (j.question) {
       h += `<div class="q">${esc(j.question)}</div>${j.reason ? `<div class="small">${esc(j.reason)}</div>` : ""}<textarea data-ans="${j.id}" placeholder="Answer (saved to your profile for next time)">${esc(drafts[j.id] || "")}</textarea>`;
       btns.push(["answer", "Answer & continue", "primary"]);
     } else {
@@ -66,6 +73,8 @@ async function renderQueue() {
     if (list.length) h += `<div class="group">${name} (${list.length})</div>` + list.map(jobCard).join("");
   }
   h += `<div class="group">Apply to any posting</div><form id="addurl" class="row" style="margin-top:0;flex-wrap:nowrap"><input id="url" type="url" required placeholder="https://… application link"><button class="b">Queue</button></form><div class="small" id="addmsg"></div>`;
+  const sp = await spend(), avg = perApplication(jobs);
+  if (sp.calls) h += `<div class="small" style="margin-top:14px">AI spend this month: <b>${money(sp.month_usd)}</b>${sp.budget ? ` of ${money(sp.budget)} budget` : ""}${avg ? ` · about ${money(avg)} per application` : ""}</div>`;
   h += `<div class="row" style="justify-content:space-between;margin-top:14px"><button class="b link" id="dive2">Redo Deep Dive</button><button class="b link" id="clear">Clear finished</button></div>`;
   main.innerHTML = h;
 
@@ -73,7 +82,12 @@ async function renderQueue() {
   main.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", async () => {
     const id = b.closest("[data-id]").dataset.id;
     const act = b.dataset.act;
-    if (act === "answer") {
+    if (act === "preview_tailored") {
+      const r = await send({ type: "get_tailored", id });
+      if (!r || !r.file) return;
+      const bin = atob(r.file.b64), bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      chrome.tabs.create({ url: URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })) });
+    } else if (act === "answer") {
       const v = (drafts[id] || "").trim();
       if (!v) return;
       delete drafts[id];
@@ -147,6 +161,6 @@ function render() {
 
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== "local") return;
-  if ((tab === "queue" && ch.queue) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }
+  if ((tab === "queue" && (ch.queue || ch.usage)) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }
 });
 render();

@@ -52,6 +52,17 @@ RULES = [
     ("education", r"teaching|education|curriculum|instructor|tutor"),
     ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate"),
     ("architecture", r"architect(ure|ural)|urban plan|landscape"),
+    ("psychology", r"psycholog|behavioral (health|science)|mental health|counsel(ing|or)\b|\baba\b|cognitive science"),
+    ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
+    ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house"),
+    ("arts", r"\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat"),
+    ("hospitality", r"hospitality|\bhotel|restaurant|culinary|food (and|&) beverage|event planning|\bevents? (intern|coordinat)|tourism"),
+    ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"),
+    ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation"),
+    ("languages", r"translat(or|ion)|interpreter\b|bilingual|linguist"),
+    ("real_estate", r"real estate|property manage|\breit\b|leasing"),
+    ("insurance", r"insurance|underwrit|claims (analyst|intern)|actuar"),
+    ("retail", r"\bretail\b|merchandis|buying intern|\bfashion\b|apparel|e-?commerce|store operations"),
 ]
 
 INTERN_RE = re.compile(r"\b(intern|internship|co-?op|new ?grad|early career|apprentice|trainee|summer analyst|campus)\b", re.I)

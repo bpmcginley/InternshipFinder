@@ -1,15 +1,19 @@
 // Minimal Anthropic Messages API client (raw fetch; MV3 cannot load the SDK from a CDN and the
 // extension has no bundler). The key never leaves the extension except to api.anthropic.com.
 import { callGemini } from "./gemini.js";
+import { recordUsage } from "../lib/usage.js";
 
 const URL = "https://api.anthropic.com/v1/messages";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Routes by model id: gemini-* goes to Google with the Gemini key, everything else to Anthropic.
-export function callAI({ ai, model, ...opts }) {
-  return String(model).startsWith("gemini")
-    ? callGemini({ apiKey: ai.geminiKey, model, ...opts })
-    : callClaude({ apiKey: ai.apiKey, model, ...opts });
+// Every call is priced and added to the monthly total; the cost comes back as resp.cost_usd.
+export async function callAI({ ai, model, kind, ...opts }) {
+  const resp = String(model).startsWith("gemini")
+    ? await callGemini({ apiKey: ai.geminiKey, model, ...opts })
+    : await callClaude({ apiKey: ai.apiKey, model, ...opts });
+  try { resp.cost_usd = await recordUsage(model, resp.usage, kind); } catch (e) { resp.cost_usd = 0; }
+  return resp;
 }
 
 export async function callClaude({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {

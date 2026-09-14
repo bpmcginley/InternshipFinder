@@ -3,11 +3,49 @@ and US-remote roles. A posting passes if ANY of its locations is in region."""
 from __future__ import annotations
 import re
 from .config import REGION
-from .geo import REMOTE_RE, _NON_US, city_of, haversine_miles, locate, state_of  # noqa: F401
+from .geo import REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, city_of, haversine_miles, locate, state_of  # noqa: F401
 
 IN_CITY = {"boston|MA", "cambridge|MA", "new york|NY", "new york city|NY", "nyc|NY",
            "manhattan|NY", "brooklyn|NY", "queens|NY", "bronx|NY", "long island city|NY"}
 _SPLIT = re.compile(r"\s*(?:;|\||\s/\s|\sor\s|\n)\s*")
+# Big posting cities outside the gazetteer, so "New York, Chicago" is read as two cities, not one.
+_MAJOR = {
+    "chicago": "IL", "seattle": "WA", "redmond": "WA", "bellevue": "WA", "austin": "TX", "dallas": "TX",
+    "houston": "TX", "san antonio": "TX", "san francisco": "CA", "los angeles": "CA", "san jose": "CA",
+    "san diego": "CA", "palo alto": "CA", "mountain view": "CA", "menlo park": "CA", "sunnyvale": "CA",
+    "santa clara": "CA", "irvine": "CA", "sacramento": "CA", "denver": "CO", "boulder": "CO",
+    "atlanta": "GA", "miami": "FL", "orlando": "FL", "tampa": "FL", "phoenix": "AZ", "salt lake city": "UT",
+    "detroit": "MI", "ann arbor": "MI", "minneapolis": "MN", "raleigh": "NC", "charlotte": "NC",
+    "durham": "NC", "nashville": "TN", "baltimore": "MD", "columbus": "OH", "st. louis": "MO",
+    "kansas city": "MO", "las vegas": "NV", "washington dc": "DC", "washington d.c.": "DC",
+    "new york": "NY", "new york city": "NY", "sf": "CA", "la": "CA", "dc": "DC",
+}
+
+
+def _known_city(part: str) -> str | None:
+    p = part.strip().lower()
+    return _MAJOR.get(p) or (_CITY_ONLY[p][2] if p in _CITY_ONLY else None)
+
+
+# "Cambridge, MA, Arlington, VA" -> split after each state code, but keep "Boston, MA, United States" whole.
+_AFTER_STATE = re.compile(r"(?<=[\s,][A-Z]{2}),\s*(?=(?!United States|USA?\b)[A-Z][a-z])")
+
+
+def _split_cities(loc: str) -> list[str]:
+    """'New York, Chicago' -> ['New York', 'Chicago']; 'Brooklyn, New York' and 'Boston, MA' stay whole."""
+    pieces = _AFTER_STATE.split(loc)
+    if len(pieces) > 1:
+        return [q for p in pieces for q in _split_cities(p.strip())]
+    parts = [p.strip() for p in loc.split(",") if p.strip()]
+    if len(parts) < 2:
+        return [loc]
+    states = [_known_city(p) for p in parts]
+    if not all(states):
+        return [loc]
+    last = parts[-1].lower()
+    if len(parts) == 2 and last in STATE_NAMES and STATE_NAMES[last] == states[0]:
+        return [loc]  # "Brooklyn, New York" is a city and its state
+    return parts
 # Words that may accompany a US-remote location. Anything left over ("Remote - HU", "Virtual, BR") is
 # a non-US qualifier, so the posting is not US-remote.
 _REMOTE_NOISE = re.compile(
@@ -25,7 +63,9 @@ def split_locations(locations) -> list[str]:
     for loc in locations or []:
         if not isinstance(loc, str):
             continue
-        out += [p.strip() for p in _SPLIT.split(loc) if p and p.strip()]
+        for p in _SPLIT.split(loc):
+            if p and p.strip():
+                out += _split_cities(p.strip())
     return out
 
 
@@ -75,6 +115,9 @@ def evaluate_locations(locations) -> dict:
         "in_city": any(h["in_city"] for h in local),
         "state": best["state"] if best else ("Remote" if region else None),
         "region_locations": [l for l, _ in region],
+        # one entry per region location, so the dashboard can filter and show the right one
+        "regions": [{"loc": l, "kind": h["kind"], "state": h["state"] or ("Remote" if h["kind"] == "remote" else None)}
+                    for l, h in region],
         "best_distance": best["distance"] if best else None,
         "lat": best["lat"] if best else None,
         "lng": best["lng"] if best else None,

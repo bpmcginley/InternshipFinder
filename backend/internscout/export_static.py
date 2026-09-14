@@ -14,11 +14,23 @@ from sqlalchemy import select, func
 from .db import SessionLocal, init_db
 from .models import Listing, Application
 from .config import PROFILE, REGION
+from .insights import extract, PATTERNS
+from .score import W
+from .region import evaluate_locations
 
 DESC_CHARS = 1500
 
 
+def _regions(row: Listing) -> list[dict]:
+    # Re-read the raw locations so older rows get today's splitting rules too.
+    ev = evaluate_locations([row.location_raw]) if row.location_raw else None
+    if ev and ev["regions"]:
+        return ev["regions"]
+    return evaluate_locations(row.region_locations or [])["regions"]
+
+
 def _listing_dict(row: Listing) -> dict:
+    regions = _regions(row)
     return {
         "id": row.id,
         "company_name": row.company_name,
@@ -33,13 +45,17 @@ def _listing_dict(row: Listing) -> dict:
         "within_radius": row.within_radius,
         "distance_miles": round(row.distance_miles, 1) if row.distance_miles is not None else None,
         "state": row.state,
-        "region_locations": row.region_locations or [],
+        "region_locations": [g["loc"] for g in regions] or (row.region_locations or []),
+        "regions": regions,
         "ats": row.ats,
         "apply_url": row.apply_url,
         # trimmed JD: the Auto-Apply agent uses it to tailor answers
         "description": (row.description or "")[:DESC_CHARS] if row.status == "open" else None,
         "status": row.status,
         "relevance_score": row.relevance_score,
+        "score_parts": row.score_parts,
+        # requirements, eligibility limits and deadline parsed from the full description
+        "insights": extract(row.description) if row.status == "open" else None,
         "is_new": row.is_new,
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
         "last_seen": row.last_seen.isoformat() if row.last_seen else None,
@@ -72,6 +88,8 @@ def export(out_dir: str) -> dict:
             },
             "by_state": dict(Counter(r.state for r in rows if r.status == "open").most_common()),
             "by_ats": dict(Counter(r.ats for r in rows if r.status == "open").most_common()),
+            "score_weights": W,
+            "skill_patterns": PATTERNS,
         }
     with open(os.path.join(out_dir, "listings.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(listings, f, indent=None, separators=(",", ":"), ensure_ascii=False)

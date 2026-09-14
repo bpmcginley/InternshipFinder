@@ -21,8 +21,15 @@ PATTERNS = [
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/([A-Za-z0-9_.%-]+)", re.I)),
     ("workday", re.compile(r"https?://([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)", re.I)),
     ("smartrecruiters", re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)", re.I)),
+    ("workable", re.compile(r"apply\.workable\.com/([A-Za-z0-9_-]+)", re.I)),
+    ("recruitee", re.compile(r"https?://([a-z0-9-]+)\.recruitee\.com", re.I)),
+    ("bamboohr", re.compile(r"https?://([a-z0-9-]+)\.bamboohr\.com/(?:careers|jobs)", re.I)),
+    ("rippling", re.compile(r"ats\.rippling\.com/(?:embed/)?([A-Za-z0-9_-]+)/jobs", re.I)),
+    ("oracle", re.compile(r"https?://([a-z0-9-]+\.fa(?:\.[a-z0-9]+)?\.oraclecloud\.com)/hcmUI/CandidateExperience/"
+                          r"[a-z]{2}(?:-[A-Za-z]{2})?/sites/([A-Za-z0-9_]+)", re.I)),
 ]
-_BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1", "oneclick-ui"}
+_BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1", "oneclick-ui",
+               "j", "api", "www", "app", "careers"}
 ATS_HOSTS = [  # recognised even when no token can be extracted
     ("icims", "icims.com"), ("taleo", "taleo.net"), ("oracle", "oraclecloud.com"),
     ("successfactors", "successfactors"), ("jobvite", "jobvite.com"),
@@ -44,6 +51,8 @@ def ats_of(url: str | None) -> tuple[str, str | None]:
                 continue
             if ats == "workday":
                 token = f"{m.group(1).lower()}|{m.group(2).lower()}|{m.group(3)}"
+            elif ats in ("oracle", "recruitee", "bamboohr"):
+                token = f"{m.group(1).lower()}|{m.group(2)}" if ats == "oracle" else m.group(1).lower()
             return ats, token
     low = url.lower()
     for ats, needle in ATS_HOSTS:
@@ -81,7 +90,8 @@ def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False) -
 def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
-    for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS"):
+    for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
+                "BAMBOOHR", "RIPPLING", "ORACLE"):
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False))
     return n

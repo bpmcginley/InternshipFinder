@@ -1,4 +1,5 @@
 import { loadStore, hasKey } from "../lib/store.js";
+import { spend, perApplication, money } from "../lib/usage.js";
 
 const DASHBOARD = "https://bpmcginley.github.io/InternshipFinder/";
 const $ = (id) => document.getElementById(id);
@@ -21,6 +22,11 @@ $("ver").textContent = "v" + chrome.runtime.getManifest().version;
   set("n-ready", jobs.filter((j) => j.status === "ready_to_submit").length);
   set("n-work", jobs.filter((j) => j.status === "working" || j.status === "queued").length);
   $("figs").hidden = false;
+  const sp = await spend(), avg = perApplication(jobs);
+  if (sp.calls) {
+    $("spend").hidden = false;
+    $("spend").textContent = `AI this month: ${money(sp.month_usd)}${sp.budget ? ` of ${money(sp.budget)}` : ""}${avg ? ` · ~${money(avg)}/application` : ""}${sp.over ? " · budget reached" : ""}`;
+  }
 })();
 
 $("queue").addEventListener("click", async () => {

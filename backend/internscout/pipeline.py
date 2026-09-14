@@ -13,7 +13,7 @@ from .config import PROFILE
 from .normalize import normalize
 from .dedupe import merge_batch
 from .discover import ats_of
-from .score import score_listing
+from .score import score_parts
 
 
 def _term_ok(season, year) -> bool:
@@ -86,11 +86,12 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.posted_at = it["posted_at"]
             row.last_seen = now
             row.status = "open" if it.get("active", True) else "closed"
-            row.relevance_score = score_listing(
+            row.score_parts = score_parts(
                 field_tags=it["field_tags"], geo=it["geo"], first_seen=row.first_seen,
                 status=row.status, is_quant_target=it.get("is_quant_target", False),
                 sources=sources,
             )
+            row.relevance_score = round(sum(row.score_parts.values()), 1)
             db.flush()
             # source links
             existing = {sl.source for sl in row.source_links}

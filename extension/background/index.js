@@ -2,6 +2,7 @@
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs } from "./queue.js";
 import { runJob, resumeJob, isRunning, checkSubmitted } from "./agent.js";
 import { loadStore, hasKey } from "../lib/store.js";
+import { spend } from "../lib/usage.js";
 
 const ONBOARDING = "onboarding/onboarding.html";
 const PANEL = "sidepanel/sidepanel.html";
@@ -107,6 +108,13 @@ async function control(id, action, answer) {
       await updateJob(id, { status: "queued", pending: null, steps: 0, reason: "", question: "", summary: "", double_check: [] });
       schedule();
       break;
+    case "approve_tailored":
+    case "skip_tailored":
+      if (!j.tailored || j.tailored.status !== "pending") return { error: "Nothing to review" };
+      await updateJob(id, (x) => ({ tailored: { ...x.tailored, status: action === "approve_tailored" ? "approved" : "skipped" } }));
+      await resumeJob(id);
+      schedule();
+      break;
     case "focus":
       await focusJob(j);
       break;
@@ -124,7 +132,7 @@ async function control(id, action, answer) {
 }
 
 // ---------- router ----------
-const PAGE_ALLOWED = new Set(["ping", "enqueue", "get_queue", "control", "open_deep_dive", "open_panel"]);
+const PAGE_ALLOWED = new Set(["ping", "enqueue", "get_queue", "control", "open_deep_dive", "open_panel", "get_profile_summary"]);
 
 async function handle(m, sender, fromPage) {
   if (!m || typeof m !== "object") return { error: "bad message" };
@@ -132,7 +140,7 @@ async function handle(m, sender, fromPage) {
   switch (m.type) {
     case "ping": {
       const s = await loadStore();
-      return { ok: true, version: chrome.runtime.getManifest().version, onboarded: !!s.settings.onboarded, hasKey: !!hasKey(s) };
+      return { ok: true, version: chrome.runtime.getManifest().version, onboarded: !!s.settings.onboarded, hasKey: !!hasKey(s), spend: await spend() };
     }
     case "enqueue": {
       const s = await loadStore();
@@ -145,6 +153,20 @@ async function handle(m, sender, fromPage) {
     }
     case "get_queue":
       return { queue: publicQueue(await getQueue()) };
+    case "get_profile_summary": {
+      // Only what the dashboard needs to say "you have this skill" / "you may not be eligible".
+      const s = await loadStore(), p = s.profile, edu = p.education[0] || {};
+      const text = [
+        [...p.skills.technical, ...p.skills.tools, ...p.skills.soft].join(", "),
+        ...p.experience.map((e) => [e.title, ...(e.bullets || [])].join(". ")),
+        ...p.projects.map((x) => [x.name, x.description].join(". ")),
+        ...p.education.map((e) => [e.major, e.minor, e.coursework].join(". ")),
+        (s.files.resume && s.files.resume.text) || "",
+      ].join("\n");
+      const year = String(edu.end || edu.grad_term || "").match(/20\d\d/);
+      return { skills_text: text.slice(0, 30000), grad_year: year ? +year[0] : null, gpa: parseFloat(edu.gpa) || null,
+        citizenship: p.facts.citizenship || "", needs_sponsorship: /^y/i.test(p.facts.needs_sponsorship || ""), degree: edu.degree || "" };
+    }
     case "control": {
       // Content scripts on job sites may only control the job running in their own tab.
       if (!fromPage && sender.tab && !String(sender.url || "").startsWith(chrome.runtime.getURL(""))) {
@@ -152,6 +174,10 @@ async function handle(m, sender, fromPage) {
         if (!j || j.tabId !== sender.tab.id) return { error: "not allowed" };
       }
       return control(m.id, m.action, m.answer);
+    }
+    case "get_tailored": {
+      const j = await getJob(m.id);
+      return { file: (j && j.tailored && j.tailored.file) || null };
     }
     case "open_deep_dive":
       await openDeepDive();

@@ -52,6 +52,7 @@ class Listing(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime, default=_now)
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)  # open|closed
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    score_parts: Mapped[dict | None] = mapped_column(JSON)                     # points per component
     is_new: Mapped[bool] = mapped_column(Boolean, default=True)
 
     source_links: Mapped[list["SourceLink"]] = relationship(back_populates="listing", cascade="all, delete-orphan")

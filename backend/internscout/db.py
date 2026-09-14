@@ -18,7 +18,7 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     # create_all never alters existing tables: add columns introduced later
     have = {c["name"] for c in inspect(engine).get_columns("listing")}
-    added = {"state": "VARCHAR(24)", "region_locations": "JSON", "ats": "VARCHAR(24)"}
+    added = {"state": "VARCHAR(24)", "region_locations": "JSON", "ats": "VARCHAR(24)", "score_parts": "JSON"}
     with engine.begin() as conn:
         for name, ddl in added.items():
             if name not in have:

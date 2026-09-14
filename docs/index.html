@@ -123,6 +123,23 @@
   .open-link:hover{text-decoration-color:var(--ink)}
   .rowbtn{margin-top:7px;font:500 12.5px var(--sans);color:var(--accent);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
   .rowbtn:hover{text-decoration:underline;text-underline-offset:3px}
+  .whybtn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
+  .whybtn .why-l{font-size:11.5px;color:var(--ink3)}
+  .whybtn:hover .why-l{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+  tbody tr.opened td{border-bottom-color:transparent}
+  tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:16px 18px 18px}
+  .whyg{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.5fr) minmax(220px,1fr);gap:30px}
+  .whyg h4{margin:0 0 9px;font:600 12.5px var(--sans);color:var(--ink)}
+  .part{display:grid;grid-template-columns:118px 1fr 42px;gap:8px;align-items:center;font-size:12.5px;color:var(--ink2);margin:4px 0}
+  .part .bar{height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
+  .part .bar i{display:block;height:100%;background:var(--accent)}
+  .part .num{text-align:right;font-size:11.5px}
+  .tag{display:inline-block;font-size:12px;padding:2px 7px;border-radius:4px;margin:0 4px 5px 0;background:var(--panel);border:1px solid var(--rule);color:var(--ink2)}
+  .tag.ok{border-color:color-mix(in srgb,var(--green) 45%,transparent);color:var(--green)}
+  .tag.miss{border-color:color-mix(in srgb,var(--red) 40%,transparent);color:var(--red)}
+  .flag{font-size:12.5px;margin:3px 0;color:var(--ink2)}
+  .flag.bad{color:var(--red)} .flag.warn{color:var(--amber)} .flag.good{color:var(--green)}
+  @media (max-width:900px){.whyg{grid-template-columns:1fr;gap:18px}}
   footer{color:var(--ink3);font-size:12.5px;padding:14px 0 48px}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
   @media (max-width:760px){
@@ -147,6 +164,63 @@ const NEW_ENGLAND=["MA","CT","RI","NH","VT","ME"];
 const JOB_LABEL={queued:"Queued",working:"Agent working",needs_you:"Needs you",ready_to_submit:"Ready to submit",submitted:"Submitted",failed:"Failed"};
 const ATS={greenhouse:"Greenhouse",lever:"Lever",ashby:"Ashby",workday:"Workday",smartrecruiters:"SmartRecruiters",icims:"iCIMS",oracle:"Oracle",bamboohr:"BambooHR",workable:"Workable",taleo:"Taleo"};
 const ACTIVE=["queued","working","needs_you","ready_to_submit"];
+const SAVED_KEY="internscout.saved.v1";
+const PART_LABEL={field:"Field fit",location:"Location",freshness:"Freshness",employer:"Target employer",openness:"Still open",source:"Source"};
+const DEFAULT_WEIGHTS={field:35,location:20,freshness:15,employer:15,openness:10,source:5};
+const DAY=864e5;
+const daysAgo=iso=>{if(!iso)return null;const t=new Date(iso).getTime();return isNaN(t)?null:Math.max(0,Math.floor((Date.now()-t)/DAY));};
+const ago=n=>n===0?"today":n===1?"yesterday":`${n} days ago`;
+const fmtDay=d=>new Date(d+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+const daysUntil=d=>Math.ceil((new Date(d+"T23:59:59").getTime()-Date.now())/DAY);
+
+// Search: every word must appear (company, role, field, place, description, skills); -word excludes; "quoted phrase" matches exactly.
+const parseQuery=q=>(q.match(/-?"[^"]+"|\S+/g)||[]).map(t=>{const neg=t.length>1&&t[0]==="-";return {t:(neg?t.slice(1):t).replace(/"/g,"").toLowerCase(),neg};}).filter(x=>x.t);
+// Place words in search ("new england", "nyc", "boston", "MA", "remote") match locations only, never descriptions.
+const PLACES={"new england":{kind:"new_england"},"nyc metro":{kind:"nyc_metro"},"new york city":{kind:"nyc_metro"},"new york":{kind:"nyc_metro"},"nyc":{kind:"nyc_metro"},"tri-state":{kind:"nyc_metro"},"remote":{kind:"remote"},
+  "massachusetts":{state:"MA"},"connecticut":{state:"CT"},"rhode island":{state:"RI"},"new hampshire":{state:"NH"},"vermont":{state:"VT"},"maine":{state:"ME"},"new jersey":{state:"NJ"},
+  "ma":{state:"MA"},"ct":{state:"CT"},"ri":{state:"RI"},"nh":{state:"NH"},"vt":{state:"VT"},"nj":{state:"NJ"},"ny":{state:"NY"}};
+const PLACE_KEYS=Object.keys(PLACES).sort((a,b)=>b.length-a.length);
+const NOT_PLACE=new Set(["new","city","north","south","east","west","park","hill","hills","beach","heights","falls","center","village","island","lake","port","united","states","usa","hybrid","office","onsite","the","and","area","metro","county","greater"]);
+function splitPlaces(q){
+  const places=[]; let rest=" "+q+" ";
+  for(const k of PLACE_KEYS){const re=new RegExp(`\\s(-?)${k.replace(/[-.]/g,"\\$&")}(?=\\s)`,"gi");rest=rest.replace(re,(m,neg)=>{places.push({...PLACES[k],neg:!!neg});return " ";});}
+  return {rest,places};
+}
+const NYC_RE=/,\s*(NY|NJ)\b|\b(new york|nyc|manhattan|brooklyn|queens|bronx|jersey city|hoboken|newark|stamford)\b/i;
+const REMOTE_RE=/\b(remote|anywhere|work from home|virtual)\b/i;
+// One entry per in-region location: {loc, kind: new_england|nyc_metro|remote, state}. Older data has no x.regions; guess it.
+const regs=x=>x._regs||(x._regs=(()=>{
+  if(x.regions&&x.regions.length)return x.regions;
+  const locs=(x.region_locations&&x.region_locations.length?x.region_locations:(x.location_raw||"").split(";")).map(s=>s.trim()).filter(Boolean);
+  const out=locs.map(loc=>{const m=/,\s*([A-Z]{2})\b/.exec(loc),s=m?m[1]:null;
+    const kind=NEW_ENGLAND.includes(s)?"new_england":NYC_RE.test(loc)&&(!s||["NY","NJ","CT","PA"].includes(s))?"nyc_metro":REMOTE_RE.test(loc)&&!s?"remote":null;
+    return {loc,kind,state:s||(kind==="remote"?"Remote":kind==="nyc_metro"?"NY":null)};}).filter(g=>g.kind);
+  if(out.length||!x.state)return out;
+  return [{loc:locs[0]||x.state,kind:x.state==="Remote"?"remote":NEW_ENGLAND.includes(x.state)?"new_england":"nyc_metro",state:x.state}];
+})());
+const REGION_KIND={ne:"new_england",nyc:"nyc_metro",remote:"remote"};
+const regMatch=(g,f)=>(!REGION_KIND[f.region]||g.kind===REGION_KIND[f.region])&&(f.region!=="onsite"||g.kind!=="remote")&&(!f.states.length||f.states.includes(g.state));
+const locHay=x=>x._loch||(x._loch=[...regs(x).map(g=>g.loc),x.location_raw||""].join(" \n ").toLowerCase());
+const hay=x=>x._hay||(x._hay=[x.company_name,x.title,(x.field_tags||[]).join(" "),x.location_raw,(x.region_locations||[]).join(" "),x.state,x.term,x.ats,x.description,((x.insights||{}).skills||[]).map(s=>s.name).join(" ")].filter(Boolean).join(" \n ").toLowerCase());
+
+// Eligibility and deadline checks: [level, text], level is bad | warn | good | "" (neutral).
+function checks(r,p){
+  const x=r.insights||{}, out=[];
+  if(x.grad_years){const lo=Math.min(...x.grad_years),hi=Math.max(...x.grad_years),gy=p&&p.grad_year,t=lo===hi?`Graduating in ${lo}`:`Graduating ${lo}–${hi}`;
+    out.push(gy?(gy>=lo&&gy<=hi?["good",t]:["bad",`${t} (you: ${gy})`]):["",t]);}
+  if(x.class_standing) out.push(["",`For ${x.class_standing.join(" or ")} students`]);
+  if(x.citizenship){const t=x.citizenship==="citizen"?"U.S. citizens only":"U.S. citizens or permanent residents only",c=p&&p.citizenship;
+    const ok=c&&(/\bu\.?\s?s\.?a?\b|united states|american/i.test(c)||(x.citizenship!=="citizen"&&/permanent|green card/i.test(c)));
+    out.push(c?[ok?"good":"bad",t]:["warn",t]);}
+  if(x.clearance) out.push(["warn","Needs a security clearance"]);
+  if(x.degree_only){const t=x.degree_only==="phd"?"PhD students only":"Master's students only";
+    out.push(p?[(x.degree_only==="phd"?/ph\.?d|doctor/i:/master|m\.s\.|m\.eng|mba/i).test(p.degree||"")?"good":"bad",t]:["warn",t]);}
+  if(x.gpa_min){const g=p&&p.gpa;out.push(g?[g>=x.gpa_min?"good":"bad",`Minimum GPA ${x.gpa_min} (you: ${g})`]:["",`Minimum GPA ${x.gpa_min}`]);}
+  if(x.no_sponsorship) out.push([p&&p.needs_sponsorship?"bad":"","No visa sponsorship"]);
+  if(x.deadline){const d=daysUntil(x.deadline);out.push(d<0?["bad",`Deadline passed (${fmtDay(x.deadline)})`]:[d<=14?"warn":"",`Apply by ${fmtDay(x.deadline)}${d<=14?` (${d} day${d===1?"":"s"} left)`:""}`]);}
+  return out;
+}
+const blockers=(r,p)=>checks(r,p).filter(c=>c[0]==="bad").map(c=>c[1]);
 const loadStates=()=>{try{return JSON.parse(localStorage.getItem(LS_KEY))||{}}catch(e){return {}}};
 const saveStates=m=>{try{localStorage.setItem(LS_KEY,JSON.stringify(m))}catch(e){}};
 const shortDate=iso=>{if(!iso)return null;const d=new Date(iso);return isNaN(d)?null:d.toLocaleDateString(undefined,{month:"short",day:"numeric"})};
@@ -159,7 +233,7 @@ const ext=(()=>{
     if(e.source!==window||!e.data||!e.data.__internscout)return;
     const d=e.data;
     if(d.__internscout==="res"&&waiting.has(d.id)){waiting.get(d.id)(d.result);waiting.delete(d.id);}
-    else if(d.__internscout==="push"||d.__internscout==="hello") subs.forEach(f=>f(d));
+    else if(d.__internscout==="push"||d.__internscout==="hello"||d.__internscout==="gone") subs.forEach(f=>f(d));
   });
   return {
     present:()=>!!document.documentElement.dataset.internscout,
@@ -175,18 +249,22 @@ const ext=(()=>{
 function useExtension(){
   const [info,setInfo]=useState({checked:false,installed:false});
   const [queue,setQueue]=useState({order:[],jobs:{}});
+  const [profile,setProfile]=useState(null);
   const ping=useCallback(async()=>{
     const r=await ext.call({type:"ping"},1500);
-    if(r&&r.ok){setInfo({checked:true,installed:true,...r});const q=await ext.call({type:"get_queue"});if(q&&q.queue)setQueue(q.queue);}
+    if(r&&r.error==="reload_page"){setInfo({checked:true,installed:false,stale:true});return;}
+    if(r&&r.ok){setInfo({checked:true,installed:true,...r});const q=await ext.call({type:"get_queue"});if(q&&q.queue)setQueue(q.queue);
+      if(r.onboarded){const p=await ext.call({type:"get_profile_summary"});if(p&&!p.error)setProfile(p);}}
     else setInfo({checked:true,installed:false});
   },[]);
   useEffect(()=>{
-    const off=ext.on(d=>{if(d.__internscout==="push"&&d.queue)setQueue(d.queue); if(d.__internscout==="hello")ping();});
+    const off=ext.on(d=>{if(d.__internscout==="push"&&d.queue)setQueue(d.queue); if(d.__internscout==="hello")ping();
+      if(d.__internscout==="gone")setInfo({checked:true,installed:false,stale:true});});
     ping();
     const t=setInterval(()=>{if(document.visibilityState==="visible")ping();},20000);
     return ()=>{off();clearInterval(t);};
   },[ping]);
-  return {info,queue,ping};
+  return {info,queue,ping,profile};
 }
 
 function MultiSelect({placeholder, options, selected, onChange}){
@@ -225,36 +303,73 @@ function MultiSelect({placeholder, options, selected, onChange}){
   );
 }
 
-function Loc({r}){
-  const locs=r.region_locations&&r.region_locations.length?r.region_locations:(r.location_raw||"").split(";");
-  const first=(locs[0]||"").trim()||(r.state==="Remote"?"Remote":"—");
+// Shows the location that matches the active region/state filter first.
+function Loc({r,f}){
+  const all=regs(r), hit=all.filter(g=>regMatch(g,f)), g=hit[0]||all[0];
+  const first=g?g.loc:((r.location_raw||"").split(";")[0].trim()||"—");
   const inCity=/boston|cambridge|new york|nyc|manhattan|brooklyn/i.test(first);
-  const sub=r.state==="Remote"?"Remote":[r.state,r.distance_miles!=null&&!inCity?`${Math.round(r.distance_miles)} mi`:null].filter(Boolean).join(" · ");
+  const sub=g&&g.kind==="remote"?"Remote":[g?g.state:r.state,g&&g.state===r.state&&r.distance_miles!=null&&!inCity?`${Math.round(r.distance_miles)} mi`:null].filter(Boolean).join(" · ");
+  const more=Math.max(0,all.length-1);
   return <>
-    <div>{first}{locs.length>1&&<span className="muted"> +{locs.length-1}</span>}</div>
+    <div title={all.map(x=>x.loc).join("; ")}>{first}{more>0&&<span className="muted"> +{more}</span>}</div>
     {sub&&sub!==first&&<div className="meta">{sub}</div>}
   </>;
 }
 
-function Row({r,state,onState,job,checked,onCheck,canAuto,onAuto}){
+function Why({r,profile,patterns,weights}){
+  const W=weights||DEFAULT_WEIGHTS, parts=r.score_parts, ins=r.insights||{};
+  const has=useMemo(()=>{
+    if(!profile||!patterns)return null;
+    const t=profile.skills_text||"", m={};
+    for(const [n,p] of Object.entries(patterns)){try{m[n]=new RegExp(p,"i").test(t);}catch(e){}}
+    return m;
+  },[profile,patterns]);
+  const skills=ins.skills||[], req=skills.filter(s=>s.level==="required"), pref=skills.filter(s=>s.level==="preferred");
+  const met=has?req.filter(s=>has[s.name]).length:0;
+  const posted=daysAgo(r.posted_at), seen=daysAgo(r.first_seen), cs=checks(r,profile);
+  const chip=s=><span key={s.name} className={"tag "+(has?(has[s.name]?"ok":"miss"):"")} title={has?(has[s.name]?"Found on your profile":"Not on your profile"):""}>{has?(has[s.name]?"✓ ":"✗ "):""}{s.name}</span>;
+  return <div className="whyg">
+    <div><h4>Match score {r.relevance_score} of 100</h4>
+      {parts?Object.entries(PART_LABEL).map(([k,l])=>{const w=W[k]||0,v=parts[k]||0;
+        return <div className="part" key={k}><span>{l}</span><span className="bar"><i style={{width:(w?Math.min(100,v/w*100):0)+"%"}}/></span><span className="num">{Math.round(v)}/{w}</span></div>;})
+        :<div className="meta">The breakdown appears after the next scan.</div>}
+      <div className="meta" style={{marginTop:9}}>{posted!=null?`Posted ${ago(posted)}`:"Posting date not listed"}{seen!=null?` · first seen ${ago(seen)}`:""}</div>
+    </div>
+    <div><h4>Skills asked for{has&&req.length?` · you have ${met} of ${req.length} required`:""}</h4>
+      {!skills.length&&<div className="meta">{r.status==="open"?"No specific skills named in the description.":"Closed posting, so the description isn't kept."}</div>}
+      {req.length>0&&<div>{req.map(chip)}</div>}
+      {pref.length>0&&<><div className="meta" style={{margin:"4px 0 5px"}}>Nice to have</div><div>{pref.map(chip)}</div></>}
+      {!profile&&skills.length>0&&<div className="meta" style={{marginTop:6}}>With the extension and a finished Deep Dive, this shows which ones you have.</div>}
+    </div>
+    <div><h4>Eligibility and deadline</h4>
+      {cs.length?cs.map(([lv,t],i)=><div key={i} className={"flag "+lv}>{lv==="bad"?"✗ ":lv==="good"?"✓ ":lv==="warn"?"! ":"· "}{t}</div>)
+        :<div className="meta">No limits or deadline found in the description.</div>}
+    </div>
+  </div>;
+}
+
+function Row({r,f,state,onState,job,checked,onCheck,canAuto,onAuto,open,onWhy,profile,patterns,weights}){
   const cls=r.relevance_score>=85?"hi":r.relevance_score>=70?"mid":"lo";
   const active=job&&ACTIVE.includes(job.status);
-  const meta=[shortDate(r.posted_at)&&`Posted ${shortDate(r.posted_at)}`, r.ats&&r.ats!=="other"&&(ATS[r.ats]||r.ats)].filter(Boolean).join(" · ");
+  const dl=r.insights&&r.insights.deadline;
+  const meta=[shortDate(r.posted_at)&&`Posted ${shortDate(r.posted_at)}`, dl&&daysUntil(dl)>=0&&`Apply by ${fmtDay(dl)}`, r.ats&&r.ats!=="other"&&(ATS[r.ats]||r.ats)].filter(Boolean).join(" · ");
+  const bl=profile?blockers(r,profile):[];
   const tags=r.field_tags||[];
-  return (
-    <tr className={checked?"sel":""}>
+  return (<>
+    <tr className={(checked?"sel":"")+(open?" opened":"")}>
       {canAuto&&<td><input type="checkbox" aria-label={"Select "+r.company_name} checked={checked}
         disabled={!r.apply_url||active||(job&&job.status==="submitted")} onChange={e=>onCheck(r.id,e.target.checked)}/></td>}
       <td className="c-co">
         <div className="co">{r.company_name}{r.is_new&&<span className="new">New</span>}</div>
         <div className="role">{r.title}</div>
         {(meta||r.status==="closed")&&<div className="meta">{meta}{r.status==="closed"&&<span className="closed">{meta?" · ":""}Closed</span>}</div>}
+        {bl.length>0&&<div className="meta"><span className="closed" title={bl.join("; ")}>May not be eligible: {bl[0]}</span></div>}
       </td>
       <td>{tags.length?tags.map(fmtTag).join(", "):<span className="muted">—</span>}</td>
-      <td><Loc r={r}/></td>
+      <td><Loc r={r} f={f}/></td>
       <td>{r.term||<span className="muted">—</span>}{r.duration&&<div className="meta">{r.duration}</div>}</td>
       <td>{r.salary?<span className="num">{r.salary}</span>:<span className="muted">—</span>}</td>
-      <td><span className={"score "+cls} title={`Match score ${r.relevance_score} of 100`}><span className="num">{r.relevance_score}</span><span className="bar"><i style={{width:Math.max(4,Math.min(100,r.relevance_score))+"%"}}/></span></span></td>
+      <td><button className={"score whybtn "+cls} aria-expanded={!!open} onClick={()=>onWhy(r.id)} title={`Match score ${r.relevance_score} of 100. Click for why.`}><span className="num">{r.relevance_score}</span><span className="bar"><i style={{width:Math.max(4,Math.min(100,r.relevance_score))+"%"}}/></span><span className="why-l">{open?"Hide":"Why"}</span></button></td>
       <td>
         <select className="mine" aria-label="Your status" value={state} onChange={e=>onState(r.id,e.target.value)}>{STATES.map(s=><option key={s} value={s}>{STATE_LABEL[s]}</option>)}</select>
         {job&&<div><span className={"st "+job.status} title={job.reason||job.question||job.summary||""}>{JOB_LABEL[job.status]||job.status}</span></div>}
@@ -264,18 +379,28 @@ function Row({r,state,onState,job,checked,onCheck,canAuto,onAuto}){
         {!job&&canAuto&&r.apply_url&&<div><button className="rowbtn" onClick={()=>onAuto([r])}>Auto-Apply</button></div>}
       </td>
     </tr>
-  );
+    {open&&<tr className="why"><td colSpan={canAuto?9:8}><Why r={r} profile={profile} patterns={patterns} weights={weights}/></td></tr>}
+  </>);
 }
 
 function App(){
   const [all,setAll]=useState([]); const [meta,setMeta]=useState(null); const [err,setErr]=useState(null);
   const [states,setStates]=useState(loadStates);
-  const [f,setF]=useState({q:"",fields:[],states:[],region:"",status:"open",app_state:"",new_only:false,sort:"score"});
+  const [f,setF]=useState({q:"",fields:[],states:[],region:"",status:"open",app_state:"",new_only:false,eligible:false,sort:"score"});
+  const [openId,setOpenId]=useState(null);
+  const [saved,setSaved]=useState(()=>{try{return JSON.parse(localStorage.getItem(SAVED_KEY))||[]}catch(e){return []}});
   const [token,setToken]=useState(()=>{try{return localStorage.getItem("internscout.gh_token")||""}catch(e){return ""}});
   const [busy,setBusy]=useState("");
   const [sel,setSel]=useState(()=>new Set());
   const [note,setNote]=useState("");
-  const {info,queue}=useExtension();
+  const {info,queue,profile}=useExtension();
+  const onWhy=useCallback(id=>setOpenId(o=>o===id?null:id),[]);
+  const keepSaved=list=>{setSaved(list);try{localStorage.setItem(SAVED_KEY,JSON.stringify(list))}catch(e){}};
+  function onSaved(v){
+    if(v==="__save"){const name=(window.prompt("Name this search")||"").trim();if(name)keepSaved([...saved.filter(s=>s.name!==name),{name,f}]);}
+    else if(v.startsWith("del:"))keepSaved(saved.filter(s=>s.name!==v.slice(4)));
+    else{const s=saved.find(x=>x.name===v);if(s)setF(cur=>({...cur,...s.f}));}
+  }
 
   const loadData=fromRaw=>{const base=fromRaw?RAW:DATA,b="?t="+Date.now();
     return Promise.all([fetch(base+"listings.json"+b).then(r=>r.json()),fetch(base+"stats.json"+b).then(r=>r.json())])
@@ -294,8 +419,12 @@ function App(){
   useEffect(()=>{Object.entries(jobs).forEach(([id,j])=>{if(j.status==="submitted"&&(states[id]||"none")==="none")setState(id,"applied");});},[jobs]);
 
   const stateOpts=useMemo(()=>{
-    const m=new Map(); all.forEach(x=>{if(x.state)m.set(x.state,(m.get(x.state)||0)+1);});
+    const m=new Map(); all.forEach(x=>new Set(regs(x).map(g=>g.state).filter(Boolean)).forEach(s=>m.set(s,(m.get(s)||0)+1)));
     return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([value,count])=>({value,count}));
+  },[all]);
+  const locWords=useMemo(()=>{
+    const w=new Set(); all.forEach(x=>locHay(x).split(/[^a-z]+/).forEach(t=>{if(t.length>=3&&!NOT_PLACE.has(t))w.add(t);}));
+    return w;
   },[all]);
   const fieldOpts=useMemo(()=>{
     const m=new Map(); all.forEach(x=>(x.field_tags||[]).forEach(t=>m.set(t,(m.get(t)||0)+1)));
@@ -304,13 +433,12 @@ function App(){
 
   const rows=useMemo(()=>{
     let r=all.slice();
-    if(f.q){const q=f.q.toLowerCase();r=r.filter(x=>x.company_name.toLowerCase().includes(q)||x.title.toLowerCase().includes(q));}
+    if(f.q.trim()){const {rest,places}=splitPlaces(f.q),terms=parseQuery(rest);
+      r=r.filter(x=>places.every(p=>regs(x).some(g=>p.kind?g.kind===p.kind:g.state===p.state)!==p.neg)&&
+        terms.every(({t,neg})=>(locWords.has(t)?locHay(x):hay(x)).includes(t)!==neg));}
+    if(f.eligible&&profile) r=r.filter(x=>!blockers(x,profile).length);
     if(f.fields.length) r=r.filter(x=>(x.field_tags||[]).some(t=>f.fields.includes(t)));
-    if(f.states.length) r=r.filter(x=>f.states.includes(x.state));
-    if(f.region==="ne") r=r.filter(x=>NEW_ENGLAND.includes(x.state));
-    else if(f.region==="nyc") r=r.filter(x=>x.state==="NY"||x.state==="NJ"||(x.within_radius&&!NEW_ENGLAND.includes(x.state)&&x.state!=="Remote"));
-    else if(f.region==="remote") r=r.filter(x=>x.state==="Remote"||x.is_remote);
-    else if(f.region==="onsite") r=r.filter(x=>x.state!=="Remote");
+    if(f.region||f.states.length) r=r.filter(x=>regs(x).some(g=>regMatch(g,f)));
     if(f.status) r=r.filter(x=>x.status===f.status);
     if(f.new_only) r=r.filter(x=>x.is_new);
     if(f.app_state==="auto") r=r.filter(x=>jobs[String(x.id)]);
@@ -320,7 +448,7 @@ function App(){
     else if(f.sort==="company") r.sort((a,b)=>a.company_name.localeCompare(b.company_name));
     else if(f.sort==="comp") r.sort((a,b)=>(b.salary?1:0)-(a.salary?1:0));
     return r;
-  },[all,f,states,jobs]);
+  },[all,f,states,jobs,profile,locWords]);
 
   const stats=useMemo(()=>{const applied=all.filter(x=>st(x.id)==="applied").length;return meta?{...meta,applied}:{total:0,open:0,new:0,applied};},[all,meta,states]);
   const gen=meta&&meta.generated_at?new Date(meta.generated_at).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"never";
@@ -387,6 +515,7 @@ function App(){
         </div>
         <div className="top-r">
           {busy&&<span className="busy">{busy}</span>}
+          {info.spend&&info.spend.calls>0&&<span className="busy" title="Estimated AI cost of Auto-Apply and the Deep Dive this month">AI ${info.spend.month_usd.toFixed(2)} this month{info.spend.budget?` of $${info.spend.budget}`:""}</span>}
           <button className="btn quiet" onClick={refresh} disabled={!!busy} title="Run the scanner on GitHub now">Rescan</button>
           {token&&<button className="btn quiet" onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token cleared");}} title="Forget the saved GitHub token">Forget token</button>}
           {info.installed&&<button className="btn quiet" onClick={()=>ext.call({type:"open_deep_dive"})}>{info.onboarded?"Deep Dive":"Start Deep Dive"}</button>}
@@ -407,12 +536,19 @@ function App(){
         </div>
       </section>
 
-      {info.checked&&!info.installed&&<div className="notice"><b>Auto-Apply needs the InternScout extension.</b> Download the repo, open <code>chrome://extensions</code>, turn on Developer mode, choose <b>Load unpacked</b> and pick the <code>extension</code> folder, then reload this page. <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/extension" target="_blank" rel="noopener">Setup guide</a></div>}
+      {info.stale&&<div className="notice"><b>The extension was reloaded or updated.</b> <a href="#" onClick={e=>{e.preventDefault();location.reload();}}>Reload this page</a> to reconnect Auto-Apply.</div>}
+      {info.checked&&!info.installed&&!info.stale&&<div className="notice"><b>Auto-Apply needs the InternScout extension.</b> Download the repo, open <code>chrome://extensions</code>, turn on Developer mode, choose <b>Load unpacked</b> and pick the <code>extension</code> folder, then reload this page. <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/extension" target="_blank" rel="noopener">Setup guide</a></div>}
       {info.installed&&!info.onboarded&&<div className="notice"><b>One step left:</b> do the Deep Dive so the agent knows your background. <a href="#" onClick={e=>{e.preventDefault();ext.call({type:"open_deep_dive"});}}>Start the Deep Dive</a></div>}
       {note&&<div className="notice">{note}</div>}
 
       <div className="filters">
-        <div className="field search"><input type="text" aria-label="Search" placeholder="Search company or role" value={f.q} onChange={e=>upd("q",e.target.value)}/></div>
+        <div className="field search"><input type="text" aria-label="Search" placeholder='Search anything: python boston -senior "machine learning"' value={f.q} onChange={e=>upd("q",e.target.value)}/></div>
+        <div className="field sel"><select aria-label="Saved searches" value="" onChange={e=>onSaved(e.target.value)}>
+          <option value="">Saved searches</option>
+          {saved.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
+          <option value="__save">+ Save current filters…</option>
+          {saved.length>0&&<optgroup label="Delete">{saved.map(s=><option key={"d"+s.name} value={"del:"+s.name}>Delete “{s.name}”</option>)}</optgroup>}
+        </select></div>
         <MultiSelect placeholder="Field" options={fieldOpts} selected={f.fields} onChange={v=>upd("fields",v)}/>
         <div className="field sel"><select aria-label="Region" value={f.region} onChange={e=>upd("region",e.target.value)}>
           <option value="">Whole region</option><option value="ne">New England</option><option value="nyc">NYC metro</option><option value="onsite">In person</option><option value="remote">Remote</option></select></div>
@@ -422,6 +558,7 @@ function App(){
         <div className="field sel"><select aria-label="Your status" value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
           <option value="">Any progress</option>{STATES.map(s=><option key={s} value={s}>{STATE_LABEL[s]}</option>)}<option value="auto">In Auto-Apply queue</option></select></div>
         <label className="field toggle"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New only</label>
+        {profile&&<label className="field toggle" title="Hide postings whose description rules you out (grad year, citizenship, GPA, degree, sponsorship, passed deadline)"><input type="checkbox" checked={f.eligible} onChange={e=>upd("eligible",e.target.checked)}/> Hide not eligible</label>}
         <div className="field sel"><select aria-label="Sort" value={f.sort} onChange={e=>upd("sort",e.target.value)}>
           <option value="score">Best match</option><option value="new">Newest</option><option value="company">Company A–Z</option><option value="comp">Pay listed</option></select></div>
         <span className="spacer"/>
@@ -438,8 +575,9 @@ function App(){
           {sortTh("company","Company and role")}<th>Field</th><th>Location</th><th>Term</th>
           {sortTh("comp","Pay")}{sortTh("score","Match")}<th>Your status</th><th></th>
         </tr></thead>
-        <tbody>{rows.map(r=><Row key={r.id} r={r} state={st(r.id)} onState={setState} job={jobs[String(r.id)]}
-          checked={sel.has(r.id)} onCheck={check} canAuto={canAuto} onAuto={autoApply}/>)}</tbody>
+        <tbody>{rows.map(r=><Row key={r.id} r={r} f={f}state={st(r.id)} onState={setState} job={jobs[String(r.id)]}
+          checked={sel.has(r.id)} onCheck={check} canAuto={canAuto} onAuto={autoApply}
+          open={openId===r.id} onWhy={onWhy} profile={profile} patterns={meta&&meta.skill_patterns} weights={meta&&meta.score_weights}/>)}</tbody>
       </table></div></div>}
       <footer>{rows.length} of {all.length} shown. Your progress is saved in this browser.{canAuto?" Auto-Apply never presses Submit; you do.":""}</footer>
     </div>

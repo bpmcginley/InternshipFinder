@@ -17,10 +17,27 @@ export const isGemini = (ai) => (ai && ai.provider) === "gemini";
 export const modelsFor = (ai) => (isGemini(ai) ? GEMINI_MODELS : MODELS);
 export const keyFor = (ai) => (isGemini(ai) ? ai.geminiKey : ai.apiKey) || "";
 export const hasKey = (s) => !!keyFor(s.ai);
-// The saved model, unless it belongs to the other provider.
-export function agentModel(ai) {
-  const m = ai.model || "";
-  return m && m.startsWith("gemini") === isGemini(ai) ? m : modelsFor(ai).agent;
+
+// Cost presets. Tasks: agent (fills forms, many calls), deep (one-time profile extraction / voice),
+// interview (chat turns), tailor (one call per job), fast (checks and tiny replies).
+export const PRESETS = {
+  economy: {
+    label: "Economy", blurb: "Cheapest. Haiku everywhere; fine for simple forms, weaker on tricky widgets and essays.",
+    anthropic: { agent: MODELS.fast, deep: MODELS.agent, interview: MODELS.fast, tailor: MODELS.fast, fast: MODELS.fast },
+  },
+  balanced: {
+    label: "Balanced", blurb: "Recommended. Sonnet fills forms and tailors; Haiku does the small stuff.",
+    anthropic: { agent: MODELS.agent, deep: MODELS.agent, interview: MODELS.fast, tailor: MODELS.agent, fast: MODELS.fast },
+  },
+  best: {
+    label: "Best", blurb: "Most careful. Opus reads your files once and tailors; Sonnet fills forms.",
+    anthropic: { agent: MODELS.agent, deep: MODELS.deep, interview: MODELS.agent, tailor: MODELS.deep, fast: MODELS.fast },
+  },
+};
+export const modeOf = (s) => (PRESETS[s.settings && s.settings.ai_mode] ? s.settings.ai_mode : "balanced");
+export function modelFor(s, task) {
+  if (isGemini(s.ai)) return GEMINI_MODELS[task] || GEMINI_MODELS.agent;
+  return PRESETS[modeOf(s)].anthropic[task] || MODELS.agent;
 }
 
 export const EMPTY_FACTS = {
@@ -57,6 +74,8 @@ export function emptyStore() {
     settings: {
       signup_email: "", password_mode: "unique", master_password: "",
       max_tabs: 2, onboarded: false, deep_dive_at: null,
+      ai_mode: "balanced",       // economy | balanced | best (see PRESETS)
+      tailor_resume: "review",   // off | review (you approve each one) | auto
     },
     answers: [],       // log: {jobId, company, title, question, answer, at}
   };

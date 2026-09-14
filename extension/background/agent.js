@@ -1,8 +1,11 @@
 // The Auto-Apply loop: snapshot the page → Claude picks actions (tool use) → execute with
 // verify-after-set → repeat, across page navigations, until ready_to_submit / needs_you.
 import { callAI } from "./claude.js";
-import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, isGemini, agentModel } from "../lib/store.js";
+import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, isGemini, modelFor } from "../lib/store.js";
+import { tailorResume } from "./tailor.js";
+import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs } from "./queue.js";
+import { spend, money } from "../lib/usage.js";
 
 const MAX_STEPS = 40;
 const MAX_FIELD_FAILS = 3;
@@ -18,7 +21,7 @@ HOW IT WORKS
 FILLING
 - Fill every field the profile supports, required and optional. Leave optional fields blank only when nothing in the profile fits.
 - Use the candidate's real facts only. Never invent employers, dates, GPAs, awards, skills, or links. If a REQUIRED answer is missing and cannot be reasonably derived, call ask_user (one clear question).
-- Choice fields (select, react_select, listbox, combobox, radio_group): pass the option text that matches the profile's meaning. If a select fails, the result lists real options; retry with one of them.
+- Choice fields (select, react_select, listbox, combobox, radio_group): pass the option text that matches the profile's meaning. If a select fails, the result lists real options; retry with one of them. A react_select marked searchable loads options from a search (school, city, discipline): pass the full proper name, e.g. the school's official name.
 - Work authorization and visa sponsorship are different questions. Read each label carefully.
 - EEO / demographic / veteran / disability questions: use the profile facts (default "decline to self-identify").
 - Dates: match the field format (type=date needs YYYY-MM-DD; month/year splits need separate values).
@@ -208,6 +211,23 @@ function accountLine(store, url) {
     : `ACCOUNT (${a.domain}): exists. Sign in with email ${a.email}; use fill_secret for the password.`;
 }
 
+// ---------- tailored resume ----------
+async function tailorStep(id, job, store) {
+  await updateJob(id, { activity: "Tailoring your resume to this posting…" });
+  try {
+    const { cost_usd, ...t } = await tailorResume(store, job);
+    const auto = store.settings.tailor_resume === "auto";
+    job = await updateJob(id, (j) => ({ tailored: { ...t, status: auto ? "approved" : "pending" }, cost_usd: (j.cost_usd || 0) + cost_usd }));
+    await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${auto ? ", used automatically" : ""}.` });
+    if (!auto) job = await updateJob(id, { status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
+  } catch (e) {
+    const msg = String((e && e.message) || e);
+    job = await updateJob(id, { tailored: { status: "failed", error: msg } });
+    await appendLog(id, { kind: "tailor", text: `Couldn't tailor the resume (${msg.slice(0, 80)}). Using your original.` });
+  }
+  return job;
+}
+
 // ---------- main loop ----------
 const running = new Set();
 export const isRunning = (id) => running.has(id);
@@ -232,6 +252,10 @@ async function loop(id) {
     await updateJob(id, { status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Deep Dive → Setup), then Resume.` });
     return;
   }
+  if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && !(await spend()).over) {
+    job = await tailorStep(id, job, store);
+    if (job.status !== "working") return; // waiting for the human to approve it
+  }
   const tabId = await ensureTab(job);
   job = await updateJob(id, { tabId, status: "working", reason: "", question: "" });
   const msgs = await loadMsgs(id);
@@ -244,6 +268,12 @@ async function loop(id) {
     if (!job || job.status !== "working") return;
     if (steps >= MAX_STEPS) {
       await updateJob(id, { status: "needs_you", reason: `Stopped after ${MAX_STEPS} steps. Finish by hand, or Resume to let it keep going.`, steps: 0, pending });
+      await saveMsgs(id, msgs);
+      return;
+    }
+    const sp = await spend();
+    if (sp.over) {
+      await updateJob(id, { status: "needs_you", reason: `Monthly AI budget reached (${money(sp.month_usd)} of ${money(sp.budget)}). Raise it in Deep Dive → Setup, then Resume.`, pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
     }
@@ -278,13 +308,13 @@ async function loop(id) {
       { type: "text", text: RULES },
       { type: "text", text: `CANDIDATE PROFILE (JSON)\n${JSON.stringify(profileForModel(store))}`, cache_control: { type: "ephemeral" } },
     ];
-    const resp = await callAI({ ai: store.ai, model: agentModel(store.ai), system, messages: msgs, tools: TOOLS, max_tokens: 8000 });
+    const resp = await callAI({ ai: store.ai, model: modelFor(store, "agent"), system, messages: msgs, tools: TOOLS, max_tokens: 8000, kind: "agent" });
     msgs.push({ role: "assistant", content: resp.content });
     steps++;
 
     const uses = resp.content.filter((b) => b.type === "tool_use");
     const say = resp.content.filter((b) => b.type === "text").map((b) => b.text).join(" ").trim();
-    await updateJob(id, { steps, activity: (say || uses.map((u) => u.name).join(", ")).slice(0, 160) });
+    await updateJob(id, (j) => ({ steps, activity: (say || uses.map((u) => u.name).join(", ")).slice(0, 160), cost_usd: (j.cost_usd || 0) + (resp.cost_usd || 0) }));
 
     if (!uses.length) {
       pending = { results: [], note: resp.stop_reason === "max_tokens"
@@ -356,7 +386,8 @@ async function execTool(u, ctx) {
       r = await act(tabId, input.ref, "check", { checked: !!input.checked });
       break;
     case "upload": {
-      const file = store.files[input.file];
+      const tailored = input.file === "resume" && job.tailored && job.tailored.status === "approved" && job.tailored.file;
+      const file = tailored || store.files[input.file];
       if (!file || !file.b64) return { content: `No ${input.file} file saved. Skip unless required; if required, ask_user.`, isError: true };
       r = await act(tabId, input.ref, "upload", { file: { name: file.name, type: file.type, b64: file.b64 } });
       break;

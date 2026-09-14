@@ -1,6 +1,7 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
-import { loadStore, updateStore, modelsFor, hasKey, isGemini, agentModel } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isGemini, modelFor, modeOf, PRESETS } from "../lib/store.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
+import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -28,8 +29,8 @@ function save(now) {
 }
 window.addEventListener("beforeunload", () => save(true));
 
-const ai = (opts) => callAI({ ai: S.ai, ...opts });
-const M = () => modelsFor(S.ai);
+const ai = (opts) => callAI({ ai: S.ai, kind: "deep_dive", ...opts });
+const M = () => ({ fast: modelFor(S, "fast"), deep: modelFor(S, "deep"), agent: modelFor(S, "interview") });
 const busy = (el, text) => { el.innerHTML = `<span class="spin"></span>${esc(text)}`; };
 
 // ---------- file helpers ----------
@@ -99,13 +100,23 @@ function setup() {
         ? `<label class="f"><span>Gemini key (from aistudio.google.com → Get API key)</span><input type="password" id="key" value="${esc(S.ai.geminiKey)}" placeholder="AIza…"></label>`
         : `<label class="f"><span>Anthropic key (from console.anthropic.com → API keys)</span><input type="password" id="key" value="${esc(S.ai.apiKey)}" placeholder="sk-ant-…"></label>`}
       <div class="row"><button class="btn small" id="test">Test key</button><span id="testout" class="small"></span></div>
-      <label class="f" style="margin-top:12px"><span>Model for filling applications</span><select id="model">
-        ${isGemini(S.ai)
-          ? `<option value="gemini-3.8-flash">Gemini 3.8 Flash (fast, low cost)</option>`
-          : `<option value="claude-sonnet-5">Claude Sonnet 5 (recommended, balanced)</option>
-        <option value="claude-opus-5">Claude Opus 5 (most careful, costs more)</option>
-        <option value="claude-haiku-4-5">Claude Haiku 4.5 (cheapest, less reliable)</option>`}</select></label>
-      ${isGemini(S.ai) ? `<p class="small muted" style="margin:0">Your resume, files and interview go to Google when Gemini is used.</p>` : ""}
+      ${isGemini(S.ai)
+        ? `<p class="small muted" style="margin:12px 0 0">Gemini 3.8 Flash is used for everything. Google's free tier covers light use. Your resume, files and interview go to Google when Gemini is used.</p>`
+        : `<label class="f" style="margin-top:12px"><span>Quality vs. cost</span><select id="mode">${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join("")}</select></label>
+      <p class="small muted" id="modeblurb" style="margin:0"></p>`}
+    </div>
+    <div class="card"><h3>Tailored resumes</h3>
+      <p class="small muted" style="margin-top:0">Before each application, the AI rewords your existing resume bullets toward the posting and makes a clean one-page-style PDF. It can't add jobs, skills or numbers you didn't list; changed numbers are thrown out automatically. About 1 to 5 cents per job.</p>
+      <label class="f"><span>When applying</span><select id="tailor">
+        <option value="review">Tailor it, and let me approve each one (recommended)</option>
+        <option value="auto">Tailor it and use it automatically</option>
+        <option value="off">Always upload my original resume</option></select></label>
+    </div>
+    <div class="card"><h3>AI spending</h3>
+      <p class="small muted" style="margin-top:0">Every AI call is priced and added up. When the monthly budget is reached, applications pause until you raise it. Prices are estimates in USD per million tokens; correct them from your provider's pricing page if they differ.</p>
+      <p class="small" id="spent" style="margin-top:0"></p>
+      <label class="f"><span>Monthly budget in USD (0 = no limit)</span><input type="number" id="budget" min="0" step="1"></label>
+      <div id="prices" class="grid"></div>
     </div>
     <div class="card"><h3>Job-site accounts</h3>
       <p class="small muted" style="margin-top:0">Workday, iCIMS and similar sites need an account. The agent creates it for you with this email. Passwords are filled in by the extension itself and never shown to the AI.</p>
@@ -119,10 +130,12 @@ function setup() {
     <div id="need" class="small warn"></div>
     ${navButtons(null, "files")}`;
   $("#provider").value = isGemini(S.ai) ? "gemini" : "anthropic";
-  $("#model").value = agentModel(S.ai);
+  const syncMode = () => { if ($("#mode")) { $("#mode").value = modeOf(S); $("#modeblurb").textContent = PRESETS[modeOf(S)].blurb; } };
+  syncMode();
+  $("#tailor").value = S.settings.tailor_resume || "review";
   $("#provider").addEventListener("change", (e) => {
     S.ai.provider = e.target.value;
-    S.ai.model = modelsFor(S.ai).agent;
+    S.ai.model = modelFor(S, "agent");
     save();
     setup();
   });
@@ -131,11 +144,13 @@ function setup() {
   syncMaster();
   const bind = (id, fn) => $(id).addEventListener("input", (e) => { fn(e.target.value); save(); });
   bind("#key", (v) => { if (isGemini(S.ai)) S.ai.geminiKey = v.trim(); else S.ai.apiKey = v.trim(); });
-  bind("#model", (v) => { S.ai.model = v; });
+  if ($("#mode")) bind("#mode", (v) => { S.settings.ai_mode = v; S.ai.model = modelFor(S, "agent"); syncMode(); });
+  bind("#tailor", (v) => { S.settings.tailor_resume = v; });
   bind("#email", (v) => { S.settings.signup_email = v.trim(); if (!S.profile.facts.email) S.profile.facts.email = v.trim(); });
   bind("#pwmode", (v) => { S.settings.password_mode = v; syncMaster(); });
   bind("#master", (v) => { S.settings.master_password = v; });
   bind("#tabs", (v) => { S.settings.max_tabs = +v; });
+  fillSpending();
   $("#test").addEventListener("click", async () => {
     const out = $("#testout");
     busy(out, "Checking…");
@@ -144,6 +159,24 @@ function setup() {
       out.innerHTML = `<span class="ok">Key works.</span>`;
     } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
   });
+}
+
+async function fillSpending() {
+  const u = await loadUsage(), sp = await spend();
+  if (!$("#prices")) return;
+  $("#spent").textContent = `This month so far: ${money(sp.month_usd)} across ${sp.calls} AI calls.`;
+  $("#budget").value = u.budget || 0;
+  $("#budget").addEventListener("input", (e) => saveUsage({ budget: Math.max(0, +e.target.value || 0) }));
+  const models = Object.keys(DEFAULT_PRICES).filter((m) => m.startsWith("gemini") === isGemini(S.ai));
+  $("#prices").innerHTML = models.map((m) => {
+    const p = priceFor(m, u.prices);
+    return `<label class="f"><span>${esc(m)}: input / output</span><div class="row" style="flex-wrap:nowrap"><input type="number" min="0" step="0.01" data-m="${m}" data-k="in" value="${p.in}"><input type="number" min="0" step="0.01" data-m="${m}" data-k="out" value="${p.out}"></div></label>`;
+  }).join("");
+  $("#prices").querySelectorAll("input").forEach((inp) => inp.addEventListener("input", async () => {
+    const prices = (await loadUsage()).prices;
+    prices[inp.dataset.m] = { ...priceFor(inp.dataset.m, prices), [inp.dataset.k]: Math.max(0, +inp.value || 0) };
+    await saveUsage({ prices });
+  }));
 }
 
 // ---------- 2. files ----------

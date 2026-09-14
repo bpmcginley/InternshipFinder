@@ -44,6 +44,22 @@ def test_region_fields():
     assert g["region_locations"] == ["Hoboken, NJ"] and g["state"] == "NJ"
 
 
+def test_comma_city_lists():
+    g = evaluate_locations(["New York, Chicago"])
+    assert g["region_locations"] == ["New York"] and g["state"] == "NY"
+    assert [r["kind"] for r in g["regions"]] == ["nyc_metro"]
+    g = evaluate_locations(["Austin, TX; Boston, MA; New York, NY"])
+    assert [(r["kind"], r["state"]) for r in g["regions"]] == [("new_england", "MA"), ("nyc_metro", "NY")]
+    assert evaluate_locations(["Brooklyn, New York"])["region_locations"] == ["Brooklyn, New York"]
+    assert evaluate_locations(["Boston, MA"])["region_locations"] == ["Boston, MA"]
+    assert not in_region("Chicago, Seattle")
+    g = evaluate_locations(["Cambridge, MA, Arlington, VA, Seattle, WA"])
+    assert g["region_locations"] == ["Cambridge, MA"]
+    assert evaluate_locations(["Boston, MA, United States"])["region_locations"] == ["Boston, MA, United States"]
+    g = evaluate_locations(["Remote - US"])
+    assert g["regions"] == [{"loc": "Remote - US", "kind": "remote", "state": "Remote"}]
+
+
 def test_ats_of():
     assert ats_of("https://boards.greenhouse.io/janestreet/jobs/123") == ("greenhouse", "janestreet")
     assert ats_of("https://job-boards.greenhouse.io/point72/jobs/9") == ("greenhouse", "point72")
