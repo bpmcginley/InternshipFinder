@@ -1,5 +1,10 @@
 {
+"00052 - new york corporate buying office|NY":null,
+"129 north rd|NY":null,
 "130 north 18th street - one logan square|PA":null,
+"300 creekview ave|NJ":null,
+"3001 archer dr|PA":null,
+"900 river rd|PA":null,
 "ambler|PA":[
 40.1545,
 -75.2222
@@ -35,6 +40,10 @@
 "bethlehem|PA":[
 40.6179,
 -75.3787
+],
+"blauvelt|NY":[
+41.0634,
+-73.9576
 ],
 "bohemia|NY":[
 40.7693,
@@ -109,6 +118,10 @@
 40.8584,
 -74.1638
 ],
+"coeymans|NY":[
+42.474,
+-73.7923
+],
 "cohoes|NY":[
 42.7742,
 -73.7001
@@ -116,6 +129,10 @@
 "concordville|PA":[
 39.8852,
 -75.5202
+],
+"connellsville|PA":[
+40.0179,
+-79.5895
 ],
 "corning|NY":[
 42.1435,
@@ -134,9 +151,17 @@
 40.0507,
 -74.9535
 ],
+"downingtown|PA":[
+40.0065,
+-75.7033
+],
 "dresher|PA":[
 40.1409,
 -75.1668
+],
+"east aurora|NY":[
+42.7689,
+-78.6178
 ],
 "east brunswick|NJ":[
 40.4279,
@@ -154,6 +179,14 @@
 40.2962,
 -74.051
 ],
+"edgewood|NY":[
+42.1404,
+-74.2124
+],
+"elmira|NY":[
+42.0898,
+-76.8077
+],
 "englewood|NJ":[
 40.8929,
 -73.9727
@@ -166,6 +199,10 @@
 40.029,
 -75.6208
 ],
+"fair lawn|NJ":[
+40.9358,
+-74.1175
+],
 "findlay township|PA":[
 40.4786,
 -80.2806
@@ -174,9 +211,21 @@
 41.5356,
 -73.8987
 ],
+"fleetwood|PA":[
+40.454,
+-75.818
+],
 "floral park|NY":[
 40.7247,
 -73.7048
+],
+"florence|NJ":[
+39.7343,
+-74.9182
+],
+"flourtown|PA":[
+40.1029,
+-75.2128
 ],
 "flushing|NY":[
 40.7654,
@@ -185,6 +234,10 @@
 "fort washington|PA":[
 40.1378,
 -75.2118
+],
+"fredonia|NY":[
+42.44,
+-79.3315
 ],
 "gettysburg|PA":[
 39.8309,
@@ -197,6 +250,10 @@
 "glenolden|PA":[
 39.9,
 -75.2892
+],
+"glens falls|NY":[
+43.3099,
+-73.6444
 ],
 "greensburg|PA":[
 40.3025,
@@ -222,6 +279,10 @@
 40.8174,
 -74.3954
 ],
+"hanover|PA":[
+39.8005,
+-76.9833
+],
 "harrisburg|PA":[
 40.2663,
 -76.8861
@@ -229,6 +290,10 @@
 "harrison|NJ":[
 40.7465,
 -74.1563
+],
+"henrietta|NY":[
+43.0612,
+-77.6339
 ],
 "hermitage|PA":[
 41.2334,
@@ -254,13 +319,26 @@
 40.1784,
 -75.1285
 ],
+"hudson rbt|NY":null,
+"hudson|NY":[
+42.2529,
+-73.791
+],
 "jackson township|NJ":[
 40.1152,
 -74.3648
 ],
+"jamesville|NY":[
+42.992,
+-76.0716
+],
 "kearny|NJ":[
 40.7684,
 -74.1454
+],
+"kingston|NY":[
+41.9288,
+-74.0024
 ],
 "lake grove|NY":[
 40.8529,
@@ -277,6 +355,10 @@
 "lawrence township|NJ":[
 40.2877,
 -74.7123
+],
+"lewisburg|PA":[
+40.9644,
+-76.8848
 ],
 "linden|NJ":[
 40.622,
@@ -307,6 +389,10 @@
 40.7957,
 -73.6989
 ],
+"mcconnellsburg|PA":[
+39.9326,
+-77.9989
+],
 "mckeesport|PA":[
 40.3478,
 -79.8642
@@ -331,6 +417,10 @@
 40.4335,
 -79.7606
 ],
+"montoursville|PA":[
+41.2495,
+-76.9267
+],
 "moon twp|PA":[
 40.5061,
 -80.2082
@@ -340,9 +430,21 @@
 -74.4811
 ],
 "morristown-re|NJ":null,
+"mount pleasant|PA":[
+40.1487,
+-79.5421
+],
 "mt laurel township|NJ":[
 39.934,
 -74.891
+],
+"murrysville|PA":[
+40.4284,
+-79.6975
+],
+"nazareth|PA":[
+40.7423,
+-75.3112
 ],
 "new city|NY":[
 41.147,
@@ -356,12 +458,23 @@
 40.5353,
 -74.3456
 ],
+"new kensington|PA":[
+40.5698,
+-79.7648
+],
 "new windsor|NY":[
 41.4768,
 -74.0238
 ],
+"new york - 104 w 40th|NY":null,
+"new york - new york|NY":[
+40.7127,
+-74.006
+],
 "new york city office|NY":null,
+"new york ny usa|NY":null,
 "new york office|NY":null,
+"new york \u2013 1350 avenue of the americas|NY":null,
 "newburgh|NY":[
 41.5001,
 -74.0098
@@ -378,12 +491,18 @@
 42.8154,
 -73.8929
 ],
+"nj - morristown|NJ":null,
 "nj-jersey city|NJ":null,
 "nj-parsippany|NJ":null,
+"north tonawanda|NY":[
+43.0408,
+-78.8661
+],
 "ny-new york|NY":[
 40.6379,
 -74.1856
 ],
+"offsite - usa - ny - metro|NY":null,
 "orchard park|NY":[
 42.767,
 -78.7436
@@ -392,6 +511,7 @@
 39.9407,
 -75.1502
 ],
+"pa-west chester - dunwoody dr|PA":null,
 "painted post|NY":[
 42.162,
 -77.0941
@@ -404,10 +524,12 @@
 40.9168,
 -74.1718
 ],
+"pennsylvania - king of prussia|PA":null,
 "pennsylvania|PA":[
 40.0117,
 -75.1844
 ],
+"philadelphia clinic|PA":null,
 "phoenixville|PA":[
 40.1339,
 -75.5173
@@ -416,13 +538,22 @@
 40.8604,
 -74.3404
 ],
+"pittsburgh - pa - 2730 sidney street - suite 330|PA":null,
 "plainview|NY":[
 40.7765,
 -73.467
 ],
+"plymouth meeting|PA":[
+40.1023,
+-75.2743
+],
 "pottstown|PA":[
 40.2453,
 -75.6496
+],
+"queensbury|NY":[
+43.3619,
+-73.6652
 ],
 "radnor|PA":[
 40.0463,
@@ -474,6 +605,10 @@
 40.1854,
 -75.2277
 ],
+"springville|NY":[
+42.5087,
+-78.6667
+],
 "stanhope|NJ":[
 40.9029,
 -74.7091
@@ -482,9 +617,21 @@
 40.7945,
 -77.8616
 ],
+"swiftwater|PA":[
+41.0954,
+-75.3249
+],
 "tarentum|PA":[
 40.6021,
 -79.7545
+],
+"tonawanda plant|NY":[
+43.0484,
+-78.8539
+],
+"torrance|PA":[
+40.4173,
+-79.2228
 ],
 "tredyffrin township|PA":[
 40.0687,
@@ -498,6 +645,8 @@
 40.7795,
 -74.0238
 ],
+"united states - new jersey - parsippany|NJ":null,
+"united states of america|NY":null,
 "university park|PA":[
 34.7406,
 -86.623
@@ -506,7 +655,24 @@
 40.2142,
 -75.3042
 ],
+"us home office new jersey|NJ":null,
+"us home office new york|NY":null,
+"us home office pennsylvania|PA":null,
+"us-new york|NY":null,
+"us-pennsylvania|PA":null,
+"us.ny.new york.10 east 40 street|NY":null,
+"usa - new jersey - rahway|NJ":null,
 "usa - ny (remote|NY":null,
+"usa - pennsylvania - king of prussia|PA":null,
+"usa - pennsylvania - philadelphia|PA":null,
+"usa - pennsylvania - west point|PA":null,
+"usa ny new york city 66 hudson blvd e|NY":null,
+"usa-new jersey-edgewater park|NJ":null,
+"usa-new jersey-middlesex county|NJ":null,
+"usa-new jersey-newark|NJ":null,
+"usa-new jersey-perth amboy|NJ":null,
+"usa-new jersey-piscataway township|NJ":null,
+"usa-new jersey|NJ":null,
 "usa|NJ":[
 40.603,
 -74.6874
@@ -546,6 +712,10 @@
 "west point|PA":[
 40.2068,
 -75.2993
+],
+"westampton|NJ":[
+40.0155,
+-74.8281
 ],
 "wilkes-barre|PA":[
 41.2465,

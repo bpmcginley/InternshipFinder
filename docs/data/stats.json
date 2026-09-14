@@ -1,37 +1,49 @@
 {
-  "total": 327,
-  "open": 285,
-  "new": 327,
-  "generated_at": "2026-09-14T11:14:57.791957+00:00",
+  "total": 1084,
+  "open": 934,
+  "new": 1084,
+  "generated_at": "2026-09-14T13:46:12.547414+00:00",
   "profile": {
-    "name": "CS/Quant \u00b7 Summer 2027 \u00b7 Boston",
-    "center_city": "Boston, MA",
-    "radius_miles": 30.0,
+    "name": "All fields · Summer 2027 · New England + NYC",
+    "center_city": "New England + NYC metro",
+    "radius_miles": 50.0,
     "include_remote": true,
     "terms": [
       "Summer 2027"
     ],
-    "metros": [
-      "Boston",
-      "New York",
-      "Chicago",
-      "Miami",
-      "San Francisco",
-      "Seattle",
-      "Austin",
-      "Los Angeles",
-      "Washington DC",
-      "Philadelphia",
-      "Atlanta",
-      "Denver",
-      "Pittsburgh",
-      "Dallas",
-      "Houston",
-      "San Diego",
-      "Raleigh",
-      "Minneapolis",
-      "Phoenix",
-      "Detroit"
-    ]
+    "region": "New England + NYC metro",
+    "states": [
+      "CT",
+      "MA",
+      "ME",
+      "NH",
+      "RI",
+      "VT"
+    ],
+    "nyc_radius_miles": 50.0
+  },
+  "by_state": {
+    "NY": 440,
+    "MA": 220,
+    "Remote": 142,
+    "CT": 65,
+    "NJ": 46,
+    "VT": 10,
+    "NH": 5,
+    "RI": 5,
+    "ME": 1
+  },
+  "by_ats": {
+    "workday": 396,
+    "greenhouse": 241,
+    "ashby": 87,
+    "other": 69,
+    "oracle": 47,
+    "smartrecruiters": 42,
+    "lever": 41,
+    "icims": 8,
+    "bamboohr": 1,
+    "workable": 1,
+    "taleo": 1
   }
 }
