@@ -8,6 +8,9 @@ import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
+// Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
+// here (in the worker) as well as in the page, and this keeps one copy with one set of tests.
+import "../agent/guard.js";
 
 const MAX_STEPS = 40;
 const MAX_FIELD_FAILS = 3;
@@ -37,8 +40,9 @@ NAVIGATION
 - If validation errors appear, fix them before moving on.
 
 ACCOUNTS
-- If the site needs an account, follow the ACCOUNT line: sign in if one exists, otherwise create one with the given email. Use fill_secret for EVERY password and confirm-password field; never type a password with fill. Tick required account terms/privacy checkboxes.
+- Passwords are the candidate's, not yours. Never type one, in any field, by any means. Sign-up and sign-in pages are handed back to the candidate automatically before you see them; if one reaches you anyway, call pause_for_user.
 - Email verification, CAPTCHA, SMS or 2FA → pause_for_user with a short instruction.
+- Non-password account fields (email, name, terms/privacy checkboxes) are fine to fill when they appear on an ordinary application page.
 
 FINISHING
 - The final submit button is reserved for the human and is blocked in code. Buttons marked BLOCKED must not be clicked.
@@ -184,6 +188,23 @@ function formatSnapshot(frames, fails) {
   return { text: lines.join("\n"), index, top, hasFinal };
 }
 
+// Choosing a password and reading a code out of your own inbox are yours to do, so the agent
+// stops at those pages and hands the tab back. Checked here, before the model gets a turn, for
+// the same reason the final submit button is blocked in code: it isn't the model's call to make.
+const GATE_HELP = {
+  account_creation: "This site wants you to create an account. Pick a password and finish signing up in the tab, then press Resume.",
+  sign_in: "This site wants you to sign in. Enter your password in the tab, then press Resume.",
+  email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
+};
+
+function gateIn(frames) {
+  for (const f of frames) {
+    const g = globalThis.ISGuard.detectGate(f);
+    if (g) return g;
+  }
+  return null;
+}
+
 // Old snapshots are the bulk of the context; keep only the last two.
 function trimHistory(msgs) {
   let seen = 0;
@@ -208,9 +229,7 @@ function jobIntro(job) {
 
 function accountLine(store, url) {
   const a = accountFor(store, url);
-  return a.isNew
-    ? `ACCOUNT (${a.domain}): none saved. If an account is required, create one with email ${a.email}.`
-    : `ACCOUNT (${a.domain}): exists. Sign in with email ${a.email}; use fill_secret for the password.`;
+  return `ACCOUNT (${a.domain}): use ${a.email} for any email field. Signing up or signing in is the candidate's step, not yours.`;
 }
 
 // ---------- tailored resume ----------
@@ -301,6 +320,14 @@ async function loop(id) {
     }
     const snap = formatSnapshot(frames, fails);
     const url = (snap.top && snap.top.url) || job.apply_url;
+
+    const gate = gateIn(frames);
+    if (gate) {
+      await appendLog(job.id, { kind: "gate", text: `Paused: ${gate.reason}` });
+      await updateJob(id, { status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
+      await saveMsgs(id, msgs);
+      return;
+    }
 
     const content = [];
     if (pending && pending.results) content.push(...pending.results);
