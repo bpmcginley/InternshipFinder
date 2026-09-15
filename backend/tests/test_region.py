@@ -69,7 +69,10 @@ def test_ats_of():
     assert ats_of("https://modernatx.wd1.myworkdayjobs.com/en-US/M_tx/job/Cambridge/Intern_R1") == \
         ("workday", "modernatx|wd1|M_tx")
     assert ats_of("https://jobs.smartrecruiters.com/BoschGroup/7440") == ("smartrecruiters", "BoschGroup")
-    assert ats_of("https://careers-foo.icims.com/jobs/1/intern/job") == ("icims", None)
+    # the whole subdomain is the iCIMS tenant, prefix and all
+    assert ats_of("https://careers-foo.icims.com/jobs/1/intern/job") == ("icims", "careers-foo")
+    # ...but a bare "careers" is a _BAD_TOKEN, so it stays recognised-without-a-token
+    assert ats_of("https://careers.icims.com/jobs/1/intern/job") == ("icims", None)
     assert ats_of("https://example.com/careers") == ("other", None)
 
 

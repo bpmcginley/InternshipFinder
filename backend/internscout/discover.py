@@ -31,6 +31,8 @@ PATTERNS = [
     ("taleo", re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I)),
     ("adp", re.compile(r"workforcenow\.adp\.com/.*?[?&]cid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", re.I)),
     ("jobvite", re.compile(r"jobs\.jobvite\.com/(?:careers/)?([A-Za-z0-9_-]+)", re.I)),
+    # The whole subdomain is the tenant: hospital-midlandhealth, careers-uhnjcareers, jobs-selectmedicalcorp.
+    ("icims", re.compile(r"https?://([a-z0-9-]+)\.icims\.com", re.I)),
 ]
 _BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1", "oneclick-ui",
                "j", "api", "www", "app", "careers", "rest"}

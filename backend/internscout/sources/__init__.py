@@ -12,6 +12,7 @@ from .oracle import fetch_oracle_board
 from .taleo import fetch_taleo_board
 from .adp import fetch_adp_board
 from .jobvite import fetch_jobvite_board
+from .icims import fetch_icims_board
 from .google_jobs import fetch_google_jobs
 from .usajobs import fetch_usajobs
 from .nyc_jobs import fetch_nyc_jobs
@@ -31,6 +32,7 @@ BOARD_FETCHERS = {
     "taleo": fetch_taleo_board,
     "adp": fetch_adp_board,
     "jobvite": fetch_jobvite_board,
+    "icims": fetch_icims_board,
 }
 __all__ = ["fetch_github_lists", "fetch_greenhouse", "fetch_lever", "fetch_google_jobs", "fetch_usajobs",
            "fetch_nyc_jobs", "BOARD_FETCHERS"]

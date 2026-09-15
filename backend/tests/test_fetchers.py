@@ -12,6 +12,7 @@ from internscout.sources.oracle import parse_oracle
 from internscout.sources.taleo import parse_taleo
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
+from internscout.sources.icims import parse_icims
 from internscout.sources.usajobs import parse_usajobs
 from internscout.sources.nyc_jobs import parse_nyc_jobs
 from internscout.sources.github_lists import _parse
@@ -187,6 +188,29 @@ def test_jobvite():
     desc = parse_jobvite_detail('<div class="jv-job-detail-description" ng-non-bindable><h3>Description</h3>'
                                 '<div><p>Plan routes.</p></div></div><div class="jv-job-detail-bottom-actions">')
     assert "Plan routes." in desc
+
+
+def test_icims():
+    def card(jid, title, loc):
+        return f"""<li class="col-xs-12 iCIMS_JobCardItem"><div class="row">
+        <div class="col-xs-6 header left"><span class="sr-only field-label">Job Locations</span>
+        <span > {loc}</span></div>
+        <div class="col-xs-12 title">
+        <a href="https://acme.icims.com/jobs/{jid}/slug/job?in_iframe=1" class="iCIMS_Anchor" title="{jid} - {title}">
+        <h3 > {title}</h3></a></div>
+        <div class="col-xs-12 description">&nbsp; Care for patients...</div>
+        </div></li>"""
+    page = (card(7600, "RN Internship", "US-TX-Midland")
+            + card(7601, "Executive Chef", "US-TX-Midland")
+            + card(7602, "Summer Intern", "CA-ON-Toronto")
+            + card(7603, "Dietetic Intern", "US-MA-Boston | US-Remote"))
+    items = parse_icims(page, CO)
+    # the chef is not an internship; Toronto is not US, so it drops with no US location left
+    assert [i["title"] for i in items] == ["RN Internship", "Dietetic Intern"]
+    assert items[0]["locations"] == ["Midland, TX"]
+    assert items[1]["locations"] == ["Boston, MA", "Remote - US"]
+    # in_iframe is a fetch detail, not part of the link we hand a student
+    assert items[0]["url"] == "https://acme.icims.com/jobs/7600/slug/job"
 
 
 def test_usajobs():
