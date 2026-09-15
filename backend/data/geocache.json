@@ -370,6 +370,7 @@
 42.992,
 -76.0716
 ],
+"kansas city|PA":null,
 "kearny|NJ":[
 40.7684,
 -74.1454
@@ -506,6 +507,7 @@
 40.3643,
 -74.9513
 ],
+"new jersey (usa|NJ":null,
 "new jersey|NJ":[
 40.5353,
 -74.3456
@@ -518,6 +520,7 @@
 41.4768,
 -74.0238
 ],
+"new york (usa|NY":null,
 "new york - 104 w 40th|NY":null,
 "new york - 1166|NY":null,
 "new york - 499 park|NY":null,
@@ -525,6 +528,7 @@
 40.7127,
 -74.006
 ],
+"new york city m&s|NY":null,
 "new york city office|NY":null,
 "new york ny usa|NY":null,
 "new york office|NY":null,
@@ -654,6 +658,7 @@
 -74.1718
 ],
 "pa|PA":null,
+"pennsylvania (usa|PA":null,
 "pennsylvania - king of prussia|PA":null,
 "pennsylvania|PA":[
 40.0117,
@@ -816,6 +821,7 @@
 -74.0238
 ],
 "united states - new jersey - parsippany|NJ":null,
+"united states - wayne|PA":null,
 "united states of america|NJ":null,
 "united states of america|NY":null,
 "university park|PA":[
