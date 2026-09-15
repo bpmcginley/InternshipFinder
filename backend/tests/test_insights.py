@@ -76,7 +76,7 @@ def test_patterns_are_js_compatible():
 
 def test_score_parts_sum_to_total():
     kw = dict(field_tags=["swe"], geo={"in_city": True}, first_seen=datetime.now(timezone.utc),
-              status="open", is_quant_target=False, sources=["greenhouse"])
+              status="open", sources=["greenhouse"])
     parts = score_parts(**kw)
     assert set(parts) == set(W)
     assert parts["location"] == W["location"]

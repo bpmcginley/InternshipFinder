@@ -13,10 +13,14 @@ export const GEMINI_MODELS = {
   fast: "gemini-3.8-flash",
 };
 
+// Providers: "internscout" (default; the InternScout Worker with Google/Microsoft sign-in, no key in the extension),
+// "anthropic" or "gemini" (Advanced: the student's own key).
+export const isWorker = (ai) => (ai && ai.provider) === "internscout";
 export const isGemini = (ai) => (ai && ai.provider) === "gemini";
-export const modelsFor = (ai) => (isGemini(ai) ? GEMINI_MODELS : MODELS);
+export const modelsFor = (ai) => (isGemini(ai) || isWorker(ai) ? GEMINI_MODELS : MODELS);
 export const keyFor = (ai) => (isGemini(ai) ? ai.geminiKey : ai.apiKey) || "";
-export const hasKey = (s) => !!keyFor(s.ai);
+// "AI is set up". InternScout needs no key; sign-in is checked when a call is made (lib/auth.js).
+export const hasKey = (s) => isWorker(s.ai) || !!keyFor(s.ai);
 
 // Cost presets. Tasks: agent (fills forms, many calls), deep (one-time profile extraction / voice),
 // interview (chat turns), tailor (one call per job), fast (checks and tiny replies).
@@ -36,7 +40,8 @@ export const PRESETS = {
 };
 export const modeOf = (s) => (PRESETS[s.settings && s.settings.ai_mode] ? s.settings.ai_mode : "balanced");
 export function modelFor(s, task) {
-  if (isGemini(s.ai)) return GEMINI_MODELS[task] || GEMINI_MODELS.agent;
+  // The Worker picks its own model per task; the id is only a label there.
+  if (isGemini(s.ai) || isWorker(s.ai)) return GEMINI_MODELS[task] || GEMINI_MODELS.agent;
   return PRESETS[modeOf(s)].anthropic[task] || MODELS.agent;
 }
 
@@ -51,11 +56,14 @@ export const EMPTY_FACTS = {
   over_18: "Yes", background_check: "Yes", drug_test: "Yes", non_compete: "No",
   gender: "Decline to self-identify", race: "Decline to self-identify", hispanic: "Decline to self-identify",
   veteran: "I don't wish to answer", disability: "I don't wish to answer", lgbtq: "Decline to self-identify",
+  majors: "", class_year: "", grad_term: "", // from the dashboard profile (bridge profile:set); majors comma-joined
 };
+
+export const STORE_VERSION = 3;
 
 export function emptyStore() {
   return {
-    version: 2,
+    version: STORE_VERSION,
     profile: {
       facts: { ...EMPTY_FACTS },
       education: [],   // {school, degree, major, minor, gpa, start, end, grad_term, coursework}
@@ -69,7 +77,8 @@ export function emptyStore() {
       extra: {},       // answers to ask_user questions: {question_text: answer}
     },
     files: { resume: null, cv: null, transcript: null, cover_letter: null, samples: [] }, // {name, type, b64, size, text?}
-    ai: { provider: "anthropic", apiKey: "", geminiKey: "", model: MODELS.agent },
+    ai: { provider: "internscout", apiKey: "", geminiKey: "", model: GEMINI_MODELS.agent },
+    dashboard_profile: null, // last profile the dashboard sent: {majors, minors, class_year, grad_term, stages, terms, states, work_auth}
     accounts: [],      // {domain, email, password, created}
     settings: {
       signup_email: "", password_mode: "unique", master_password: "",
@@ -108,7 +117,7 @@ export function migrate(old) {
   if (p.background) s.profile.goals.interests = p.background;
   if (p.resume_text) s.files.resume_text = p.resume_text;
   const a = old.ai || {};
-  if (a.apiKey) s.ai.apiKey = a.apiKey;
+  if (a.apiKey) Object.assign(s.ai, { provider: "anthropic", apiKey: a.apiKey, model: MODELS.agent });
   const f = old.files || {};
   const conv = (x) => x && (x.data || x.b64) ? { name: x.name, type: x.type, b64: x.b64 || x.data, size: x.size || 0 } : null;
   s.files.resume = conv(f.resume); s.files.transcript = conv(f.transcript); s.files.cover_letter = conv(f.cover);
@@ -116,9 +125,26 @@ export function migrate(old) {
   return s;
 }
 
+// v2 → v3: InternScout becomes the AI provider, unless a key was saved (then the student's provider stays).
+export function upgradeStore(stored) {
+  const s = deepMerge(emptyStore(), stored);
+  if (stored.version === 2) {
+    const a = stored.ai || {};
+    if (!a.apiKey && !a.geminiKey) Object.assign(s.ai, { provider: "internscout", model: GEMINI_MODELS.agent });
+    else if (!a.provider) s.ai.provider = a.geminiKey && !a.apiKey ? "gemini" : "anthropic";
+  }
+  s.version = STORE_VERSION;
+  return s;
+}
+
 export async function loadStore() {
   const raw = await chrome.storage.local.get(null);
-  if (raw.store && raw.store.version === 2) return deepMerge(emptyStore(), raw.store);
+  if (raw.store && raw.store.version === STORE_VERSION) return deepMerge(emptyStore(), raw.store);
+  if (raw.store && raw.store.version === 2) {
+    const s = upgradeStore(raw.store);
+    await chrome.storage.local.set({ store: s });
+    return s;
+  }
   const s = (raw.internscout || raw.ai || raw.files) ? migrate(raw) : emptyStore();
   await chrome.storage.local.set({ store: s });
   if (raw.internscout || raw.ai || raw.files) await chrome.storage.local.remove(["internscout", "ai", "files"]);

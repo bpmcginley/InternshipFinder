@@ -1,0 +1,436 @@
+[
+ {
+  "sector": "government_policy",
+  "name": "American Enterprise Institute",
+  "ats": "unsupported",
+  "source_url": "https://aeijobs.silkroad.com/",
+  "note": "SilkRoad/HarQen -- unsupported ATS."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Bipartisan Policy Center",
+  "ats": "unsupported",
+  "source_url": "https://bipartisanpolicy.freshteam.com/jobs",
+  "note": "Freshteam -- unsupported ATS. Runs a named paid internship program (bipartisanpolicy.org/about-us/careers/internships/)."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Brookings Institution",
+  "ats": "unsupported",
+  "source_url": "https://careers-brookings.icims.com",
+  "note": "iCIMS -- unsupported ATS."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Carnegie Endowment for International Peace",
+  "ats": "unsupported",
+  "source_url": "http://carnegieendowment.applicantpro.com/",
+  "note": "ApplicantPro -- unsupported ATS. Runs a named one-year fellowship program for recent grads."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Center for American Progress",
+  "ats": "unsupported",
+  "source_url": "https://www.paycomonline.net/v4/ats/web.php/portal/55F4FB03406C70EB6159BCD864666469/jobs",
+  "note": "Paycom ATS -- unsupported. Listings linked from americanprogress.org/about-us/jobs/; also runs a named summer internship program."
+ },
+ {
+  "sector": "government_policy",
+  "name": "City of Boston",
+  "ats": "unsupported",
+  "source_url": "https://www.governmentjobs.com/careers/boston",
+  "note": "NEOGOV/governmentjobs.com -- unsupported ATS."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Council on Foreign Relations",
+  "ats": "unsupported",
+  "source_url": "https://careers-cfr.icims.com",
+  "note": "iCIMS -- unsupported ATS. Also runs paid internship program described at cfr.org/career-opportunities."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Federal Reserve Board",
+  "ats": "unresolved",
+  "source_url": "https://frbog.taleo.net/careersection/1/jobsearch.ftl",
+  "note": "Board of Governors uses a separate Taleo tenant (frbog|1) from the regional Reserve Banks' Workday system. Token matches URL pattern but live fetch throws httpx.DecodingError (gzip/WAF header mismatch on frbog.taleo.net) unrelated to token correctness -- unverified."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Heritage Foundation",
+  "ats": "unresolved",
+  "source_url": "https://www.heritage.org/jobs-list",
+  "note": "Site returns 403 to non-browser fetches; custom job-bank page, underlying ATS could not be determined within lookup budget."
+ },
+ {
+  "sector": "government_policy",
+  "name": "MBTA",
+  "ats": "unsupported",
+  "source_url": "https://www.governmentjobs.com/careers/mbtama",
+  "note": "NEOGOV/governmentjobs.com -- unsupported ATS."
+ },
+ {
+  "sector": "government_policy",
+  "name": "Mathematica",
+  "ats": "unsupported",
+  "source_url": "https://mathematica.csod.com/ux/ats/careersite/4/home",
+  "note": "Cornerstone OnDemand (CSOD) -- unsupported ATS. careers.mathematica.org redirects there."
+ },
+ {
+  "sector": "health",
+  "name": "Blue Cross Blue Shield of Massachusetts",
+  "ats": "unsupported",
+  "source_url": "https://careers.bluecrossma.org/us/en",
+  "note": "Phenom People"
+ },
+ {
+  "sector": "health",
+  "name": "Boston Children's Hospital",
+  "ats": "unsupported",
+  "source_url": "https://jobs.bostonchildrens.org/",
+  "note": "BrassRing (IBM Kenexa) ATS"
+ },
+ {
+  "sector": "health",
+  "name": "Boston Scientific",
+  "ats": "unsupported",
+  "source_url": "https://bostonscientific.eightfold.ai/careers",
+  "note": "Eightfold AI"
+ },
+ {
+  "sector": "health",
+  "name": "Cambridge Health Alliance",
+  "ats": "unsupported",
+  "source_url": "https://www.chacareers.org/",
+  "note": "HealthcareSource ATS"
+ },
+ {
+  "sector": "health",
+  "name": "Dartmouth Health",
+  "ats": "unsupported",
+  "source_url": "https://careers-dartmouth-hitchcock.icims.com/jobs/intro",
+  "note": "iCIMS"
+ },
+ {
+  "sector": "health",
+  "name": "Hartford HealthCare",
+  "ats": "unsupported",
+  "source_url": "https://www.hhccareers.org/us/en",
+  "note": "Phenom People (CareerConnect)"
+ },
+ {
+  "sector": "health",
+  "name": "Johns Hopkins Medicine",
+  "ats": "unsupported",
+  "source_url": "https://career4.successfactors.com/career?company=SFHUP",
+  "note": "SAP SuccessFactors"
+ },
+ {
+  "sector": "health",
+  "name": "Kaiser Permanente",
+  "ats": "unresolved",
+  "source_url": "https://www.kaiserpermanentejobs.org/",
+  "note": "Taleo (kp.taleo.net) backs candidate accounts but public job search is a custom front-end on kaiserpermanentejobs.org; no working careersection slug found within lookup budget"
+ },
+ {
+  "sector": "health",
+  "name": "NYU Langone Health",
+  "ats": "unsupported",
+  "source_url": "https://careers-nyu.icims.com/",
+  "note": "iCIMS"
+ },
+ {
+  "sector": "health",
+  "name": "UnitedHealth Group",
+  "ats": "unresolved",
+  "source_url": "https://careers.unitedhealthgroup.com/search-jobs/",
+  "note": "Taleo (uhg.taleo.net) backend redirects to custom careers.unitedhealthgroup.com search UI; no working careersection slug found within lookup budget"
+ },
+ {
+  "sector": "health",
+  "name": "Yale New Haven Health",
+  "ats": "unsupported",
+  "source_url": "https://external-ynhhs.icims.com/",
+  "note": "iCIMS"
+ },
+ {
+  "sector": "hospitality_sports",
+  "name": "Aramark",
+  "ats": "unsupported",
+  "source_url": "https://careers.aramark.com/",
+  "note": "SAP SuccessFactors"
+ },
+ {
+  "sector": "hospitality_sports",
+  "name": "Sodexo",
+  "ats": "unsupported",
+  "source_url": "https://external-careers-sodexo.icims.com/jobs/intro",
+  "note": "iCIMS"
+ },
+ {
+  "sector": "media",
+  "name": "Associated Press",
+  "ats": "unresolved",
+  "source_url": "https://careers.ap.org/",
+  "note": "could not fetch careers.ap.org or determine ATS within lookup budget"
+ },
+ {
+  "sector": "media",
+  "name": "Bloomberg",
+  "ats": "unsupported",
+  "source_url": "https://bloomberg.avature.net/careers/SearchJobs",
+  "note": "Avature"
+ },
+ {
+  "sector": "media",
+  "name": "Boston Globe Media",
+  "ats": "unsupported",
+  "source_url": "https://www.bostonglobemedia.com/opportunities/",
+  "note": "UKG Pro Recruiting (globe.rec.pro.ukg.net)"
+ },
+ {
+  "sector": "media",
+  "name": "HarperCollins",
+  "ats": "unsupported",
+  "source_url": "https://careers-harpercollins.icims.com/jobs/intro",
+  "note": "iCIMS"
+ },
+ {
+  "sector": "media",
+  "name": "Macmillan",
+  "ats": "unresolved",
+  "source_url": "https://us.macmillan.com/about/careers",
+  "note": "careers page blocks fetch (403); could not determine ATS within lookup budget"
+ },
+ {
+  "sector": "media",
+  "name": "Paramount",
+  "ats": "unsupported",
+  "source_url": "https://careers.paramount.com/",
+  "note": "SAP SuccessFactors"
+ },
+ {
+  "sector": "media",
+  "name": "Penguin Random House",
+  "ats": "unsupported",
+  "source_url": "https://careers.penguinrandomhouse.com/",
+  "note": "CreateYourOwnCareer (Lumesse/PeopleFluent) platform"
+ },
+ {
+  "sector": "media",
+  "name": "Simon & Schuster",
+  "ats": "unresolved",
+  "source_url": "https://www.simonandschuster.biz/p/careers-at-simon-schuster/",
+  "note": "careers site blocks fetch (403); could not determine ATS within lookup budget"
+ },
+ {
+  "sector": "media",
+  "name": "WBUR",
+  "ats": "unsupported",
+  "source_url": "https://www.wbur.org/inside/jobs",
+  "note": "SilkRoad ATS via Boston University (jobs.silkroad.com)"
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Big Brothers Big Sisters of America",
+  "ats": "unsupported",
+  "source_url": "https://big-brothers-big-sisters-of-america.breezy.hr/",
+  "note": "Breezy HR -- unsupported ATS."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Boys & Girls Clubs of America",
+  "ats": "unsupported",
+  "source_url": "https://careers-bgca.icims.com/",
+  "note": "iCIMS -- unsupported ATS. (Separate clubjobs-bgca.icims.com also exists for local-club postings.)"
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Conservation Law Foundation",
+  "ats": "unsupported",
+  "source_url": "https://secure6.saashr.com/ta/6181430.careers?CareersSearch",
+  "note": "SaaSHR -- unsupported ATS. Runs a named summer internship program for law/undergrad students."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Jumpstart",
+  "ats": "unresolved",
+  "source_url": "https://www.jstart.org/job-opportunities/",
+  "note": "Site returns 403 to non-browser fetches; page mostly links external partner postings (Bright Horizons, Urban Teachers) rather than a single HQ ATS -- undetermined within lookup budget."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "NRDC",
+  "ats": "unsupported",
+  "source_url": "https://careers-nrdc.icims.com/",
+  "note": "iCIMS -- unsupported ATS."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Partners In Health",
+  "ats": "unresolved",
+  "source_url": "https://jobs.jobvite.com/pih/jobs",
+  "note": "Jobvite listing URL now redirects to pih.org/employment, which returns 403 to the fetcher -- token found but live verification failed."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Rainforest Alliance",
+  "ats": "unsupported",
+  "source_url": "https://recruiting.ultipro.com/RAI1015FORES/JobBoard/7a1c3d86-f0fa-4e0e-a501-dcfedd4f7d8c/",
+  "note": "UltiPro/UKG -- unsupported ATS."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Save the Children",
+  "ats": "unresolved",
+  "source_url": "https://www.savethechildren.org/us/about-us/careers",
+  "note": "Careers page returns 403 to non-browser fetches; underlying ATS could not be determined within lookup budget."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Share Our Strength",
+  "ats": "unsupported",
+  "source_url": "https://shareourstrength.hrmdirect.com/employment/careers.php",
+  "note": "HRMDirect -- unsupported ATS."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "Special Olympics",
+  "ats": "unsupported",
+  "source_url": "https://recruiting.ultipro.com/SPE1016SPOL/JobBoard/48c569fb-e342-71d0-cf2c-f3622cec1d24",
+  "note": "UltiPro/UKG -- unsupported ATS. Separate named internship/fellowship page at specialolympics.org/about/intern-opportunities."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "United Way",
+  "ats": "unresolved",
+  "source_url": "https://careers.unitedway.org/jobs",
+  "note": "Custom-branded portal at careers.unitedway.org; could not identify underlying ATS vendor within lookup budget (page content didn't expose apply-button destination)."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "World Wildlife Fund",
+  "ats": "unsupported",
+  "source_url": "https://careers-wwfus.icims.com/jobs/search",
+  "note": "iCIMS -- unsupported ATS."
+ },
+ {
+  "sector": "nonprofit",
+  "name": "YMCA of Greater Boston",
+  "ats": "unsupported",
+  "source_url": "https://ymcaboston.pinpointhq.com/",
+  "note": "Pinpoint ATS -- unsupported."
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Ahold Delhaize USA",
+  "ats": "unsupported",
+  "source_url": "https://careers.aholddelhaize.com/vacancies",
+  "note": "custom career site (careers.aholddelhaize.com, /vacancy/<id>/<slug> URLs), not a recognized ATS"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Best Buy",
+  "ats": "unresolved",
+  "source_url": "https://careers.bestbuy.com/bby",
+  "note": "US site (careers.bestbuy.com / jobs.bestbuy.com) ATS backend unclear after 3 lookups; only Best Buy Canada confirmed on Workday, which is a separate board not applicable to US postings"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Big Y",
+  "ats": "unsupported",
+  "source_url": "https://cta.cadienttalent.com/index.jsp?locale=en_US&APPLICATIONNAME=BigYNonReqExt",
+  "note": "Cadient Talent (cta.cadienttalent.com)"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Chewy",
+  "ats": "unresolved",
+  "source_url": "https://careers.chewy.com/us/en/search-results",
+  "note": "Custom domain careers.chewy.com; internal HR uses Workday but external job URLs (careers.chewy.com/us/en/job/<id>/<slug>) don't match myworkdayjobs.com pattern and a sample job link returned HTTP 410. ATS backend unresolved after 3 lookups."
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Chobani",
+  "ats": "unresolved",
+  "source_url": "https://careers.chobani.com/",
+  "note": "Could not determine underlying ATS after 3 lookups"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Converse",
+  "ats": "unsupported",
+  "source_url": "https://careers.nike.com/jobs",
+  "note": "Converse hiring runs through Nike's custom careers.nike.com career site, not a recognized ATS"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Estee Lauder Companies",
+  "ats": "unsupported",
+  "source_url": "https://careers.elcompanies.com/careers",
+  "note": "Eightfold AI (Platform Configuration System)"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Keurig Dr Pepper",
+  "ats": "unsupported",
+  "source_url": "https://careers.keurigdrpepper.com/en/search-jobs",
+  "note": "Eightfold AI (kdrp.eightfold.ai)"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "L'Oreal",
+  "ats": "unsupported",
+  "source_url": "https://careers.loreal.com/en_US/jobs/SearchJobs/internship",
+  "note": "SAP SuccessFactors"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Macy's",
+  "ats": "unresolved",
+  "source_url": "https://www.macysinc.com/work-with-us/careers/default.aspx",
+  "note": "Could not determine underlying ATS after 3 lookups"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "PepsiCo",
+  "ats": "unsupported",
+  "source_url": "https://uscareers-pepsico.icims.com/jobs/login?loginOnly=1",
+  "note": "iCIMS"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Procter & Gamble",
+  "ats": "unsupported",
+  "source_url": "https://www.pgcareers.com/global/en/internships",
+  "note": "Phenom People (cdn.phenompeople.com)"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Ralph Lauren",
+  "ats": "unresolved",
+  "source_url": "https://careers.ralphlauren.com/en_US/CareersCorporate/SearchJobsCorporate",
+  "note": "Custom-branded careers.ralphlauren.com career section; could not determine underlying ATS after 4 lookups"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Stop & Shop",
+  "ats": "unsupported",
+  "source_url": "https://stopandshop.careerswithus.com/",
+  "note": "careerswithus.com (Radancy-style platform), same as parent Ahold Delhaize USA"
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Wayfair",
+  "ats": "unresolved",
+  "source_url": "https://job-boards.greenhouse.io/wayfair",
+  "note": "Job board page exists at job-boards.greenhouse.io/wayfair but boards-api.greenhouse.io/v1/boards/wayfair/jobs returns 404; tried wayfairinc/wayfairllc/wayfair1 variants, all 404. Board may be decommissioned/renamed. Unresolved after 3 lookups."
+ },
+ {
+  "sector": "retail_consumer",
+  "name": "Whole Foods Market",
+  "ats": "unsupported",
+  "source_url": "https://careers.wholefoods.com/",
+  "note": "Amazon custom hiring platform (Sage virtual career guide / amazon.jobs), not a recognized ATS"
+ }
+]

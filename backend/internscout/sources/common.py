@@ -33,5 +33,5 @@ def board_item(co: dict, *, source: str, title: str, locations: list, url: str |
         "active": True,
         "source": source,
         "source_url": url,
-        "_is_quant_target": co.get("is_quant_target", False),
+        "sector": co.get("sector"),
     }

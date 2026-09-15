@@ -1,7 +1,8 @@
 """ATS auto-discovery: pull job-board tokens out of apply URLs and keep a registry of
 boards to scan whole on every run (backend/data/ats_registry.json, committed by CI).
 
-Registry shape: {ats: {token: {"name", "quant", "fails", "added"}}}
+Registry shape: {ats: {token: {"name", "quant", "sector", "fails", "added"}}}
+sector is an employer label (health, nonprofit, quant_finance, ...); it never changes the score.
 Workday tokens are "tenant|wdN|site".
 """
 from __future__ import annotations
@@ -27,9 +28,12 @@ PATTERNS = [
     ("rippling", re.compile(r"ats\.rippling\.com/(?:embed/)?([A-Za-z0-9_-]+)/jobs", re.I)),
     ("oracle", re.compile(r"https?://([a-z0-9-]+\.fa(?:\.[a-z0-9]+)?\.oraclecloud\.com)/hcmUI/CandidateExperience/"
                           r"[a-z]{2}(?:-[A-Za-z]{2})?/sites/([A-Za-z0-9_]+)", re.I)),
+    ("taleo", re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I)),
+    ("adp", re.compile(r"workforcenow\.adp\.com/.*?[?&]cid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", re.I)),
+    ("jobvite", re.compile(r"jobs\.jobvite\.com/(?:careers/)?([A-Za-z0-9_-]+)", re.I)),
 ]
 _BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1", "oneclick-ui",
-               "j", "api", "www", "app", "careers"}
+               "j", "api", "www", "app", "careers", "rest"}
 ATS_HOSTS = [  # recognised even when no token can be extracted
     ("icims", "icims.com"), ("taleo", "taleo.net"), ("oracle", "oraclecloud.com"),
     ("successfactors", "successfactors"), ("jobvite", "jobvite.com"),
@@ -51,6 +55,10 @@ def ats_of(url: str | None) -> tuple[str, str | None]:
                 continue
             if ats == "workday":
                 token = f"{m.group(1).lower()}|{m.group(2).lower()}|{m.group(3)}"
+            elif ats == "taleo":
+                token = f"{m.group(1).lower()}|{m.group(2)}"
+            elif ats == "adp":
+                token = m.group(1).lower()
             elif ats in ("oracle", "recruitee", "bamboohr"):
                 token = f"{m.group(1).lower()}|{m.group(2)}" if ats == "oracle" else m.group(1).lower()
             return ats, token
@@ -76,14 +84,19 @@ def save_registry(reg: dict) -> None:
         json.dump(out, f, indent=1, ensure_ascii=False)
 
 
-def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False) -> bool:
+def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, sector: str | None = None) -> bool:
+    sector = sector or ("quant_finance" if quant else None)
     boards = reg.setdefault(ats, {})
     lower = {t.lower(): t for t in boards}
     if token.lower() in lower:
         entry = boards[lower[token.lower()]]
         entry["quant"] = entry.get("quant", False) or quant
+        if sector and not entry.get("sector"):
+            entry["sector"] = sector
         return False
     boards[token] = {"name": name or token, "quant": quant, "fails": 0, "added": date.today().isoformat()}
+    if sector:
+        boards[token]["sector"] = sector
     return True
 
 
@@ -91,9 +104,10 @@ def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
     for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
-                "BAMBOOHR", "RIPPLING", "ORACLE"):
+                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE"):
         for co in getattr(seed, ats, []):
-            n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False))
+            n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
+                           co.get("sector"))
     return n
 
 

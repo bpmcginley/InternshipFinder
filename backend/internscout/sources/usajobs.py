@@ -1,0 +1,78 @@
+"""USAJOBS Search API, student hiring path (Pathways internships, student trainees).
+Needs a free key from developer.usajobs.gov: USAJOBS_API_KEY, plus USAJOBS_EMAIL (the address the
+key was requested with; USAJOBS requires it as the User-Agent). Skipped when either is missing."""
+from __future__ import annotations
+import os
+from .base import client
+from .common import board_item, html_to_text
+from ..classify import is_internship
+
+API = "https://data.usajobs.gov/api/search"
+PAGE, MAX_PAGES = 500, 10
+
+
+def _place(name: str) -> str:
+    parts = [p.strip() for p in (name or "").split(",") if p.strip()]
+    return ", ".join(parts[-2:])   # "Point Loma Complex, San Diego, California" -> "San Diego, California"
+
+
+def _text(v) -> str:
+    return "\n".join(map(str, v)) if isinstance(v, list) else str(v or "")
+
+
+def parse_usajobs(payload: dict) -> tuple[list[dict], int]:
+    res = payload.get("SearchResult") or {}
+    out = []
+    for hit in res.get("SearchResultItems") or []:
+        d = hit.get("MatchedObjectDescriptor") or {}
+        title = d.get("PositionTitle") or ""
+        sched = ((d.get("PositionSchedule") or [{}])[0] or {}).get("Name") or ""
+        emp = f"Intern {sched}".strip()      # every student-path posting is a student role
+        if not is_internship(title, emp):
+            continue
+        locs = [_place(l.get("LocationName")) for l in d.get("PositionLocation") or []
+                if (l.get("CountryCode") or "") in ("United States", "US")]
+        if not locs:
+            continue
+        details = (d.get("UserArea") or {}).get("Details") or {}
+        pay = (d.get("PositionRemuneration") or [{}])[0] or {}
+        lines = []
+        if pay.get("MinimumRange"):
+            lines.append(f"Salary: ${pay['MinimumRange']} - ${pay.get('MaximumRange') or pay['MinimumRange']} "
+                         f"{pay.get('Description') or ''}".strip())
+        who = (details.get("WhoMayApply") or {}).get("Name")
+        if who:
+            lines.append(f"Who may apply: {who}")
+        if d.get("ApplicationCloseDate"):
+            lines.append(f"Apply by: {d['ApplicationCloseDate'][:10]}")
+        lines += [_text(details.get("JobSummary")), _text(details.get("MajorDuties")), _text(d.get("QualificationSummary"))]
+        url = d.get("PositionURI")
+        out.append(board_item({"name": d.get("OrganizationName") or d.get("DepartmentName") or "US Government"},
+                              source="usajobs", title=title, locations=locs, url=url,
+                              apply_url=(d.get("ApplyURI") or [url])[0], posted_at=d.get("PublicationStartDate"),
+                              description=html_to_text("\n".join(l for l in lines if l.strip())),
+                              employment_type=emp))
+    return out, int(res.get("SearchResultCountAll") or 0)
+
+
+def fetch_usajobs(api_key: str | None = None, email: str | None = None) -> list[dict]:
+    api_key = api_key or os.environ.get("USAJOBS_API_KEY")
+    email = email or os.environ.get("USAJOBS_EMAIL")
+    if not (api_key and email):
+        print("[usajobs] no USAJOBS_API_KEY/USAJOBS_EMAIL set; skipping")
+        return []
+    headers = {"Host": "data.usajobs.gov", "User-Agent": email, "Authorization-Key": api_key}
+    out: list[dict] = []
+    try:
+        with client() as c:
+            for page in range(1, MAX_PAGES + 1):
+                r = c.get(API, params={"HiringPath": "student", "ResultsPerPage": PAGE, "Page": page}, headers=headers)
+                r.raise_for_status()
+                items, total = parse_usajobs(r.json())
+                out += items
+                if page * PAGE >= total:
+                    break
+    except Exception as e:
+        print(f"[usajobs] failed: {e}")
+    print(f"[usajobs] {len(out)} student postings")
+    return out

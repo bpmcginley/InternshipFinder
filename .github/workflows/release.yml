@@ -1,0 +1,47 @@
+name: Release extension
+
+# Push a tag like ext-v0.3.0 to build the extension zip and attach it to a GitHub Release.
+# The tag version must match "version" in extension/manifest.json.
+#   git tag ext-v0.3.0 && git push origin ext-v0.3.0
+on:
+  push:
+    tags: ["ext-v*"]
+
+permissions:
+  contents: write               # create the release and upload the zip
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches manifest version
+        run: |
+          manifest=$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")
+          tag="${GITHUB_REF_NAME#ext-v}"
+          if [ "$manifest" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $manifest"
+            exit 1
+          fi
+
+      - name: Run extension tests
+        run: node --test extension/test/*.test.mjs
+
+      - name: Build zip
+        id: build
+        run: echo "zip=$(python3 scripts/package_extension.py)" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP: ${{ steps.build.outputs.zip }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$ZIP" \
+              --title "InternScout extension ${GITHUB_REF_NAME#ext-v}" \
+              --notes "Download the zip below, then follow the install guide: https://bpmcginley.github.io/InternshipFinder/install.html"
+          fi

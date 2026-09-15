@@ -43,9 +43,10 @@ def _greenhouse(c, slug, name):
     return r.status_code == 200 and _same_name(r.json().get("name"), name)
 
 
+# Empty Workable accounts named after big employers exist (Mayo Clinic, HCA), so the board must have jobs.
 def _workable(c, slug, name):
-    r = c.get(f"https://apply.workable.com/api/v1/widget/accounts/{slug}")
-    return r.status_code == 200 and _same_name(r.json().get("name"), name)
+    r = c.get(f"https://apply.workable.com/api/v1/widget/accounts/{slug}", params={"details": "true"})
+    return r.status_code == 200 and _same_name(r.json().get("name"), name) and len(r.json().get("jobs") or []) > 0
 
 
 # Lever and Ashby have no board-name endpoint, so only the exact squashed name counts, and the board must have jobs.

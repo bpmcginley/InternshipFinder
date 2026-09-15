@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Install the extension · InternScout</title>
+<meta name="description" content="How to install the InternScout Auto-Apply extension by hand, until it's in the Chrome Web Store."/>
+<style>
+  :root{
+    --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
+    --ink:#17191c; --ink2:#4b5058; --ink3:#868b92; --rule:#e2ded4;
+    --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8; --amber:#9a6412;
+    --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
+    --ink:#ecebe6; --ink2:#b3b1aa; --ink3:#7d7c77; --rule:#2c2d31;
+    --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24; --amber:#e0b25e;
+    color-scheme:dark;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:740px;margin:0 auto;padding:0 20px 64px}
+  header.top{display:flex;align-items:baseline;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;padding:22px 0 14px;border-bottom:1px solid var(--ink)}
+  .mark{font:600 22px/1 var(--serif);letter-spacing:-.3px;color:var(--ink);text-decoration:none}
+  nav{display:flex;gap:4px 16px;flex-wrap:wrap}
+  nav a{color:var(--ink2);font-size:14px;text-decoration:none}
+  nav a:hover{color:var(--ink)}
+  nav a[aria-current=page]{color:var(--accent);font-weight:600}
+  h1{font:600 34px/1.15 var(--serif);letter-spacing:-.5px;margin:36px 0 4px}
+  .meta{color:var(--ink3);font-size:14px;margin:0 0 20px}
+  .lede{font-size:18px;color:var(--ink2);margin:0 0 8px}
+  h2{font:600 22px/1.25 var(--serif);margin:40px 0 10px;padding-top:20px;border-top:1px solid var(--rule)}
+  h3{font-size:17px;margin:0 0 4px;color:var(--ink)}
+  p,li{color:var(--ink2)}
+  strong{color:var(--ink)}
+  a{color:var(--accent)}
+  ul{padding-left:22px}
+  li{margin:5px 0}
+  code,kbd{font:14px var(--mono);background:var(--sunk);padding:1px 6px;border-radius:4px;overflow-wrap:anywhere}
+  .box{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:4px;padding:6px 18px;margin:22px 0}
+  .box.warn{border-left-color:var(--amber)}
+  .box h3{margin-top:12px}
+  .btn{display:inline-block;margin:8px 0 4px;padding:10px 16px;border-radius:6px;background:var(--accent);color:var(--accent-ink);font-weight:600;text-decoration:none}
+  .btn:hover{filter:brightness(1.1)}
+  ol.steps{list-style:none;counter-reset:step;padding:0;margin:28px 0 0}
+  ol.steps>li{counter-increment:step;position:relative;padding:0 0 22px 52px;margin:0}
+  ol.steps>li::before{content:counter(step);position:absolute;left:0;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:600 16px/34px var(--sans);text-align:center}
+  ol.steps>li p{margin:4px 0}
+  footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
+  footer a{color:var(--ink2)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (max-width:480px){h1{font-size:28px}.lede{font-size:17px}ol.steps>li{padding-left:46px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="index.html">InternScout</a>
+    <nav aria-label="Site">
+      <a href="index.html">Dashboard</a>
+      <a href="install.html" aria-current="page">Install</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Install the extension</h1>
+    <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop</p>
+    <p class="lede">The InternScout Auto-Apply extension isn't in the Chrome Web Store yet. Until it is, you install it by hand. These steps show you how.</p>
+    <p>You don't need the extension to search. The <a href="index.html">dashboard</a> works on its own. The extension adds your Deep Dive profile and Auto-Apply, which fills out applications and stops at the submit button.</p>
+
+    <ol class="steps">
+      <li>
+        <h3>Download the zip</h3>
+        <p>Open the latest release on GitHub. Under <strong>Assets</strong>, download <code>internscout-extension-<em>version</em>.zip</code>. Don't pick "Source code".</p>
+        <a class="btn" href="https://github.com/bpmcginley/InternshipFinder/releases/latest">Open the latest release</a>
+      </li>
+      <li>
+        <h3>Unzip it into a folder you'll keep</h3>
+        <p><strong>Windows:</strong> right-click the zip, then <em>Extract All</em>. <strong>Mac:</strong> double-click the zip.</p>
+        <p>Move the new folder somewhere it can stay, like Documents. Chrome runs the extension from this folder. If you delete or move it, the extension stops working.</p>
+      </li>
+      <li>
+        <h3>Open the extensions page</h3>
+        <p>Type <code>chrome://extensions</code> in the address bar and press Enter. In Edge, use <code>edge://extensions</code>. (Browsers don't let you click these links, so type it.)</p>
+      </li>
+      <li>
+        <h3>Turn on Developer mode</h3>
+        <p>Flip the <strong>Developer mode</strong> switch. In Chrome it's at the top right. In Edge it's in the left sidebar.</p>
+      </li>
+      <li>
+        <h3>Click Load unpacked</h3>
+        <p>Pick the folder you unzipped: the one with <code>manifest.json</code> directly inside. An <strong>InternScout Auto-Apply</strong> card appears, and the Deep Dive setup opens in a new tab.</p>
+      </li>
+      <li>
+        <h3>Pin it to your toolbar</h3>
+        <p>Click the puzzle-piece icon next to the address bar, then the pin next to <strong>InternScout Auto-Apply</strong>.</p>
+      </li>
+      <li>
+        <h3>Sign in with Google or Microsoft</h3>
+        <p>Click the InternScout icon and choose <strong>Sign in with Google</strong> or <strong>Sign in with Microsoft</strong>. Any account works. If you use your school account with a .edu email (for UMass, your @umass.edu Microsoft or Google account), you get twice the monthly AI use. We never see your password.</p>
+        <p>Sign-in is only needed for AI features like Auto-Apply and tailored resumes.</p>
+      </li>
+    </ol>
+
+    <div class="box">
+      <h3>Next</h3>
+      <ul>
+        <li>Finish the <strong>Deep Dive</strong>: your resume, facts and a few short questions. Everything stays on your device.</li>
+        <li>Open the <a href="index.html">dashboard</a>, tick some listings and press <strong>Auto-Apply</strong>.</li>
+      </ul>
+    </div>
+
+    <div class="box warn">
+      <h3>"Disable developer mode extensions" warning</h3>
+      <p>Chrome may show this warning for extensions installed by hand. It's normal. Close it to keep using InternScout. It goes away once the extension is in the Web Store.</p>
+    </div>
+
+    <h2>Updating</h2>
+    <ol>
+      <li>Download the new zip from the <a href="https://github.com/bpmcginley/InternshipFinder/releases/latest">latest release</a>.</li>
+      <li>Unzip it and replace the files in your <strong>existing</strong> folder. Keep the folder in the same place.</li>
+      <li>Go to <code>chrome://extensions</code> and click the reload arrow on the InternScout card.</li>
+    </ol>
+    <p>Your profile and files are saved in Chrome, not in the folder, so they carry over. If you load the extension from a different folder location, Chrome treats it as a new extension and your saved profile won't show up.</p>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+      <li><strong>"Manifest file is missing or unreadable":</strong> you picked the outer folder. Open it and pick the folder that has <code>manifest.json</code> inside.</li>
+      <li><strong>Sign-in fails:</strong> try the other provider, or check that pop-ups aren't blocked. If you expected the larger school allowance, sign in with the account that has your .edu email. If it still fails, <a href="https://github.com/bpmcginley/InternshipFinder/issues">open an issue</a>.</li>
+      <li><strong>Remove it:</strong> go to <code>chrome://extensions</code> and click <em>Remove</em>. Chrome deletes everything the extension saved. See <a href="privacy.html#delete">how to delete your data</a>.</li>
+    </ul>
+  </main>
+
+  <footer>
+    <a href="index.html">Back to InternScout</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · Not affiliated with UMass Amherst.
+  </footer>
+</div>
+</body>
+</html>

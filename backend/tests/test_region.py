@@ -15,21 +15,21 @@ def test_region_cases():
     assert in_region("Burlington, VT")
     assert in_region("Stamford, CT")
     assert in_region("Jersey City, NJ")
-    assert not in_region("Philadelphia, PA")
+    assert in_region("Philadelphia, PA")        # nationwide now
     assert in_region("Princeton, NJ")          # ~45 mi from Midtown
     assert in_region("Remote - US")
     assert in_region("Remote in USA")
     assert not in_region("Remote - Canada")
-    assert not in_region("Remote, TX")
+    assert in_region("Remote, TX")
     for loc in ("Remote - serbia", "Remote - HU", "Virtual, BR", "Remote - SG", "Remote (India)"):
         assert not in_region(loc), loc
     for loc in ("Remote", "Remote (US)", "United States - Virtual", "Remote - any location", "Remote/Homebased"):
         assert in_region(loc), loc
     assert in_region(["San Francisco, CA", "New York, NY"])
     assert in_region("San Francisco, CA; New York, NY")
-    assert not in_region("Albany, NY")
+    assert in_region("Albany, NY")
     assert not in_region("Cambridge, United Kingdom")
-    assert not in_region("Portland, OR")
+    assert in_region("Portland, OR")
     assert in_region("Portland, ME")
     assert in_region("NYC")
     assert not in_region([])
@@ -41,20 +41,21 @@ def test_region_fields():
     g = evaluate_locations(["Remote in USA"])
     assert g["in_region"] and g["is_remote"] and not g["within_radius"] and g["state"] == "Remote"
     g = evaluate_locations(["Seattle, WA", "Hoboken, NJ"])
-    assert g["region_locations"] == ["Hoboken, NJ"] and g["state"] == "NJ"
+    assert g["region_locations"] == ["Seattle, WA", "Hoboken, NJ"] and g["state"] == "NJ"
+    assert [r["kind"] for r in g["regions"]] == ["us", "nyc_metro"] and g["within_radius"]
 
 
 def test_comma_city_lists():
     g = evaluate_locations(["New York, Chicago"])
-    assert g["region_locations"] == ["New York"] and g["state"] == "NY"
-    assert [r["kind"] for r in g["regions"]] == ["nyc_metro"]
+    assert g["region_locations"] == ["New York", "Chicago"] and g["state"] == "NY"
+    assert [r["kind"] for r in g["regions"]] == ["nyc_metro", "us"]
     g = evaluate_locations(["Austin, TX; Boston, MA; New York, NY"])
-    assert [(r["kind"], r["state"]) for r in g["regions"]] == [("new_england", "MA"), ("nyc_metro", "NY")]
+    assert [(r["kind"], r["state"]) for r in g["regions"]] == [("us", "TX"), ("new_england", "MA"), ("nyc_metro", "NY")]
     assert evaluate_locations(["Brooklyn, New York"])["region_locations"] == ["Brooklyn, New York"]
     assert evaluate_locations(["Boston, MA"])["region_locations"] == ["Boston, MA"]
-    assert not in_region("Chicago, Seattle")
+    assert in_region("Chicago, Seattle")
     g = evaluate_locations(["Cambridge, MA, Arlington, VA, Seattle, WA"])
-    assert g["region_locations"] == ["Cambridge, MA"]
+    assert g["region_locations"] == ["Cambridge, MA", "Arlington, VA", "Seattle, WA"] and g["state"] == "MA"
     assert evaluate_locations(["Boston, MA, United States"])["region_locations"] == ["Boston, MA, United States"]
     g = evaluate_locations(["Remote - US"])
     assert g["regions"] == [{"loc": "Remote - US", "kind": "remote", "state": "Remote"}]

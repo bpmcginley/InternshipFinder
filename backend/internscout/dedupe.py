@@ -14,13 +14,16 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
         else:
             cur = out[k]
             cur["_sources"].append((it["source"], it.get("source_url")))
-            # prefer a within-radius geo if the current one isn't
-            if it["within_radius"] and not cur["within_radius"]:
+            # prefer a named place (baseline area first) over a remote-only geo
+            rank = lambda x: (x["within_radius"], x["geo"].get("on_site", False))
+            if rank(it) > rank(cur):
                 for f in ("geo", "location_raw", "lat", "lng", "is_remote",
                           "within_radius", "distance_miles"):
                     cur[f] = it[f]
             if not cur.get("apply_url") and it.get("apply_url"):
                 cur["apply_url"] = it["apply_url"]
+            if not cur.get("sector") and it.get("sector"):
+                cur["sector"] = it["sector"]
             if not cur.get("description") and it.get("description"):
                 cur["description"] = it["description"]
             # region locations can differ per source: keep the union

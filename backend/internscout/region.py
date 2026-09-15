@@ -1,12 +1,16 @@
-"""Region filter: New England (ME, NH, VT, MA, RI, CT), the NYC metro (50 mi of Midtown),
-and US-remote roles. A posting passes if ANY of its locations is in region."""
+"""Location labels: every US and US-remote role is kept. Each location gets a kind:
+new_england (ME, NH, VT, MA, RI, CT), nyc_metro (50 mi of Midtown), us (any other state, or just
+"United States") or remote. A posting is kept if ANY of its locations is in the US."""
 from __future__ import annotations
 import re
-from .config import REGION
-from .geo import REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, city_of, haversine_miles, locate, state_of  # noqa: F401
+from .config import REGION, wanted_states
+from .geo import (REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, _US_COUNTRY_RE,  # noqa: F401
+                  city_of, haversine_miles, locate, state_of)
 
 IN_CITY = {"boston|MA", "cambridge|MA", "new york|NY", "new york city|NY", "nyc|NY",
            "manhattan|NY", "brooklyn|NY", "queens|NY", "bronx|NY", "long island city|NY"}
+BASELINE_KINDS = ("new_england", "nyc_metro")
+ON_SITE_KINDS = ("new_england", "nyc_metro", "us")
 _SPLIT = re.compile(r"\s*(?:;|\||\s/\s|\sor\s|\n)\s*")
 # Big posting cities outside the gazetteer, so "New York, Chicago" is read as two cities, not one.
 _MAJOR = {
@@ -69,30 +73,40 @@ def split_locations(locations) -> list[str]:
     return out
 
 
+def _state(loc: str) -> str | None:
+    return state_of(loc) or ("," not in loc and _MAJOR.get(city_of(loc))) or None
+
+
 def maybe_in_region(loc: str) -> bool:
-    """Cheap, network-free pre-check used by fetchers before fetching job details."""
+    """Cheap, network-free check fetchers use before a per-job detail call. True for US-remote,
+    an unknown state, or a wanted state (the baseline plus states students picked)."""
     if not loc or _NON_US.search(loc):
         return False
-    st = state_of(loc)
-    return st is None or st in REGION.states or st in {"NY", "NJ", "PA"} or bool(REMOTE_RE.search(loc))
+    st = _state(loc)
+    return st is None or st in wanted_states()
 
 
 def classify_location(loc: str) -> dict | None:
-    """{kind: new_england|nyc_metro|remote, state, lat, lng, distance, in_city} or None."""
+    """{kind: new_england|nyc_metro|us|remote, state, lat, lng, distance, in_city} or None."""
     if not loc or _NON_US.search(loc):
         return None
     hit = locate(loc)
     lat = lng = st = None
     if hit:
         lat, lng, st = hit
+    st = st or _state(loc)
     remote = bool(REMOTE_RE.search(loc))
     nyc = haversine_miles(*REGION.nyc_center, lat, lng) if lat is not None else None
     if st in REGION.states:
         kind = "new_england"
     elif nyc is not None and nyc <= REGION.nyc_radius_miles:
         kind = "nyc_metro"
-    elif remote and REGION.include_remote and st is None and remote_ok(loc):
-        kind = "remote"          # "Remote", "Remote - US"; a non-region state ("Remote, TX") is not
+    elif st:
+        kind = "remote" if remote else "us"   # "Remote, TX" is remote but limited to Texas
+    elif remote and REGION.include_remote and remote_ok(loc):
+        kind = "remote"                        # "Remote", "Remote - US"
+    elif not remote and _US_COUNTRY_RE.search(loc):
+        kind = "us"                            # "United States": somewhere in the US
     else:
         return None
     dist = None
@@ -105,17 +119,21 @@ def classify_location(loc: str) -> dict | None:
 def evaluate_locations(locations) -> dict:
     locs = split_locations(locations)
     region = [(l, h) for l in locs for h in [classify_location(l)] if h]
-    local = [h for _, h in region if h["kind"] != "remote"]
-    placed = [h for h in local if h["distance"] is not None]
-    best = min(placed, key=lambda h: h["distance"]) if placed else (local[0] if local else None)
+    local = [h for _, h in region if h["kind"] in BASELINE_KINDS]
+    on_site = [h for _, h in region if h["kind"] in ON_SITE_KINDS]
+    pool = local or on_site
+    placed = [h for h in pool if h["distance"] is not None]
+    best = min(placed, key=lambda h: h["distance"]) if placed else (pool[0] if pool else None)
+    stated = next((h["state"] for _, h in region if h["state"]), None)
     return {
-        "in_region": bool(region),
+        "in_region": bool(region),                 # any US or US-remote location
         "is_remote": any(REMOTE_RE.search(l) for l in locs),
-        "within_radius": bool(local),              # has a non-remote in-region location
+        "on_site": bool(on_site),                  # has a non-remote US location
+        "within_radius": bool(local),              # has a New England / NYC-metro location
         "in_city": any(h["in_city"] for h in local),
-        "state": best["state"] if best else ("Remote" if region else None),
+        "state": (best and best["state"]) or stated or ("Remote" if region else None),
         "region_locations": [l for l, _ in region],
-        # one entry per region location, so the dashboard can filter and show the right one
+        # one entry per US location, so the dashboard can filter and show the right one
         "regions": [{"loc": l, "kind": h["kind"], "state": h["state"] or ("Remote" if h["kind"] == "remote" else None)}
                     for l, h in region],
         "best_distance": best["distance"] if best else None,

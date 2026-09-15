@@ -1,7 +1,8 @@
 // Service worker entry: message router, scheduler (max N tabs), notifications, submit detection.
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs } from "./queue.js";
 import { runJob, resumeJob, isRunning, checkSubmitted } from "./agent.js";
-import { loadStore, hasKey } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
+import { getToken, authStatus, signIn, signOut } from "../lib/auth.js";
 import { spend } from "../lib/usage.js";
 
 const ONBOARDING = "onboarding/onboarding.html";
@@ -105,7 +106,7 @@ async function control(id, action, answer) {
       await saveMsgs(id, []);
       // Start from a clean page: reload the tab so no half-filled form or stale page script carries over.
       if (j.tabId) await chrome.tabs.update(j.tabId, { url: j.apply_url }).catch(() => {});
-      await updateJob(id, { status: "queued", pending: null, steps: 0, reason: "", question: "", summary: "", double_check: [] });
+      await updateJob(id, { status: "queued", pending: null, steps: 0, reason: "", question: "", summary: "", double_check: [], run_id: null });
       schedule();
       break;
     case "approve_tailored":
@@ -131,8 +132,18 @@ async function control(id, action, answer) {
   return { ok: true };
 }
 
+// ---------- dashboard profile (worker/API.md → bridge) ----------
+const str = (v, n = 80) => (typeof v === "string" || typeof v === "number" ? String(v).trim().slice(0, n) : "");
+const strs = (v, max, n = 80) => (Array.isArray(v) ? v : typeof v === "string" ? [v] : []).map((x) => str(x, n)).filter(Boolean).slice(0, max);
+function cleanProfile(p) {
+  if (!p || typeof p !== "object") return null;
+  return { majors: strs(p.majors, 10), minors: strs(p.minors, 10), class_year: str(p.class_year, 40), grad_term: str(p.grad_term, 40),
+    stages: strs(p.stages, 20, 40), terms: strs(p.terms, 20, 40), states: strs(p.states, 60, 10), work_auth: str(p.work_auth, 60) };
+}
+
 // ---------- router ----------
-const PAGE_ALLOWED = new Set(["ping", "enqueue", "get_queue", "control", "open_deep_dive", "open_panel", "get_profile_summary"]);
+const PAGE_ALLOWED = new Set(["ping", "enqueue", "get_queue", "control", "open_deep_dive", "open_panel", "get_profile_summary",
+  "profile:set", "profile:get", "auth:token"]);
 
 async function handle(m, sender, fromPage) {
   if (!m || typeof m !== "object") return { error: "bad message" };
@@ -140,7 +151,8 @@ async function handle(m, sender, fromPage) {
   switch (m.type) {
     case "ping": {
       const s = await loadStore();
-      return { ok: true, version: chrome.runtime.getManifest().version, onboarded: !!s.settings.onboarded, hasKey: !!hasKey(s), spend: await spend() };
+      return { ok: true, version: chrome.runtime.getManifest().version, onboarded: !!s.settings.onboarded, hasKey: !!hasKey(s), spend: await spend(),
+        provider: s.ai.provider, signed_in: isWorker(s.ai) ? !!(await getToken()) : null };
     }
     case "enqueue": {
       const s = await loadStore();
@@ -167,6 +179,33 @@ async function handle(m, sender, fromPage) {
       return { skills_text: text.slice(0, 30000), grad_year: year ? +year[0] : null, gpa: parseFloat(edu.gpa) || null,
         citizenship: p.facts.citizenship || "", needs_sponsorship: /^y/i.test(p.facts.needs_sponsorship || ""), degree: edu.degree || "" };
     }
+    case "profile:set": {
+      const p = cleanProfile(m.profile);
+      if (!p) return { error: "bad profile" };
+      await updateStore((s) => {
+        s.dashboard_profile = p;
+        Object.assign(s.profile.facts, { majors: p.majors.join(", "), class_year: p.class_year, grad_term: p.grad_term });
+      });
+      return { ok: true };
+    }
+    case "profile:get": {
+      const s = await loadStore(), f = s.profile.facts, d = s.dashboard_profile;
+      if (!d && !f.majors && !f.class_year && !f.grad_term) return { profile: null };
+      // Facts may have been edited in the Deep Dive since the dashboard sent them; facts win.
+      const majors = d && d.majors.join(", ") === f.majors ? d.majors : String(f.majors || "").split(/\s*,\s*/).filter(Boolean);
+      return { profile: { ...(d || {}), majors, class_year: f.class_year, grad_term: f.grad_term } };
+    }
+    case "auth:token":
+      return { token: await getToken() };
+    case "auth:signin":
+      // Runs here, not in the popup: the popup closes when the sign-in window takes focus.
+      await signIn({ interactive: true, provider: m.provider === "microsoft" ? "microsoft" : "google" });
+      return authStatus();
+    case "auth:signout":
+      await signOut();
+      return { ok: true };
+    case "auth:status":
+      return authStatus();
     case "control": {
       // Content scripts on job sites may only control the job running in their own tab.
       if (!fromPage && sender.tab && !String(sender.url || "").startsWith(chrome.runtime.getURL(""))) {

@@ -4,12 +4,10 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>InternScout</title>
+<meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet"/>
-<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
@@ -41,6 +39,7 @@
   .mark{font:600 32px/1 var(--serif);letter-spacing:-.6px;margin:0}
   .sub{color:var(--ink2);margin-top:8px;font-size:13.5px}
   .top-r{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .signed{display:inline-flex;align-items:center;gap:2px;color:var(--green);font-size:13px;padding-left:6px}
 
   .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
   .btn:hover:not(:disabled){border-color:var(--ink3)}
@@ -49,21 +48,67 @@
   .btn.primary:hover:not(:disabled){filter:brightness(1.1)}
   .btn.quiet{border-color:transparent;background:transparent;color:var(--ink2);padding:0 8px}
   .btn.quiet:hover:not(:disabled){color:var(--ink);border-color:transparent}
+  .btn.small{height:28px;padding:0 10px;font-size:12.5px}
+  .btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+  .btn.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
+  .btn.danger:hover:not(:disabled){border-color:var(--red)}
   .count{font:500 11px/1 var(--mono);background:var(--amber-soft);color:var(--amber);padding:4px 6px;border-radius:4px}
   .count.ok{background:var(--accent-soft);color:var(--green)}
   .busy{color:var(--ink3);font:12px var(--mono);margin-right:4px}
+
+  /* landing */
+  .landing-mini{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding:10px 0;color:var(--ink3);font-size:12.5px;border-bottom:1px solid var(--rule)}
+  .landing{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:20px 44px;padding:26px 0;border-bottom:1px solid var(--rule)}
+  .landing h2{font:600 26px/1.2 var(--serif);letter-spacing:-.4px;margin:0 0 10px}
+  .landing h3{font:600 13px var(--sans);margin:0 0 6px}
+  .landing p{color:var(--ink2);margin:0 0 8px;font-size:14.5px}
+  .landing .fine{color:var(--ink3);font-size:12.5px}
+  .landing ul,.landing ol{margin:0;padding-left:20px;color:var(--ink2)}
+  .landing li{margin:4px 0}
+  .landing-cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .landing-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+  /* profile setup */
+  .setup{margin:18px 0 0;padding:20px 24px 18px}
+  .setup-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .setup-head h2{font:600 22px/1.2 var(--serif);margin:0}
+  .setup h3{font:600 15px var(--sans);margin:10px 0 12px}
+  .steps{display:flex;gap:6px}
+  .dot{width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font:500 11.5px var(--mono);border:1px solid var(--rule);color:var(--ink3)}
+  .dot.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .dot.done{border-color:var(--accent);color:var(--accent)}
+  .lbl{display:block;font-weight:500;font-size:13px;margin:0 0 14px}
+  .lbl > .field,.lbl > .row2{margin-top:6px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row2.tight{gap:6px;margin-top:6px}
+  .row2 .lbl{margin-bottom:6px}
+  .ms.wide{width:100%}
+  .setup .field.sel select{width:100%}
+  fieldset{border:0;margin:0 0 14px;padding:0}
+  legend{font-weight:500;font-size:13px;padding:0;margin-bottom:6px}
+  .checks{display:flex;flex-wrap:wrap;gap:6px 18px}
+  .check{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--ink2);cursor:pointer}
+  .check input{margin:0}
+  .check .c,.stategrid .c{color:var(--ink3);font:11px var(--mono);margin-left:4px}
+  .check.remote{margin:4px 0 10px}
+  .shortcuts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .stategrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 12px;margin-bottom:10px;max-height:340px;overflow:auto;padding:6px 8px;border:1px solid var(--rule2);border-radius:6px}
+  .stategrid .check{padding:3px 2px}
+  .stategrid .check.on{color:var(--ink)}
+  .setup-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--rule2)}
+  .setup-danger{display:flex;gap:8px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px}
+  .setup-danger .meta{margin:0}
 
   .figures{display:flex;gap:44px;flex-wrap:wrap;padding:22px 0;border-bottom:1px solid var(--rule)}
   .fig .n{font:600 36px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
   .fig .l{color:var(--ink3);font-size:12.5px;margin-top:7px}
   .fig.states{margin-left:auto;align-self:flex-end;color:var(--ink2);font-size:12.5px;max-width:480px;text-align:right;line-height:1.7}
-  .fig.states b{font:500 12px var(--mono);color:var(--ink)}
   .updated{color:var(--ink3)}
 
   .notice{margin:16px 0 0;padding:12px 16px;background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:4px;color:var(--ink2)}
   .notice b{color:var(--ink)}
   .notice a{color:var(--accent);font-weight:500}
-  .notice code{font:12px var(--mono);background:var(--sunk);padding:1px 5px;border-radius:3px}
+  .notice.quietnote{border-left-color:var(--rule);font-size:13px}
 
   .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:18px 0 14px}
   .field{position:relative;display:flex;align-items:center;min-height:34px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
@@ -99,8 +144,11 @@
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover td{background:color-mix(in srgb,var(--sunk) 50%,transparent)}
   tbody tr.sel td{background:var(--accent-soft)}
-  input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:2px 0 0;cursor:pointer}
+  tbody tr.dim td{opacity:.62}
+  input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:15px;height:15px;margin:2px 0 0;cursor:pointer}
+  .c-chk{width:34px}
   .c-co{min-width:250px}
+  .c-links{white-space:nowrap}
   .co{font-weight:600}
   .role{color:var(--ink2);margin-top:1px}
   .meta{color:var(--ink3);font-size:12px;margin-top:3px}
@@ -123,13 +171,16 @@
   .open-link:hover{text-decoration-color:var(--ink)}
   .rowbtn{margin-top:7px;font:500 12.5px var(--sans);color:var(--accent);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
   .rowbtn:hover{text-decoration:underline;text-underline-offset:3px}
+  .report{display:inline-block;margin-top:7px;font-size:12px;color:var(--ink3);text-decoration:none}
+  .report:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .whybtn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
   .whybtn .why-l{font-size:11.5px;color:var(--ink3)}
   .whybtn:hover .why-l{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
   tbody tr.opened td{border-bottom-color:transparent}
-  tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:16px 18px 18px}
+  tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:16px 18px 18px;opacity:1}
   .whyg{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.5fr) minmax(220px,1fr);gap:30px}
   .whyg h4{margin:0 0 9px;font:600 12.5px var(--sans);color:var(--ink)}
+  .whyg a{color:var(--accent)}
   .part{display:grid;grid-template-columns:118px 1fr 42px;gap:8px;align-items:center;font-size:12.5px;color:var(--ink2);margin:4px 0}
   .part .bar{height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
   .part .bar i{display:block;height:100%;background:var(--accent)}
@@ -139,451 +190,61 @@
   .tag.miss{border-color:color-mix(in srgb,var(--red) 40%,transparent);color:var(--red)}
   .flag{font-size:12.5px;margin:3px 0;color:var(--ink2)}
   .flag.bad{color:var(--red)} .flag.warn{color:var(--amber)} .flag.good{color:var(--green)}
-  @media (max-width:900px){.whyg{grid-template-columns:1fr;gap:18px}}
+  .more{display:flex;justify-content:center;padding:14px;border-top:1px solid var(--rule2)}
   footer{color:var(--ink3);font-size:12.5px;padding:14px 0 48px}
+  footer .links{display:flex;gap:4px 16px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  footer .links a{color:var(--ink2);text-decoration:none}
+  footer .links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
+  noscript p{max-width:640px;margin:40px auto;padding:0 20px;color:var(--ink2)}
+  @media (max-width:900px){
+    .whyg{grid-template-columns:1fr;gap:18px}
+    .landing{grid-template-columns:1fr}
+  }
   @media (max-width:760px){
     .wrap{padding:0 16px}
     .figures{gap:26px}
     .fig .n{font-size:28px}
     .fig.states{margin-left:0;text-align:left}
     .top-r{margin-left:0}
+    .landing-cols,.row2{grid-template-columns:1fr}
+    .setup{padding:16px}
+    /* listings as cards */
+    table.list thead{display:none}
+    table.list,table.list tbody,table.list tr,table.list td{display:block;width:100%}
+    table.list tr{padding:10px 0;border-bottom:1px solid var(--rule)}
+    table.list tbody td{border:0;padding:4px 14px}
+    table.list td[data-label]::before{content:attr(data-label);display:block;font-size:11px;color:var(--ink3)}
+    table.list .c-chk{float:right;width:auto}
+    table.list .c-co{min-width:0}
+    tbody tr.why td{padding:14px}
   }
 </style>
+<script>
+  // Public settings for this page. Nothing secret belongs here (see worker/API.md).
+  window.CONFIG = {
+    repo: "bpmcginley/InternshipFinder",
+    workflow: "ingest.yml",
+    dataUrl: "./data/",
+    rawDataFallback: "https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/",
+    // Placeholder until the Worker is deployed; sign-in stays hidden while it's the example URL.
+    workerUrl: "https://internscout-api.example.workers.dev",
+    // Google Form, with the listing ID pre-filled. Same form as .github/ISSUE_TEMPLATE/config.yml.
+    formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform?usp=pp_url&entry.306779001={id}",
+    issuesUrl: "https://github.com/bpmcginley/InternshipFinder/issues/new/choose",
+    reportTemplate: "wrong_tag.yml",
+    handshakeUrl: "https://umass.joinhandshake.com/",
+    extensionInstallUrl: "install.html",
+    baselineStates: ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"],
+  };
+</script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script defer src="js/core.js"></script>
+<script defer src="js/app.js"></script>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const {useState,useEffect,useMemo,useRef,useCallback} = React;
-const DATA="./data/";
-const RAW="https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/";
-const LS_KEY="internscout.appstate.v1";
-const STATES=["none","interested","applied","interviewing","rejected","offer"];
-const STATE_LABEL={none:"Not started",interested:"Interested",applied:"Applied",interviewing:"Interviewing",rejected:"Rejected",offer:"Offer"};
-const NEW_ENGLAND=["MA","CT","RI","NH","VT","ME"];
-const JOB_LABEL={queued:"Queued",working:"Agent working",needs_you:"Needs you",ready_to_submit:"Ready to submit",submitted:"Submitted",failed:"Failed"};
-const ATS={greenhouse:"Greenhouse",lever:"Lever",ashby:"Ashby",workday:"Workday",smartrecruiters:"SmartRecruiters",icims:"iCIMS",oracle:"Oracle",bamboohr:"BambooHR",workable:"Workable",taleo:"Taleo"};
-const ACTIVE=["queued","working","needs_you","ready_to_submit"];
-const SAVED_KEY="internscout.saved.v1";
-const PART_LABEL={field:"Field fit",location:"Location",freshness:"Freshness",employer:"Target employer",openness:"Still open",source:"Source"};
-const DEFAULT_WEIGHTS={field:35,location:20,freshness:15,employer:15,openness:10,source:5};
-const DAY=864e5;
-const daysAgo=iso=>{if(!iso)return null;const t=new Date(iso).getTime();return isNaN(t)?null:Math.max(0,Math.floor((Date.now()-t)/DAY));};
-const ago=n=>n===0?"today":n===1?"yesterday":`${n} days ago`;
-const fmtDay=d=>new Date(d+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
-const daysUntil=d=>Math.ceil((new Date(d+"T23:59:59").getTime()-Date.now())/DAY);
-
-// Search: every word must appear (company, role, field, place, description, skills); -word excludes; "quoted phrase" matches exactly.
-const parseQuery=q=>(q.match(/-?"[^"]+"|\S+/g)||[]).map(t=>{const neg=t.length>1&&t[0]==="-";return {t:(neg?t.slice(1):t).replace(/"/g,"").toLowerCase(),neg};}).filter(x=>x.t);
-// Place words in search ("new england", "nyc", "boston", "MA", "remote") match locations only, never descriptions.
-const PLACES={"new england":{kind:"new_england"},"nyc metro":{kind:"nyc_metro"},"new york city":{kind:"nyc_metro"},"new york":{kind:"nyc_metro"},"nyc":{kind:"nyc_metro"},"tri-state":{kind:"nyc_metro"},"remote":{kind:"remote"},
-  "massachusetts":{state:"MA"},"connecticut":{state:"CT"},"rhode island":{state:"RI"},"new hampshire":{state:"NH"},"vermont":{state:"VT"},"maine":{state:"ME"},"new jersey":{state:"NJ"},
-  "ma":{state:"MA"},"ct":{state:"CT"},"ri":{state:"RI"},"nh":{state:"NH"},"vt":{state:"VT"},"nj":{state:"NJ"},"ny":{state:"NY"}};
-const PLACE_KEYS=Object.keys(PLACES).sort((a,b)=>b.length-a.length);
-const NOT_PLACE=new Set(["new","city","north","south","east","west","park","hill","hills","beach","heights","falls","center","village","island","lake","port","united","states","usa","hybrid","office","onsite","the","and","area","metro","county","greater"]);
-function splitPlaces(q){
-  const places=[]; let rest=" "+q+" ";
-  for(const k of PLACE_KEYS){const re=new RegExp(`\\s(-?)${k.replace(/[-.]/g,"\\$&")}(?=\\s)`,"gi");rest=rest.replace(re,(m,neg)=>{places.push({...PLACES[k],neg:!!neg});return " ";});}
-  return {rest,places};
-}
-const NYC_RE=/,\s*(NY|NJ)\b|\b(new york|nyc|manhattan|brooklyn|queens|bronx|jersey city|hoboken|newark|stamford)\b/i;
-const REMOTE_RE=/\b(remote|anywhere|work from home|virtual)\b/i;
-// One entry per in-region location: {loc, kind: new_england|nyc_metro|remote, state}. Older data has no x.regions; guess it.
-const regs=x=>x._regs||(x._regs=(()=>{
-  if(x.regions&&x.regions.length)return x.regions;
-  const locs=(x.region_locations&&x.region_locations.length?x.region_locations:(x.location_raw||"").split(";")).map(s=>s.trim()).filter(Boolean);
-  const out=locs.map(loc=>{const m=/,\s*([A-Z]{2})\b/.exec(loc),s=m?m[1]:null;
-    const kind=NEW_ENGLAND.includes(s)?"new_england":NYC_RE.test(loc)&&(!s||["NY","NJ","CT","PA"].includes(s))?"nyc_metro":REMOTE_RE.test(loc)&&!s?"remote":null;
-    return {loc,kind,state:s||(kind==="remote"?"Remote":kind==="nyc_metro"?"NY":null)};}).filter(g=>g.kind);
-  if(out.length||!x.state)return out;
-  return [{loc:locs[0]||x.state,kind:x.state==="Remote"?"remote":NEW_ENGLAND.includes(x.state)?"new_england":"nyc_metro",state:x.state}];
-})());
-const REGION_KIND={ne:"new_england",nyc:"nyc_metro",remote:"remote"};
-const regMatch=(g,f)=>(!REGION_KIND[f.region]||g.kind===REGION_KIND[f.region])&&(f.region!=="onsite"||g.kind!=="remote")&&(!f.states.length||f.states.includes(g.state));
-const locHay=x=>x._loch||(x._loch=[...regs(x).map(g=>g.loc),x.location_raw||""].join(" \n ").toLowerCase());
-const hay=x=>x._hay||(x._hay=[x.company_name,x.title,(x.field_tags||[]).join(" "),x.location_raw,(x.region_locations||[]).join(" "),x.state,x.term,x.ats,x.description,((x.insights||{}).skills||[]).map(s=>s.name).join(" ")].filter(Boolean).join(" \n ").toLowerCase());
-
-// Eligibility and deadline checks: [level, text], level is bad | warn | good | "" (neutral).
-function checks(r,p){
-  const x=r.insights||{}, out=[];
-  if(x.grad_years){const lo=Math.min(...x.grad_years),hi=Math.max(...x.grad_years),gy=p&&p.grad_year,t=lo===hi?`Graduating in ${lo}`:`Graduating ${lo}–${hi}`;
-    out.push(gy?(gy>=lo&&gy<=hi?["good",t]:["bad",`${t} (you: ${gy})`]):["",t]);}
-  if(x.class_standing) out.push(["",`For ${x.class_standing.join(" or ")} students`]);
-  if(x.citizenship){const t=x.citizenship==="citizen"?"U.S. citizens only":"U.S. citizens or permanent residents only",c=p&&p.citizenship;
-    const ok=c&&(/\bu\.?\s?s\.?a?\b|united states|american/i.test(c)||(x.citizenship!=="citizen"&&/permanent|green card/i.test(c)));
-    out.push(c?[ok?"good":"bad",t]:["warn",t]);}
-  if(x.clearance) out.push(["warn","Needs a security clearance"]);
-  if(x.degree_only){const t=x.degree_only==="phd"?"PhD students only":"Master's students only";
-    out.push(p?[(x.degree_only==="phd"?/ph\.?d|doctor/i:/master|m\.s\.|m\.eng|mba/i).test(p.degree||"")?"good":"bad",t]:["warn",t]);}
-  if(x.gpa_min){const g=p&&p.gpa;out.push(g?[g>=x.gpa_min?"good":"bad",`Minimum GPA ${x.gpa_min} (you: ${g})`]:["",`Minimum GPA ${x.gpa_min}`]);}
-  if(x.no_sponsorship) out.push([p&&p.needs_sponsorship?"bad":"","No visa sponsorship"]);
-  if(x.deadline){const d=daysUntil(x.deadline);out.push(d<0?["bad",`Deadline passed (${fmtDay(x.deadline)})`]:[d<=14?"warn":"",`Apply by ${fmtDay(x.deadline)}${d<=14?` (${d} day${d===1?"":"s"} left)`:""}`]);}
-  return out;
-}
-const blockers=(r,p)=>checks(r,p).filter(c=>c[0]==="bad").map(c=>c[1]);
-const loadStates=()=>{try{return JSON.parse(localStorage.getItem(LS_KEY))||{}}catch(e){return {}}};
-const saveStates=m=>{try{localStorage.setItem(LS_KEY,JSON.stringify(m))}catch(e){}};
-const shortDate=iso=>{if(!iso)return null;const d=new Date(iso);return isNaN(d)?null:d.toLocaleDateString(undefined,{month:"short",day:"numeric"})};
-const fmtTag=t=>t.length<=3?t.toUpperCase():t[0].toUpperCase()+t.slice(1);
-
-// ---- extension bridge (content script bridge/bridge.js relays window messages) ----
-const ext=(()=>{
-  let n=0; const waiting=new Map(); const subs=new Set();
-  window.addEventListener("message",e=>{
-    if(e.source!==window||!e.data||!e.data.__internscout)return;
-    const d=e.data;
-    if(d.__internscout==="res"&&waiting.has(d.id)){waiting.get(d.id)(d.result);waiting.delete(d.id);}
-    else if(d.__internscout==="push"||d.__internscout==="hello"||d.__internscout==="gone") subs.forEach(f=>f(d));
-  });
-  return {
-    present:()=>!!document.documentElement.dataset.internscout,
-    call:(msg,timeout=5000)=>new Promise(res=>{
-      const id=++n; waiting.set(id,res);
-      window.postMessage({__internscout:"req",id,msg},location.origin);
-      setTimeout(()=>{if(waiting.has(id)){waiting.delete(id);res({error:"no_extension"});}},timeout);
-    }),
-    on:f=>{subs.add(f);return ()=>subs.delete(f);},
-  };
-})();
-
-function useExtension(){
-  const [info,setInfo]=useState({checked:false,installed:false});
-  const [queue,setQueue]=useState({order:[],jobs:{}});
-  const [profile,setProfile]=useState(null);
-  const ping=useCallback(async()=>{
-    const r=await ext.call({type:"ping"},1500);
-    if(r&&r.error==="reload_page"){setInfo({checked:true,installed:false,stale:true});return;}
-    if(r&&r.ok){setInfo({checked:true,installed:true,...r});const q=await ext.call({type:"get_queue"});if(q&&q.queue)setQueue(q.queue);
-      if(r.onboarded){const p=await ext.call({type:"get_profile_summary"});if(p&&!p.error)setProfile(p);}}
-    else setInfo({checked:true,installed:false});
-  },[]);
-  useEffect(()=>{
-    const off=ext.on(d=>{if(d.__internscout==="push"&&d.queue)setQueue(d.queue); if(d.__internscout==="hello")ping();
-      if(d.__internscout==="gone")setInfo({checked:true,installed:false,stale:true});});
-    ping();
-    const t=setInterval(()=>{if(document.visibilityState==="visible")ping();},20000);
-    return ()=>{off();clearInterval(t);};
-  },[ping]);
-  return {info,queue,ping,profile};
-}
-
-function MultiSelect({placeholder, options, selected, onChange}){
-  const [q,setQ]=useState(""); const [open,setOpen]=useState(false); const [act,setAct]=useState(0);
-  const ref=useRef();
-  useEffect(()=>{
-    const h=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h);
-  },[]);
-  const avail=options.filter(o=>!selected.includes(o.value));
-  const filtered=(q?avail.filter(o=>o.value.toLowerCase().includes(q.toLowerCase())):avail).slice(0,40);
-  const add=v=>{ onChange([...selected,v]); setQ(""); setAct(0); };
-  const rm=v=>onChange(selected.filter(x=>x!==v));
-  const onKey=e=>{
-    if(e.key==="Enter" && filtered[act]){ add(filtered[act].value); e.preventDefault(); }
-    else if(e.key==="ArrowDown"){ setAct(a=>Math.min(a+1,filtered.length-1)); e.preventDefault(); }
-    else if(e.key==="ArrowUp"){ setAct(a=>Math.max(a-1,0)); e.preventDefault(); }
-    else if(e.key==="Escape"){ setOpen(false); }
-    else if(e.key==="Backspace" && !q && selected.length){ rm(selected[selected.length-1]); }
-  };
-  return (
-    <div className="field ms" ref={ref}>
-      <div className="box" onClick={()=>setOpen(true)}>
-        {selected.map(s=><span key={s} className="chip">{s}<button aria-label={"Remove "+s} onClick={e=>{e.stopPropagation();rm(s)}}>×</button></span>)}
-        <input value={q} placeholder={selected.length?"":placeholder}
-          onChange={e=>{setQ(e.target.value);setOpen(true);setAct(0)}} onFocus={()=>setOpen(true)} onKeyDown={onKey}/>
-      </div>
-      {open && filtered.length>0 &&
-        <div className="drop">
-          {filtered.map((o,i)=>
-            <div key={o.value} className={"opt"+(i===act?" act":"")} onMouseDown={e=>{e.preventDefault();add(o.value)}} onMouseEnter={()=>setAct(i)}>
-              <span>{o.value}</span>{o.count!=null&&<span className="c">{o.count}</span>}
-            </div>)}
-        </div>}
-    </div>
-  );
-}
-
-// Shows the location that matches the active region/state filter first.
-function Loc({r,f}){
-  const all=regs(r), hit=all.filter(g=>regMatch(g,f)), g=hit[0]||all[0];
-  const first=g?g.loc:((r.location_raw||"").split(";")[0].trim()||"—");
-  const inCity=/boston|cambridge|new york|nyc|manhattan|brooklyn/i.test(first);
-  const sub=g&&g.kind==="remote"?"Remote":[g?g.state:r.state,g&&g.state===r.state&&r.distance_miles!=null&&!inCity?`${Math.round(r.distance_miles)} mi`:null].filter(Boolean).join(" · ");
-  const more=Math.max(0,all.length-1);
-  return <>
-    <div title={all.map(x=>x.loc).join("; ")}>{first}{more>0&&<span className="muted"> +{more}</span>}</div>
-    {sub&&sub!==first&&<div className="meta">{sub}</div>}
-  </>;
-}
-
-function Why({r,profile,patterns,weights}){
-  const W=weights||DEFAULT_WEIGHTS, parts=r.score_parts, ins=r.insights||{};
-  const has=useMemo(()=>{
-    if(!profile||!patterns)return null;
-    const t=profile.skills_text||"", m={};
-    for(const [n,p] of Object.entries(patterns)){try{m[n]=new RegExp(p,"i").test(t);}catch(e){}}
-    return m;
-  },[profile,patterns]);
-  const skills=ins.skills||[], req=skills.filter(s=>s.level==="required"), pref=skills.filter(s=>s.level==="preferred");
-  const met=has?req.filter(s=>has[s.name]).length:0;
-  const posted=daysAgo(r.posted_at), seen=daysAgo(r.first_seen), cs=checks(r,profile);
-  const chip=s=><span key={s.name} className={"tag "+(has?(has[s.name]?"ok":"miss"):"")} title={has?(has[s.name]?"Found on your profile":"Not on your profile"):""}>{has?(has[s.name]?"✓ ":"✗ "):""}{s.name}</span>;
-  return <div className="whyg">
-    <div><h4>Match score {r.relevance_score} of 100</h4>
-      {parts?Object.entries(PART_LABEL).map(([k,l])=>{const w=W[k]||0,v=parts[k]||0;
-        return <div className="part" key={k}><span>{l}</span><span className="bar"><i style={{width:(w?Math.min(100,v/w*100):0)+"%"}}/></span><span className="num">{Math.round(v)}/{w}</span></div>;})
-        :<div className="meta">The breakdown appears after the next scan.</div>}
-      <div className="meta" style={{marginTop:9}}>{posted!=null?`Posted ${ago(posted)}`:"Posting date not listed"}{seen!=null?` · first seen ${ago(seen)}`:""}</div>
-    </div>
-    <div><h4>Skills asked for{has&&req.length?` · you have ${met} of ${req.length} required`:""}</h4>
-      {!skills.length&&<div className="meta">{r.status==="open"?"No specific skills named in the description.":"Closed posting, so the description isn't kept."}</div>}
-      {req.length>0&&<div>{req.map(chip)}</div>}
-      {pref.length>0&&<><div className="meta" style={{margin:"4px 0 5px"}}>Nice to have</div><div>{pref.map(chip)}</div></>}
-      {!profile&&skills.length>0&&<div className="meta" style={{marginTop:6}}>With the extension and a finished Deep Dive, this shows which ones you have.</div>}
-    </div>
-    <div><h4>Eligibility and deadline</h4>
-      {cs.length?cs.map(([lv,t],i)=><div key={i} className={"flag "+lv}>{lv==="bad"?"✗ ":lv==="good"?"✓ ":lv==="warn"?"! ":"· "}{t}</div>)
-        :<div className="meta">No limits or deadline found in the description.</div>}
-    </div>
-  </div>;
-}
-
-function Row({r,f,state,onState,job,checked,onCheck,canAuto,onAuto,open,onWhy,profile,patterns,weights}){
-  const cls=r.relevance_score>=85?"hi":r.relevance_score>=70?"mid":"lo";
-  const active=job&&ACTIVE.includes(job.status);
-  const dl=r.insights&&r.insights.deadline;
-  const meta=[shortDate(r.posted_at)&&`Posted ${shortDate(r.posted_at)}`, dl&&daysUntil(dl)>=0&&`Apply by ${fmtDay(dl)}`, r.ats&&r.ats!=="other"&&(ATS[r.ats]||r.ats)].filter(Boolean).join(" · ");
-  const bl=profile?blockers(r,profile):[];
-  const tags=r.field_tags||[];
-  return (<>
-    <tr className={(checked?"sel":"")+(open?" opened":"")}>
-      {canAuto&&<td><input type="checkbox" aria-label={"Select "+r.company_name} checked={checked}
-        disabled={!r.apply_url||active||(job&&job.status==="submitted")} onChange={e=>onCheck(r.id,e.target.checked)}/></td>}
-      <td className="c-co">
-        <div className="co">{r.company_name}{r.is_new&&<span className="new">New</span>}</div>
-        <div className="role">{r.title}</div>
-        {(meta||r.status==="closed")&&<div className="meta">{meta}{r.status==="closed"&&<span className="closed">{meta?" · ":""}Closed</span>}</div>}
-        {bl.length>0&&<div className="meta"><span className="closed" title={bl.join("; ")}>May not be eligible: {bl[0]}</span></div>}
-      </td>
-      <td>{tags.length?tags.map(fmtTag).join(", "):<span className="muted">—</span>}</td>
-      <td><Loc r={r} f={f}/></td>
-      <td>{r.term||<span className="muted">—</span>}{r.duration&&<div className="meta">{r.duration}</div>}</td>
-      <td>{r.salary?<span className="num">{r.salary}</span>:<span className="muted">—</span>}</td>
-      <td><button className={"score whybtn "+cls} aria-expanded={!!open} onClick={()=>onWhy(r.id)} title={`Match score ${r.relevance_score} of 100. Click for why.`}><span className="num">{r.relevance_score}</span><span className="bar"><i style={{width:Math.max(4,Math.min(100,r.relevance_score))+"%"}}/></span><span className="why-l">{open?"Hide":"Why"}</span></button></td>
-      <td>
-        <select className="mine" aria-label="Your status" value={state} onChange={e=>onState(r.id,e.target.value)}>{STATES.map(s=><option key={s} value={s}>{STATE_LABEL[s]}</option>)}</select>
-        {job&&<div><span className={"st "+job.status} title={job.reason||job.question||job.summary||""}>{JOB_LABEL[job.status]||job.status}</span></div>}
-      </td>
-      <td>
-        {r.apply_url?<a className="open-link" href={r.apply_url} target="_blank" rel="noopener">Open posting</a>:<span className="muted">—</span>}
-        {!job&&canAuto&&r.apply_url&&<div><button className="rowbtn" onClick={()=>onAuto([r])}>Auto-Apply</button></div>}
-      </td>
-    </tr>
-    {open&&<tr className="why"><td colSpan={canAuto?9:8}><Why r={r} profile={profile} patterns={patterns} weights={weights}/></td></tr>}
-  </>);
-}
-
-function App(){
-  const [all,setAll]=useState([]); const [meta,setMeta]=useState(null); const [err,setErr]=useState(null);
-  const [states,setStates]=useState(loadStates);
-  const [f,setF]=useState({q:"",fields:[],states:[],region:"",status:"open",app_state:"",new_only:false,eligible:false,sort:"score"});
-  const [openId,setOpenId]=useState(null);
-  const [saved,setSaved]=useState(()=>{try{return JSON.parse(localStorage.getItem(SAVED_KEY))||[]}catch(e){return []}});
-  const [token,setToken]=useState(()=>{try{return localStorage.getItem("internscout.gh_token")||""}catch(e){return ""}});
-  const [busy,setBusy]=useState("");
-  const [sel,setSel]=useState(()=>new Set());
-  const [note,setNote]=useState("");
-  const {info,queue,profile}=useExtension();
-  const onWhy=useCallback(id=>setOpenId(o=>o===id?null:id),[]);
-  const keepSaved=list=>{setSaved(list);try{localStorage.setItem(SAVED_KEY,JSON.stringify(list))}catch(e){}};
-  function onSaved(v){
-    if(v==="__save"){const name=(window.prompt("Name this search")||"").trim();if(name)keepSaved([...saved.filter(s=>s.name!==name),{name,f}]);}
-    else if(v.startsWith("del:"))keepSaved(saved.filter(s=>s.name!==v.slice(4)));
-    else{const s=saved.find(x=>x.name===v);if(s)setF(cur=>({...cur,...s.f}));}
-  }
-
-  const loadData=fromRaw=>{const base=fromRaw?RAW:DATA,b="?t="+Date.now();
-    return Promise.all([fetch(base+"listings.json"+b).then(r=>r.json()),fetch(base+"stats.json"+b).then(r=>r.json())])
-      .then(([ls,st])=>{setAll(ls);setMeta(st)});};
-  useEffect(()=>{loadData().catch(e=>setErr(String(e)))},[]);
-
-  const setState=useCallback((id,v)=>setStates(m=>{const n={...m,[id]:v};if(v==="none")delete n[id];saveStates(n);return n;}),[]);
-  const upd=(k,v)=>setF(s=>({...s,[k]:v})); const st=id=>states[id]||"none";
-
-  // latest job per listing
-  const jobs=useMemo(()=>{
-    const m={}; Object.values(queue.jobs||{}).forEach(j=>{if(j.listingId==null)return; const k=String(j.listingId); if(!m[k]||m[k].updated<j.updated)m[k]=j;});
-    return m;
-  },[queue]);
-  // submitted by the extension → mark applied
-  useEffect(()=>{Object.entries(jobs).forEach(([id,j])=>{if(j.status==="submitted"&&(states[id]||"none")==="none")setState(id,"applied");});},[jobs]);
-
-  const stateOpts=useMemo(()=>{
-    const m=new Map(); all.forEach(x=>new Set(regs(x).map(g=>g.state).filter(Boolean)).forEach(s=>m.set(s,(m.get(s)||0)+1)));
-    return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([value,count])=>({value,count}));
-  },[all]);
-  const locWords=useMemo(()=>{
-    const w=new Set(); all.forEach(x=>locHay(x).split(/[^a-z]+/).forEach(t=>{if(t.length>=3&&!NOT_PLACE.has(t))w.add(t);}));
-    return w;
-  },[all]);
-  const fieldOpts=useMemo(()=>{
-    const m=new Map(); all.forEach(x=>(x.field_tags||[]).forEach(t=>m.set(t,(m.get(t)||0)+1)));
-    return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([value,count])=>({value,count}));
-  },[all]);
-
-  const rows=useMemo(()=>{
-    let r=all.slice();
-    if(f.q.trim()){const {rest,places}=splitPlaces(f.q),terms=parseQuery(rest);
-      r=r.filter(x=>places.every(p=>regs(x).some(g=>p.kind?g.kind===p.kind:g.state===p.state)!==p.neg)&&
-        terms.every(({t,neg})=>(locWords.has(t)?locHay(x):hay(x)).includes(t)!==neg));}
-    if(f.eligible&&profile) r=r.filter(x=>!blockers(x,profile).length);
-    if(f.fields.length) r=r.filter(x=>(x.field_tags||[]).some(t=>f.fields.includes(t)));
-    if(f.region||f.states.length) r=r.filter(x=>regs(x).some(g=>regMatch(g,f)));
-    if(f.status) r=r.filter(x=>x.status===f.status);
-    if(f.new_only) r=r.filter(x=>x.is_new);
-    if(f.app_state==="auto") r=r.filter(x=>jobs[String(x.id)]);
-    else if(f.app_state) r=r.filter(x=>st(x.id)===f.app_state);
-    if(f.sort==="score") r.sort((a,b)=>b.relevance_score-a.relevance_score||(b.first_seen||"").localeCompare(a.first_seen||""));
-    else if(f.sort==="new") r.sort((a,b)=>(b.posted_at||b.first_seen||"").localeCompare(a.posted_at||a.first_seen||""));
-    else if(f.sort==="company") r.sort((a,b)=>a.company_name.localeCompare(b.company_name));
-    else if(f.sort==="comp") r.sort((a,b)=>(b.salary?1:0)-(a.salary?1:0));
-    return r;
-  },[all,f,states,jobs,profile,locWords]);
-
-  const stats=useMemo(()=>{const applied=all.filter(x=>st(x.id)==="applied").length;return meta?{...meta,applied}:{total:0,open:0,new:0,applied};},[all,meta,states]);
-  const gen=meta&&meta.generated_at?new Date(meta.generated_at).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"never";
-  const region=meta&&meta.profile?(meta.profile.region||meta.profile.center_city):"";
-  const jobCounts=useMemo(()=>{const c={};Object.values(queue.jobs||{}).forEach(j=>{c[j.status]=(c[j.status]||0)+1;});return c;},[queue]);
-
-  const canAuto=info.installed;
-  const check=useCallback((id,on)=>setSel(s=>{const n=new Set(s);on?n.add(id):n.delete(id);return n;}),[]);
-  const selectable=rows.filter(r=>r.apply_url&&!jobs[String(r.id)]);
-  const allChecked=selectable.length>0&&selectable.every(r=>sel.has(r.id));
-
-  async function autoApply(list){
-    if(!info.installed){setNote("Install the InternScout extension first.");return;}
-    const payload=list.filter(r=>r.apply_url).slice(0,100).map(r=>({
-      id:r.id, apply_url:r.apply_url, company:r.company_name, title:r.title,
-      location:(r.region_locations||[]).join("; ")||r.location_raw||"", description:r.description||"",
-    }));
-    if(!payload.length)return;
-    setNote("Adding to the queue…");
-    const res=await ext.call({type:"enqueue",jobs:payload});
-    if(res.error==="setup_required"){setNote("Finish the Deep Dive first. It just opened in a new tab.");return;}
-    if(res.error){setNote("Couldn't queue: "+res.error);return;}
-    setSel(new Set());
-    const added=(res.added||[]).length, skipped=(res.skipped||[]).length;
-    setNote(`Queued ${added} application${added===1?"":"s"}${skipped?` (${skipped} already queued)`:""}. Each one is filled in and left for you to submit.`);
-    list.forEach(r=>{if(st(r.id)==="none")setState(r.id,"interested");});
-    ext.call({type:"open_panel"});
-    setTimeout(()=>setNote(""),9000);
-  }
-
-  const REPO="bpmcginley/InternshipFinder",WF="ingest.yml";
-  async function refresh(){
-    let t=token;
-    if(!t){t=(window.prompt("Paste your GitHub fine-grained token (Actions: Read and write). Stored only in this browser; sent only to github.com.")||"").trim();if(!t)return;localStorage.setItem("internscout.gh_token",t);setToken(t);}
-    const H={Authorization:"Bearer "+t,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};
-    try{
-      setBusy("Starting…");
-      const before=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=1`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
-      const beforeId=(before.workflow_runs&&before.workflow_runs[0])?before.workflow_runs[0].id:0;
-      const disp=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/dispatches`,{method:"POST",headers:H,body:JSON.stringify({ref:"main"})});
-      if(disp.status===401){localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token rejected");return;}
-      if(disp.status!==204){setBusy("Failed (HTTP "+disp.status+")");return;}
-      setBusy("Scanning, 4–6 min");
-      for(let i=0;i<120;i++){await new Promise(r=>setTimeout(r,5000));
-        const runs=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WF}/runs?per_page=5`,{headers:H}).then(r=>r.ok?r.json():{}).catch(()=>({}));
-        const run=(runs.workflow_runs||[]).find(x=>x.id>beforeId); if(!run)continue;
-        if(run.status!=="completed"){setBusy("Scanning ("+String(run.status).replace("_"," ")+")");continue;}
-        if(run.conclusion!=="success"){setBusy("Scan "+run.conclusion);return;}
-        setBusy("Loading…");await new Promise(r=>setTimeout(r,3000));await loadData(true);setBusy("Updated");setTimeout(()=>setBusy(""),4000);return;}
-      setBusy("Still running, reload shortly");
-    }catch(e){setBusy("Error: "+e.message);}
-  }
-
-  const byState=meta&&meta.by_state?Object.entries(meta.by_state).sort((a,b)=>b[1]-a[1]):[];
-  const terms=meta&&meta.profile?(meta.profile.terms||[]).join(", "):"";
-  const sortTh=(key,label)=><th className={"sort"+(f.sort===key?" on":"")} onClick={()=>upd("sort",key)}>{label}</th>;
-
-  return (
-    <div className="wrap">
-      <header className="top">
-        <div>
-          <h1 className="mark">InternScout</h1>
-          <div className="sub">{meta?`${terms} internships in ${region||"the Northeast"}${meta.profile.include_remote?", plus US remote":""}`:"Loading listings…"}</div>
-        </div>
-        <div className="top-r">
-          {busy&&<span className="busy">{busy}</span>}
-          {info.spend&&info.spend.calls>0&&<span className="busy" title="Estimated AI cost of Auto-Apply and the Deep Dive this month">AI ${info.spend.month_usd.toFixed(2)} this month{info.spend.budget?` of $${info.spend.budget}`:""}</span>}
-          <button className="btn quiet" onClick={refresh} disabled={!!busy} title="Run the scanner on GitHub now">Rescan</button>
-          {token&&<button className="btn quiet" onClick={()=>{localStorage.removeItem("internscout.gh_token");setToken("");setBusy("Token cleared");}} title="Forget the saved GitHub token">Forget token</button>}
-          {info.installed&&<button className="btn quiet" onClick={()=>ext.call({type:"open_deep_dive"})}>{info.onboarded?"Deep Dive":"Start Deep Dive"}</button>}
-          {info.installed&&<button className="btn" onClick={()=>ext.call({type:"open_panel"})}>Queue
-            {jobCounts.needs_you?<span className="count">{jobCounts.needs_you} need you</span>:null}
-            {jobCounts.ready_to_submit?<span className="count ok">{jobCounts.ready_to_submit} ready</span>:null}</button>}
-        </div>
-      </header>
-
-      <section className="figures">
-        <div className="fig"><div className="n">{stats.open}</div><div className="l">Open now</div></div>
-        <div className="fig"><div className="n">{stats.new}</div><div className="l">New this scan</div></div>
-        <div className="fig"><div className="n">{stats.applied}</div><div className="l">You applied</div></div>
-        <div className="fig"><div className="n">{stats.total}</div><div className="l">Tracked</div></div>
-        <div className="fig states">
-          {byState.slice(0,9).map(([s,n],i)=><span key={s}>{i?" · ":""}{s} <b>{n}</b></span>)}
-          <div className="updated">Updated {gen}</div>
-        </div>
-      </section>
-
-      {info.stale&&<div className="notice"><b>The extension was reloaded or updated.</b> <a href="#" onClick={e=>{e.preventDefault();location.reload();}}>Reload this page</a> to reconnect Auto-Apply.</div>}
-      {info.checked&&!info.installed&&!info.stale&&<div className="notice"><b>Auto-Apply needs the InternScout extension.</b> Download the repo, open <code>chrome://extensions</code>, turn on Developer mode, choose <b>Load unpacked</b> and pick the <code>extension</code> folder, then reload this page. <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/extension" target="_blank" rel="noopener">Setup guide</a></div>}
-      {info.installed&&!info.onboarded&&<div className="notice"><b>One step left:</b> do the Deep Dive so the agent knows your background. <a href="#" onClick={e=>{e.preventDefault();ext.call({type:"open_deep_dive"});}}>Start the Deep Dive</a></div>}
-      {note&&<div className="notice">{note}</div>}
-
-      <div className="filters">
-        <div className="field search"><input type="text" aria-label="Search" placeholder='Search anything: python boston -senior "machine learning"' value={f.q} onChange={e=>upd("q",e.target.value)}/></div>
-        <div className="field sel"><select aria-label="Saved searches" value="" onChange={e=>onSaved(e.target.value)}>
-          <option value="">Saved searches</option>
-          {saved.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
-          <option value="__save">+ Save current filters…</option>
-          {saved.length>0&&<optgroup label="Delete">{saved.map(s=><option key={"d"+s.name} value={"del:"+s.name}>Delete “{s.name}”</option>)}</optgroup>}
-        </select></div>
-        <MultiSelect placeholder="Field" options={fieldOpts} selected={f.fields} onChange={v=>upd("fields",v)}/>
-        <div className="field sel"><select aria-label="Region" value={f.region} onChange={e=>upd("region",e.target.value)}>
-          <option value="">Whole region</option><option value="ne">New England</option><option value="nyc">NYC metro</option><option value="onsite">In person</option><option value="remote">Remote</option></select></div>
-        <MultiSelect placeholder="State" options={stateOpts} selected={f.states} onChange={v=>upd("states",v)}/>
-        <div className="field sel"><select aria-label="Posting status" value={f.status} onChange={e=>upd("status",e.target.value)}>
-          <option value="">Open or closed</option><option value="open">Open</option><option value="closed">Closed</option></select></div>
-        <div className="field sel"><select aria-label="Your status" value={f.app_state} onChange={e=>upd("app_state",e.target.value)}>
-          <option value="">Any progress</option>{STATES.map(s=><option key={s} value={s}>{STATE_LABEL[s]}</option>)}<option value="auto">In Auto-Apply queue</option></select></div>
-        <label className="field toggle"><input type="checkbox" checked={f.new_only} onChange={e=>upd("new_only",e.target.checked)}/> New only</label>
-        {profile&&<label className="field toggle" title="Hide postings whose description rules you out (grad year, citizenship, GPA, degree, sponsorship, passed deadline)"><input type="checkbox" checked={f.eligible} onChange={e=>upd("eligible",e.target.checked)}/> Hide not eligible</label>}
-        <div className="field sel"><select aria-label="Sort" value={f.sort} onChange={e=>upd("sort",e.target.value)}>
-          <option value="score">Best match</option><option value="new">Newest</option><option value="company">Company A–Z</option><option value="comp">Pay listed</option></select></div>
-        <span className="spacer"/>
-        {canAuto&&<button className="btn primary" disabled={!sel.size} onClick={()=>autoApply(all.filter(r=>sel.has(r.id)))}>Auto-Apply{sel.size?` ${sel.size} selected`:""}</button>}
-      </div>
-
-      {err? <div className="sheet empty">Couldn't load listings: {err}</div> :
-       all.length===0? <div className="sheet empty">No listings yet. Press <b>Rescan</b> to run the scanner.</div> :
-       rows.length===0? <div className="sheet empty">Nothing matches these filters.</div> :
-      <div className="sheet"><div className="tablewrap"><table>
-        <thead><tr>
-          {canAuto&&<th><input type="checkbox" aria-label="Select all shown" checked={allChecked} disabled={!selectable.length}
-            onChange={e=>setSel(s=>{const n=new Set(s);selectable.slice(0,100).forEach(r=>e.target.checked?n.add(r.id):n.delete(r.id));return n;})}/></th>}
-          {sortTh("company","Company and role")}<th>Field</th><th>Location</th><th>Term</th>
-          {sortTh("comp","Pay")}{sortTh("score","Match")}<th>Your status</th><th></th>
-        </tr></thead>
-        <tbody>{rows.map(r=><Row key={r.id} r={r} f={f}state={st(r.id)} onState={setState} job={jobs[String(r.id)]}
-          checked={sel.has(r.id)} onCheck={check} canAuto={canAuto} onAuto={autoApply}
-          open={openId===r.id} onWhy={onWhy} profile={profile} patterns={meta&&meta.skill_patterns} weights={meta&&meta.score_weights}/>)}</tbody>
-      </table></div></div>}
-      <footer>{rows.length} of {all.length} shown. Your progress is saved in this browser.{canAuto?" Auto-Apply never presses Submit; you do.":""}</footer>
-    </div>
-  );
-}
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
+<noscript><p>InternScout needs JavaScript to search and rank listings. The raw data is public at <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/docs/data">github.com/bpmcginley/InternshipFinder</a>.</p></noscript>
 </body>
 </html>

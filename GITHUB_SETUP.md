@@ -3,7 +3,7 @@
 GitHub Pages serves **static files only** — it can't run the Python backend. So this repo
 uses a two-part setup:
 
-1. **GitHub Actions** runs the scraper on a schedule and commits `docs/data/listings.json`.
+1. **GitHub Actions** runs the scraper on a schedule and commits the listing files in `docs/data/listings/`.
 2. **GitHub Pages** serves the static dashboard in `docs/`, which reads that JSON.
 
 Your application statuses (interested/applied/…) are saved in your browser (localStorage),
@@ -14,24 +14,18 @@ so they persist per-device without a backend.
 ## One-time setup
 
 ### 1. Push to your repo (`bpmcginley/InternshipFinder`)
-The remote already exists. From the `internscout/` folder, run the included one-shot script:
+The remote already exists. Use a normal clone and push. **Do not use `push-to-github.ps1` or
+`push-to-github.sh`**: they delete `.git`, which wipes history and the data commits Actions made.
+See `CONTRIBUTING.md` for the full workflow.
 
-- **Windows (PowerShell):** open this folder in Terminal, then:
-  ```powershell
-  ./push-to-github.ps1
-  ```
-- **macOS/Linux:**
-  ```bash
-  bash push-to-github.sh
-  ```
+```bash
+git clone https://github.com/bpmcginley/InternshipFinder.git
+cd InternshipFinder
+git pull --ff-only
+git add -A && git commit -m "your change" && git push origin main
+```
 
-The script re-initializes git cleanly, commits everything, sets the remote to
-`https://github.com/bpmcginley/InternshipFinder.git`, and pushes to `main`. It'll ask you to
-authenticate to GitHub the first time (browser sign-in via Git Credential Manager, or a
-Personal Access Token as the password).
-
-> If the push is rejected because the repo already has commits, and you're sure it should be
-> replaced, append `--force`: `git push -u origin main --force`.
+Always pull first: every Action run commits `docs/data/` and `backend/data/`. Never force-push.
 
 ### 2. Allow Actions to commit
 Repo → **Settings → Actions → General → Workflow permissions** →

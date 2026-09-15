@@ -38,7 +38,7 @@ def _to_out(row: Listing) -> ListingOut:
 @app.get("/api/profile")
 def get_profile():
     return {
-        "name": PROFILE.name, "fields": PROFILE.fields, "core_fields": PROFILE.core_fields,
+        "name": PROFILE.name, "fields": PROFILE.fields,
         "terms": [f"{s} {y}" for s, y in PROFILE.terms],
         "center_city": PROFILE.center_city, "radius_miles": PROFILE.radius_miles,
         "include_remote": PROFILE.include_remote,

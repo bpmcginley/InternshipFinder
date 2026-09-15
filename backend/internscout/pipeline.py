@@ -43,10 +43,8 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             continue
         if not _term_ok(n["season"], n["year"]):
             continue
-        if not n["geo"]["in_region"]:
+        if not n["geo"]["in_region"]:   # anywhere in the US, or US-remote
             continue
-        # carry quant-target flag from ATS payloads
-        n["is_quant_target"] = raw.get("_is_quant_target", False)
         normalized.append(n)
 
     merged = merge_batch(normalized)
@@ -71,6 +69,8 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.title = it["title"]
             row.description = it.get("description")
             row.field_tags = it["field_tags"]
+            row.stage = it.get("stage") or []
+            row.employment_type = it.get("employment_type")
             row.season = it["season"]; row.year = it["year"]; row.term = it["term"]
             row.location_raw = it["location_raw"]
             row.lat = it["lat"]; row.lng = it["lng"]
@@ -80,6 +80,7 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.state = it["geo"]["state"]
             row.region_locations = it["geo"]["region_locations"]
             row.ats = ats_of(it["apply_url"])[0]
+            row.sector = it.get("sector") or row.sector
             row.salary = it.get("salary")
             row.duration = it.get("duration")
             row.apply_url = it["apply_url"]
@@ -88,8 +89,7 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.status = "open" if it.get("active", True) else "closed"
             row.score_parts = score_parts(
                 field_tags=it["field_tags"], geo=it["geo"], first_seen=row.first_seen,
-                status=row.status, is_quant_target=it.get("is_quant_target", False),
-                sources=sources,
+                status=row.status, sources=sources,
             )
             row.relevance_score = round(sum(row.score_parts.values()), 1)
             db.flush()

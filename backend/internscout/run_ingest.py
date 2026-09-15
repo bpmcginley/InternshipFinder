@@ -12,10 +12,10 @@ import argparse
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .sources import fetch_github_lists, fetch_google_jobs, BOARD_FETCHERS
+from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, BOARD_FETCHERS
 from .sources.base import client
 from .sources.github_lists import parse_fixture
-from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS
+from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
 from .discover import load_registry, save_registry, seed_registry, discover, boards, record_result, prune
 from .probe import probe_boards
 from .geo import save_cache
@@ -31,7 +31,8 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
     with client() as c, ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {
             ex.submit(BOARD_FETCHERS[ats], c,
-                      {"name": e["name"], "ats_token": tok, "is_quant_target": e.get("quant", False)}): (ats, tok)
+                      {"name": e["name"], "ats_token": tok, "is_quant_target": e.get("quant", False),
+                       "sector": e.get("sector") or ("quant_finance" if e.get("quant") else None)}): (ats, tok)
             for ats, tok, e in todo
         }
         for f in as_completed(futs):
@@ -55,6 +56,7 @@ def main():
     ap.add_argument("--lists", action="store_true", help="GitHub lists only")
     ap.add_argument("--ats", action="store_true", help="registered ATS boards only")
     ap.add_argument("--google", action="store_true", help="Google Jobs (SerpApi) only")
+    ap.add_argument("--public", action="store_true", help="public-sector feeds (USAJOBS, NYC) only")
     ap.add_argument("--fixture", help="parse a local listings.json instead of fetching")
     ap.add_argument("--source", default="vanshb03")
     ap.add_argument("--export", metavar="DIR", help="also write static JSON for GitHub Pages")
@@ -65,7 +67,7 @@ def main():
     if args.fixture:
         raw += parse_fixture(args.fixture, source=args.source)
     else:
-        do_all = not (args.lists or args.ats or args.google)
+        do_all = not (args.lists or args.ats or args.google or args.public)
         reg = load_registry()
         seeded = seed_registry(reg)
         found = 0
@@ -74,7 +76,7 @@ def main():
             found += discover(reg, items)
             raw += items
         if args.google or do_all:
-            items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_LOCATIONS, max_searches=GOOGLE_JOBS_MAX_SEARCHES)
+            items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, google_jobs_locations(), max_searches=GOOGLE_JOBS_MAX_SEARCHES)
             found += discover(reg, items)
             raw += items
         if raw:
@@ -83,6 +85,8 @@ def main():
             print(f"[probe] +{probed} boards guessed from company names", flush=True)
         if args.ats or do_all:
             raw += scan_boards(reg, args.workers)
+        if args.public or do_all:  # government feeds: no ATS boards to discover from these
+            raw += fetch_usajobs() + fetch_nyc_jobs()
         dropped = prune(reg)
         save_registry(reg)
         print(f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead; "

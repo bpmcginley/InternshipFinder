@@ -1,0 +1,17 @@
+{
+  "name": "internscout-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/",
+    "test:workers": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.9",
+    "vitest": "4.1.11",
+    "wrangler": "4.131.2"
+  }
+}

@@ -1,9 +1,9 @@
-"""Relevance score 0-100 for ranking within the filtered set. Weights are config-like."""
+"""Neutral relevance score 0-100: the same for every student. The dashboard re-scores each listing
+against the student's own majors, year and states; this only orders listings with no profile."""
 from __future__ import annotations
 from datetime import datetime, timezone
-from .config import PROFILE
 
-W = {"field": 35, "location": 20, "freshness": 15, "employer": 15, "openness": 10, "source": 5}
+W = {"field": 35, "location": 20, "freshness": 15, "openness": 10, "source": 5}
 SOURCE_CONFIDENCE = {  # 0..1
     "greenhouse": 1.0, "lever": 1.0, "ashby": 1.0, "workday": 1.0, "company": 1.0,
     "smartrecruiters": 0.9, "adzuna": 0.6, "usajobs": 0.7,
@@ -20,24 +20,21 @@ def _freshness(first_seen: datetime | None) -> float:
     return max(0.0, 1.0 - age_days / 21.0)  # linear decay over ~3 weeks
 
 
-def score_parts(*, field_tags, geo, first_seen, status, is_quant_target, sources) -> dict:
+def score_parts(*, field_tags, geo, first_seen, status, sources, **_) -> dict:
     """Points earned per component (each out of W[component]); the total is their sum."""
-    # field fit
-    core = set(PROFILE.core_fields)
-    if any(t in core for t in field_tags):
+    # field: how sure we are what the role is (a known field vs "other")
+    if any(t != "other" for t in field_tags):
         field = 1.0
     elif field_tags:
-        field = 0.55  # adjacent (data/ml)
+        field = 0.4
     else:
         field = 0.0
 
-    # location: Boston/NYC proper > rest of New England + NYC metro > US-remote
-    if geo.get("in_city"):
+    # location: a named US place > US-remote
+    if geo.get("on_site") or geo.get("within_radius") or geo.get("in_city"):
         location = 1.0
-    elif geo.get("within_radius"):
-        location = 0.8
-    elif geo.get("is_remote"):
-        location = 0.5
+    elif geo.get("is_remote") or geo.get("in_region"):
+        location = 0.6
     else:
         location = 0.2
 
@@ -45,7 +42,6 @@ def score_parts(*, field_tags, geo, first_seen, status, is_quant_target, sources
         "field": field,
         "location": location,
         "freshness": _freshness(first_seen),
-        "employer": 1.0 if is_quant_target else 0.3,
         "openness": 1.0 if status == "open" else 0.0,
         "source": max((SOURCE_CONFIDENCE.get(s, 0.4) for s in (sources or ["github"])), default=0.4),
     }

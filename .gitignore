@@ -5,3 +5,11 @@ __pycache__/
 # Chrome extension signing key - never commit
 extension.pem
 *.pem
+
+# Built extension zips (scripts/package_extension.py)
+dist/
+
+# Worker: local secrets and build state - never commit
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars

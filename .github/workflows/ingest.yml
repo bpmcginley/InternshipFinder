@@ -32,6 +32,25 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
+      # Extra states (beyond New England + NY/NJ) that get detail calls and Google searches:
+      # the states students picked (Worker GET /demand, counts only) plus the optional repo variable.
+      - name: Add states students picked
+        env:
+          DEMAND_URL: ${{ secrets.INTERNSCOUT_DEMAND_URL }}
+          DEMAND_TOKEN: ${{ secrets.INTERNSCOUT_DEMAND_TOKEN }}
+          EXTRA: ${{ vars.INTERNSCOUT_WANTED_STATES }}
+        run: |
+          picked=""
+          if [ -n "$DEMAND_URL" ] && [ -n "$DEMAND_TOKEN" ]; then
+            picked=$(curl -fsS --max-time 20 -H "Authorization: Bearer $DEMAND_TOKEN" "$DEMAND_URL" \
+              | jq -r '.states | keys | map(select(length == 2)) | join(",")') || picked=""
+          else
+            echo "No Worker /demand secrets set; using the repo variable only."
+          fi
+          states=$(printf '%s,%s' "$EXTRA" "$picked" | sed 's/^,*//; s/,*$//')
+          echo "Wanted states beyond the baseline: ${states:-none}"
+          echo "INTERNSCOUT_WANTED_STATES=$states" >> "$GITHUB_ENV"
+
       - name: Run ingester and export static JSON
         working-directory: backend
         env:
@@ -39,14 +58,21 @@ jobs:
           # Look up unknown NY/NJ/PA towns once (cached in backend/data/geocache.json)
           INTERNSCOUT_GEOCODE: "1"
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}   # optional: enables Google Jobs search layer
+          # optional: federal student jobs (free key from developer.usajobs.gov; the email it was issued to)
+          USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+          USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
         run: |
           python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data"
+
+      - name: Coverage report
+        working-directory: backend
+        run: python -m internscout.coverage "${{ github.workspace }}/docs/data/listings"
 
       - name: Commit updated data
         run: |
           git config user.name  "internscout-bot"
           git config user.email "actions@github.com"
-          git add docs/data/listings.json docs/data/stats.json backend/data/ats_registry.json backend/data/geocache.json
+          git add -A docs/data backend/data/ats_registry.json backend/data/geocache.json
           if git diff --staged --quiet; then
             echo "No changes."
           else

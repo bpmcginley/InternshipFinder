@@ -1,7 +1,9 @@
 // The Auto-Apply loop: snapshot the page → Claude picks actions (tool use) → execute with
 // verify-after-set → repeat, across page navigations, until ready_to_submit / needs_you.
 import { callAI } from "./claude.js";
-import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, isGemini, modelFor } from "../lib/store.js";
+import { NEEDS_YOU_CODES } from "./gemini.js";
+import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor } from "../lib/store.js";
+import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs } from "./queue.js";
@@ -223,7 +225,7 @@ async function tailorStep(id, job, store) {
   } catch (e) {
     const msg = String((e && e.message) || e);
     job = await updateJob(id, { tailored: { status: "failed", error: msg } });
-    await appendLog(id, { kind: "tailor", text: `Couldn't tailor the resume (${msg.slice(0, 80)}). Using your original.` });
+    await appendLog(id, { kind: "tailor", text: `Couldn't tailor the resume (${e && e.code ? msg : msg.slice(0, 80)}). Using your original.` });
   }
   return job;
 }
@@ -252,7 +254,13 @@ async function loop(id) {
     await updateJob(id, { status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Deep Dive → Setup), then Resume.` });
     return;
   }
-  if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && !(await spend()).over) {
+  if (isWorker(store.ai) && !(await ensureToken())) {
+    await updateJob(id, { status: "needs_you", reason: "Sign in with Google or Microsoft (InternScout popup or Deep Dive → Setup), then Resume.", activity: "" });
+    return;
+  }
+  // One Auto-Apply run = one allowance unit on the InternScout Worker; kept across Resume, reset by Retry.
+  if (!job.run_id) job = await updateJob(id, { run_id: crypto.randomUUID() });
+  if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
     job = await tailorStep(id, job, store);
     if (job.status !== "working") return; // waiting for the human to approve it
   }
@@ -272,7 +280,7 @@ async function loop(id) {
       return;
     }
     const sp = await spend();
-    if (sp.over) {
+    if (sp.over && !isWorker(store.ai)) {
       await updateJob(id, { status: "needs_you", reason: `Monthly AI budget reached (${money(sp.month_usd)} of ${money(sp.budget)}). Raise it in Deep Dive → Setup, then Resume.`, pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
@@ -301,6 +309,7 @@ async function loop(id) {
     if (pre.length) content.push({ type: "text", text: `Pre-filled: ${pre.join("; ")}` });
     content.push({ type: "text", text: `SNAPSHOT\n${accountLine(store, url)}\n${snap.text}` });
     msgs.push({ role: "user", content });
+    const prevPending = pending;
     pending = null;
     trimHistory(msgs);
 
@@ -308,7 +317,17 @@ async function loop(id) {
       { type: "text", text: RULES },
       { type: "text", text: `CANDIDATE PROFILE (JSON)\n${JSON.stringify(profileForModel(store))}`, cache_control: { type: "ephemeral" } },
     ];
-    const resp = await callAI({ ai: store.ai, model: modelFor(store, "agent"), system, messages: msgs, tools: TOOLS, max_tokens: 8000, kind: "agent" });
+    let resp;
+    try {
+      resp = await callAI({ ai: store.ai, model: modelFor(store, "agent"), system, messages: msgs, tools: TOOLS, max_tokens: 8000, kind: "agent", run_id: job.run_id });
+    } catch (e) {
+      // Sign-in, allowance, rate or pause: hand the job to the student instead of failing it; Resume retries this step.
+      if (!NEEDS_YOU_CODES.has(e && e.code)) throw e;
+      msgs.pop();
+      await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "" });
+      await saveMsgs(id, msgs);
+      return;
+    }
     msgs.push({ role: "assistant", content: resp.content });
     steps++;
 

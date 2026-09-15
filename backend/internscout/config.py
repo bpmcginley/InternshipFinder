@@ -2,30 +2,40 @@
 from __future__ import annotations
 import os
 from dataclasses import dataclass, field
+from datetime import date
+
+# last month of each term; co-ops and part-time roles run outside summer
+_TERM_END = {"Winter": 2, "Spring": 5, "Summer": 8, "Fall": 12, "Year-round": 12}
+
+
+def open_terms(today: date | None = None) -> tuple[tuple[str, int], ...]:
+    """Every (season, year) this year or next that hasn't ended yet."""
+    today = today or date.today()
+    return tuple((s, y) for y in (today.year, today.year + 1) for s, end in _TERM_END.items()
+                 if (y, end) >= (today.year, today.month))
 
 
 @dataclass
 class Profile:
     """The configurable search: field, term, location."""
-    name: str = "All fields · Summer 2027 · New England + NYC"
+    name: str = "All fields · upcoming terms · United States"
     # field tags we keep (see classify.py for the tag vocabulary)
     # Accept every discipline the classifier knows (filter in the dashboard instead of
     # dropping at ingest). Narrow this tuple to restrict what gets collected.
     fields: tuple[str, ...] = ()          # empty = accept all
-    # exact-target fields score highest; adjacent still surface, scored lower
-    core_fields: tuple[str, ...] = ("swe", "quant")
     # term(s) to keep, as (season, year)
-    terms: tuple[tuple[str, int], ...] = (("Summer", 2027),)
+    terms: tuple[tuple[str, int], ...] = field(default_factory=open_terms)
     # shown by the API/dashboard; the actual geo rule lives in REGION below
-    center_city: str = "New England + NYC metro"
+    center_city: str = "United States"
     radius_miles: float = 50.0
     include_remote: bool = True
 
 
 @dataclass(frozen=True)
 class Region:
-    """Where roles must be: New England states, within N miles of Midtown, or US-remote."""
-    name: str = "New England + NYC metro"
+    """Every US and US-remote role is kept. New England and the NYC metro (N miles of Midtown)
+    are the baseline area, labeled separately and always given full detail fetches."""
+    name: str = "United States"
     states: frozenset = frozenset({"ME", "NH", "VT", "MA", "RI", "CT"})
     nyc_center: tuple = (40.7580, -73.9855)
     nyc_radius_miles: float = 50.0
@@ -34,6 +44,15 @@ class Region:
 
 
 REGION = Region()
+
+# Slow or paid work (per-job detail calls, Google Jobs searches) runs only for these states.
+# CI adds the states students picked (the Worker's /demand counts) via INTERNSCOUT_WANTED_STATES.
+BASELINE_STATES = frozenset({"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"})
+
+
+def wanted_states() -> frozenset:
+    extra = os.environ.get("INTERNSCOUT_WANTED_STATES", "")
+    return BASELINE_STATES | {s.strip().upper() for s in extra.split(",") if len(s.strip()) == 2}
 
 # Active profile (edit here or override via the API /profile endpoint later).
 PROFILE = Profile()
@@ -47,7 +66,7 @@ FETCH_WORKERS = int(os.environ.get("INTERNSCOUT_WORKERS", "16"))
 
 # Network etiquette
 HTTP_TIMEOUT = 25.0
-USER_AGENT = "InternScout/0.1 (personal internship finder; contact: brucepmcginley@gmail.com)"
+USER_AGENT = "InternScout/0.2 (student internship finder; +https://github.com/bpmcginley/InternshipFinder)"
 
 # GitHub community lists (Tier 1). Each maps season->cycle year for that repo.
 GITHUB_LISTS = [
@@ -68,48 +87,35 @@ GITHUB_LISTS = [
 # Google Jobs (SerpApi) search layer. Finds roles from companies NOT in the ATS registry.
 # Set SERPAPI_KEY in the environment (GitHub Actions secret or local) to enable.
 GOOGLE_JOBS_QUERIES = [
-    # computing / quant
-    "software engineer intern summer 2027",
-    "software engineering internship 2027",
-    "quantitative researcher intern summer 2027",
-    "quantitative developer intern summer 2027",
-    "quantitative trading intern summer 2027",
-    "machine learning intern summer 2027",
-    "data science intern summer 2027",
-    "data engineering intern summer 2027",
-    "cybersecurity intern summer 2027",
-    "cloud infrastructure intern summer 2027",
-    "product management intern summer 2027",
-    "computer science internship summer 2027",
-    # engineering
-    "electrical engineering intern summer 2027",
-    "mechanical engineering intern summer 2027",
-    "civil engineering intern summer 2027",
-    "aerospace engineering intern summer 2027",
-    "chemical engineering intern summer 2027",
-    "biomedical engineering intern summer 2027",
-    "industrial engineering intern summer 2027",
-    "hardware engineering intern summer 2027",
-    # science / math / health
-    "biology research intern summer 2027",
-    "chemistry intern summer 2027",
-    "physics research intern summer 2027",
-    "mathematics statistics intern summer 2027",
-    "public health intern summer 2027",
-    "clinical research intern summer 2027",
-    # business / finance / other
-    "finance intern summer 2027",
-    "investment banking summer analyst 2027",
-    "accounting intern summer 2027",
-    "consulting intern summer 2027",
-    "marketing intern summer 2027",
-    "human resources intern summer 2027",
-    "supply chain intern summer 2027",
-    "economics research intern summer 2027",
-    "ux design intern summer 2027",
-    "legal intern summer 2027",
-    "journalism media intern summer 2027",
-    "architecture intern summer 2027",
+    # Google finds employers that aren't on a job board we scan, so these lean toward fields the
+    # boards cover thinly (health, public service, arts, media, hospitality). One cluster per line;
+    # the run number picks which ones run, so every cluster gets its turn.
+    "nursing student internship",
+    "hospital summer internship undergraduate",
+    "public health internship 2027",
+    "clinical research internship undergraduate",
+    "government internship college student",
+    "public policy fellowship undergraduate",
+    "legal internship undergraduate",
+    "nonprofit internship summer 2027",
+    "social work practicum student",
+    "education internship college student",
+    "museum internship",
+    "arts internship college student",
+    "journalism internship 2027",
+    "communications public relations internship",
+    "hospitality internship summer 2027",
+    "sports management internship",
+    "environmental sustainability internship",
+    "undergraduate research assistant summer",
+    "psychology research internship undergraduate",
+    "economics research internship",
+    "agriculture food science internship",
+    "architecture design internship",
+    "marketing internship summer 2027",
+    "finance accounting internship summer 2027",
+    "engineering co-op 2027",
+    "data analyst internship 2027",
 ]
 # Google Jobs is location-driven; one search per location per query (watch your SerpApi quota).
 GOOGLE_JOBS_LOCATIONS = [
@@ -120,6 +126,29 @@ GOOGLE_JOBS_LOCATIONS = [
     "Manchester, New Hampshire",
     "Portland, Maine",
 ]
+# The metro searched for each state students pick (baseline states are covered above).
+STATE_METROS = {
+    "AL": "Birmingham, Alabama", "AK": "Anchorage, Alaska", "AZ": "Phoenix, Arizona",
+    "AR": "Little Rock, Arkansas", "CA": "San Francisco, California", "CO": "Denver, Colorado",
+    "DE": "Wilmington, Delaware", "DC": "Washington, District of Columbia", "FL": "Miami, Florida",
+    "GA": "Atlanta, Georgia", "HI": "Honolulu, Hawaii", "ID": "Boise, Idaho", "IL": "Chicago, Illinois",
+    "IN": "Indianapolis, Indiana", "IA": "Des Moines, Iowa", "KS": "Wichita, Kansas",
+    "KY": "Louisville, Kentucky", "LA": "New Orleans, Louisiana", "MD": "Baltimore, Maryland",
+    "MI": "Detroit, Michigan", "MN": "Minneapolis, Minnesota", "MS": "Jackson, Mississippi",
+    "MO": "St. Louis, Missouri", "MT": "Billings, Montana", "NE": "Omaha, Nebraska",
+    "NV": "Las Vegas, Nevada", "NM": "Albuquerque, New Mexico", "NC": "Charlotte, North Carolina",
+    "ND": "Fargo, North Dakota", "OH": "Columbus, Ohio", "OK": "Oklahoma City, Oklahoma",
+    "OR": "Portland, Oregon", "PA": "Philadelphia, Pennsylvania", "SC": "Charleston, South Carolina",
+    "SD": "Sioux Falls, South Dakota", "TN": "Nashville, Tennessee", "TX": "Dallas, Texas",
+    "UT": "Salt Lake City, Utah", "VA": "Arlington, Virginia", "WA": "Seattle, Washington",
+    "WV": "Charleston, West Virginia", "WI": "Milwaukee, Wisconsin", "WY": "Cheyenne, Wyoming",
+}
+
+
+def google_jobs_locations() -> list[str]:
+    """Baseline metros first, then one metro per extra wanted state."""
+    extra = sorted(s for s in wanted_states() - BASELINE_STATES if s in STATE_METROS)
+    return GOOGLE_JOBS_LOCATIONS + [STATE_METROS[s] for s in extra]
 
 # SerpApi free tier = 100 searches/month. Each run uses at most this many searches;
 # queries rotate between runs (by day) so the whole list gets covered over time.

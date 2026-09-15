@@ -9,6 +9,11 @@ from internscout.sources.recruitee import parse_recruitee
 from internscout.sources.bamboohr import parse_bamboohr
 from internscout.sources.rippling import parse_rippling
 from internscout.sources.oracle import parse_oracle
+from internscout.sources.taleo import parse_taleo
+from internscout.sources.adp import parse_adp
+from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
+from internscout.sources.usajobs import parse_usajobs
+from internscout.sources.nyc_jobs import parse_nyc_jobs
 from internscout.sources.github_lists import _parse
 
 CO = {"name": "Acme", "ats_token": "acme", "is_quant_target": False}
@@ -131,3 +136,109 @@ def test_simplify_terms():
                      "locations": ["Boston, MA"], "url": "u", "active": True, "source": "Simplify"}],
                    "simplify", {"Summer": 2027})
     assert (items[0]["season"], items[0]["year"], items[0]["source"]) == ("Summer", 2027, "simplify")
+
+
+def test_taleo():
+    items, total = parse_taleo({"pagingData": {"totalCount": 3}, "requisitionList": [
+        {"contestNo": "342925", "linkedColumn": 0, "locationsColumns": [1],
+         "column": ["2027 Intern - Autonomy Engineer", '["US-Maryland-Hunt Valley","CA-Ontario-Toronto"]', "09/01/2026"]},
+        {"contestNo": "1", "linkedColumn": 0, "locationsColumns": [1],
+         "column": ["Engineering Intern", '["CA-Ontario-Toronto"]', "09/01/2026"]},
+        {"contestNo": "2", "linkedColumn": 0, "locationsColumns": [1],
+         "column": ["Machinist", '["US-Texas-Fort Worth"]', "09/01/2026"]},
+    ]}, CO, "acme", "ext")
+    assert total == 3 and len(items) == 1
+    assert items[0]["locations"] == ["Hunt Valley, Maryland"] and items[0]["posted_at"] == "2026-09-01"
+    assert items[0]["url"] == "https://acme.taleo.net/careersection/ext/jobdetail.ftl?job=342925"
+
+
+def test_adp():
+    def req(i, title, locs, level="Intern"):
+        return {"itemID": i, "requisitionTitle": title, "postDate": "2026-09-01T00:00:00-04:00",
+                "workLevelCode": {"shortName": level},
+                "customFieldGroup": {"stringFields": [{"nameCode": {"codeValue": "ExternalJobID"}, "stringValue": "6026"}]},
+                "requisitionLocations": locs}
+    ma = {"address": {"cityName": "Boston", "countrySubdivisionLevel1": {"codeValue": "MA"}},
+          "nameCode": {"shortName": "HQ, Boston, MA, US"}}
+    fr = {"address": {"cityName": "Paris", "countrySubdivisionLevel1": {"codeValue": "IDF"}, "countryCode": "FR"},
+          "nameCode": {"shortName": "Store, Paris, IDF, FR"}}
+    items, total = parse_adp({"meta": {"totalNumber": 3}, "jobRequisitions": [
+        req("a_1", "Marketing Intern", [ma, fr]), req("b_1", "Design Intern", [fr]),
+        req("c_1", "Sales Supervisor", [ma], level="Full Time"),
+    ]}, CO, "cid-1")
+    assert total == 3 and len(items) == 1
+    assert items[0]["locations"] == ["Boston, MA"] and items[0]["_adp_id"] == "a_1"
+    assert "cid=cid-1" in items[0]["url"] and "jobId=6026" in items[0]["url"]
+
+
+def test_jobvite():
+    page = """<tr><td class="jv-job-list-name">
+        <a href="/acme/job/oA1">Summer Intern - Planning</a>
+    </td>
+    <td class="jv-job-list-location">
+        Brooklyn,
+        NY
+    </td></tr>
+    <tr><td class="jv-job-list-name"><a href="/acme/job/oB2">Agency Attorney</a></td>
+    <td class="jv-job-list-location">New York, NY</td></tr>"""
+    items = parse_jobvite(page, CO)
+    assert len(items) == 1 and items[0]["locations"] == ["Brooklyn, NY"]
+    assert items[0]["url"] == "https://jobs.jobvite.com/acme/job/oA1" and items[0]["apply_url"].endswith("/oA1/apply")
+    desc = parse_jobvite_detail('<div class="jv-job-detail-description" ng-non-bindable><h3>Description</h3>'
+                                '<div><p>Plan routes.</p></div></div><div class="jv-job-detail-bottom-actions">')
+    assert "Plan routes." in desc
+
+
+def test_usajobs():
+    def hit(title, loc, country="United States"):
+        return {"MatchedObjectDescriptor": {
+            "PositionTitle": title, "PositionURI": "https://www.usajobs.gov/GetJob/ViewDetails/1",
+            "ApplyURI": ["https://www.usajobs.gov/GetJob/ViewDetails/1?PostingChannelID=RESTAPI"],
+            "OrganizationName": "National Park Service", "PublicationStartDate": "2026-09-01T00:00:00Z",
+            "ApplicationCloseDate": "2026-10-01T00:00:00Z",
+            "PositionLocation": [{"LocationName": loc, "CountryCode": country}],
+            "PositionSchedule": [{"Name": "Part-time"}],
+            "PositionRemuneration": [{"MinimumRange": "17.50", "MaximumRange": "22.00", "Description": "Per Hour"}],
+            "UserArea": {"Details": {"JobSummary": "<p>Help visitors.</p>", "MajorDuties": ["Lead tours"],
+                                     "WhoMayApply": {"Name": "United States Citizens"}}}}}
+    items, total = parse_usajobs({"SearchResult": {"SearchResultCountAll": 3, "SearchResultItems": [
+        hit("Park Ranger (Student Trainee)", "Lowell National Historical Park, Lowell, Massachusetts"),
+        hit("Biological Science Technician", "Acadia, Bar Harbor, Maine"),
+        hit("Student Trainee (Admin)", "Naples, Italy", country="Italy"),
+    ]}})
+    assert total == 3 and len(items) == 2
+    a = items[0]
+    assert a["company_name"] == "National Park Service" and a["locations"] == ["Lowell, Massachusetts"]
+    assert a["apply_url"].endswith("RESTAPI") and "Salary: $17.50 - $22.00 Per Hour" in a["description"]
+    assert "United States Citizens" in a["description"] and "Lead tours" in a["description"]
+
+
+def test_nyc_jobs():
+    from datetime import date
+    row = lambda **kw: {"job_id": "1", "agency": "DEPT OF PARKS & RECREATION", "posting_type": "Internal",
+                        "business_title": "Communications Intern", "career_level": "Student",
+                        "full_time_part_time_indicator": "P", "salary_range_from": "19.14",
+                        "salary_range_to": "24.08", "salary_frequency": "Hourly",
+                        "posting_date": "2026-09-04T00:00:00.000", "post_until": "03-NOV-2026",
+                        "job_description": "Write posts.", **kw}
+    items = parse_nyc_jobs([
+        row(), row(posting_type="External", job_description="External copy."),
+        row(job_id="2", business_title="Assistant General Counsel", career_level="Experienced (non-manager)"),
+        row(job_id="3", business_title="Legal Intern", post_until="01-AUG-2026"),
+    ], today=date(2026, 9, 14))
+    assert len(items) == 1
+    it = items[0]
+    assert it["url"] == "https://cityjobs.nyc.gov/job/1" and it["description"].count("External copy.") == 1
+    assert it["company_name"] == "Dept Of Parks & Recreation" and it["posted_at"] == "2026-09-04"
+    assert it["employment_type"] == "Intern Part-time" and "Apply by: 2026-11-03" in it["description"]
+
+
+def test_public_feeds_are_government():
+    from datetime import date
+    from internscout.normalize import normalize
+    items = parse_nyc_jobs([{"job_id": "9", "agency": "POLICE DEPARTMENT", "business_title": "College Aide",
+                             "career_level": "Student", "posting_type": "External"},
+                            {"job_id": "8", "agency": "DOHMH", "business_title": "College Intern, Public Health Clinics",
+                             "career_level": "Student", "posting_type": "External"}], today=date(2026, 9, 14))
+    tags = [normalize(i)["field_tags"] for i in items]
+    assert tags[0] == ["government"] and "government" in tags[1] and "public_health" in tags[1]

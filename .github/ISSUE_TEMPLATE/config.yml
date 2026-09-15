@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  # Same form as CONFIG.formUrl on the dashboard.
+  - name: Quick feedback form (no GitHub account needed)
+    url: https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform
+    about: Suggestions, a missing employer, or anything you'd rather not post publicly.
+  - name: Privacy and your data
+    url: https://bpmcginley.github.io/InternshipFinder/privacy.html
+    about: What InternScout stores and how to delete it.

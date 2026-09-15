@@ -20,7 +20,7 @@ Reply with JSON only:
 
 export async function tailorResume(store, job) {
   const resp = await callAI({
-    ai: store.ai, model: modelFor(store, "tailor"), kind: "tailor", max_tokens: 4000, system: SYSTEM,
+    ai: store.ai, model: modelFor(store, "tailor"), kind: "tailor", run_id: job.run_id, max_tokens: 4000, system: SYSTEM,
     messages: [{ role: "user", content: `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}\n\nPROFILE (JSON)\n${JSON.stringify(tailorInput(store))}` }],
   });
   const out = jsonOf(resp);

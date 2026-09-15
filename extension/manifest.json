@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "InternScout Auto-Apply",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Walks every step of an internship application, fills it from your Deep Dive profile, and stops at the submit button for you.",
   "permissions": [
     "storage",
@@ -11,7 +11,8 @@
     "scripting",
     "webNavigation",
     "sidePanel",
-    "notifications"
+    "notifications",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -1,14 +1,24 @@
 // Minimal Anthropic Messages API client (raw fetch; MV3 cannot load the SDK from a CDN and the
 // extension has no bundler). The key never leaves the extension except to api.anthropic.com.
-import { callGemini } from "./gemini.js";
+import { callGemini, callWorker, taskFor } from "./gemini.js";
 import { recordUsage } from "../lib/usage.js";
+import { WORKER_URL } from "../lib/config.js";
+import { ensureToken } from "../lib/auth.js";
 
 const URL = "https://api.anthropic.com/v1/messages";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Routes by model id: gemini-* goes to Google with the Gemini key, everything else to Anthropic.
-// Every call is priced and added to the monthly total; the cost comes back as resp.cost_usd.
-export async function callAI({ ai, model, kind, ...opts }) {
+// provider "internscout": the InternScout Worker with the Google/Microsoft sign-in token. Not billed to the student,
+// so nothing is added to the local spend meter. task defaults from kind (see taskFor); run_id groups the
+// calls of one Auto-Apply or Deep Dive run into one allowance unit.
+// Otherwise routes by model id: gemini-* goes to Google with the Gemini key, everything else to Anthropic.
+// Every own-key call is priced and added to the monthly total; the cost comes back as resp.cost_usd.
+export async function callAI({ ai, model, kind, task, run_id, ...opts }) {
+  if (ai && ai.provider === "internscout") {
+    const resp = await callWorker({ url: WORKER_URL, token: await ensureToken(), refreshToken: ensureToken, task: task || taskFor(kind), run_id, ...opts });
+    resp.cost_usd = 0;
+    return resp;
+  }
   const resp = String(model).startsWith("gemini")
     ? await callGemini({ apiKey: ai.geminiKey, model, ...opts })
     : await callClaude({ apiKey: ai.apiKey, model, ...opts });

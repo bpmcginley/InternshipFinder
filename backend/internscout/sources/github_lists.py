@@ -23,7 +23,8 @@ def _parse(payload: list[dict], source: str, cycle_years: dict) -> list[dict]:
         year = cycle_years.get(season) if season else None
         terms = [t for t in (r.get("terms") or []) if isinstance(t, str)]
         if terms:  # Simplify shape: terms ["Summer 2027", "Fall 2026"]; prefer a wanted one
-            pick = next((t for t in terms if t in wanted), terms[0])
+            ok = [t for t in terms if t in wanted]  # summer is the main cycle when several are open
+            pick = next((t for t in ok if t.lower().startswith("summer")), ok[0] if ok else terms[0])
             m = re.match(r"\s*(Summer|Fall|Winter|Spring)\s+(\d{4})", pick, re.I)
             if m:
                 season, year = m.group(1).title(), int(m.group(2))

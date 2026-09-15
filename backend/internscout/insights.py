@@ -214,6 +214,13 @@ def extract(text: str | None, today: date | None = None) -> dict:
     if re.search(r"(?:not|unable to|cannot|won't|will not|does not|do not)\s+(?:be able to\s+)?(?:provide|offer|support|sponsor)[^.\n]{0,40}sponsor|(?:not|unable to|cannot|will not|does not|do not)\s+sponsor|without\s+(?:the\s+need\s+for\s+)?(?:current\s+or\s+future\s+)?(?:employment\s+)?(?:visa\s+)?sponsorship|sponsorship\s+(?:is\s+|will\s+)?not\s+(?:be\s+)?(?:available|provided|offered)", text, re.I):
         out["no_sponsorship"] = True
 
+    if re.search(r"\bunpaid\b|volunteer (?:position|role|internship)|(?:is|are) not paid|no (?:compensation|pay)\b|for academic credit only", text, re.I):
+        out["pay"] = "unpaid"
+    elif re.search(r"\bstipends?\b", text, re.I):
+        out["pay"] = "stipend"
+    elif re.search(r"\bpaid (?:internship|position|opportunity|role|co-?op)|\$\s?\d|hourly (?:rate|wage|pay)|pay range|salary range|compensation range", text, re.I):
+        out["pay"] = "paid"
+
     m = re.search(r"(?:deadline|apply by|apply before|applications?\s+(?:are\s+|is\s+|will\s+be\s+)?(?:due|close[sd]?|accepted\s+(?:until|through))|submit[^.\n]{0,25}\bby)[^.\n\d]{0,25}"
                   r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d\d)?|\d{1,2}/\d{1,2}/(?:20)?\d\d)", text, re.I)
     if m:

@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in the dashboard or the extension doesn't work.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. **Don't paste your resume, profile, passwords, tokens or sign-in details.**
+  - type: dropdown
+    id: part
+    attributes:
+      label: Where
+      options:
+        - Dashboard (search, filters, profile)
+        - Extension - Deep Dive
+        - Extension - Auto-Apply
+        - Sign-in
+        - Tailored resume
+        - Monthly allowance / caps
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to repeat it
+      placeholder: |
+        1. Open ...
+        2. Click ...
+  - type: input
+    id: site
+    attributes:
+      label: Application site (Auto-Apply only)
+      description: Just the site, for example "Workday" or "company.icims.com".
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      description: Shown on the card at chrome://extensions.
+      placeholder: 0.3.0
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 140 on Windows 11
+  - type: textarea
+    id: errors
+    attributes:
+      label: Error messages
+      description: Remove anything personal first.
+      render: text

@@ -34,7 +34,7 @@ def test_geo():
     g2 = evaluate_locations(["Remote in USA"])
     assert g2["is_remote"] and not g2["within_radius"] and g2["in_region"]
     g3 = evaluate_locations(["San Francisco, CA"])
-    assert not g3["in_region"]                                      # outside the Northeast
+    assert g3["in_region"] and not g3["within_radius"] and g3["on_site"]   # nationwide, outside the baseline
     g4 = evaluate_locations(["Hoboken, NJ"])
     assert g4["within_radius"] and g4["state"] == "NJ"              # NYC metro
 
@@ -62,11 +62,11 @@ def test_full_pipeline():
         assert "Jane Street" in names
         assert "HRT" in names
         assert "Acme Cloud" in names
-        assert "FarCorp" not in names        # SF is outside New England + NYC
+        assert "FarCorp" in names            # every US location is kept
         assert "OldCo" not in names          # wrong year
         assert "BioLab" in names             # marketing is a supported discipline now
         assert "FullTimeCo" not in names     # not an internship
-        # quant + boston should outrank remote swe
+        # a named place outranks a remote-only role (neutral score)
         js = next(r for r in rows if r.company_name == "Jane Street")
         acme = next(r for r in rows if r.company_name == "Acme Cloud")
         assert js.relevance_score > acme.relevance_score

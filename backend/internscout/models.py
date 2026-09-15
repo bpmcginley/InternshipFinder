@@ -31,6 +31,7 @@ class Listing(Base):
     title: Mapped[str] = mapped_column(String(400))
     description: Mapped[str | None] = mapped_column(Text)
     field_tags: Mapped[list] = mapped_column(JSON, default=list)
+    stage: Mapped[list | None] = mapped_column(JSON, default=list)           # internship|co_op|research|...
     season: Mapped[str | None] = mapped_column(String(16))
     year: Mapped[int | None] = mapped_column(Integer)
     term: Mapped[str | None] = mapped_column(String(32), index=True)   # "Summer 2027"
@@ -46,6 +47,7 @@ class Listing(Base):
     state: Mapped[str | None] = mapped_column(String(24), index=True)        # "MA", "NY", "Remote"
     region_locations: Mapped[list | None] = mapped_column(JSON, default=list)
     ats: Mapped[str | None] = mapped_column(String(24))                       # greenhouse|workday|...|other
+    sector: Mapped[str | None] = mapped_column(String(32), index=True)        # employer label from the registry
     apply_url: Mapped[str | None] = mapped_column(String(1024))
     posted_at: Mapped[datetime | None] = mapped_column(DateTime)
     first_seen: Mapped[datetime] = mapped_column(DateTime, default=_now)

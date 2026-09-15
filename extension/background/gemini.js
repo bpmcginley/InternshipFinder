@@ -1,6 +1,7 @@
 // Gemini generateContent client. Takes and returns the same message shapes as claude.js
 // (text / document / tool_use / tool_result blocks), so the agent and Deep Dive stay provider-agnostic.
-// The key never leaves the extension except to generativelanguage.googleapis.com.
+// The key never leaves the extension except to generativelanguage.googleapis.com. In InternScout mode the same
+// body goes to the Worker (no key in the extension) and the reply is parsed the same way.
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const THINKING_RESERVE = 8192; // Gemini counts thinking tokens against maxOutputTokens
@@ -69,8 +70,8 @@ function fromResponse(data) {
   return { content, stop_reason, usage: data.usageMetadata };
 }
 
-export async function callGemini({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {
-  if (!apiKey) throw new Error("No Gemini API key. Open Deep Dive → Setup.");
+// Gemini generateContent body (no model). Shared by direct-key calls and the InternScout Worker.
+export function buildGeminiBody({ system, messages, tools, max_tokens = 4096, thinking }) {
   const body = {
     contents: toContents(messages),
     generationConfig: {
@@ -83,6 +84,12 @@ export async function callGemini({ apiKey, model, system, messages, tools, max_t
   if (tools && tools.length) {
     body.tools = [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: t.input_schema })) }];
   }
+  return body;
+}
+
+export async function callGemini({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {
+  if (!apiKey) throw new Error("No Gemini API key. Open Deep Dive → Setup.");
+  const body = buildGeminiBody({ system, messages, tools, max_tokens, thinking });
   let lastErr = "";
   for (let attempt = 0; attempt < 5; attempt++) {
     let res;
@@ -108,4 +115,85 @@ export async function callGemini({ apiKey, model, system, messages, tools, max_t
     return fromResponse(data);
   }
   throw new Error(`Gemini API unavailable (${lastErr}). Try again shortly.`);
+}
+
+// ---------- InternScout Worker (worker/API.md → POST /ai) ----------
+export const WORKER_TASKS = ["resume_tailor", "autofill", "deep_dive", "field_match", "short_answer"];
+// Call-site kind → Worker task. agent = Auto-Apply steps, tailor = tailored resume, deep_dive = Deep Dive
+// (resume reading, interview, stories, voice), test = the tiny "Reply OK" check.
+const KIND_TASK = { agent: "autofill", tailor: "resume_tailor", deep_dive: "deep_dive", test: "short_answer", field_match: "field_match", short_answer: "short_answer" };
+export const taskFor = (kind) => KIND_TASK[kind] || "short_answer";
+
+export function buildWorkerRequest({ task, run_id, ...opts }) {
+  if (!WORKER_TASKS.includes(task)) throw new Error(`Unknown InternScout task: ${task}`);
+  return { task, ...(run_id ? { run_id } : {}), request: buildGeminiBody(opts) };
+}
+
+const SIGN_IN_HINT = "Sign in with Google or Microsoft in the InternScout popup or Deep Dive → Setup";
+const OWN_KEY_HINT = "or add your own key under Deep Dive → Setup → Advanced";
+
+// Turns a Worker error reply into an Error with .code and a message a student can act on.
+export function workerError(status, data = {}) {
+  const code = data.error || (status === 401 ? "auth" : status === 503 ? "paused" : status === 429 ? "rate" : status >= 500 ? "upstream" : "bad_request");
+  let msg;
+  if (code === "auth") msg = `${SIGN_IN_HINT} to use AI features, then try again.`;
+  else if (code === "cap") {
+    const label = { resume_tailor: "tailored-resume", autofill: "Auto-Apply", deep_dive: "Deep Dive", field_match: "field-matching", short_answer: "short-answer" }[data.task] || "AI";
+    const resets = data.resets ? ` It resets ${new Date(data.resets).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}.` : "";
+    msg = data.resets
+      ? `You've used this month's free ${label} allowance.${resets} Accounts with a school .edu email get twice as much. To keep going now, ${OWN_KEY_HINT.replace(/^or /, "")}.`
+      : `This run hit its AI call limit${data.message ? ` (${data.message})` : ""}. Finish it by hand, ${OWN_KEY_HINT}.`;
+  } else if (code === "rate") msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
+  else if (code === "paused") msg = `InternScout AI is paused for everyone until the monthly budget resets. Search still works; to keep applying, ${OWN_KEY_HINT.replace(/^or /, "")}.`;
+  else if (code === "upstream") msg = "The AI service had a problem. Try again shortly.";
+  else msg = `InternScout rejected the request (${status}${data.message ? `: ${data.message}` : ""}).`;
+  const e = new Error(msg);
+  e.code = code;
+  e.status = status;
+  if (data.retry_after) e.retry_after = +data.retry_after;
+  return e;
+}
+
+// Codes that should pause a job for the student rather than fail it.
+export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused"]);
+
+// Sends the same Gemini body to WORKER_URL/ai and parses the reply with the Gemini parser.
+// refreshToken(): called once after a 401; returns a new token or null.
+export async function callWorker({ url, token, refreshToken, task, run_id, signal, fetchImpl = fetch, sleepImpl = sleep, ...opts }) {
+  if (!token) throw workerError(401, { error: "auth" });
+  const body = JSON.stringify(buildWorkerRequest({ task, run_id, ...opts }));
+  let refreshed = false, lastErr = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let res;
+    try {
+      res = await fetchImpl(`${url}/ai`, {
+        method: "POST",
+        signal,
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body,
+      });
+    } catch (e) {
+      if (signal && signal.aborted) throw e;
+      lastErr = workerError(502, { error: "upstream" });
+      await sleepImpl(1500 * 2 ** attempt);
+      continue;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return fromResponse(data);
+    const err = workerError(res.status, data);
+    if (err.code === "auth" && !refreshed && refreshToken) {
+      refreshed = true;
+      token = await refreshToken().catch(() => null);
+      if (!token) throw err;
+      attempt--;
+      continue;
+    }
+    if ((err.code === "rate" && (err.retry_after || 0) <= 30) || err.code === "upstream") {
+      lastErr = err;
+      await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt);
+      continue;
+    }
+    throw err;
+  }
+  throw lastErr || workerError(502, { error: "upstream" });
 }

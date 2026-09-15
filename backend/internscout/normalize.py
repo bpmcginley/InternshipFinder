@@ -2,10 +2,13 @@
 from __future__ import annotations
 import re
 from datetime import datetime, timezone
-from .classify import classify, is_internship
+from .classify import classify, stage_of, SECTOR_FIELDS
 from .region import evaluate_locations
 
-_SEASON_RE = re.compile(r"\b(summer|fall|winter|spring)\b", re.I)
+# "Spring Boot" and "fall under" are not terms
+_SEASON_RE = re.compile(r"\b(summer|fall(?!\s+(?:under|within|into|in|on|behind|short|outside|off)\b)|autumn|winter|"
+                        r"spring(?!\s*(?:boot|framework|mvc|cloud|batch|data)\b)|year[- ]round|academic year)\b", re.I)
+_SEASON_NAME = {"autumn": "Fall", "year round": "Year-round", "year-round": "Year-round", "academic year": "Year-round"}
 _YEAR_RE = re.compile(r"\b(20[2-3]\d)\b")  # 2020-2039, avoids matching job-id digits
 
 
@@ -14,7 +17,7 @@ def parse_term_from_text(text: str):
     text = text or ""
     m = _SEASON_RE.search(text)
     y = _YEAR_RE.search(text)
-    season = m.group(1).capitalize() if m else None
+    season = _SEASON_NAME.get(m.group(1).lower(), m.group(1).capitalize()) if m else None
     year = int(y.group(1)) if y else None
     return season, year
 
@@ -102,6 +105,9 @@ def _to_dt(ts):
     return None
 
 
+PUBLIC_SOURCES = ("usajobs", "nyc_jobs")
+
+
 def normalize(raw: dict) -> dict | None:
     """raw fields expected: company_name, title, locations[list], season, year,
     apply_url, source, source_url, posted_at, active(bool), description(optional).
@@ -112,10 +118,15 @@ def normalize(raw: dict) -> dict | None:
     company = (raw.get("company_name") or "").strip()
     if not title or not company:
         return None
-    if not is_internship(title, raw.get("employment_type", "")):
+    stages = stage_of(title, raw.get("employment_type", ""))
+    if not stages:  # student opportunities only
         return None
 
     tags = classify(title)  # title-only: avoids off-target tags from JD boilerplate
+    if tags == ["other"] and raw.get("sector") in SECTOR_FIELDS:
+        tags = [SECTOR_FIELDS[raw["sector"]]]
+    if raw.get("source") in PUBLIC_SOURCES:  # every posting from a government feed is government work
+        tags = [t for t in tags if t != "other"] + ([] if "government" in tags else ["government"])
     if not tags:
         return None
 
@@ -139,10 +150,11 @@ def normalize(raw: dict) -> dict | None:
         "title": title,
         "description": raw.get("description"),
         "field_tags": tags,
+        "stage": stages,
         "season": season,
         "year": year,
         "term": term,
-        "employment_type": "internship",
+        "employment_type": stages[0],
         "salary": raw.get("salary") or extract_salary(_blob),
         "duration": extract_duration(_blob),
         "locations": raw.get("locations") or [],
@@ -158,4 +170,5 @@ def normalize(raw: dict) -> dict | None:
         "source": raw.get("source", "github"),
         "source_url": raw.get("source_url") or raw.get("url"),
         "dedupe_key": make_dedupe_key(company, title, season, year),
+        "sector": raw.get("sector"),
     }

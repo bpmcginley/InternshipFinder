@@ -1,20 +1,24 @@
 """Export the DB to static JSON files for the GitHub Pages frontend.
 
 Produces:
-  <out>/listings.json  - array of listing objects (all listings)
-  <out>/stats.json     - counts + generated_at + profile summary
+  <out>/listings/<ST>.json    - the listings in one state; remote.json (US-remote), US.json (country only)
+  <out>/listings/index.json   - per-file counts by field and stage, so the dashboard loads only picked states
+  <out>/stats.json            - counts + generated_at + profile summary
+  <out>/majors.json           - majors -> field tags for the profile picker
 The static site reads these directly; no backend needed.
 """
 from __future__ import annotations
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 import os
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from .db import SessionLocal, init_db
 from .models import Listing, Application
-from .config import PROFILE, REGION
+from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
+from .classify import stage_of, years_of
+from .majors import majors_export
 from .score import W
 from .region import evaluate_locations
 
@@ -22,28 +26,74 @@ DESC_CHARS = 1500
 
 
 def _regions(row: Listing) -> list[dict]:
-    # Re-read the raw locations so older rows get today's splitting rules too.
-    ev = evaluate_locations([row.location_raw]) if row.location_raw else None
-    if ev and ev["regions"]:
-        return ev["regions"]
-    return evaluate_locations(row.region_locations or [])["regions"]
+    # Re-read the raw locations so older rows get today's rules too; region_locations keeps
+    # places other sources of the same role listed.
+    ev = evaluate_locations([row.location_raw or ""] + (row.region_locations or []))["regions"]
+    return list({g["loc"]: g for g in ev}.values())
+
+
+def shard_keys(listing: dict) -> set[str]:
+    """The listing files a listing belongs in: each state it names, "remote" for US-remote roles
+    with no state, "US" for roles that name only the country."""
+    keys = set()
+    for g in listing.get("regions") or []:
+        if g["state"] and g["state"] != "Remote":
+            keys.add(g["state"])
+        else:
+            keys.add("remote" if g["kind"] == "remote" else "US")
+    if not keys and listing.get("state"):
+        keys.add("remote" if listing["state"] == "Remote" else listing["state"])
+    return keys
+
+
+def _dump(obj, path: str, indent=None) -> None:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(obj, f, indent=indent, separators=None if indent else (",", ":"), ensure_ascii=False)
+
+
+def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
+    shard_dir = os.path.join(out_dir, "listings")
+    os.makedirs(shard_dir, exist_ok=True)
+    shards: dict[str, list] = defaultdict(list)
+    for x in listings:
+        for k in shard_keys(x):
+            shards[k].append(x)
+    index = {"generated_at": generated_at, "files": {}}
+    for k, items in sorted(shards.items()):
+        _dump(items, os.path.join(shard_dir, f"{k}.json"))
+        live = [x for x in items if x["status"] == "open"]
+        index["files"][k] = {
+            "file": f"listings/{k}.json", "count": len(items), "open": len(live),
+            "by_field": dict(Counter(t for x in live for t in x["field_tags"]).most_common()),
+            "by_stage": dict(Counter(s for x in live for s in x["stage"]).most_common()),
+            "by_sector": dict(Counter(x["sector"] for x in live if x.get("sector")).most_common()),
+        }
+    for name in os.listdir(shard_dir):  # a state with no listings left
+        if name.endswith(".json") and name != "index.json" and name[:-5] not in shards:
+            os.remove(os.path.join(shard_dir, name))
+    _dump(index, os.path.join(shard_dir, "index.json"), indent=1)
+    return index
 
 
 def _listing_dict(row: Listing) -> dict:
     regions = _regions(row)
+    ins = extract(row.description) if row.status == "open" else None
+    if ins is not None and "pay" not in ins and row.salary:
+        ins["pay"] = "paid"
     return {
         "id": row.id,
         "company_name": row.company_name,
         "title": row.title,
         "field_tags": row.field_tags or [],
+        "sector": row.sector,
+        "stage": row.stage or stage_of(row.title),
+        "years": years_of(row.title, ins),
         "term": row.term,
         "salary": row.salary,
         "duration": row.duration,
         "posted_at": row.posted_at.isoformat() if row.posted_at else None,
         "location_raw": row.location_raw,
         "is_remote": row.is_remote,
-        "within_radius": row.within_radius,
-        "distance_miles": round(row.distance_miles, 1) if row.distance_miles is not None else None,
         "state": row.state,
         "region_locations": [g["loc"] for g in regions] or (row.region_locations or []),
         "regions": regions,
@@ -52,14 +102,11 @@ def _listing_dict(row: Listing) -> dict:
         # trimmed JD: the Auto-Apply agent uses it to tailor answers
         "description": (row.description or "")[:DESC_CHARS] if row.status == "open" else None,
         "status": row.status,
-        "relevance_score": row.relevance_score,
         "score_parts": row.score_parts,
         # requirements, eligibility limits and deadline parsed from the full description
-        "insights": extract(row.description) if row.status == "open" else None,
+        "insights": ins,
         "is_new": row.is_new,
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
-        "last_seen": row.last_seen.isoformat() if row.last_seen else None,
-        "sources": [{"source": s.source, "source_url": s.source_url} for s in row.source_links],
     }
 
 
@@ -71,11 +118,12 @@ def export(out_dir: str) -> dict:
             select(Listing).order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
         listings = [_listing_dict(r) for r in rows]
+        generated_at = datetime.now(timezone.utc).isoformat()
         stats = {
             "total": len(rows),
             "open": sum(1 for r in rows if r.status == "open"),
             "new": sum(1 for r in rows if r.is_new),
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": generated_at,
             "profile": {
                 "name": PROFILE.name,
                 "center_city": PROFILE.center_city,
@@ -83,19 +131,25 @@ def export(out_dir: str) -> dict:
                 "include_remote": PROFILE.include_remote,
                 "terms": [f"{s} {y}" for s, y in PROFILE.terms],
                 "region": REGION.name,
-                "states": sorted(REGION.states),
+                "baseline_states": sorted(BASELINE_STATES),
+                "wanted_states": sorted(wanted_states()),
                 "nyc_radius_miles": REGION.nyc_radius_miles,
             },
-            "by_state": dict(Counter(r.state for r in rows if r.status == "open").most_common()),
+            "by_state": dict(Counter(k for x in listings if x["status"] == "open" for k in shard_keys(x)).most_common()),
             "by_ats": dict(Counter(r.ats for r in rows if r.status == "open").most_common()),
+            "by_field": dict(Counter(t for x in listings if x["status"] == "open" for t in x["field_tags"]).most_common()),
+            "by_stage": dict(Counter(s for x in listings if x["status"] == "open" for s in x["stage"]).most_common()),
+            "by_sector": dict(Counter(x["sector"] for x in listings if x["status"] == "open" and x.get("sector")).most_common()),
             "score_weights": W,
             "skill_patterns": PATTERNS,
         }
-    with open(os.path.join(out_dir, "listings.json"), "w", encoding="utf-8", newline="\n") as f:
-        json.dump(listings, f, indent=None, separators=(",", ":"), ensure_ascii=False)
-    with open(os.path.join(out_dir, "stats.json"), "w", encoding="utf-8", newline="\n") as f:
-        json.dump(stats, f, indent=2, ensure_ascii=False)
-    print(f"[export] wrote {len(listings)} listings to {out_dir}")
+    legacy = os.path.join(out_dir, "listings.json")  # replaced by the per-state files
+    if os.path.exists(legacy):
+        os.remove(legacy)
+    _dump(stats, os.path.join(out_dir, "stats.json"), indent=2)
+    _dump(majors_export(), os.path.join(out_dir, "majors.json"))
+    index = write_shards(listings, out_dir, generated_at)
+    print(f"[export] wrote {len(listings)} listings ({len(index['files'])} state files) to {out_dir}")
     return stats
 
 
