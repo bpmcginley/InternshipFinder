@@ -1,8 +1,8 @@
 {
-  "total": 1528,
-  "open": 1379,
-  "new": 1528,
-  "generated_at": "2026-09-14T21:19:05.081162+00:00",
+  "total": 1362,
+  "open": 1213,
+  "new": 1362,
+  "generated_at": "2026-09-15T02:33:01.218888+00:00",
   "profile": {
     "name": "All fields · Summer 2027 · New England + NYC",
     "center_city": "New England + NYC metro",
@@ -23,26 +23,26 @@
     "nyc_radius_miles": 50.0
   },
   "by_state": {
-    "NY": 599,
-    "MA": 317,
-    "Remote": 177,
-    "NJ": 118,
-    "CT": 109,
-    "VT": 30,
-    "NH": 12,
-    "RI": 10,
-    "ME": 7
+    "NY": 583,
+    "MA": 252,
+    "Remote": 154,
+    "NJ": 98,
+    "CT": 78,
+    "VT": 24,
+    "NH": 11,
+    "RI": 7,
+    "ME": 6
   },
   "by_ats": {
-    "workday": 544,
-    "greenhouse": 262,
+    "workday": 363,
+    "greenhouse": 264,
     "oracle": 233,
     "other": 141,
-    "ashby": 88,
-    "smartrecruiters": 47,
+    "ashby": 99,
+    "smartrecruiters": 48,
     "lever": 41,
     "icims": 9,
-    "workable": 7,
+    "workable": 8,
     "rippling": 5,
     "bamboohr": 1,
     "taleo": 1
