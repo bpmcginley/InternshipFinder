@@ -80,6 +80,10 @@
 39.8783,
 -75.1205
 ],
+"camp hill|PA":[
+40.2398,
+-76.92
+],
 "canandaigua|NY":[
 42.8507,
 -77.3191
@@ -174,6 +178,10 @@
 40.0065,
 -75.7033
 ],
+"doylestown|PA":[
+40.31,
+-75.1305
+],
 "dresher|PA":[
 40.1409,
 -75.1668
@@ -253,6 +261,10 @@
 "fredonia|NY":[
 42.44,
 -79.3315
+],
+"gap|PA":[
+39.9873,
+-76.0205
 ],
 "gettysburg|PA":[
 39.8309,
@@ -387,6 +399,10 @@
 40.834,
 -75.7136
 ],
+"levittown|PA":[
+40.1548,
+-74.838
+],
 "lewisburg|PA":[
 40.9644,
 -76.8848
@@ -498,6 +514,7 @@
 41.147,
 -73.9903
 ],
+"new cumberland-pennsylvania-united states of america|PA":null,
 "new hope|PA":[
 40.3643,
 -74.9513
@@ -547,6 +564,10 @@
 "nj-jersey city|NJ":null,
 "nj-parsippany|NJ":null,
 "nj-swedesboro|NJ":null,
+"nj|NJ":[
+40.7568,
+-74.0608
+],
 "north tonawanda|NY":[
 43.0408,
 -78.8661
@@ -561,6 +582,10 @@
 "ny-new york|NY":[
 40.6379,
 -74.1856
+],
+"ny|NY":[
+41.6454,
+-74.8618
 ],
 "oaks|PA":[
 40.1318,
@@ -671,6 +696,10 @@
 40.664,
 -77.5958
 ],
+"rhinebeck|NY":[
+41.9268,
+-73.9128
+],
 "ridley park|PA":[
 39.8812,
 -75.3238
@@ -777,6 +806,7 @@
 40.7795,
 -74.0238
 ],
+"united states - new jersey - parsippany|NJ":null,
 "united states - new york - new york city|NY":null,
 "united states - wayne|PA":null,
 "united states of america|NY":null,
@@ -802,6 +832,7 @@
 "usa - ny (remote|NY":null,
 "usa - pennsylvania - king of prussia|PA":null,
 "usa - pennsylvania - philadelphia|PA":null,
+"usa - pennsylvania - upper gwynedd|PA":null,
 "usa - pennsylvania - west point|PA":null,
 "usa - philadelphia|PA":null,
 "usa - ridley park|PA":null,
