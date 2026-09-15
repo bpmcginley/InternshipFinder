@@ -2,27 +2,42 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 3; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 4; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
   let seq = 0;
 
+  // Some ATS platforms (SmartRecruiters oneclick-ui, Oracle JET) render real form fields inside
+  // shadow roots on custom elements, invisible to plain document.querySelectorAll. Walk shadow
+  // trees too. rootOf() scopes id/for lookups to the same root as the element being labeled,
+  // since ids are only unique within one root.
+  function deepQueryAll(selector, root = document) {
+    const out = [...root.querySelectorAll(selector)];
+    for (const el of root.querySelectorAll("*")) {
+      if (el.shadowRoot) out.push(...deepQueryAll(selector, el.shadowRoot));
+    }
+    return out;
+  }
+  const rootOf = (el) => (el && el.getRootNode ? el.getRootNode() : document);
+
   const txt = (el) => (el ? norm(el.innerText || el.textContent) : "");
   const cut = (s, n = 300) => (s.length > n ? s.slice(0, n) + "…" : s);
-  const byIds = (ids) => ids.split(/\s+/).map((i) => txt(document.getElementById(i))).filter(Boolean).join(" ");
+  const byIds = (ids, root = document) => ids.split(/\s+/).map((i) => txt(root.getElementById ? root.getElementById(i) : document.getElementById(i))).filter(Boolean).join(" ");
   function refOf(el) {
     let r = el.getAttribute("data-is-ref");
     if (!r) { r = String(++seq); el.setAttribute("data-is-ref", r); }
     return r;
   }
   const isField = (el) => el.matches("input, select, textarea");
+  // Required-field markers aren't always ASCII "*" — Lever uses U+2731 HEAVY ASTERISK ("✱").
+  const REQUIRED_MARK_RE = /[*✱∗⁎]\s*$/;
 
   function questionLabel(el, scope = el) {
     const lb = el.getAttribute("aria-labelledby");
-    if (lb) { const t = byIds(lb); if (t) return t; }
+    if (lb) { const t = byIds(lb, rootOf(el)); if (t) return t; }
     if (isField(el)) {
-      if (el.id) { const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`); if (txt(l)) return txt(l); }
+      if (el.id) { const l = rootOf(el).querySelector(`label[for="${CSS.escape(el.id)}"]`); if (txt(l)) return txt(l); }
       const w = el.closest("label"); if (txt(w)) return txt(w);
     }
     const fs = el.closest("fieldset");
@@ -42,10 +57,10 @@
   }
 
   function optLabel(r) {
-    if (r.id) { const l = document.querySelector(`label[for="${CSS.escape(r.id)}"]`); if (txt(l)) return txt(l); }
+    if (r.id) { const l = rootOf(r).querySelector(`label[for="${CSS.escape(r.id)}"]`); if (txt(l)) return txt(l); }
     const w = r.closest("label"); if (txt(w)) return txt(w);
     if (r.getAttribute("aria-label")) return norm(r.getAttribute("aria-label"));
-    const lb = r.getAttribute("aria-labelledby"); if (lb && byIds(lb)) return byIds(lb);
+    const lb = r.getAttribute("aria-labelledby"); if (lb && byIds(lb, rootOf(r))) return byIds(lb, rootOf(r));
     if (txt(r.nextElementSibling)) return txt(r.nextElementSibling);
     return norm(r.value || txt(r));
   }
@@ -57,7 +72,7 @@
   }
 
   function labelVisible(el) {
-    const l = (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`)) || el.closest("label");
+    const l = (el.id && rootOf(el).querySelector(`label[for="${CSS.escape(el.id)}"]`)) || el.closest("label");
     return l && A.visible(l);
   }
 
@@ -98,7 +113,7 @@
   function collect() {
     refs.clear();
     const elements = [], seen = new Set();
-    const nodes = document.querySelectorAll('input, textarea, select, button[aria-haspopup="listbox"], [role="radio"], [role="checkbox"], [contenteditable="true"]');
+    const nodes = deepQueryAll('input, textarea, select, button[aria-haspopup="listbox"], [role="radio"], [role="checkbox"], [contenteditable="true"]');
     for (const el of nodes) {
       if (el.closest("[data-is-overlay]")) continue;
       const type = (el.getAttribute("type") || "").toLowerCase();
@@ -122,7 +137,7 @@
       if (kind === "radio_group") {
         const container = el.closest('[role="radiogroup"], fieldset, [data-automation-id^="formField-"]');
         const name = el.getAttribute("name");
-        let els = name ? [...document.querySelectorAll(`input[type="radio"][name="${CSS.escape(name)}"]`)]
+        let els = name ? [...rootOf(el).querySelectorAll(`input[type="radio"][name="${CSS.escape(name)}"]`)]
           : container ? [...container.querySelectorAll('[role="radio"]')] : [el];
         const key = els[0];
         if (seen.has(key)) continue;
@@ -134,7 +149,7 @@
         rec.label = questionLabel(scope || el, scope || el);
         rec.value = (els.find((r) => r.checked || r.getAttribute("aria-checked") === "true") && optLabel(els.find((r) => r.checked || r.getAttribute("aria-checked") === "true"))) || "";
         rec.el = key;
-        rec.required = els.some((r) => r.required || r.getAttribute("aria-required") === "true") || /\*/.test(rec.label);
+        rec.required = els.some((r) => r.required || r.getAttribute("aria-required") === "true") || REQUIRED_MARK_RE.test(rec.label);
       } else {
         rec.el = el;
         rec.label = questionLabel(el);
@@ -150,7 +165,7 @@
         }
         if (kind === "select") rec.options = [...el.options].map((o) => norm(o.text)).filter((t) => t && !/^(select|choose|--|please select)/i.test(t)).slice(0, 80);
         rec.value = valueOf(el, kind);
-        rec.required = el.required || el.getAttribute("aria-required") === "true" || /\*\s*$|\(required\)/i.test(rec.label);
+        rec.required = el.required || el.getAttribute("aria-required") === "true" || REQUIRED_MARK_RE.test(rec.label) || /\(required\)/i.test(rec.label);
         if (kind === "text") rec.type = type || "text";
         if (el.maxLength > 0 && el.maxLength < 100000) rec.maxlength = el.maxLength;
       }
@@ -167,7 +182,7 @@
   const LINK_RE = /apply|next|continue|sign ?(in|up)|create|account|log ?in|register|start|begin|submit|review|upload|autofill|manual|add|save|back|resume|proceed|interested|forgot/i;
   function collectButtons(ctx) {
     const out = [], seenText = new Set();
-    for (const el of document.querySelectorAll('button:not([aria-haspopup="listbox"]), input[type="submit"], input[type="button"], [role="button"], a[href]')) {
+    for (const el of deepQueryAll('button:not([aria-haspopup="listbox"]), input[type="submit"], input[type="button"], [role="button"], a[href]')) {
       if (out.length >= 50) break;
       if (el.closest("[data-is-overlay]") || !A.visible(el) || el.disabled) continue;
       if (el.closest('[role="listbox"], [role="menu"]')) continue;
@@ -191,12 +206,12 @@
     const elements = collect();
     const ctx = G.pageContext(document);
     const buttons = collectButtons(ctx);
-    const headings = [...document.querySelectorAll('h1, h2, [data-automation-id="pageHeaderTitleText"], [role="heading"]')]
+    const headings = deepQueryAll('h1, h2, [data-automation-id="pageHeaderTitleText"], [role="heading"]')
       .filter(A.visible).map(txt).filter(Boolean).slice(0, 6).map((t) => cut(t, 120));
-    const step = cut(txt([...document.querySelectorAll('[aria-current="step"], [data-automation-id="progressBarActiveStep"], [class*="step"][class*="active"]')].find(A.visible)), 120);
-    const errors = [...new Set([...document.querySelectorAll('[role="alert"], [data-automation-id="errorMessage"], .error, .field-error, [class*="error-message"], [class*="errorMessage"], [class*="ErrorMessage"]')]
+    const step = cut(txt(deepQueryAll('[aria-current="step"], [data-automation-id="progressBarActiveStep"], [class*="step"][class*="active"]').find(A.visible)), 120);
+    const errors = [...new Set(deepQueryAll('[role="alert"], [data-automation-id="errorMessage"], .error, .field-error, [class*="error-message"], [class*="errorMessage"], [class*="ErrorMessage"]')
       .filter(A.visible).map(txt).filter(Boolean).map((t) => cut(t, 160)))].slice(0, 12);
-    const captcha = [...document.querySelectorAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="turnstile"], .g-recaptcha, .h-captcha, .cf-turnstile')].some(A.visible);
+    const captcha = deepQueryAll('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="turnstile"], .g-recaptcha, .h-captcha, .cf-turnstile').some(A.visible);
     const text = elements.length < 4 ? cut(txt(document.body), 2500) : "";
     return { url: location.href, title: document.title, headings, step, errors, captcha, elements, buttons, text, filledFields: ctx.filledFields };
   }
@@ -228,7 +243,7 @@
           // Workday search inputs search on Enter (synthetic keys never trigger native form submit)
           el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
           await A.sleep(900);
-          const opts = [...document.querySelectorAll('[data-automation-id="promptOption"], [role="option"]')].filter(A.visible);
+          const opts = deepQueryAll('[data-automation-id="promptOption"], [role="option"]').filter(A.visible);
           const pk = A.best(opts, value, (o) => o.textContent);
           if (pk) { A.mouseClick(pk); await A.sleep(300); r = { ok: true, chosen: norm(pk.textContent) }; }
           else r = { ok: false, options: opts.map((o) => norm(o.textContent)).slice(0, 40) };
@@ -289,7 +304,7 @@
   const FAST = [
     [/given-name|first.?name|firstname|legalname--firstname/, "first_name"],
     [/family-name|last.?name|family.?name|surname|lastname|legalname--lastname/, "last_name"],
-    [/^\s*(full ?name|name|your name|legal name)\s*\*?\s*$/, "full_name"],
+    [/^\s*(full ?name|name|your name|legal name)\s*[*✱∗⁎]?\s*$/, "full_name"],
     [/\bemail\b|e-mail/, "email"],
     [/\btel\b|phone|mobile|telephone/, "phone"],
     [/linkedin/, "linkedin"],
@@ -326,7 +341,7 @@
       document.head.appendChild(s);
     }
     const box = (el) => el.closest('[data-automation-id^="formField-"], .select-shell, [class*="select__control"]') || el;
-    document.querySelectorAll("[data-is-filled]").forEach((el) => box(el).classList.add("is-filled"));
+    deepQueryAll("[data-is-filled]").forEach((el) => box(el).classList.add("is-filled"));
     collect();
     let missing = 0;
     for (const rec of refs.values()) {
@@ -336,7 +351,7 @@
     }
     const ctx = G.pageContext(document);
     let final = null;
-    for (const el of document.querySelectorAll('button, input[type="submit"], [role="button"]')) {
+    for (const el of deepQueryAll('button, input[type="submit"], [role="button"]')) {
       if (A.visible(el) && !G.allowClick(G.describe(el), ctx).allowed) { el.classList.add("is-final"); final = final || el; }
     }
     if (final) try { final.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}

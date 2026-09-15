@@ -46,9 +46,19 @@
     };
   }
 
+  // Some ATS platforms (SmartRecruiters oneclick-ui, Oracle JET) render real fields inside shadow
+  // roots, invisible to plain querySelectorAll. Without this, filledFields can undercount on
+  // those pages, which weakens the "block ambiguous Apply/Send once the form is filled" check below.
+  function deepQueryAll(selector, root) {
+    root = root || document;
+    const out = [...root.querySelectorAll(selector)];
+    root.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) out.push(...deepQueryAll(selector, el.shadowRoot)); });
+    return out;
+  }
+
   function pageContext(doc) {
     let filled = 0;
-    doc.querySelectorAll("input, textarea, select").forEach((el) => {
+    deepQueryAll("input, textarea, select", doc).forEach((el) => {
       const t = (el.type || "").toLowerCase();
       if (["hidden", "submit", "button", "search", "image", "reset"].includes(t)) return;
       if (/search/i.test(el.name || el.id || "")) return;
