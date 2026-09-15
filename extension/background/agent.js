@@ -187,12 +187,10 @@ function formatSnapshot(frames, fails) {
   return { text: lines.join("\n"), index, top, hasFinal };
 }
 
-// Choosing a password and reading a code out of your own inbox are yours to do, so the agent
-// stops at those pages and hands the tab back. Checked here, before the model gets a turn, for
-// the same reason the final submit button is blocked in code: it isn't the model's call to make.
+// A code sitting in your inbox is yours to fetch, so the agent stops there and hands the tab
+// back. Checked here, before the model gets a turn, so the pause costs no AI call and does not
+// depend on the model choosing to call pause_for_user.
 const GATE_HELP = {
-  account_creation: "This site wants you to create an account. Pick a password and finish signing up in the tab, then press Resume.",
-  sign_in: "This site wants you to sign in. Enter your password in the tab, then press Resume.",
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
 };
 

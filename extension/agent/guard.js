@@ -13,34 +13,27 @@
   function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
 
   // ---- gates the human has to clear themselves ----
-  // Choosing a password, and reading a code out of their own inbox, are the student's to do.
-  // Detected here rather than left to the model, for the same reason the submit guard is.
-  const SIGNUP_RE = /create\s+(a\s+|an\s+|your\s+)?(new\s+)?account|sign\s*up|registration|register\s+(now|here|for)|set\s+(a|your)\s+password|choose\s+a\s+password/i;
+  // A code sent to the student's inbox is theirs to read: the agent cannot reach it, and guessing
+  // only burns steps. Detected here rather than left to the model, for the same reason the submit
+  // guard is. Sign-up and sign-in pages are deliberately NOT gates — the agent handles those
+  // itself (see the ACCOUNTS rules and fill_secret in background/agent.js).
   const VERIFY_RE = /verif(y|ication)|one[-\s]?time\s*(code|password|pin)|security\s+code|confirmation\s+code|enter\s+the\s+code|we\s+(sent|emailed)\s+you|check\s+your\s+(email|inbox)|\d\s*-?\s*digit/i;
   // A bare "Code", or an explicitly named verification code — never a postal/country/promo code.
   const CODE_FIELD_RE = /\b(verification|confirmation|security|access|activation|one[-\s]?time)\s*(code|pin)\b|\b(otp|passcode)\b|^\s*(code|pin)\s*\*?\s*$/i;
   const NOT_CODE_RE = /postal|zip|country|area|promo|discount|referral|coupon|province|dial|sort/i;
 
   // page: {headings:[], step, buttons:[{text}], text, elements:[{kind,label,question}]}
-  // -> {kind: "account_creation"|"sign_in"|"email_verification", reason} or null
+  // -> {kind: "email_verification", reason} or null
   function detectGate(page) {
     if (!page) return null;
     const els = page.elements || [];
     const heads = norm([...(page.headings || []), page.step || ""].join(" "));
     const wide = norm([heads, (page.buttons || []).map((b) => b.text).join(" "), page.text || ""].join(" "));
-    const pw = els.filter((e) => e.kind === "password");
     const hasCode = els.some((e) => {
       const l = norm([e.label, e.question].filter(Boolean).join(" "));
       return CODE_FIELD_RE.test(l) && !NOT_CODE_RE.test(l);
     });
 
-    // Password + confirm-password is a signup form regardless of wording.
-    if (pw.length >= 2) return { kind: "account_creation", reason: "this page asks you to create an account and pick a password" };
-    if (pw.length === 1) {
-      return SIGNUP_RE.test(heads) || (SIGNUP_RE.test(wide) && !/\bsign\s*in\b|\blog\s*in\b/i.test(heads))
-        ? { kind: "account_creation", reason: "this page asks you to create an account and pick a password" }
-        : { kind: "sign_in", reason: "this page asks you to sign in" };
-    }
     if (hasCode && VERIFY_RE.test(wide)) return { kind: "email_verification", reason: "this page wants a verification code sent to your email" };
     // "We emailed you a code" interstitial with nothing to fill in yet.
     if (!els.length && VERIFY_RE.test(heads)) return { kind: "email_verification", reason: "this page is waiting on an email verification step" };

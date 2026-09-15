@@ -41,22 +41,19 @@ test("navigation and account buttons are allowed", () => {
 const page = (o = {}) => ({ headings: [], step: "", buttons: [], text: "", elements: [], ...o });
 const el = (kind, label, extra = {}) => ({ kind, label, question: "", ...extra });
 
-test("password fields always stop the agent", () => {
-  // Workday's "Create Account" modal: password + verify password.
+// Sign-up and sign-in are the agent's job, not gates. Pinned here so that stays deliberate:
+// Workday's "Verify New Password" must not read as a verification code.
+test("account pages are not gates", () => {
   assert.equal(G.detectGate(page({
     headings: ["Create Account"],
     elements: [el("email", "Email Address"), el("password", "Password"), el("password", "Verify New Password")],
-  })).kind, "account_creation");
+  })), null);
 
-  // One password box and signup wording.
-  assert.equal(G.detectGate(page({ headings: ["Sign up"], elements: [el("password", "Password")] })).kind, "account_creation");
-  assert.equal(G.detectGate(page({ headings: ["Choose a password"], elements: [el("password", "Password")] })).kind, "account_creation");
-
-  // One password box and sign-in wording. Still a password, still not ours to type.
-  assert.equal(G.detectGate(page({ headings: ["Sign In"], elements: [el("email", "Email"), el("password", "Password")] })).kind, "sign_in");
-
-  // Unlabelled password box on an otherwise blank page.
-  assert.ok(G.detectGate(page({ elements: [el("password", "")] })));
+  assert.equal(G.detectGate(page({ headings: ["Sign up"], elements: [el("password", "Password")] })), null);
+  assert.equal(G.detectGate(page({
+    headings: ["Sign In"],
+    elements: [el("email", "Email"), el("password", "Password")],
+  })), null);
 });
 
 test("emailed verification codes stop the agent", () => {
