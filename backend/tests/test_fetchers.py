@@ -191,10 +191,16 @@ def test_jobvite():
 
 
 def test_icims():
-    def card(jid, title, loc):
+    def card(jid, title, loc, header_layout=False):
+        # two real layouts: "Job Locations" in a plain span, and "Location" inside the header-field
+        # block with the value past a </dt><dd> boundary
+        where = (f"""<dl class="iCIMS_JobHeaderGroup"><div class="iCIMS_JobHeaderTag">
+        <dt class="iCIMS_JobHeaderField"><span class="glyphicons" aria-hidden="true"></span>
+        <span class="sr-only field-label">Location</span> </dt>
+        <dd class="iCIMS_JobHeaderData"><span > {loc}</span> </dd></div></dl>""" if header_layout else
+        f"""<span class="sr-only field-label">Job Locations</span><span > {loc}</span>""")
         return f"""<li class="col-xs-12 iCIMS_JobCardItem"><div class="row">
-        <div class="col-xs-6 header left"><span class="sr-only field-label">Job Locations</span>
-        <span > {loc}</span></div>
+        <div class="col-xs-6 header left">{where}</div>
         <div class="col-xs-12 title">
         <a href="https://acme.icims.com/jobs/{jid}/slug/job?in_iframe=1" class="iCIMS_Anchor" title="{jid} - {title}">
         <h3 > {title}</h3></a></div>
@@ -203,14 +209,17 @@ def test_icims():
     page = (card(7600, "RN Internship", "US-TX-Midland")
             + card(7601, "Executive Chef", "US-TX-Midland")
             + card(7602, "Summer Intern", "CA-ON-Toronto")
-            + card(7603, "Dietetic Intern", "US-MA-Boston | US-Remote"))
+            + card(7603, "Dietetic Intern", "US-MA-Boston | US-Remote", header_layout=True))
     items = parse_icims(page, CO)
     # the chef is not an internship; Toronto is not US, so it drops with no US location left
     assert [i["title"] for i in items] == ["RN Internship", "Dietetic Intern"]
     assert items[0]["locations"] == ["Midland, TX"]
+    # the header-field layout resolves too, or a whole tenant silently yields nothing
     assert items[1]["locations"] == ["Boston, MA", "Remote - US"]
     # in_iframe is a fetch detail, not part of the link we hand a student
     assert items[0]["url"] == "https://acme.icims.com/jobs/7600/slug/job"
+    # "International" is not an internship, but iCIMS keyword search matches it on substring
+    assert parse_icims(card(7604, "International Scholar Advisor", "US-NY-New York"), CO) == []
 
 
 def test_usajobs():

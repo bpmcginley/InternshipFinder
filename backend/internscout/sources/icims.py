@@ -27,9 +27,17 @@ MAX_PAGES = 5
 CARD_RE = re.compile(r'<li[^>]*class="[^"]*iCIMS_JobCardItem[^"]*"[^>]*>(.*?)</li>', re.S | re.I)
 LINK_RE = re.compile(r'<a\s+href="([^"]+)"[^>]*class="[^"]*iCIMS_Anchor', re.S | re.I)
 TITLE_RE = re.compile(r"<h3[^>]*>(.*?)</h3>", re.S | re.I)
-LOC_RE = re.compile(r"Job Locations</span>\s*<span[^>]*>(.*?)</span>", re.S | re.I)
+# Tenants label this either "Job Locations" in a plain span (Midland) or "Location" inside the
+# header-field block (NYU), where the value sits past a </dt><dd> boundary. Both put it in the
+# next span. Bounded to 200 chars so a tenant we have not seen cannot swallow half the card.
+LOC_RE = re.compile(r'field-label">\s*(?:Job\s+)?Locations?\s*</span>.{0,200}?<span[^>]*>(.*?)</span>', re.S | re.I)
 DESC_RE = re.compile(r'class="[^"]*description[^"]*"[^>]*>(.*?)</div>', re.S | re.I)
 ID_RE = re.compile(r"/jobs/(\d+)/")
+# A tenant that has left iCIMS still answers 200, with a body that is nothing but a JS hop to the
+# new board (Yale New Haven now does this). That parses to zero items and looks exactly like an
+# employer with no internships, so we raise instead: scan_boards then records the board as failed
+# and the stale token shows up in the run summary rather than hiding as a quiet zero.
+MOVED_RE = re.compile(r"window\.top\.location\.href\s*=\s*'([^']+)'", re.I)
 # The card's additionalFields block is NOT a job type: which field a tenant puts there varies
 # (Midland shows Requisition ID), and feeding a req number to stage_of() is worse than sending
 # nothing. The title alone decides the stage here.
@@ -76,6 +84,9 @@ def fetch_icims_board(c, co: dict) -> list[dict]:
             r = c.get(SEARCH_URL.format(token=token),
                       params={"ss": 1, "searchKeyword": kw, "pr": page, "in_iframe": 1})
             r.raise_for_status()
+            moved = MOVED_RE.search(r.text) if len(r.text) < 2000 else None
+            if moved:
+                raise ValueError(f"icims tenant {token!r} has moved to {moved.group(1).replace(chr(92), '')}")
             found = parse_icims(r.text, co)
             if not found:
                 break
