@@ -37,6 +37,25 @@ test("navigation and account buttons are allowed", () => {
   assert.equal(G.allowClick(btn("Next", { automationId: "bottom-navigation-next-button", type: "submit" }), filled).allowed, true);
 });
 
+test("final buttons that never say submit are refused", () => {
+  for (const t of ["Confirm and send", "Confirm & Send", "I agree and apply", "Agree & Submit",
+    "Confirm Application", "Confirm my application"]) {
+    assert.equal(G.allowClick(btn(t), empty).allowed, false, t);
+    assert.equal(G.allowClick(btn(t), filled).allowed, false, t);
+  }
+});
+
+test("a submit-id'd button is rescued only when its label starts with a navigation word", () => {
+  // A safe word somewhere in the label is not enough: this is the final button on its page.
+  for (const t of ["Agree & Continue", "I have reviewed my answers, continue", "Review and continue"]) {
+    assert.equal(G.allowClick(btn(t, { automationId: "submitApplication", type: "submit" }), filled).allowed, false, t);
+  }
+  // Real navigation and account buttons that happen to carry a submit id still work.
+  for (const t of ["Create Account", "Sign In", "Next: Work Experience", "Save and Continue", "Save & Continue Later", "Continue Application"]) {
+    assert.equal(G.allowClick(btn(t, { automationId: "submitButton", type: "submit" }), filled).allowed, true, t);
+  }
+});
+
 // ---- gates the human clears themselves ----
 const page = (o = {}) => ({ headings: [], step: "", buttons: [], text: "", elements: [], ...o });
 const el = (kind, label, extra = {}) => ({ kind, label, question: "", ...extra });

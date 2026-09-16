@@ -4,11 +4,18 @@
 (function (root) {
   if (root.ISGuard) return;
 
-  const FINAL_RE = /\b(submit|send\s+(my\s+|your\s+|the\s+)?application|finish\s+(my\s+|your\s+|the\s+)?application|complete\s+(my\s+|your\s+|the\s+)?application|confirm\s+(and|&)\s+(submit|apply))\b/i;
+  // "Confirm and send" / "I agree and apply" are the same button as "Confirm and submit"; without them
+  // the label has no word FINAL_RE knows and it falls through to AMBIGUOUS_RE, which is anchored and so
+  // only matches a bare "Confirm".
+  const FINAL_RE = /\b(submit|send\s+(my\s+|your\s+|the\s+)?application|finish\s+(my\s+|your\s+|the\s+)?application|complete\s+(my\s+|your\s+|the\s+)?application|confirm\s+(my\s+|your\s+|the\s+)?application|(confirm|agree)\s+(and|&)\s+(submit|apply|send))\b/i;
   // Buttons that are final on some sites and harmless on others ("Apply" on a job page opens
   // the form; "Apply" under a filled form sends it). Refused once the page has filled fields.
   const AMBIGUOUS_RE = /^\s*(apply|apply\s+now|apply\s+for\s+this\s+(job|position|role|opportunity)|apply\s+to\s+this\s+(job|position|role)|send|send\s+now|finish|done|complete|confirm|i'?m\s+done|i\s+am\s+done)\s*[.!]?\s*$/i;
-  const SAFE_RE = /\b(save\s+(and|&)\s+continue|next|continue|back|previous|add(\s+another)?|upload|sign\s*(in|up)|create\s+(an\s+)?account|log\s*in|register|verify|search|autofill|apply\s+manually|use\s+my\s+last\s+application)\b/i;
+  // Only rescues a button whose id says "submit" (line in classify). Anchored at the start of the label:
+  // unanchored, any label merely *containing* a safe word -- "Agree & Continue" on the last page of a
+  // Workday flow whose button id is submitApplication -- was rescued to "ok" and clickable. A label that
+  // starts with the safe word ("Next: Work experience", "Create Account") is still a navigation button.
+  const SAFE_RE = /^\s*(save\s+(and|&)\s+continue|next|continue|back|previous|add(\s+another)?|upload|sign\s*(in|up)|create\s+(an\s+)?account|log\s*in|register|verify|search|autofill|apply\s+manually|use\s+my\s+last\s+application)\b/i;
 
   function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
 
