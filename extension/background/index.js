@@ -2,7 +2,7 @@
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs } from "./queue.js";
 import { runJob, resumeJob, isRunning, checkSubmitted } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
-import { getToken, authStatus, signIn, signOut } from "../lib/auth.js";
+import { getToken, authStatus, signIn, signOut, ensureToken, getMe } from "../lib/auth.js";
 import { spend } from "../lib/usage.js";
 
 const ONBOARDING = "onboarding/onboarding.html";
@@ -206,6 +206,11 @@ async function handle(m, sender, fromPage) {
       return { ok: true };
     case "auth:status":
       return authStatus();
+    case "auth:me": {
+      // Sign-in status plus this month's allowance. An expired token is refreshed silently, never with a window.
+      const token = await ensureToken();
+      return { ...(await authStatus()), me: token ? await getMe(token) : null };
+    }
     case "control": {
       // Content scripts on job sites may only control the job running in their own tab.
       if (!fromPage && sender.tab && !String(sender.url || "").startsWith(chrome.runtime.getURL(""))) {

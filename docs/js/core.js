@@ -380,6 +380,26 @@
     return false;
   }
 
+  // GET /me: this month's allowance ({tier, paused, allowance:{task:{used,limit}}}), or null.
+  async function fetchMe(token) {
+    if (!workerOn() || !token) return null;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/me", { headers: { Authorization: "Bearer " + token } });
+      if (r.status === 401) { signOut(); return null; }
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  }
+  const ALLOWANCE_LABELS = { autofill: "Auto-Apply runs", resume_tailor: "Tailored resumes", deep_dive: "Deep Dives" };
+  const leftOf = (me, task) => { const a = me && me.allowance && me.allowance[task]; return a ? Math.max(0, (a.limit || 0) - (a.used || 0)) : null; };
+  // "Auto-Apply runs: 15 of 15 left" lines plus the tier, for a tooltip.
+  function allowanceText(me) {
+    if (!me || !me.allowance) return "";
+    const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
+    lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
+    if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");
+    return lines.join("\n");
+  }
+
   // "Delete my data": server rows (if signed in), then everything this page keeps in the browser.
   async function deleteMyData(token) {
     let server = null;
@@ -410,6 +430,7 @@
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData,
+    fetchMe, leftOf, allowanceText,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

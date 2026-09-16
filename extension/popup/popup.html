@@ -14,6 +14,12 @@ body{width:300px}
 .note{padding:14px 16px 0;color:var(--ink2);font-size:12.5px}
 .actions{padding:14px 16px 16px;display:grid;gap:8px}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acct{padding:14px 16px 0;display:grid;gap:8px;font-size:12.5px}
+.who{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--ink2)}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link{background:none;border:0;padding:0;color:var(--accent);font:inherit;cursor:pointer}
+.allow{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-variant-numeric:tabular-nums}
+.muted{color:var(--ink3)} .err{color:var(--red)}
 </style></head><body>
 <div class="head"><span class="mark">InternScout</span><span class="ver" id="ver"></span></div>
 <div class="figs" id="figs" hidden>
@@ -23,6 +29,15 @@ body{width:300px}
 </div>
 <div class="note" id="spend" hidden></div>
 <div class="note" id="note" hidden></div>
+<div class="acct" id="acct" hidden>
+  <div id="acct-out" hidden>
+    <div style="margin-bottom:8px;color:var(--ink2)">Sign in to use the free AI features. Any Google account or personal Microsoft account works.</div>
+    <div class="pair"><button class="btn" data-signin="google">Google</button><button class="btn" data-signin="microsoft">Microsoft</button></div>
+  </div>
+  <div class="who" id="acct-in" hidden><span id="acct-email"></span><button class="link" id="signout">Sign out</button></div>
+  <ul class="allow" id="allow" hidden></ul>
+  <div class="muted" id="tier" hidden></div>
+</div>
 <div class="actions">
   <button class="btn primary" id="queue">Open queue</button>
   <div class="pair"><button class="btn" id="dash">Dashboard</button><button class="btn" id="dive">Deep Dive</button></div>

@@ -152,3 +152,16 @@ export function allowanceLines(me, tasks) {
     .filter(([k]) => !tasks || tasks.includes(k))
     .map(([k, v]) => `${TASK_LABELS[k] || k}: ${Math.max(0, (v.limit || 0) - (v.used || 0))} of ${v.limit || 0} left`);
 }
+
+// The allowances a student acts on; field matches and short answers happen inside those runs.
+export const MAIN_TASKS = ["autofill", "resume_tailor", "deep_dive"];
+
+// One line under the allowance: which tier, or why the allowance couldn't be read.
+export function tierNote(me) {
+  if (!me) return "Couldn't reach InternScout to check your allowance.";
+  if (me.error) return me.message || `Couldn't check your allowance (${me.error}).`;
+  const paused = me.paused ? " AI is paused for everyone until next month; search still works." : "";
+  return (me.tier === "edu"
+    ? "School (.edu) allowance: twice the standard. Resets on the 1st."
+    : "Standard allowance. A Google account with a .edu email gets twice as much. Resets on the 1st.") + paused;
+}

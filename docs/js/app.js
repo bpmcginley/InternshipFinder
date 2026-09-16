@@ -405,6 +405,11 @@
     }, [info.installed]);
     useEffect(() => { if (auth.token && p) IS.postDemand(auth.token, p); }, [auth.token, p]);
     const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
+    const [me, setMe] = useState(null);
+    useEffect(() => {
+      setMe(null);
+      if (auth.token) IS.fetchMe(auth.token).then(setMe);
+    }, [auth.token]);
 
     // profile sync with the extension
     const synced = useRef("");
@@ -604,6 +609,8 @@
           signInBtn,
           auth.token && h("span", { className: "signed", title: who && who.email ? `Signed in as ${who.email}` : "Signed in" }, "Signed in",
             auth.source === "page" && h("button", { type: "button", className: "btn quiet", onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); } }, "Sign out")),
+          auth.token && me && me.allowance && h("span", { className: "busy", title: IS.allowanceText(me) },
+            me.paused ? "AI paused this month" : `${IS.leftOf(me, "autofill")} Auto-Apply · ${IS.leftOf(me, "resume_tailor")} resumes left${me.tier === "edu" ? " (.edu)" : ""}`),
           info.installed && h("button", { type: "button", className: "btn quiet", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
           info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_panel" }) }, "Queue",
             jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,

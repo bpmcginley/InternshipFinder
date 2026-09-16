@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
-import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines } from "../lib/auth.js";
+import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -157,6 +157,15 @@ test("sign-in URL and redirect parsing check the nonce", () => {
 test("allowance lines from GET /me", () => {
   const lines = allowanceLines({ allowance: { resume_tailor: { used: 1, limit: 8 }, autofill: { used: 16, limit: 15 } } });
   assert.deepEqual(lines, ["Tailored resumes: 7 of 8 left", "Auto-Apply runs: 0 of 15 left"]);
+});
+
+test("account panel: main tasks only, and a tier note", () => {
+  const me = { tier: "edu", paused: false, allowance: { field_match: { used: 0, limit: 200 }, deep_dive: { used: 0, limit: 2 } } };
+  assert.deepEqual(allowanceLines(me, MAIN_TASKS), ["Deep Dives: 2 of 2 left"]);
+  assert.match(tierNote(me), /School \(\.edu\)/);
+  assert.match(tierNote({ ...me, tier: "general", paused: true }), /Standard.*paused/);
+  assert.match(tierNote(null), /Couldn't reach/);
+  assert.match(tierNote({ error: "auth" }), /auth/);
 });
 
 test("new installs default to InternScout", () => {

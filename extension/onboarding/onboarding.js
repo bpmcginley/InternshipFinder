@@ -1,5 +1,6 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
-import { loadStore, updateStore, hasKey, isGemini, modelFor, modeOf, PRESETS } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS } from "../lib/store.js";
+import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/auth.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
 
@@ -91,16 +92,21 @@ function render() {
 function setup() {
   main.innerHTML = `
     ${rerun ? `<div class="banner">You've done the Deep Dive before. Everything you entered is kept, so just update what changed.</div>` : ""}
-    <h2>Setup</h2><p class="lead">Auto-Apply uses your own AI API key. The key and your passwords stay in this browser.</p>
+    <h2>Setup</h2><p class="lead">${isWorker(S.ai)
+      ? "Auto-Apply uses InternScout's free AI: sign in with Google or Microsoft and there's nothing else to set up. Your passwords stay in this browser."
+      : "Auto-Apply uses your own AI API key. The key and your passwords stay in this browser."}</p>
     <div class="card"><h3>AI provider</h3>
       <label class="f"><span>Provider</span><select id="provider">
-        <option value="anthropic">Anthropic (Claude)</option>
-        <option value="gemini">Google (Gemini)</option></select></label>
-      ${isGemini(S.ai)
+        <option value="internscout">InternScout (free, sign in with Google or Microsoft)</option>
+        <option value="anthropic">Your own Anthropic (Claude) key</option>
+        <option value="gemini">Your own Google (Gemini) key</option></select></label>
+      ${isWorker(S.ai)
+        ? `<div id="acct"><span class="small muted"><span class="spin"></span>Checking sign-in…</span></div>`
+        : isGemini(S.ai)
         ? `<label class="f"><span>Gemini key (from aistudio.google.com → Get API key)</span><input type="password" id="key" value="${esc(S.ai.geminiKey)}" placeholder="AIza…"></label>`
         : `<label class="f"><span>Anthropic key (from console.anthropic.com → API keys)</span><input type="password" id="key" value="${esc(S.ai.apiKey)}" placeholder="sk-ant-…"></label>`}
-      <div class="row"><button class="btn small" id="test">Test key</button><span id="testout" class="small"></span></div>
-      ${isGemini(S.ai)
+      ${isWorker(S.ai) ? "" : `<div class="row"><button class="btn small" id="test">Test key</button><span id="testout" class="small"></span></div>`}
+      ${isWorker(S.ai) ? "" : isGemini(S.ai)
         ? `<p class="small muted" style="margin:12px 0 0">Gemini 3.8 Flash is used for everything. Google's free tier covers light use. Your resume, files and interview go to Google when Gemini is used.</p>`
         : `<label class="f" style="margin-top:12px"><span>Quality vs. cost</span><select id="mode">${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join("")}</select></label>
       <p class="small muted" id="modeblurb" style="margin:0"></p>`}
@@ -112,12 +118,12 @@ function setup() {
         <option value="auto">Tailor it and use it automatically</option>
         <option value="off">Always upload my original resume</option></select></label>
     </div>
-    <div class="card"><h3>AI spending</h3>
+    ${isWorker(S.ai) ? "" : `<div class="card"><h3>AI spending</h3>
       <p class="small muted" style="margin-top:0">Every AI call is priced and added up. When the monthly budget is reached, applications pause until you raise it. Prices are estimates in USD per million tokens; correct them from your provider's pricing page if they differ.</p>
       <p class="small" id="spent" style="margin-top:0"></p>
       <label class="f"><span>Monthly budget in USD (0 = no limit)</span><input type="number" id="budget" min="0" step="1"></label>
       <div id="prices" class="grid"></div>
-    </div>
+    </div>`}
     <div class="card"><h3>Job-site accounts</h3>
       <p class="small muted" style="margin-top:0">Workday, iCIMS and similar sites need an account. The agent creates it for you with this email. Passwords are filled in by the extension itself and never shown to the AI.</p>
       <label class="f"><span>Email for applications and sign-ups</span><input type="email" id="email" value="${esc(S.settings.signup_email || S.profile.facts.email)}"></label>
@@ -129,7 +135,8 @@ function setup() {
     </div>
     <div id="need" class="small warn"></div>
     ${navButtons(null, "files")}`;
-  $("#provider").value = isGemini(S.ai) ? "gemini" : "anthropic";
+  $("#provider").value = isWorker(S.ai) ? "internscout" : isGemini(S.ai) ? "gemini" : "anthropic";
+  if (isWorker(S.ai)) fillAccount();
   const syncMode = () => { if ($("#mode")) { $("#mode").value = modeOf(S); $("#modeblurb").textContent = PRESETS[modeOf(S)].blurb; } };
   syncMode();
   $("#tailor").value = S.settings.tailor_resume || "review";
@@ -143,7 +150,7 @@ function setup() {
   const syncMaster = () => { $("#masterwrap").hidden = $("#pwmode").value !== "master"; };
   syncMaster();
   const bind = (id, fn) => $(id).addEventListener("input", (e) => { fn(e.target.value); save(); });
-  bind("#key", (v) => { if (isGemini(S.ai)) S.ai.geminiKey = v.trim(); else S.ai.apiKey = v.trim(); });
+  if ($("#key")) bind("#key", (v) => { if (isGemini(S.ai)) S.ai.geminiKey = v.trim(); else S.ai.apiKey = v.trim(); });
   if ($("#mode")) bind("#mode", (v) => { S.settings.ai_mode = v; S.ai.model = modelFor(S, "agent"); syncMode(); });
   bind("#tailor", (v) => { S.settings.tailor_resume = v; });
   bind("#email", (v) => { S.settings.signup_email = v.trim(); if (!S.profile.facts.email) S.profile.facts.email = v.trim(); });
@@ -151,13 +158,45 @@ function setup() {
   bind("#master", (v) => { S.settings.master_password = v; });
   bind("#tabs", (v) => { S.settings.max_tabs = +v; });
   fillSpending();
-  $("#test").addEventListener("click", async () => {
+  if ($("#test")) $("#test").addEventListener("click", async () => {
     const out = $("#testout");
     busy(out, "Checking…");
     try {
       await ai({ model: M().fast, max_tokens: 5, messages: [{ role: "user", content: "Reply OK" }] });
       out.innerHTML = `<span class="ok">Key works.</span>`;
     } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  });
+}
+
+// InternScout AI: sign-in state and this month's allowance, from the background (auth:me).
+async function fillAccount(msg) {
+  const box = $("#acct");
+  if (!box) return;
+  const a = await chrome.runtime.sendMessage({ type: "auth:me" }).catch((e) => ({ error: e.message }));
+  if (!$("#acct")) return; // moved to another step meanwhile
+  const note = msg ? `<p class="small err" style="margin:8px 0 0">${esc(msg)}</p>` : "";
+  if (!a || a.error || !a.signedIn) {
+    box.innerHTML = `
+      <p class="small" style="margin:0 0 10px">Sign in to use the AI. Any Google account or personal Microsoft account works. School Microsoft accounts (like @umass.edu Outlook) need IT approval, so use Google with your school email for the larger .edu allowance.</p>
+      <div class="row"><button class="btn blue" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
+      ${note || (a && a.error ? `<p class="small err" style="margin:8px 0 0">${esc(a.error)}</p>` : "")}`;
+    box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
+      box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
+      busy($("#signin-msg"), "Waiting for the sign-in window…");
+      const r = await chrome.runtime.sendMessage({ type: "auth:signin", provider: b.dataset.signin }).catch((e) => ({ error: e.message }));
+      fillAccount(r && r.error ? r.error : "");
+    }));
+    return;
+  }
+  const lines = allowanceLines(a.me, MAIN_TASKS);
+  box.innerHTML = `
+    <p class="small" style="margin:0 0 8px">Signed in${a.provider ? ` with ${esc(PROVIDER_LABELS[a.provider] || a.provider)}` : ""}${a.email ? ` as <b>${esc(a.email)}</b>` : ""}. <a href="#" id="signout">Sign out</a></p>
+    ${lines.length ? `<ul class="small" style="margin:0 0 6px;padding-left:18px">${lines.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+    <p class="small ${!a.me || a.me.error ? "err" : "muted"}" style="margin:0">${esc(tierNote(a.me))}</p>${note}`;
+  $("#signout").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await chrome.runtime.sendMessage({ type: "auth:signout" });
+    fillAccount();
   });
 }
 
