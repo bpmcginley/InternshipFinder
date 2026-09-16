@@ -13,6 +13,8 @@ dashboard (`docs/index.html`). Change it here first, then in all three.
 
 ## Sign-in
 - Anyone with a Google or Microsoft account can sign in (personal, school or work). Search never needs sign-in.
+  Until the Entra app has publisher verification, most school/work Microsoft tenants (UMass included) ask
+  for admin approval, so in practice Microsoft sign-in is for personal accounts.
 - Request header: `Authorization: Bearer <OIDC ID token>`. The Worker picks the provider from the token's `iss`:
   - **Google:** `iss` is `https://accounts.google.com` (or `accounts.google.com`), `aud == GOOGLE_CLIENT_ID`.
   - **Microsoft:** the app is multi-tenant (`common` authority). `iss` must equal
