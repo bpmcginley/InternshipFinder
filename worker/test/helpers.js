@@ -95,7 +95,7 @@ export function makeEnv(extra = {}) {
   return {
     DB: fakeD1(),
     GOOGLE_CLIENT_ID: CLIENT, MS_CLIENT_ID: MS_CLIENT, EDU_EXTRA_DOMAINS: "", GENERAL_ALLOWANCE_PCT: "50",
-    ALLOWED_ORIGINS: "https://bpmcginley.github.io,http://localhost:8000",
+    ALLOWED_ORIGINS: "https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag",
     MONTHLY_BUDGET_CENTS: "2500",
     GEMINI_API_KEY: "dummy-test-key", HASH_SALT: "test-salt", DEMAND_TOKEN: "ci-test-token",
     ...extra,

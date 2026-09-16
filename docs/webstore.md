@@ -111,6 +111,8 @@ Chrome counts data as "collected" when it leaves the device. Profile data stays 
 
 ## Before submitting
 - `identity` must be in `manifest.json` `permissions` (the sign-in build adds it). Remove its row above if it isn't.
-- Build the zip with `python scripts/package_extension.py` and upload `dist/internscout-extension-<version>.zip`.
-- After the first upload, register `https://<store-extension-id>.chromiumapp.org/` as a redirect URI with the sign-in provider.
+- Build the zips with `python scripts/package_extension.py` and upload `dist/internscout-extension-<version>-webstore.zip`
+  (the same build without manifest `"key"`; the plain zip keeps it for GitHub Releases).
+- Store ID: `jmjjgnckddhjbohfpbekodkpbpbmfjag`. `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/` must be a
+  redirect URI with both sign-in providers.
 - Test account for reviewers: none needed. Reviewers can sign in with any Google or Microsoft account (they get the smaller general allowance). Note in the reviewer notes that search and the Deep Dive also work without sign-in.

@@ -7,13 +7,16 @@ import { addSpend, admit, allowanceFor, cleanup, commitRun, deleteUser, isPaused
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
-const DEFAULT_ORIGINS = "https://bpmcginley.github.io,http://localhost:8000";
+// The extension's ID is fixed by the "key" in its manifest (same ID from the store and from Load unpacked),
+// so it is named here instead of trusting every chrome-extension:// origin.
+const EXTENSION_ORIGIN = "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag";
+const DEFAULT_ORIGINS = `https://bpmcginley.github.io,http://localhost:8000,${EXTENSION_ORIGIN}`;
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");
   if (!origin) return {};
   const allowed = (env.ALLOWED_ORIGINS || DEFAULT_ORIGINS).split(",").map((s) => s.trim());
-  if (!allowed.includes(origin) && !origin.startsWith("chrome-extension://")) return {};
+  if (!allowed.includes(origin)) return {};
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",

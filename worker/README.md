@@ -66,8 +66,8 @@ Both client IDs are public and live in `wrangler.toml`. A provider is hidden whi
 
 Both need these redirect URIs:
 - `https://bpmcginley.github.io/InternshipFinder/`
-- `https://<extension-id>.chromiumapp.org/`, for each extension ID in use. The unpacked ID depends on
-  the load folder, and the Chrome Web Store ID is different, so add that one after the first upload.
+- `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`. The `"key"` in `extension/manifest.json`
+  gives the store install and every Load unpacked copy this same ID, so one redirect covers both.
 
 ## Changing limits
 

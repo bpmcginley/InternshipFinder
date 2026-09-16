@@ -152,7 +152,9 @@ test("CORS: allowed origins and extensions only", async () => {
   const origin = (o) => w.api("GET", "/config", { headers: { Origin: o } })
     .then((r) => r.headers.get("Access-Control-Allow-Origin"));
   assert.equal(await origin("https://bpmcginley.github.io"), "https://bpmcginley.github.io");
-  assert.equal(await origin("chrome-extension://abcdefg"), "chrome-extension://abcdefg");
+  assert.equal(await origin("chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag"), "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag");
+  // Only InternScout's own ID: any other extension could otherwise call the API from a student's browser
+  assert.equal(await origin("chrome-extension://abcdefg"), null);
   assert.equal(await origin("https://evil.example"), null);
   const pre = await w.api("OPTIONS", "/ai", { headers: { Origin: "http://localhost:8000" } });
   assert.equal(pre.status, 204);
