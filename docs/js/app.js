@@ -593,7 +593,7 @@
     const feedbackUrl = C.formUrl ? C.formUrl.split("{id}").join("") : C.issuesUrl;
     const signInTitle = "Optional. Search works without it. Any Google or Microsoft account works; a school .edu email gets more AI use. Signing in also lets your chosen states count toward where we scan in more detail.";
     const signInBtn = auth.cfg && !auth.token && auth.cfg.providers.map(pr =>
-      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
+      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
 
     return h("div", { className: "wrap" },
       h("header", { className: "top" },

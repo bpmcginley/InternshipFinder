@@ -178,7 +178,7 @@ async function fillAccount(msg) {
   if (!a || a.error || !a.signedIn) {
     box.innerHTML = `
       <p class="small" style="margin:0 0 10px">Sign in to use the AI. Any Google account or personal Microsoft account works. School Microsoft accounts (like @umass.edu Outlook) need IT approval, so use Google with your school email for the larger .edu allowance.</p>
-      <div class="row"><button class="btn blue" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
+      <div class="row"><button class="btn blue" data-signin="google">Sign in with Google (UMass email)</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
       ${note || (a && a.error ? `<p class="small err" style="margin:8px 0 0">${esc(a.error)}</p>` : "")}`;
     box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
       box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
