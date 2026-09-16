@@ -593,6 +593,7 @@
 -78.8661
 ],
 "ny - amherst|NY":null,
+"ny - buffalo|NY":null,
 "ny - delmar|NY":null,
 "ny - new york (10173|NY":null,
 "ny - new york|NY":[
@@ -851,6 +852,10 @@
 "united states - new york - new york city|NY":null,
 "united states - wayne|PA":null,
 "united states of america|NY":null,
+"united states|PA":[
+40.0775,
+-75.1866
+],
 "university park|PA":[
 34.7406,
 -86.623
