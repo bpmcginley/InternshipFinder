@@ -2,6 +2,7 @@
 // verify-after-set → repeat, across page navigations, until ready_to_submit / needs_you.
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
+import { hasHostAccess, hostOf } from "../lib/hosts.js";
 import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
@@ -276,6 +277,15 @@ async function loop(id) {
     await updateJob(id, { status: "needs_you", reason: "Sign in with Google or Microsoft (InternScout popup or Deep Dive → Setup), then Resume.", activity: "" });
     return;
   }
+  // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
+  // site needs the student's say-so, and Chrome only grants that from a click on an extension page, so
+  // the side panel asks and this run waits. Checked before the tab opens: a tab we cannot script is
+  // just a confusing window.
+  if (!(await hasHostAccess(job.apply_url))) {
+    await updateJob(id, { status: "needs_you", needs_host: job.apply_url, activity: "",
+      reason: `InternScout needs your permission to work on ${hostOf(job.apply_url)}. Allow it below, then Resume.` });
+    return;
+  }
   // One Auto-Apply run = one allowance unit on the InternScout Worker; kept across Resume, reset by Retry.
   if (!job.run_id) job = await updateJob(id, { run_id: crypto.randomUUID() });
   if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
@@ -283,7 +293,7 @@ async function loop(id) {
     if (job.status !== "working") return; // waiting for the human to approve it
   }
   const tabId = await ensureTab(job);
-  job = await updateJob(id, { tabId, status: "working", reason: "", question: "" });
+  job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "" });
   const msgs = await loadMsgs(id);
   const fails = {};
   let pending = job.pending || null;

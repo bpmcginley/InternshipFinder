@@ -15,6 +15,26 @@
     "identity"
   ],
   "host_permissions": [
+    "https://*.myworkdayjobs.com/*",
+    "https://*.myworkdaysite.com/*",
+    "https://*.greenhouse.io/*",
+    "https://*.lever.co/*",
+    "https://*.ashbyhq.com/*",
+    "https://*.smartrecruiters.com/*",
+    "https://*.oraclecloud.com/*",
+    "https://*.icims.com/*",
+    "https://*.taleo.net/*",
+    "https://*.workable.com/*",
+    "https://*.rippling.com/*",
+    "https://*.bamboohr.com/*",
+    "https://*.jobvite.com/*",
+    "https://*.recruitee.com/*",
+    "https://*.adp.com/*",
+    "https://*.successfactors.com/*",
+    "https://*.paylocity.com/*",
+    "https://*.applytojob.com/*"
+  ],
+  "optional_host_permissions": [
     "<all_urls>"
   ],
   "background": {
