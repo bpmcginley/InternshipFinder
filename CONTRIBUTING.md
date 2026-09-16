@@ -56,6 +56,7 @@ In CI, this prints to the job summary.
 | Variable | Use |
 |---|---|
 | `SERPAPI_KEY`, `SERPAPI_MAX_SEARCHES` | Google Jobs layer (default cap 12 searches per run) |
+| `SERPAPI_EVERY_RUN`, `SERPAPI_MONTHLY_SEARCHES` | Google Jobs searches only on the first run after 00:00 UTC, spending the plan over 31 days. Set `SERPAPI_EVERY_RUN=1` to search on a local or manual run (it still spends from the same monthly plan). `SERPAPI_MONTHLY_SEARCHES` (default 100) is used only if SerpApi's Account API can't be reached. |
 | `USAJOBS_API_KEY`, `USAJOBS_EMAIL` | USAJOBS Students/Pathways feed (free key) |
 | `INTERNSCOUT_WANTED_STATES` | Extra states beyond the baseline that get detail calls and Google searches, e.g. `CA,TX` |
 | `INTERNSCOUT_GEOCODE=1`, `INTERNSCOUT_GEOCODE_MAX` | Look up unknown towns on OpenStreetMap (1 req/s, cached in `backend/data/geocache.json`) |

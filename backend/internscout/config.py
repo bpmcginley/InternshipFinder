@@ -150,6 +150,7 @@ def google_jobs_locations() -> list[str]:
     extra = sorted(s for s in wanted_states() - BASELINE_STATES if s in STATE_METROS)
     return GOOGLE_JOBS_LOCATIONS + [STATE_METROS[s] for s in extra]
 
-# SerpApi free tier = 100 searches/month. Each run uses at most this many searches;
-# queries rotate between runs (by day) so the whole list gets covered over time.
+# SerpApi free tier = 250 searches/month. Google Jobs runs once a day and spends the plan evenly
+# (searches_per_month / 31, read from SerpApi's free Account API), never more than this cap;
+# queries rotate between runs so the whole list gets covered over time.
 GOOGLE_JOBS_MAX_SEARCHES = int(os.environ.get("SERPAPI_MAX_SEARCHES", "12"))
