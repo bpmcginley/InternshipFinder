@@ -41,7 +41,13 @@ export const CONFIG = {
   PRICES,
   FALLBACK_PRICE,
   MAX_CALLS_PER_RUN: 60,
-  RATE: { perMinute: 10, perDay: 300 },
+  // perMinute/perDay are per student. globalPerMinute is the whole deployment: without it, a dozen
+  // students working at once can spend the account's entire Gemini RPM, and Google answers everyone
+  // with 429s instead of just turning the newest arrivals away. Google no longer publishes a fixed
+  // per-tier RPM -- it is account-specific and shown at aistudio.google.com/rate-limit -- so this
+  // default is deliberately well under any paid tier. Raise it via the GLOBAL_RPM var once you have
+  // read your own number, keeping some headroom.
+  RATE: { perMinute: 10, perDay: 300, globalPerMinute: 120 },
   MONTHLY_BUDGET_CENTS: 2500,   // default; the MONTHLY_BUDGET_CENTS var wins
   DEMAND_WINDOW_DAYS: 90,
   MAX_BODY_BYTES: 4_000_000,

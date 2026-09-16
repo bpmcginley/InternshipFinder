@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { aiBody, setup } from "./helpers.js";
 import { FLASH, FLASH_LITE } from "../src/config.js";
+import { GLOBAL_USER } from "../src/limits.js";
 
 const me = async (w, token) => (await w.api("GET", "/me", { token })).json();
 const geminiCalls = (w) => w.fetch.calls.filter((c) => c.url.includes("generativelanguage"));
@@ -78,6 +79,41 @@ test("rate limit: 10 per minute, then per day", async () => {
   res = await d.api("POST", "/ai", { token: t2, body: aiBody("field_match") });
   assert.equal(res.status, 429);
   assert.equal((await res.json()).retry_after, 13 * 3600 + 54 * 60 + 30);
+});
+
+test("a global stampede turns away a student who is inside their own limit", async () => {
+  const w = await setup({ config: { RATE: { perMinute: 100, perDay: 300, globalPerMinute: 3 } } });
+  const busy = await w.token({ sub: "busy-student" });
+  const other = await w.token({ sub: "other-student" });
+  for (let i = 0; i < 3; i++) {
+    assert.equal((await w.api("POST", "/ai", { token: busy, body: aiBody("field_match", "r" + i) })).status, 200);
+  }
+  // the second student has used none of their own 100/min, so this can only be the global ceiling
+  const res = await w.api("POST", "/ai", { token: other, body: aiBody("field_match", "r0") });
+  assert.equal(res.status, 503);
+  const err = await res.json();
+  assert.equal(err.error, "busy");          // not "rate": it is not this student's doing
+  assert.equal(err.retry_after, 30);
+  assert.equal(geminiCalls(w).length, 3);   // the refusal never reached Gemini
+
+  // being turned away must not have cost them any allowance
+  assert.equal((await me(w, other)).allowance.field_match.used, 0);
+  w.setNow(new Date("2026-09-14T10:06:01Z"));
+  assert.equal((await w.api("POST", "/ai", { token: other, body: aiBody("field_match", "r0") })).status, 200);
+});
+
+test("GLOBAL_RPM overrides config, and no configured ceiling means no global limit", async () => {
+  const w = await setup({ env: { GLOBAL_RPM: "1" }, config: { RATE: { perMinute: 100, perDay: 300, globalPerMinute: 500 } } });
+  const token = await w.token();
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("field_match", "a") })).status, 200);
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("field_match", "b") })).status, 503);
+
+  // RATE without globalPerMinute must not become a NaN compare that silently never fires
+  const n = await setup({ config: { RATE: { perMinute: 100, perDay: 300 } } });
+  const t2 = await n.token();
+  for (let i = 0; i < 5; i++) {
+    assert.equal((await n.api("POST", "/ai", { token: t2, body: aiBody("field_match", "r" + i) })).status, 200);
+  }
 });
 
 test("budget reached -> 503 paused, and Gemini is not called", async () => {
@@ -203,12 +239,18 @@ test("DELETE /me removes this user's rows only", async () => {
   const res = await w.api("DELETE", "/me", { token: a });
   assert.deepEqual(await res.json(), { ok: true });
   const after = w.db.dump();
+  // The deployment-wide rate counter is keyed "*" and holds a call count, not a person. Like budget
+  // it is nobody's personal data, so it is not a user's to delete -- exclude it before checking that
+  // every per-user row for the deleted student is gone.
+  const mine = (rows) => rows.filter((r) => r.user_hash !== GLOBAL_USER);
   for (const t of ["usage", "runs", "rate", "demand"]) {
-    const users = new Set(after[t].map((r) => r.user_hash));
+    const rows = mine(after[t]);
+    const users = new Set(rows.map((r) => r.user_hash));
     assert.equal(users.size, 1, t);
-    assert.equal(after[t].length, before[t].length / 2, t);
+    assert.equal(rows.length, mine(before[t]).length / 2, t);
   }
   assert.equal(after.budget.length, 1, "spend is not per-user and stays");
+  assert.ok(after.rate.some((r) => r.user_hash === GLOBAL_USER), "the global rate counter is not a user's to delete");
   assert.equal((await me(w, a)).allowance.autofill.used, 0);
   assert.equal((await me(w, b)).allowance.autofill.used, 1);
 });

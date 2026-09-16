@@ -29,6 +29,20 @@ export async function addSpend(db, month, cents) {
   ).bind(month, cents).run();
 }
 
+// The deployment-wide rate bucket shares the rate table under a sentinel that no real user_hash can
+// collide with (those are sha256 hex), so the existing bucket-prefix cleanup sweeps it for free.
+export const GLOBAL_USER = "*";
+
+// Whole-deployment ceiling per minute; the GLOBAL_RPM var wins over config. "0" turns AI off now.
+export function globalRpm(env, config) {
+  const v = env.GLOBAL_RPM;
+  if (v !== undefined && v !== "" && Number.isFinite(Number(v))) return Number(v);
+  // Absent from config means no deployment-wide ceiling. Stated as Infinity rather than left
+  // undefined so the comparison is a real one and not a NaN that silently never fires.
+  const c = config.RATE.globalPerMinute;
+  return Number.isFinite(c) ? c : Infinity;
+}
+
 export async function usageFor(db, user, month) {
   const { results } = await db.prepare("SELECT task, units FROM usage WHERE user_hash = ? AND month = ?")
     .bind(user, month).all();
@@ -55,11 +69,20 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   const iso = now.toISOString();
   const minute = "m:" + iso.slice(0, 16);
   const day = "d:" + iso.slice(0, 10);
-  const { results } = await db.prepare("SELECT bucket, calls FROM rate WHERE user_hash = ? AND bucket IN (?, ?)")
-    .bind(user, minute, day).all();
-  const calls = Object.fromEntries(results.map((r) => [r.bucket, r.calls]));
+  const { results } = await db.prepare(
+    "SELECT user_hash, bucket, calls FROM rate WHERE (user_hash = ? AND bucket IN (?, ?)) OR (user_hash = ? AND bucket = ?)")
+    .bind(user, minute, day, GLOBAL_USER, minute).all();
+  const calls = Object.fromEntries(results.filter((r) => r.user_hash === user).map((r) => [r.bucket, r.calls]));
+  const globalCalls = (results.find((r) => r.user_hash === GLOBAL_USER) || {}).calls || 0;
+  const untilNextMinute = 60 - now.getUTCSeconds();
   if ((calls[minute] || 0) >= config.RATE.perMinute) {
-    throw new HttpError(429, "rate", "Too many AI calls this minute", { retry_after: 60 - now.getUTCSeconds() });
+    throw new HttpError(429, "rate", "Too many AI calls this minute", { retry_after: untilNextMinute });
+  }
+  // Checked after the student's own limit so that someone who is genuinely over their own rate hears
+  // that, not a server-busy message. 503 not 429: this one is not their fault and is worth retrying.
+  if (globalCalls >= globalRpm(env, config)) {
+    throw new HttpError(503, "busy", "InternScout is handling a lot of AI requests right now. Try again in a minute.",
+                        { retry_after: untilNextMinute });
   }
   if ((calls[day] || 0) >= config.RATE.perDay) {
     const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
@@ -78,7 +101,8 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
 
   const bump = "INSERT INTO rate (user_hash, bucket, calls) VALUES (?, ?, 1) " +
     "ON CONFLICT(user_hash, bucket) DO UPDATE SET calls = calls + 1";
-  await db.batch([db.prepare(bump).bind(user, minute), db.prepare(bump).bind(user, day)]);
+  await db.batch([db.prepare(bump).bind(user, minute), db.prepare(bump).bind(user, day),
+                  db.prepare(bump).bind(GLOBAL_USER, minute)]);
   return { month, used, limit };
 }
 

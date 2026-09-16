@@ -28,3 +28,7 @@ EDU_EXTRA_DOMAINS = ""
 GENERAL_ALLOWANCE_PCT = "50"
 ALLOWED_ORIGINS = "https://bpmcginley.github.io,http://localhost:8000"
 MONTHLY_BUDGET_CENTS = "2500"
+# AI calls per minute across everyone, so a busy hour cannot spend the whole Gemini per-minute quota
+# and leave every student with upstream 429s. Your account's real number is at
+# aistudio.google.com/rate-limit -- set this under it, with headroom. "0" turns AI off immediately.
+GLOBAL_RPM = "120"

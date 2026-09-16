@@ -74,6 +74,10 @@ Both need these redirect URIs:
 - Allowances, models, prices and rate limits: `src/config.js`, then deploy.
 - Global monthly budget: `MONTHLY_BUDGET_CENTS` in `wrangler.toml`. Keep the Google Cloud budget
   alert ($25) in step with it.
+- AI calls per minute across everyone: `GLOBAL_RPM`. This is the guard against a busy hour spending
+  the whole Gemini per-minute quota, which would answer every student with upstream errors instead
+  of turning away only the newest arrivals. Read your account's real number at
+  aistudio.google.com/rate-limit and set this under it. `"0"` turns AI off at once.
 - Share of the allowance for non-.edu accounts: `GENERAL_ALLOWANCE_PCT`.
 - Extra school domains that don't end in `.edu`: `EDU_EXTRA_DOMAINS`.
 - New allowed site origin (for example a custom domain): add it to `ALLOWED_ORIGINS`, and to both

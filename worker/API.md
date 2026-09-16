@@ -45,7 +45,8 @@ Every error is JSON `{ "error": code, "message": text }`:
 | 400 | `bad_request` / `bad_task` | invalid body or unknown task |
 | 401 | `auth` | missing, expired or invalid token |
 | 429 | `cap` | monthly allowance for the task is used up; includes `task`, `resets` (ISO date) |
-| 429 | `rate` | per-minute or per-day call limit; includes `retry_after` (s) |
+| 429 | `rate` | this caller's per-minute or per-day call limit; includes `retry_after` (s) |
+| 503 | `busy` | everyone's calls together hit `GLOBAL_RPM` for this minute; nothing to do with this caller's own limits, so retry after `retry_after` (s) |
 | 503 | `paused` | global monthly budget reached; search still works |
 | 502 | `upstream` | Gemini failed |
 
@@ -92,7 +93,9 @@ Body:
   - A multi-call Auto-Apply or Deep Dive run costs 1 unit.
   - Each run is capped at `MAX_CALLS_PER_RUN` calls (config; default 60). Past that, the Worker returns `429 cap`.
   - A missing `run_id` means every call is its own run.
-- **Rate limits:** 10 calls/min and 300 calls/day per user, counted over all tasks.
+- **Rate limits:** 10 calls/min and 300 calls/day per user, counted over all tasks. On top of that,
+  `GLOBAL_RPM` calls/min across every user together; over that the Worker returns `503 busy` without
+  spending the caller's rate bucket or allowance.
 - **Response:** without `?stream=1`, the Worker returns the Gemini `generateContent` JSON response unchanged. With `?stream=1`, it passes through Gemini's `streamGenerateContent?alt=sse` as `text/event-stream`.
 - **Success headers:**
   - `X-InternScout-Model`
@@ -121,6 +124,7 @@ Only users active in the last 90 days count. The ingest workflow reads this with
   - `EDU_EXTRA_DOMAINS` (comma list of non-`.edu` school domains, default empty), `GENERAL_ALLOWANCE_PCT` (default 50)
   - `ALLOWED_ORIGINS`
   - `MONTHLY_BUDGET_CENTS` (default 2500)
+  - `GLOBAL_RPM` (AI calls per minute across everyone, default 120; `"0"` turns AI off)
 - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`. The schema is in `worker/schema.sql`.
 
 ## Dashboard ↔ extension bridge

@@ -76,6 +76,22 @@ test("rate limits wait retry_after and retry; caps and pauses do not retry", asy
   }
 });
 
+test("a busy server is waited out, and pauses the job only after every retry", async () => {
+  const slept = [];
+  let n = 0;
+  const busy = res(503, { error: "busy", retry_after: 45 });
+  // 45s is past the 30s the per-student "rate" code will wait, but the global bucket empties at the
+  // minute boundary regardless, so this one is still worth sitting out rather than failing.
+  const fetchImpl = async () => (n++ === 0 ? busy : res(200, reply("ok")));
+  await callWorker({ url: "u", token: "t", task: "autofill", fetchImpl, sleepImpl: async (ms) => slept.push(ms), ...opts });
+  assert.deepEqual(slept, [45000]);
+
+  let calls = 0;
+  await assert.rejects(callWorker({ url: "u", token: "t", task: "autofill", sleepImpl: async () => {},
+    fetchImpl: async () => { calls++; return busy; }, ...opts }), (e) => e.code === "busy");
+  assert.equal(calls, 4, "a surge that never clears is retried, not given up on at once");
+});
+
 test("error mapping gives clear student-facing messages", () => {
   const cap = workerError(429, { error: "cap", task: "resume_tailor", resets: "2026-10-01T00:00:00Z" });
   assert.equal(cap.code, "cap");
@@ -86,10 +102,15 @@ test("error mapping gives clear student-facing messages", () => {
   assert.match(workerError(429, { error: "rate", retry_after: 40 }).message, /40 seconds/);
   assert.match(cap.message, /\.edu email get twice/);
   assert.match(workerError(503, { error: "paused" }).message, /paused for everyone/);
+  // A busy server must not read as the student's own limit, and must not be mistaken for the budget pause
+  const b = workerError(503, { error: "busy", retry_after: 45 });
+  assert.equal(b.code, "busy");
+  assert.match(b.message, /too many students/);
+  assert.match(b.message, /45 seconds/);
   assert.equal(workerError(401, {}).code, "auth");
   assert.equal(workerError(502, {}).code, "upstream");
   assert.equal(workerError(400, { error: "bad_task", message: "nope" }).code, "bad_task");
-  for (const c of ["auth", "cap", "rate", "paused"]) assert.ok(NEEDS_YOU_CODES.has(c));
+  for (const c of ["auth", "cap", "rate", "paused", "busy"]) assert.ok(NEEDS_YOU_CODES.has(c));
   assert.ok(!NEEDS_YOU_CODES.has("not_campus"));
   assert.ok(!NEEDS_YOU_CODES.has("upstream"));
 });

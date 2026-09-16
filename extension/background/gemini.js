@@ -144,6 +144,9 @@ export function workerError(status, data = {}) {
       ? `You've used this month's free ${label} allowance.${resets} Accounts with a school .edu email get twice as much. To keep going now, ${OWN_KEY_HINT.replace(/^or /, "")}.`
       : `This run hit its AI call limit${data.message ? ` (${data.message})` : ""}. Finish it by hand, ${OWN_KEY_HINT}.`;
   } else if (code === "rate") msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
+  // Not this student's own limit: everyone's calls together hit the server's per-minute ceiling. Say so,
+  // or they read it as a punishment and cut back for no reason.
+  else if (code === "busy") msg = `InternScout is busy right now — too many students using AI this minute. It should clear in ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}.`;
   else if (code === "paused") msg = `InternScout AI is paused for everyone until the monthly budget resets. Search still works; to keep applying, ${OWN_KEY_HINT.replace(/^or /, "")}.`;
   else if (code === "upstream") msg = "The AI service had a problem. Try again shortly.";
   else msg = `InternScout rejected the request (${status}${data.message ? `: ${data.message}` : ""}).`;
@@ -155,7 +158,9 @@ export function workerError(status, data = {}) {
 }
 
 // Codes that should pause a job for the student rather than fail it.
-export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused"]);
+// "busy" is here as the backstop: callWorker already waits out a surge, so a job only gets this far
+// when the server stayed busy across every retry. Pausing keeps the run resumable; failing loses it.
+export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused", "busy"]);
 
 // Sends the same Gemini body to WORKER_URL/ai and parses the reply with the Gemini parser.
 // refreshToken(): called once after a 401; returns a new token or null.
@@ -188,7 +193,10 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
       attempt--;
       continue;
     }
-    if ((err.code === "rate" && (err.retry_after || 0) <= 30) || err.code === "upstream") {
+    // "busy" waits up to a full minute, unlike "rate": the global bucket always empties at the minute
+    // boundary, so the wait is bounded and the student did nothing wrong to have to sit out.
+    if ((err.code === "rate" && (err.retry_after || 0) <= 30) || (err.code === "busy" && (err.retry_after || 0) <= 60)
+        || err.code === "upstream") {
       lastErr = err;
       await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt);
       continue;
