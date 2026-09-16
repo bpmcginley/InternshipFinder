@@ -7,13 +7,22 @@ Keep this file in step with `extension/manifest.json` and `docs/privacy.html`.
 
 **Name:** InternScout Auto-Apply
 
+"Auto-Apply" is the one phrase in this listing that could be read as "it applies for me". Every other
+surface has to contradict that immediately, which is why the short description, the first line of the
+long description and the manifest description all say it outright. Keep them saying it.
+
+No other company's name goes in the item name, the icon or the promotional images — not Workday, not
+Greenhouse, not LinkedIn, not a university. Using someone's trademark in the title or artwork implies
+an affiliation InternScout does not have, and it is a common rejection reason. Naming those systems
+inside the description as sites the extension works on is fine, with the non-affiliation line below.
+
 **Short description** (max 132 characters):
-> Fills out internship applications from your saved profile, then stops at the submit button so you review and submit yourself.
+> Fills internship applications from your saved profile and stops at the submit button. It never submits an application for you.
 
 **Category:** Tools (alternative: Productivity)
 
 **Long description:**
-> InternScout helps college students apply to internships, co-ops, research programs and fellowships faster, without letting a bot apply for them.
+> InternScout helps college students apply to internships, co-ops, research programs and fellowships faster. It never submits an application for you: it fills the form and stops at the submit button, and you decide whether to send it.
 >
 > HOW IT WORKS
 > • Do the Deep Dive once: add your resume and other files, basic facts, and a few short answers about your projects and goals.
@@ -22,8 +31,13 @@ Keep this file in step with `extension/manifest.json` and `docs/privacy.html`.
 > • It fills everything from your profile and stops at the submit button.
 > • You review every answer and press Submit yourself.
 >
+> WHAT IT DOES NOT DO
+> • It does not submit applications. You press Submit yourself, every time.
+> • It does not apply on your behalf while you're away, and it does not mass-apply.
+> • It does not write anything you haven't seen. Every answer is on screen before you send it.
+>
 > SAFE BY DESIGN
-> • It never submits for you. The submit guard is code, not an AI instruction.
+> • The submit guard is code, not an AI instruction: submit buttons are blocked, not merely discouraged.
 > • Your profile and files stay in Chrome on your device.
 > • Passwords for application sites are filled by the extension and never sent to the AI.
 > • CAPTCHAs, email codes and two-step sign-in always go to you.
@@ -33,12 +47,18 @@ Keep this file in step with `extension/manifest.json` and `docs/privacy.html`.
 > • Each student gets a free monthly allowance. The extension shows what's left.
 > • We don't store your resume, prompts or AI replies.
 >
-> Works best on Workday, Greenhouse, Lever and Ashby. Other sites may need more help from you.
+> Works best on the big application systems — Workday, Greenhouse, Lever, Ashby, SmartRecruiters, iCIMS and similar. Employer-run career sites may need more help from you.
 >
-> Made by a UMass Amherst student. Not affiliated with UMass Amherst.
+> Made by a UMass Amherst student. Not affiliated with UMass Amherst, or with any of the application systems or employers named above; those names are used only to say where the extension works.
 > Privacy: https://bpmcginley.github.io/InternshipFinder/privacy.html
 
-**Screenshots to take (1280×800):** dashboard with listings ticked; Deep Dive files step; side panel queue with "Ready to submit"; a filled form paused at Submit with the overlay.
+**Screenshots to take (1280×800):** dashboard with listings ticked; Deep Dive files step; side panel
+queue with "Ready to submit"; a filled form paused at Submit with the overlay.
+
+Blur or crop the employer's logo and product chrome in the form screenshot, and don't caption a shot
+with a system's name. The screenshot that carries the whole message is the one paused at Submit — caption
+it "InternScout stops here. You press Submit." Keep the item icon and any promo tile to the InternScout
+mark and plain text.
 
 ## Single purpose
 

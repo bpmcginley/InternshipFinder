@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "InternScout Auto-Apply",
   "version": "0.4.0",
-  "description": "Walks every step of an internship application, fills it from your Deep Dive profile, and stops at the submit button for you.",
+  "description": "Fills internship applications from your saved profile and stops at the submit button. It never submits an application for you.",
   "permissions": [
     "storage",
     "unlimitedStorage",
