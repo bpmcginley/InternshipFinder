@@ -77,5 +77,10 @@ jobs:
             echo "No changes."
           else
             git commit -m "data: refresh listings ($(date -u +%FT%TZ))"
-            git push
+            # A run that waited in the queue checked out an older commit; replay onto main and keep this run's data.
+            for i in 1 2 3; do
+              git push && break
+              [ "$i" = 3 ] && exit 1
+              git pull --rebase -X theirs origin main
+            done
           fi
