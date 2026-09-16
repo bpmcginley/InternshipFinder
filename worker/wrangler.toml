@@ -15,7 +15,7 @@ crons = ["17 7 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "internscout"
-database_id = "REPLACE_WITH_ID_FROM_WRANGLER_D1_CREATE"
+database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 
 # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN
 [vars]
