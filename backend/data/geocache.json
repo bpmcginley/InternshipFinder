@@ -4,6 +4,7 @@
 "130 north 18th street - one logan square|PA":null,
 "300 creekview ave|NJ":null,
 "399 park avenue-new york|NY":null,
+"915 broadway|NY":null,
 "ambler|PA":[
 40.1545,
 -75.2222
@@ -234,6 +235,10 @@
 "eatontown|NJ":[
 40.2962,
 -74.051
+],
+"ebensburg|PA":[
+40.4853,
+-78.7248
 ],
 "edgewood|NY":[
 42.1404,
