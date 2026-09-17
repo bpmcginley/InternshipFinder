@@ -76,6 +76,7 @@
 40.5931,
 -74.605
 ],
+"bristol (pa|PA":null,
 "bristol|PA":[
 40.1229,
 -74.8645
@@ -83,6 +84,10 @@
 "brooklawn|NJ":[
 39.8783,
 -75.1205
+],
+"bulger|PA":[
+40.3784,
+-80.3278
 ],
 "camp hill|PA":[
 40.2398,
@@ -104,6 +109,10 @@
 40.2015,
 -77.1891
 ],
+"carlstadt|NJ":[
+40.8404,
+-74.0907
+],
 "carnegie|PA":[
 40.4087,
 -80.0834
@@ -115,6 +124,10 @@
 "charleroi|PA":[
 40.1378,
 -79.8981
+],
+"chatham|NJ":[
+40.7409,
+-74.3837
 ],
 "cheektowaga|NY":[
 42.9034,
@@ -142,6 +155,10 @@
 40.9732,
 -73.9615
 ],
+"coal township|PA":[
+40.7918,
+-76.5936
+],
 "coaldale|PA":[
 40.825,
 -75.9085
@@ -154,6 +171,7 @@
 42.7742,
 -73.7001
 ],
+"collegeville (pa|PA":null,
 "concordville|PA":[
 39.8852,
 -75.5202
@@ -173,6 +191,11 @@
 "cranberry twp|PA":[
 40.7099,
 -80.1061
+],
+"croydon (pa|PA":null,
+"danville|PA":[
+40.9665,
+-76.6131
 ],
 "de witt|NY":null,
 "delanco|NJ":[
@@ -219,6 +242,10 @@
 "elmira|NY":[
 42.0898,
 -76.8077
+],
+"elysburg|PA":[
+40.8647,
+-76.5524
 ],
 "englewood|NJ":[
 40.8929,
@@ -414,6 +441,10 @@
 40.9644,
 -76.8848
 ],
+"lewistown|PA":[
+40.5992,
+-77.5714
+],
 "linden|NJ":[
 40.622,
 -74.2446
@@ -509,6 +540,10 @@
 "mt laurel township|NJ":[
 39.934,
 -74.891
+],
+"muncy|PA":[
+41.2048,
+-76.7871
 ],
 "murrysville|PA":[
 40.4284,
@@ -877,6 +912,7 @@
 -72.8868
 ],
 "us - ny|NY":null,
+"us - pittsburgh|PA":null,
 "us home office new jersey|NJ":null,
 "us home office new york|NY":null,
 "us home office pennsylvania|PA":null,
