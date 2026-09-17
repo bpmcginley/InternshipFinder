@@ -203,6 +203,7 @@ function formatSnapshot(frames, fails) {
 const GATE_HELP = {
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
   captcha: "The site wants you to prove you're human. Solve the check in the tab, then press Resume.",
+  human_check: "This form asks a question meant to prove a person is applying, not a program. Answer that one yourself in the tab, then press Resume.",
 };
 
 function gateIn(frames) {
