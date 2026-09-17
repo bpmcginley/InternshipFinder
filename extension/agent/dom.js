@@ -42,7 +42,7 @@
   // it here"), which tells the model nothing about WHICH file. Look past those to the group label.
   const GENERIC_LABEL_RE = /^(attach|upload|browse|(choose|select|add)\s+(a\s+)?files?|drop|drag|click to (upload|attach|browse)|enter manually|or)\b[^?]{0,40}$/i;
   const HINT_RE = /^(no file (selected|chosen)|accepted file types|allowed (file )?types|max(imum)? (file )?size|file size|supported formats|total \d+ files? (selected|attached|uploaded)|drag (and|&) drop|drop (your )?files? here)\b/i;
-  const useful = (t) => !!t && !HINT_RE.test(t) && !(GENERIC_LABEL_RE.test(t) && !/resume|\bcv\b|cover|transcript|letter|portfolio|writing|photo|certificat/i.test(t));
+  const useful = (t) => !!t && !HINT_RE.test(t) && !(GENERIC_LABEL_RE.test(t) && !/r[eé]sum[eé]|\bcv\b|cover|transcript|letter|portfolio|writing|photo|certificat/i.test(t));
 
   function questionLabel(el, scope = el) {
     const lb = el.getAttribute("aria-labelledby");
@@ -477,11 +477,6 @@
   ];
   const SKIP = /refer|emergency|reference|manager|supervisor|recruiter|company|employer|school|parent|guardian|middle|preferred|nick|confirm|search|verif|code|password|extension|country|device|type|other/;
 
-  // Which file box is unmistakably "your resume goes here". Anything that also mentions another
-  // document is left for the model, because putting a resume in the transcript slot is worse than
-  // spending a turn to get it right.
-  const RESUME_RE = /\bresume\b|\bcv\b|curriculum vitae/i;
-  const NOT_RESUME_RE = /cover|transcript|portfolio|writing sample|certificat|licen[cs]e|passport|photo|\bid\b|other/i;
 
   // The one file field this is safe to fill without asking the model: exactly one empty box on the
   // page says resume, and nothing else does.
@@ -490,7 +485,7 @@
     for (const rec of refs.values()) {
       if (rec.kind !== "file") continue;
       const hint = [rec.label, rec.el.name, rec.el.id, rec.el.getAttribute("data-automation-id")].filter(Boolean).join(" ");
-      if (!RESUME_RE.test(hint) || NOT_RESUME_RE.test(hint)) continue;
+      if (!G.isResumeBox(hint)) continue;
       if (valueOf(rec.el, "file")) return null;   // already attached: leave it alone
       if (hit) return null;                        // two resume boxes is a question, not a rule
       hit = rec;

@@ -216,7 +216,22 @@
     if (doc.__isClickBlock) { doc.removeEventListener("click", doc.__isClickBlock, true); delete doc.__isClickBlock; }
   }
 
-  const api = { classify, nothingLeftForAI, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, FINAL_RE, AMBIGUOUS_RE };
+  // Which file box is unmistakably "your resume goes here". It lives here rather than in dom.js so it
+  // can be tested without a browser: every bug this has had so far was in the patterns, not the walk.
+  // Rippling and others spell it "Résumé", and a JS word boundary is ASCII only, so it never fires
+  // next to the accent; the lookarounds do, and they also catch a name like resume_upload.
+  const RESUME_RE = /(?<![a-z])r[eé]sum[eé](?![a-z])|(?<![a-z])cv(?![a-z])|curriculum vitae/i;
+  // Anything that names a second document as well is left for the model: putting a resume in the
+  // transcript slot is worse than spending a turn to get it right.
+  const NOT_RESUME_RE = /cover|transcript|portfolio|writing sample|certificat|licen[cs]e|passport|photo|(?<![a-z])id(?![a-z])|other/i;
+  // Ashby and a few others put a second resume box at the top whose only job is to read the file and
+  // pre-fill the form. It is not the box the application is submitted with, and counting it would make
+  // those pages look like they had two resume fields, so the rule would give up on every one of them.
+  const PARSER_RE = /autofill|auto-fill|autocomplete the|prefill|pre-fill|parse/i;
+
+  const isResumeBox = (hint) => RESUME_RE.test(hint) && !NOT_RESUME_RE.test(hint) && !PARSER_RE.test(hint);
+
+  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, FINAL_RE, AMBIGUOUS_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

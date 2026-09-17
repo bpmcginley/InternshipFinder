@@ -213,3 +213,34 @@ test("more form ahead, or trouble on the page, is never skipped", () => {
   };
   for (const [why, frames] of Object.entries(cases)) assert.equal(G.nothingLeftForAI(frames, 3), false, why);
 });
+
+// The labels below are the real ones, read off live application pages, not invented for the test.
+test("the resume box is recognised on the boards students actually meet", () => {
+  for (const hint of [
+    "Resume",                                   // Greenhouse, Ashby
+    "Resume/CV ✱ ATTACH RESUME/CV",           // Lever
+    "Resume Choose file",                       // Workable
+    "Résumé",                                   // Rippling
+    "Resumé",
+    "resume_upload",
+    "Curriculum Vitae",
+    "CV",
+  ]) assert.equal(G.isResumeBox(hint), true, hint);
+});
+
+test("a box for some other document is never mistaken for the resume", () => {
+  for (const hint of [
+    "Cover letter",
+    "Transcript",
+    "Writing sample",
+    "Upload other documents",
+    "Government ID",
+    "Photo",
+    "Video resume portfolio",
+    "Attach",
+    "",
+    // Ashby's parser box reads the file to pre-fill the form; it is not what gets submitted, and
+    // counting it would make every Ashby page look like it had two resume fields.
+    "Autofill from resume Upload your resume here to autofill key fields",
+  ]) assert.equal(G.isResumeBox(hint), false, hint);
+});
