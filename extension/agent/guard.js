@@ -28,9 +28,11 @@
   // A bare "Code", or an explicitly named verification code — never a postal/country/promo code.
   const CODE_FIELD_RE = /\b(verification|confirmation|security|access|activation|one[-\s]?time)\s*(code|pin)\b|\b(otp|passcode)\b|^\s*(code|pin)\s*\*?\s*$/i;
   const NOT_CODE_RE = /postal|zip|country|area|promo|discount|referral|coupon|province|dial|sort/i;
+  // Anti-bot interstitials (Cloudflare, DataDome, PerimeterX, Imperva, Akamai) that replace the page.
+  const BOTWALL_RE = /just a moment|checking (if the site connection is secure|your browser)|verify(ing)? (that )?you are (a )?human|are you a robot|press (&|and) hold|unusual (traffic|activity) from your|pardon our interruption|request unsuccessful\. incapsula|access to this page has been denied/i;
 
-  // page: {headings:[], step, buttons:[{text}], text, elements:[{kind,label,question}]}
-  // -> {kind: "email_verification", reason} or null
+  // page: {headings:[], step, buttons:[{text}], text, elements:[{kind,label,question}], captcha}
+  // -> {kind: "email_verification" | "captcha", reason} or null
   function detectGate(page) {
     if (!page) return null;
     const els = page.elements || [];
@@ -44,6 +46,10 @@
     if (hasCode && VERIFY_RE.test(wide)) return { kind: "email_verification", reason: "this page wants a verification code sent to your email" };
     // "We emailed you a code" interstitial with nothing to fill in yet.
     if (!els.length && VERIFY_RE.test(heads)) return { kind: "email_verification", reason: "this page is waiting on an email verification step" };
+    // A CAPTCHA beside a filled form is left for the human at submit time; one that IS the page blocks everything.
+    const actionable = (page.buttons || []).some((b) => !b.blocked);
+    if (!els.length && ((page.captcha && !actionable) || (BOTWALL_RE.test(norm([page.title || "", wide].join(" "))) && norm(page.text).length < 1500)))
+      return { kind: "captcha", reason: "the site is showing a CAPTCHA / \"are you human\" check" };
     return null;
   }
 
@@ -91,13 +97,56 @@
     return out;
   }
 
+  // Widgets that sit on job pages with values already set but are not the application: cookie managers
+  // (OneTrust ships pre-checked hidden switches), site search, and job-alert sign-ups (SuccessFactors'
+  // "every 7 days" box). Counting them blocked "Apply" on the job page before anything was filled.
+  const NOT_APPLICATION_SEL = '#onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .truste_box_overlay, [id*="cookie" i], [class*="cookie" i], ' +
+    '[role="search"], [class*="subscribe" i], [id*="subscribe" i], [class*="job-alert" i], [class*="jobalert" i], [id*="jobalert" i], [id*="job-alert" i], [class*="newsletter" i], [id*="newsletter" i]';
+
+  // Site chrome outside any form: Workday's header language picker, TikTok's top-bar <menu> select,
+  // Rippling's footer "Search" locale combobox. The model was offered these as application questions.
+  const CHROME_SEL = 'header, nav, footer, menu, [role="banner"], [role="navigation"], [role="contentinfo"], [role="menubar"]';
+  // A form whose only action is one of these is a talent-community / alert sign-up beside the real
+  // application (Waymo's "Departments / Locations / Notify me" sidebar), not the application itself.
+  const SIGNUP_BTN_RE = /^\s*(notify me|subscribe|get (job )?alerts|create (a )?(job )?alert|sign up for (job )?alerts|join (our )?(talent (community|network|pool)|mailing list)|keep me (posted|updated))\b/i;
+  const LOCALE_RE = /^\s*(español|deutsch|français|italiano|português|nederlands|polski|türkçe|русский|日本語|中文|简体中文|繁體中文|한국어|bahasa|tiếng việt)/i;
+  function notApplication(el) {
+    if (!el || !el.closest) return false;
+    if (el.closest(NOT_APPLICATION_SEL)) return true;
+    const form = el.closest("form");
+    if (!form) {
+      if (el.closest(CHROME_SEL)) return true;
+      const a = norm((el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("placeholder"))) || "");
+      if (/^search\b/i.test(a)) return true;
+      // A job-board search box: "Enter Title, Skill, or Location" (TikTok). A form field asks one thing ("Job title").
+      const asks = new Set((a.toLowerCase().match(/\b(title|skill|keyword|location|job|city|zip|department)s?\b/g) || []).map((w) => w.replace(/s$/, "")));
+      if (asks.size >= 2 && /,|\bor\b/i.test(a)) return true;
+      // Locale pickers list languages by their own names; an application question would say "Spanish".
+      if (el.tagName === "SELECT") {
+        const texts = [...el.options].map((o) => o.text);
+        const native = texts.filter((t) => LOCALE_RE.test(t)).length;
+        if (native >= 2 || (native >= 1 && texts.some((t) => /^\s*english\b/i.test(t)))) return true;
+      }
+      return false;
+    }
+    if (form.getAttribute("role") === "search") return true;
+    const acts = [...form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])')].map((b) => norm(b.innerText || b.value || b.textContent)).filter(Boolean);
+    return acts.length > 0 && acts.every((t) => SIGNUP_BTN_RE.test(t)) && !form.querySelector('input[type="file"], textarea');
+  }
+
   function pageContext(doc) {
     let filled = 0;
     deepQueryAll("input, textarea, select", doc).forEach((el) => {
       const t = (el.type || "").toLowerCase();
-      if (["hidden", "submit", "button", "search", "image", "reset"].includes(t)) return;
+      if (["hidden", "submit", "button", "search", "image", "reset", "range", "color"].includes(t)) return;
       if (/search/i.test(el.name || el.id || "")) return;
-      if (t === "checkbox" || t === "radio") { if (el.checked) filled++; return; }
+      if (notApplication(el)) return;
+      if (t === "checkbox" || t === "radio") {
+        // Styled checkboxes hide the input itself, so accept a rendered label or parent instead.
+        const shown = (n) => n && n.getClientRects && n.getClientRects().length;
+        if (el.checked && (!el.getClientRects || shown(el) || shown(el.parentElement) || (el.labels && [...el.labels].some(shown)))) filled++;
+        return;
+      }
       if (t === "file") { if (el.files && el.files.length) filled++; return; }
       // Read-only, disabled or unrendered boxes (e.g. Oracle's hidden "Copy Link" input) are not answers.
       if (el.readOnly || el.disabled) return;
@@ -133,7 +182,7 @@
     if (doc.__isClickBlock) { doc.removeEventListener("click", doc.__isClickBlock, true); delete doc.__isClickBlock; }
   }
 
-  const api = { classify, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, FINAL_RE, AMBIGUOUS_RE };
+  const api = { classify, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, FINAL_RE, AMBIGUOUS_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

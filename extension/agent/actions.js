@@ -2,7 +2,7 @@
 // content.js / workday.js and generalised: native setters, react-select via fiber
 // selectOption, Workday listboxes, ARIA comboboxes, radios, files.
 (function () {
-  if (window.ISActions && window.ISActions.v >= 3) return; // bump with dom.js V when this file changes
+  if (window.ISActions && window.ISActions.v >= 5) return; // bump with dom.js V when this file changes
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
   const low = (s) => norm(s).toLowerCase();
@@ -27,6 +27,12 @@
   function blur(el) {
     el.dispatchEvent(new Event("blur", { bubbles: true }));
     el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+  }
+  // Option lists drawn inside shadow roots (SmartRecruiters oneclick-ui) are invisible to document.querySelectorAll.
+  function deepQueryAll(selector, root = document) {
+    const out = [...root.querySelectorAll(selector)];
+    for (const el of root.querySelectorAll("*")) if (el.shadowRoot) out.push(...deepQueryAll(selector, el.shadowRoot));
+    return out;
   }
   function mouseClick(el) {
     for (const t of ["pointerdown", "mousedown", "pointerup", "mouseup"])
@@ -188,6 +194,12 @@
     const searchable = rsSearchable(h.sp);
     if (!searchable) consider(rsFlat(h.sp.options));
     else for (const q of searchTerms(value)) { consider(await rsSearch(input, h, q)); if (score >= 60) break; }
+    // A search that matched nothing still leaves the model guessing; the empty search shows what exists
+    // (Greenhouse "Degree" / "Discipline" are async lists with no options until something is typed).
+    if ((!pick || score < 30) && searchable && !seen.length) {
+      const first = await rsSearch(input, h, "");
+      for (const o of first) seen.push(rsLabel(h.sp, o));
+    }
     const options = [...new Set(seen)].slice(0, 40);
     if (!pick || score < 30) {
       if (searchable && typeof h.sp.onInputChange === "function") try { h.sp.onInputChange("", { action: "input-blur", prevInputValue: "" }); } catch (e) {}
@@ -222,25 +234,89 @@
     return { ok: !!shown, chosen: shown || norm(pick.textContent), options: shown ? undefined : available };
   }
 
-  function listboxOptions() {
-    return [...document.querySelectorAll('[data-automation-id="promptOption"], [role="option"], [data-automation-id="menuItem"]')].filter(visible);
+  // Search-as-you-type select libraries (selectize, tom-select, select2, chosen, choices) whose options come
+  // from the server (Greenhouse "School": the real <select> is empty until you type). Type into the
+  // library's own box, wait for its result rows to settle, click the best one.
+  const LIB_BOX_SEL = ".selectize-control, .ts-wrapper, .chosen-container, .select2-container, .choices";
+  const LIB_ROW_SEL = ".selectize-dropdown .option, .ts-dropdown .option, .select2-results__option, .chosen-results li.active-result, .choices__list--dropdown .choices__item--selectable";
+  async function searchSelectPick(input, value) {
+    const box = input.closest(LIB_BOX_SEL) || input.parentElement;
+    const rows = () => deepQueryAll(LIB_ROW_SEL).filter((o) => visible(o) && !o.classList.contains("create") &&
+      norm(o.textContent) && !/^(no (results|matches)|searching|loading)/i.test(norm(o.textContent)));
+    const loading = () => !!(box.querySelector(".loading") || box.classList.contains("loading") || deepQueryAll(".select2-results__option.loading-results").some(visible));
+    const shown = () => norm([...box.querySelectorAll(".item, .select2-selection__rendered, .chosen-single span, .choices__list--single .choices__item")].map((i) => i.textContent).join(" "));
+    // Server searches often need an exact substring ("University of Massachusetts - Amherst"), so fall back
+    // to the distinctive words, then the single longest one; never to filler like "University of".
+    const words = String(value).split(/[\s,\-–]+/).filter((w) => w && !/^(university|college|of|the|at|and|&|school|institute|inc|llc)$/i.test(w));
+    const longest = [...words].sort((a, b) => b.length - a.length)[0] || "";
+    let opts = [];
+    mouseClick(input);
+    for (const q of [...new Set([String(value), words.join(" "), longest])].filter((q) => q && q.length > 1)) {
+      setNative(input, q);
+      const key = q.slice(-1);
+      for (const t of ["keydown", "keypress", "keyup"]) input.dispatchEvent(new KeyboardEvent(t, { key, bubbles: true }));
+      // Done when rows show, or when a search we saw start has finished with none (debounced searches
+      // may not start for a while, so without a visible spinner wait the full time).
+      const t0 = Date.now();
+      let started = false;
+      opts = [];
+      while (Date.now() - t0 < 9000) {
+        await sleep(150);
+        opts = rows();
+        if (opts.length) break;
+        if (loading()) started = true;
+        else if (started && Date.now() - t0 > 600) break;
+      }
+      if (opts.length) { await sleep(300); opts = rows(); break; }
+    }
+    const pick = best(opts, value, (o) => o.textContent);
+    if (!pick) {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return opts.length ? { ok: false, options: opts.map((o) => norm(o.textContent)).slice(0, 40) }
+        : { ok: false, error: "No matches appeared for that search. Try a shorter or different spelling.", options: [] };
+    }
+    mouseClick(pick); await sleep(300);
+    const now = shown();
+    return { ok: !!now, chosen: now || norm(pick.textContent) };
+  }
+
+  function listboxOptions(scope) {
+    return deepQueryAll('[data-automation-id="promptOption"], [role="option"], [data-automation-id="menuItem"], [role="menu"] [role="menuitem"], [role="menu"] [role="menuitemradio"]', scope || document).filter(visible);
   }
   // Workday: button[aria-haspopup=listbox] opens a popup; some popups have a search box and
   // nested levels ("How did you hear" -> "Job Board" -> "LinkedIn").
   async function workdayPick(btn, value) {
+    // Menu-style selects (BambooHR) keep every menu mounted and fade the last one out, so options
+    // read page-wide right after a pick belonged to the PREVIOUS dropdown. Read the button's own menu.
+    const menuId = btn.getAttribute("aria-haspopup") !== "listbox" && (btn.getAttribute("aria-controls") || btn.getAttribute("data-menu-id"));
+    const optionsNow = () => (menuId ? (document.getElementById(menuId) ? listboxOptions(document.getElementById(menuId)) : []) : listboxOptions());
     mouseClick(btn); await sleep(350);
+    if (menuId && !(await waitFor(optionsNow, 800)).length && btn.getAttribute("aria-expanded") !== "true") {
+      // Some menus (BambooHR fab-Select) ignore synthetic mouse events but open from the keyboard,
+      // and render ~0.5s later. Focus usually still sits on the LAST dropdown picked, and a key sent in the
+      // same tick as focus() is dropped, so move focus, let it settle, then try keys one at a time.
+      if (document.activeElement && document.activeElement !== btn && document.activeElement.blur) document.activeElement.blur();
+      btn.focus(); await sleep(200);
+      for (const key of ["ArrowDown", "Enter", " "]) {
+        if (btn.getAttribute("aria-expanded") === "true") { await waitFor(optionsNow, 1500); break; }
+        if (document.activeElement !== btn) { btn.focus(); await sleep(150); }
+        btn.dispatchEvent(new KeyboardEvent("keydown", { key, code: key === " " ? "Space" : key, bubbles: true }));
+        if ((await waitFor(optionsNow, 1500)).length) break;
+      }
+    }
     const search = document.querySelector('input[data-automation-id="searchBox"], [data-automation-id="promptSearch"] input');
     if (search && visible(search)) { setNative(search, value); await sleep(500); }
     for (let level = 0; level < 3; level++) {
-      const opts = await waitFor(listboxOptions, 1500);
+      const opts = await waitFor(optionsNow, 1500);
       const pick = best(opts, value, (o) => o.textContent);
       if (!pick) {
         const available = opts.map((o) => norm(o.textContent)).slice(0, 40);
         document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        if (!available.length && level === 0) return { ok: false, error: "The dropdown did not open (no options appeared). Try clicking it once, then selecting again.", options: [] };
         return { ok: false, options: available };
       }
       mouseClick(pick); await sleep(400);
-      const still = listboxOptions();
+      const still = optionsNow();
       if (!still.length || still.some((o) => o === pick)) break;
     }
     await sleep(150);
@@ -253,12 +329,49 @@
     if (input.tagName === "INPUT") setNative(input, value);
     await sleep(300);
     const ctl = input.getAttribute("aria-controls") || input.getAttribute("aria-owns");
-    const scope = (ctl && document.getElementById(ctl)) || document;
-    const opts = await waitFor(() => [...scope.querySelectorAll('[role="option"], li[id*="option"]')].filter(visible), 2000);
+    const root = input.getRootNode ? input.getRootNode() : document;
+    const scope = (ctl && root.getElementById && root.getElementById(ctl)) || (ctl && document.getElementById(ctl)) || document;
+    const opts = await waitFor(() => deepQueryAll('[role="option"], li[id*="option"]', scope).filter(visible), 2000);
     const pick = best(opts, value, (o) => o.textContent);
     if (!pick) return { ok: false, options: opts.map((o) => norm(o.textContent)).slice(0, 40) };
     mouseClick(pick); await sleep(200);
     return { ok: true, chosen: norm(pick.textContent) };
+  }
+
+  // Plain <input> wired to a suggestion list with no ARIA roles (Lever "Current location", Google Places,
+  // many custom city/school boxes). They clear the box on blur unless a suggestion was chosen, so: type,
+  // fire the key events their handlers listen for, wait for NEW visible items that match, click the best.
+  const SUGGEST_SEL = '[role="option"], li, .pac-item, [class*="suggest" i] > *, [class*="autocomplete" i] > *, [class*="dropdown" i] > *, [class*="result" i] > *, [class*="option" i], [class*="location" i]';
+  function suggestions(input) {
+    const zone = input.closest("label, li, .field, [class*='field' i], [class*='question' i]") || input.parentElement;
+    const found = [...(zone ? zone.querySelectorAll(SUGGEST_SEL) : []), ...deepQueryAll('.pac-container .pac-item, [role="listbox"] [role="option"]')];
+    return found.filter((o) => o !== input && !o.contains(input) && visible(o) && norm(o.textContent).length > 0 && norm(o.textContent).length < 160 &&
+      !o.querySelector("input, select, textarea"));
+  }
+  async function typeahead(input, value) {
+    const before = new Set(suggestions(input));
+    const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    input.focus();
+    desc.set.call(input, value);
+    const key = String(value).slice(-1);
+    for (const t of ["keydown", "keypress"]) input.dispatchEvent(new KeyboardEvent(t, { key, bubbles: true }));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+    const fresh = () => suggestions(input).filter((o) => !before.has(o));
+    const matching = () => fresh().filter((o) => scoreOption(o.textContent, value) >= 30);
+    const opts = await waitFor(matching, 4000, 200);
+    const pick = best(opts, value, (o) => o.textContent);
+    if (!pick) {
+      const shown = fresh().map((o) => norm(o.textContent)).filter(Boolean);
+      blur(input);
+      return { ok: false, error: "This box only accepts a choice from its suggestion list.", options: [...new Set(shown)].slice(0, 20) };
+    }
+    const chosen = norm(pick.textContent);
+    mouseClick(pick);
+    await sleep(300);
+    blur(input);
+    await sleep(100);
+    return input.value ? { ok: true, chosen: norm(input.value) || chosen } : { ok: false, error: "Picked a suggestion but the box stayed empty." };
   }
 
   function nativeSelect(el, value) {
@@ -311,7 +424,7 @@
     return true;
   }
 
-  window.ISActions = { v: 3, sleep, norm, low, visible, setNative, blur, mouseClick, best, scoreOption, getFiber, fiberProp,
+  window.ISActions = { v: 5, sleep, norm, low, visible, setNative, blur, mouseClick, best, scoreOption, getFiber, fiberProp, deepQueryAll, typeahead,
     waitFor, isReactSelect, reactSelectPick, reactSelectContainer, reactSelectOptions, reactSelectValue, workdayPick, ariaComboPick, nativeSelect, radioPick, setChecked,
-    b64ToFile, setFileInput, dropFile };
+    b64ToFile, setFileInput, dropFile, searchSelectPick, LIB_BOX_SEL };
 })();

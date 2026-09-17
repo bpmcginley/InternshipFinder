@@ -42,7 +42,8 @@ NAVIGATION
 
 ACCOUNTS
 - If the site needs an account, follow the ACCOUNT line: sign in if one exists, otherwise create one with the given email. Use fill_secret for EVERY password and confirm-password field; never type a password with fill. Tick required account terms/privacy checkboxes.
-- Email verification, CAPTCHA, SMS or 2FA → pause_for_user with a short instruction.
+- Email verification, SMS or 2FA → pause_for_user with a short instruction.
+- CAPTCHA PRESENT on a form: it is the human's to solve at submit time. Fill everything else, then call ready_to_submit and put "solve the CAPTCHA" in double_check. Only pause_for_user if the CAPTCHA must be solved before you can continue (e.g. before Next or Sign in).
 
 FINISHING
 - The final submit button is reserved for the human and is blocked in code. Buttons marked BLOCKED must not be clicked.
@@ -88,6 +89,13 @@ async function ensureTab(job) {
     await chrome.storage.session.set({ groupId });
   } catch (e) { /* tab groups unsupported (e.g. Edge variants) */ }
   return t.id;
+}
+
+async function groupTab(tabId) {
+  try {
+    const { groupId } = await chrome.storage.session.get("groupId");
+    if (groupId != null) await chrome.tabs.group({ tabIds: [tabId], groupId });
+  } catch (e) { /* group gone or unsupported */ }
 }
 
 async function waitForTab(tabId, timeout = 25000) {
@@ -171,6 +179,7 @@ function formatSnapshot(frames, fails) {
       if (e.question) s += ` in "${e.question}"`;
       s += ` = ${JSON.stringify(e.value === undefined ? "" : e.value)}`;
       if (e.options && e.options.length) s += ` options: ${e.options.join(" | ")}`;
+      if (e.placeholder) s += ` placeholder=${JSON.stringify(e.placeholder)}`;
       if (e.maxlength) s += ` maxlength=${e.maxlength}`;
       if (e.error) s += ` ERROR: ${e.error}`;
       if ((fails[ref] || 0) >= MAX_FIELD_FAILS) s += " (failed 3 times: skip it or pause_for_user if required)";
@@ -181,7 +190,7 @@ function formatSnapshot(frames, fails) {
       const ref = `${f.frameId}:${b.ref}`;
       index[ref] = { kind: "button", label: b.text };
       if (b.blocked) hasFinal = true;
-      lines.push(`[${ref}] "${b.text}"${b.blocked ? " BLOCKED (final submit, human only)" : ""}`);
+      lines.push(`[${ref}] "${b.text}"${b.blocked ? " BLOCKED (final submit, human only)" : ""}${b.menu === "open" ? " (menu already open: click one of its items, not this again)" : ""}`);
     }
     if (f.text) lines.push(`PAGE TEXT: ${f.text}`);
   }
@@ -193,6 +202,7 @@ function formatSnapshot(frames, fails) {
 // depend on the model choosing to call pause_for_user.
 const GATE_HELP = {
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
+  captcha: "The site wants you to prove you're human. Solve the check in the tab, then press Resume.",
 };
 
 function gateIn(frames) {
@@ -292,7 +302,7 @@ async function loop(id) {
     job = await tailorStep(id, job, store);
     if (job.status !== "working") return; // waiting for the human to approve it
   }
-  const tabId = await ensureTab(job);
+  let tabId = await ensureTab(job);
   job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "" });
   const msgs = await loadMsgs(id);
   const fails = {};
@@ -314,7 +324,14 @@ async function loop(id) {
       return;
     }
 
-    await waitForTab(tabId);
+    const cur = await waitForTab(tabId);
+    // A redirect or a new tab can land on a site the student never allowed (company page -> external ATS).
+    if (cur && cur.url && !(await hasHostAccess(cur.url))) {
+      await updateJob(id, { status: "needs_you", needs_host: cur.url, pending, activity: "",
+        reason: `The application moved to ${hostOf(cur.url)}. Allow InternScout there below, then Resume.` });
+      await saveMsgs(id, msgs);
+      return;
+    }
     await sleep(800);
     await inject(tabId);
     store = await loadStore();
@@ -327,7 +344,15 @@ async function loop(id) {
       await inject(tabId);
       frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
+    // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
+    // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
+    for (let i = 0; i < 4 && !frames.some((f) => f.elements.length) && frames.some((f) => f.busy); i++) {
+      await sleep(2000);
+      await inject(tabId);
+      frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+    }
     const snap = formatSnapshot(frames, fails);
+    snap.tabId = tabId;
     const url = (snap.top && snap.top.url) || job.apply_url;
 
     const gate = gateIn(frames);
@@ -384,7 +409,14 @@ async function loop(id) {
     let stop = null;
     for (const u of uses) {
       if (stop) { results.push(toolResult(u.id, "Not run: the job paused.")); continue; }
+      if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
       const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, store, job, fails, url });
+      if (r.newTab) {
+        tabId = r.newTab;
+        await groupTab(tabId);
+        await updateJob(id, { tabId });
+        await appendLog(job.id, { kind: "nav", text: "The site opened the application in a new tab; following it." });
+      }
       if (r.stop) {
         stop = { ...r, id: u.id };
         if (r.content != null) results.push(toolResult(u.id, r.content));
@@ -461,9 +493,20 @@ async function execTool(u, ctx) {
       break;
     }
     case "click": {
-      r = await act(tabId, input.ref, "click", {});
+      // "Apply" links often carry target=_blank (Oracle, company career pages, iCIMS portals). The agent
+      // would keep reading the old tab forever, so notice a tab this click opened and move to it.
+      const opened = [];
+      const onNew = (t) => { if (t.openerTabId === tabId) opened.push(t.id); };
+      chrome.tabs.onCreated.addListener(onNew);
+      try {
+        r = await act(tabId, input.ref, "click", {});
+        if (r.ok) { await sleep(1500); await waitForTab(tabId).catch(() => {}); }
+      } finally {
+        chrome.tabs.onCreated.removeListener(onNew);
+      }
       if (r.blocked) return { content: `${r.error}. Do not click it. If everything else is complete, call ready_to_submit; otherwise keep filling fields.`, isError: true };
-      if (r.ok) { await sleep(1500); await waitForTab(tabId).catch(() => {}); }
+      const newTab = opened.length && (await chrome.tabs.get(opened[opened.length - 1]).catch(() => null));
+      if (r.ok && newTab) return { content: { ...r, note: "Opened a new tab; the next snapshot is from that tab." }, newTab: newTab.id };
       break;
     }
     case "wait":

@@ -114,3 +114,59 @@ test("ordinary application pages are not gates", () => {
   assert.equal(G.detectGate(page()), null);
   assert.equal(G.detectGate(null), null);
 });
+
+test("a CAPTCHA or bot wall that replaces the page is a gate; one beside a form is not", () => {
+  assert.equal(G.detectGate(page({ captcha: true })).kind, "captcha");
+  assert.equal(G.detectGate(page({ title: "Just a moment...", text: "Checking your browser before accessing the site." })).kind, "captcha");
+  assert.equal(G.detectGate(page({ text: "Press & Hold to confirm you are a human (and not a bot)." })).kind, "captcha");
+
+  // The human solves it at submit time.
+  assert.equal(G.detectGate(page({ captcha: true, elements: [el("text", "First Name")] })), null);
+  // A job page with an invisible reCAPTCHA still has an Apply button to press.
+  assert.equal(G.detectGate(page({ captcha: true, buttons: [{ text: "Apply", blocked: false }] })), null);
+  assert.equal(G.detectGate(page({ captcha: true, buttons: [{ text: "Submit", blocked: true }] })).kind, "captcha");
+  // A long page that merely mentions robots is not a wall.
+  assert.equal(G.detectGate(page({ text: "Are you a robot enthusiast? " + "Join our robotics team. ".repeat(80) })), null);
+});
+
+// Just enough of an element for notApplication(): closest() answers per selector family.
+const fakeForm = ({ role = null, buttons = [], rich = false } = {}) => ({
+  getAttribute: (n) => (n === "role" ? role : null),
+  querySelectorAll: () => buttons.map((t) => ({ innerText: t })),
+  querySelector: () => (rich ? {} : null),
+});
+const fakeEl = ({ tag = "INPUT", attrs = {}, form = null, overlay = false, chrome = false, options } = {}) => ({
+  tagName: tag, options,
+  getAttribute: (n) => (n in attrs ? attrs[n] : null),
+  closest: (s) => (s === "form" ? form : s.startsWith("#onetrust") ? (overlay ? {} : null) : s.startsWith("header") ? (chrome ? {} : null) : null),
+});
+
+test("page chrome, cookie banners, search and alert sign-ups are not application fields", () => {
+  assert.equal(G.notApplication(fakeEl({ overlay: true })), true);
+  assert.equal(G.notApplication(fakeEl({ chrome: true })), true);
+  assert.equal(G.notApplication(fakeEl({ attrs: { "aria-label": "Search jobs" } })), true);
+  const opt = (text) => ({ text });
+  assert.equal(G.notApplication(fakeEl({ tag: "SELECT", options: [opt("English"), opt("Español"), opt("Deutsch")] })), true);
+  assert.equal(G.notApplication(fakeEl({ form: fakeForm({ role: "search" }) })), true);
+  assert.equal(G.notApplication(fakeEl({ form: fakeForm({ buttons: ["Notify me"] }) })), true);
+  assert.equal(G.notApplication(fakeEl({ form: fakeForm({ buttons: ["Join our talent community"] }) })), true);
+});
+
+test("real application fields are kept", () => {
+  assert.equal(G.notApplication(fakeEl({ attrs: { "aria-label": "First name" } })), false);
+  assert.equal(G.notApplication(fakeEl({ tag: "SELECT", options: [{ text: "Yes" }, { text: "No" }] })), false);
+  assert.equal(G.notApplication(fakeEl({ form: fakeForm({ buttons: ["Submit application"] }) })), false);
+  assert.equal(G.notApplication(fakeEl({ form: fakeForm() })), false);
+  // A talent-community form that takes a resume is an application.
+  assert.equal(G.notApplication(fakeEl({ form: fakeForm({ buttons: ["Join our talent community"], rich: true }) })), false);
+  assert.equal(G.notApplication(null), false);
+});
+
+test("job-board search boxes and two-language pickers outside a form are skipped", () => {
+  assert.equal(G.notApplication(fakeEl({ attrs: { placeholder: "Enter Title, Skill, or Location" } })), true);
+  assert.equal(G.notApplication(fakeEl({ tag: "SELECT", options: [{ text: "English" }, { text: "日本語" }] })), true);
+  // One question, even if it names two things, is a field.
+  assert.equal(G.notApplication(fakeEl({ attrs: { placeholder: "Job title" } })), false);
+  assert.equal(G.notApplication(fakeEl({ attrs: { placeholder: "City, State" } })), false);
+  assert.equal(G.notApplication(fakeEl({ tag: "SELECT", options: [{ text: "English" }, { text: "Spanish" }] })), false);
+});
