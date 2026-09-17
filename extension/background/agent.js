@@ -117,13 +117,26 @@ async function waitForTab(tabId, timeout = 25000) {
   return chrome.tabs.get(tabId);
 }
 
+// A page can wedge its own renderer so thoroughly that nothing sent into it ever comes back: ADP
+// Workforce Now's recruitment page stops answering scripts altogether, and Chrome neither returns a
+// result nor reports an error. Every trip into the page therefore gets a deadline, because a run
+// that is merely waiting looks exactly like a run that is working, and says nothing to the student.
+export const FROZEN_PAGE = "The page stopped responding. Open the tab and reload it, then Retry.";
+export function toPage(p, ms = 15000) {
+  let t;
+  return Promise.race([
+    Promise.resolve(p).finally(() => clearTimeout(t)),
+    new Promise((_, reject) => { t = setTimeout(() => reject(new Error(FROZEN_PAGE)), ms); }),
+  ]);
+}
+
 async function inject(tabId) {
   try {
-    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", files: PAGE_FILES });
+    await toPage(chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", files: PAGE_FILES }));
   } catch (e) {
     for (let attempt = 0; ; attempt++) {
       try {
-        await chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", files: PAGE_FILES });
+        await toPage(chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", files: PAGE_FILES }));
         break;
       } catch (err) {
         // Chrome's own error page (network blip, site block): reload a couple of times before giving up.
@@ -137,13 +150,13 @@ async function inject(tabId) {
     }
   }
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["agent/guard.js", "agent/overlay.js"] });
+    await toPage(chrome.scripting.executeScript({ target: { tabId }, files: ["agent/guard.js", "agent/overlay.js"] }));
   } catch (e) {}
 }
 
 async function inFrames(tabId, func, args = []) {
   try {
-    const res = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", func, args });
+    const res = await toPage(chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", func, args }));
     return res.filter((r) => r && r.result);
   } catch (e) {
     return [];
@@ -162,11 +175,11 @@ export const noChange = (before, after) => !!before && !!after && before === aft
 async function act(tabId, fullRef, action, payload) {
   const [fid, local] = String(fullRef).split(":");
   try {
-    const [r] = await chrome.scripting.executeScript({
+    const [r] = await toPage(chrome.scripting.executeScript({
       target: { tabId, frameIds: [Number(fid)] }, world: "MAIN",
       func: (ref, a, p) => (window.ISDom ? window.ISDom.act(ref, a, p) : { ok: false, error: "Page changed. Use the new snapshot." }),
       args: [local, action, payload],
-    });
+    }));
     return (r && r.result) || { ok: false, error: "No result (frame navigated?)" };
   } catch (e) {
     return { ok: false, error: "Could not reach the page: " + e.message };

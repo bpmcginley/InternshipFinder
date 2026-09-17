@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
-import { postingGone, deadPage, pageGone, noChange } from "../background/agent.js";
+import { postingGone, deadPage, pageGone, noChange, toPage, FROZEN_PAGE } from "../background/agent.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (payload) => `${b64url({ alg: "RS256" })}.${b64url(payload)}.sig`;
@@ -310,4 +310,14 @@ test("a click that changed nothing is only reported when both marks are real", (
   // Mid-navigation nothing answers, and an unreachable page is not a page that stayed the same.
   assert.equal(noChange(page, ""), false);
   assert.equal(noChange("", ""), false);
+});
+
+// ADP Workforce Now's recruitment page can wedge its renderer: scripts sent into it never come back,
+// and Chrome reports neither a result nor an error. Without a deadline the run simply waits, and a
+// run that is waiting looks no different to the student from one that is working.
+test("a page that never answers is given up on rather than waited for", async () => {
+  assert.equal(await toPage(Promise.resolve("here"), 50), "here");
+  await assert.rejects(toPage(new Promise(() => {}), 20), (e) => e.message === FROZEN_PAGE);
+  // The page's own errors still reach the caller unchanged.
+  await assert.rejects(toPage(Promise.reject(new Error("no such tab")), 50), /no such tab/);
 });
