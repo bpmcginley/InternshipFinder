@@ -246,7 +246,27 @@
 
   const isResumeBox = (hint) => RESUME_RE.test(hint) && !NOT_RESUME_RE.test(hint) && !PARSER_RE.test(hint);
 
-  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, FINAL_RE, AMBIGUOUS_RE };
+  // A cookie banner is the student's decision, not ours, and "Accept all cookies" is the one button
+  // on it that gives something away. These widgets are already kept out of the field list, but their
+  // buttons were still offered to the model, and a banner sitting over the form is exactly the thing
+  // a model reaches for the biggest button to clear. So offer only the ways out that keep the
+  // default — reject, necessary-only, close, or the preference screen. The banner still gets
+  // dismissed when it is in the way; it gets dismissed the careful way.
+  const CONSENT_SEL = '#onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .truste_box_overlay, [id*="cookie" i], [class*="cookie" i]';
+  const CONSENT_OK_RE = /reject|decline|refuse|deny|disagree|opt.?out|necessary|essential|close|dismiss|manage|preference|setting|customi[sz]e|continue without|^no\b|^x$/i;
+  // Two ways that selector could swallow the page instead of the banner, both worth ruling out.
+  // Plenty of sites mark <body class="cookie-banner-open"> while the banner is up, and that would
+  // match every button on the page and leave the model with none to press. And a consent widget
+  // never asks anyone to type, so anything holding a text box is a form that happens to be named
+  // after a cookie, not a banner.
+  const consentWidget = (el) => {
+    const w = el && el.closest && el.closest(CONSENT_SEL);
+    if (!w || w.tagName === "BODY" || w.tagName === "HTML") return null;
+    return w.querySelector('textarea, input[type="text"], input[type="email"], input:not([type])') ? null : w;
+  };
+  const consentGiveaway = (el, text) => !!consentWidget(el) && !CONSENT_OK_RE.test(text || "");
+
+  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

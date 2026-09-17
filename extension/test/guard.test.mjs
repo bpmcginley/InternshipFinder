@@ -276,3 +276,24 @@ test("an answered AI-trap question stops being a gate", () => {
   assert.equal(G.detectGate(page({ elements: [el("text", label, { value: "3" })] })), null);
   assert.equal(G.detectGate(page({ elements: [el("text", label, { value: "" })] })).kind, "human_check");
 });
+
+test("on a cookie banner, only the choices that keep the default are offered", () => {
+  const ok = (t) => assert.equal(G.CONSENT_OK_RE.test(t), true, t);
+  const no = (t) => assert.equal(G.CONSENT_OK_RE.test(t), false, t);
+  for (const t of ["Reject All", "Decline", "Only necessary cookies", "Strictly necessary",
+    "Close", "Close preference center", "Manage preferences", "Cookie Settings",
+    "Customize", "Continue without accepting", "Opt out", "Deny"]) ok(t);
+  for (const t of ["Accept All Cookies", "Accept", "Allow all", "I agree", "Got it",
+    "OK", "Yes, I accept", "Enable all"]) no(t);
+
+  // No element means no banner: an ordinary button is untouched whatever it says.
+  assert.equal(G.consentGiveaway(null, "Accept All Cookies"), false);
+
+  // Just enough of an element for closest()/querySelector(): the banner itself, the <body> a site
+  // marks while the banner is up, and a form whose wrapper happens to be named after a cookie.
+  const inside = (tagName, textBox) => ({ closest: () => ({ tagName, querySelector: () => (textBox ? {} : null) }) });
+  assert.equal(G.consentGiveaway(inside("DIV", false), "Accept All Cookies"), true);
+  assert.equal(G.consentGiveaway(inside("DIV", false), "Reject All"), false);
+  assert.equal(G.consentGiveaway(inside("BODY", false), "Accept All Cookies"), false);
+  assert.equal(G.consentGiveaway(inside("DIV", true), "Accept All Cookies"), false);
+});

@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 9; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 10; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -308,6 +308,7 @@
       if (el.closest('[role="listbox"], [role="menu"]')) continue;
       const text = cut(norm(el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || ""), 80);
       if (!text) continue;
+      if (G.consentGiveaway(el, text)) continue;
       if (el.tagName === "A" && !LINK_RE.test(text)) continue;
       const key = text + "|" + el.tagName;
       if (seenText.has(key) && el.tagName === "A") continue;
