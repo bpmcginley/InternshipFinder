@@ -245,6 +245,15 @@ test("a posting that redirected to a board of other jobs is caught; a real step 
       headings: ["Current Openings"],
       text: "Customer Support Rep | Paid Media Manager | Sr. Product Manager - Payments | Revenue Operations Analyst",
     })), true);
+
+  // Taleo sends everyone to a login page before the form, and keeps the posting id in the query
+  // string where the key never looks. What is left of the path has to be the part both URLs share,
+  // and the name of the template that drew the page is not it.
+  assert.equal(postingGone(
+    { title: "2027 Data Product & Analytics Intern", apply_url: "https://textron.taleo.net/careersection/textron/jobdetail.ftl?job=343181" },
+    snap("https://textron.taleo.net/careersection/iam/accessmanagement/login.jsf"), page({
+      title: "Applicant Login", headings: ["Applicant Login"], buttons: [{ text: "SIGN IN" }],
+    })), false);
 });
 
 // Not every pulled posting redirects. Some just 404 and say so.

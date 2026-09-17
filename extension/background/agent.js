@@ -231,10 +231,18 @@ const TITLE_NOISE_RE = /^(a|an|the|and|for|with|our|new|us|usa|united|states|int
 // BambooHR bounced the run to /careers, the board root still "contained" the key and the closed
 // posting went unnoticed. A bare number is a posting id as much as a slug is.
 const KEY_NOISE_RE = /^(jobs?|careers?|apply|application|openings?|positions?|posting|details?|view|list|board|search|index|en|us|en-us|p)$/i;
+// The name of the page that draws the posting is not the posting either, whatever the server writes
+// its templates in. Taleo's URL is /careersection/<company>/jobdetail.ftl?job=343181: the id is in the
+// query string, which leaves "careersection" and "jobdetail.ftl" tied at thirteen characters for the
+// longest segment. "careersection" happens to win that tie today, and it is in the login URL Taleo
+// redirects to, so the posting reads as still there — but the tie is decided by the order the
+// segments happen to appear in, and had it gone the other way every Taleo application would have
+// been abandoned as a dead posting at the login wall.
+const PAGE_FILE_RE = /\.(html?|aspx?|php|jsp|ftl|jsf|jss|cfm|do|action)$/i;
 function postingKey(u) {
   try {
     return new URL(u).pathname.split("/").filter(Boolean)
-      .filter((s) => !KEY_NOISE_RE.test(s) && !/\.(html?|aspx?|php|jsp)$/i.test(s))
+      .filter((s) => !KEY_NOISE_RE.test(s) && !PAGE_FILE_RE.test(s))
       .sort((a, b) => b.length - a.length)[0] || "";
   } catch (e) { return ""; }
 }
