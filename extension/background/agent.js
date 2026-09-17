@@ -225,16 +225,39 @@ const GATE_HELP = {
 // title is anywhere on the page. A Workday or iCIMS step still names the job it belongs to.
 const TITLE_NOISE_RE = /^(a|an|the|and|for|with|our|new|us|usa|united|states|intern|interns|internship|internships|co|op|coop|summer|fall|spring|winter|remote|hybrid|onsite|student|students|program|programs|programme|position|positions|role|roles|opportunity|opportunities|full|part|time|year|level|entry|grad|graduate|undergraduate|\d+)$/i;
 
-// The distinctive part of an apply URL is its longest path segment: a posting id or slug.
+// The distinctive part of an apply URL is its longest path segment: a posting id or slug. The words
+// every careers site shares are not distinctive, and taking the longest without dropping them first
+// picked "careers" out of /careers/131/ — so when Fullbay's Software Engineer Intern closed and
+// BambooHR bounced the run to /careers, the board root still "contained" the key and the closed
+// posting went unnoticed. A bare number is a posting id as much as a slug is.
+const KEY_NOISE_RE = /^(jobs?|careers?|apply|application|openings?|positions?|posting|details?|view|list|board|search|index|en|us|en-us|p)$/i;
 function postingKey(u) {
-  try { return new URL(u).pathname.split("/").filter(Boolean).sort((a, b) => b.length - a.length)[0] || ""; }
-  catch (e) { return ""; }
+  try {
+    return new URL(u).pathname.split("/").filter(Boolean)
+      .filter((s) => !KEY_NOISE_RE.test(s) && !/\.(html?|aspx?|php|jsp)$/i.test(s))
+      .sort((a, b) => b.length - a.length)[0] || "";
+  } catch (e) { return ""; }
+}
+
+// Some postings do not redirect anywhere: the link simply 404s, and the site says so. AcreTrader's
+// Data Intern on Rippling answers with "404 | Page Not Found", a footer and a site-search box — one
+// field, so there is something to fill and nothing worth filling, which is how it slipped past both
+// the redirect check and the empty-page check. Take the page at its word, but only when it is not
+// also asking for an application: a form that mentions "not found" in an error is still a form.
+const NOT_FOUND_RE = /\b(404|page not found|job not found|no longer (available|accepting|posted|open)|position (has been )?(filled|closed)|posting (is )?(closed|expired|removed|no longer))\b/i;
+const APPLICATION_FIELD_RE = /e-?mail|r[eé]sum[eé]|\bcv\b|first name|last name|full name|phone/i;
+
+export function pageGone(frames) {
+  const top = frames.find((f) => f.frameId === 0) || frames[0];
+  if (!top) return false;
+  if (!NOT_FOUND_RE.test(top.title || "") && !(top.headings || []).some((h) => NOT_FOUND_RE.test(h))) return false;
+  return !frames.some((f) => (f.elements || []).some((e) => e.kind === "file" || APPLICATION_FIELD_RE.test(e.label || "")));
 }
 
 export function postingGone(job, snap, frames) {
   const key = postingKey(job.apply_url);
   const here = (snap.top && snap.top.url) || "";
-  if (key.length < 6 || here.includes(key)) return false;
+  if ((key.length < 6 && !/^\d{2,}$/.test(key)) || here.includes(key)) return false;
   const words = String(job.title || "").split(/[^A-Za-z0-9]+/).filter((w) => w.length >= 4 && !TITLE_NOISE_RE.test(w));
   if (!words.length) return false;
   const hay = (here + " " + frames.map((f) => [f.title, (f.headings || []).join(" "),
@@ -434,7 +457,7 @@ async function loop(id) {
       return;
     }
 
-    if (!msgs.length && postingGone(job, snap, frames)) {
+    if (!msgs.length && (postingGone(job, snap, frames) || pageGone(frames))) {
       await appendLog(job.id, { kind: "gate", text: "Paused: this is not the posting you picked." });
       await updateJob(id, { status: "needs_you", pending, activity: "", question: "",
         reason: `The link for "${job.title}" opened somewhere else — the employer has most likely closed the posting. Look at the tab: if the job is gone, remove this one; if you find it, open it yourself and press Resume.` });

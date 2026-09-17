@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
-import { postingGone, deadPage } from "../background/agent.js";
+import { postingGone, deadPage, pageGone } from "../background/agent.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (payload) => `${b64url({ alg: "RS256" })}.${b64url(payload)}.sig`;
@@ -236,6 +236,33 @@ test("a posting that redirected to a board of other jobs is caught; a real step 
   // A short or missing path segment is no evidence either way.
   assert.equal(postingGone({ title: "Robotics Intern", apply_url: "https://acme.com/jobs/7" },
     snap("https://acme.com/"), page({})), false);
+
+  // BambooHR numbers its postings, and every one of its links says "careers" as well. Picking the
+  // longest segment picked the word the board root also has, so the redirect read as no redirect.
+  assert.equal(postingGone(
+    { title: "Software Engineer Intern", apply_url: "https://fullbay.bamboohr.com/careers/131/" },
+    snap("https://fullbay.bamboohr.com/careers"), page({
+      headings: ["Current Openings"],
+      text: "Customer Support Rep | Paid Media Manager | Sr. Product Manager - Payments | Revenue Operations Analyst",
+    })), true);
+});
+
+// Not every pulled posting redirects. Some just 404 and say so.
+test("a page that says the posting is not there is believed, unless it is still a form", () => {
+  const f = (o) => ({ frameId: 0, title: "", headings: [], elements: [], ...o });
+
+  // AcreTrader's Data Intern on Rippling: a 404 title, a footer, and the site's own search box.
+  assert.equal(pageGone([f({ title: "404 | Page Not Found", elements: [{ kind: "text", label: "Search" }] })]), true);
+  assert.equal(pageGone([f({ headings: ["This job is no longer available"] })]), true);
+  assert.equal(pageGone([f({ title: "Careers", headings: ["The position has been filled"] })]), true);
+
+  // A real application that happens to say it: the form is still asking for the student.
+  assert.equal(pageGone([f({ title: "404 | Page Not Found",
+    elements: [{ kind: "text", label: "Email address" }, { kind: "file", label: "Resume" }] })]), false);
+
+  // An ordinary posting says nothing of the kind.
+  assert.equal(pageGone([f({ title: "Data Intern at AcreTrader", elements: [] })]), false);
+  assert.equal(pageGone([]), false);
 });
 
 // A link that renders nothing costs a model turn and a slice of the student's allowance before

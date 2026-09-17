@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 10; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 11; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -40,7 +40,11 @@
   const REQUIRED_MARK_RE = /[*✱∗⁎]\s*$/;
   // Upload widgets label the <input type=file> with the button text ("Attach", "Choose a file or drop
   // it here"), which tells the model nothing about WHICH file. Look past those to the group label.
-  const GENERIC_LABEL_RE = /^(attach|upload|browse|(choose|select|add)\s+(a\s+)?files?|drop|drag|click to (upload|attach|browse)|enter manually|or)\b[^?]{0,40}$/i;
+  // "File" on its own belongs to this list too. Jobvite gives both of its uploads the same
+  // <label for>, reading just "File", and puts the only thing that tells them apart — "Type or paste
+  // your Resume here" against "...your Cover Letter here" — one box further out. Two fields called
+  // File is a coin toss over which one the résumé goes in.
+  const GENERIC_LABEL_RE = /^(attach|upload|browse|(choose|select|add)\s+(a\s+)?files?|drop|drag|click to (upload|attach|browse)|enter manually|or|files?|attachments?|documents?)\b[^?]{0,40}$/i;
   const HINT_RE = /^(no file (selected|chosen)|accepted file types|allowed (file )?types|max(imum)? (file )?size|file size|supported formats|total \d+ files? (selected|attached|uploaded)|drag (and|&) drop|drop (your )?files? here)\b/i;
   const useful = (t) => !!t && !HINT_RE.test(t) && !(GENERIC_LABEL_RE.test(t) && !/r[eé]sum[eé]|\bcv\b|cover|transcript|letter|portfolio|writing|photo|certificat/i.test(t));
 
