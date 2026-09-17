@@ -16,6 +16,7 @@ prompts, replies, emails or tokens. Workers Logs stay off for the same reason.
 | `src/limits.js` | Monthly allowance, per-minute/day rate limits, budget |
 | `src/gemini.js` | Builds the Gemini request, clamps tokens and thinking, prices usage |
 | `src/demand.js` | `POST /demand` and CI-only `GET /demand` |
+| `src/billing.js` | Optional Supporter plan: Stripe Checkout, the billing portal, webhook checks |
 | `src/config.js` | Models, per-task allowances, prices, rate limits. Edit here, then deploy |
 | `wrangler.toml` | Public vars (client IDs, origins, budget) and the D1 binding |
 
@@ -69,6 +70,31 @@ Both need these redirect URIs:
 - `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`. The `"key"` in `extension/manifest.json`
   gives the store install and every Load unpacked copy this same ID, so one redirect covers both.
 
+## Supporter plan (Bruce, only when AI spend needs covering)
+
+The code ships dormant: `PAYMENTS_ENABLED = "0"` in `wrangler.toml`, so `/config` says
+`payments: { enabled: false }`, the dashboard shows no upgrade button and all three `/billing/*` routes
+return 404. Turning it on is these steps, and Claude does none of them — keys stay with you.
+
+1. In Stripe, **test mode first**: create a product ("InternScout Supporter") with a recurring monthly
+   price. Copy the price id (`price_…`).
+2. Price it at AI cost plus fees. `src/config.js` `PLANS.supporter.multiplier` (4×) decides what the
+   money buys; `SUPPORTER_PRICE_TEXT` in `wrangler.toml` is only the text students read, so keep it in
+   step with the real Stripe price.
+3. Secrets:
+   - `npx wrangler secret put STRIPE_SECRET_KEY` (the test `sk_test_…` first)
+   - `npx wrangler secret put STRIPE_PRICE_ID`
+4. Add the webhook in Stripe → Developers → Webhooks: URL `<worker-url>/billing/webhook`, events
+   `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
+   Copy the signing secret and run `npx wrangler secret put STRIPE_WEBHOOK_SECRET`.
+5. Set `PAYMENTS_ENABLED = "1"` and a correct `SITE_URL` in `wrangler.toml`, then `npm run deploy`.
+6. Check it with a test card (`4242 4242 4242 4242`): `GET /me` should flip to `"plan": "supporter"`
+   with a larger allowance, and cancelling in the portal should put it back to `free`.
+7. Only then repeat steps 1–5 with the live keys.
+
+To switch it off again, set `PAYMENTS_ENABLED = "0"` and deploy. Existing subscribers keep their plan
+row but stop being charged only once you cancel their subscriptions in Stripe, so cancel there too.
+
 ## Changing limits
 
 - Allowances, models, prices and rate limits: `src/config.js`, then deploy.
@@ -79,6 +105,7 @@ Both need these redirect URIs:
   of turning away only the newest arrivals. Read your account's real number at
   aistudio.google.com/rate-limit and set this under it. `"0"` turns AI off at once.
 - Share of the allowance for non-.edu accounts: `GENERAL_ALLOWANCE_PCT`.
+- What a Supporter gets: `PLANS.supporter.multiplier` and `SUPPORTER_RATE` in `src/config.js`.
 - Extra school domains that don't end in `.edu`: `EDU_EXTRA_DOMAINS`.
 - New allowed site origin (for example a custom domain): add it to `ALLOWED_ORIGINS`, and to both
   sign-in providers' redirect URIs.

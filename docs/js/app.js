@@ -411,6 +411,29 @@
       if (auth.token) IS.fetchMe(auth.token).then(setMe);
     }, [auth.token]);
 
+    // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
+    // moment later, so check once now and once shortly after before saying anything.
+    useEffect(() => {
+      if (!new URLSearchParams(location.search).has("upgraded")) return;
+      history.replaceState(null, "", location.pathname);
+      setNote("Thanks for supporting InternScout. Your larger allowance is being switched on…");
+      const check = n => IS.fetchMe(auth.token).then(m => {
+        if (m) setMe(m);
+        if (m && m.plan === "supporter") setNote("You're on the Supporter plan. Your AI allowance is now larger.");
+        else if (n > 0) setTimeout(() => check(n - 1), 3000);
+        else setNote("Payment received. If the larger allowance hasn't appeared in a minute, reload the page.");
+      });
+      if (auth.token) check(4);
+    }, [auth.token]);
+
+    async function billing(kind) {
+      setBusy(kind === "checkout" ? "Opening Stripe…" : "Opening your billing page…");
+      const r = await IS.billingUrl(auth.token, kind);
+      setBusy("");
+      if (r.url) location.assign(r.url);
+      else setNote(r.error);
+    }
+
     // profile sync with the extension
     const synced = useRef("");
     useEffect(() => {
@@ -440,6 +463,7 @@
       const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your usage counts and chosen states from our server" : "") + "? This can't be undone.";
       if (!window.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
+      if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
       setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
       setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.");
@@ -591,6 +615,11 @@
     const whereText = p ? [p.states.length ? (p.states.length <= 5 ? p.states.join(", ") : `${p.states.length} states`) : IS.BASELINE.join(", "), p.remote ? "remote" : ""].filter(Boolean).join(" + ") : "";
     const sortTh = (key, label) => h("th", { className: cx("sort", f.sort === key && "on"), onClick: () => upd("sort", key) }, label);
     const feedbackUrl = C.formUrl ? C.formUrl.split("{id}").join("") : C.issuesUrl;
+    // Optional supporter plan. The Worker only advertises it when payments are switched on.
+    const payInfo = auth.cfg && auth.cfg.payments && auth.cfg.payments.enabled ? auth.cfg.payments : null;
+    const upgradeTitle = "Optional. Covers the AI bill and gives you "
+      + (payInfo && payInfo.multiplier ? payInfo.multiplier + "×" : "a bigger")
+      + " your monthly AI allowance. Stripe takes the payment; we never see your card. Cancel any time.";
     const signInTitle = "Optional. Search works without it. Any Google or Microsoft account works; a school .edu email gets more AI use. Signing in also lets your chosen states count toward where we scan in more detail.";
     const signInBtn = auth.cfg && !auth.token && auth.cfg.providers.map(pr =>
       h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
@@ -610,7 +639,9 @@
           auth.token && h("span", { className: "signed", title: who && who.email ? `Signed in as ${who.email}` : "Signed in" }, "Signed in",
             auth.source === "page" && h("button", { type: "button", className: "btn quiet", onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); } }, "Sign out")),
           auth.token && me && me.allowance && h("span", { className: "busy", title: IS.allowanceText(me) },
-            me.paused ? "AI paused this month" : `${IS.leftOf(me, "autofill")} Auto-Apply · ${IS.leftOf(me, "resume_tailor")} resumes left${me.tier === "edu" ? " (.edu)" : ""}`),
+            me.paused ? "AI paused this month" : `${IS.leftOf(me, "autofill")} Auto-Apply · ${IS.leftOf(me, "resume_tailor")} resumes left${me.plan === "supporter" ? " (supporter)" : me.tier === "edu" ? " (.edu)" : ""}`),
+          auth.token && me && me.can_upgrade && h("button", { type: "button", className: "btn quiet", onClick: () => billing("checkout"), disabled: !!busy, title: upgradeTitle }, `Upgrade${payInfo && payInfo.price ? ` · ${payInfo.price}` : ""}`),
+          auth.token && me && me.can_manage && h("button", { type: "button", className: "btn quiet", onClick: () => billing("portal"), disabled: !!busy, title: "Change your card or cancel, on Stripe's own page." }, "Manage plan"),
           info.installed && h("button", { type: "button", className: "btn quiet", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
           info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_panel" }) }, "Queue",
             jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,

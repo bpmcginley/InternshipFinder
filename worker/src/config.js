@@ -35,8 +35,16 @@ export const PRICES = {
 // Unknown model: priced high on purpose so spend is never under-counted
 export const FALLBACK_PRICE = { input: 2, output: 12, cached: 0.2 };
 
+// Plans. "free" is everyone; "supporter" is the optional paid plan that exists so AI spend can be
+// covered if InternScout gets busy. Its multiplier scales every task allowance in TASKS.
+export const PLANS = {
+  free: { multiplier: 1 },
+  supporter: { multiplier: 4, priceText: "$3/month" },
+};
+
 export const CONFIG = {
   TASKS,
+  PLANS,
   THINKING_LEVELS,
   PRICES,
   FALLBACK_PRICE,
@@ -52,4 +60,7 @@ export const CONFIG = {
   DEMAND_WINDOW_DAYS: 90,
   MAX_BODY_BYTES: 4_000_000,
   SCOPES: ["openid", "email", "profile"],
+  // A Supporter gets a bigger share of the budget than a free student, but still a ceiling: one
+  // person on a paid plan must not be able to spend the whole month's budget by themselves.
+  SUPPORTER_RATE: { perMinute: 20, perDay: 900 },
 };

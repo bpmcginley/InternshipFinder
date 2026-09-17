@@ -43,3 +43,23 @@ CREATE INDEX IF NOT EXISTS usage_month ON usage (month);
 CREATE INDEX IF NOT EXISTS runs_month ON runs (month);
 CREATE INDEX IF NOT EXISTS rate_bucket ON rate (bucket);
 CREATE INDEX IF NOT EXISTS demand_seen ON demand (seen);
+
+-- Supporter plan. Stripe keeps the card, the name and the email; these are ids and a status only.
+CREATE TABLE IF NOT EXISTS plans (
+  user_hash TEXT PRIMARY KEY,
+  plan TEXT NOT NULL DEFAULT 'free',
+  status TEXT NOT NULL DEFAULT 'none',
+  customer TEXT,
+  subscription TEXT,
+  period_end TEXT,
+  updated TEXT NOT NULL
+);
+
+-- Seen webhook event ids, so a Stripe retry cannot apply the same change twice
+CREATE TABLE IF NOT EXISTS stripe_events (
+  id TEXT PRIMARY KEY,
+  seen TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS plans_subscription ON plans (subscription);
+CREATE INDEX IF NOT EXISTS stripe_events_seen ON stripe_events (seen);

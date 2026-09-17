@@ -17,7 +17,8 @@ binding = "DB"
 database_name = "internscout"
 database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 
-# Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN
+# Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
+# and for the optional Supporter plan: STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET
 [vars]
 # Anyone with a Google or Microsoft account can sign in; a provider is off while its client ID is empty.
 GOOGLE_CLIENT_ID = "393696929617-g2ck4v93fdl54gioop0utk9c46p4thut.apps.googleusercontent.com"
@@ -33,3 +34,10 @@ MONTHLY_BUDGET_CENTS = "2500"
 # and leave every student with upstream 429s. Your account's real number is at
 # aistudio.google.com/rate-limit -- set this under it, with headroom. "0" turns AI off immediately.
 GLOBAL_RPM = "120"
+# The paid "Supporter" plan is dormant until this is "1" and the three Stripe secrets are set.
+# While it is off, nothing about paying is shown and the billing routes answer 404.
+PAYMENTS_ENABLED = "0"
+# Shown on the upgrade button. Stripe charges whatever the price in your Stripe dashboard says.
+SUPPORTER_PRICE_TEXT = "$3/month"
+# Where Stripe sends students back to after checkout
+SITE_URL = "https://bpmcginley.github.io/InternshipFinder"

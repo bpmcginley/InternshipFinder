@@ -1,5 +1,6 @@
 // Allowance, per-run, rate and budget checks over D1. Counters only, never request content.
 import { HttpError } from "./http.js";
+import { paymentsOn } from "./billing.js";
 
 export const monthOf = (d) => d.toISOString().slice(0, 7);
 
@@ -50,8 +51,9 @@ export async function usageFor(db, user, month) {
 }
 
 // Monthly units for a task: the full table for "edu", GENERAL_ALLOWANCE_PCT of it (min 1) for "general".
-export function allowanceFor(config, env, task, tier) {
-  const base = config.TASKS[task].allowance;
+export function allowanceFor(config, env, task, tier, plan = "free") {
+  const mult = (config.PLANS[plan] || config.PLANS.free).multiplier;
+  const base = config.TASKS[task].allowance * mult;
   if (tier === "edu") return base;
   const raw = Number(env.GENERAL_ALLOWANCE_PCT);
   const pct = env.GENERAL_ALLOWANCE_PCT !== undefined && env.GENERAL_ALLOWANCE_PCT !== "" && Number.isFinite(raw)
@@ -60,7 +62,8 @@ export function allowanceFor(config, env, task, tier) {
 }
 
 // Checks budget, rate and allowance for one /ai call, then counts it in the rate buckets.
-export async function admit(db, env, config, user, task, runId, now, tier = "general") {
+export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free") {
+  const rate = plan === "supporter" && config.SUPPORTER_RATE ? config.SUPPORTER_RATE : config.RATE;
   const month = monthOf(now);
   if ((await spend(db, month)) >= budgetCents(env, config)) {
     throw new HttpError(503, "paused", "AI features are paused until next month because the budget is used up. Search still works.");
@@ -75,7 +78,7 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   const calls = Object.fromEntries(results.filter((r) => r.user_hash === user).map((r) => [r.bucket, r.calls]));
   const globalCalls = (results.find((r) => r.user_hash === GLOBAL_USER) || {}).calls || 0;
   const untilNextMinute = 60 - now.getUTCSeconds();
-  if ((calls[minute] || 0) >= config.RATE.perMinute) {
+  if ((calls[minute] || 0) >= rate.perMinute) {
     throw new HttpError(429, "rate", "Too many AI calls this minute", { retry_after: untilNextMinute });
   }
   // Checked after the student's own limit so that someone who is genuinely over their own rate hears
@@ -84,18 +87,19 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     throw new HttpError(503, "busy", "InternScout is handling a lot of AI requests right now. Try again in a minute.",
                         { retry_after: untilNextMinute });
   }
-  if ((calls[day] || 0) >= config.RATE.perDay) {
+  if ((calls[day] || 0) >= rate.perDay) {
     const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
     throw new HttpError(429, "rate", "Daily AI call limit reached", { retry_after: Math.ceil((midnight - now.getTime()) / 1000) });
   }
 
-  const limit = allowanceFor(config, env, task, tier);
+  const limit = allowanceFor(config, env, task, tier, plan);
   const run = await db.prepare("SELECT calls FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?")
     .bind(user, month, task, runId).first();
   const row = await db.prepare("SELECT units FROM usage WHERE user_hash = ? AND month = ? AND task = ?")
     .bind(user, month, task).first();
   const used = row ? row.units : 0;
-  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now) });
+  // The client uses `upgrade` to decide whether to mention the Supporter plan; it never guesses.
+  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: paymentsOn(env) && plan === "free" });
   if (run && run.calls >= config.MAX_CALLS_PER_RUN) throw cap("This run reached its call limit");
   if (!run && used >= limit) throw cap(`Monthly ${task} allowance is used up`);
 
@@ -139,5 +143,7 @@ export async function cleanup(db, now) {
     db.prepare("DELETE FROM rate WHERE bucket >= 'm:' AND bucket < ?").bind("m:" + day),
     db.prepare("DELETE FROM runs WHERE month < ?").bind(monthOf(now)),
     db.prepare("DELETE FROM usage WHERE month < ?").bind(yearAgo),
+    // Webhook ids are only needed for as long as Stripe retries an event (hours, not weeks).
+    db.prepare("DELETE FROM stripe_events WHERE seen < ?").bind(new Date(now.getTime() - 30 * 86400e3).toISOString()),
   ]);
 }

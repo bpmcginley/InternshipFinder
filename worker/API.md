@@ -65,20 +65,34 @@ Every error is JSON `{ "error": code, "message": text }`:
       "scopes": ["openid", "email", "profile"] } ],
   "allowance": {
     "edu":     { "resume_tailor": 8, "autofill": 15, "deep_dive": 2, "field_match": 200, "short_answer": 60 },
-    "general": { "resume_tailor": 4, "autofill": 7,  "deep_dive": 1, "field_match": 100, "short_answer": 30 } },
+    "general": { "resume_tailor": 4, "autofill": 7,  "deep_dive": 1, "field_match": 100, "short_answer": 30 },
+    "supporter": { "resume_tailor": 32, "autofill": 60, "deep_dive": 8, "field_match": 800, "short_answer": 240 } },
+  "payments": { "enabled": false },
   "paused": false }
 ```
 The `general` allowance is `floor(edu × GENERAL_ALLOWANCE_PCT / 100)`, with a minimum of 1 per task. Only providers
 with a client ID set are listed.
 
+`supporter` is the `edu` allowance times the Supporter multiplier, shown so the dashboard can say what
+upgrading buys. When the Supporter plan is on, `payments` is
+`{ "enabled": true, "price": "$3/month", "multiplier": 4 }`; otherwise it is `{ "enabled": false }`.
+
 ### `GET /me` (auth)
 ```json
-{ "month": "2026-09", "plan": "free", "tier": "edu", "paused": false,
+{ "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
+  "can_upgrade": true, "can_manage": false,
   "allowance": { "resume_tailor": { "used": 1, "limit": 8 }, "autofill": { "used": 0, "limit": 15 } } }
 ```
+- **`plan`** is `free` or `supporter`. `limit` already includes the plan multiplier.
+- **`plan_renews`** is the paid-through date (ISO) while subscribed, else `null`.
+- **`can_upgrade`** is true when payments are on and the student is on the free plan.
+- **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
 
 ### `DELETE /me` (auth)
-Deletes every usage and demand row for this user. Returns `{ "ok": true }`.
+Deletes every usage, demand and plan row for this user. Returns `{ "ok": true }`.
+
+While a subscription is active it returns `409 subscribed` instead: cancelling in Stripe has to come
+first, so nothing keeps billing a card for an account that no longer exists here.
 
 ### `POST /ai` (auth)
 Body:
@@ -117,18 +131,45 @@ Only users active in the last 90 days count. The ingest workflow reads this with
 `INTERNSCOUT_DEMAND_URL` + `INTERNSCOUT_DEMAND_TOKEN` and passes the state codes to the backend as
 `INTERNSCOUT_WANTED_STATES`.
 
+## Supporter plan (optional, off by default)
+
+Every route below returns `404 not_found` unless `PAYMENTS_ENABLED` is `"1"` **and** `STRIPE_SECRET_KEY`
+and `STRIPE_PRICE_ID` are set (the webhook also needs `STRIPE_WEBHOOK_SECRET`). Stripe holds the card,
+name and email. The Worker stores only the hashed user id, the Stripe customer and subscription ids, a
+status and the paid-through date.
+
+### `POST /billing/checkout` (auth)
+Returns `{ "url": "https://checkout.stripe.com/…" }` for the student to open. The session carries
+`client_reference_id = user_hash` only, so a payment can be matched back to an account without Stripe
+learning who the student is. `409 already` if they are already on the Supporter plan.
+
+### `POST /billing/portal` (auth)
+Returns `{ "url": … }` for Stripe's own billing portal (change card, cancel). `404` if there is no
+Stripe customer for this user. We build no billing screens.
+
+### `POST /billing/webhook` (Stripe only, no sign-in)
+Needs a valid `Stripe-Signature` header; an unverified body never changes a plan. A signature more than
+5 minutes old is refused, and a repeated event id returns `{ "ok": true, "repeat": true }` without
+applying twice. Handled types: `checkout.session.completed`, `customer.subscription.updated`,
+`customer.subscription.deleted`. Anything else is ignored.
+
+In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
+
 ## Worker secrets and vars
 - **Secrets** (Bruce sets them with `wrangler secret put`):
   - `GEMINI_API_KEY`
   - `HASH_SALT`
   - `DEMAND_TOKEN`
+  - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (only for the Supporter plan)
 - **Vars:**
   - `GOOGLE_CLIENT_ID`, `MS_CLIENT_ID` (a provider is off while its ID is empty)
   - `EDU_EXTRA_DOMAINS` (comma list of non-`.edu` school domains, default empty), `GENERAL_ALLOWANCE_PCT` (default 50)
   - `ALLOWED_ORIGINS`
   - `MONTHLY_BUDGET_CENTS` (default 2500)
   - `GLOBAL_RPM` (AI calls per minute across everyone, default 120; `"0"` turns AI off)
-- **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`. The schema is in `worker/schema.sql`.
+  - `PAYMENTS_ENABLED` (`"0"` by default), `SUPPORTER_PRICE_TEXT` (display only), `SITE_URL` (where Stripe returns to)
+- **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `plans`, `stripe_events`.
+  The schema is in `worker/schema.sql`.
 
 ## Dashboard ↔ extension bridge
 - The existing bridge (`extension/bridge/bridge.js`) relays `{__internscout:"req", id, msg}`. The background worker handles it by `msg.type`.

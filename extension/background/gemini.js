@@ -140,8 +140,11 @@ export function workerError(status, data = {}) {
   else if (code === "cap") {
     const label = { resume_tailor: "tailored-resume", autofill: "Auto-Apply", deep_dive: "Deep Dive", field_match: "field-matching", short_answer: "short-answer" }[data.task] || "AI";
     const resets = data.resets ? ` It resets ${new Date(data.resets).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}.` : "";
+    // The Worker sets `upgrade` only when the Supporter plan is switched on, so we never advertise
+    // a plan that doesn't exist.
+    const more = data.upgrade ? " To raise it, open the InternScout dashboard and press Upgrade, or " : " To keep going now, ";
     msg = data.resets
-      ? `You've used this month's free ${label} allowance.${resets} Accounts with a school .edu email get twice as much. To keep going now, ${OWN_KEY_HINT.replace(/^or /, "")}.`
+      ? `You've used this month's free ${label} allowance.${resets} Accounts with a school .edu email get twice as much.${more}${OWN_KEY_HINT.replace(/^or /, "")}.`
       : `This run hit its AI call limit${data.message ? ` (${data.message})` : ""}. Finish it by hand, ${OWN_KEY_HINT}.`;
   } else if (code === "rate") msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
   // Not this student's own limit: everyone's calls together hit the server's per-minute ceiling. Say so,

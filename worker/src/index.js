@@ -5,6 +5,7 @@ import { authenticateUser, providers } from "./auth.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
 import { addSpend, admit, allowanceFor, cleanup, commitRun, deleteUser, isPaused, monthOf, usageFor } from "./limits.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
+import { applyEvent, blocksDeletion, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // The extension's ID is fixed by the "key" in its manifest (same ID from the store and from Load unpacked),
@@ -68,13 +69,14 @@ async function route(request, env, ctx, d) {
   const now = d.now();
   let who = { user: null, tier: "general" };   // set by signIn()
   const signIn = async () => (who = await authenticateUser(request, env, { fetch: d.fetch, now: now.getTime() })).user;
-  const limits = (tier) => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier));
+  const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan));
 
   switch (`${request.method} ${path}`) {
     case "GET /config": {
       return json({
         providers: providers(env).map((p) => ({ ...p, scopes: d.config.SCOPES })),
-        allowance: { edu: limits("edu"), general: limits("general") },
+        allowance: { edu: limits("edu"), general: limits("general"), supporter: limits("edu", "supporter") },
+        payments: paymentsInfo(env, d.config),
         paused: await isPaused(db, env, d.config, now),
       });
     }
@@ -84,19 +86,47 @@ async function route(request, env, ctx, d) {
       later(ctx, touchSeen(db, user, now));
       const month = monthOf(now);
       const used = await usageFor(db, user, month);
+      const mine = await planOf(db, user);
       return json({
         month,
-        plan: "free",
+        plan: mine.plan,
+        plan_renews: mine.periodEnd,
+        can_upgrade: paymentsOn(env) && mine.plan === "free",
+        can_manage: paymentsOn(env) && !!mine.customer,
         tier: who.tier,
         paused: await isPaused(db, env, d.config, now),
-        allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier) })),
+        allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan) })),
       });
     }
 
     case "DELETE /me": {
       const user = await signIn();
+      if (await blocksDeletion(db, user)) {
+        throw new HttpError(409, "subscribed", "Cancel your Supporter plan first, then delete your data.");
+      }
       await deleteUser(db, user);
+      await deletePlan(db, user);
       return json({ ok: true });
+    }
+
+    // Stripe hosts both pages; we only hand out the link.
+    case "POST /billing/checkout": {
+      const user = await signIn();
+      return json(await checkout(db, env, user, now, d.fetch));
+    }
+
+    case "POST /billing/portal": {
+      const user = await signIn();
+      return json(await portal(db, env, user, d.fetch));
+    }
+
+    // Called by Stripe, not by a student: no sign-in, a signature instead.
+    case "POST /billing/webhook": {
+      if (!paymentsOn(env) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
+      const body = await request.text();
+      if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
+      const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
+      return json(await applyEvent(db, env, event, now, d.fetch));
     }
 
     case "POST /ai": {
@@ -115,7 +145,8 @@ async function route(request, env, ctx, d) {
       const model = d.config.TASKS[task].model;
       const stream = url.searchParams.get("stream") === "1";
 
-      const admitted = await admit(db, env, d.config, user, task, runId, now, who.tier);
+      const { plan } = await planOf(db, user);
+      const admitted = await admit(db, env, d.config, user, task, runId, now, who.tier, plan);
       const upstream = await callGemini(model, gem, stream, env, d.fetch);
       const remaining = await commitRun(db, user, task, runId, admitted);
       later(ctx, touchSeen(db, user, now));

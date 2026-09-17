@@ -396,17 +396,36 @@
     if (!me || !me.allowance) return "";
     const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
     lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
+    if (me.plan === "supporter") lines.push("Supporter plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
     if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");
     return lines.join("\n");
   }
 
+  // Upgrade ("checkout") or change/cancel ("portal"). The Worker talks to Stripe; we only get a URL to
+  // send the student to. No card details ever touch this page.
+  async function billingUrl(token, kind) {
+    if (!workerOn() || !token) return { error: "Sign in first." };
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/billing/" + kind, {
+        method: "POST", headers: { Authorization: "Bearer " + token },
+      });
+      if (r.status === 401) { signOut(); return { error: "Sign in again." }; }
+      const b = await r.json().catch(() => ({}));
+      if (r.ok && b.url) return { url: b.url };
+      return { error: b.message || "That didn't work. Try again later." };
+    } catch (e) { return { error: "Couldn't reach the server." }; }
+  }
+
   // "Delete my data": server rows (if signed in), then everything this page keeps in the browser.
   async function deleteMyData(token) {
-    let server = null;
+    let server = null, blocked = false;
     if (workerOn() && token) {
       try {
         const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/me", { method: "DELETE", headers: { Authorization: "Bearer " + token } });
         server = r.ok;
+        // A live subscription would keep billing a card for an account we'd just erased, so the
+        // Worker refuses until it is cancelled. Leave the browser copy alone and say so.
+        if (r.status === 409) return { server: false, blocked: true };
       } catch (e) { server = false; }
     }
     ls.del(PROFILE_KEY); ls.del("internscout.demand.sent");
@@ -430,7 +449,7 @@
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData,
-    fetchMe, leftOf, allowanceText,
+    fetchMe, leftOf, allowanceText, billingUrl,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

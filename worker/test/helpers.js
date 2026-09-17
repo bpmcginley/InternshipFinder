@@ -43,7 +43,7 @@ export function fakeD1() {
     exec: async (query) => (sql.exec(query), { count: 1 }),
     dump() {
       const out = {};
-      for (const t of ["usage", "runs", "rate", "demand", "budget"]) {
+      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events"]) {
         out[t] = sql.prepare(`SELECT * FROM ${t}`).all().map((r) => ({ ...r }));
       }
       return out;
@@ -120,13 +120,22 @@ export function geminiReply(url) {
   return Response.json({ candidates: [{ content: { role: "model", parts: [{ text: "Hello world" }] } }], usageMetadata: USAGE });
 }
 
-export function fakeFetch(jwks, gemini = geminiReply) {
+// stripe(url, init) answers api.stripe.com; the default pretends every call succeeds.
+export function stripeReply(url) {
+  if (url.includes("checkout/sessions")) return Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" });
+  if (url.includes("billing_portal/sessions")) return Response.json({ id: "bps_1", url: "https://billing.stripe.test/p/1" });
+  if (url.includes("subscriptions/")) return Response.json({ id: "sub_1", status: "active", current_period_end: 1794000000 });
+  return Response.json({ error: { type: "invalid_request_error" } }, { status: 400 });
+}
+
+export function fakeFetch(jwks, gemini = geminiReply, stripe = stripeReply) {
   const calls = [];
   const fn = async (url, init = {}) => {
     url = String(url);
     calls.push({ url, init });
     if (url.endsWith("/certs") || url.endsWith("/keys")) return Response.json({ keys: jwks });
     if (url.includes("generativelanguage.googleapis.com")) return gemini(url, init);
+    if (url.startsWith("https://api.stripe.com/")) return stripe(url, init);
     return new Response("not found", { status: 404 });
   };
   fn.calls = calls;
@@ -134,11 +143,11 @@ export function fakeFetch(jwks, gemini = geminiReply) {
 }
 
 // A Worker plus helpers: api(method, path, {token, body, headers}) and token(claimOverrides)
-export async function setup({ env = {}, config = {}, gemini, now = NOW } = {}) {
+export async function setup({ env = {}, config = {}, gemini, stripe, now = NOW } = {}) {
   clearJwksCache();
   const keys = await sharedKeys();
   const e = makeEnv(env);
-  const fetch = fakeFetch([keys.jwk], gemini);
+  const fetch = fakeFetch([keys.jwk], gemini, stripe);
   const cfg = { ...CONFIG, ...config };
   const pending = [];
   const ctx = { waitUntil: (p) => pending.push(p) };

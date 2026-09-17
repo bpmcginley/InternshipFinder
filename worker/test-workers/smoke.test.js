@@ -16,7 +16,8 @@ it("GET /config answers without sign-in", async () => {
   const res = await exports.default.fetch("https://internscout.test/config");
   expect(res.status).toBe(200);
   const body = await res.json();
-  expect(body.scopes).toEqual(["openid", "email", "profile"]);
+  expect(body.providers.every((p) => p.scopes.includes("openid"))).toBe(true);
+  expect(body.payments.enabled).toBe(false);
   expect(body.paused).toBe(false);
 });
 
