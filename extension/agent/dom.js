@@ -36,6 +36,12 @@
   // model had just been given. act() uses this to find the replacement node under the same ref.
   const fingerprint = (rec) => [rec.kind, rec.el.id || "", rec.el.getAttribute("name") || "", rec.label || ""].join("|");
   const isField = (el) => el.matches("input, select, textarea");
+  // "Is there a second question in this box?" — asked while climbing towards a caption. Hidden and
+  // disabled controls do not count: a form library parks a shadow <input> beside every widget it
+  // draws, and a step that has not been reached yet is not competing for the caption either.
+  const OTHER_FIELD_SEL = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select, [role="radio"], [role="checkbox"]';
+  const otherFieldIn = (box, scope) => [...box.querySelectorAll(OTHER_FIELD_SEL)]
+    .some((f) => f !== scope && !scope.contains(f) && !f.contains(scope) && !f.disabled && A.visible(f));
   // Required-field markers aren't always ASCII "*" — Lever uses U+2731 HEAVY ASTERISK ("✱").
   const REQUIRED_MARK_RE = /[*✱∗⁎]\s*$/;
   // Upload widgets label the <input type=file> with the button text ("Attach", "Choose a file or drop
@@ -75,6 +81,13 @@
     // Upload widgets nest the input deeper under their "Resume*" caption (BambooHR: 6 levels).
     const depth = el.type === "file" ? 7 : 5;
     for (let i = 0; i < depth && p && p !== document.body; i++, p = p.parentElement) {
+      // Stop at the first box that holds a second field. A caption in there is over both of them, so
+      // it names neither: JazzHR draws the street, city, state and postal boxes in one row under a
+      // single "Address", and the walk handed "Address" back for all four. Three fields with the
+      // same label is a guess for the model and nothing at all for the rule-based contact fill,
+      // which matches on the label — while the boxes' own placeholders say City, State/Province and
+      // Postal. One field in the box is what makes a caption a label.
+      if (otherFieldIn(p, scope)) break;
       for (const l of p.querySelectorAll('label, legend, [class*="label"], [class*="Label"], [class*="question"], h3, h4, p')) {
         if (scope.contains(l) || l.contains(scope)) continue;
         const t = txt(l);

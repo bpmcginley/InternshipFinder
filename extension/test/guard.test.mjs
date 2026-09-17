@@ -296,4 +296,24 @@ test("on a cookie banner, only the choices that keep the default are offered", (
   assert.equal(G.consentGiveaway(inside("DIV", false), "Reject All"), false);
   assert.equal(G.consentGiveaway(inside("BODY", false), "Accept All Cookies"), false);
   assert.equal(G.consentGiveaway(inside("DIV", true), "Accept All Cookies"), false);
+
+  // A stack of boxes from the button up; the fixed one is the banner. JazzHR's buttons sit two
+  // levels under #tracking-consent-banner, in a container laid out normally, so asking only about
+  // the button's nearest consent-named box would have missed the overlay.
+  const stack = (...specs) => {
+    const win = { getComputedStyle: (e) => ({ position: e.position || "static" }) };
+    const nodes = specs.map((s) => ({
+      tagName: "DIV", ownerDocument: { defaultView: win }, parentElement: null, ...s,
+      closest() { let p = this; while (p) { if (p.consent) return p; p = p.parentElement; } return null; },
+      querySelector() { return this.textBox ? {} : null; },
+    }));
+    nodes.forEach((n, i) => { n.parentElement = nodes[i + 1] || null; });
+    return nodes[0];
+  };
+  const jazz = () => stack({}, { consent: true }, { consent: true, position: "fixed" }, { tagName: "FOOTER" });
+  assert.equal(G.consentGiveaway(jazz(), "ALLOW"), true);
+  assert.equal(G.consentGiveaway(jazz(), "REJECT ALL"), false);
+  // A part of a real application that happens to be named "consent" is laid out in the page rather
+  // than over it, and its button is the way forward, not a giveaway.
+  assert.equal(G.consentGiveaway(stack({}, { consent: true }, { tagName: "BODY" }), "Continue"), false);
 });

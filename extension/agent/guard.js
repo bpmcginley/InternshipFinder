@@ -252,17 +252,37 @@
   // a model reaches for the biggest button to clear. So offer only the ways out that keep the
   // default — reject, necessary-only, close, or the preference screen. The banner still gets
   // dismissed when it is in the way; it gets dismissed the careful way.
-  const CONSENT_SEL = '#onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .truste_box_overlay, [id*="cookie" i], [class*="cookie" i]';
+  // JazzHR's banner is not named after a cookie at all: its buttons sit in #tracking-consent-banner,
+  // so "ALLOW" was still on the model's list. The word these widgets do share is "consent".
+  const CONSENT_SEL = '#onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .truste_box_overlay, [id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i], [id*="gdpr" i], [class*="gdpr" i]';
   const CONSENT_OK_RE = /reject|decline|refuse|deny|disagree|opt.?out|necessary|essential|close|dismiss|manage|preference|setting|customi[sz]e|continue without|^no\b|^x$/i;
   // Two ways that selector could swallow the page instead of the banner, both worth ruling out.
   // Plenty of sites mark <body class="cookie-banner-open"> while the banner is up, and that would
   // match every button on the page and leave the model with none to press. And a consent widget
   // never asks anyone to type, so anything holding a text box is a form that happens to be named
   // after a cookie, not a banner.
+  // A banner is an overlay: drawn over the page rather than laid out in it. That is the line between
+  // the cookie notice sitting on top of the form and a part of the form that happens to be named
+  // "consent" — and taking away the one button that moves a real application on would be a worse
+  // failure than the one this prevents. The fixed box is usually a level or two above the button's
+  // nearest consent-named ancestor (JazzHR wraps its buttons in a static container; OneTrust puts
+  // the fixed banner inside a static sdk root), so ask about the whole chain up to the outermost.
+  const overlay = (el, w) => {
+    const win = el.ownerDocument && el.ownerDocument.defaultView;
+    if (!win || !win.getComputedStyle) return true; // nothing to measure: treat it as the banner
+    for (let p = el; p; p = p.parentElement) {
+      const pos = win.getComputedStyle(p).position;
+      if (pos === "fixed" || pos === "sticky") return true;
+      if (p === w) return false;
+    }
+    return false;
+  };
   const consentWidget = (el) => {
-    const w = el && el.closest && el.closest(CONSENT_SEL);
+    let w = el && el.closest && el.closest(CONSENT_SEL);
+    while (w && w.parentElement && w.parentElement.closest(CONSENT_SEL)) w = w.parentElement.closest(CONSENT_SEL);
     if (!w || w.tagName === "BODY" || w.tagName === "HTML") return null;
-    return w.querySelector('textarea, input[type="text"], input[type="email"], input:not([type])') ? null : w;
+    if (w.querySelector('textarea, input[type="text"], input[type="email"], input:not([type])')) return null;
+    return overlay(el, w) ? w : null;
   };
   const consentGiveaway = (el, text) => !!consentWidget(el) && !CONSENT_OK_RE.test(text || "");
 
