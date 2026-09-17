@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
-import { postingGone } from "../background/agent.js";
+import { postingGone, deadPage } from "../background/agent.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (payload) => `${b64url({ alg: "RS256" })}.${b64url(payload)}.sig`;
@@ -236,4 +236,30 @@ test("a posting that redirected to a board of other jobs is caught; a real step 
   // A short or missing path segment is no evidence either way.
   assert.equal(postingGone({ title: "Robotics Intern", apply_url: "https://acme.com/jobs/7" },
     snap("https://acme.com/"), page({})), false);
+});
+
+// A link that renders nothing costs a model turn and a slice of the student's allowance before
+// anyone finds out. ADP's cookie-walled page is the real one this came from.
+test("a page with nothing to fill and no way forward is not sent to the model", () => {
+  const f = (o) => ({ elements: [], buttons: [], busy: false, captcha: false, ...o });
+
+  // ADP: a OneTrust banner and nothing else.
+  assert.equal(deadPage([f({ buttons: [{ text: "Close" }, { text: "Cookie Privacy Statement" }] })]), true);
+
+  // A normal job page before the form: no fields yet, but a way in.
+  assert.equal(deadPage([f({ buttons: [{ text: "Apply now" }] })]), false);
+  assert.equal(deadPage([f({ buttons: [{ text: "Sign in to continue" }] })]), false);
+
+  // Still drawing, or asking for a robot check: not dead, just slow.
+  assert.equal(deadPage([f({ busy: true })]), false);
+  assert.equal(deadPage([f({ captcha: true })]), false);
+
+  // A form: obviously alive, whatever the buttons say.
+  assert.equal(deadPage([f({ elements: [{ ref: "e1" }], buttons: [{ text: "Close" }] })]), false);
+
+  // An iframe carrying the application counts for the whole page.
+  assert.equal(deadPage([f({ buttons: [{ text: "Close" }] }), f({ buttons: [{ text: "Start application" }] })]), false);
+
+  // No frames at all means the page was not readable; that is a different story.
+  assert.equal(deadPage([]), false);
 });

@@ -108,6 +108,18 @@ def _to_dt(ts):
 PUBLIC_SOURCES = ("usajobs", "nyc_jobs")
 
 
+def _dead_url(url: str) -> bool:
+    """A career-centre link that has lost the tenant id it needs opens nothing at all.
+
+    ADP's recruitment.html without a cid draws its cookie banner and then stops: no job, no form,
+    no Apply, however long you wait. Our own ADP fetcher always writes the cid, but the same link
+    reaches us second-hand from search feeds, which carry it the way it was posted rather than the
+    way it works. A listing nobody can open is worse than one we never had.
+    """
+    u = (url or "").lower()
+    return "workforcenow.adp.com" in u and "recruitment.html" in u and "cid=" not in u
+
+
 def normalize(raw: dict) -> dict | None:
     """raw fields expected: company_name, title, locations[list], season, year,
     apply_url, source, source_url, posted_at, active(bool), description(optional).
@@ -117,6 +129,8 @@ def normalize(raw: dict) -> dict | None:
     title = (raw.get("title") or "").strip()
     company = (raw.get("company_name") or "").strip()
     if not title or not company:
+        return None
+    if _dead_url(raw.get("apply_url") or raw.get("url") or ""):
         return None
     stages = stage_of(title, raw.get("employment_type", ""))
     if not stages:  # student opportunities only

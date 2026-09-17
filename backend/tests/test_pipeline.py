@@ -79,3 +79,15 @@ def test_full_pipeline():
 if __name__ == "__main__":
     test_classify(); test_term_parse(); test_geo(); test_dedupe_title(); test_full_pipeline()
     print("OK")
+
+
+def test_dead_adp_link_is_dropped():
+    """ADP's recruitment.html without a cid opens a cookie banner and nothing else, forever."""
+    base = dict(company_name="Mathtech", title="Web Application Developer Intern",
+                locations=["Falls Church, VA"], source="google_jobs", active=True)
+    adp = "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html"
+    assert normalize({**base, "apply_url": adp + "?jobId=565843"}) is None
+    # The same posting with the tenant id our own fetcher writes is fine.
+    assert normalize({**base, "apply_url": adp + "?cid=89da4960&ccId=19000101_000001&jobId=565843"})
+    # And nothing else on ADP is touched.
+    assert normalize({**base, "apply_url": "https://workforcenow.adp.com/jobs/apply/posting.html?client=acme"})

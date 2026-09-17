@@ -242,6 +242,20 @@ export function postingGone(job, snap, frames) {
   return !words.some((w) => hay.includes(w.toLowerCase()));
 }
 
+// A dead link is not a rare accident: postings get pulled, a career centre link loses the tenant id
+// it needs, a whole site answers from behind a cookie wall. Mathtech's Web Application Developer
+// Intern on ADP draws a OneTrust banner and nothing else - no job, no form, no Apply - and the run
+// would have spent a turn, and a slice of the student's allowance, asking a model what to make of
+// it. Nothing to fill and no way forward is not a page worth thinking about.
+const FORWARD_RE = /appl|start|begin|continue|next|proceed|submit|sign ?(in|up)|log ?in|register|create|upload|autofill|r[eé]sum[eé]|interested/i;
+
+export function deadPage(frames) {
+  return frames.length > 0
+    && !frames.some((f) => (f.elements || []).length)
+    && !frames.some((f) => (f.buttons || []).some((b) => FORWARD_RE.test(b.text || "")))
+    && !frames.some((f) => f.busy || f.captcha || f.captchaFrame);
+}
+
 function gateIn(frames) {
   for (const f of frames) {
     const g = globalThis.ISGuard.detectGate(f);
@@ -424,6 +438,14 @@ async function loop(id) {
       await appendLog(job.id, { kind: "gate", text: "Paused: this is not the posting you picked." });
       await updateJob(id, { status: "needs_you", pending, activity: "", question: "",
         reason: `The link for "${job.title}" opened somewhere else — the employer has most likely closed the posting. Look at the tab: if the job is gone, remove this one; if you find it, open it yourself and press Resume.` });
+      await saveMsgs(id, msgs);
+      return;
+    }
+
+    if (!msgs.length && deadPage(frames)) {
+      await appendLog(job.id, { kind: "gate", text: "Paused: nothing loaded on this page." });
+      await updateJob(id, { status: "needs_you", pending, activity: "", question: "",
+        reason: "Nothing loaded on that page — no application, no Apply button. The link is probably dead, or the site is not letting us in. Have a look in the tab: if you get to a form, press Resume." });
       await saveMsgs(id, msgs);
       return;
     }
