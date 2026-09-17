@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 7; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 8; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -330,6 +330,17 @@
   // Frames that belong to a CAPTCHA provider: their "Verify" / "Refresh challenge" buttons are not ours to press.
   const CAPTCHA_FRAME = /(^|\.)(hcaptcha\.com|recaptcha\.net|captcha-delivery\.com|arkoselabs\.com|funcaptcha\.com)$|^challenges\.cloudflare\.com$/.test(location.hostname) ||
     (/(^|\.)google\.com$/.test(location.hostname) && /^\/recaptcha\//.test(location.pathname));
+  // Chrome stops requestAnimationFrame in a tab the student has switched away from, and every
+  // renderer that paints inside a frame stops with it. On Pinpoint (Rails/Turbo) the Apply link
+  // changed the URL and then drew nothing at all: the old job page stayed on screen until the tab
+  // came back to the front, so the agent would have clicked Apply against a page that could not
+  // move, once per turn, until it ran out of turns. A heartbeat measures the stall itself rather
+  // than inferring it, and pairing it with visibilityState keeps a merely slow page out.
+  let lastFrame = 0;
+  const beat = () => { lastFrame = Date.now(); requestAnimationFrame(beat); };
+  requestAnimationFrame(beat);
+  const frozen = () => document.visibilityState === "hidden" && (!lastFrame || Date.now() - lastFrame > 1500);
+
   // Nothing to fill yet because the page is still drawing (Workday and Oracle load the job after the tab says complete).
   function busy() {
     if (deepQueryAll('[aria-busy="true"], [data-automation-id*="loading" i], [class*="spinner" i], [class*="loading" i]:not(body):not(html)').some(A.visible)) return true;
@@ -350,7 +361,7 @@
       .filter(A.visible).map(txt).filter(Boolean).map((t) => cut(t, 160)))].slice(0, 12);
     const captcha = captchaShown();
     const text = elements.length < 4 ? cut(txt(document.body), 2500) : "";
-    return { url: location.href, title: document.title, headings, step, errors, captcha, elements, buttons, text, filledFields: ctx.filledFields, busy: !elements.length && busy() };
+    return { url: location.href, title: document.title, headings, step, errors, captcha, elements, buttons, text, filledFields: ctx.filledFields, busy: !elements.length && busy(), frozen: frozen() };
   }
 
   async function fillText(rec, text, secret) {

@@ -78,9 +78,17 @@ export const TOOLS = [
 async function ensureTab(job) {
   if (job.tabId) {
     const t = await chrome.tabs.get(job.tabId).catch(() => null);
-    if (t) return t.id;
+    // Resume is pressed from the InternScout panel, which is a tab of its own, so without this the
+    // job tab would still be the one in the background and the run would pause again at once.
+    if (t) { await chrome.tabs.update(t.id, { active: true }).catch(() => {}); return t.id; }
   }
-  const t = await chrome.tabs.create({ url: job.apply_url, active: false });
+  // Foreground, and it has to be. Chrome gives a tab the student has switched away from no
+  // requestAnimationFrame at all and one timer per second: measured on a real form, five chained
+  // 100ms timers took 6.8 seconds, and a Turbo page changed its URL and then never drew the new
+  // one. A tab opened with active:false is born in that state, so every run was working blind
+  // against a page that could barely move. Borrowing the foreground is the smaller cost, and the
+  // student is meant to be watching this tab anyway: it is where they press Resume.
+  const t = await chrome.tabs.create({ url: job.apply_url, active: true });
   try {
     let { groupId } = await chrome.storage.session.get("groupId");
     if (groupId != null) await chrome.tabGroups.get(groupId).catch(() => { groupId = null; });
@@ -204,6 +212,7 @@ const GATE_HELP = {
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
   captcha: "The site wants you to prove you're human. Solve the check in the tab, then press Resume.",
   human_check: "This form asks a question meant to prove a person is applying, not a program. Answer that one yourself in the tab, then press Resume.",
+  background_tab: "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing. Bring the application tab back to the front, then press Resume.",
 };
 
 function gateIn(frames) {
@@ -357,11 +366,26 @@ async function loop(id) {
       await inject(tabId);
       frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
+    // A page Chrome has put to sleep answers every snapshot with whatever was on screen when the
+    // student left, so acting on it would be acting on a photograph. Say so instead of guessing.
+    // Confirmed a second time first: another window passing over this one counts as hidden for a
+    // moment, and that is not worth stopping a run for.
+    let asleep = frames.some((f) => f.frozen);
+    if (asleep) {
+      await sleep(2500);
+      await inject(tabId);
+      frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+      asleep = frames.some((f) => f.frozen);
+    }
+
     const snap = formatSnapshot(frames, fails);
     snap.tabId = tabId;
     const url = (snap.top && snap.top.url) || job.apply_url;
 
-    const gate = gateIn(frames);
+    // A sleeping tab still runs its scripts, just slowly, so its DOM is real and a CAPTCHA or a
+    // login wall found in it is real too. Name that instead when there is one: it is the more
+    // useful thing to tell the student, and bringing the tab forward is part of answering it anyway.
+    const gate = gateIn(frames) || (asleep ? { kind: "background_tab", reason: "this tab is asleep in the background" } : null);
     if (gate) {
       await appendLog(job.id, { kind: "gate", text: `Paused: ${gate.reason}` });
       await updateJob(id, { status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
