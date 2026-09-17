@@ -733,6 +733,9 @@
 40.664,
 -77.5958
 ],
+"remote location-philadelphia area|PA":null,
+"remote location|NJ":null,
+"remote location|PA":null,
 "rhinebeck|NY":[
 41.9268,
 -73.9128
@@ -934,6 +937,10 @@
 "west conshohocken|PA":[
 40.0698,
 -75.3163
+],
+"west henrietta|NY":[
+43.0401,
+-77.6617
 ],
 "west point|PA":[
 40.2068,
