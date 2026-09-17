@@ -28,6 +28,21 @@
     el.dispatchEvent(new Event("blur", { bubbles: true }));
     el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
   }
+  // Say it again as keystrokes. SuccessFactors' picklists (Country, State, School) render only the
+  // first 100 items and narrow the list from an inline onkeyup/onkeydown handler, so a value set the
+  // React way — value setter plus an "input" event — leaves the list unfiltered. "United States" is
+  // the 234th country, never drawn, so the pick failed and the model was handed 40 countries ending
+  // at Iran. One keydown/keyup pair after the value is set is what a human's last keypress looks
+  // like, which is all those handlers are waiting for.
+  // keyCode and which are gone from the spec but still what older widgets read, and Chrome lets an
+  // init dict set them, so send both spellings.
+  function keyEcho(el, value) {
+    const key = String(value == null ? "" : value).slice(-1) || "a";
+    const kc = key.toUpperCase().charCodeAt(0) || 0;
+    const code = /[a-z]/i.test(key) ? "Key" + key.toUpperCase() : /\d/.test(key) ? "Digit" + key : "";
+    for (const t of ["keydown", "keypress", "keyup"])
+      el.dispatchEvent(new KeyboardEvent(t, { key, code, keyCode: kc, which: kc, bubbles: true }));
+  }
   // Option lists drawn inside shadow roots (SmartRecruiters oneclick-ui) are invisible to document.querySelectorAll.
   function deepQueryAll(selector, root = document) {
     const out = [...root.querySelectorAll(selector)];
@@ -326,12 +341,18 @@
   async function ariaComboPick(el, value) {
     const input = el.tagName === "INPUT" ? el : el.querySelector("input") || el;
     mouseClick(input);
-    if (input.tagName === "INPUT") setNative(input, value);
+    if (input.tagName === "INPUT") { setNative(input, value); keyEcho(input, value); }
     await sleep(300);
     const ctl = input.getAttribute("aria-controls") || input.getAttribute("aria-owns");
     const root = input.getRootNode ? input.getRootNode() : document;
     const scope = (ctl && root.getElementById && root.getElementById(ctl)) || (ctl && document.getElementById(ctl)) || document;
-    const opts = await waitFor(() => deepQueryAll('[role="option"], li[id*="option"]', scope).filter(visible), 2000);
+    const shown = () => deepQueryAll('[role="option"], li[id*="option"]', scope).filter(visible);
+    // The click opens the unfiltered list at once, so waiting only for "some options exist" would
+    // read it before the keystroke has narrowed it. Wait for one that actually matches, and settle
+    // for whatever is on screen when the time is up, which is what the model gets told about.
+    // Three seconds because SuccessFactors fetches the narrowed page from its server: measured at
+    // just over 1.2s on a warm session, and the old 2s budget left no room for a slow one.
+    const opts = (await waitFor(() => { const o = shown(); return o.length && best(o, value, (x) => x.textContent) ? o : null; }, 3000)) || shown();
     const pick = best(opts, value, (o) => o.textContent);
     if (!pick) return { ok: false, options: opts.map((o) => norm(o.textContent)).slice(0, 40) };
     mouseClick(pick); await sleep(200);
