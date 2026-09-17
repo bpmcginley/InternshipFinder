@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 8; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 9; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -101,6 +101,17 @@
   // Inputs no human can reach: react-select's "requiredInput" validation shadow (aria-hidden, tabindex -1)
   // was listed as a second copy of every Greenhouse dropdown, labeled with the NEXT question's text.
   const unreachable = (el) => el.getAttribute("aria-hidden") === "true" && el.getAttribute("tabindex") === "-1";
+  // Parked off the page where nobody can see it. Breezy's spam trap is <input name="hp_7f2b"> at
+  // left:-9999px inside a zero-height box: display, visibility and opacity are all normal, which is
+  // the whole point, so every "is it visible" test passes it and the model was handed an unlabeled
+  // required-looking text field. Filling one gets the application thrown away without a word.
+  // Measure where the box actually lands on the page instead: right edge at document x -9749 is not
+  // somewhere a student could ever type. A screen-reader-only field would be caught too, but an
+  // unfilled one costs a question; a filled honeypot costs the whole application.
+  const offDocument = (el) => {
+    const r = el.getBoundingClientRect();
+    return (r.width > 0 || r.height > 0) && (r.right + window.scrollX <= 0 || r.bottom + window.scrollY <= 0);
+  };
   // A video player's seek/volume sliders are not questions (and their values made a job page look filled).
   const mediaControl = (el) => {
     if (el.type !== "range") return false;
@@ -205,7 +216,7 @@
       }
       // Anti-spam honeypots ("Please leave this field blank", BambooHR) sit in an aria-hidden box;
       // filling one gets the application silently discarded.
-      if ((kind === "text" || kind === "textarea") && (el.closest('[aria-hidden="true"]') || /honey.?pot/i.test([el.name, el.id, el.className].join(" ")))) continue;
+      if ((kind === "text" || kind === "textarea") && (el.closest('[aria-hidden="true"]') || offDocument(el) || /honey.?pot|^hp[_-]/i.test([el.name, el.id, el.className].join(" ")))) continue;
       const proxy = kind === "select" && selectProxy(el);
       if (proxy && !realOptions(el) && [...proxy.querySelectorAll("input")].some((i) => i.type !== "hidden" && A.visible(i))) continue;
       if (kind === "file") {

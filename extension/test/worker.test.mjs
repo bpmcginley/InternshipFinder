@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
+import { postingGone } from "../background/agent.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (payload) => `${b64url({ alg: "RS256" })}.${b64url(payload)}.sig`;
@@ -201,4 +202,38 @@ test("store migration keeps a student's own key and provider", () => {
   // v0.1 flat keys with a key go to Anthropic; without one, to InternScout.
   assert.equal(migrate({ ai: { apiKey: "sk-ant-placeholder" } }).ai.provider, "anthropic");
   assert.equal(migrate({ internscout: { first_name: "Sam" } }).ai.provider, "internscout");
+});
+
+// A closed posting redirects to the company's list of other openings; filling one of those hands
+// the student an application for a job they never picked.
+test("a posting that redirected to a board of other jobs is caught; a real step is not", () => {
+  const snap = (url) => ({ top: { url } });
+  const page = (o) => [{ title: "", headings: [], buttons: [], text: "", ...o }];
+  const vetsez = { title: "Full Stack Developer Intern", apply_url: "https://vetsez.breezy.hr/p/a4010fdb3a7001-full-stack-developer-intern-remote-opportunity" };
+
+  assert.equal(postingGone(vetsez, snap("https://vetsez.breezy.hr/"), page({
+    title: "Openings at VetsEZ",
+    headings: ["Build the AI-Native Future of Federal Health"],
+    buttons: [{ text: "Apply" }, { text: "View Openings" }],
+    text: "Proposal Solutions Architect - DHA | Program Manager | Senior Cybersecurity Engineer",
+  })), true);
+
+  // Same redirect, but the posting is on the page after all: the student is where they meant to be.
+  assert.equal(postingGone(vetsez, snap("https://vetsez.breezy.hr/"), page({
+    headings: ["Full Stack Developer Intern (Remote Opportunity)"],
+  })), false);
+
+  // A normal multi-step application keeps the posting id in the URL.
+  assert.equal(postingGone(
+    { title: "Data Analyst Intern", apply_url: "https://job-boards.greenhouse.io/olsson/jobs/5397033008" },
+    snap("https://job-boards.greenhouse.io/olsson/jobs/5397033008#app"), page({})), false);
+
+  // A title with nothing distinctive in it ("Summer Internship Program") can't be judged this way.
+  assert.equal(postingGone(
+    { title: "Summer 2027 Internship Program", apply_url: "https://acme.com/careers/openings/12345-summer" },
+    snap("https://acme.com/careers"), page({ text: "Nothing here." })), false);
+
+  // A short or missing path segment is no evidence either way.
+  assert.equal(postingGone({ title: "Robotics Intern", apply_url: "https://acme.com/jobs/7" },
+    snap("https://acme.com/"), page({})), false);
 });

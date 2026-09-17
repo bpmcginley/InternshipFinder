@@ -215,6 +215,33 @@ const GATE_HELP = {
   background_tab: "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing. Bring the application tab back to the front, then press Resume.",
 };
 
+// A posting that has been filled or pulled almost never 404s. Breezy, Lever and Greenhouse all
+// bounce the student to the company's list of other openings instead, and the run would then be
+// looking at a page full of Apply buttons for jobs nobody chose — fill one of those and the
+// student is handed a finished application for a job they never picked. VetsEZ's Full Stack
+// Developer Intern did exactly this: its apply URL landed on the board root, fifteen other roles.
+// Two things have to be true before saying so, because a real application also moves between
+// pages: the posting's own id or slug is gone from the URL, and not one distinctive word of its
+// title is anywhere on the page. A Workday or iCIMS step still names the job it belongs to.
+const TITLE_NOISE_RE = /^(a|an|the|and|for|with|our|new|us|usa|united|states|intern|interns|internship|internships|co|op|coop|summer|fall|spring|winter|remote|hybrid|onsite|student|students|program|programs|programme|position|positions|role|roles|opportunity|opportunities|full|part|time|year|level|entry|grad|graduate|undergraduate|\d+)$/i;
+
+// The distinctive part of an apply URL is its longest path segment: a posting id or slug.
+function postingKey(u) {
+  try { return new URL(u).pathname.split("/").filter(Boolean).sort((a, b) => b.length - a.length)[0] || ""; }
+  catch (e) { return ""; }
+}
+
+export function postingGone(job, snap, frames) {
+  const key = postingKey(job.apply_url);
+  const here = (snap.top && snap.top.url) || "";
+  if (key.length < 6 || here.includes(key)) return false;
+  const words = String(job.title || "").split(/[^A-Za-z0-9]+/).filter((w) => w.length >= 4 && !TITLE_NOISE_RE.test(w));
+  if (!words.length) return false;
+  const hay = (here + " " + frames.map((f) => [f.title, (f.headings || []).join(" "),
+    (f.buttons || []).map((b) => b.text).join(" "), f.text || ""].join(" ")).join(" ")).toLowerCase();
+  return !words.some((w) => hay.includes(w.toLowerCase()));
+}
+
 function gateIn(frames) {
   for (const f of frames) {
     const g = globalThis.ISGuard.detectGate(f);
@@ -389,6 +416,14 @@ async function loop(id) {
     if (gate) {
       await appendLog(job.id, { kind: "gate", text: `Paused: ${gate.reason}` });
       await updateJob(id, { status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
+      await saveMsgs(id, msgs);
+      return;
+    }
+
+    if (!msgs.length && postingGone(job, snap, frames)) {
+      await appendLog(job.id, { kind: "gate", text: "Paused: this is not the posting you picked." });
+      await updateJob(id, { status: "needs_you", pending, activity: "", question: "",
+        reason: `The link for "${job.title}" opened somewhere else — the employer has most likely closed the posting. Look at the tab: if the job is gone, remove this one; if you find it, open it yourself and press Resume.` });
       await saveMsgs(id, msgs);
       return;
     }
