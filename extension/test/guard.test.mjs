@@ -291,7 +291,8 @@ test("on a cookie banner, only the choices that keep the default are offered", (
 
   // Just enough of an element for closest()/querySelector(): the banner itself, the <body> a site
   // marks while the banner is up, and a form whose wrapper happens to be named after a cookie.
-  const inside = (tagName, textBox) => ({ closest: () => ({ tagName, querySelector: () => (textBox ? {} : null) }) });
+  const box = { getClientRects: () => [{}] };
+  const inside = (tagName, textBox) => ({ closest: () => ({ tagName, querySelectorAll: () => (textBox ? [box] : []) }) });
   assert.equal(G.consentGiveaway(inside("DIV", false), "Accept All Cookies"), true);
   assert.equal(G.consentGiveaway(inside("DIV", false), "Reject All"), false);
   assert.equal(G.consentGiveaway(inside("BODY", false), "Accept All Cookies"), false);
@@ -305,7 +306,7 @@ test("on a cookie banner, only the choices that keep the default are offered", (
     const nodes = specs.map((s) => ({
       tagName: "DIV", ownerDocument: { defaultView: win }, parentElement: null, ...s,
       closest() { let p = this; while (p) { if (p.consent) return p; p = p.parentElement; } return null; },
-      querySelector() { return this.textBox ? {} : null; },
+      querySelectorAll() { return this.textBox ? [this.hiddenBox ? { getClientRects: () => [] } : box] : []; },
     }));
     nodes.forEach((n, i) => { n.parentElement = nodes[i + 1] || null; });
     return nodes[0];
@@ -316,4 +317,7 @@ test("on a cookie banner, only the choices that keep the default are offered", (
   // A part of a real application that happens to be named "consent" is laid out in the page rather
   // than over it, and its button is the way forward, not a giveaway.
   assert.equal(G.consentGiveaway(stack({}, { consent: true }, { tagName: "BODY" }), "Continue"), false);
+  // A hidden text box is not a box anyone can type in: OneTrust parks its preference centre, search
+  // box and all, in the same root as the banner, and the banner is still a banner.
+  assert.equal(G.consentGiveaway(stack({}, { consent: true, position: "fixed", textBox: true, hiddenBox: true }), "Accept All Cookies"), true);
 });

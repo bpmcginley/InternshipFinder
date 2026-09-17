@@ -259,14 +259,15 @@
   // Two ways that selector could swallow the page instead of the banner, both worth ruling out.
   // Plenty of sites mark <body class="cookie-banner-open"> while the banner is up, and that would
   // match every button on the page and leave the model with none to press. And a consent widget
-  // never asks anyone to type, so anything holding a text box is a form that happens to be named
-  // after a cookie, not a banner.
+  // never asks anyone to type, so anything holding a text box someone can reach is a form that
+  // happens to be named after a cookie, not a banner.
   // A banner is an overlay: drawn over the page rather than laid out in it. That is the line between
   // the cookie notice sitting on top of the form and a part of the form that happens to be named
   // "consent" — and taking away the one button that moves a real application on would be a worse
   // failure than the one this prevents. The fixed box is usually a level or two above the button's
   // nearest consent-named ancestor (JazzHR wraps its buttons in a static container; OneTrust puts
   // the fixed banner inside a static sdk root), so ask about the whole chain up to the outermost.
+  const TEXTBOX_SEL = 'textarea, input[type="text"], input[type="email"], input:not([type])';
   const overlay = (el, w) => {
     const win = el.ownerDocument && el.ownerDocument.defaultView;
     if (!win || !win.getComputedStyle) return true; // nothing to measure: treat it as the banner
@@ -281,7 +282,10 @@
     let w = el && el.closest && el.closest(CONSENT_SEL);
     while (w && w.parentElement && w.parentElement.closest(CONSENT_SEL)) w = w.parentElement.closest(CONSENT_SEL);
     if (!w || w.tagName === "BODY" || w.tagName === "HTML") return null;
-    if (w.querySelector('textarea, input[type="text"], input[type="email"], input:not([type])')) return null;
+    // Only a box someone can actually type in counts. OneTrust keeps its preference centre in the same
+    // root as the banner, and that centre holds a vendor-search box: hidden until the centre is opened,
+    // and enough to make the most common banner on the web look like a form and go unnoticed.
+    if ([...w.querySelectorAll(TEXTBOX_SEL)].some((i) => i.getClientRects && i.getClientRects().length)) return null;
     return overlay(el, w) ? w : null;
   };
   const consentGiveaway = (el, text) => !!consentWidget(el) && !CONSENT_OK_RE.test(text || "");
