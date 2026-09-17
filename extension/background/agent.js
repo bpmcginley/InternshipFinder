@@ -150,6 +150,15 @@ async function inFrames(tabId, func, args = []) {
   }
 }
 
+// Every frame's mark(), in one string. An empty answer means the page was not reachable at that
+// moment — mid-navigation, or before the scripts are back — which is a change by itself, so an
+// empty mark on either side never counts as "nothing happened".
+async function pageMark(tabId) {
+  const rs = await inFrames(tabId, () => (window.ISDom && window.ISDom.mark ? window.ISDom.mark() : ""));
+  return rs.map((r) => `${r.frameId}=${r.result}`).join("~");
+}
+export const noChange = (before, after) => !!before && !!after && before === after;
+
 async function act(tabId, fullRef, action, payload) {
   const [fid, local] = String(fullRef).split(":");
   try {
@@ -631,6 +640,7 @@ async function execTool(u, ctx) {
       const opened = [];
       const onNew = (t) => { if (t.openerTabId === tabId) opened.push(t.id); };
       chrome.tabs.onCreated.addListener(onNew);
+      const before = await pageMark(tabId);
       try {
         r = await act(tabId, input.ref, "click", {});
         if (r.ok) { await sleep(1500); await waitForTab(tabId).catch(() => {}); }
@@ -640,6 +650,12 @@ async function execTool(u, ctx) {
       if (r.blocked) return { content: `${r.error}. Do not click it. If everything else is complete, call ready_to_submit; otherwise keep filling fields.`, isError: true };
       const newTab = opened.length && (await chrome.tabs.get(opened[opened.length - 1]).catch(() => null));
       if (r.ok && newTab) return { content: { ...r, note: "Opened a new tab; the next snapshot is from that tab." }, newTab: newTab.id };
+      // A click that reports success and changes nothing is the quietest way an application stalls:
+      // the script that would have answered it had not loaded yet. Nothing in the next snapshot says
+      // it is the same page as the last one, so say it here, while it is still one button's fault.
+      if (r.ok && noChange(before, await pageMark(tabId))) {
+        return { content: { ...r, note: "The page looks the same as before the click; the button may not have been wired up yet. Wait a few seconds and click it once more before trying something else." } };
+      }
       break;
     }
     case "wait":

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
-import { postingGone, deadPage, pageGone } from "../background/agent.js";
+import { postingGone, deadPage, pageGone, noChange } from "../background/agent.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (payload) => `${b64url({ alg: "RS256" })}.${b64url(payload)}.sig`;
@@ -298,4 +298,16 @@ test("a page with nothing to fill and no way forward is not sent to the model", 
 
   // No frames at all means the page was not readable; that is a different story.
   assert.equal(deadPage([]), false);
+});
+
+// A click the page never answered. Qorvo draws "Apply now" as a dropdown whose menu is bound by a
+// script that lands after the page is otherwise ready: clicked a moment early it reports success,
+// opens nothing, and leaves the run to work out for itself that this is the same page again.
+test("a click that changed nothing is only reported when both marks are real", () => {
+  const page = "0=https://careers.qorvo.com/job/x~3~28~Analog Design Intern";
+  assert.equal(noChange(page, page), true);
+  assert.equal(noChange(page, "0=https://careers.qorvo.com/job/x~3~32~Analog Design Intern"), false);
+  // Mid-navigation nothing answers, and an unreachable page is not a page that stayed the same.
+  assert.equal(noChange(page, ""), false);
+  assert.equal(noChange("", ""), false);
 });

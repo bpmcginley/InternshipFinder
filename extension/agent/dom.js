@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 11; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 12; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -377,6 +377,17 @@
     return t.length < 400 && /\bloading\b/i.test(t);
   }
 
+  // What the page looks like from outside, in one short string, so a click that did something can be
+  // told from one that did nothing at all. Qorvo's SuccessFactors site draws its "Apply now" as a
+  // dropdown whose menu is bound by a script that arrives after the page is otherwise ready: click it
+  // a moment too early and there is no error, no navigation and no menu — just the same page again.
+  // A snapshot alone does not say that, because nothing in it announces that it is the old one.
+  function mark() {
+    const n = (sel) => deepQueryAll(sel).filter(A.visible).length;
+    return cut([location.href, n("input, textarea, select"), n('button, a, [role="button"]'),
+      deepQueryAll('h1, h2, [role="heading"]').filter(A.visible).map(txt).join("|")].join("~"), 400);
+  }
+
   function snapshot() {
     if (CAPTCHA_FRAME) return { url: location.href, title: document.title, headings: [], step: "", errors: [], captcha: false, elements: [], buttons: [], text: "", filledFields: 0, captchaFrame: true };
     G.installClickBlock(document);
@@ -584,5 +595,5 @@
     return { missing, final: !!final };
   }
 
-  window.ISDom = { v: V, snapshot, act, fastFill, highlight };
+  window.ISDom = { v: V, snapshot, act, fastFill, highlight, mark };
 })();
