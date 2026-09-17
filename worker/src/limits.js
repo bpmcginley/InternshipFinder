@@ -1,6 +1,6 @@
 // Allowance, per-run, rate and budget checks over D1. Counters only, never request content.
 import { HttpError } from "./http.js";
-import { paymentsOn } from "./billing.js";
+import { canUpgrade } from "./billing.js";
 
 export const monthOf = (d) => d.toISOString().slice(0, 7);
 
@@ -53,7 +53,9 @@ export async function usageFor(db, user, month) {
 // Monthly units for a task: the full table for "edu", GENERAL_ALLOWANCE_PCT of it (min 1) for "general".
 export function allowanceFor(config, env, task, tier, plan = "free") {
   const mult = (config.PLANS[plan] || config.PLANS.free).multiplier;
-  const base = config.TASKS[task].allowance * mult;
+  // Rounded because a multiplier can be fractional: a plan is priced against what AI actually costs,
+  // not against whole numbers.
+  const base = Math.round(config.TASKS[task].allowance * mult);
   if (tier === "edu") return base;
   const raw = Number(env.GENERAL_ALLOWANCE_PCT);
   const pct = env.GENERAL_ALLOWANCE_PCT !== undefined && env.GENERAL_ALLOWANCE_PCT !== "" && Number.isFinite(raw)
@@ -63,7 +65,7 @@ export function allowanceFor(config, env, task, tier, plan = "free") {
 
 // Checks budget, rate and allowance for one /ai call, then counts it in the rate buckets.
 export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free") {
-  const rate = plan === "supporter" && config.SUPPORTER_RATE ? config.SUPPORTER_RATE : config.RATE;
+  const rate = (config.PLANS[plan] || config.PLANS.free).rate || config.RATE;
   const month = monthOf(now);
   if ((await spend(db, month)) >= budgetCents(env, config)) {
     throw new HttpError(503, "paused", "AI features are paused until next month because the budget is used up. Search still works.");
@@ -98,8 +100,10 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   const row = await db.prepare("SELECT units FROM usage WHERE user_hash = ? AND month = ? AND task = ?")
     .bind(user, month, task).first();
   const used = row ? row.units : 0;
-  // The client uses `upgrade` to decide whether to mention the Supporter plan; it never guesses.
-  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: paymentsOn(env) && plan === "free" });
+  // The client uses `upgrade` to decide whether to mention a paid plan; it never guesses.
+  // `upgrade` tells the client whether a bigger plan exists for this student, so it never offers one
+  // that is switched off or that they are already on.
+  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: canUpgrade(env, config, plan) });
   if (run && run.calls >= config.MAX_CALLS_PER_RUN) throw cap("This run reached its call limit");
   if (!run && used >= limit) throw cap(`Monthly ${task} allowance is used up`);
 

@@ -336,7 +336,12 @@ async function loop(id) {
     await inject(tabId);
     store = await loadStore();
     const facts = { ...store.profile.facts, email: store.settings.signup_email || store.profile.facts.email };
-    const pre = (await inFrames(tabId, (f) => window.ISDom && window.ISDom.fastFill(f), [facts])).flatMap((r) => r.result || []);
+    // The resume goes in with the contact details when the page has one obvious box for it, on the
+    // same rules-first principle: a turn spent telling the model to attach the file it was always
+    // going to attach is a turn nobody gets back. Same choice of file as the upload tool makes.
+    const resume = (job.tailored && job.tailored.status === "approved" && job.tailored.file) || store.files.resume || null;
+    const pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
+      .flatMap((r) => r.result || []);
 
     let frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
     if (!frames.some((f) => f.elements.length || f.buttons.length)) {
@@ -359,6 +364,21 @@ async function loop(id) {
     if (gate) {
       await appendLog(job.id, { kind: "gate", text: `Paused: ${gate.reason}` });
       await updateJob(id, { status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
+      await saveMsgs(id, msgs);
+      return;
+    }
+
+    if (!msgs.length && globalThis.ISGuard.nothingLeftForAI(frames, pre.length)) {
+      await appendLog(job.id, { kind: "note", text: `Filled ${pre.length} field(s) from your profile; no AI was needed.` });
+      const hl = (await inFrames(tabId, () => window.ISDom && window.ISDom.highlight())).map((r) => r.result);
+      const missing = hl.reduce((n, h) => n + ((h && h.missing) || 0), 0);
+      // highlight() re-reads the page after the fills settled, so it is the last word: if it finds a
+      // hole the snapshot missed, say so rather than claiming the form is done.
+      await updateJob(id, {
+        status: "ready_to_submit", activity: "", steps: 0,
+        summary: `Filled ${pre.length} field(s) from your profile. Nothing on this page needed AI, so it cost you no allowance. Check every answer before you submit.`,
+        double_check: missing ? [`${missing} required field(s) look empty (amber outline).`] : [],
+      });
       await saveMsgs(id, msgs);
       return;
     }

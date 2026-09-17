@@ -390,24 +390,29 @@
     } catch (e) { return null; }
   }
   const ALLOWANCE_LABELS = { autofill: "Auto-Apply runs", resume_tailor: "Tailored resumes", deep_dive: "Deep Dives" };
+  // Fallback names for the paid tiers. /config carries the real labels; this is for when it hasn't
+  // loaded yet, or an older page meets a tier it doesn't know.
+  const PLAN_LABELS = { supporter: "Supporter", pro: "Pro" };
   const leftOf = (me, task) => { const a = me && me.allowance && me.allowance[task]; return a ? Math.max(0, (a.limit || 0) - (a.used || 0)) : null; };
   // "Auto-Apply runs: 15 of 15 left" lines plus the tier, for a tooltip.
   function allowanceText(me) {
     if (!me || !me.allowance) return "";
     const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
     lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
-    if (me.plan === "supporter") lines.push("Supporter plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
+    if (me.plan && me.plan !== "free") lines.push((PLAN_LABELS[me.plan] || me.plan) + " plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
     if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");
     return lines.join("\n");
   }
 
-  // Upgrade ("checkout") or change/cancel ("portal"). The Worker talks to Stripe; we only get a URL to
-  // send the student to. No card details ever touch this page.
-  async function billingUrl(token, kind) {
+  // Upgrade ("checkout", with which tier) or change/cancel ("portal"). The Worker talks to Stripe;
+  // we only get a URL to send the student to. No card details ever touch this page.
+  async function billingUrl(token, kind, plan) {
     if (!workerOn() || !token) return { error: "Sign in first." };
     try {
       const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/billing/" + kind, {
-        method: "POST", headers: { Authorization: "Bearer " + token },
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify(plan ? { plan } : {}),
       });
       if (r.status === 401) { signOut(); return { error: "Sign in again." }; }
       const b = await r.json().catch(() => ({}));
@@ -449,7 +454,7 @@
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData,
-    fetchMe, leftOf, allowanceText, billingUrl,
+    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

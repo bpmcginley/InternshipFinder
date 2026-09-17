@@ -170,3 +170,46 @@ test("job-board search boxes and two-language pickers outside a form are skipped
   assert.equal(G.notApplication(fakeEl({ attrs: { placeholder: "City, State" } })), false);
   assert.equal(G.notApplication(fakeEl({ tag: "SELECT", options: [{ text: "English" }, { text: "Spanish" }] })), false);
 });
+
+// --- skipping the AI when the rules already finished the form ---
+
+const field = (o = {}) => ({ ref: "r1", kind: "text", label: "First name", required: true, value: "Testy", ...o });
+const submit = { ref: "b1", text: "Submit application", blocked: true };
+// A finished Greenhouse-shaped page: contact details in, submit button guarded, nothing else.
+const donePage = (extra = {}) => [{
+  elements: [field(), field({ ref: "r2", label: "Email", value: "t@example.com" }),
+             field({ ref: "r3", kind: "file", label: "Resume", value: "resume.pdf" })],
+  buttons: [submit], errors: [], ...extra,
+}];
+
+test("a form the rules already finished needs no model call", () => {
+  assert.equal(G.nothingLeftForAI(donePage(), 3), true);
+});
+
+test("nothing is skipped when fastFill filled nothing", () => {
+  assert.equal(G.nothingLeftForAI(donePage(), 0), false);
+});
+
+test("an unfinished form still goes to the model", () => {
+  const cases = {
+    "empty required field": donePage({ elements: [field({ value: "" })], buttons: [submit] }),
+    "empty file box the page never marked required":
+      donePage({ elements: [field({ kind: "file", required: false, value: "" })], buttons: [submit] }),
+    "empty optional free-text answer":
+      donePage({ elements: [field({ kind: "textarea", required: false, value: "" })], buttons: [submit] }),
+    "unticked required checkbox":
+      donePage({ elements: [field({ kind: "checkbox", value: false })], buttons: [submit] }),
+  };
+  for (const [why, frames] of Object.entries(cases)) assert.equal(G.nothingLeftForAI(frames, 3), false, why);
+});
+
+test("more form ahead, or trouble on the page, is never skipped", () => {
+  const cases = {
+    "a Next button means another page": [{ ...donePage()[0], buttons: [submit, { ref: "b2", text: "Save and continue" }] }],
+    "no submit button yet": [{ ...donePage()[0], buttons: [{ ref: "b2", text: "Attach" }] }],
+    "a validation error is showing": [{ ...donePage()[0], errors: ["Enter a valid phone number"] }],
+    "a CAPTCHA is up": [{ ...donePage()[0], captcha: true }],
+    "a second frame still has work": [donePage()[0], { elements: [field({ value: "" })], buttons: [] }],
+  };
+  for (const [why, frames] of Object.entries(cases)) assert.equal(G.nothingLeftForAI(frames, 3), false, why);
+});

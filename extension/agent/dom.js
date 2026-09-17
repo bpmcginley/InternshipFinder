@@ -477,7 +477,29 @@
   ];
   const SKIP = /refer|emergency|reference|manager|supervisor|recruiter|company|employer|school|parent|guardian|middle|preferred|nick|confirm|search|verif|code|password|extension|country|device|type|other/;
 
-  function fastFill(facts) {
+  // Which file box is unmistakably "your resume goes here". Anything that also mentions another
+  // document is left for the model, because putting a resume in the transcript slot is worse than
+  // spending a turn to get it right.
+  const RESUME_RE = /\bresume\b|\bcv\b|curriculum vitae/i;
+  const NOT_RESUME_RE = /cover|transcript|portfolio|writing sample|certificat|licen[cs]e|passport|photo|\bid\b|other/i;
+
+  // The one file field this is safe to fill without asking the model: exactly one empty box on the
+  // page says resume, and nothing else does.
+  function loneResumeField() {
+    let hit = null;
+    for (const rec of refs.values()) {
+      if (rec.kind !== "file") continue;
+      const hint = [rec.label, rec.el.name, rec.el.id, rec.el.getAttribute("data-automation-id")].filter(Boolean).join(" ");
+      if (!RESUME_RE.test(hint) || NOT_RESUME_RE.test(hint)) continue;
+      if (valueOf(rec.el, "file")) return null;   // already attached: leave it alone
+      if (hit) return null;                        // two resume boxes is a question, not a rule
+      hit = rec;
+    }
+    return hit;
+  }
+
+  // file: {name, type, b64} or null. Returns the human-readable list of what it filled.
+  async function fastFill(facts, file) {
     const done = [];
     for (const rec of (collect(), refs.values())) {
       if (rec.kind !== "text" || rec.el.value) continue;
@@ -491,6 +513,11 @@
       if (!v) continue;
       A.setNative(el, v); A.blur(el);
       if (el.value) { el.setAttribute("data-is-filled", "1"); done.push(`${rec.label || key} = ${v}`); }
+    }
+    const slot = file && file.b64 ? loneResumeField() : null;
+    if (slot) {
+      const r = await upload(slot, file);
+      if (r.ok) { slot.el.setAttribute("data-is-filled", "1"); done.push(`${slot.label || "Resume"} = ${file.name}`); }
     }
     return done;
   }

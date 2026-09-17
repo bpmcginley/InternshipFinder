@@ -10,21 +10,40 @@ const ACTIVE = new Set(["active", "trialing"]);
 // Stripe rejects a signature this far from its timestamp; the same window stops a replayed webhook.
 const SIG_TOLERANCE_S = 300;
 
-export const paymentsOn = (env) =>
-  env.PAYMENTS_ENABLED === "1" && !!env.STRIPE_SECRET_KEY && !!env.STRIPE_PRICE_ID;
+// A paid plan is on offer only when its own Stripe Price id is set, so one tier can go live first.
+export const priceIdOf = (env, config, plan) => {
+  const p = config.PLANS[plan];
+  return p && p.priceEnv ? env[p.priceEnv] || "" : "";
+};
 
-// What GET /config tells the dashboard. Price text is display only; Stripe charges what the price says.
+export const offeredPlans = (env, config) =>
+  (config.PAID_PLANS || []).filter((plan) => !!priceIdOf(env, config, plan));
+
+export const paymentsOn = (env, config) =>
+  env.PAYMENTS_ENABLED === "1" && !!env.STRIPE_SECRET_KEY && (!config || offeredPlans(env, config).length > 0);
+
+// Is there a bigger plan than the one this student is on? Drives the Upgrade button and the
+// "you could raise this" wording on a cap error.
+export function canUpgrade(env, config, plan = "free") {
+  if (!paymentsOn(env, config)) return false;
+  const mine = (config.PLANS[plan] || config.PLANS.free).multiplier;
+  return offeredPlans(env, config).some((p) => config.PLANS[p].multiplier > mine);
+}
+
+// What GET /config tells the dashboard. Price text is display only; Stripe charges what the Price says.
 export function paymentsInfo(env, config) {
-  if (!paymentsOn(env)) return { enabled: false };
+  if (!paymentsOn(env, config)) return { enabled: false, plans: [] };
   return {
     enabled: true,
-    price: env.SUPPORTER_PRICE_TEXT || config.PLANS.supporter.priceText,
-    multiplier: config.PLANS.supporter.multiplier,
+    plans: offeredPlans(env, config).map((plan) => {
+      const p = config.PLANS[plan];
+      return { plan, label: p.label || plan, price: (p.textEnv && env[p.textEnv]) || p.priceText, multiplier: p.multiplier };
+    }),
   };
 }
 
-function need(env) {
-  if (!paymentsOn(env)) throw new HttpError(404, "not_found", "Supporter plans are not turned on");
+function need(env, config) {
+  if (!paymentsOn(env, config)) throw new HttpError(404, "not_found", "Paid plans are not turned on");
 }
 
 async function stripe(env, path, form, fetchImpl, idempotencyKey) {
@@ -68,22 +87,30 @@ async function savePlan(db, user, { plan, status, customer, subscription, period
 
 const siteUrl = (env) => (env.SITE_URL || "https://bpmcginley.github.io/InternshipFinder").replace(/\/+$/, "");
 
-// Checkout for the Supporter plan. client_reference_id carries the hash back on the webhook, so a
+// Checkout for a paid tier. client_reference_id carries the hash back on the webhook, so a
 // payment can be matched to an account without Stripe ever learning who the student is.
-export async function checkout(db, env, user, now, fetchImpl) {
-  need(env);
+export async function checkout(db, env, config, user, plan, now, fetchImpl) {
+  need(env, config);
+  plan = plan || offeredPlans(env, config)[0];
+  const wanted = config.PLANS[plan];
+  if (!wanted || !priceIdOf(env, config, plan)) throw new HttpError(400, "bad_plan", "No such plan");
   const existing = await planOf(db, user);
-  if (existing.plan === "supporter") {
-    throw new HttpError(409, "already", "You are already on the Supporter plan.");
+  // Moving between paid tiers is a change of subscription, which Stripe's own portal does properly
+  // (with proration). Starting a second one here would bill the student twice.
+  if (existing.plan !== "free") {
+    throw new HttpError(409, "already", existing.plan === plan
+      ? `You are already on the ${wanted.label || plan} plan.`
+      : "You already have a plan. Use Manage plan to switch.");
   }
   const form = {
     mode: "subscription",
-    "line_items[0][price]": env.STRIPE_PRICE_ID,
+    "line_items[0][price]": priceIdOf(env, config, plan),
     "line_items[0][quantity]": "1",
     client_reference_id: user,
     success_url: siteUrl(env) + "/?upgraded=1",
     cancel_url: siteUrl(env) + "/",
     "subscription_data[metadata][user_hash]": user,
+    "subscription_data[metadata][plan]": plan,
     allow_promotion_codes: "true",
   };
   if (existing.customer) form.customer = existing.customer;
@@ -92,8 +119,8 @@ export async function checkout(db, env, user, now, fetchImpl) {
 }
 
 // Stripe's own page for changing or cancelling. We build no billing screens.
-export async function portal(db, env, user, fetchImpl) {
-  need(env);
+export async function portal(db, env, config, user, fetchImpl) {
+  need(env, config);
   const row = await db.prepare("SELECT customer FROM plans WHERE user_hash = ?").bind(user).first();
   if (!row || !row.customer) throw new HttpError(404, "not_found", "No subscription to manage");
   const session = await stripe(env, "billing_portal/sessions",
@@ -152,7 +179,19 @@ function endOf(sub) {
 }
 
 // Turns one verified event into a plan row. Unknown event types are ignored on purpose.
-export async function applyEvent(db, env, event, now, fetchImpl) {
+// Which tier a Stripe object belongs to. Checkout stamps the plan into the subscription metadata,
+// but a subscription changed inside Stripe's own portal (a student switching tiers) keeps the old
+// metadata, so the price id is the more reliable answer and wins when it matches a known plan.
+export function planFrom(env, config, o, fallback = "supporter") {
+  const price = ((((o.items || {}).data || [])[0] || {}).price || {}).id || "";
+  const byPrice = (config.PAID_PLANS || []).find((p) => price && priceIdOf(env, config, p) === price);
+  if (byPrice) return byPrice;
+  const named = (o.metadata || {}).plan;
+  if (named && config.PLANS[named] && named !== "free") return named;
+  return fallback;
+}
+
+export async function applyEvent(db, env, config, event, now, fetchImpl) {
   if (!(await firstTime(db, String(event.id || crypto.randomUUID()), now))) return { ok: true, repeat: true };
   const o = (event.data && event.data.object) || {};
 
@@ -160,15 +199,17 @@ export async function applyEvent(db, env, event, now, fetchImpl) {
     const user = o.client_reference_id;
     if (!user || o.payment_status === "unpaid") return { ok: true, ignored: true };
     // The session says nothing about when the subscription renews; read that from the subscription.
-    let periodEnd = null, status = "active";
+    let periodEnd = null, status = "active", plan = (o.metadata || {}).plan;
     if (o.subscription) {
       const sub = await stripe(env, "subscriptions/" + encodeURIComponent(o.subscription), {}, fetchImpl).catch(() => null);
       if (sub) {
         periodEnd = endOf(sub);
         status = sub.status || status;
+        plan = planFrom(env, config, sub, plan);
       }
     }
-    await savePlan(db, user, { plan: "supporter", status, customer: o.customer, subscription: o.subscription, periodEnd }, now);
+    if (!plan || !config.PLANS[plan] || plan === "free") plan = (config.PAID_PLANS || ["supporter"])[0];
+    await savePlan(db, user, { plan, status, customer: o.customer, subscription: o.subscription, periodEnd }, now);
     return { ok: true };
   }
 
@@ -178,7 +219,7 @@ export async function applyEvent(db, env, event, now, fetchImpl) {
     if (!user) return { ok: true, ignored: true };
     const status = event.type === "customer.subscription.deleted" ? "canceled" : (o.status || "canceled");
     await savePlan(db, user, {
-      plan: ACTIVE.has(status) ? "supporter" : "free",
+      plan: ACTIVE.has(status) ? planFrom(env, config, o) : "free",
       status,
       customer: o.customer,
       subscription: o.id,

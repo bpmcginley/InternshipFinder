@@ -18,7 +18,8 @@ database_name = "internscout"
 database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 
 # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
-# and for the optional Supporter plan: STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET
+# and for the optional paid plans: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
+# (Supporter) and STRIPE_PRICE_ID_PRO (Pro). A plan whose price id is unset is simply not offered.
 [vars]
 # Anyone with a Google or Microsoft account can sign in; a provider is off while its client ID is empty.
 GOOGLE_CLIENT_ID = "393696929617-g2ck4v93fdl54gioop0utk9c46p4thut.apps.googleusercontent.com"
@@ -29,15 +30,17 @@ EDU_EXTRA_DOMAINS = ""
 GENERAL_ALLOWANCE_PCT = "50"
 # The chrome-extension:// origin is the ID fixed by "key" in extension/manifest.json
 ALLOWED_ORIGINS = "https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag"
-MONTHLY_BUDGET_CENTS = "2500"
+MONTHLY_BUDGET_CENTS = "7500"
 # AI calls per minute across everyone, so a busy hour cannot spend the whole Gemini per-minute quota
 # and leave every student with upstream 429s. Your account's real number is at
 # aistudio.google.com/rate-limit -- set this under it, with headroom. "0" turns AI off immediately.
 GLOBAL_RPM = "120"
-# The paid "Supporter" plan is dormant until this is "1" and the three Stripe secrets are set.
-# While it is off, nothing about paying is shown and the billing routes answer 404.
+# The paid plans are dormant until this is "1" and the Stripe secrets are set. While it is off,
+# nothing about paying is shown and the billing routes answer 404.
 PAYMENTS_ENABLED = "0"
-# Shown on the upgrade button. Stripe charges whatever the price in your Stripe dashboard says.
-SUPPORTER_PRICE_TEXT = "$3/month"
+# Shown on the upgrade buttons. Stripe charges whatever the price in your Stripe dashboard says,
+# so keep these in step with it.
+SUPPORTER_PRICE_TEXT = "$5/month"
+PRO_PRICE_TEXT = "$12/month"
 # Where Stripe sends students back to after checkout
 SITE_URL = "https://bpmcginley.github.io/InternshipFinder"

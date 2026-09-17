@@ -33,9 +33,10 @@ test("personal Gmail signs in with the general tier (half, min 1)", async () => 
   const { status, body } = await me(w, await w.token({ hd: undefined, email: "someone@gmail.com" }));
   assert.equal(status, 200);
   assert.equal(body.tier, "general");
-  assert.equal(body.allowance.resume_tailor.limit, 4);
+  assert.equal(body.allowance.resume_tailor.limit, 5);
+  assert.equal(body.allowance.autofill.limit, 10);
   assert.equal(body.allowance.deep_dive.limit, 1);
-  assert.equal(body.allowance.field_match.limit, 100);
+  assert.equal(body.allowance.field_match.limit, 130);
 });
 
 test("unverified .edu email is general, not edu", async () => {
@@ -122,8 +123,11 @@ test("GET /config needs no sign-in and lists both providers and both allowance t
   assert.equal(m.client_id, MS_CLIENT);
   assert.equal(m.authorize_url, "https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
   assert.deepEqual(g.scopes, ["openid", "email", "profile"]);
-  assert.equal(c.allowance.edu.resume_tailor, 8);
-  assert.equal(c.allowance.general.resume_tailor, 4);
+  assert.equal(c.allowance.edu.resume_tailor, 10);
+  assert.equal(c.allowance.general.resume_tailor, 5);
+  // Every paid tier gets its own table, so the dashboard can say what the money buys.
+  assert.equal(c.allowance.supporter.autofill, 50);
+  assert.equal(c.allowance.pro.autofill, 120);
   assert.equal(c.paused, false);
 });
 

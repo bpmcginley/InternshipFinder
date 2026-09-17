@@ -53,6 +53,40 @@
     return null;
   }
 
+  // A short application whose every field is plain contact detail -- most Greenhouse, Lever and Ashby
+  // forms -- is already finished by the extension's own fastFill before the model has seen anything.
+  // Calling the model there spends a monthly unit and about 8 cents of Gemini to be told what the
+  // page already says, so this looks for the one shape where that is provably true and the job can
+  // go straight to the student.
+  //
+  // Every clause is a way of being wrong, so all of them are strict:
+  //  - the blocked submit button must be on the page. That is what makes this the last page; a Next
+  //    or Continue means more form ahead, and only the model can work through it
+  //  - nothing required may be empty, and no file box may be empty even when the page never marked
+  //    it required, because a resume left unattached is worse than a spent unit
+  //  - no empty free-text box, required or not: writing those is what a student wants the AI for,
+  //    so a blank one is a reason to run, not to skip
+  // frames: snapshot() results; prefilled: how many fields fastFill just set.
+  const NEXT_RE = /\b(next|continue|proceed|save and|go to)\b/i;
+  const WRITE_KINDS = ["textarea", "rich_text"];
+
+  function nothingLeftForAI(frames, prefilled) {
+    if (!prefilled) return false;   // fastFill filled nothing, so there is nothing to be finished by
+    let blocked = false;
+    for (const f of frames || []) {
+      if (!f || f.captcha || f.captchaFrame || (f.errors || []).length) return false;
+      for (const b of f.buttons || []) {
+        if (b.blocked) blocked = true;
+        else if (NEXT_RE.test(b.text || "")) return false;
+      }
+      for (const e of f.elements || []) {
+        if (!(e.value === "" || e.value === false || e.value == null)) continue;
+        if (e.required || e.kind === "file" || WRITE_KINDS.includes(e.kind)) return false;
+      }
+    }
+    return blocked;
+  }
+
   // d: {text, value, ariaLabel, title, type, automationId}
   function classify(d) {
     const text = norm([d.text, d.value, d.ariaLabel, d.title].filter(Boolean).join(" "));
@@ -182,7 +216,7 @@
     if (doc.__isClickBlock) { doc.removeEventListener("click", doc.__isClickBlock, true); delete doc.__isClickBlock; }
   }
 
-  const api = { classify, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, FINAL_RE, AMBIGUOUS_RE };
+  const api = { classify, nothingLeftForAI, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, FINAL_RE, AMBIGUOUS_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -6,10 +6,10 @@ export const FLASH_LITE = "gemini-3.5-flash-lite";
 
 // Per task: model, output-token ceiling, thinking ceiling, monthly allowance in units (runs)
 export const TASKS = {
-  field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 200 },
-  short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 60 },
-  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 8 },
-  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 15 },
+  field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 260 },
+  short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 80 },
+  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 10 },
+  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 20 },
   deep_dive:     { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 2 },
 };
 
@@ -35,12 +35,37 @@ export const PRICES = {
 // Unknown model: priced high on purpose so spend is never under-counted
 export const FALLBACK_PRICE = { input: 2, output: 12, cached: 0.2 };
 
-// Plans. "free" is everyone; "supporter" is the optional paid plan that exists so AI spend can be
-// covered if InternScout gets busy. Its multiplier scales every task allowance in TASKS.
+// A Supporter or Pro gets a bigger share of the budget than a free student, but still a ceiling: one
+// person on a paid plan must not be able to spend the whole month's budget by themselves.
+const FREE_RATE = { perMinute: 10, perDay: 300 };
+const PAID_RATE = { perMinute: 20, perDay: 900 };
+const PRO_RATE = { perMinute: 25, perDay: 2000 };
+
+// Plans. "free" is everyone. The paid plans exist so AI spend can be covered if InternScout gets
+// busy; a plan's multiplier scales every task allowance in TASKS, and the .edu doubling applies on
+// top, so a UMass supporter gets twice what a non-UMass supporter does.
+//
+// The multipliers are set so a plan still pays for itself even when a .edu student uses every unit
+// of it. An auto-filled application is what dominates the bill, at roughly $0.06 of Gemini once the
+// rules-first path has skipped the applications that need no model at all; a tailored resume is
+// about $0.01 and a Deep Dive about $0.02. Stripe keeps 2.9% + 30c, so at the ceiling:
+//   Supporter $5  -> $4.56 net, 50 autofills + 25 resumes + 5 Deep Dives = about $3.35 (27% left)
+//   Pro       $12 -> $11.35 net, 120 autofills + 60 resumes + 12 Deep Dives = about $8.04 (29% left)
+// Almost nobody empties a month's allowance, so the everyday margin is far wider than that; the
+// ceiling is what stops a heavy month from costing more than it brought in. Raising a multiplier
+// without raising the price eats it fast: 3x on Supporter is already near break-even.
+//
+// `priceEnv` names the wrangler secret holding that plan's Stripe Price id. A plan whose secret is
+// unset is simply not offered, so one tier can go live before the other.
 export const PLANS = {
+  // free has no `rate` of its own: it uses CONFIG.RATE below, which the RATE var can override.
   free: { multiplier: 1 },
-  supporter: { multiplier: 4, priceText: "$3/month" },
+  supporter: { multiplier: 2.5, priceText: "$5/month", priceEnv: "STRIPE_PRICE_ID", textEnv: "SUPPORTER_PRICE_TEXT", label: "Supporter", rate: PAID_RATE },
+  pro: { multiplier: 6, priceText: "$12/month", priceEnv: "STRIPE_PRICE_ID_PRO", textEnv: "PRO_PRICE_TEXT", label: "Pro", rate: PRO_RATE },
 };
+
+// The paid plans, cheapest first. Order is what the dashboard shows.
+export const PAID_PLANS = ["supporter", "pro"];
 
 export const CONFIG = {
   TASKS,
@@ -55,12 +80,10 @@ export const CONFIG = {
   // per-tier RPM -- it is account-specific and shown at aistudio.google.com/rate-limit -- so this
   // default is deliberately well under any paid tier. Raise it via the GLOBAL_RPM var once you have
   // read your own number, keeping some headroom.
-  RATE: { perMinute: 10, perDay: 300, globalPerMinute: 120 },
-  MONTHLY_BUDGET_CENTS: 2500,   // default; the MONTHLY_BUDGET_CENTS var wins
+  RATE: { ...FREE_RATE, globalPerMinute: 120 },
+  MONTHLY_BUDGET_CENTS: 7500,   // default; the MONTHLY_BUDGET_CENTS var wins
   DEMAND_WINDOW_DAYS: 90,
   MAX_BODY_BYTES: 4_000_000,
   SCOPES: ["openid", "email", "profile"],
-  // A Supporter gets a bigger share of the budget than a free student, but still a ceiling: one
-  // person on a paid plan must not be able to spend the whole month's budget by themselves.
-  SUPPORTER_RATE: { perMinute: 20, perDay: 900 },
+  PAID_PLANS,
 };

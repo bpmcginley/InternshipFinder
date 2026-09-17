@@ -1,11 +1,14 @@
-// The optional Supporter plan: it stays invisible until it is turned on, only Stripe can change a
-// plan, a retried webhook cannot pay twice, and a paid student gets a bigger allowance.
+// The optional paid plans: they stay invisible until turned on, only Stripe can change a plan, a
+// retried webhook cannot pay twice, a paid student gets a bigger allowance, and each tier is told
+// apart by the Stripe price the student actually bought.
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { NOW, aiBody, setup } from "./helpers.js";
 
 const SECRET = "whsec_test";
 const PAID = { PAYMENTS_ENABLED: "1", STRIPE_SECRET_KEY: "sk_test_1", STRIPE_PRICE_ID: "price_1", STRIPE_WEBHOOK_SECRET: SECRET, SITE_URL: "https://site.test/app" };
+// Both tiers on offer. Supporter is 2.5x the free allowance and Pro is 6x (src/config.js).
+const BOTH = { ...PAID, STRIPE_PRICE_ID_PRO: "price_pro" };
 
 async function sign(body, secret = SECRET, at = NOW) {
   const t = Math.floor(at.getTime() / 1000);
@@ -110,8 +113,37 @@ describe("webhook", () => {
     assert.equal(after.plan, "supporter");
     assert.equal(after.can_upgrade, false);
     assert.equal(after.can_manage, true);
-    assert.equal(after.allowance.resume_tailor.limit, before.allowance.resume_tailor.limit * 4);
+    assert.equal(after.allowance.autofill.limit, before.allowance.autofill.limit * 2.5);
     assert.equal(after.plan_renews, "2026-11-06T21:20:00.000Z");
+  });
+
+  // Which tier the student bought is the price they paid, not what the checkout metadata remembers:
+  // switching tiers inside Stripe's own portal rewrites the price and leaves the metadata behind.
+  it("puts the student on the tier their Stripe price belongs to", async () => {
+    const sub = (price) => (url) =>
+      url.includes("subscriptions/")
+        ? Response.json({ id: "sub_1", status: "active", current_period_end: 1794000000, items: { data: [{ price: { id: price } }] } })
+        : Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" });
+
+    for (const [price, plan, autofill] of [["price_1", "supporter", 50], ["price_pro", "pro", 120]]) {
+      const { api, db, token } = await setup({ env: BOTH, stripe: sub(price) });
+      const user = await whoami(api, token, db);
+      // Stale metadata from an earlier tier must not win over the price actually being billed.
+      assert.equal((await post(api, completed(user, { metadata: { plan: "supporter" } }))).status, 200);
+      const me = await (await api("GET", "/me", { token: await token() })).json();
+      assert.equal(me.plan, plan);
+      assert.equal(me.allowance.autofill.limit, autofill);
+      // Pro is the top tier, so there is nothing left to upgrade to.
+      assert.equal(me.can_upgrade, plan === "supporter");
+    }
+  });
+
+  it("offers only the tiers whose Stripe price is set", async () => {
+    const one = await (await (await setup({ env: PAID })).api("GET", "/config")).json();
+    assert.deepEqual(one.payments.plans.map((p) => p.plan), ["supporter"]);
+    const two = await (await (await setup({ env: BOTH })).api("GET", "/config")).json();
+    assert.deepEqual(two.payments.plans.map((p) => p.plan), ["supporter", "pro"]);
+    assert.deepEqual(two.payments.plans.map((p) => p.multiplier), [2.5, 6]);
   });
 
   // Stripe's newer API versions put the renewal date on the subscription item instead.

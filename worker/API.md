@@ -64,28 +64,39 @@ Every error is JSON `{ "error": code, "message": text }`:
       "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
       "scopes": ["openid", "email", "profile"] } ],
   "allowance": {
-    "edu":     { "resume_tailor": 8, "autofill": 15, "deep_dive": 2, "field_match": 200, "short_answer": 60 },
-    "general": { "resume_tailor": 4, "autofill": 7,  "deep_dive": 1, "field_match": 100, "short_answer": 30 },
-    "supporter": { "resume_tailor": 32, "autofill": 60, "deep_dive": 8, "field_match": 800, "short_answer": 240 } },
-  "payments": { "enabled": false },
+    "edu":       { "resume_tailor": 10, "autofill": 20,  "deep_dive": 2,  "field_match": 260,  "short_answer": 80 },
+    "general":   { "resume_tailor": 5,  "autofill": 10,  "deep_dive": 1,  "field_match": 130,  "short_answer": 40 },
+    "supporter": { "resume_tailor": 25, "autofill": 50,  "deep_dive": 5,  "field_match": 650,  "short_answer": 200 },
+    "pro":       { "resume_tailor": 60, "autofill": 120, "deep_dive": 12, "field_match": 1560, "short_answer": 480 } },
+  "payments": { "enabled": false, "plans": [] },
   "paused": false }
 ```
 The `general` allowance is `floor(edu × GENERAL_ALLOWANCE_PCT / 100)`, with a minimum of 1 per task. Only providers
 with a client ID set are listed.
 
-`supporter` is the `edu` allowance times the Supporter multiplier, shown so the dashboard can say what
-upgrading buys. When the Supporter plan is on, `payments` is
-`{ "enabled": true, "price": "$3/month", "multiplier": 4 }`; otherwise it is `{ "enabled": false }`.
+There is one `allowance` block per paid tier as well, each the `edu` allowance times that tier's
+multiplier (rounded), so the dashboard can say exactly what upgrading buys. A tier appears only while
+its own Stripe price id is set. When paid plans are on, `payments` looks like
+
+```json
+{ "enabled": true, "plans": [
+    { "plan": "supporter", "label": "Supporter", "price": "$5/month", "multiplier": 2.5 },
+    { "plan": "pro",       "label": "Pro",       "price": "$12/month", "multiplier": 6 } ] }
+```
+
+and otherwise it is `{ "enabled": false, "plans": [] }`.
 
 ### `GET /me` (auth)
 ```json
 { "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
   "can_upgrade": true, "can_manage": false,
-  "allowance": { "resume_tailor": { "used": 1, "limit": 8 }, "autofill": { "used": 0, "limit": 15 } } }
+  "allowance": { "resume_tailor": { "used": 1, "limit": 10 }, "autofill": { "used": 0, "limit": 20 } } }
 ```
-- **`plan`** is `free` or `supporter`. `limit` already includes the plan multiplier.
+- **`plan`** is `free` or the id of a paid tier (`supporter`, `pro`). `limit` already includes the
+  plan multiplier, so the client never multiplies anything itself.
 - **`plan_renews`** is the paid-through date (ISO) while subscribed, else `null`.
-- **`can_upgrade`** is true when payments are on and the student is on the free plan.
+- **`can_upgrade`** is true when payments are on and a larger tier than the current one is offered, so
+  it stays true for a Supporter while Pro exists and goes false on the top tier.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
 
 ### `DELETE /me` (auth)
@@ -131,17 +142,21 @@ Only users active in the last 90 days count. The ingest workflow reads this with
 `INTERNSCOUT_DEMAND_URL` + `INTERNSCOUT_DEMAND_TOKEN` and passes the state codes to the backend as
 `INTERNSCOUT_WANTED_STATES`.
 
-## Supporter plan (optional, off by default)
+## Paid plans (optional, off by default)
 
 Every route below returns `404 not_found` unless `PAYMENTS_ENABLED` is `"1"` **and** `STRIPE_SECRET_KEY`
-and `STRIPE_PRICE_ID` are set (the webhook also needs `STRIPE_WEBHOOK_SECRET`). Stripe holds the card,
+and at least one price id are set (the webhook also needs `STRIPE_WEBHOOK_SECRET`). Each tier is
+offered separately: `STRIPE_PRICE_ID` turns on Supporter and `STRIPE_PRICE_ID_PRO` turns on Pro, so
+launching with one tier and adding the other later needs no code change. Stripe holds the card,
 name and email. The Worker stores only the hashed user id, the Stripe customer and subscription ids, a
 status and the paid-through date.
 
 ### `POST /billing/checkout` (auth)
-Returns `{ "url": "https://checkout.stripe.com/…" }` for the student to open. The session carries
+Body is optional: `{ "plan": "supporter" | "pro" }`, defaulting to the first offered tier. Returns
+`{ "url": "https://checkout.stripe.com/…" }` for the student to open. The session carries
 `client_reference_id = user_hash` only, so a payment can be matched back to an account without Stripe
-learning who the student is. `409 already` if they are already on the Supporter plan.
+learning who the student is. `400 bad_plan` for a tier that isn't offered, and `409 already` if they
+already have any paid plan — switching tiers happens in the portal, where Stripe prorates it.
 
 ### `POST /billing/portal` (auth)
 Returns `{ "url": … }` for Stripe's own billing portal (change card, cancel). `404` if there is no
@@ -153,6 +168,10 @@ Needs a valid `Stripe-Signature` header; an unverified body never changes a plan
 applying twice. Handled types: `checkout.session.completed`, `customer.subscription.updated`,
 `customer.subscription.deleted`. Anything else is ignored.
 
+The tier comes from the subscription's price id rather than its metadata, because a student who
+switches tier inside Stripe's portal keeps the metadata the original checkout wrote. Metadata is only
+the fallback when no price matches a known tier.
+
 In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
 
 ## Worker secrets and vars
@@ -160,14 +179,16 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   - `GEMINI_API_KEY`
   - `HASH_SALT`
   - `DEMAND_TOKEN`
-  - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (only for the Supporter plan)
+  - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (Supporter), `STRIPE_PRICE_ID_PRO` (Pro),
+    `STRIPE_WEBHOOK_SECRET` — only for the paid plans
 - **Vars:**
   - `GOOGLE_CLIENT_ID`, `MS_CLIENT_ID` (a provider is off while its ID is empty)
   - `EDU_EXTRA_DOMAINS` (comma list of non-`.edu` school domains, default empty), `GENERAL_ALLOWANCE_PCT` (default 50)
   - `ALLOWED_ORIGINS`
-  - `MONTHLY_BUDGET_CENTS` (default 2500)
+  - `MONTHLY_BUDGET_CENTS` (default 7500)
   - `GLOBAL_RPM` (AI calls per minute across everyone, default 120; `"0"` turns AI off)
-  - `PAYMENTS_ENABLED` (`"0"` by default), `SUPPORTER_PRICE_TEXT` (display only), `SITE_URL` (where Stripe returns to)
+  - `PAYMENTS_ENABLED` (`"0"` by default), `SUPPORTER_PRICE_TEXT` and `PRO_PRICE_TEXT` (display only),
+    `SITE_URL` (where Stripe returns to)
 - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `plans`, `stripe_events`.
   The schema is in `worker/schema.sql`.
 

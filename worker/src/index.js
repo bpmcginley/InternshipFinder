@@ -5,7 +5,7 @@ import { authenticateUser, providers } from "./auth.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
 import { addSpend, admit, allowanceFor, cleanup, commitRun, deleteUser, isPaused, monthOf, usageFor } from "./limits.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
-import { applyEvent, blocksDeletion, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
+import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // The extension's ID is fixed by the "key" in its manifest (same ID from the store and from Load unpacked),
@@ -34,12 +34,15 @@ function later(ctx, promise) {
   if (ctx && ctx.waitUntil) ctx.waitUntil(p);
 }
 
-async function readJson(request, maxBytes) {
+async function readJson(request, maxBytes, optional = false) {
   if (Number(request.headers.get("Content-Length")) > maxBytes) {
     throw new HttpError(400, "bad_request", "Request body is too large");
   }
   const text = await request.text();
   if (text.length > maxBytes) throw new HttpError(400, "bad_request", "Request body is too large");
+  // Some routes take a body only to carry an optional choice, so no body means "use the default"
+  // rather than a mistake.
+  if (optional && !text.trim()) return { body: {}, bytes: 0 };
   try {
     const body = JSON.parse(text);
     if (body === null || typeof body !== "object") throw new Error();
@@ -75,7 +78,13 @@ async function route(request, env, ctx, d) {
     case "GET /config": {
       return json({
         providers: providers(env).map((p) => ({ ...p, scopes: d.config.SCOPES })),
-        allowance: { edu: limits("edu"), general: limits("general"), supporter: limits("edu", "supporter") },
+        // One table per plan, so the dashboard can say what each tier actually buys before
+        // a student pays. `general` is the non-.edu half of the free tier.
+        allowance: {
+          edu: limits("edu"),
+          general: limits("general"),
+          ...Object.fromEntries(d.config.PAID_PLANS.map((plan) => [plan, limits("edu", plan)])),
+        },
         payments: paymentsInfo(env, d.config),
         paused: await isPaused(db, env, d.config, now),
       });
@@ -91,8 +100,8 @@ async function route(request, env, ctx, d) {
         month,
         plan: mine.plan,
         plan_renews: mine.periodEnd,
-        can_upgrade: paymentsOn(env) && mine.plan === "free",
-        can_manage: paymentsOn(env) && !!mine.customer,
+        can_upgrade: canUpgrade(env, d.config, mine.plan),
+        can_manage: paymentsOn(env, d.config) && !!mine.customer,
         tier: who.tier,
         paused: await isPaused(db, env, d.config, now),
         allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan) })),
@@ -102,7 +111,7 @@ async function route(request, env, ctx, d) {
     case "DELETE /me": {
       const user = await signIn();
       if (await blocksDeletion(db, user)) {
-        throw new HttpError(409, "subscribed", "Cancel your Supporter plan first, then delete your data.");
+        throw new HttpError(409, "subscribed", "Cancel your paid plan first, then delete your data.");
       }
       await deleteUser(db, user);
       await deletePlan(db, user);
@@ -112,21 +121,24 @@ async function route(request, env, ctx, d) {
     // Stripe hosts both pages; we only hand out the link.
     case "POST /billing/checkout": {
       const user = await signIn();
-      return json(await checkout(db, env, user, now, d.fetch));
+      // The plan is optional: an older extension or dashboard that predates the second tier sends
+      // nothing, and gets the cheapest plan on offer.
+      const { body } = await readJson(request, d.config.MAX_BODY_BYTES, true);
+      return json(await checkout(db, env, d.config, user, body.plan, now, d.fetch));
     }
 
     case "POST /billing/portal": {
       const user = await signIn();
-      return json(await portal(db, env, user, d.fetch));
+      return json(await portal(db, env, d.config, user, d.fetch));
     }
 
     // Called by Stripe, not by a student: no sign-in, a signature instead.
     case "POST /billing/webhook": {
-      if (!paymentsOn(env) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
+      if (!paymentsOn(env, d.config) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
       const body = await request.text();
       if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
       const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
-      return json(await applyEvent(db, env, event, now, d.fetch));
+      return json(await applyEvent(db, env, d.config, event, now, d.fetch));
     }
 
     case "POST /ai": {
