@@ -17,7 +17,7 @@ from .db import SessionLocal, init_db
 from .models import Listing, Application
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
-from .classify import stage_of, years_of
+from .classify import STAGES, stage_of, years_of
 from .majors import majors_export
 from .score import W
 from .region import evaluate_locations
@@ -86,7 +86,7 @@ def _listing_dict(row: Listing) -> dict:
         "title": row.title,
         "field_tags": row.field_tags or [],
         "sector": row.sector,
-        "stage": row.stage or stage_of(row.title),
+        "stage": merged_stages(row.stage, row.title),
         "years": years_of(row.title, ins),
         "term": row.term,
         "salary": row.salary,
@@ -108,6 +108,23 @@ def _listing_dict(row: Listing) -> dict:
         "is_new": row.is_new,
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
     }
+
+
+def merged_stages(stored: list[str] | None, title: str) -> list[str]:
+    """Every stage this posting has, in STAGES order: the stored ones and today's reading of it.
+
+    A stored stage is the answer the rules gave the day the row arrived, and the rules move. The
+    last export published 25 postings that plainly say research - "PhD Research Intern", "Research
+    Science Intern, Financial Innovation Lab", "Research and Technology Co-Op" - as internships
+    and nothing else, because they were stored before the research rule learned the bare word. A
+    student filtering for research did not see them.
+
+    The stored list is kept rather than replaced, because it is the only record of what the source
+    said the employment type was. Eight listings owe their whole stage to it: the title of a
+    Palantir posting is "Growth" and of another "Cohort 0", and only the feed says intern.
+    """
+    found = set(stored or []) | set(stage_of(title))
+    return [s for s in STAGES if s in found]
 
 
 def still_student_opportunities(listings: list[dict]) -> list[dict]:

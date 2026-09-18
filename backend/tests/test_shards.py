@@ -3,7 +3,8 @@ import json
 import os
 from internscout.classify import ALL_FIELDS
 from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, per_tag, report
-from internscout.export_static import shard_keys, still_student_opportunities, write_shards
+from internscout.export_static import (merged_stages, shard_keys,
+                                       still_student_opportunities, write_shards)
 from internscout.region import evaluate_locations, maybe_in_region
 
 
@@ -131,3 +132,17 @@ def test_a_row_that_would_no_longer_be_admitted_is_not_published():
             "Manufacturing Co-op (Spring 2027)"]
     rows = [{"id": i, "title": t, "stage": stage_of(t)} for i, t in enumerate(stale + keep)]
     assert [x["title"] for x in still_student_opportunities(rows)] == keep
+
+
+def test_a_stored_stage_is_added_to_and_not_trusted_alone():
+    # "PhD Research Intern" was stored as an internship and nothing else, because the research rule
+    # did not know the bare word yet. 25 listings in one export were research jobs a student
+    # filtering for research could not find.
+    assert merged_stages(["internship"], "PhD Research Intern") == ["internship", "research"]
+    assert merged_stages([], "Research and Technology Co-Op") == ["co_op", "research"]
+    # The stored list is the only record of what the feed said the employment type was: the whole
+    # title of one Palantir posting is "Growth", and of another "Cohort 0".
+    assert merged_stages(["internship"], "Growth") == ["internship"]
+    assert merged_stages(["internship", "part_time"], "Data Analyst") == ["internship", "part_time"]
+    # and the order is STAGES order, whichever side a stage came from.
+    assert merged_stages(["research"], "Summer Intern") == ["internship", "research"]
