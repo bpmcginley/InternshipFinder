@@ -3,7 +3,7 @@ from internscout.sources.greenhouse import parse_greenhouse
 from internscout.sources.lever import parse_lever
 from internscout.sources.ashby import parse_ashby
 from internscout.sources.workday import parse_workday_list, parse_workday_detail, host_of
-from internscout.sources.smartrecruiters import parse_smartrecruiters
+from internscout.sources.smartrecruiters import parse_smartrecruiters, parse_smartrecruiters_detail
 from internscout.sources.workable import parse_workable
 from internscout.sources.recruitee import parse_recruitee
 from internscout.sources.bamboohr import parse_bamboohr
@@ -74,6 +74,25 @@ def test_smartrecruiters():
         {"id": "8", "name": "Marketing Intern", "location": {"city": "Paris", "country": "fr"}},
     ]}, CO, "Acme")
     assert len(items) == 1 and items[0]["url"] == "https://jobs.smartrecruiters.com/Acme/7"
+    # The id has to survive the parse, or the detail call has nothing to ask for.
+    assert items[0]["_sr_id"] == "7"
+
+
+def test_smartrecruiters_detail():
+    # The advert's own sections, in posting order. companyDescription is the same boilerplate on
+    # every job a company has, so it is left out rather than spent from the 4,000-char budget.
+    text = parse_smartrecruiters_detail({"jobAd": {"sections": {
+        "companyDescription": {"text": "<p>Acme has been making anvils since 1923.</p>"},
+        "qualifications": {"text": "<p>Rising junior &amp; up</p>"},
+        "jobDescription": {"text": "<p>Design anvils</p>"},
+        "additionalInformation": {"text": "<p>Paid</p>"},
+    }}})
+    assert text == "Design anvils\nRising junior & up\nPaid"
+
+    # A posting with no advert at all must come back empty, not raise: an empty description is
+    # what every SmartRecruiters listing had before this, so it has to stay survivable.
+    assert parse_smartrecruiters_detail({}) == ""
+    assert parse_smartrecruiters_detail({"jobAd": {"sections": {"jobDescription": None}}}) == ""
 
 
 def test_workable():
