@@ -159,6 +159,10 @@ WORKDAY = [
 ]
 SMARTRECRUITERS = [
     {"name": "Bosch", "ats_token": "BoschGroup", "is_quant_target": False},
+    # Education research and public health, Waltham MA. The one employer of this sweep whose
+    # token the name probe could reach on its own; the rest had to be read off a careers page.
+    {'name': 'Education Development Center', 'ats_token': 'educationdevelopmentcenter',
+     'is_quant_target': False, 'sector': 'education_research'},
 ]
 
 # Sector employers (health, government, arts, ...): each entry also has "sector".
@@ -170,6 +174,10 @@ JOBVITE: list = []
 ADP += [
     {'name': 'Greater Boston Food Bank', 'ats_token': 'c8a69c17-a9c1-45ff-8324-98137a9b6b4d', 'is_quant_target': False, 'sector': 'nonprofit'},
     {'name': 'Mass Audubon', 'ats_token': '6044bc19-19e6-443a-8a51-62fe8af33798', 'is_quant_target': False, 'sector': 'nonprofit'},
+    # Child and family policy research. One student posting the day it was added. ADP had two
+    # boards in the registry and its tokens are opaque UUIDs no naming rule can guess, so each
+    # one has to be read off the employer's own careers page.
+    {'name': 'Child Trends', 'ats_token': '70c1bbee-a65c-4b42-bb04-9dcb8a73868a', 'is_quant_target': False, 'sector': 'education_research'},
 ]
 GREENHOUSE += [
     {'name': "Sotheby's", 'ats_token': 'sothebys', 'is_quant_target': False, 'sector': 'arts_museums'},
@@ -561,6 +569,13 @@ ICIMS = [
     {'name': 'Analysis Group', 'ats_token': 'professionalcareers-analysisgroup', 'is_quant_target': False},
     {'name': 'Analysis Group', 'ats_token': 'datasciencecareers-analysisgroup', 'is_quant_target': False},
     {'name': 'Advocates', 'ats_token': 'careers-advocatesinc', 'is_quant_target': False, 'sector': 'nonprofit'},
+    # Human services across central MA: disability, brain injury and behavioral health. Five
+    # postings on the board the day it was added and no student role among them, which is
+    # September; the board is registered so the spring practicum postings are there when they
+    # appear. behavioral_health is the only sector that reaches the psychology tag, and three
+    # boards carried it before these.
+    {'name': 'Seven Hills Foundation', 'ats_token': 'careers-sevenhills', 'is_quant_target': False,
+     'sector': 'behavioral_health'},
 ]
 RECRUITEE = [
     {'name': 'TransPerfect', 'ats_token': 'transperfect', 'is_quant_target': False},
@@ -572,11 +587,23 @@ WORKDAY += [
     # Likewise Compass Lexecon through FTI Consulting's. 10 economics internships on the day it was
     # added, all in Europe; the US ones post later in the season.
     {'name': 'Compass Lexecon', 'ats_token': 'fticonsulting|wd108|CompassLexeconCareers', 'is_quant_target': False},
+    # Two boards on one tenant, both live: the staff board had 18 postings the day it was added
+    # and the pre-service board, which is the corps pipeline students actually enter through,
+    # had none. An empty board is registered rather than skipped - it answers 200 with a total
+    # of 0, which is a season, not a dead board, and only a failing fetch counts against it.
+    {'name': 'Teach For America', 'ats_token': 'teachforamerica|wd1|TFA_Careers', 'is_quant_target': False,
+     'sector': 'education_research'},
+    {'name': 'Teach For America', 'ats_token': 'teachforamerica|wd1|TFA_Pre-Service_Careers',
+     'is_quant_target': False, 'sector': 'education_research'},
 ]
 
 JAZZHR += [
     {'name': "Let's Get Ready", 'ats_token': 'letsgetready', 'is_quant_target': False,
      'sector': 'education_research'},
+    # Crisis counselling, which is where a psychology undergraduate actually starts. Eight
+    # openings the day it was added, none of them student roles yet.
+    {'name': 'Crisis Text Line', 'ats_token': 'CrisisTextLineInc', 'is_quant_target': False,
+     'sector': 'behavioral_health'},
 ]
 
 
@@ -652,5 +679,26 @@ WORKDAY += [
 # Of the other two systems seen here, SilkRoad allows its job pages (Crawl-Delay: 10, so a board
 # is a minute of waiting) and BrassRing serves no robots.txt at all. Neither appears anywhere in
 # the apply_url hosts we already index, so a fetcher for either would be built for one employer.
+
+# --- human services and social research, checked live 2026-09-18 ---
+# Looking for the employers behind the one cluster the coverage report calls thin. Reachable and
+# seeded above: Seven Hills (iCIMS), Teach For America (Workday), Child Trends (ADP), Crisis Text
+# Line (JazzHR), Education Development Center (SmartRecruiters). Not reachable:
+#
+#   Center for Human Development    recruiting.ultipro.com          UKG, closed by robots.txt
+#   Gandara Center                  recruiting.ultipro.com          UKG, closed by robots.txt
+#   Behavioral Health Network       bhnteam.rec.pro.ukg.net         UKG, closed by robots.txt
+#   Baker Center for Children       secure7.saashr.com              UKG Ready
+#   MDRC                            secure6.saashr.com              UKG Ready
+#   Clinical & Support Options      csoemployment.e3applicants.com  E3, one employer
+#   ServiceNet, JRI, Wayside, May Institute, Elwyn, Devereux, City Year, Boys & Girls Clubs of
+#   Boston, RAND, Trevor Project    no ATS reachable from the careers page
+#
+# UKG Ready (saashr.com) is a different host from the UKG board already ruled out and may well
+# allow what its parent forbids, but it turned up for two employers here and appears in no
+# apply_url we index, so a fetcher for it would be built for those two - the same reason SilkRoad
+# and BrassRing were left alone above. The Pioneer Valley agencies nearest UMass are the loss
+# that matters: CHD, Gandara and BHN are all on UKG, and they are exactly who a psychology
+# undergraduate in Amherst would apply to.
 
 # --- end sector seeds ---
