@@ -59,7 +59,7 @@ UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "Nutrition": (("health", "public_health"), ("agriculture", "clinical_research")),
     "Public Health Sciences": (("public_health", "health"), ("clinical_research", "government", "nonprofit", "data")),
     # Social and Behavioral Sciences
-    "Anthropology": (("nonprofit", "museums"), ("public_health", "government")),
+    "Anthropology": (("social_science", "nonprofit", "museums"), ("public_health", "government")),
     "Communication": (("communications", "media"), ("marketing", "film", "journalism")),
     "Economics": (("economics",), ("finance", "consulting", "government", "data", "business")),
     "Resource Economics": (("economics",), ("sustainability", "agriculture", "finance")),
@@ -67,7 +67,7 @@ UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "Legal Studies": (("law",), ("government", "nonprofit")),
     "Political Science": (("government", "law"), ("nonprofit", "economics", "communications")),
     "Public Policy": (("government", "economics"), ("nonprofit", "urban_planning", "public_health")),
-    "Sociology": (("social_work", "nonprofit"), ("government", "data", "hr")),
+    "Sociology": (("social_science", "social_work", "nonprofit"), ("government", "data", "hr")),
     "Social Thought and Political Economy": (("nonprofit", "government"), ("economics",)),
     "Sustainable Community Development": (("urban_planning", "sustainability"), ("nonprofit", "government")),
     "Women, Gender, Sexuality Studies": (("nonprofit", "social_work"), ("government", "public_health")),

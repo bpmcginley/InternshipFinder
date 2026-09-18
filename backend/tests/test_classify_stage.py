@@ -486,3 +486,13 @@ def test_market_research_policy_and_community_work_reach_a_field():
         assert "nonprofit" not in classify(title), title
     for title in ("Enterprise Cybersecurity IT Policy Intern", "Service Policy Intern - MN, WI"):
         assert "government" not in classify(title), title
+
+
+def test_sociology_anthropology_and_survey_work_are_social_science():
+    for title in ("Sociology Research Intern", "Anthropology Intern", "Survey Research Intern",
+                  "Polling and Outreach Intern",
+                  "Student Research Assistant - Department of Sociology and Criminology"):
+        assert "social_science" in classify(title), title
+    # the retailer is not the discipline
+    assert "social_science" not in classify("Anthropologie Buying Intern - Home")
+    assert "social_science" in majors_export()["fields"]

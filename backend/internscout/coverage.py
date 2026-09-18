@@ -38,7 +38,7 @@ CLUSTERS = {
     "Engineering": ("mechanical", "electrical", "civil", "chemical", "industrial", "aerospace",
                     "hardware", "materials", "environmental", "engineering"),
     "Sciences": ("biology", "chemistry", "physics", "lab_research", "math", "agriculture", "sustainability"),
-    "Social sciences": ("psychology", "economics", "languages"),
+    "Social sciences": ("psychology", "economics", "languages", "social_science"),
     "Tech & data": ("swe", "ml", "data", "security", "quant"),
 }
 

@@ -113,6 +113,10 @@ RULES = [
      # psychology major can actually get. None of them say "psychology" in the title.
      r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)|psychiatr|human factors|child (and adolescent )?development|behavio(u)?r science|suicide prevention|(?<!respiratory )(?<!recreation )(?<!recreational )(?<!activity )(?<!physical )(?<!occupational )(?<!speech )(?<!massage )\btherapist\b"),
     ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
+    # Sociology and anthropology had no tag at all, so the coverage report's social-sciences line
+    # could only ever count psychology, economics and languages, and a "Survey Research Intern" or
+    # "Sociology Research Intern" landed in "other". "Anthropologie" is a clothing retailer.
+    ("social_science", r"sociolog|anthropolog(y|ist|ical)|demograph|ethnograph|social science|survey research|\bpolling\b|public opinion"),
     ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house|political scien|"
      # Policy work: "Energy Policy & Regulation Intern", "Policy & Advocacy Intern", "Policy Fellow",
      # "Policy Assistant", "Public Policy Assistant". Tied to a role word or a policy area, because

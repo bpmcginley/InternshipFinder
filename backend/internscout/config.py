@@ -110,6 +110,11 @@ GOOGLE_JOBS_QUERIES = [
     "undergraduate research assistant summer",
     "psychology research internship undergraduate",
     "economics research internship",
+    # Social sciences stayed the thinnest field on the coverage report (12 open listings in the
+    # baseline states against a target of 15), and the employers that hire for it most - RTI,
+    # NORC, Mathematica, Westat - are either closed to us by robots.txt or post nowhere we scan.
+    "sociology anthropology internship",
+    "survey research polling internship",
     "agriculture food science internship",
     "architecture design internship",
     "marketing internship summer 2027",
