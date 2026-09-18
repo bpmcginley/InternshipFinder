@@ -40,6 +40,10 @@ function jobCard(j) {
     } else if (j.question) {
       h += `<div class="q">${esc(j.question)}</div>${j.reason ? `<div class="small">${esc(j.reason)}</div>` : ""}<textarea data-ans="${j.id}" placeholder="Answer (saved to your profile for next time)">${esc(drafts[j.id] || "")}</textarea>`;
       btns.push(["answer", "Answer & continue", "primary"]);
+    } else if (j.needs_auth) {
+      // The sign-in window has to open from a click, which this button is.
+      h += `<div class="msg">${esc(j.reason)}</div>`;
+      btns.push(["signin_resume", "Sign in & resume", "primary"]);
     } else if (j.needs_host) {
       // Chrome only grants a site from a click on an extension page, which is what this is.
       h += `<div class="msg">${esc(j.reason)}</div>`;
@@ -96,6 +100,11 @@ async function renderQueue() {
       const j = jobs.find((x) => x.id === id);
       // Declining is a real answer: leave the job where it is rather than starting a run that cannot work.
       if (j && j.needs_host && await requestHostAccess(j.needs_host)) await control(id, "resume");
+      else render();
+    } else if (act === "signin_resume") {
+      // Same provider as last time (the Worker keeps it); a failed or cancelled sign-in leaves the job waiting.
+      const r = await send({ type: "auth:signin" });
+      if (r && r.signedIn) await control(id, "resume");
       else render();
     } else if (act === "answer") {
       const v = (drafts[id] || "").trim();

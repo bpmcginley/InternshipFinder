@@ -93,7 +93,11 @@ export async function signIn({ interactive = true, provider } = {}) {
   const nonce = crypto.randomUUID();
   const hint = saved.provider === id ? saved.hint : undefined;
   const url = buildAuthUrl(p, { redirectUri: chrome.identity.getRedirectURL(), nonce, loginHint: hint, silent: !interactive });
-  const back = await chrome.identity.launchWebAuthFlow({ url, interactive });
+  // A silent refresh (prompt=none) can take a redirect or two after the first page load; by default Chrome
+  // gives up on a non-interactive flow at that first load, so the refresh failed and every job an hour
+  // after sign-in stopped at "sign in". These two options (Chrome 113+, ignored before) let it finish.
+  const back = await chrome.identity.launchWebAuthFlow(interactive ? { url, interactive }
+    : { url, interactive, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 10000 });
   if (!back) throw new Error("Sign-in was cancelled.");
   const token = parseRedirect(back, nonce);
   await chrome.storage.session.set({ [KEY]: { token, hint: emailOf(decodeJwt(token)), provider: id } });

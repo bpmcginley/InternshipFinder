@@ -409,7 +409,9 @@ async function loop(id) {
     return;
   }
   if (isWorker(store.ai) && !(await ensureToken())) {
-    await updateJob(id, { status: "needs_you", reason: "Sign in with Google or Microsoft (InternScout popup or Deep Dive → Setup), then Resume.", activity: "" });
+    // needs_auth gives the card a "Sign in & resume" button. A plain Resume only re-ran this check, and an
+    // expired sign-in (they last an hour) that could not refresh silently stayed stuck here.
+    await updateJob(id, { status: "needs_you", needs_auth: true, reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
     return;
   }
   // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
@@ -428,7 +430,7 @@ async function loop(id) {
     if (job.status !== "working") return; // waiting for the human to approve it
   }
   let tabId = await ensureTab(job);
-  job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "" });
+  job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "", needs_auth: false });
   const msgs = await loadMsgs(id);
   const fails = {};
   let pending = job.pending || null;
@@ -583,7 +585,7 @@ async function loop(id) {
       // Sign-in, allowance, rate or pause: hand the job to the student instead of failing it; Resume retries this step.
       if (!NEEDS_YOU_CODES.has(e && e.code)) throw e;
       msgs.pop();
-      await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "" });
+      await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
       await saveMsgs(id, msgs);
       return;
     }

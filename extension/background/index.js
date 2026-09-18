@@ -199,7 +199,8 @@ async function handle(m, sender, fromPage) {
       return { token: await getToken() };
     case "auth:signin":
       // Runs here, not in the popup: the popup closes when the sign-in window takes focus.
-      await signIn({ interactive: true, provider: m.provider === "microsoft" ? "microsoft" : "google" });
+      // No provider given (the side panel's "Sign in & resume"): signIn reuses the last one, else Google.
+      await signIn({ interactive: true, provider: ["google", "microsoft"].includes(m.provider) ? m.provider : undefined });
       return authStatus();
     case "auth:signout":
       await signOut();
