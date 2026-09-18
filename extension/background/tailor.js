@@ -3,6 +3,7 @@ import { callAI, jsonOf } from "./claude.js";
 import { modelFor } from "../lib/store.js";
 import { renderResume, toB64 } from "../lib/pdf.js";
 import { applyTailoring, tailorInput } from "../lib/tailoring.js";
+import { readTailored, tailorKey, writeTailored } from "../lib/tailor_cache.js";
 
 const SYSTEM = `You tailor a student's resume to one job posting. You may ONLY:
 - reword existing bullets so they use the posting's language, where that stays truthful;
@@ -19,21 +20,28 @@ Reply with JSON only:
  "changes": ["short note on each meaningful change and why it fits the posting"]}`;
 
 export async function tailorResume(store, job) {
+  const model = modelFor(store, "tailor");
+  const prompt = `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}\n\nPROFILE (JSON)\n${JSON.stringify(tailorInput(store))}`;
+  const key = await tailorKey(model, SYSTEM, prompt);
+  const hit = await readTailored(key);
+  if (hit) return { ...hit, cost_usd: 0, reused: true };
+
   const resp = await callAI({
-    ai: store.ai, model: modelFor(store, "tailor"), kind: "tailor", run_id: job.run_id, max_tokens: 4000, system: SYSTEM,
-    messages: [{ role: "user", content: `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}\n\nPROFILE (JSON)\n${JSON.stringify(tailorInput(store))}` }],
+    ai: store.ai, model, kind: "tailor", run_id: job.run_id, max_tokens: 4000, system: SYSTEM,
+    messages: [{ role: "user", content: prompt }],
   });
   const out = jsonOf(resp);
   const { resume, diff } = applyTailoring(store, out);
   const bytes = renderResume(resume);
   const f = store.profile.facts;
   const base = [f.first_name, f.last_name].filter(Boolean).join("_").replace(/[^\w-]/g, "") || "Tailored";
-  return {
+  const tailored = {
     file: { name: `${base}_Resume.pdf`, type: "application/pdf", size: bytes.length, b64: toB64(bytes) },
     summary: resume.summary,
     changes: (Array.isArray(out.changes) ? out.changes : []).slice(0, 8).map(String),
     diff,
-    cost_usd: resp.cost_usd || 0,
     created: Date.now(),
   };
+  await writeTailored(key, tailored);
+  return { ...tailored, cost_usd: resp.cost_usd || 0 };
 }

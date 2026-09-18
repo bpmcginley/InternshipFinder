@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyTailoring, canTailor, hasNewNumbers } from "../lib/tailoring.js";
+import { clearTailored, readTailored, tailorKey, writeTailored } from "../lib/tailor_cache.js";
 import { renderResume, wrap, clean } from "../lib/pdf.js";
 
 const store = () => ({
@@ -59,4 +60,54 @@ test("pdf is well formed", () => {
   }
   assert.ok(wrap("word ".repeat(200), 10, false, 500).length > 3);
   assert.equal(clean("“Résumé” – café"), '"Resume" - cafe');
+});
+
+
+// A fake chrome.storage.local: one object, the same get/set/remove shape, and a switch for failing.
+function fakeStore() {
+  let data = {}, fail = false;
+  return {
+    get: async (k) => (fail ? Promise.reject(new Error("quota")) : { [k]: data[k] }),
+    set: async (o) => { if (fail) throw new Error("quota"); Object.assign(data, o); },
+    remove: async (k) => { delete data[k]; },
+    break: (v) => { fail = v; },
+    raw: () => data,
+  };
+}
+
+test("tailor cache key depends on every input, and cannot be forged by shifting them", async () => {
+  const k = await tailorKey("gemini-3.8-flash", "SYS", "JOB");
+  assert.match(k, /^[0-9a-f]{64}$/);
+  assert.equal(k, await tailorKey("gemini-3.8-flash", "SYS", "JOB"));
+  assert.notEqual(k, await tailorKey("claude-haiku-4-5", "SYS", "JOB"));   // a different model
+  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SYS2", "JOB"));  // a reworded system prompt
+  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SYS", "JOB2"));  // a different posting
+  // Length prefixes are what stop a boundary shift from colliding: "SY"+"SJOB" must not equal "SYS"+"JOB".
+  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SY", "SJOB"));
+});
+
+test("a tailored resume is stored, read back, and capped at 12 entries", async () => {
+  const st = fakeStore();
+  assert.equal(await readTailored("missing", st), null);
+
+  await writeTailored("k1", { summary: "hi", diff: [] }, st);
+  assert.deepEqual(await readTailored("k1", st), { summary: "hi", diff: [] });
+
+  for (let i = 0; i < 20; i++) await writeTailored(`n${i}`, { summary: `r${i}`, diff: [] }, st);
+  const kept = Object.keys(st.raw().tailor_cache);
+  assert.equal(kept.length, 12);
+  assert.ok(kept.includes("n19"), "the newest entry survives");
+  assert.equal(await readTailored("k1", st), null, "the oldest was evicted");
+
+  await clearTailored(st);
+  assert.equal(await readTailored("n19", st), null);
+});
+
+test("a broken cache costs an AI call, never the tailoring", async () => {
+  const st = fakeStore();
+  st.break(true);
+  assert.equal(await readTailored("k1", st), null);          // a failed read is simply a miss
+  await writeTailored("k1", { summary: "hi" }, st);          // and a failed write must not throw
+  st.break(false);
+  assert.equal(await readTailored("k1", st), null);
 });

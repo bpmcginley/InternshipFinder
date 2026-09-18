@@ -371,10 +371,10 @@ function accountLine(store, url) {
 async function tailorStep(id, job, store) {
   await updateJob(id, { activity: "Tailoring your resume to this posting…" });
   try {
-    const { cost_usd, ...t } = await tailorResume(store, job);
+    const { cost_usd, reused, ...t } = await tailorResume(store, job);
     const auto = store.settings.tailor_resume === "auto";
     job = await updateJob(id, (j) => ({ tailored: { ...t, status: auto ? "approved" : "pending" }, cost_usd: (j.cost_usd || 0) + cost_usd }));
-    await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${auto ? ", used automatically" : ""}.` });
+    await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${reused ? ", reused from an earlier run at no cost" : ""}${auto ? ", used automatically" : ""}.` });
     if (!auto) job = await updateJob(id, { status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
   } catch (e) {
     const msg = String((e && e.message) || e);
