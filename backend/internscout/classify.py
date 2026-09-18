@@ -180,7 +180,13 @@ _STUDENT_WORD_RE = re.compile(r"\b(student|undergrad(uate)?|summer)\b", re.I)
 _NEW_GRAD_RE = re.compile(r"new ?grad|early career|entry[- ]level|recent (college )?grad|university grad|"
                           r"graduate (development |rotational )?program|rotational program|leadership development program", re.I)
 _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdirector\b|\bsenior\b|\bstaff\b|\bprincipal\b|\blead\b", re.I)
-_NEVER_STUDENT_RE = re.compile(r"post-?doc|post-?doctoral|post-?bacc|faculty|professor|physician|attending", re.I)
+# The separator is optional and it is not always a hyphen. Employers write "Post Doctoral
+# Research Fellow" and "Post Doc Research Associate" as often as they write "Postdoctoral",
+# and five of them were live on the board while this rule sat here meaning to exclude exactly
+# those. One is titled "Post Doc Scientist Data Science AI/ML Intern"; it goes too, because a
+# postdoc needs a finished PhD whatever else the title says, and that is already what this
+# rule did to anyone who spelled it with a hyphen.
+_NEVER_STUDENT_RE = re.compile(r"post[- ]?doc|post[- ]?doctoral|post[- ]?bacc|faculty|professor|physician|attending", re.I)
 # The job of running an internship programme is not an internship. Universities and hospitals post
 # plenty of them - "Assistant/Associate Coop Coordinator", "Manager, Internship Programs",
 # "Practicum Coordinator II for Nursing" - and they came through, because the very words that make

@@ -334,3 +334,21 @@ def test_a_degree_list_in_a_description_does_not_make_a_job_a_software_job():
          "For students pursuing a degree in Computer Science or a related technical field."),
     ):
         assert "swe" not in classify(title, body), title
+
+
+def test_a_postdoc_is_a_postdoc_however_the_employer_spells_it():
+    # All five of these were open on the board, and none of them matched, because the rule asked
+    # for an optional hyphen and every one of these employers used a space instead.
+    for title in ("Post Doctoral Research Fellow",
+                  "Post Doc Research Associate - Networking and Distributed Systems Lab",
+                  "School of Arts and Communication Post Doc Visiting Research Associate",
+                  "Pain Psychology Post Doctoral Fellowship",
+                  "Post Bacc Research Assistant"):
+        assert stage_of(title) == [], title
+        assert stage_of(title.replace(" Doc", "-Doc").replace(" Bacc", "-Bacc")) == [], title
+    # A postdoc that calls itself an intern is still a postdoc - it needs a finished PhD - and the
+    # hyphenated spelling was already dropped for the same reason.
+    assert stage_of("Post Doc Scientist Data Science AI/ML Intern") == []
+    # "post" only starts a postdoc when "doc" or "bacc" follows it, so the word itself is safe.
+    assert stage_of("Social Media Post Production Intern") == ["internship"]
+    assert stage_of("Research Intern") == ["internship", "research"]
