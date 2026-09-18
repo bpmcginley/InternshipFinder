@@ -35,7 +35,16 @@ def _regions(row: Listing) -> list[dict]:
 
 def shard_keys(listing: dict) -> set[str]:
     """The listing files a listing belongs in: each state it names, "remote" for US-remote roles
-    with no state, "US" for roles that name only the country."""
+    with no state, "US" for roles that name only the country.
+
+    This can come back empty, and a listing it comes back empty for is in no file and so cannot be
+    reached from the site at all. The pipeline cannot produce one - it drops anything whose
+    locations do not classify - but a carried listing can become one, because _regions re-reads the
+    stored location under today's rules and today's rules may no longer place it. There is no
+    honest file for it: "US" would be claiming a country the listing never named. So it is withheld
+    and counted, and export says how many, because a corpus that quietly shrinks between the total
+    and the state files is worse than one that shrinks out loud.
+    """
     keys = set()
     for g in listing.get("regions") or []:
         if g["state"] and g["state"] != "Remote":
@@ -336,7 +345,14 @@ def export(out_dir: str) -> dict:
     print(f"[export] {held} listings held from the last export because their board came back "
           f"with half or less of what it had")
     index = write_shards(listings, out_dir, generated_at)
-    print(f"[export] wrote {len(listings)} listings ({len(index['files'])} state files) to {out_dir}")
+    unplaced = [x for x in listings if not shard_keys(x)]
+    print(f"[export] wrote {len(listings) - len(unplaced)} listings "
+          f"({len(index['files'])} state files) to {out_dir}")
+    if unplaced:
+        print(f"[export] {len(unplaced)} listings name no US location today's rules can place, so "
+              f"they are in no state file and the site cannot show them: "
+              + "; ".join(f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
+                          for x in unplaced[:5]))
     return stats
 
 

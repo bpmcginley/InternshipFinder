@@ -269,3 +269,18 @@ def test_a_board_that_stays_quiet_empties_out(tmp_path):
     _write_prev(tmp_path, prev)
     listings = []
     assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+
+
+def test_a_listing_no_rule_can_place_lands_in_no_state_file(tmp_path):
+    # Not hypothetical: _regions re-reads a carried listing's stored location under today's
+    # rules, so a listing that classified when it was first seen can stop classifying later.
+    # It cannot go in US.json - it never named the US - so it is withheld, and the only thing
+    # that stops it being lost silently is that export counts it.
+    lost = {"id": "x", "regions": [], "state": None, "status": "open",
+            "field_tags": ["health"], "stage": ["internship"], "sector": None}
+
+    assert shard_keys(lost) == set()
+    index = write_shards([lost, _listing("y", ["Boston, MA"])], str(tmp_path), "now")
+    assert list(index["files"]) == ["MA"]
+    kept = json.load(open(os.path.join(str(tmp_path), "listings", "MA.json"), encoding="utf-8"))
+    assert [x["id"] for x in kept] == ["y"]
