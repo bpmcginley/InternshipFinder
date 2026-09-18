@@ -9660,7 +9660,7 @@
   "fa-exty-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Howmet Aerospace",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14"
   },
   "fa-exvu-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
@@ -11778,7 +11778,7 @@
   "accenture|wd103|AccentureCareers": {
    "name": "Accenture",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "accenture|wd103|AvanadeCareers": {
@@ -11916,7 +11916,7 @@
   "aig|wd1|aig": {
    "name": "AIG",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-16",
    "sector": "insurance_finance"
   },
@@ -11936,13 +11936,13 @@
   "airliquidehr|wd3|airgasexternalcareer": {
    "name": "Airgas",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "airliquidehr|wd3|AirLiquideExternalCareer": {
    "name": "Air Liquide",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "airproducts|wd5|AP0001": {
@@ -12752,7 +12752,7 @@
   "bdx|wd1|EXTERNAL_CAREER_SITE_USA": {
    "name": "Becton Dickinson",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "bdx|wd1|US_EARLY_TALENT_SITE": {
@@ -12896,19 +12896,25 @@
   "bmo|wd3|Privileged": {
    "name": "BMO",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 2,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 1,
+   "fails": 3,
+   "added": "2026-09-18"
+  },
+  "boeing|wd1|INTERN": {
+   "name": "The Boeing Company",
+   "quant": false,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "borgwarner|wd5|BorgWarner_Careers": {
@@ -12946,7 +12952,7 @@
   "bpinternational|wd3|bpCareers": {
    "name": "BP",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "bpinternational|wd3|bpEarlyCareers": {
@@ -12994,8 +13000,8 @@
   "brookfield|wd5|bpandc": {
    "name": "Argo Group",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-13"
   },
   "brookfield|wd5|brookfield": {
    "name": "Brookfield",
@@ -13068,7 +13074,7 @@
   "cadence|wd1|external_careers": {
    "name": "Cadence",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "cadence|wd1|OpenEye_Careers": {
@@ -13811,7 +13817,7 @@
   "cvshealth|wd1|CVS_Health_Careers": {
    "name": "CVS Health",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-18",
    "sector": "health"
   },
@@ -13958,7 +13964,7 @@
   "disney|wd5|disneycareerdc": {
    "name": "The Walt Disney Company",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18",
    "sector": "hospitality_sports"
   },
@@ -14072,7 +14078,7 @@
   "ebi|wd5|ebicareers": {
    "name": "Ensign-Bickford Industries",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "echo|wd1|Echo_Logistics": {
@@ -14201,7 +14207,7 @@
   "envista|wd1|envistacareers": {
    "name": "Envista",
    "quant": false,
-   "fails": 3,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "epicorsoftware|wd5|epicorjobs": {
@@ -14262,7 +14268,7 @@
   "eversource|wd1|ExternalSite": {
    "name": "Eversource Energy",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "evolito|wd3|Evolito_Career_Site": {
@@ -14316,7 +14322,7 @@
   "faithtechnologies|wd1|FTI_Engineering": {
    "name": "Faith Technologies",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "fanniemae|wd1|FannieMaeCareers": {
@@ -14328,7 +14334,7 @@
   "fau|wd1|FAU": {
    "name": "Florida Atlantic University",
    "quant": false,
-   "fails": 2,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "fccfac|wd3|careers-carrieres": {
@@ -14358,7 +14364,7 @@
   "ffin|wd1|First_Financial_Bank": {
    "name": "First Financial ",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "ffive|wd5|f5jobs": {
@@ -14496,7 +14502,7 @@
   "fmr|wd1|fidelitycareers": {
    "name": "Fidelity Investments",
    "quant": false,
-   "fails": 1,
+   "fails": 3,
    "added": "2026-09-18",
    "sector": "insurance_finance"
   },
@@ -14588,7 +14594,7 @@
   "fticonsulting|wd108|FTIConsultingCareers": {
    "name": "FTI Consulting",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "fticonsulting|wd108|FTIConsultingCareersPrivate": {
@@ -14857,7 +14863,7 @@
   "granite|wd1|careers": {
    "name": "Granite Construction",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "graybar|wd1|Careers": {
@@ -15138,6 +15144,12 @@
   },
   "hpe|wd5|Jobsathpe": {
    "name": "Hewlett Packard Enterprise",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18"
+  },
+  "hp|wd5|externalcareersite": {
+   "name": "Hewlett Packard (HP)",
    "quant": false,
    "fails": 1,
    "added": "2026-09-18"
@@ -15490,7 +15502,7 @@
   "jci|wd5|JCI": {
    "name": "Johnson Controls",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "jci|wd5|JCI_Confidential": {
@@ -15623,7 +15635,7 @@
   "kiongroup|wd3|kiongroup": {
    "name": "KION Group",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "kla|wd1|AnnArbor": {
@@ -15641,7 +15653,7 @@
   "kla|wd1|UR": {
    "name": "KLA",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "kokosing|wd5|Kokosing_External_Career_Site": {
@@ -15780,7 +15792,7 @@
   "livenation|wd503|LNExternalSite": {
    "name": "Live Nation Entertainment",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-15"
   },
   "livenation|wd503|TMExternalSite": {
@@ -15836,7 +15848,7 @@
   "lplfinancial|wd1|External": {
    "name": "LPL Financial Holdings",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18"
   },
   "lplfinancial|wd1|university": {
@@ -15848,7 +15860,7 @@
   "lseg|wd3|Careers": {
    "name": "LSEG",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "lseg|wd3|Graduate_Careers": {
@@ -15932,7 +15944,7 @@
   "manulife|wd3|MFCJH_Jobs": {
    "name": "Manulife Financial",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "maricopa|wd1|MC_External": {
@@ -15968,7 +15980,7 @@
   "marvell|wd1|MarvellCareers": {
    "name": "Marvell",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-17"
   },
   "marvell|wd1|MarvellCareers2": {
@@ -16077,14 +16089,14 @@
   "medtronic|wd1|medtroniccareers": {
    "name": "Medtronic",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
   },
   "medtronic|wd1|redeploymentmedtroniccareers": {
    "name": "Medtronic",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
   },
@@ -16603,7 +16615,7 @@
   "ntrs|wd1|northerntrust": {
    "name": "Northern Trust",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "ntst|wd1|careers": {
@@ -17100,13 +17112,13 @@
   "pwc|wd3|Global_Experienced_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "pwc|wd3|US_Entry_Level_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "q2ebanking|wd5|Q2": {
@@ -17185,13 +17197,13 @@
   "rbc|wd3|RBCEARLYTALENT1": {
    "name": "Royal Bank of Canada",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18"
   },
   "rbc|wd3|rbcglobal1": {
    "name": "Royal Bank of Canada",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "rbs|wd3|rbs": {
@@ -17258,7 +17270,7 @@
   "relx|wd3|LexisNexisLegal": {
    "name": "LexisNexis Risk Solutions",
    "quant": false,
-   "fails": 3,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "relx|wd3|relx": {
@@ -17447,7 +17459,7 @@
   "ryan|wd1|RyanCareers": {
    "name": "Ryan",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "ryan|wd1|Students-Graduates": {
@@ -17489,7 +17501,7 @@
   "salesforce|wd12|External_Career_Site": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "salesforce|wd12|Futureforce_Internships": {
@@ -18205,7 +18217,7 @@
   "tencent|wd1|OA_Huoshui_Platform": {
    "name": "Tencent",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "tencent|wd1|Tencent_Careers": {
@@ -18487,7 +18499,7 @@
   "uasys|wd5|uasys": {
    "name": "University of Arkansas",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "ubc|wd10|ubcstaffjobs": {
