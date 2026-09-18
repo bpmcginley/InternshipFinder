@@ -109,6 +109,49 @@ _NEW_GRAD_RE = re.compile(r"new ?grad|early career|entry[- ]level|recent (colleg
                           r"graduate (development |rotational )?program|rotational program|leadership development program", re.I)
 _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdirector\b|\bsenior\b|\bstaff\b|\bprincipal\b|\blead\b", re.I)
 _NEVER_STUDENT_RE = re.compile(r"post-?doc|post-?doctoral|post-?bacc|faculty|professor|physician|attending", re.I)
+# The job of running an internship programme is not an internship. Universities and hospitals post
+# plenty of them - "Assistant/Associate Coop Coordinator", "Manager, Internship Programs",
+# "Practicum Coordinator II for Nursing" - and they came through, because the very words that make
+# them staff jobs are the ones `explicit` below trusts to overrule _NON_INTERN_RE.
+#
+# Both kinds of word turn up in both kinds of title, so the test is which one heads the title.
+# "Intern Coordinator" hires a coordinator; "Program Coordinator Intern" hires an intern. A word
+# followed by a separator is the head - "Volunteer/Intern: Content Marketing Manager" hires the
+# intern - and with no separator either way the later word wins, as in "Quality Coordinator Intern".
+# "assistant" is deliberately not a staff word: a research assistant is a student.
+_SEP = r"\s*([-,:(/|–—]|$)"
+_STAFF_ROLE = (r"coordinator|supervisor|administrator|advis[eo]r|counselor|preceptor|liaison|"
+               r"recruiter|manager|director")
+_STUDENT_ROLE = (r"interns?|internships?|co-?ops?|externs?|externships?|trainees?|apprentices?|"
+                 r"fellows?|fellowships?|student (worker|assistant|employee|aide)")
+_STAFF_ROLE_RE = re.compile(rf"\b({_STAFF_ROLE})\b", re.I)
+_STUDENT_ROLE_RE = re.compile(rf"\b({_STUDENT_ROLE})\b", re.I)
+_STAFF_HEAD_RE = re.compile(rf"\b({_STAFF_ROLE})\b{_SEP}", re.I)
+_STUDENT_HEAD_RE = re.compile(rf"\b({_STUDENT_ROLE})\b{_SEP}", re.I)
+# "Coordinator of Student Internships" is staff; "Summer Intern - Product Manager for X" is not,
+# which is why this only counts when it comes before any student word.
+_RUNS_PROGRAM_RE = re.compile(rf"\b({_STAFF_ROLE})\b\s+(of|for)\b", re.I)
+# Work-study is a student job by definition, whatever the role is called.
+_WORK_STUDY_RE = re.compile(r"work[- ]?study", re.I)
+
+
+def _runs_the_programme(title: str) -> bool:
+    """True for the staff job that administers a programme, rather than a place on one."""
+    staff = _STAFF_ROLE_RE.search(title)
+    if not staff or _WORK_STUDY_RE.search(title):
+        return False
+    student = _STUDENT_ROLE_RE.search(title)
+    if not student:
+        return True
+    runs = _RUNS_PROGRAM_RE.search(title)
+    if runs and runs.start() < student.start():
+        return True
+    if _STUDENT_HEAD_RE.search(title):
+        return False
+    if _STAFF_HEAD_RE.search(title):
+        return True
+    last = lambda rx: max(m.start() for m in rx.finditer(title))
+    return last(_STAFF_ROLE_RE) > last(_STUDENT_ROLE_RE)
 
 
 def classify(title: str, description: str = "") -> list[str]:
@@ -127,7 +170,7 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
     """Student-opportunity stages for a posting, in STAGES order. Empty = not a student role."""
     title = title or ""
     emp = employment_type or ""
-    if _NEVER_STUDENT_RE.search(title):
+    if _NEVER_STUDENT_RE.search(title) or _runs_the_programme(title):
         return []
     found = {s for s, rx in _STAGE_RULES if rx.search(title)}
     if _LOWER_YEARS_RE.search(title) and _PROGRAM_RE.search(title):

@@ -35,6 +35,34 @@ def test_not_student_roles():
     assert "operations" in classify("PGIM: 2027 Operations, Internship Program")
 
 
+def test_runs_the_programme():
+    """The staff job that administers a programme is not a place on it."""
+    for t in ("Assistant/Associate Coop Coordinator",      # Northeastern posts this one
+              "Practicum Coordinator II for Nursing",      # and it was our only 'nursing' listing
+              "Manager, Internship Programs", "Internship Program Manager", "Intern Coordinator",
+              "Co-op Program Director", "Internship Supervisor", "Internship Recruiter",
+              "Fellowship Coordinator", "Intern and Volunteer Supervisor",
+              "Advisor, Co-op and Experiential Learning", "Intern & Special Programs Coordinator",
+              # "<staff noun> of|for" only counts ahead of the student word, hence both of these
+              "Coordinator of Student Internships", "Director of Public Sector Internships"):
+        assert stage_of(t) == [], t
+
+    # ...but the same words describe real student roles, and then the student word heads the title:
+    for t in ("Program Coordinator Intern",                 # at the end
+              "Research Coordinator Intern (Summer 2027)",  # or before a separator
+              "Intern, Program Coordination", "Co-op, Advisor Technology Platform",
+              "Volunteer/Intern: Content Marketing Manager",
+              "Internship \u2014 Business Coordinator (Year-Round)",
+              "Summer 2027 Internship: Learning and Development Programs Administrator",
+              # neither word takes a separator, so the later one wins
+              "Quality Coordinator Intern Summer 2027, Idaho",
+              # "for" here belongs to the product, not to a programme being administered
+              "Summer Intern - Product Manager for Allegion Home",
+              # work-study is a student job whatever the role is called
+              "Federal Work Study possible: Art@Work Graduate Coordinator"):
+        assert is_internship(t), t
+
+
 def test_new_field_tags():
     cases = {
         "Nursing Student Extern": "nursing", "Public Health Intern": "public_health",
