@@ -330,6 +330,8 @@ _PART_TIME_RESEARCH_RE = re.compile(r"part[- ]time.{0,20}\bresearch (assistant|a
 _STUDENT_WORD_RE = re.compile(r"\b(student|undergrad(uate)?|summer)\b", re.I)
 _NEW_GRAD_RE = re.compile(r"new ?grad|early career|entry[- ]level|recent (college )?grad|university grad|"
                           r"graduate (development |rotational )?program|rotational program|leadership development program", re.I)
+_NEW_GRAD_STRONG_RE = re.compile(r"new[- ]?grad|recent (college )?grad|university grad|entry[- ]level", re.I)
+_STUDENT_TERM_RE = re.compile(r"\bintern(ship)?s?\b|\bco-?op\b|\bstudents?\b", re.I)
 _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdirector\b|\bsenior\b|\bstaff\b|\bprincipal\b|\blead\b", re.I)
 # The separator is optional and it is not always a hyphen. Employers write "Post Doctoral
 # Research Fellow" and "Post Doc Research Associate" as often as they write "Postdoctoral",
@@ -419,10 +421,21 @@ def classify(title: str, description: str = "") -> list[str]:
     return out or ["other"]
 
 
+# A nurse who has finished school. Hospitals call their programmes for new graduate nurses
+# "internships" and "residencies" - St. Luke's posted eleven "Graduate Nurse and Registered Nurse ...
+# Internship" roles and ChristianaCare six "Nurse Residency" ones - and a nursing student can apply to
+# none of them: they start after the licence. A title that also says student is left alone
+# ("Student Registered Nurse Anesthetist" is a graduate student).
+_LICENSED_NURSE_RE = re.compile(r"\bgraduate nurses?\b|\bnurse residency\b|\bRN residency\b|"
+                                r"\bregistered nurses?\b.*\b(internship|residency|fellowship)\b", re.I)
+
+
 def never_student(title: str) -> bool:
     """True when the title rules a student out whatever the feed calls the job: a postdoc, a
     SkillBridge placement, the staff job that runs an internship programme."""
     title = title or ""
+    if _LICENSED_NURSE_RE.search(title) and not re.search(r"\bstudents?\b", title, re.I):
+        return True
     return bool(_NEVER_STUDENT_RE.search(title)) or _runs_the_programme(title)
 
 
@@ -454,6 +467,13 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
     # a dated summer role ("Early Career Mechanical Engineering - Summer 2027") is an internship
     explicit = re.search(r"\bintern(ship)?s?\b|\bco-?op\b|\bsummer 20[2-3]\d\b", title, re.I)
     if _NEW_GRAD_RE.search(title) and not explicit:
+        return []
+    # For a new-grad job the summer date is a start date, not a term: "Additive Engineer (New Grad
+    # Summer 2027)", "New Grad Civil Engineer I - Summer 2027", "Sales Analyst (Recent Grad - Summer
+    # 2027 Start)" all came through on it. So with these words only a student word keeps a title in.
+    # "Early career" is not among them: "Early Career Mechanical Engineering - Summer 2027" is a
+    # summer internship.
+    if _NEW_GRAD_STRONG_RE.search(title) and not _STUDENT_TERM_RE.search(title):
         return []
     if _NON_INTERN_RE.search(title) and not explicit:
         return []

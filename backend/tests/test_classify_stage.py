@@ -697,3 +697,27 @@ def test_a_credentialed_clinician_is_not_a_fellow():
         assert stage_of(title) == [], title
     assert stage_of("Research Student") != []
     assert stage_of("Arborist Apprentice (Tree Surgeon)") == ["apprenticeship"]
+
+
+def test_a_summer_start_date_does_not_make_a_new_grad_job_an_internship():
+    # The plan keeps student opportunities only. For these the summer date is when the job starts.
+    for title in ("Additive Engineer (New Grad Summer 2027)",
+                  "New Grad Civil Engineer I: Transportation - Summer 2027",
+                  "Sales Analyst (Recent Grad - Summer 2027 Start)",
+                  "Entry Level Staff Engineer - Roadway Design - Summer 2027",
+                  "Summer 2027 - Data Scientist (New Grad)"):
+        assert stage_of(title) == [], title
+    # A title that also offers an internship or a co-op stays.
+    for title in ("Photonics Characterization Intern & New Grad", "New Grad / Intern Software Engineer",
+                  "Early Career Mechanical Engineering- Summer 2027"):
+        assert stage_of(title) != [], title
+
+
+def test_a_licensed_nurse_programme_is_not_for_students():
+    for title in ("Graduate Nurse, Acute Care (Med Surg) Internship, Opportunities at Multiple Campuses",
+                  "Graduate Nurse and Registered Nurse NICU Internship- Winter 2027 Cohort",
+                  "Nurse Residency Program", "Registered Nurse Labor and Delivery Internship"):
+        assert stage_of(title) == [], title
+    for title in ("Student Nurse Extern", "Student Registered Nurse Anesthetist Internship",
+                  "Nursing Student Internship - Summer 2027"):
+        assert stage_of(title) != [], title
