@@ -16,14 +16,14 @@ RULES = [
     ("ml", r"\bml\b|machine learning|deep learning|\bnlp\b|computer vision|\bai\b|artificial intelligence|genai|\bllm|research scientist|reinforcement learning"),
     ("data", r"\bdata (scien|engineer|analy|platform)|\banalytics\b|business intelligence|\bbi\b|\betl\b|data warehouse|\bdata\b|informatics"),
     ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber"),
-    ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic|advanced packaging"),
+    ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic|advanced packaging|design verification|digital logic"),
     ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien|site reliability"),
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner"),
 
     # --- engineering (non-software) ---
     ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern"),
     ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac"),
-    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation"),
+    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
     ("chemical", r"chemical engineer|process engineer|petroleum|refin"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
@@ -36,9 +36,13 @@ RULES = [
     # safety of our employees" is boilerplate in the body of an oil and gas posting, a geology
     # posting and a jewellery boutique posting, so that half is anchored to the role word and only
     # fires on a title like "Environment, Safety and Health Undergraduate Intern".
+    #
+    # A bare "Safety Intern" is the same job at a builder or a plant, and "Process Safety" and
+    # "Industrial Hygiene" are its chemical-plant names. "Product", "Functional" (automotive ISO
+    # 26262) and "Food" safety are not, and are left to their own rules.
     ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources|geolog|geoscien|geophysic|geospatial|geographic information system|"
      r"occupational (health (and|&|,) )?safety|\behs\b|\bhse\b|"
-     r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)|health,? safety,? (&|and) environment(al)?\W{0,5}(intern|co-?op)|safety (&|and) environment\W{0,5}(intern|co-?op)|\b(workplace|fire/life|fire (and|&) life|employee health (&|and)) safety( \w+){0,2} (intern|co-?op)|(intern|co-?op)\s*[-–,:|]\s*(\w+ ){0,2}(workplace|employee health (&|and)) safety"),
+     r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)|health,? safety,? (&|and) environment(al)?\W{0,5}(intern|co-?op)|safety (&|and) environment\W{0,5}(intern|co-?op)|\b(workplace|fire/life|fire (and|&) life|employee health (&|and)) safety( \w+){0,2} (intern|co-?op)|(intern|co-?op)\s*[-–,:|]\s*(\w+ ){0,2}(workplace|employee health (&|and)) safety|industrial hygiene|process safety|contractor safety|(?<!product )(?<!functional )(?<!food )\bsafety (intern|internship|specialist intern|co-?op)\b|\bintern,? safety\b"),
     ("biomedical", r"biomedical|bioengineer|medical device|clinical engineer"),
     # A posting that says engineering and nothing more specific is still an engineering
     # posting. classify drops this again the moment any other rule matched, so it is the
@@ -78,7 +82,7 @@ RULES = [
     ("economics", r"\beconomic|econometric|policy analys"),
 
     # --- design / media / arts / humanities ---
-    ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design"),
+    ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design|experience design"),
     ("media", r"journalis|editorial|\bwriting intern|content creat|video|film|photograph|broadcast|podcast|creative"),
     ("journalism", r"journalis|reporter|newsroom|\bnews\b|editorial"),
     ("publishing", r"publish|editorial|literary|\beditor\b|\bbooks?\b"),
@@ -86,7 +90,7 @@ RULES = [
     ("music", r"\bmusic|record label|audio engineer|recording studio|concert"),
     ("theater", r"theat(er|re)\b|stage manag|performing arts|\bdance\b|\bopera\b|ballet"),
     ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|\bcounsel\b|policy intern"),
-    ("education", r"teaching|education|curriculum|instructor|tutor"),
+    ("education", r"teaching|education|curriculum|instructor|tutor|instructional design"),
     ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate"),
     ("architecture", r"architect(ure|ural)|urban plan|landscape"),
     ("urban_planning", r"urban plan|city plan|regional plan|planning intern|transportation planning|zoning|\bgis\b|housing (policy|development)|community development"),

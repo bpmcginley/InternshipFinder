@@ -405,3 +405,17 @@ def test_investment_testing_and_rnd_titles_reach_their_field():
     assert "finance" not in classify("Community Relations and Social Investments Intern - WI")
     assert "finance" not in classify("Investment Planning Co-Op Engineer - Fall 2027")
     assert "engineering" not in classify("Site Reliability Internship - Spring 2027")
+
+
+def test_safety_verification_and_design_titles_reach_their_field():
+    for title, tag in (("Safety Intern (College 26-27 Season) - Tyson's, VA", "environmental"),
+                       ("Process Safety Intern", "environmental"),
+                       ("Intern/Co-op - HES&S Safety and Industrial Hygiene (Summer 2027)", "environmental"),
+                       ("Design Verification Intern - MS", "hardware"),
+                       ("Highway Design Intern - Summer 2027", "civil"),
+                       ("Geomatics Technician Apprentice - Survey and Mapping", "civil"),
+                       ("Instructional Design Intern", "education"),
+                       ("2027 Experience Design Summer Intern", "design")):
+        assert tag in classify(title), (title, classify(title))
+    for title in ("Functional Safety Intern", "Product Safety Intern", "Food Safety Intern- Summer 2027"):
+        assert "environmental" not in classify(title), title
