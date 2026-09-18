@@ -721,3 +721,11 @@ def test_a_licensed_nurse_programme_is_not_for_students():
     for title in ("Student Nurse Extern", "Student Registered Nurse Anesthetist Internship",
                   "Nursing Student Internship - Summer 2027"):
         assert stage_of(title) != [], title
+
+
+def test_archaeology_criminology_and_digital_forensics():
+    assert classify("Archaeology Intern - Summer 2027") == ["social_science"]
+    assert classify("Archaeological Intern - Summer 2027") == ["social_science"]
+    assert "social_science" in classify("Criminology Research Intern")
+    assert classify("Digital Forensics Intern") == ["security"]
+    assert "security" not in classify("Forensic Accounting Intern")

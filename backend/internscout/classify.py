@@ -36,7 +36,10 @@ RULES = [
     ("quant", r"\bquant(itative)?\b|\btrader\b|\btrading\b|market mak|derivativ|\balpha\b|portfolio manag"),
     ("ml", r"\bml\b|machine learning|deep learning|\bnlp\b|computer vision|\bai\b|artificial intelligence|genai|\bllm|research scientist|reinforcement learning"),
     ("data", r"\bdata (scien|engineer|analy|platform)|\banalytics\b|business intelligence|\bbi\b|\betl\b|data warehouse|\bdata\b|informatics|decision scien"),
-    ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber|identity (&|and) access"),
+    ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber|identity (&|and) access|"
+     # Crowe's and AlixPartners' "Digital Forensics" interns recover evidence from devices, a
+     # security job; plain "Forensic Accounting" stays accounting.
+     r"digital forensic"),
     ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic|advanced packaging|design verification|digital logic"),
     ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien|site reliability|systems? administrat|systems analyst|application analyst"),
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner|product analyst|product strateg"),
@@ -177,7 +180,10 @@ RULES = [
      # research, the job a sociology or development-studies major is trained for. A phone survey
      # is survey research; a "Survey Intern" on its own is a land surveyor (civil, below).
      r"political scien|monitoring,? (&|and )?evaluation|program(me)? evaluation|impact evaluation|"
-     r"(phone|telephone|household) survey"),
+     r"(phone|telephone|household) survey|"
+     # Archaeology is a branch of anthropology: AtkinsRealis's "Archaeology Intern" and
+     # "Archaeological Intern" (cultural-resource surveys) were "other". Criminology is sociology's.
+     r"arch(a)?eolog|criminolog"),
     ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house|political scien|"
      # Policy work: "Energy Policy & Regulation Intern", "Policy & Advocacy Intern", "Policy Fellow",
      # "Policy Assistant", "Public Policy Assistant". Tied to a role word or a policy area, because

@@ -987,4 +987,24 @@ GREENHOUSE += [
     {'name': 'Clinton Foundation', 'ats_token': 'clintonfoundation', 'is_quant_target': False, 'sector': 'nonprofit'},
 ]
 
+# --- social research, polling and behavioral health (probed and fetched live 2026-09-18) ---
+# Social sciences is the one cluster under the coverage report's line of 15. 44 unseeded economic
+# consultancies, pollsters, evaluation shops, translation firms and autism/behavioral-health
+# providers were probed; six answered. Autism Speaks had four community and events internships and
+# Guidehouse two campus internships (state and local government, energy). Civis Analytics, FSG,
+# Magellan and Easterseals NH/VT had no student roles on the day; they are seeded because each
+# hires interns or practicum students in season, and an empty board costs one request.
+GREENHOUSE += [
+    {'name': 'Civis Analytics', 'ats_token': 'civisanalytics', 'is_quant_target': False, 'sector': 'social_research'},
+    {'name': 'FSG', 'ats_token': 'fsg', 'is_quant_target': False, 'sector': 'nonprofit'},
+]
+JAZZHR += [
+    {'name': 'Autism Speaks', 'ats_token': 'autismspeaks', 'is_quant_target': False, 'sector': 'nonprofit'},
+]
+WORKDAY += [
+    {'name': 'Guidehouse', 'ats_token': 'guidehouse|wd1|External', 'is_quant_target': False, 'sector': 'government_policy'},
+    {'name': 'Magellan Health', 'ats_token': 'magellanhealth|wd5|magellan_health_careers', 'is_quant_target': False, 'sector': 'behavioral_health'},
+    {'name': 'Easterseals NH VT', 'ats_token': 'easterseals|wd5|ESNH_VTcareers', 'is_quant_target': False, 'sector': 'behavioral_health'},
+]
+
 # --- end sector seeds ---
