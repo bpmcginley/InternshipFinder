@@ -2,15 +2,15 @@
 import json
 import os
 from internscout.classify import ALL_FIELDS
-from internscout.coverage import CLUSTERS, counts, per_tag, report
+from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, per_tag, report
 from internscout.export_static import shard_keys, write_shards
 from internscout.region import evaluate_locations, maybe_in_region
 
 
-def _listing(i, locs, status="open", tags=("health",)):
+def _listing(i, locs, status="open", tags=("health",), sector=None):
     ev = evaluate_locations(locs)
     return {"id": i, "regions": ev["regions"], "state": ev["state"], "status": status,
-            "field_tags": list(tags), "stage": ["internship"]}
+            "field_tags": list(tags), "stage": ["internship"], "sector": sector}
 
 
 def test_kinds():
@@ -92,3 +92,28 @@ def test_coverage():
     assert "**thin**" in text
     # nothing is thin below a bar of zero, and then there is no breakdown to print
     assert "Every cluster has at least" in report(rows, minimum=0)
+def test_coverage_counts_the_employers_sector():
+    # Every sector the classifier can fall back on has to land in some cluster, or listings from those
+    # employers would be counted by nobody.
+    assert set(SECTOR_CLUSTER.values()) <= set(CLUSTERS)
+    assert SECTOR_CLUSTER["nonprofit"] == "Nonprofit & social work"
+    assert SECTOR_CLUSTER["quant_finance"] == "Business"
+    assert "engineering_manufacturing" not in SECTOR_CLUSTER   # absent from SECTOR_FIELDS on purpose
+
+    # The case this exists for: a real ACLU posting is tagged by what the role is, not who it is for,
+    # so on tags alone a nonprofit's whole board can count towards the nonprofit cluster zero times.
+    aclu = _listing(1, ["Boston, MA"], tags=("law",), sector="nonprofit")
+    c = counts([aclu])
+    assert c["Nonprofit & social work"] == 1
+    assert c["Government & law"] == 1, "the tag still counts too - it is a legal internship"
+    assert per_tag([aclu])["nonprofit"] == 0, "and it is still not given a tag it never had"
+
+    # A listing that matched the cluster both ways is one listing, not two.
+    assert counts([_listing(2, ["Boston, MA"], tags=("nonprofit",), sector="nonprofit")])[
+        "Nonprofit & social work"] == 1
+    # An employer with no sector label, which is most of them, is unaffected.
+    assert counts([_listing(3, ["Boston, MA"], tags=("swe",))])["Nonprofit & social work"] == 0
+
+    # The breakdown has to account for the difference, and count only what no tag already covered.
+    text = report([aclu, _listing(4, ["Boston, MA"], tags=("nonprofit",), sector="nonprofit")], minimum=15)
+    assert "- Nonprofit & social work: social_work 0, nonprofit 1, plus 1 from employers in that sector" in text

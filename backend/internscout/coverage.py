@@ -1,6 +1,17 @@
 """Coverage report: open listings per field cluster in the baseline states (plus US-remote).
 A thin cluster tells us where to add employer seeds or search queries next.
 
+A listing counts towards a cluster on either of two grounds: a field tag from its title, or an
+employer whose sector belongs to the cluster. Both are needed, because a field tag is what the role
+is and a sector is who it is for, and the two come apart precisely where this report is read most.
+Counted on tags alone, the seventeen seeded nonprofits contributed nothing at all to "Nonprofit &
+social work": their fourteen open listings are tagged law, swe, ml, security and environmental,
+because a legal internship at the ACLU really is a legal internship. `nonprofit` is a fallback tag
+that only fires when nothing more specific did, so the cluster counted 5 while 87 listings sat under
+an employer in that sector - and the report's advice was to go and seed more nonprofits, which would
+have changed nothing. Sector covers only the ~6% of listings whose board carries a label, so it adds
+to the tags rather than replacing them.
+
   python -m internscout.coverage [docs/data/listings] [--min 15] [--all-states]
 
 In GitHub Actions the table is also appended to the job summary.
@@ -10,6 +21,7 @@ import argparse
 import collections
 import json
 import os
+from .classify import SECTOR_FIELDS
 from .config import BASELINE_STATES
 
 CLUSTERS = {
@@ -30,6 +42,12 @@ CLUSTERS = {
 }
 
 
+# Composed from the classifier's own sector -> field map rather than written out again here, so a new
+# sector cannot land in one table and be forgotten in the other. engineering_manufacturing is absent
+# from that map on purpose, so those employers count through their field tags alone.
+SECTOR_CLUSTER = {sector: name for sector, field in SECTOR_FIELDS.items()
+                  for name, tags in CLUSTERS.items() if field in tags}
+
 def in_baseline(listing: dict) -> bool:
     for g in listing.get("regions") or []:
         if g["state"] in BASELINE_STATES or g["kind"] == "remote":
@@ -42,10 +60,14 @@ def open_here(listings: list[dict], baseline_only: bool = True) -> list[dict]:
             if x.get("status") == "open" and (in_baseline(x) if baseline_only else True)]
 
 
+def in_cluster(listing: dict, name: str, tags: tuple[str, ...]) -> bool:
+    return bool(set(listing.get("field_tags") or ()) & set(tags)) \
+        or SECTOR_CLUSTER.get(listing.get("sector")) == name
+
+
 def counts(listings: list[dict], baseline_only: bool = True) -> dict[str, int]:
     live = open_here(listings, baseline_only)
-    return {name: sum(1 for x in live if set(x.get("field_tags") or ()) & set(tags))
-            for name, tags in CLUSTERS.items()}
+    return {name: sum(1 for x in live if in_cluster(x, name, tags)) for name, tags in CLUSTERS.items()}
 
 
 def per_tag(listings: list[dict], baseline_only: bool = True) -> collections.Counter:
@@ -70,9 +92,15 @@ def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True) 
     tags = per_tag(listings, baseline_only)
     lines.append("")
     lines.append("Tags inside them, rarest first:")
+    live = open_here(listings, baseline_only)
     for name in thin:
         inside = sorted(CLUSTERS[name], key=lambda t: tags[t])
-        lines.append(f"  - {name}: " + ", ".join(f"{t} {tags[t]}" for t in inside))
+        # Listings counted only because of their employer have no tag to seed against, so they are
+        # named separately rather than being folded into a tag that would then read as a gap.
+        by_sector = sum(1 for x in live if SECTOR_CLUSTER.get(x.get("sector")) == name
+                        and not set(x.get("field_tags") or ()) & set(CLUSTERS[name]))
+        extra = f", plus {by_sector} from employers in that sector" if by_sector else ""
+        lines.append(f"  - {name}: " + ", ".join(f"{t} {tags[t]}" for t in inside) + extra)
     return "\n".join(lines)
 
 
