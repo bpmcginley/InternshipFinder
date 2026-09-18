@@ -19,6 +19,7 @@ from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
 from .classify import STAGES, stage_of, years_of
 from .majors import majors_export
+from .normalize import listing_id
 from .score import W
 from .region import evaluate_locations
 
@@ -81,7 +82,8 @@ def _listing_dict(row: Listing) -> dict:
     if ins is not None and "pay" not in ins and row.salary:
         ins["pay"] = "paid"
     return {
-        "id": row.id,
+        # Not row.id: the database is rebuilt every run, so that was the insert order.
+        "id": listing_id(row.dedupe_key),
         "company_name": row.company_name,
         "title": row.title,
         "field_tags": row.field_tags or [],

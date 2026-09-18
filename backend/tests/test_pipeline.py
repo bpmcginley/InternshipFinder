@@ -146,3 +146,35 @@ def test_freshness_counts_from_the_day_the_employer_posted_it():
     assert _freshness(now - timedelta(days=60), None) == 0.0
     # A naive datetime is read as UTC rather than crashing on the subtraction.
     assert _freshness(None, (now - timedelta(days=1)).replace(tzinfo=None)) > 0.9
+
+
+def test_a_listing_keeps_its_id_when_the_next_run_rebuilds_the_database():
+    # CI commits the exported JSON, not the db file, so every run starts on an empty table and
+    # the row id a posting gets is its position in that run's insert order. Between the exports
+    # of 2026-09-18 08:25 and 08:33, 8,592 of the 12,997 postings present in both changed id.
+    # The student's own Applied marks are keyed on it in localStorage, so they moved too.
+    from internscout.db import SessionLocal
+    from internscout.models import Listing
+    from internscout.export_static import _listing_dict
+    from internscout.normalize import listing_id, make_dedupe_key
+
+    item = dict(company_name="Idstable", title="Software Engineer Intern - Summer 2027",
+                locations=["Boston, MA"], source="workday", active=True,
+                url="https://idstable.wd1.myworkdayjobs.com/careers/job/Boston/R1",
+                apply_url="https://idstable.wd1.myworkdayjobs.com/careers/job/Boston/R1")
+    run([item])
+    with SessionLocal() as db:
+        row = db.query(Listing).filter(Listing.company_name == "Idstable").one()
+        got = _listing_dict(row)["id"]
+        assert got == listing_id(row.dedupe_key)
+        # The row id is what it used to export, and what the next run would have changed.
+        assert got != row.id and isinstance(got, str)
+
+    # The next run reads the employer, the title and the term off the board again and rebuilds
+    # the same key from them, so it recomputes the same id without having stored anything.
+    assert got == listing_id(make_dedupe_key("Idstable",
+                                             "Software Engineer Intern - Summer 2027",
+                                             "Summer", 2027))
+    # A different posting is a different id; the same one twice is not.
+    assert listing_id("a|b||") != listing_id("a|c||")
+    assert len(listing_id("a|b||")) == 16

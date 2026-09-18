@@ -1,5 +1,6 @@
 """Turn a raw posting (any source) into a normalized dict ready for persistence."""
 from __future__ import annotations
+import hashlib
 import re
 from datetime import datetime, timezone
 from .classify import classify, stage_of, SECTOR_FIELDS
@@ -82,6 +83,30 @@ def normalize_title(title: str) -> str:
 
 def make_dedupe_key(company: str, title: str, season: str | None, year: int | None) -> str:
     return f"{normalize_company(company)}|{normalize_title(title)}|{(season or '').lower()}|{year or ''}"
+
+
+def listing_id(dedupe_key: str) -> str:
+    """The id a listing is stored under in the browser, stable from one run to the next.
+
+    This used to be the database row id. CI keeps no database between runs - it commits the
+    exported JSON and the registry, not the db file - so every run rebuilds the table from
+    scratch and the id a posting got was really its position in that run's insert order. Two
+    consecutive exports agreed on it for 34% of the postings they both contained.
+
+    Everything a student owns is keyed on this id. Their Applied/Interviewing marks live in
+    localStorage under it, the Auto-Apply queue carries it to the extension, and the per-listing
+    Report link puts it in the feedback form. So a mark made on Monday was sitting on somebody
+    else's job by Tuesday, and a reported id named a posting that no longer existed.
+
+    The dedupe key is the identity the pipeline already merges a posting on, and it is built
+    from the employer, the title and the term - all of which the next run reads again from the
+    board. Hashing it gives the same answer next run without storing anything. Measured on the
+    two exports above: 99.0% of postings present in both keep their id, against 33.9% before.
+
+    16 hex characters of SHA-256; the key is already unique per listing, and a corpus of 13,000
+    has about a 5e-9 chance of a collision on top of that.
+    """
+    return hashlib.sha256(dedupe_key.encode("utf-8")).hexdigest()[:16]
 
 
 def _to_dt(ts):
