@@ -77,7 +77,11 @@ RULES = [
     ("finance", r"banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)"),
     ("accounting", r"assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
-    ("marketing", r"\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern"),
+    ("marketing", r"\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern|"
+     # Market research is the marketing department's research, and it was landing in "other" with
+     # everything else the research word no longer carries: "Market Research Insights Intern",
+     # "Intern, Market Intelligence (LCS)", "Market Researcher". So is running a brand's community.
+     r"market (research|intelligence|insights?)|consumer insights?|community manager"),
     ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)"),
     ("sales", r"\bsales\b|business development|account executive|account manager|client relations|customer success"),
     ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations"),
@@ -96,7 +100,11 @@ RULES = [
     ("theater", r"theat(er|re)\b|stage manag|performing arts|\bdance\b|\bopera\b|ballet"),
     ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|\bcounsel\b|policy intern"),
     ("education", r"teaching|education|curriculum|instructor|tutor|instructional design"),
-    ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate"),
+    ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate|"
+     # "Community Impact Intern", "Community Engagement Grant Intern", "Community Partnerships
+     # Intern" are the giving and outreach side of an employer, and all sat in "other". Advocacy is
+     # too, except at an insurer, where "Client Advocacy" and "Benefits Advocacy" are service desks.
+     r"community (impact|engagement|partnerships?|involvement|relations|investments?)|(?<!client )(?<!care )(?<!benefits )\badvocacy\b"),
     ("architecture", r"architect(ure|ural)|urban plan|landscape"),
     ("urban_planning", r"urban plan|city plan|regional plan|planning intern|transportation planning|zoning|\bgis\b|housing (policy|development)|community development"),
     ("psychology", r"psycholog|behavioral (health|science)|\bmental health|counsel(ing|or)\b|\baba\b|cognitive science|"
@@ -105,7 +113,13 @@ RULES = [
      # psychology major can actually get. None of them say "psychology" in the title.
      r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)|psychiatr|human factors|child (and adolescent )?development|behavio(u)?r science|suicide prevention|(?<!respiratory )(?<!recreation )(?<!recreational )(?<!activity )(?<!physical )(?<!occupational )(?<!speech )(?<!massage )\btherapist\b"),
     ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
-    ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house|political scien"),
+    ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house|political scien|"
+     # Policy work: "Energy Policy & Regulation Intern", "Policy & Advocacy Intern", "Policy Fellow",
+     # "Policy Assistant", "Public Policy Assistant". Tied to a role word or a policy area, because
+     # "Product Policy" at a platform company is trust and safety, and an "IT Policy" or "Service
+     # Policy" intern writes internal rules, not public ones.
+     r"public policy|(energy|health|economic|social|justice|climate|environmental|education|housing|tax|trade|foreign) policy|"
+     r"policy (&|and) (advocacy|regulation|research)|(?<!it )(?<!service )(?<!security )(?<!product )\bpolicy (intern|fellow|assistant|analyst|associate)"),
     ("arts", r"animator|\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat"),
     ("museums", r"\bmuseum|curat(or|orial)|collections (intern|management|assistant)|archiv(e|es|ist|al)|exhibit"),
     ("library", r"librar(y|ian)|information science|archiv(e|es|ist|al)"),

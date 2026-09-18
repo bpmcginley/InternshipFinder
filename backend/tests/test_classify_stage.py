@@ -470,3 +470,19 @@ def test_student_research_jobs_that_never_say_intern_are_kept():
         assert stage_of(title) == ["research", "part_time"], title
     # the work-study code is a word, not a piece of one
     assert stage_of("TFWS Research and Insights Analyst") == []
+
+
+def test_market_research_policy_and_community_work_reach_a_field():
+    for title, tag in (("Market Research Intern", "marketing"), ("Intern, Market Intelligence (LCS)", "marketing"),
+                       ("Consumer Insights Intern/Co-op", "marketing"), ("Community Manager Intern", "marketing"),
+                       ("Community Impact Summer Intern", "nonprofit"), ("Community Engagement Grant Intern", "nonprofit"),
+                       ("Advocacy & Survivor Leadership Intern - Spring 2027", "nonprofit"),
+                       ("Energy Policy & Regulation Intern", "government"), ("Policy Assistant", "government"),
+                       ("Summer Associate Internship (Public Policy Assistant)", "government")):
+        assert tag in classify(title), (title, classify(title))
+    # an insurer's advocacy desk and an internal policy role are not those
+    for title in ("Benefits Advocacy Intern", "Customer Care Advocacy Summer Intern",
+                  "Corporate Risk and Broking - Client Advocacy- Personal Lines- 2027"):
+        assert "nonprofit" not in classify(title), title
+    for title in ("Enterprise Cybersecurity IT Policy Intern", "Service Policy Intern - MN, WI"):
+        assert "government" not in classify(title), title
