@@ -413,7 +413,7 @@ async function loop(id) {
   if (isWorker(store.ai) && !(await ensureToken())) {
     // needs_auth gives the card a "Sign in & resume" button. A plain Resume only re-ran this check, and an
     // expired sign-in (they last an hour) that could not refresh silently stayed stuck here.
-    await updateJob(id, { status: "needs_you", needs_auth: true, reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
+    await updateJob(id, { status: "needs_you", needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
     return;
   }
   // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
@@ -421,7 +421,9 @@ async function loop(id) {
   // the side panel asks and this run waits. Checked before the tab opens: a tab we cannot script is
   // just a confusing window.
   if (!(await hasHostAccess(job.apply_url))) {
-    await updateJob(id, { status: "needs_you", needs_host: job.apply_url, activity: "",
+    // Flags outlive the pause that set them, and the side panel checks needs_auth before needs_host,
+    // so clear the other one here or a sign-in that expired earlier hides the Allow button.
+    await updateJob(id, { status: "needs_you", needs_host: job.apply_url, needs_auth: false, activity: "",
       reason: `InternScout needs your permission to work on ${hostOf(job.apply_url)}. Allow it below, then Resume.` });
     return;
   }
@@ -458,7 +460,7 @@ async function loop(id) {
     const cur = await waitForTab(tabId);
     // A redirect or a new tab can land on a site the student never allowed (company page -> external ATS).
     if (cur && cur.url && !(await hasHostAccess(cur.url))) {
-      await updateJob(id, { status: "needs_you", needs_host: cur.url, pending, activity: "",
+      await updateJob(id, { status: "needs_you", needs_host: cur.url, needs_auth: false, pending, activity: "",
         reason: `The application moved to ${hostOf(cur.url)}. Allow InternScout there below, then Resume.` });
       await saveMsgs(id, msgs);
       return;
