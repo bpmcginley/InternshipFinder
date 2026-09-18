@@ -13,6 +13,7 @@ from .taleo import fetch_taleo_board
 from .adp import fetch_adp_board
 from .jobvite import fetch_jobvite_board
 from .icims import fetch_icims_board
+from .icims_site import fetch_icims_site_board
 from .successfactors import fetch_successfactors_board
 from .eightfold import fetch_eightfold_board
 from .jazzhr import fetch_jazzhr_board
@@ -36,6 +37,7 @@ BOARD_FETCHERS = {
     "adp": fetch_adp_board,
     "jobvite": fetch_jobvite_board,
     "icims": fetch_icims_board,
+    "icims_site": fetch_icims_site_board,
     "successfactors": fetch_successfactors_board,
     "eightfold": fetch_eightfold_board,
     "jazzhr": fetch_jazzhr_board,

@@ -48,6 +48,10 @@ PATTERNS = [
     ("eightfold", re.compile(r"https?://([a-z0-9-]+)\.eightfold\.ai/", re.I)),
     # The whole subdomain is the tenant: hospital-midlandhealth, careers-uhnjcareers, jobs-selectmedicalcorp.
     ("icims", re.compile(r"https?://([a-z0-9-]+)\.icims\.com", re.I)),
+    # The same jobs behind the employer's own host, which is a different product with a different
+    # API - see sources/icims_site.py. The token is the host. The pattern above claims the
+    # icims.com ones first, so what reaches here is only ever a branded one.
+    ("icims_site", re.compile(r"https?://([a-z0-9][a-z0-9.-]*\.[a-z]{2,})/jobs/\d+\S*[?&]icims=1", re.I)),
     # JazzHR: the tenant is the subdomain and the board is always at /apply.
     ("jazzhr", re.compile(r"https?://([a-z0-9-]+)\.applytojob\.com", re.I)),
 ]
@@ -133,7 +137,7 @@ def seed_registry(reg: dict) -> int:
     n = 0
     for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
                 "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS",
-                "EIGHTFOLD", "ICIMS", "JAZZHR"):
+                "EIGHTFOLD", "ICIMS", "ICIMS_SITE", "JAZZHR"):
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
                            co.get("sector"))

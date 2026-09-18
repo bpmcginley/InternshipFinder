@@ -136,7 +136,7 @@
   // ---------- scoring (plan 3b) ----------
   const WEIGHTS = { field: 35, fit: 20, location: 20, freshness: 15, openness: 5, source: 5 };
   const PART_LABEL = { field: "Field fit", fit: "Stage and year", location: "Location", freshness: "Freshness", openness: "Still open", source: "Source" };
-  const SOURCE_BY_ATS = { greenhouse: 1, lever: 1, ashby: 1, workday: 1, smartrecruiters: .9, icims: .9, taleo: .9, oracle: .9, workable: .9, bamboohr: .9 };
+  const SOURCE_BY_ATS = { greenhouse: 1, lever: 1, ashby: 1, workday: 1, smartrecruiters: .9, icims: .9, icims_site: .9, taleo: .9, oracle: .9, workable: .9, bamboohr: .9 };
 
   // Field tags a profile counts as direct (1.0) and related (0.6).
   function profileFields(p, majorsData) {

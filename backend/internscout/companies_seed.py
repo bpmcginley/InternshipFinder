@@ -392,6 +392,69 @@ EIGHTFOLD: list = [
 ]
 
 
+# iCIMS career sites on the employer's own host (sources/icims_site.py). These are every branded
+# host our own listings already carried an "?icims=1" apply link for; all 29 answered /api/jobs
+# when they were checked on 2026-09-18. Discovery adds more on its own, but only from a paid
+# Google Jobs run, and the boards are free to scan, so they are named here rather than waited for.
+ICIMS_SITE: list = [
+    {'name': 'AMD', 'ats_token': 'careers.amd.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Johns Hopkins Applied Physics Laboratory', 'ats_token': 'careers.jhuapl.edu',
+     'is_quant_target': False, 'sector': 'education_research'},
+    {'name': 'Medpace', 'ats_token': 'careers.medpace.com', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'State Farm', 'ats_token': 'jobs.statefarm.com', 'is_quant_target': False,
+     'sector': 'insurance_finance'},
+    {'name': 'Clyde Companies', 'ats_token': 'careers.clydeinc.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Constellation Energy', 'ats_token': 'jobs.constellationenergy.com', 'is_quant_target': False,
+     'sector': 'energy_environment'},
+    {'name': 'Kinder Morgan', 'ats_token': 'careers.kindermorgan.com', 'is_quant_target': False,
+     'sector': 'energy_environment'},
+    {'name': 'Principal Financial Group', 'ats_token': 'careers.principal.com', 'is_quant_target': False,
+     'sector': 'insurance_finance'},
+    {'name': 'Post Holdings', 'ats_token': 'jobs.postholdings.com', 'is_quant_target': False,
+     'sector': 'retail_consumer'},
+    {'name': 'Garmin', 'ats_token': 'careers.garmin.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Keysight Technologies', 'ats_token': 'jobs.keysight.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Stryten', 'ats_token': 'jobs.stryten.com', 'is_quant_target': False,
+     'sector': 'energy_environment'},
+    {'name': 'Ulta Beauty', 'ats_token': 'careers.ulta.com', 'is_quant_target': False,
+     'sector': 'retail_consumer'},
+    {'name': 'Spirit AeroSystems', 'ats_token': 'careers.spiritaero.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'MSA Safety', 'ats_token': 'careers.msasafety.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'M.C. Dean', 'ats_token': 'careers.mcdean.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Exelon', 'ats_token': 'careers.comed.com', 'is_quant_target': False,
+     'sector': 'energy_environment'},
+    {'name': 'AARP', 'ats_token': 'careers.aarp.org', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Publicis Groupe', 'ats_token': 'careers.publicisgroupe.com', 'is_quant_target': False,
+     'sector': 'media'},
+    {'name': 'Arthur J. Gallagher & Co.', 'ats_token': 'jobs.ajg.com', 'is_quant_target': False,
+     'sector': 'insurance_finance'},
+    {'name': 'V2X', 'ats_token': 'careers.gov2x.com', 'is_quant_target': False,
+     'sector': 'government_policy'},
+    {'name': 'Sabre Systems', 'ats_token': 'careers.sabresystems.com', 'is_quant_target': False,
+     'sector': 'government_policy'},
+    {'name': 'BJC HealthCare', 'ats_token': 'jobs.bjc.org', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'CDM Smith', 'ats_token': 'careers.cdmsmith.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Universal Health Services', 'ats_token': 'jobs.uhsinc.com', 'is_quant_target': False,
+     'sector': 'health'},
+    {'name': 'Planview', 'ats_token': 'careers.planview.com', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'FAST Enterprises', 'ats_token': 'careers.fastenterprises.com', 'is_quant_target': False,
+     'sector': 'government_policy'},
+    {'name': 'Cvent', 'ats_token': 'careers.cvent.com', 'is_quant_target': False,
+     'sector': 'hospitality_sports'},
+    {'name': 'Foundation Finance', 'ats_token': 'careers.foundationfinance.com', 'is_quant_target': False,
+     'sector': 'insurance_finance'},
+]
+
+
 # JazzHR boards, the small-employer end of the market: one page holds the whole board, so a
 # tenant costs a single request however many jobs it has. These are the tenants our own data
 # already pointed at, resolved to the employer names JazzHR serves on the board - the subdomain

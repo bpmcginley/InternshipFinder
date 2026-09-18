@@ -13,6 +13,7 @@ from internscout.sources.taleo import parse_taleo, parse_taleo_detail
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
 from internscout.sources.icims import parse_icims, parse_icims_detail
+from internscout.sources.icims_site import parse_icims_site
 from internscout.sources.successfactors import parse_successfactors, parse_successfactors_detail
 from internscout.sources.eightfold import parse_eightfold, host_of as ef_host
 from internscout.sources.jazzhr import parse_jazzhr
@@ -380,6 +381,42 @@ def test_eightfold():
     # unless a seed pins it
     assert ef_host("johndeere") == ("johndeere", "johndeere.com")
     assert ef_host("wf|wellsfargo.com") == ("wf", "wellsfargo.com")
+
+
+def test_icims_site():
+    def job(slug, title, city, state, cc="US", emp=None, extra=None):
+        d = {"slug": slug, "title": title, "city": city, "state": state, "country_code": cc,
+             "description": "Overview Build real things.", "posted_date": "2026-09-16T15:40:00+0000"}
+        if emp:
+            d["employment_type"] = emp
+        if extra:
+            d["additional_locations"] = extra
+        return {"data": d}
+
+    payload = {"totalCount": 5, "jobs": [
+        job(92526, "Summer 2027 Analyst Intern", "Austin", "Texas"),
+        job(91463, "Undergrad ASIC Co-op", "San Jose", "California",
+            extra=[{"city": "Santa Clara", "state": "California", "country_code": "US"},
+                   {"city": "Markham", "state": "Ontario", "country_code": "CA"}]),
+        job(88001, "Senior Staff Engineer", "Austin", "Texas"),
+        job(88002, "Finance Intern", "Singapore", None, cc="SG"),
+        job(88003, "Clinical Services Assistant", "Temple", "Texas", emp="INTERN"),
+    ]}
+    items = parse_icims_site(payload, {"name": "Acme", "ats_token": "careers.acme.com"})
+    # The staff engineer is not a student role; the Singapore job has no US location left.
+    assert [i["title"] for i in items] == ["Summer 2027 Analyst Intern", "Undergrad ASIC Co-op",
+                                           "Clinical Services Assistant"]
+    # A multi-location posting keeps its other US sites and drops the ones abroad.
+    assert items[1]["locations"] == ["San Jose, California", "Santa Clara, California"]
+    # The employment type carries a role whose title alone would not have qualified it.
+    assert items[2]["employment_type"] == "INTERN"
+    # The student is sent to the employer's own page, not to the iCIMS login the API points at.
+    assert items[0]["url"] == "https://careers.acme.com/jobs/92526"
+    assert items[0]["posted_at"] == "2026-09-16"
+    assert items[0]["description"] == "Overview Build real things."
+
+    # An employer with nothing open, and a payload shape we have not seen, are both just empty.
+    assert parse_icims_site({"jobs": []}, CO) == [] and parse_icims_site({}, CO) == []
 
 
 def test_successfactors():
