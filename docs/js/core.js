@@ -184,8 +184,16 @@
       if ((k === "remote" || k === "US") && ctx.keys.has(k)) location = Math.max(location, .8);
     }
 
+    // Counted from the day the employer posted it, not the day we found it: 2,800 open listings
+    // were first seen more than the whole 21-day window after they were posted, and 568 of those
+    // more than six months after, so a job posted in March scored as new. With no posting date the
+    // age is unknown, which is worth the same .5 a listing with no date at all has always been
+    // worth; giving it the benefit of first_seen would rank the boards that withhold the date
+    // above the ones that publish it. Keep this in step with _freshness() in backend score.py.
+    const postedAt = x.posted_at ? new Date(x.posted_at).getTime() : NaN;
     const seen = x.first_seen ? new Date(x.first_seen).getTime() : NaN;
-    const freshness = isNaN(seen) ? .5 : Math.max(0, 1 - (Date.now() - seen) / DAY / 21);
+    const decay = t => Math.max(0, 1 - (Date.now() - t) / DAY / 21);
+    const freshness = !isNaN(postedAt) ? decay(postedAt) : isNaN(seen) ? .5 : Math.min(.5, decay(seen));
     const openness = x.status === "open" ? 1 : 0;
     const sp = x.score_parts && x.score_parts.source;
     const source = sp != null ? Math.min(1, sp / 5) : (SOURCE_BY_ATS[x.ats] || .5);

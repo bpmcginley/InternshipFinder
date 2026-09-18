@@ -11,16 +11,36 @@ SOURCE_CONFIDENCE = {  # 0..1
 }
 
 
-def _freshness(first_seen: datetime | None) -> float:
+def _freshness(first_seen: datetime | None, posted_at: datetime | None = None) -> float:
+    """How new the posting is, counted from the day the employer posted it wherever we know it.
+
+    first_seen is the day InternScout first saw the posting, which is not the same thing as its age.
+    2,800 of the 11,019 open listings in one export were first seen more than 21 days after they
+    were posted - the whole decay window - and 568 of those more than six months after. Every one of
+    them scored as new, so a job posted in March sat at the top of the list beside one posted
+    yesterday, and the card said so: "Posted 6 months ago" under a full freshness bar.
+
+    Where no board gave a date the age is genuinely unknown, and unknown is worth the 0.5 this
+    function already returns when there is no date at all. It decays from there as we go on holding
+    the posting, since first_seen is at least a floor on the age. Handing an undated posting the
+    full benefit of first_seen would rank the boards that withhold the date above the ones that
+    publish it - Workday discloses on 21% of postings and Greenhouse on 100%.
+    """
+    now = datetime.now(timezone.utc)
+
+    def decay(d: datetime) -> float:
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return max(0.0, 1.0 - (now - d).total_seconds() / 86400 / 21.0)  # linear over ~3 weeks
+
+    if posted_at:
+        return decay(posted_at)
     if not first_seen:
         return 0.5
-    if first_seen.tzinfo is None:
-        first_seen = first_seen.replace(tzinfo=timezone.utc)
-    age_days = (datetime.now(timezone.utc) - first_seen).total_seconds() / 86400
-    return max(0.0, 1.0 - age_days / 21.0)  # linear decay over ~3 weeks
+    return min(0.5, decay(first_seen))
 
 
-def score_parts(*, field_tags, geo, first_seen, status, sources, **_) -> dict:
+def score_parts(*, field_tags, geo, first_seen, status, sources, posted_at=None, **_) -> dict:
     """Points earned per component (each out of W[component]); the total is their sum."""
     # field: how sure we are what the role is (a known field vs "other")
     if any(t != "other" for t in field_tags):
@@ -41,7 +61,7 @@ def score_parts(*, field_tags, geo, first_seen, status, sources, **_) -> dict:
     values = {
         "field": field,
         "location": location,
-        "freshness": _freshness(first_seen),
+        "freshness": _freshness(first_seen, posted_at),
         "openness": 1.0 if status == "open" else 0.0,
         "source": max((SOURCE_CONFIDENCE.get(s, 0.4) for s in (sources or ["github"])), default=0.4),
     }

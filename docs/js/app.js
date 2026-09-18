@@ -163,7 +163,10 @@
     const why = {
       field: !ctx.p ? "No profile yet: any known field counts" : tags.some(t => ctx.direct.has(t)) ? "Matches your major or fields" : tags.some(t => ctx.related.has(t)) ? "Related to your major" : "Outside your fields",
       fit: sc.mismatch ? "Not open to your class year" : !ctx.p ? "" : `${(r.stage || []).map(s => IS.STAGE_LABEL[s] || s).join(", ") || "Stage unknown"} · ${IS.termText(r.term) || "term not listed"}`,
-      location: "", freshness: "", openness: "", source: "",
+      location: "",
+      freshness: posted != null ? "Counted from the day it was posted"
+        : "No posting date given, so its age counts as unknown rather than new",
+      openness: "", source: "",
     };
     const chip = s => h("span", { key: s.name, className: cx("tag", has && (has[s.name] ? "ok" : "miss")), title: has ? (has[s.name] ? "Found on your profile" : "Not on your profile") : "" }, has ? (has[s.name] ? "✓ " : "✗ ") : "", s.name);
     return h("div", { className: "whyg" },

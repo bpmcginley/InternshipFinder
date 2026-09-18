@@ -125,3 +125,24 @@ def test_a_run_that_reports_no_date_does_not_erase_the_one_we_have():
         row = db.query(Listing).filter(Listing.company_name == "Datewise").one()
         assert row.posted_at is not None
         assert row.posted_at.date().isoformat() == "2026-08-07"
+
+
+def test_freshness_counts_from_the_day_the_employer_posted_it():
+    # 2,800 open listings in one export were first seen more than the whole 21-day window after
+    # they were posted, and scored as new on the strength of when we happened to find them.
+    from datetime import datetime, timedelta, timezone
+    from internscout.score import _freshness
+    now = datetime.now(timezone.utc)
+    old, yday = now - timedelta(days=180), now - timedelta(days=1)
+    assert _freshness(yday, old) == 0.0          # posted in March, found yesterday: not new
+    assert _freshness(old, yday) > 0.9           # posted yesterday, held for months: new
+    # No posting date means the age is unknown, which is not the same as new, and it can never
+    # outscore a posting we know is fresh.
+    assert _freshness(now, None) == 0.5
+    assert _freshness(now, None) < _freshness(now, yday)
+    assert _freshness(None, None) == 0.5
+    # Unknown decays from there as we go on holding it, because first_seen is a floor on the age.
+    assert _freshness(now - timedelta(days=14), None) < 0.5
+    assert _freshness(now - timedelta(days=60), None) == 0.0
+    # A naive datetime is read as UTC rather than crashing on the subtraction.
+    assert _freshness(None, (now - timedelta(days=1)).replace(tzinfo=None)) > 0.9

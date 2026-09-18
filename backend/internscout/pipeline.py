@@ -94,7 +94,7 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.status = "open" if it.get("active", True) else "closed"
             row.score_parts = score_parts(
                 field_tags=it["field_tags"], geo=it["geo"], first_seen=row.first_seen,
-                status=row.status, sources=sources,
+                posted_at=row.posted_at, status=row.status, sources=sources,
             )
             row.relevance_score = round(sum(row.score_parts.values()), 1)
             db.flush()
