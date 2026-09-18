@@ -217,7 +217,8 @@ def test_a_first_export_has_nothing_to_carry_and_does_not_mind(tmp_path):
 def _prev(**over):
     row = {"id": "x", "apply_url": "https://x/0", "ats": "workday", "company_name": "Stryker",
            "status": "open", "first_seen": "2026-09-16T00:00:00+00:00",
-           "last_seen": "2026-09-18T00:00:00+00:00", "regions": [], "state": "MA"}
+           "last_seen": "2026-09-18T00:00:00+00:00", "regions": [], "state": "MA",
+           "title": "Summer Intern", "stage": ["internship"]}
     row.update(over)
     return row
 
@@ -251,6 +252,29 @@ def test_a_board_that_merely_closed_a_job_is_left_alone(tmp_path):
     listings = [dict(r) for r in prev[:6]]   # six of ten: an employer closing jobs, not a failure
     assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
     assert len(listings) == 6
+
+
+def test_rows_todays_rules_drop_are_not_carried_back(tmp_path):
+    # A board whose staff jobs stopped counting as student ones is not a board that failed to
+    # answer: its dropped rows are not counted, and none of them come back.
+    from datetime import date
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i, title="Research Scientist II",
+                  stage=["research"]) for i in range(8)]
+    prev += [_prev(id="i%d" % i, apply_url="https://x/i%d" % i, title="PhD Research Intern",
+                   stage=["research"]) for i in range(2)]
+    _write_prev(tmp_path, prev)
+    listings = [dict(r) for r in prev[8:]]
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+    # and a genuine collapse carries only the rows that would still be admitted, restaged
+    listings = []
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i, title="Research Scientist II",
+                  stage=["research"]) for i in range(3)]
+    prev += [_prev(id="i%d" % i, apply_url="https://x/i%d" % i, title="PhD Research Intern",
+                   stage=["internship"]) for i in range(4)]
+    _write_prev(tmp_path, prev)
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 4
+    assert all(x["title"] == "PhD Research Intern" for x in listings)
+    assert all(x["stage"] == ["internship", "research"] for x in listings)
 
 
 def test_a_tiny_board_is_left_alone_because_churn_looks_the_same(tmp_path):

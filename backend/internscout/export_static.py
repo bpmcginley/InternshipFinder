@@ -280,7 +280,15 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
     was_open: dict[tuple, list[dict]] = defaultdict(list)
     for it in prev:
         if it.get("status") == "open" and it.get("ats") and it.get("company_name"):
-            was_open[board(it)].append(it)
+            # The last export's rows answer today's stage question too, before they are counted.
+            # When the research rule stopped admitting staff jobs on the bare word, a lab whose
+            # board was mostly "Research Scientist" lost more than half its rows in one run, which
+            # reads exactly like a fetch that collapsed - and 472 of those staff jobs were carried
+            # straight back, stale stage and all.
+            stage = merged_stages(it.get("stage"), it.get("title") or "")
+            if not stage:
+                continue
+            was_open[board(it)].append({**it, "stage": stage})
 
     held = 0
     for key, rows in was_open.items():
