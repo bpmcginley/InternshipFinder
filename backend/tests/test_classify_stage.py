@@ -608,3 +608,19 @@ def test_political_science_evaluation_survey_and_user_research_titles():
     assert classify("Student Internship - Survey") == ["civil"]
     assert classify("Business Survey Intern") == ["economics"]
     assert "civil" not in classify("Survey Research Intern")
+
+
+def test_hotel_venue_and_team_titles_that_never_say_hospitality_or_sports():
+    from internscout.classify import classify
+    assert classify("Personal Trainer Internship, NYC") == ["sports"]
+    assert "hr" not in classify("Personal Training Intern")
+    assert "sports" in classify("2027 International Scouting Associate")
+    assert "sports" in classify("Operations Intern | Highmark Stadium")
+    assert classify("Student Worker (Tennis Complex)") == ["sports"]
+    assert "hospitality" in classify("Spring 2027 - 6-Month Front Desk College Intern - Scottsdale, AZ")
+    assert "hospitality" in classify("Intern - F&B Administration")
+    assert "hospitality" in classify("C3 Presents - Festival Marketing Intern")
+    # the near misses
+    assert "sports" not in classify("Summer 2027 Intern- Innovation Group- Scouting/Business Research")
+    assert "hospitality" not in classify("Intern, Digital Product Management (Platforms & Guest Experience)")
+    assert "hospitality" not in classify("Patient Concierge Intern - Spring 2027")

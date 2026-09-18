@@ -412,3 +412,19 @@ def test_a_miss_cached_before_the_probes_last_grew_is_asked_again():
     cache = {"oldmiss": (changed - timedelta(days=1)).isoformat(),   # asked before the new probe
              "newmiss": changed.isoformat()}                          # asked with it
     assert candidates({}, items, cache, changed + timedelta(days=1)) == ["Old Miss"]
+
+
+def test_rename_board_is_opt_in_and_fixes_a_wrong_name():
+    # The Red Sox's board was registered as "Major League Baseball"; add_board keeps the first
+    # name it heard, so only an explicit rename can fix it.
+    from internscout.discover import rename_board
+    reg = {}
+    add_board(reg, "lever", "redsox", "Major League Baseball")
+    assert not add_board(reg, "lever", "redsox", "Boston Red Sox")
+    assert reg["lever"]["redsox"]["name"] == "Major League Baseball"
+    assert rename_board(reg, "lever", "RedSox", "Boston Red Sox")
+    assert reg["lever"]["redsox"]["name"] == "Boston Red Sox"
+    assert not rename_board(reg, "lever", "redsox", "Boston Red Sox")     # nothing to do
+    assert not rename_board(reg, "lever", "never-heard-of-it", "X")
+    seeded = [co for co in companies_seed.LEVER if co["ats_token"] == "redsox"]
+    assert seeded and seeded[0].get("rename") and seeded[0]["sector"] == "hospitality_sports"

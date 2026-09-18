@@ -775,4 +775,69 @@ BAMBOOHR: list = [
     {'name': 'IDinsight', 'ats_token': 'idinsight', 'is_quant_target': False, 'sector': 'social_research'},
 ]
 
+# --- hospitality, sports and events (probed and fetched live 2026-09-18) ---
+# Hospitality & sports had 25 open listings in the baseline states. The plan's named employers
+# were checked one by one; most are out of reach and are listed here so nobody re-checks them:
+#   - 403 to our user agent: Aramark, Delaware North, the Celtics, Kraft Group/Patriots, Foxwoods,
+#     Wasserman. No board found by probe: Compass Group, Levy, Wynn, Planet Fitness, ESPN (posts
+#     through Disney, already seeded), the NBA/NFL/NHL league offices.
+#   - UKG (IHG) and SmartRecruiters (Accor, Westgate) are on the skipped list.
+#   - Six Flags/Cedar Fair's iCIMS tenants redirect to a Radancy site we have no fetcher for.
+#   - TeamWork Online, where most teams post: robots.txt allows it but its terms forbid robots
+#     and "systematic extraction of data", so it is skipped like Handshake.
+# Entries marked 'rename' were already in the registry under a wrong name (see
+# discover.rename_board). A rename changes those listings' ids (normalize.listing_id hashes the
+# employer name), so it is kept to names that were actually wrong. Boards with no student posting today are kept because they hire
+# interns seasonally; the fetch is one request each.
+GREENHOUSE += [
+    {'name': 'Four Seasons', 'ats_token': 'fourseasons', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Octagon', 'ats_token': 'octagon', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Excel Sports Management', 'ats_token': 'excelsportsmanagement', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'World Surf League', 'ats_token': 'worldsurfleague', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Baltimore Orioles', 'ats_token': 'baltimoreorioles', 'is_quant_target': False, 'sector': 'hospitality_sports',
+     'rename': True},
+    {'name': 'Philadelphia Phillies', 'ats_token': 'philliesbaseballoperations', 'is_quant_target': False,
+     'sector': 'hospitality_sports', 'rename': True},
+]
+LEVER += [
+    {'name': 'Boston Red Sox', 'ats_token': 'redsox', 'is_quant_target': False, 'sector': 'hospitality_sports', 'rename': True},
+    {'name': 'San Francisco Giants', 'ats_token': 'sfgiants', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+ICIMS += [
+    {'name': 'United States Tennis Association', 'ats_token': 'careers-usopen', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    # 54 hotel internships across the US (finance, sales, operations) on the "hourly" board.
+    {'name': 'Highgate', 'ats_token': 'externalhourly-highgate', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+WORKDAY += [
+    # Personal-training internships at clubs nationwide: the kinesiology listings.
+    {'name': 'Life Time', 'ats_token': 'lifetime|wd1|lifetime', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Loews Hotels', 'ats_token': 'loewshotels|wd5|loewshotels', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    # Mohegan Sun, Uncasville CT: a baseline-state resort.
+    {'name': 'Mohegan', 'ats_token': 'mohegan|wd1|Mohegan', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Seminole Hard Rock', 'ats_token': 'seminolehardrock|wd503|seminolehardrockcareers',
+     'is_quant_target': False, 'sector': 'hospitality_sports'},
+    # Legends and ASM Global merged; legendsglobal.com/careers links to this board.
+    # Not renamed to "Legends": the id of every listing is built from the employer name, so a
+    # rename resets students' saved marks on it, and "ASM Global" is not wrong.
+    {'name': 'ASM Global', 'ats_token': 'asmglobal|wd1|careers', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'IMG', 'ats_token': 'wwecorp|wd5|IMG', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'PGA TOUR', 'ats_token': 'pgatour|wd5|PGATOURExternal', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Live Nation Entertainment', 'ats_token': 'livenation|wd503|LNExternalSite', 'is_quant_target': False,
+     'sector': 'hospitality_sports'},
+    {'name': 'Maple Leaf Sports & Entertainment Partnership (MLSE)', 'ats_token': 'mlse|wd3|MLSE',
+     'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Texas Rangers', 'ats_token': 'rangersmlb|wd5|Rangers', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'TKO Group Holdings, Inc', 'ats_token': 'wwecorp|wd5|tko', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'WWE', 'ats_token': 'wwecorp|wd5|wwecorp', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Choice Hotels', 'ats_token': 'choicehotels|wd5|External', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Marriott Vacations Worldwide', 'ats_token': 'mymvw|wd5|mvw', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Acushnet Holdings', 'ats_token': 'acushnetgolf|wd12|ACU', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+SUCCESSFACTORS += [
+    # The Rookie Program, UA's yearly intern class; the 2027 postings were not up yet.
+    {'name': 'Under Armour', 'ats_token': 'careers.underarmour.com', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Wyndham Hotels & Resorts', 'ats_token': 'careers.wyndhamhotels.com', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Royal Caribbean Group', 'ats_token': 'jobs.royalcaribbeangroup.com', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+
 # --- end sector seeds ---

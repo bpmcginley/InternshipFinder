@@ -147,6 +147,20 @@ def relabel_sector(reg: dict, ats: str, token: str, sector: str) -> bool:
     return True
 
 
+def rename_board(reg: dict, ats: str, token: str, name: str) -> bool:
+    """Give a board the name the seed file says. Opt-in (a seed entry with 'rename': True) because
+    add_board keeps the first name it heard, and discovery sometimes hears the wrong one: the Red Sox,
+    Orioles and Phillies boards were all registered as "Major League Baseball", so each team's own
+    internships showed under the league's name. Most seed names are no better than
+    what discovery found, so renaming everything on every seed would churn names for nothing."""
+    boards = reg.get(ats) or {}
+    key = {t.lower(): t for t in boards}.get(token.lower())
+    if not key or not name or boards[key].get("name") == name:
+        return False
+    boards[key]["name"] = name
+    return True
+
+
 # A university is the one kind of employer that reliably names its own sector, and 57 boards
 # in the registry were unlabelled, with 435 open listings sitting on them - the largest
 # unlabelled group there is, and the one feeding the Education cluster that the coverage
@@ -263,6 +277,8 @@ def seed_registry(reg: dict) -> int:
                 relabel_sector(reg, ats.lower(), co["ats_token"], co["sector"])
             if co.get("location"):
                 set_location(reg, ats.lower(), co["ats_token"], co["location"])
+            if co.get("rename"):
+                rename_board(reg, ats.lower(), co["ats_token"], co["name"])
     return n
 
 

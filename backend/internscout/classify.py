@@ -109,7 +109,7 @@ RULES = [
      r"market (research|intelligence|insights?)|consumer insights?|community manager"),
     ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)"),
     ("sales", r"\bsales\b|business development|account executive|account manager|client relations|customer success|(account|sales|business) development representative"),
-    ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations|\bhris\b|learning (and|&) development|\bl&d\b|team relations|total rewards|compensation (and|&) benefits|\bhuman resource\b|\btraining (intern|co-?op|coordinator)\b|talent (management|development)"),
+    ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations|\bhris\b|learning (and|&) development|\bl&d\b|team relations|total rewards|compensation (and|&) benefits|\bhuman resource\b|(?<!personal )\btraining (intern|co-?op|coordinator)\b|talent (management|development)"),
     ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b|operational excellence|continuous improvement|quality management|\bqms\b|\bquality (internship|programs?|analyst)\b|\bquality control\b|site quality|(?<!engineering )(?<!engineer )\b(intern|internship)\W+quality\b(?! engineer)|\bfacilities (management|planning|planner|services|corporate|intern|internship)\b|\b(19|20)\d\d facilities intern|summer internship - facilities"),
     ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern|supplier (management|quality|development)(?! engineer)|supply management|materials? management|transportation (analyst|/storage)|fleet transportation"),
     ("entrepreneurship", r"entrepreneur|\bstart-?ups?\b|incubator|accelerator|small business"),
@@ -162,8 +162,19 @@ RULES = [
     ("arts", r"animator|\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat"),
     ("museums", r"\bmuseum|curat(or|orial)|collections (intern|management|assistant)|archiv(e|es|ist|al)|exhibit"),
     ("library", r"librar(y|ian)|information science|archiv(e|es|ist|al)"),
-    ("hospitality", r"hospitality|\bhotel|restaurant|culinary|food (and|&) beverage|event planning|\bevents? (intern|coordinat)|tourism"),
-    ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"),
+    ("hospitality", r"hospitality|\bhotel|restaurant|culinary|food (and|&) beverage|event planning|\bevents? (intern|coordinat)|tourism"
+     # What hotel, resort and venue boards actually call their internships (Marriott Vacations,
+     # Highgate, Hard Rock, Live Nation's festivals), none of which says "hospitality". Not "guest
+     # experience" (retailers call shoppers guests) and not a patient concierge (a clinic job).
+     r"|front desk|guest (services|relations)|\bf&b\b|housekeeping|\bresorts?\b|(?<!patient )concierge"
+     r"|banquet|catering|\bfestivals?\b|\bconcessions?\b|ticket (sales|operations|office)"
+     r"|premium (client|seating|services)"),
+    ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"
+     # Team and club boards name the sport or the job, not "sports": Life Time's personal-training
+     # interns, the Red Sox's scouting and ballpark roles, the PGA TOUR's and Titleist's programs.
+     # Scouting only with a sports word beside it: State Farm's "Scouting/Business Research" is not.
+     r"|personal train(er|ing)|\b(international|amateur|pro|professional|academy|player) scout(ing)?\b|\bscouting (associate|intern)|\bgolf\b|\bstadium\b|\bballpark\b|\bbaseball\b|basketball"
+     r"|\bfootball\b|\bhockey\b|\bsoccer\b|\btennis\b|\b(pga|nba|nfl|nhl|mlb|mls|wnba)\b"),
     ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation|food safety( (&|and) quality| quality( assurance)?)?( \w+){0,2} (intern|co-?op)|quality ((&|and) )?food safety|\bsensory\b|\bseed (production|research)|brewery|brewing"),
     ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl|(?<!high-)(?<!high )\benergy (intern|internship|assessment intern)|building energy model|advanced energy intern"),
     ("languages", r"translat(or|ion)s?\b|interpreter\b|bilingual|linguist|"
