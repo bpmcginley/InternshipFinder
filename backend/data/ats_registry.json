@@ -3143,6 +3143,13 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "civisanalytics": {
+   "name": "Civis Analytics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "social_research"
+  },
   "clarityinnovates": {
    "name": "Clarity Innovations",
    "quant": false,
@@ -3846,6 +3853,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "fsg": {
+   "name": "FSG",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "nonprofit"
   },
   "fspco-op012325": {
    "name": "Flagship Pioneering",
@@ -4780,6 +4794,13 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "monumentalsports": {
+   "name": "Monumental Sports & Entertainment",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
+  },
   "morsecorpcoop": {
    "name": "Meridian Partners",
    "quant": false,
@@ -4805,6 +4826,13 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "nonprofit"
+  },
+  "msgsports": {
+   "name": "MSG Sports",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "mthreerecruitingportal": {
    "name": "mthree",
@@ -7759,6 +7787,13 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "academyofmotionpictureartsandsciences": {
+   "name": "Academy of Motion Picture Arts and Sciences",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "arts_museums"
+  },
   "aerotech": {
    "name": "Aerotech",
    "quant": false,
@@ -7797,6 +7832,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "autismspeaks": {
+   "name": "Autism Speaks",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "nonprofit"
   },
   "beesweetcitrus": {
    "name": "Bee Sweet Citrus",
@@ -13637,6 +13679,13 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "cengage|wd5|CengageNorthAmericaCareers": {
+   "name": "Cengage",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "media"
+  },
   "cenhud|wd5|cenhud": {
    "name": "Central Hudson",
    "quant": false,
@@ -14459,6 +14508,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "easterseals|wd5|ESNH_VTcareers": {
+   "name": "Easterseals NH VT",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "behavioral_health"
   },
   "ebi|wd5|ebadcareers": {
    "name": "Ensign-Bickford Aerospace & Defense Company",
@@ -15359,7 +15415,8 @@
    "name": "Guidehouse",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-18"
+   "added": "2026-09-18",
+   "sector": "government_policy"
   },
   "guidestone|wd1|guidestone": {
    "name": "GuideStone",
@@ -16382,6 +16439,13 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "magellanhealth|wd5|magellan_health_careers": {
+   "name": "Magellan Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "behavioral_health"
+  },
   "magna|wd3.myworkdaysite.com|Magna": {
    "name": "Magna",
    "quant": false,
@@ -16703,6 +16767,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "montage|wd1|Montage_International": {
+   "name": "Montage International",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "montefiore|wd12|MMC": {
    "name": "Montefiore",
@@ -17353,7 +17424,7 @@
   "pennant|wd1|PennantServicesCareerSite": {
    "name": "Pennant Group",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13"
   },
   "pentair|wd5|pentair_careers": {
@@ -18381,6 +18452,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "springernature|wd3|SpringerNatureCareers": {
+   "name": "Springer Nature",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "media"
   },
   "sprinklr|wd1|careers": {
    "name": "Sprinklr",
