@@ -593,7 +593,20 @@ JAZZHR += [
 #   NORC                         careers.norc.org                own host, no ATS marker in the page
 #   Bay Cove Human Services      -                               every careers URL 404s
 #
-# UKG is the one worth building: it is in the plan's fetcher table already, and it is what the
-# hospitals and human-services nonprofits in this sector keep turning out to be on.
+# UKG looked like the one worth building - it is in the plan's fetcher table, and it is what
+# these nonprofits keep turning out to be on - but recruiting.ultipro.com/robots.txt closes it:
+#
+#     Disallow: /
+#     Allow: */JobBoard/
+#     Disallow: */JobBoardView
+#
+# The board pages are opened on purpose and the JSON behind them is shut on purpose, and
+# LoadSearchResults lives under JobBoardView. The endpoint answers - 102 postings with clean
+# addresses and posted dates for the tenant above - which is exactly why the rule has to be the
+# thing that decides. UKG joins REU on the list of sources we are not allowed to read.
+#
+# Of the other two systems seen here, SilkRoad allows its job pages (Crawl-Delay: 10, so a board
+# is a minute of waiting) and BrassRing serves no robots.txt at all. Neither appears anywhere in
+# the apply_url hosts we already index, so a fetcher for either would be built for one employer.
 
 # --- end sector seeds ---
