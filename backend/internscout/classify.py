@@ -96,10 +96,21 @@ _STAGE_RULES = [
                               r"diversity|emerging leaders?|research) fellows?\b", re.I)),
     ("early_insight", re.compile(r"\bdiscovery (program|day|week|series|internship)|\binsights? (day|week|program|series)|"
                                  r"early insight|\bexplore (program|internship)|exploration program|spring week|possibilities summit", re.I)),
+    # "Working Student" is the German Werkstudent contract: a real part-time job for someone enrolled.
     ("part_time", re.compile(r"part[- ]time (intern|student)|\b(student|intern)\b.{0,25}part[- ]time|"
-                             r"student (worker|assistant|employee|aide)|work[- ]study|academic[- ]year intern|semester intern", re.I)),
+                             r"student (worker|assistant|employee|aide)|work[- ]study|academic[- ]year intern|"
+                             r"semester intern|working student", re.I)),
     ("apprenticeship", re.compile(r"\bapprentice(ship)?s?\b", re.I)),
-    ("internship", re.compile(r"\bintern(ship)?s?\b|summer (analyst|associate|scholar|20[2-3]\d)|\bextern(ship)?s?\b|\bpracticum\b|student trainee", re.I)),
+    # Plenty of employers never write "intern". Aramco Americas posts seventeen "<Department> -
+    # 2027 Summer Student Program" and nothing else; elsewhere the role noun is simply "Student",
+    # as in "Physical Design Student". Both were measured against 26,791 live titles from
+    # greenhouse, lever and ashby boards: "summer student" never appears on a non-student posting,
+    # and "student" heading the role matched nine titles, every one of them a student job.
+    # Plural is left out on purpose - a title ending in "Students" is usually a job serving them,
+    # like "Senior Product Manager, GPTZero - Students" - and so is "working", which is part_time.
+    ("internship", re.compile(r"\bintern(ship)?s?\b|summer (analyst|associate|scholar|20[2-3]\d)|"
+                              r"\bextern(ship)?s?\b|\bpracticum\b|student trainee|\bsummer students?\b|"
+                              r"(?<!working )\bstudent\b(?=\s*([-,:(/|–—]|$))", re.I)),
 ]
 _LOWER_YEARS_RE = re.compile(r"\b(freshm[ae]n|first[- ]year|sophomores?)\b", re.I)
 _PROGRAM_RE = re.compile(r"\b(program|summit|day|week|series|academy|conference|forum|experience)\b", re.I)

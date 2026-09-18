@@ -63,6 +63,29 @@ def test_runs_the_programme():
         assert is_internship(t), t
 
 
+def test_student_without_the_word_intern():
+    """Not every student posting says "intern"; some just say "student"."""
+    # Aramco Americas posts seventeen of these and nothing else
+    assert stage_of("Finance Department - 2027 Summer Student Program") == ["internship"]
+    assert is_internship("Summer Student, Research and Development (Boston Research Center)")
+    # the role noun on its own, at the end of the title or before a separator
+    assert stage_of("Physical Design Student") == ["internship"]
+    assert is_internship("Software Engineering Student - Summer 2027")
+
+    # a Werkstudent is a part-time job for someone enrolled, so it is part_time and not an internship
+    assert stage_of("Working Student - Brand Communications") == ["part_time"]
+    assert stage_of("Software Developer, Working Student") == ["part_time"]
+    # unless the posting says both, and then it is both
+    assert stage_of("Working Student / Intern Accounting (f/m/d)") == ["internship", "part_time"]
+
+    # plural is left out on purpose: a title ending in "Students" is usually a job serving them
+    assert not is_internship("Senior Product Manager, GPTZero - Students")
+    assert not is_internship("Senior Product Manager (Student Safety)")
+    # "student" mid-title is not the role, and these stay out on their own merits
+    assert not is_internship("Student Success Manager")
+    assert not is_internship("Director of Student Financial Services")
+
+
 def test_new_field_tags():
     cases = {
         "Nursing Student Extern": "nursing", "Public Health Intern": "public_health",
