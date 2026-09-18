@@ -128,3 +128,33 @@ def test_discover_dedupes_case():
     n = discover(reg, [{"company_name": "Ramp", "apply_url": "https://jobs.ashbyhq.com/ramp/1"},
                        {"company_name": "HRT", "url": "https://boards.greenhouse.io/wehrtyou/jobs/2"}])
     assert n == 1 and list(reg["ashby"]) == ["Ramp"] and "wehrtyou" in reg["greenhouse"]
+
+
+def test_state_of_reads_a_code_the_board_did_not_set_apart():
+    # The strict passes want the code to be a comma-or-dash piece on its own, so every board that
+    # writes something else beside it used to come back stateless and land in the "US" shard.
+    assert state_of("Cambridge, MA USA") == "MA"                 # country after the code
+    assert state_of("Chicago IL USA") == "IL"                    # no comma at all
+    assert state_of("San Mateo, CA United States") == "CA"
+    assert state_of("White Plains, NY United States of America") == "NY"
+    assert state_of("US WV Friendly") == "WV"                    # code before the town
+    assert state_of("USA-IL Oak Brook") == "IL"
+    assert state_of("US.GA.Atlanta.2018 Powers Ferry Rd") == "GA"  # dots, which are not split on
+    assert state_of("(USA) OH HAMILTON 02441 WM SUPERCENTER") == "OH"
+    assert state_of("(USA) AR ROGERS 05837 NEIGHBORHOOD MARKET") == "AR"
+    assert state_of("US FL JAX 347") == "FL"                     # an airport code after the state
+    # It reads a code, not a word: the pass is capital-only and needs the two letters to stand alone.
+    assert state_of("United States") is None
+    assert state_of("US Headquarters") is None
+    assert state_of("Remote - anywhere in the US or nearby") is None
+    assert state_of("Walmart") is None
+    assert state_of("US - UPS CORPORATE OFFICES (GACOR)") is None
+    # and the earlier passes still answer first, so a real "City, ST" is unchanged.
+    assert state_of("Boston, MA") == "MA"
+    assert state_of("Hartford, Connecticut") == "CT"
+
+
+def test_a_location_the_new_pass_reads_is_sharded_by_its_state():
+    ev = evaluate_locations(["(USA) NY WATKINS GLEN 03221 WM SUPERCENTER"])
+    assert ev["state"] == "NY"
+    assert [g["state"] for g in ev["regions"]] == ["NY"]

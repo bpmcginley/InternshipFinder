@@ -52,6 +52,7 @@ def looks_us(loc: str) -> bool:
 
 
 _TOKEN_SPLIT = re.compile(r"[,\-–/()|]")
+_LOOSE_STATE = re.compile(r"(?<![A-Za-z])([A-Z]{2})(?![A-Za-z])")
 
 
 def state_of(loc: str) -> str | None:
@@ -63,7 +64,21 @@ def state_of(loc: str) -> str | None:
         if m and m.group(1).lower() in _US_STATES:
             return m.group(1)
     m = _STATE_NAME_RE.search(loc)
-    return STATE_NAMES[m.group(1).lower()] if m else None
+    if m:
+        return STATE_NAMES[m.group(1).lower()]
+    # Last resort: a capitalised code standing on its own anywhere in the string. The two passes
+    # above want the code to be a whole comma-or-dash piece, which loses every board that writes the
+    # country beside it ("Cambridge, MA USA", "San Mateo, CA United States"), puts the code before
+    # the town ("US WV Friendly", "(USA) OH HAMILTON 02441 WM SUPERCENTER") or separates with dots
+    # ("US.GA.Atlanta.2018 Powers Ferry Rd"). That was 659 of the 20,287 US locations in one export,
+    # and each of them landed in the "US" shard, where a student filtering by their own state never
+    # saw it. Capitalisation is what keeps this honest: it reads the AR in "(USA) AR ROGERS" and not
+    # the word "or" in a sentence, and it runs only when both passes above came back empty, so no
+    # answer that already works can change.
+    for m in _LOOSE_STATE.finditer(loc):
+        if m.group(1).lower() in _US_STATES:
+            return m.group(1)
+    return None
 
 
 _PREFIX = re.compile(r"^\s*(?:hybrid|on-?site|in[- ]office|remote)\b\s*(?:in\b|[-–:(])?\s*", re.I)
