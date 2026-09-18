@@ -331,7 +331,12 @@
         if (kind === "listbox") { const t = txt(el); if (t && rec.label.length > t.length && rec.label.endsWith(t)) rec.label = norm(rec.label.slice(0, -t.length)); }
         if (kind === "checkbox") {
           const fs = el.closest('fieldset, [role="group"], [data-automation-id^="formField-"]');
-          const q = fs && txt(fs.querySelector("legend, label"));
+          // Ashby's pick-several questions (EEO: ethnicity, sexual orientation) are checkboxes in a fieldset
+          // captioned the same way as its radio groups, by a <label class="…question-title"> and no legend.
+          // The first <label> in that box is an option's own text, so the model saw "Asian", "Gay or
+          // lesbian" and never the question. Look for the caption the way the radio branch does first.
+          const cap = fs && innerCaption(fs, [...fs.querySelectorAll('input[type="checkbox"], [role="checkbox"]')]);
+          const q = cap ? txt(cap) : fs && txt(fs.querySelector("legend, label"));
           if (q && q !== rec.label) rec.question = cut(q, 300);
         }
         if (kind === "react_select") {
