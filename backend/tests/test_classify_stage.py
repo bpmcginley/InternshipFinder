@@ -223,3 +223,23 @@ def test_research_stage_reads_the_word_itself():
     assert "research" in stage_of("Summer Undergraduate Research Fellowship (SURF)")
     # and a posting with no research in it is untouched.
     assert stage_of("Software Engineering Intern") == ["internship"]
+
+
+def test_business_is_the_fallback_for_a_title_with_no_function():
+    # The Isenberg equivalent of the engineering fallback: 111 postings in one export said
+    # "business" or "commercial" and named no function a rule could read.
+    assert classify("Business Internship") == ["business"]
+    assert classify("Business Performance Intern") == ["business"]
+    assert classify("Business Management Intern") == ["business"]
+    assert classify("2027 Summer Internship - Business Administration") == ["business"]
+    assert classify("Intern, Commercial 2027") == ["business"]
+    assert classify("Future Leaders Program - MBA Internship") == ["business"]
+    # and it steps aside for anything that does name one.
+    assert classify("Business Development Intern") == ["sales"]
+    assert classify("Business Intelligence Intern") == ["data"]
+    assert classify("Business Operations Intern") == ["operations"]
+    assert classify("Commercial Real Estate Intern") == ["real_estate"]
+    assert classify("Business Analyst Intern") == ["consulting"]
+    # The suppression rule covers both fallbacks now, and a title that is only both keeps both.
+    assert classify("Business Engineering Intern") == ["engineering", "business"]
+    assert "business" in ALL_FIELDS

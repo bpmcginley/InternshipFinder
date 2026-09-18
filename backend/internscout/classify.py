@@ -93,6 +93,11 @@ RULES = [
      r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language"),
     ("real_estate", r"real estate|property manage|\breit\b|leasing"),
     ("insurance", r"insurance|underwrit|claims (analyst|intern)|actuar"),
+    # The other half of the engineering fallback above: a posting that says business and
+    # nothing more specific is still a business posting. "Business Analyst Intern",
+    # "Business Management Intern", "Business Administration Intern". Business Development
+    # is already sales and Business Intelligence is already data, so this never sees them.
+    ("business", r"\bbusiness\b|\bcommercial\b|\bmba\b"),
     ("retail", r"\bretail\b|merchandis|buying intern|\bfashion\b|apparel|e-?commerce|\bstores?\b"),
 ]
 
@@ -178,6 +183,11 @@ def _runs_the_programme(title: str) -> bool:
     return last(_STAFF_ROLE_RE) > last(_STUDENT_ROLE_RE)
 
 
+# Tags that describe the shape of a posting rather than its discipline, added by a rule that
+# matches the word in the title and taken off again the moment a real discipline matched.
+_FALLBACK_FIELDS = frozenset({"engineering", "business"})
+
+
 def classify(title: str, description: str = "") -> list[str]:
     text = f"{title} {description or ''}".lower()
     tags: list[str] = []
@@ -186,8 +196,9 @@ def classify(title: str, description: str = "") -> list[str]:
             tags.append(tag)
     seen = set()
     out = [t for t in tags if not (t in seen or seen.add(t))]
-    if "engineering" in out and len(out) > 1:
-        out.remove("engineering")   # a fallback, so anything more specific wins outright
+    specific = [t for t in out if t not in _FALLBACK_FIELDS]
+    if specific:
+        out = specific          # a fallback stands only when nothing more specific matched
     # Never drop an internship just because our vocabulary missed it.
     return out or ["other"]
 

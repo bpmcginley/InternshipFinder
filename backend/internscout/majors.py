@@ -12,13 +12,13 @@ LANG_RELATED = ("education", "government", "publishing")
 # name: (tags, related)
 UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     # Isenberg School of Management
-    "Accounting": (("accounting",), ("finance", "consulting")),
-    "Finance": (("finance",), ("accounting", "consulting", "insurance", "real_estate", "quant")),
-    "Hospitality and Tourism Management": (("hospitality",), ("marketing", "operations", "sports")),
-    "Management": (("consulting", "operations", "hr"), ("entrepreneurship", "sales", "pm")),
-    "Marketing": (("marketing",), ("sales", "communications", "retail", "design")),
-    "Operations and Information Management": (("operations", "supply_chain", "data"), ("consulting", "pm", "industrial")),
-    "Sport Management": (("sports",), ("marketing", "sales", "hospitality")),
+    "Accounting": (("accounting",), ("finance", "consulting", "business")),
+    "Finance": (("finance",), ("accounting", "consulting", "insurance", "real_estate", "quant", "business")),
+    "Hospitality and Tourism Management": (("hospitality",), ("marketing", "operations", "sports", "business")),
+    "Management": (("consulting", "operations", "hr"), ("entrepreneurship", "sales", "pm", "business")),
+    "Marketing": (("marketing",), ("sales", "communications", "retail", "design", "business")),
+    "Operations and Information Management": (("operations", "supply_chain", "data"), ("consulting", "pm", "industrial", "business")),
+    "Sport Management": (("sports",), ("marketing", "sales", "hospitality", "business")),
     # Engineering
     "Biomedical Engineering": (("biomedical",), ("biology", "health", "mechanical", "clinical_research", "engineering")),
     "Chemical Engineering": (("chemical",), ("materials", "environmental", "biology", "chemistry", "engineering")),
@@ -61,7 +61,7 @@ UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     # Social and Behavioral Sciences
     "Anthropology": (("nonprofit", "museums"), ("public_health", "government")),
     "Communication": (("communications", "media"), ("marketing", "film", "journalism")),
-    "Economics": (("economics",), ("finance", "consulting", "government", "data")),
+    "Economics": (("economics",), ("finance", "consulting", "government", "data", "business")),
     "Resource Economics": (("economics",), ("sustainability", "agriculture", "finance")),
     "Journalism": (("journalism", "media"), ("communications", "publishing")),
     "Legal Studies": (("law",), ("government", "nonprofit")),
@@ -102,16 +102,16 @@ UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 }
 
 GRADUATE: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "MBA": (("consulting", "finance", "marketing"), ("pm", "operations", "entrepreneurship")),
-    "MS Accounting": (("accounting",), ("finance",)),
+    "MBA": (("consulting", "finance", "marketing"), ("pm", "operations", "entrepreneurship", "business")),
+    "MS Accounting": (("accounting",), ("finance", "business")),
     "MS Computer Science": (("swe", "ml"), ("data", "security")),
     "MS Data Science / Statistics": (("data", "math"), ("ml", "quant")),
     "MS Engineering (any)": (("mechanical", "electrical", "civil", "industrial"), ("hardware", "materials", "engineering")),
     "Master of Public Health": (("public_health", "health"), ("clinical_research", "government")),
     "Master of Public Policy": (("government", "economics"), ("nonprofit", "urban_planning")),
     "Master of Education": (("education",), ("nonprofit", "psychology")),
-    "MS Hospitality and Tourism": (("hospitality",), ("marketing",)),
-    "MS Sport Management": (("sports",), ("marketing", "sales")),
+    "MS Hospitality and Tourism": (("hospitality",), ("marketing", "business")),
+    "MS Sport Management": (("sports",), ("marketing", "sales", "business")),
     "MFA / MA Arts and Humanities": (("arts", "publishing"), ("museums", "education")),
     "PhD Sciences": (("lab_research",), ("biology", "chemistry", "physics")),
 }
