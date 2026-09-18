@@ -12,7 +12,14 @@ from ..classify import is_internship
 from ..region import maybe_in_region
 
 PAGE = 20
-MAX_OFFSET = 200
+# How far into a board's results we read. searchText="intern" is a fuzzy match - "internal",
+# "international" - so the tail of a large board is mostly noise, but not all of it: sampling 39
+# boards, 9 hold more than 200 results, and Oshkosh alone had 53 internships past that mark
+# against 75 before it. Past CORE_OFFSET we keep reading until three pages in a row hold no
+# internship at all, which stops on the noise without cutting a board whose matches are spread out.
+CORE_OFFSET = 200
+MAX_OFFSET = 400
+DRY_PAGES = 3
 MAX_DETAIL = 40
 HEADERS = {"Accept": "application/json", "Content-Type": "application/json"}
 
@@ -71,7 +78,7 @@ def parse_workday_detail(payload: dict) -> tuple[list[str], str]:
 def fetch_workday_board(c, co: dict) -> list[dict]:
     host, tenant, site = host_of(co["ats_token"])
     api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
-    postings, offset, total = [], 0, None
+    postings, offset, total, dry = [], 0, None, 0
     while True:
         r = c.post(f"{api}/jobs", headers=HEADERS,
                    json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": "intern"})
@@ -80,10 +87,14 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
         page = data.get("jobPostings") or []
         if total is None:
             total = data.get("total") or 0   # only reported on the first page
-        postings += parse_workday_list(data)
+        found = parse_workday_list(data)
+        postings += found
+        dry = 0 if found else dry + 1
         offset += PAGE
         if not page or offset >= total or offset >= MAX_OFFSET:
             break
+        if offset >= CORE_OFFSET and dry >= DRY_PAGES:
+            break   # the matches have run out; the rest of this board is "internal" and "overseas"
 
     out = []
     for i, p in enumerate(postings):

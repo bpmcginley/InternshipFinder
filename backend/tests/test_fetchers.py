@@ -2,7 +2,9 @@
 from internscout.sources.greenhouse import parse_greenhouse
 from internscout.sources.lever import parse_lever
 from internscout.sources.ashby import parse_ashby
-from internscout.sources.workday import (parse_workday_list, parse_workday_detail,
+from internscout.sources.workday import (CORE_OFFSET, DRY_PAGES, PAGE,
+                                         fetch_workday_board,
+                                         parse_workday_list, parse_workday_detail,
                                          parse_posted_on, host_of)
 from internscout.sources.smartrecruiters import parse_smartrecruiters, parse_smartrecruiters_detail
 from internscout.sources.workable import parse_workable
@@ -615,3 +617,73 @@ def test_public_feeds_are_government():
                              "career_level": "Student", "posting_type": "External"}], today=date(2026, 9, 14))
     tags = [normalize(i)["field_tags"] for i in items]
     assert tags[0] == ["government"] and "government" in tags[1] and "public_health" in tags[1]
+
+
+class _Missing:
+    status_code = 404
+
+
+class _Page:
+    """One canned Workday list response."""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+class _Board:
+    """A Workday board holding a fixed list of postings, answering 20 at a time."""
+
+    def __init__(self, titles):
+        self.titles, self.offsets = titles, []
+
+    def post(self, url, headers=None, json=None):
+        off = json["offset"]
+        self.offsets.append(off)
+        window = self.titles[off:off + json["limit"]]
+        return _Page({"total": len(self.titles),
+                      "jobPostings": [{"title": t, "externalPath": "/job/%d" % i,
+                                       "locationsText": "Boston, MA"}
+                                      for i, t in enumerate(window, off)]})
+
+    def get(self, url, headers=None):
+        return _Missing()   # the list payload already names a state
+
+
+def _deepco():
+    return {"name": "Deepco", "ats_token": "deepco|wd1|Deepco", "is_quant_target": False,
+            "sector": None, "location": None}
+
+
+def test_a_big_workday_board_is_read_past_the_first_two_hundred_results():
+    # searchText="intern" matches "internal" and "international" too, so a large board buries
+    # real internships in noise. Of 39 boards sampled live, 9 held more than 200 results, and
+    # Oshkosh had 53 internships past the 200 mark against 75 before it.
+    titles = ["Internal Audit Manager"] * 180 + ["Software Engineer Intern"] * 40
+    board = _Board(titles)
+    out = fetch_workday_board(board, _deepco())
+    assert len(out) == 40, "the internships all sit past the old 200-result ceiling"
+    assert max(board.offsets) >= CORE_OFFSET
+
+
+def test_a_board_whose_matches_have_run_out_is_not_read_to_the_end():
+    # Past the first 200 the tail is usually all noise, and reading it costs a request a page.
+    titles = ["Software Engineer Intern"] * 200 + ["International Tax Analyst"] * 200
+    board = _Board(titles)
+    out = fetch_workday_board(board, _deepco())
+    assert len(out) == 200
+    assert max(board.offsets) == CORE_OFFSET + PAGE * (DRY_PAGES - 1)
+
+
+def test_a_gap_before_the_first_two_hundred_does_not_stop_the_read():
+    # The stop only applies past CORE_OFFSET, so a board whose matches are spread through the
+    # first 200 is read exactly as it was before.
+    titles = (["Software Engineer Intern"] * 20 + ["Internal Comms Lead"] * 120
+              + ["Marketing Intern"] * 60)
+    board = _Board(titles)
+    assert len(fetch_workday_board(board, _deepco())) == 80
