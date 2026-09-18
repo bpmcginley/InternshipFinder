@@ -26,7 +26,12 @@ RULES = [
     # production and brewing, and the design roles that are visual design. "Analog Design Intern",
     # "RFIC Design" and "Mechanical Design" are engineering and stay out of design: only the
     # visual kinds (web, textile, game, apparel, brand...) and a title that is just "Design Intern"
-    # count. Quality and supplier-quality roles followed by "engineer" stay engineering.
+    # count. Quality and supplier-quality roles followed by "engineer" stay engineering. A fourth:
+    # pricing, capital/private markets, portfolio and risk roles (not "Security Risk", and not
+    # WTW's "Corporate Risk and Broking", which is insurance), power delivery and generation,
+    # imaging tech and radiology students, transportation systems analysis, facilities, and
+    # industrial automation and simulation. "Process Automation" stays out: as often as not it is
+    # software, and "Imaging Technology" is seismic as well as medical.
     # --- computing / quant ---
     ("quant", r"\bquant(itative)?\b|\btrader\b|\btrading\b|market mak|derivativ|\balpha\b|portfolio manag"),
     ("ml", r"\bml\b|machine learning|deep learning|\bnlp\b|computer vision|\bai\b|artificial intelligence|genai|\bllm|research scientist|reinforcement learning"),
@@ -37,13 +42,13 @@ RULES = [
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner|product analyst"),
 
     # --- engineering (non-software) ---
-    ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern|signal processing|electric distribution"),
+    ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern|signal processing|electric distribution|power (delivery|generation|supply|management|integrity)|signal integrity|energy storage (intern|co-?op|engineer)|energy management system"),
     ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac|machine shop|machinist"),
-    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey|\btraffic (engineer|intern|design|signal|stud(y|ies)|safety|operations)|\bsite civil\b|\bcivil (intern|co-?op)|(roadway|transportation|civil) design"),
+    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey|\btraffic (engineer|intern|design|signal|stud(y|ies)|safety|operations)|\bsite civil\b|\bcivil (intern|co-?op)|(roadway|transportation|civil) design|transportation (bridge|systems analysis)"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
     ("chemical", r"chemical engineer|process engineer|petroleum|refin|(process|drug product|drug substance|analytical|formulation) development"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
-    ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer|human factors engineer|continuous improvement|operational excellence"),
+    ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer|human factors engineer|continuous improvement|operational excellence|(industrial|metrology|mes (&|and) industrial) automation|automation (technician|equipment|(&|and) test (intern|co-?op))|simulation (&|and) (analysis|optimization)|modeling, simulation|simulation and modeling"),
     # EHS - environment, health and safety - is the compliance arm of an environmental team, and a
     # student who wants it is an environmental science or public health major. None of its titles say
     # "environmental": 24 of them said only "other", which is the bottom of every ranking.
@@ -76,7 +81,7 @@ RULES = [
     ("chemistry", r"bioanalytical|analytical sciences|\bchemist|chemical (research|analysis)|analytical chem|organic chem"),
     ("physics", r"\bphysics\b|photonic|optic|quantum (computing|research|physics)|astronom"),
     ("math", r"\bmathematic|applied math|\bstatistic|biostatistic|actuarial"),
-    ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital|speech[- ]language patholog|speech patholog|audiolog|communication disorders|respiratory therap|occupational therap|physical therap|speech[- ]language (graduate|intern|extern|therap)|revenue cycle"),
+    ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital|speech[- ]language patholog|speech patholog|audiolog|communication disorders|respiratory therap|occupational therap|physical therap|speech[- ]language (graduate|intern|extern|therap)|revenue cycle|\bimaging tech\b|radiolog|diagnostic imaging"),
     ("nursing", r"\bnurs(e|es|ing)\b|\bcna\b|\brn\b|patient care (tech|assistant)"),
     ("public_health", r"public health|epidemiolog|community health|global health|health (policy|equity|promotion|education|services research)"),
     # "translational" is bench-to-bedside research, and the boundary added to the languages rule
@@ -90,8 +95,8 @@ RULES = [
     # is capital planning, and in "Social/Community Investments", which is giving. Together with the
     # financial-reporting phrases and engineering's R&D, test, reliability and maintenance words
     # below, this took 132 of the ~2,700 "other" titles in one export into a field.
-    ("finance", r"fraud analyst|commodit|banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)"),
-    ("accounting", r"(?<!quality )assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep|accounts (payable|receivable)|\bpayroll\b|cost (management|accounting)|expense management"),
+    ("finance", r"fraud analyst|commodit|banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)|\bpricing\b|capital markets|private markets|emerging markets|portfolio (analyst|management|implementation|and relationship)|(?<!security )\brisk (intern|internship|group)\b|corporate risk(?! (and|&) broking)|third party risk|trade risk"),
+    ("accounting", r"(?<!quality )assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep|accounts (payable|receivable)|\bpayroll\b|cost (management|accounting)|expense management|transfer pricing"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
     ("marketing", r"\bcrm (intern|co-?op|marketing|analyst|coordinator)|\bad ?ops\b|\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern|"
      # Market research is the marketing department's research, and it was landing in "other" with
@@ -101,8 +106,8 @@ RULES = [
     ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)"),
     ("sales", r"\bsales\b|business development|account executive|account manager|client relations|customer success|(account|sales|business) development representative"),
     ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations|\bhris\b|learning (and|&) development|\bl&d\b|team relations|total rewards|compensation (and|&) benefits|\bhuman resource\b|\btraining (intern|co-?op|coordinator)\b|talent (management|development)"),
-    ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b|operational excellence|continuous improvement|quality management|\bqms\b|\bquality (internship|programs?|analyst)\b|\bquality control\b|site quality|(?<!engineering )(?<!engineer )\b(intern|internship)\W+quality\b(?! engineer)"),
-    ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern|supplier (management|quality|development)(?! engineer)|supply management|materials? management"),
+    ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b|operational excellence|continuous improvement|quality management|\bqms\b|\bquality (internship|programs?|analyst)\b|\bquality control\b|site quality|(?<!engineering )(?<!engineer )\b(intern|internship)\W+quality\b(?! engineer)|\bfacilities (management|planning|planner|services|corporate|intern|internship)\b|\b(19|20)\d\d facilities intern|summer internship - facilities"),
+    ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern|supplier (management|quality|development)(?! engineer)|supply management|materials? management|transportation (analyst|/storage)|fleet transportation"),
     ("entrepreneurship", r"entrepreneur|\bstart-?ups?\b|incubator|accelerator|small business"),
     ("economics", r"\beconomic|econometric|policy analys|\beconomists?\b"),
 

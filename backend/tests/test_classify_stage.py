@@ -577,3 +577,21 @@ def test_management_analyst_quality_and_design_titles_reach_a_field():
     # quality assurance is not audit assurance
     assert "accounting" not in classify("Quality Assurance Engineering Intern - Summer 2027")
     assert "accounting" in classify("Audit & Assurance Intern")
+
+
+def test_pricing_power_imaging_and_facilities_titles_reach_a_field():
+    assert classify("Pricing Analyst Intern (Summer 2027)") == ["finance"]
+    assert "finance" in classify("Equity Capital Markets Intern")
+    assert "finance" in classify("Third Party Risk Intern")
+    assert "accounting" in classify("Transfer Pricing Intern - Summer 2027")
+    assert classify("Student Intern Power Delivery Summer 2027") == ["electrical"]
+    assert classify("Imaging Tech Student - Radiology - PRN") == ["health"]
+    assert classify("Graduate Intern - Transportation Systems Analysis") == ["civil"]
+    assert classify("Facilities Intern") == ["operations"]
+    assert classify("MES & Industrial Automation Intern") == ["industrial"]
+    assert classify("Simulation and Modeling Intern") == ["industrial"]
+    # the same words in other jobs
+    assert "finance" not in classify("Cyber Security Risk Intern [2027 Internship Program]")
+    assert "finance" not in classify("Early Careers: Corporate Risk & Broking Construction Internship")
+    assert "health" not in classify("Summer Internship - Seismic Imaging Technology - Houston, TX")
+    assert "industrial" not in classify("Process Automation Developer Intern")
