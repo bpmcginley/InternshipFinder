@@ -716,6 +716,7 @@
           h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
+          C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs"),
           signInBtn)));
   }
 

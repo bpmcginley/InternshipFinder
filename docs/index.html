@@ -239,6 +239,14 @@
     // We link rather than index them: nsf.gov/robots.txt disallows the REU site search, and
     // etap.nsf.gov, where the applications live, disallows everything.
     reuUrl: "https://www.nsf.gov/funding/initiatives/reu",
+    // UMass Amherst's own board: 138 open postings, and the on-campus ones are the most
+    // reachable work a first-year can get. We link rather than index it. Its robots.txt
+    // opens /jobs/ and advertises a sitemap, but the search itself is served from /api/,
+    // which that same file closes, so the only permitted route is a page fetch per posting
+    // from a host sitting behind an AWS WAF. That buys about five listings a run, for one
+    // employer, from a site that is actively managing automated traffic - the same call
+    // made for UKG Ready in companies_seed.py, and here a link serves the student better.
+    campusJobsUrl: "https://careers.umass.edu/jobs/search",
     extensionInstallUrl: "install.html",
     baselineStates: ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"],
   };
