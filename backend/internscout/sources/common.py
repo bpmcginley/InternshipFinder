@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import re
 
+from ..config import USER_AGENT
 from ..geo import REMOTE_RE, _NON_US, state_of
 
 DESC_CHARS = 4000
@@ -14,6 +15,82 @@ class RobotsDisallowed(Exception):
     Raised instead of returning nothing so the run can tell "the employer said no" apart from
     "the board was empty today", and so the board ages out of the registry the way a dead one does.
     """
+
+
+ROBOTS_TIMEOUT = 8.0
+_ROBOTS: dict[str, list[tuple[str, str]]] = {}
+
+
+def robots_rules(text: str, ua: str = USER_AGENT) -> list[tuple[str, str]]:
+    """The Allow/Disallow lines of the robots.txt group that applies to us.
+
+    A group is a run of User-agent lines and the rules under them, so consecutive User-agent lines
+    share one group and the next User-agent after a rule starts a new one. A group that names us
+    beats the catch-all. Most hosts publish only a catch-all, but not all: SmartRecruiters names
+    LinkedInBot, and only LinkedInBot, as the one crawler allowed to read /v1/companies/.
+    """
+    groups: dict[str, list[tuple[str, str]]] = {}
+    agents: list[str] = []
+    fresh = True
+    for line in text.splitlines():
+        field, _, value = line.split("#", 1)[0].partition(":")
+        field, value = field.strip().lower(), value.strip()
+        if field == "user-agent":
+            if not fresh:
+                agents, fresh = [], True
+            agents.append(value.lower())
+        elif field in ("allow", "disallow") and agents:
+            fresh = False
+            for a in agents:
+                groups.setdefault(a, []).append((field, value))
+    for name, rules in groups.items():
+        if name != "*" and name and name in ua.lower():
+            return rules
+    return groups.get("*", [])
+
+
+def robots_blocks(rules: list[tuple[str, str]], path: str) -> bool:
+    """Whether those rules close this path: longest match wins, and a tie goes to Allow."""
+    match, blocked = "", False
+    for field, value in rules:
+        if not value or not path.startswith(value):
+            continue
+        if len(value) > len(match) or (len(value) == len(match) and field == "allow"):
+            match, blocked = value, field == "disallow"
+    return blocked
+
+
+def robots_allows(c, base: str, path: str) -> bool:
+    """Whether the host at `base` ("https://careers-sig.icims.com") lets us request `path`.
+
+    One fetch per host per run, cached, because most ATSes give each employer its own host and a
+    host serves several paths. A host that serves no robots.txt forbids nothing, and neither does
+    one that answers with a web page instead of a robots file, which two of ours do.
+    """
+    if base not in _ROBOTS:
+        try:
+            r = c.get(f"{base}/robots.txt", timeout=ROBOTS_TIMEOUT)
+            body = r.text if r.status_code == 200 else ""
+            if "<html" in body[:400].lower():
+                body = ""
+            _ROBOTS[base] = robots_rules(body)
+        except Exception:
+            _ROBOTS[base] = []   # nothing said is nothing forbidden
+    return not robots_blocks(_ROBOTS[base], path)
+
+
+def require_robots(c, base: str, path: str, token: str) -> None:
+    """Stop before the first job request when the host tells us not to read this board.
+
+    Most ATSes hand each employer its own host, so the file is the employer speaking, exactly as
+    on Workday: 13 iCIMS tenants answer `User-agent: * / Disallow: /` - Charles Schwab, Bio-Rad,
+    Schneider Electric, SIG, Uber's university site, Toll Brothers, the rest - while their
+    neighbours serve the iCIMS default, which names the login and referral paths and opens the
+    rest. SmartRecruiters is the other shape: one file on the API host shared by every employer
+    on it, closing /v1/companies/ to everyone but LinkedInBot.
+    """
+    if not robots_allows(c, base, path):
+        raise RobotsDisallowed(token)
 
 
 def html_to_text(s: str | None) -> str:

@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 from .common import RobotsDisallowed, board_item, html_to_text
+from .common import robots_allows as _host_allows
 from ..classify import is_internship
-from ..config import USER_AGENT
 from ..region import maybe_in_region
 
 PAGE = 20
@@ -23,46 +23,6 @@ MAX_OFFSET = 400
 DRY_PAGES = 3
 MAX_DETAIL = 40
 HEADERS = {"Accept": "application/json", "Content-Type": "application/json"}
-ROBOTS_TIMEOUT = 8.0
-_ROBOTS: dict[str, list[tuple[str, str]]] = {}
-
-
-def robots_rules(text: str, ua: str = USER_AGENT) -> list[tuple[str, str]]:
-    """The Allow/Disallow lines of the robots.txt group that applies to us.
-
-    A group is a run of User-agent lines and the rules under them, so consecutive User-agent lines
-    share one group and the next User-agent after a rule starts a new one. A group that names us
-    beats the catch-all. Every Workday tenant sampled publishes only a catch-all.
-    """
-    groups: dict[str, list[tuple[str, str]]] = {}
-    agents: list[str] = []
-    fresh = True
-    for line in text.splitlines():
-        field, _, value = line.split("#", 1)[0].partition(":")
-        field, value = field.strip().lower(), value.strip()
-        if field == "user-agent":
-            if not fresh:
-                agents, fresh = [], True
-            agents.append(value.lower())
-        elif field in ("allow", "disallow") and agents:
-            fresh = False
-            for a in agents:
-                groups.setdefault(a, []).append((field, value))
-    for name, rules in groups.items():
-        if name != "*" and name and name in ua.lower():
-            return rules
-    return groups.get("*", [])
-
-
-def robots_blocks(rules: list[tuple[str, str]], path: str) -> bool:
-    """Whether those rules close this path: longest match wins, and a tie goes to Allow."""
-    match, blocked = "", False
-    for field, value in rules:
-        if not value or not path.startswith(value):
-            continue
-        if len(value) > len(match) or (len(value) == len(match) and field == "allow"):
-            match, blocked = value, field == "disallow"
-    return blocked
 
 
 def robots_allows(c, token: str) -> bool:
@@ -84,8 +44,8 @@ def robots_allows(c, token: str) -> bool:
     way it is the employer saying so, which is the rule that already kept UKG and the NSF REU list
     out of this project.
 
-    One robots.txt per host per run, cached, and the result is read per site because a host serves
-    several boards and answers differently for them, as BlackRock does above.
+    The answer is read per site, not per host, because a host serves several boards and answers
+    differently for them, as BlackRock does above; common.robots_allows caches the file itself.
 
     The second Workday domain has no per-tenant robots.txt to read - there the tenant is a path
     segment on a host shared by every tenant on the pod, so the file is not the tenant's to write -
@@ -94,13 +54,7 @@ def robots_allows(c, token: str) -> bool:
     host, _tenant, site = host_of(token)
     if "myworkdaysite" in host:
         return True
-    if host not in _ROBOTS:
-        try:
-            r = c.get(f"{host}/robots.txt", timeout=ROBOTS_TIMEOUT)
-            _ROBOTS[host] = robots_rules(r.text) if r.status_code == 200 else []
-        except Exception:
-            _ROBOTS[host] = []   # nothing said is nothing forbidden
-    return not robots_blocks(_ROBOTS[host], f"/{site}/")
+    return _host_allows(c, host, f"/{site}/")
 
 
 def host_of(token: str) -> tuple[str, str, str]:

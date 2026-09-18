@@ -8,7 +8,7 @@ no location, which dropped them from the export and, before that, from the detai
 a listing its description.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -45,6 +45,7 @@ def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
 
 def fetch_bamboohr_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
+    require_robots(c, f"https://{token}.bamboohr.com", "/careers/list", token)
     r = c.get(LIST_URL.format(token=token), headers={"Accept": "application/json"})
     r.raise_for_status()
     items = parse_bamboohr(r.json(), co, token)

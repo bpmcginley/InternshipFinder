@@ -12,7 +12,7 @@ real description inside the 4,000-character budget and hand the classifier a com
 copy to tag a job by.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -56,6 +56,7 @@ def parse_smartrecruiters_detail(payload: dict) -> str:
 
 def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
     token, out, offset = co["ats_token"], [], 0
+    require_robots(c, "https://api.smartrecruiters.com", "/v1/companies/", token)
     while offset < MAX_OFFSET:
         r = c.get(URL.format(token=token), params={"q": "intern", "limit": 100, "offset": offset})
         r.raise_for_status()

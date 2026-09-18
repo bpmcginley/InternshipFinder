@@ -29,7 +29,7 @@ where the health, education and energy listings live.
 from __future__ import annotations
 import re
 from urllib.parse import unquote
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -163,6 +163,7 @@ def parse_successfactors(html: str, co: dict) -> list[dict]:
 
 def fetch_successfactors_board(c, co: dict) -> list[dict]:
     token, seen, items = co["ats_token"], set(), []
+    require_robots(c, f"https://{token}", "/search/", token)
     for kw in KEYWORDS:
         for page in range(MAX_PAGES):
             r = c.get(SEARCH_URL.format(token=token), params={"q": kw, "startrow": page * PAGE_SIZE})

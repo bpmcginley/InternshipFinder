@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.parse
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -105,6 +105,8 @@ def _portal(c, tenant: str, section: str) -> str:
 def fetch_taleo_board(c, co: dict) -> list[dict]:
     parts = co["ats_token"].split("|")
     tenant, section = parts[0], parts[1]
+    require_robots(c, f"https://{tenant}.taleo.net",
+                   "/careersection/rest/jobboard/searchjobs", co["ats_token"])
     portal = parts[2] if len(parts) > 2 else _portal(c, tenant, section)
     url = f"{BASE.format(tenant=tenant)}/rest/jobboard/searchjobs"
     seen: dict[str, dict] = {}

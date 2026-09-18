@@ -19,7 +19,7 @@ knowing before touching this:
     neither a description nor a snippet is reported.
 """
 from __future__ import annotations
-from .common import board_item
+from .common import board_item, require_robots
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 
@@ -82,6 +82,8 @@ def parse_eightfold(payload: dict, co: dict) -> list[dict]:
 
 def fetch_eightfold_board(c, co: dict) -> list[dict]:
     tenant, domain = host_of(co["ats_token"])
+    require_robots(c, f"https://{tenant}.eightfold.ai", "/api/pcsx/search",
+                   co["ats_token"])
     seen, items = set(), []
     for kw in KEYWORDS:
         for page in range(MAX_PAGES):

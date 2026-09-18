@@ -1,6 +1,6 @@
 """Recruitee public careers API: <slug>.recruitee.com/api/offers/ (all offers, descriptions included)."""
 from __future__ import annotations
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 
 URL = "https://{token}.recruitee.com/api/offers/"
@@ -34,6 +34,8 @@ def parse_recruitee(payload: dict, co: dict) -> list[dict]:
 
 
 def fetch_recruitee_board(c, co: dict) -> list[dict]:
+    require_robots(c, f"https://{co['ats_token']}.recruitee.com", "/api/offers/",
+                   co["ats_token"])
     r = c.get(URL.format(token=co["ats_token"]))
     r.raise_for_status()
     return parse_recruitee(r.json(), co)

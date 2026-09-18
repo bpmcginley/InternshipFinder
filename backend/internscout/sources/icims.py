@@ -19,7 +19,7 @@ health, nursing and education listings live.
 from __future__ import annotations
 import json
 import re
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -101,7 +101,9 @@ def parse_icims_detail(html: str) -> tuple[str, str | None]:
     return "", None
 
 def fetch_icims_board(c, co: dict) -> list[dict]:
-    token, seen, items = co["ats_token"], set(), []
+    token = co["ats_token"]
+    require_robots(c, f"https://{token}.icims.com", "/jobs/search", token)
+    seen, items = set(), []
     for kw in KEYWORDS:
         for page in range(MAX_PAGES):
             r = c.get(SEARCH_URL.format(token=token),

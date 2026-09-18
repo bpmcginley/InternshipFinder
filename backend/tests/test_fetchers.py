@@ -2,10 +2,12 @@
 from internscout.sources.greenhouse import parse_greenhouse
 from internscout.sources.lever import parse_lever
 from internscout.sources.ashby import parse_ashby
-from internscout.sources.common import RobotsDisallowed
+from internscout.sources.common import (RobotsDisallowed, _ROBOTS, robots_blocks,
+                                        robots_rules)
+from internscout.sources.icims import fetch_icims_board
+from internscout.sources.smartrecruiters import fetch_smartrecruiters_board
 from internscout.sources.workday import (CORE_OFFSET, DRY_PAGES, PAGE,
-                                         robots_allows, robots_blocks,
-                                         robots_rules,
+                                         robots_allows,
                                          fetch_workday_board,
                                          parse_workday_list, parse_workday_detail,
                                          parse_posted_on, host_of)
@@ -776,3 +778,99 @@ def test_a_host_that_serves_no_robots_file_forbids_nothing():
     # Nothing said is nothing forbidden, and a tenant that has gone away answers 422 here.
     board = _Board(["Software Engineer Intern"] * 3)
     assert len(fetch_workday_board(board, _co("norobots|wd1|External"))) == 3
+
+
+class _Host:
+    """Any ATS host: one robots.txt, and every other request recorded and answered empty."""
+
+    def __init__(self, body, payload=None):
+        self.body, self.payload = body, payload
+        self.asked, self.robots = [], 0
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        if url.endswith("/robots.txt"):
+            self.robots += 1
+            return _Page(None, text=self.body)
+        self.asked.append(url)
+        return _Page(self.payload)
+
+
+# The real thing, from careers-framatome.icims.com on 2026-09-18: what an iCIMS tenant serves
+# when it has not written its own. It names the private paths and leaves the search open.
+_ICIMS_DEFAULT = """User-agent: *
+Sitemap: https://careers-framatome.icims.com/sitemap.xml
+Disallow: /jobs/*referral
+Disallow: /jobs/referral
+Disallow: /jobs/*login
+Disallow: /jobs/login
+Disallow: /jobs/*candidate
+Disallow: /jobs/candidate
+Disallow: /jobs/reminder
+Disallow: /connect
+"""
+
+# And from api.smartrecruiters.com the same day.
+_SMARTRECRUITERS = """User-agent: LinkedInBot
+Allow: /v1/companies/
+
+User-agent: *
+Disallow: /
+"""
+
+
+def test_an_icims_tenant_that_closes_its_own_host_is_not_searched():
+    # 13 of the 163 iCIMS tenants answer a bare Disallow: / - Charles Schwab, Bio-Rad,
+    # Schneider Electric, SIG, Uber's university site, Toll Brothers among them.
+    _ROBOTS.clear()
+    host = _Host("User-agent: *\nDisallow: /\n")
+    try:
+        fetch_icims_board(host, _co("careers-shut"))
+    except RobotsDisallowed:
+        pass
+    else:
+        raise AssertionError("a closed board was searched")
+    assert host.asked == [], "not one search may go out to a board we may not read"
+
+
+def test_the_icims_default_robots_file_leaves_the_job_search_open():
+    # The neighbours of those 13 serve this, and closing them too would be our mistake,
+    # not the employer's instruction.
+    _ROBOTS.clear()
+    host = _Host(_ICIMS_DEFAULT)
+    assert fetch_icims_board(host, _co("careers-open")) == []
+    assert host.asked, "an open board must still be searched"
+
+
+def test_smartrecruiters_closes_its_posting_api_to_everyone_but_linkedin():
+    # The other shape: not the employer's host but the vendor's, one file covering all 144
+    # boards, and an Allow naming exactly one crawler that is not us.
+    _ROBOTS.clear()
+    host = _Host(_SMARTRECRUITERS)
+    try:
+        fetch_smartrecruiters_board(host, _co("AbbVie"))
+    except RobotsDisallowed:
+        pass
+    else:
+        raise AssertionError("the posting API was called anyway")
+    assert host.asked == []
+    assert robots_blocks(robots_rules(_SMARTRECRUITERS, "LinkedInBot/1.0"),
+                         "/v1/companies/") is False, "LinkedIn is allowed; we are not"
+
+
+def test_one_robots_file_is_fetched_per_host_however_many_boards_it_serves():
+    # The check costs one request per host per run, not one per board, which is what makes
+    # asking every board affordable.
+    _ROBOTS.clear()
+    host = _Host(_ICIMS_DEFAULT)
+    fetch_icims_board(host, _co("careers-cached"))
+    fetch_icims_board(host, _co("careers-cached"))
+    assert host.robots == 1
+
+
+def test_a_robots_url_that_answers_with_a_web_page_forbids_nothing():
+    # workforcenow.adp.com and 1x.recruitee.com both answer /robots.txt with HTML. That is
+    # no robots file, and reading a page's markup as rules would close boards at random.
+    _ROBOTS.clear()
+    host = _Host("<!DOCTYPE html><html><body>Disallow: /</body></html>")
+    assert fetch_icims_board(host, _co("careers-html")) == []
+    assert host.asked

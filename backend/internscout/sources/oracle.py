@@ -17,7 +17,7 @@ it is the same employer boilerplate on every requisition, and it would crowd the
 out of the 4,000-character budget and give the classifier marketing copy to tag a job by.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -65,6 +65,9 @@ def parse_oracle_detail(payload: dict) -> str:
 
 def fetch_oracle_board(c, co: dict) -> list[dict]:
     host, site = co["ats_token"].split("|", 1)
+    require_robots(c, f"https://{host}",
+                   "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
+                   co["ats_token"])
     out, offset = [], 0
     while offset < MAX_OFFSET:
         r = c.get(API.format(host=host, site=site, limit=PAGE, offset=offset))

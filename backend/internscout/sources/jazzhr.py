@@ -22,7 +22,7 @@ from __future__ import annotations
 import html
 import re
 
-from .common import board_item
+from .common import board_item, require_robots
 from ..classify import is_internship
 from ..region import board_state, place_bare_cities
 
@@ -62,6 +62,8 @@ def parse_jazzhr(page: str, co: dict) -> list[dict]:
 
 
 def fetch_jazzhr_board(c, co: dict) -> list[dict]:
+    require_robots(c, f"https://{co['ats_token']}.applytojob.com", "/apply",
+                   co["ats_token"])
     r = c.get(URL.format(tenant=co["ats_token"]))
     r.raise_for_status()
     return parse_jazzhr(r.text, co)

@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 import time
 
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, require_robots
 from ..classify import is_internship
 
 URL = "https://{token}/api/jobs"
@@ -69,6 +69,7 @@ def parse_icims_site(payload: dict, co: dict) -> list[dict]:
 
 def fetch_icims_site_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
+    require_robots(c, f"https://{token}", "/api/jobs", token)
     seen: dict[str, dict] = {}
     for page in range(1, MAX_PAGES + 1):
         if page > 1:
