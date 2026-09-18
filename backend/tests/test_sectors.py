@@ -43,6 +43,27 @@ def test_workable_probe_needs_jobs():
     assert _workable(Client({"name": "Mayo Clinic", "jobs": [{"title": "x"}]}), "mayo-clinic", "Mayo Clinic")
 
 
+def test_jazzhr_probe_needs_the_employers_name():
+    # Every applytojob.com subdomain answers 200 - a slug nobody registered serves JazzHR's own
+    # marketing page, naming JazzHR as the organization - so the name and the jobs do all the work.
+    from internscout.probe import _jazzhr
+
+    item = '<li class="list-group-item"><a href="https://x.applytojob.com/apply/1">Intern</a></li>'
+    org = lambda n: '<script type="application/ld+json">{"@type": "Organization", "name": "%s"}</script>' % n
+
+    class Client:
+        def __init__(self, page, code=200): self.page, self.code = page, code
+        def get(self, url): return type("R", (), {"status_code": self.code, "text": self.page})()
+
+    real = org("Stellar Science") + item
+    assert _jazzhr(Client(real), "stellarscience", "Stellar Science")
+    assert not _jazzhr(Client(org("JazzHR")), "acme", "Acme")                   # unregistered slug
+    assert not _jazzhr(Client(org("JazzHR") + item), "jazzhr", "JazzHR")        # the placeholder never counts
+    assert not _jazzhr(Client(real), "roush", "ROUSH")                          # somebody else's board
+    assert not _jazzhr(Client(item), "stellarscience", "Stellar Science")       # jobs, but nothing named
+    assert not _jazzhr(Client(org("Stellar Science")), "stellarscience", "Stellar Science")   # named, no jobs
+    assert not _jazzhr(Client(real, 404), "stellarscience", "Stellar Science")
+
 def test_sector_reaches_listing():
     co = {"name": "Baystate Health", "ats_token": "x", "sector": "health"}
     raw = board_item(co, source="workday", title="Nursing Intern", locations=["Springfield, MA"],

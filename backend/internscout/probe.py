@@ -38,6 +38,9 @@ def _same_name(board_name: str | None, name: str) -> bool:
     return bool(a and b) and (a.startswith(b) or b.startswith(a))
 
 
+_JAZZHR_ORG = re.compile(r'"@type"\s*:\s*"Organization"\s*,\s*"name"\s*:\s*"([^"]{2,80})"')
+
+
 def _greenhouse(c, slug, name):
     r = c.get(f"https://boards-api.greenhouse.io/v1/boards/{slug}")
     return r.status_code == 200 and _same_name(r.json().get("name"), name)
@@ -64,7 +67,22 @@ def _ashby(c, slug, name):
     return r.status_code == 200 and len(r.json().get("jobs") or []) > 0
 
 
-PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("workable", _workable)]
+# JazzHR answers 200 for every subdomain anyone ever types at it: a made-up tenant serves a JazzHR
+# marketing page with no jobs on it, naming JazzHR itself as the organization. The status code proves
+# nothing here, so a board only counts when it names the employer we asked for and has jobs on it.
+def _jazzhr(c, slug, name):
+    r = c.get(f"https://{slug}.applytojob.com/apply")
+    if r.status_code != 200 or '<li class="list-group-item">' not in r.text:
+        return False
+    m = _JAZZHR_ORG.search(r.text)
+    org = m.group(1).strip() if m else ""
+    return org.lower() != "jazzhr" and _same_name(org, name)
+
+
+# JazzHR goes last: it is the only probe paying for a whole HTML page rather than a small JSON
+# existence check, so it is only reached when nothing cheaper matched.
+PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("workable", _workable),
+          ("jazzhr", _jazzhr)]
 
 
 def load_cache() -> dict:
