@@ -84,6 +84,11 @@ GREENHOUSE = [
     {"name": "Jane Street", "ats_token": "janestreet", "is_quant_target": True},
     {"name": "Tower Research Capital", "ats_token": "towerresearchcapital", "is_quant_target": True},
     {"name": "AQR", "ats_token": "aqr", "is_quant_target": True},
+    # optiver.com gives its board away nowhere, and no rule built from "Optiver" reaches
+    # "optiverus" - the two Optiver boards discovery did find, optiverprivate and
+    # tradingacademy2025, are neither of them the one with the internships on it. Confirmed
+    # live 2026-09-18: 163 open jobs, among them the Summer 2027 quant research internship.
+    {"name": "Optiver", "ats_token": "optiverus", "is_quant_target": True},
     {"name": "Schonfeld", "ats_token": "schonfeld", "is_quant_target": True},
     {"name": "Squarespace", "ats_token": "squarespace", "is_quant_target": False},
     {"name": "Betterment", "ats_token": "betterment", "is_quant_target": False},

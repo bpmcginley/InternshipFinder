@@ -103,6 +103,85 @@ PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("w
           ("smartrecruiters", _smartrecruiters), ("jazzhr", _jazzhr)]
 
 
+# A Greenhouse board embedded in the employer's own careers page leaves no token in the apply URL:
+# "?gh_jid=8044334" names the job, and the public API is keyed by the board. Nothing else finds these
+# - ats_of labels the URL "greenhouse" with no token, so it reads like a board we already have, and
+# the name probe never sees it - which is how careers.aqr.com, www.coinbase.com and stripe.com sat in
+# the data with no board behind them. The page serving the job does carry the board, in the embed
+# script or in a link back to greenhouse.io, and boards-api settles it by serving that same job id
+# under the token. Checked live 2026-09-18 on the 13 such hosts in the data: 10 resolved, among them
+# quantbot-technologies and optiverus, whose tokens no naming rule would have guessed.
+GH_JID = re.compile(r"[?&]gh_jid=(\d+)")
+GH_TOKEN = re.compile(r"(?:embed/job_board[^\"'<>]*?[?&]for=|job-boards\.greenhouse\.io/"
+                      r"|boards\.greenhouse\.io/(?!embed)|boards-api\.greenhouse\.io/v1/boards/)"
+                      r"([A-Za-z0-9_-]+)", re.I)
+# What the embed URL itself is made of, never a board.
+GH_NOT_TOKENS = {"embed", "job_board", "js", "jobs"}
+GH_PAGE_TIMEOUT = 15.0   # a whole careers page, not one of the small existence checks
+MAX_GH_HOSTS = 12
+
+
+def _serves_job(c, token: str, jid: str) -> bool:
+    try:
+        return c.get(f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{jid}").status_code == 200
+    except Exception:
+        return False
+
+
+def gh_host_token(c, url: str, jid: str, name: str = "") -> str | None:
+    """The Greenhouse board behind an employer's own careers host, or None if nothing answers.
+
+    Whatever the page gives up is tried first, then the employer's name, because a careers page
+    that builds its list server-side - AlixPartners, Trillium, Domino Data Lab - names no board at
+    all. The job id keeps the name guess honest: it is the same check the plain name probe makes,
+    with the posting we are holding as the proof, so a board belonging to a company of a similar
+    name cannot be mistaken for this one.
+    """
+    cands = []
+    try:
+        page = c.get(url, timeout=GH_PAGE_TIMEOUT)
+        cands = [t for t in GH_TOKEN.findall(page.text or "") if t.lower() not in GH_NOT_TOKENS]
+    except Exception:
+        pass
+    for tok in dict.fromkeys(cands + (slugs_for(name) if name else [])):
+        if _serves_job(c, tok, jid):
+            return tok
+    return None
+
+
+def gh_hosts(reg: dict, items: list[dict], cache: dict, today: date) -> list[tuple[str, str, str, str]]:
+    """(host, url, job id, employer) for each branded host whose board is still unknown."""
+    known = {norm(e.get("name")) for e in reg.get("greenhouse", {}).values()}
+    cutoff = (today - timedelta(days=TTL_DAYS)).isoformat()
+    out: dict[str, tuple[str, str, str, str]] = {}
+    for it in items:
+        url = it.get("apply_url") or ""
+        m = GH_JID.search(url)
+        if not m:
+            continue
+        h = re.match(r"https?://([^/]+)", url)
+        # greenhouse.io's own hosts carry the token in the path; ats_of has it already.
+        if not h:
+            continue
+        host = h.group(1).lower()
+        if host.endswith("greenhouse.io") or host in out:
+            continue
+        if cache.get("gh:" + host, "") >= cutoff or norm(it.get("company_name")) in known:
+            continue
+        out[host] = (host, url, m.group(1), (it.get("company_name") or "").strip())
+    return list(out.values())
+
+
+def probe_gh_hosts(reg: dict, items: list[dict], cache: dict, today: date, c) -> int:
+    found = 0
+    for host, url, jid, name in gh_hosts(reg, items, cache, today)[:MAX_GH_HOSTS]:
+        cache["gh:" + host] = today.isoformat()
+        token = gh_host_token(c, url, jid, name)
+        if token:
+            found += add_board(reg, "greenhouse", token, name or host)
+    return found
+
+
 def load_cache() -> dict:
     try:
         with open(CACHE_PATH, encoding="utf-8") as f:
@@ -157,5 +236,6 @@ def probe_boards(reg: dict, items: list[dict], _client=None, max_names: int = MA
             cache[norm(name)] = today.isoformat()
             if hit:
                 found += add_board(reg, hit[0], hit[1], name)
+        found += probe_gh_hosts(reg, items, cache, today, c)
     save_cache(cache)
     return found

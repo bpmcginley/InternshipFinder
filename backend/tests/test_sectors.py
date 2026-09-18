@@ -1,3 +1,5 @@
+from datetime import date
+
 from internscout import companies_seed
 from internscout.dedupe import merge_batch
 from internscout.discover import add_board, seed_registry
@@ -63,6 +65,47 @@ def test_jazzhr_probe_needs_the_employers_name():
     assert not _jazzhr(Client(item), "stellarscience", "Stellar Science")       # jobs, but nothing named
     assert not _jazzhr(Client(org("Stellar Science")), "stellarscience", "Stellar Science")   # named, no jobs
     assert not _jazzhr(Client(real, 404), "stellarscience", "Stellar Science")
+
+def test_greenhouse_host_probe():
+    # The employer's own careers page is the only place the board token appears; the job id in the
+    # apply URL is what proves the token is the right one rather than some other board on the page.
+    from internscout.probe import gh_host_token, gh_hosts
+
+    page = ('<script src="https://boards.greenhouse.io/embed/job_board/js?for=towerresearchcapital">'
+            '</script><a href="https://boards.greenhouse.io/embed/job_board?for=someoneelse">x</a>')
+
+    class Client:
+        def __init__(self, page, ok=("towerresearchcapital",)):
+            self.page, self.ok, self.asked = page, ok, []
+        def get(self, url, timeout=None):
+            if url.startswith("https://boards-api"):
+                tok = url.split("/boards/")[1].split("/")[0]
+                self.asked.append(tok)
+                return type("R", (), {"status_code": 200 if tok in self.ok else 404})()
+            return type("R", (), {"status_code": 200, "text": self.page})()
+
+    c = Client(page)
+    assert gh_host_token(c, "https://www.tower-research.com/open-positions/?gh_jid=8024128",
+                         "8024128") == "towerresearchcapital"
+    assert "js" not in c.asked and "embed" not in c.asked      # the embed URL's own words are not boards
+    # A page naming only a board that does not serve this job is no answer at all.
+    assert gh_host_token(Client(page, ok=()), "https://x.com/?gh_jid=1", "1") is None
+    # A careers page that renders its jobs from somewhere private gives nothing away.
+    assert gh_host_token(Client("<html>no board here</html>"), "https://x.com/?gh_jid=1", "1") is None
+
+    reg = {"greenhouse": {"coinbase": {"name": "Coinbase"}}}
+    items = [{"apply_url": "https://www.coinbase.com/careers/positions/1?gh_jid=1", "company_name": "Coinbase"},
+             {"apply_url": "https://boards.greenhouse.io/alku/jobs/2?gh_jid=2", "company_name": "ALKU"},
+             {"apply_url": "https://careers.aqr.com/jobs?gh_jid=7895562", "company_name": "AQR"},
+             {"apply_url": "https://careers.aqr.com/jobs?gh_jid=7895563", "company_name": "AQR"},
+             {"apply_url": "https://example.com/jobs/4", "company_name": "No Greenhouse Here"}]
+    got = gh_hosts(reg, items, {"gh:stale.example.com": "2000-01-01"}, date(2026, 9, 18))
+    # Coinbase already has a board, ALKU's token is in its URL, and one host is asked about once.
+    assert [g[0] for g in got] == ["careers.aqr.com"]
+    assert got[0][1:] == ("https://careers.aqr.com/jobs?gh_jid=7895562", "7895562", "AQR")
+    # A host asked about recently is left alone until the cache entry ages out.
+    assert gh_hosts(reg, items, {"gh:careers.aqr.com": "2026-09-17"}, date(2026, 9, 18)) == []
+
 
 def test_sector_reaches_listing():
     co = {"name": "Baystate Health", "ats_token": "x", "sector": "health"}
