@@ -63,12 +63,12 @@ RULES = [
     ("film", r"animat(or|ion)|rigging artist|production intern|\bfilm|video production|post-?production|cinematograph|production assistant|documentar"),
     ("music", r"\bmusic|record label|audio engineer|recording studio|concert"),
     ("theater", r"theat(er|re)\b|stage manag|performing arts|\bdance\b|\bopera\b|ballet"),
-    ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|counsel|policy intern"),
+    ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|\bcounsel\b|policy intern"),
     ("education", r"teaching|education|curriculum|instructor|tutor"),
     ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate"),
     ("architecture", r"architect(ure|ural)|urban plan|landscape"),
     ("urban_planning", r"urban plan|city plan|regional plan|planning intern|transportation planning|zoning|\bgis\b|housing (policy|development)|community development"),
-    ("psychology", r"psycholog|behavioral (health|science)|mental health|counsel(ing|or)\b|\baba\b|cognitive science|"
+    ("psychology", r"psycholog|behavioral (health|science)|\bmental health|counsel(ing|or)\b|\baba\b|cognitive science|"
      # A BCBA fieldwork apprenticeship is a psychology role by any reading, and so is a
      # behaviour technician post: they are the commonest paid placement an undergraduate
      # psychology major can actually get. None of them say "psychology" in the title.
@@ -252,4 +252,7 @@ SECTOR_FIELDS = {
     "government_policy": "government", "arts_museums": "arts", "hospitality_sports": "hospitality",
     "insurance_finance": "finance", "quant_finance": "finance", "energy_environment": "sustainability",
     "retail_consumer": "retail",
+    # Mental-health and autism-services providers. Their clinical internships are titled by degree
+    # level rather than by discipline, so the employer is the only thing that says psychology.
+    "behavioral_health": "psychology",
 }

@@ -160,3 +160,13 @@ def test_majors_use_known_tags():
         assert set(tags) <= known and set(related) <= known, name
     ex = majors_export()
     assert len(ex["majors"]) == len(UNDERGRAD) + len(GRADUATE) and "internship" in ex["stages"]
+
+def test_a_field_word_inside_a_longer_word_is_not_a_match():
+    # "Environmental Health & Safety" contains "mental health", and thirteen of the twenty-six
+    # psychology listings in one export were EHS roles because of it.
+    assert classify("Environmental Health & Safety Intern") == ["environmental"]
+    assert classify("Environmental Health and Safety Co-Op") == ["environmental"]
+    assert "psychology" in classify("Mental Health Counseling Intern")
+    # and "counsel" is a lawyer, while "counseling" and "counselor" are not.
+    assert classify("Social Work / Counseling Intern") == ["psychology", "social_work"]
+    assert classify("General Counsel Intern") == ["law"]

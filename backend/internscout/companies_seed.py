@@ -524,7 +524,14 @@ GREENHOUSE += [
     # 6 economics-tagged roles on the day it was added: the only board in the data that has them.
     {'name': 'Charles River Associates', 'ats_token': 'charlesriverassociates', 'is_quant_target': False},
     # 12 "Clinical Apprentice - BCBA Fieldwork Program" posts, which is the whole psychology cluster.
-    {'name': 'Centria Autism', 'ats_token': 'centriaautism', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Centria Autism', 'ats_token': 'centriaautism', 'is_quant_target': False,
+     'sector': 'behavioral_health'},
+    # Three clinical internships in Lexington MA, titled by degree level: the sector is what
+    # tags them, and they are the only psychology postings in the baseline states.
+    {'name': 'Eliot Community Human Services', 'ats_token': 'eliotcommunityhumanservices',
+     'is_quant_target': False, 'sector': 'behavioral_health'},
+    {'name': 'Leading Educators', 'ats_token': 'leadingeducators', 'is_quant_target': False,
+     'sector': 'education_research'},
 ]
 SMARTRECRUITERS += [
     {'name': 'Uncommon Schools', 'ats_token': 'uncommonschools', 'is_quant_target': False,
@@ -536,11 +543,57 @@ SMARTRECRUITERS += [
     # 12 personal-trainer internships, the largest single source of sports placements found so far.
     {'name': 'Equinox', 'ats_token': 'equinox', 'is_quant_target': False, 'sector': 'hospitality_sports'},
     {'name': 'Sportradar', 'ats_token': 'sportradar', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    # A Worcester ABA provider: nothing open today, everything it opens is psychology.
+    {'name': 'Behavioral Concepts', 'ats_token': 'behavioralconcepts', 'is_quant_target': False,
+     'sector': 'behavioral_health'},
 ]
 ASHBY += [
     {'name': 'Instructure', 'ats_token': 'instructure', 'is_quant_target': False, 'sector': 'education_research'},
     {'name': 'Morning Consult', 'ats_token': 'morningconsult', 'is_quant_target': False, 'sector': 'media'},
     {'name': 'Berlitz', 'ats_token': 'berlitz', 'is_quant_target': False, 'sector': 'education_research'},
 ]
+
+# --- social-science boards read off employers' own careers pages (2026-09-18) ---
+ICIMS = [
+    {'name': 'Brookings Institution', 'ats_token': 'careers-brookings', 'is_quant_target': False,
+     'sector': 'government_policy'},
+    # Analysis Group runs two boards and the internships are split across them.
+    {'name': 'Analysis Group', 'ats_token': 'professionalcareers-analysisgroup', 'is_quant_target': False},
+    {'name': 'Analysis Group', 'ats_token': 'datasciencecareers-analysisgroup', 'is_quant_target': False},
+    {'name': 'Advocates', 'ats_token': 'careers-advocatesinc', 'is_quant_target': False, 'sector': 'nonprofit'},
+]
+RECRUITEE = [
+    {'name': 'TransPerfect', 'ats_token': 'transperfect', 'is_quant_target': False},
+]
+WORKDAY += [
+    # The Pew Research Center hires through the Pew Charitable Trusts' tenant.
+    {'name': 'Pew Research Center', 'ats_token': 'pewtrusts|wd5|CenterExternal', 'is_quant_target': False,
+     'sector': 'government_policy'},
+    # Likewise Compass Lexecon through FTI Consulting's. 10 economics internships on the day it was
+    # added, all in Europe; the US ones post later in the season.
+    {'name': 'Compass Lexecon', 'ats_token': 'fticonsulting|wd108|CompassLexeconCareers', 'is_quant_target': False},
+]
+
+JAZZHR += [
+    {'name': "Let's Get Ready", 'ats_token': 'letsgetready', 'is_quant_target': False,
+     'sector': 'education_research'},
+]
+
+
+# --- employers whose board was found but cannot be fetched (checked in a browser 2026-09-18) ---
+# Their careers pages render in JavaScript, so a plain GET sees nothing; loading them in a real
+# browser and reading where the apply links go gives the board for each. None is seedable:
+#
+#   Vinfen                       careers-vinfen.icims.com        iCIMS, but the tenant answers
+#                                                                'Log in to Vinfen Corporation'
+#                                                                to an anonymous job search.
+#   The Home for Little Wanderers  recruiting.ultipro.com/HOM1009HOMLW   UKG/UltiPro - no fetcher
+#   Riverside Community Care     jobs.silkroad.com/RiversideCC   SilkRoad - no fetcher
+#   Westat                       sjobs.brassring.com             Kenexa BrassRing - no fetcher
+#   NORC                         careers.norc.org                own host, no ATS marker in the page
+#   Bay Cove Human Services      -                               every careers URL 404s
+#
+# UKG is the one worth building: it is in the plan's fetcher table already, and it is what the
+# hospitals and human-services nonprofits in this sector keep turning out to be on.
 
 # --- end sector seeds ---

@@ -2,7 +2,8 @@ from datetime import date
 
 from internscout import companies_seed
 from internscout.dedupe import merge_batch
-from internscout.discover import add_board, seed_registry
+from internscout.discover import add_board, relabel_sector, seed_registry
+from internscout.coverage import SECTOR_CLUSTER
 from internscout.normalize import normalize
 from internscout.sources.common import board_item
 
@@ -116,6 +117,31 @@ def test_sector_reaches_listing():
     first = dict(n, sector=None, source="github")
     merged = merge_batch([first, n])
     assert list(merged.values())[0]["sector"] == "health"
+
+
+def test_seed_may_relabel_a_board_it_owns():
+    # Centria Autism was seeded as health and is behavioral_health now; add_board alone kept the
+    # first label, which is what we want from a prober's guess and not from the seed file.
+    reg = {}
+    add_board(reg, "greenhouse", "centriaautism", "Centria Autism", sector="health")
+    assert not add_board(reg, "greenhouse", "centriaautism", "Centria Autism", sector="behavioral_health")
+    assert reg["greenhouse"]["centriaautism"]["sector"] == "health"
+    assert relabel_sector(reg, "greenhouse", "CentriaAutism", "behavioral_health")   # case is not the point
+    assert reg["greenhouse"]["centriaautism"]["sector"] == "behavioral_health"
+    assert not relabel_sector(reg, "greenhouse", "centriaautism", "behavioral_health")  # nothing to do
+    assert not relabel_sector(reg, "greenhouse", "never-heard-of-it", "health")
+
+
+def test_behavioral_health_employer_tags_psychology():
+    # Eliot's three real openings in Lexington: a title rule cannot read any of them, and the
+    # cluster they belong to had nothing in the baseline states before the sector existed.
+    co = {"name": "Eliot Community Human Services", "ats_token": "x", "sector": "behavioral_health"}
+    item = lambda title: normalize(board_item(co, source="greenhouse", title=title,
+                                              locations=["Lexington, MA"], url="https://example.com/1",
+                                              employment_type="Intern"))
+    assert item("Bachelor's Level Intern")["field_tags"] == ["psychology"]
+    assert item("Specialty Clinical Intern")["field_tags"] == ["health"]   # a title match still wins
+    assert SECTOR_CLUSTER["behavioral_health"] == "Social sciences"
 
 
 def test_sector_fills_untagged_titles():

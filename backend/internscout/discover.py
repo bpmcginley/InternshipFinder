@@ -132,6 +132,16 @@ def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, s
     return True
 
 
+def relabel_sector(reg: dict, ats: str, token: str, sector: str) -> bool:
+    """Give a board the sector the seed file now says, whatever it was labelled before."""
+    boards = reg.get(ats) or {}
+    key = {t.lower(): t for t in boards}.get(token.lower())
+    if not key or boards[key].get("sector") == sector:
+        return False
+    boards[key]["sector"] = sector
+    return True
+
+
 def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
@@ -141,6 +151,8 @@ def seed_registry(reg: dict) -> int:
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
                            co.get("sector"))
+            if co.get("sector"):
+                relabel_sector(reg, ats.lower(), co["ats_token"], co["sector"])
     return n
 
 
