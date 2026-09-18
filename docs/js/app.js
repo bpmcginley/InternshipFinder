@@ -712,6 +712,7 @@
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
           h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
+          h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
           signInBtn)));
   }
 
