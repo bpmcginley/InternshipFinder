@@ -65,6 +65,13 @@ def test_ats_of():
     assert ats_of("https://boards.greenhouse.io/janestreet/jobs/123") == ("greenhouse", "janestreet")
     assert ats_of("https://job-boards.greenhouse.io/point72/jobs/9") == ("greenhouse", "point72")
     assert ats_of("https://jobs.lever.co/palantir/abc-123/apply") == ("lever", "palantir")
+    # a EU-hosted board is a different API host, so the region is kept in the token
+    assert ats_of("https://jobs.eu.lever.co/cirrus/645ceaf8/apply") == ("lever", "cirrus|eu")
+    # ...but Greenhouse serves its EU boards from the same API, so the token is unchanged
+    assert ats_of("https://job-boards.eu.greenhouse.io/veeamsoftware/jobs/4952609101") == \
+        ("greenhouse", "veeamsoftware")
+    # Rippling puts a locale in front of the board slug on some links
+    assert ats_of("https://ats.rippling.com/en-GB/neosigma/jobs/a2ee1d26") == ("rippling", "neosigma")
     assert ats_of("https://jobs.ashbyhq.com/ramp/1234") == ("ashby", "ramp")
     assert ats_of("https://modernatx.wd1.myworkdayjobs.com/en-US/M_tx/job/Cambridge/Intern_R1") == \
         ("workday", "modernatx|wd1|M_tx")

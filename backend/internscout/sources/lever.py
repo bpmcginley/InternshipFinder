@@ -1,10 +1,21 @@
-"""Lever public postings API."""
+"""Lever public postings API.
+
+Token: the board slug, e.g. "palantir". A board hosted in Lever's EU region carries the region
+after a pipe - "cirrus|eu" - because api.lever.co answers 404 for those and api.eu.lever.co
+serves them. Plenty of EU-hosted boards advertise US internships, so they are worth reading.
+"""
 from __future__ import annotations
 from .base import client
 from .common import board_item
 from ..classify import is_internship
 
-URL = "https://api.lever.co/v0/postings/{token}?mode=json"
+URL = "https://api.{region}lever.co/v0/postings/{slug}?mode=json"
+
+
+def url_of(token: str) -> str:
+    """'palantir' -> the US API; 'cirrus|eu' -> the EU one."""
+    slug, _, region = token.partition("|")
+    return URL.format(region=f"{region.lower()}." if region else "", slug=slug)
 
 
 def parse_lever(payload: list, co: dict) -> list[dict]:
@@ -27,7 +38,7 @@ def parse_lever(payload: list, co: dict) -> list[dict]:
 
 
 def fetch_lever_board(c, co: dict) -> list[dict]:
-    resp = c.get(URL.format(token=co["ats_token"]))
+    resp = c.get(url_of(co["ats_token"]))
     resp.raise_for_status()
     return parse_lever(resp.json(), co)
 

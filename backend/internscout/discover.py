@@ -16,9 +16,14 @@ REGISTRY_PATH = os.path.join(DATA_DIR, "ats_registry.json")
 MAX_FAILS = 4  # consecutive failed runs before a board is dropped
 
 PATTERNS = [
-    ("greenhouse", re.compile(r"(?:boards|job-boards)\.greenhouse\.io/(?:embed/job_app\?for=)?([A-Za-z0-9_-]+)", re.I)),
+    # job-boards.eu.greenhouse.io is a European employer's board; boards-api.greenhouse.io still
+    # serves it, so widening the host is all that is needed and nothing downstream changes.
+    ("greenhouse", re.compile(r"(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/"
+                              r"(?:embed/job_app\?for=)?([A-Za-z0-9_-]+)", re.I)),
     ("greenhouse", re.compile(r"boards-api\.greenhouse\.io/v1/boards/([A-Za-z0-9_-]+)", re.I)),
-    ("lever", re.compile(r"jobs\.lever\.co/([A-Za-z0-9_.-]+)", re.I)),
+    # Unlike Greenhouse, Lever's EU boards are not on api.lever.co - it 404s for them - so the
+    # region rides in the token ("cirrus|eu") and lever.py picks its API host from that.
+    ("lever", re.compile(r"jobs\.(?:(?P<r>eu)\.)?lever\.co/(?P<t>[A-Za-z0-9_.-]+)", re.I)),
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/([A-Za-z0-9_.%-]+)", re.I)),
     ("workday", re.compile(r"https?://(?P<t>[a-z0-9-]+)\.(?P<wd>wd\d+)\.myworkdayjobs\.com/"
                           r"(?:[a-z]{2}-[A-Z]{2}/)?(?P<s>[A-Za-z0-9_-]+)", re.I)),
@@ -30,7 +35,8 @@ PATTERNS = [
     ("workable", re.compile(r"apply\.workable\.com/([A-Za-z0-9_-]+)", re.I)),
     ("recruitee", re.compile(r"https?://([a-z0-9-]+)\.recruitee\.com", re.I)),
     ("bamboohr", re.compile(r"https?://([a-z0-9-]+)\.bamboohr\.com/(?:careers|jobs)", re.I)),
-    ("rippling", re.compile(r"ats\.rippling\.com/(?:embed/)?([A-Za-z0-9_-]+)/jobs", re.I)),
+    ("rippling", re.compile(r"ats\.rippling\.com/(?:embed/)?(?:[a-z]{2}-[A-Z]{2}/)?"
+                            r"([A-Za-z0-9_-]+)/jobs", re.I)),
     ("oracle", re.compile(r"https?://([a-z0-9-]+\.fa(?:\.[a-z0-9]+)?\.oraclecloud\.com)/hcmUI/CandidateExperience/"
                           r"[a-z]{2}(?:-[A-Za-z]{2})?/sites/([A-Za-z0-9_]+)", re.I)),
     ("taleo", re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I)),
@@ -56,16 +62,21 @@ def ats_of(url: str | None) -> tuple[str, str | None]:
     for ats, pat in PATTERNS:
         m = pat.search(url)
         if m:
-            token = "|".join(m.groups())
-            # The last group is the part that names the board, except on Workday, where it is the
-            # career site's name - and that is legitimately a plain word: careers, search, External.
-            # Checking it against _BAD_TOKENS threw away every Workday board whose site is named
-            # after what it is, which is most of them. There the tenant is what has to look real.
-            check = m.group("t") if ats == "workday" else m.groups()[-1]
+            # Only meaningful for the single-group patterns; every multi-group ats rebuilds its
+            # token below. Optional groups can be None, hence the filter rather than a plain join.
+            token = "|".join(g for g in m.groups() if g)
+            # The last group is the part that names the board, except where a pattern captures
+            # something else after it. On Workday that is the career site's name, which is
+            # legitimately a plain word - careers, search, External - and checking it against
+            # _BAD_TOKENS threw away most Workday boards there are. On Lever it is the region.
+            # In both cases the tenant is the part that has to look real.
+            check = m.group("t") if ats in ("workday", "lever") else m.groups()[-1]
             if check.lower() in _BAD_TOKENS:
                 continue
             if ats == "workday":
                 token = f"{m.group('t').lower()}|{m.group('wd').lower()}|{m.group('s')}"
+            elif ats == "lever":
+                token = m.group("t") + ("|" + m.group("r").lower() if m.group("r") else "")
             elif ats == "taleo":
                 token = f"{m.group(1).lower()}|{m.group(2)}"
             elif ats == "adp":
