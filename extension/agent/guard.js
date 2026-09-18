@@ -278,9 +278,22 @@
     }
     return false;
   };
+  // closest() stops dead at a shadow boundary and dom.js collects buttons straight through them, so
+  // the way out of a shadow root has to be walked by hand. This is not hypothetical: #usercentrics-root
+  // is already named in the list above, and Usercentrics draws its whole banner inside that host's
+  // shadow root. Without this, the one consent manager we name that uses shadow DOM is the one the
+  // check cannot see into, and its "Accept all" would reach the model like any ordinary button.
+  const up = (n) => (n && n.parentElement) || (n && n.getRootNode && n.getRootNode().host) || null;
+  const closestDeep = (n) => {
+    for (let c = n; c; c = up(c)) {
+      const hit = c.closest && c.closest(CONSENT_SEL);
+      if (hit) return hit;
+    }
+    return null;
+  };
   const consentWidget = (el) => {
-    let w = el && el.closest && el.closest(CONSENT_SEL);
-    while (w && w.parentElement && w.parentElement.closest(CONSENT_SEL)) w = w.parentElement.closest(CONSENT_SEL);
+    let w = el && closestDeep(el);
+    while (w && up(w) && closestDeep(up(w))) w = closestDeep(up(w));
     if (!w || w.tagName === "BODY" || w.tagName === "HTML") return null;
     // Only a box someone can actually type in counts. OneTrust keeps its preference centre in the same
     // root as the banner, and that centre holds a vendor-search box: hidden until the centre is opened,

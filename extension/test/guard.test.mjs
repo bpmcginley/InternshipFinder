@@ -298,6 +298,16 @@ test("on a cookie banner, only the choices that keep the default are offered", (
   assert.equal(G.consentGiveaway(inside("BODY", false), "Accept All Cookies"), false);
   assert.equal(G.consentGiveaway(inside("DIV", true), "Accept All Cookies"), false);
 
+  // A banner drawn inside a shadow root. closest() stops at the boundary and answers null, but
+  // dom.js finds the button through it all the same, so the way out is the root's host. Usercentrics
+  // is built exactly this way, and it is one of the widgets named in the selector.
+  const host = { closest: () => ({ tagName: "DIV", querySelectorAll: () => [] }) };
+  const inShadow = { closest: () => null, getRootNode: () => ({ host }) };
+  assert.equal(G.consentGiveaway(inShadow, "Accept All Cookies"), true);
+  assert.equal(G.consentGiveaway(inShadow, "Reject All"), false);
+  // Still nothing when the shadow root leads nowhere near a banner.
+  assert.equal(G.consentGiveaway({ closest: () => null, getRootNode: () => ({}) }, "Accept All Cookies"), false);
+
   // A stack of boxes from the button up; the fixed one is the banner. JazzHR's buttons sit two
   // levels under #tracking-consent-banner, in a container laid out normally, so asking only about
   // the button's nearest consent-named box would have missed the overlay.
