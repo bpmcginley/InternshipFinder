@@ -317,6 +317,12 @@ export function postingGone(job, snap, frames) {
 // it. Nothing to fill and no way forward is not a page worth thinking about.
 const FORWARD_RE = /appl|start|begin|continue|next|proceed|submit|sign ?(in|up)|log ?in|register|create|upload|autofill|r[eé]sum[eé]|interested/i;
 
+// A rough measure of how much page there is, used only to tell "still arriving" from "this is all
+// there is". It does not matter what the number means, only whether it is still changing.
+export function pageBulk(frames) {
+  return frames.reduce((n, f) => n + (f.elements || []).length + (f.buttons || []).length + String(f.text || "").length, 0);
+}
+
 export function deadPage(frames) {
   return frames.length > 0
     && !frames.some((f) => (f.elements || []).length)
@@ -473,7 +479,17 @@ async function loop(id) {
     // every test for a live application - so a real posting was being handed back to the student as a
     // dead one. Waiting costs a few seconds on links that really are dead; not waiting cost the
     // application.
-    for (let i = 0; i < 4 && (deadPage(frames) || (!frames.some((f) => f.elements.length) && frames.some((f) => f.busy))); i++) {
+    // How long to wait is the page's business, not ours. A fixed number of seconds is either too
+    // short for Workable, whose application form took half a minute to arrive on a cold cache, or too
+    // long for every dead link. So watch whether the page is still arriving - more elements, more
+    // buttons, more text than the look before - and keep waiting while it is. A page that has stopped
+    // growing twice over has nothing more to show, and by then we have waited about six seconds.
+    for (let i = 0, was = -1, still = 0; i < 12
+      && (deadPage(frames) || (!frames.some((f) => f.elements.length) && frames.some((f) => f.busy))); i++) {
+      const now = pageBulk(frames);
+      still = now === was ? still + 1 : 0;
+      was = now;
+      if (i >= 3 && still >= 2) break;
       await sleep(i ? 2000 : 2500);
       await inject(tabId);
       frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));

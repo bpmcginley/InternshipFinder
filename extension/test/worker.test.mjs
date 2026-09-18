@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
-import { postingGone, deadPage, pageGone, noChange, toPage, FROZEN_PAGE } from "../background/agent.js";
+import { postingGone, deadPage, pageGone, noChange, toPage, pageBulk, FROZEN_PAGE } from "../background/agent.js";
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (payload) => `${b64url({ alg: "RS256" })}.${b64url(payload)}.sig`;
@@ -304,6 +304,27 @@ test("a page with nothing to fill and no way forward is not sent to the model", 
   // sure needs a second look a few seconds later, which is why runJob waits on this whole condition
   // and not merely on a frame with nothing in it at all.
   assert.equal(deadPage([f({ buttons: [{ text: "Cookie settings" }, { text: "Help" }, { text: "View all jobs" }] })]), true);
+});
+
+// The wait above only ends early when the page has stopped growing, so the measure of "how much page
+// is there" has to move when the page does and hold still when it does not.
+test("a page still arriving can be told from a page that is all there", () => {
+  const f = (o) => ({ elements: [], buttons: [], text: "", ...o });
+
+  // Workable, three looks apart: furniture, then the job, then the form.
+  const a = [f({ buttons: [{ text: "Cookie settings" }], text: "x".repeat(204) })];
+  const b = [f({ buttons: [{ text: "Cookie settings" }], text: "x".repeat(5765) })];
+  const c = [f({ elements: [{ ref: "e1" }, { ref: "e2" }], buttons: [{ text: "Submit application" }] })];
+  assert.notEqual(pageBulk(a), pageBulk(b));
+  assert.notEqual(pageBulk(b), pageBulk(c));
+
+  // ADP's cookie wall, twice: the same page both times, so the wait can stop.
+  const dead = [f({ buttons: [{ text: "Close" }], text: "We use cookies" })];
+  assert.equal(pageBulk(dead), pageBulk([f({ buttons: [{ text: "Close" }], text: "We use cookies" })]));
+
+  // Missing fields are counted as nothing rather than throwing.
+  assert.equal(pageBulk([{}]), 0);
+  assert.equal(pageBulk([]), 0);
 });
 
 // A click the page never answered. Qorvo draws "Apply now" as a dropdown whose menu is bound by a

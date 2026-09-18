@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 13; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 14; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -92,6 +92,22 @@
         if (scope.contains(l) || l.contains(scope)) continue;
         const t = txt(l);
         if (useful(t) && t.length < 400) return t;
+      }
+    }
+    // Workable captions its upload with a bare <strong>Resume</strong> inside a <span>: not a label,
+    // not a legend, not a heading, so the walk above goes straight past it and the one file box on the
+    // page arrives with no name at all. That box is required on every Workable application, and an
+    // unnamed one cannot be recognised as the résumé slot, so the file the student already gave us was
+    // left for the model to attach a turn later. Look again for a short caption in plain bold or a
+    // span - but only here, after every proper label has had its chance, so a real <label> never loses
+    // to a bold word, and only for a field that was going to arrive unnamed regardless.
+    let q = scope.parentElement;
+    for (let i = 0; i < depth && q && q !== document.body; i++, q = q.parentElement) {
+      if (otherFieldIn(q, scope)) break;
+      for (const l of q.querySelectorAll("strong, b, span")) {
+        if (scope.contains(l) || l.contains(scope) || l.querySelector("input, select, textarea, button")) continue;
+        const t = txt(l);
+        if (useful(t) && t.length < 60) return t;
       }
     }
     return norm(el.getAttribute("placeholder") || aria || el.getAttribute("name") || el.id || "");
