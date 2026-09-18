@@ -1,6 +1,6 @@
 // Service worker entry: message router, scheduler (max N tabs), notifications, submit detection.
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs } from "./queue.js";
-import { runJob, resumeJob, isRunning, checkSubmitted } from "./agent.js";
+import { runJob, resumeJob, isRunning, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
 import { getToken, authStatus, signIn, signOut, ensureToken, getMe } from "../lib/auth.js";
 import { spend } from "../lib/usage.js";
@@ -288,6 +288,17 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId }) => {
   if (j.status === "ready_to_submit" || j.status === "needs_you") {
     chrome.scripting.executeScript({ target: { tabId }, files: ["agent/guard.js", "agent/overlay.js"] }).catch(() => {});
   }
+});
+
+// A run paused only because its tab went to sleep in the background needs nothing from the student
+// but the tab itself. Bringing it to the front is the answer, so resume then rather than making them
+// also press Resume. The short wait lets the page draw a frame before the next snapshot.
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  const j = await jobForTab(tabId);
+  // Matched on the opening sentence, so jobs paused under the older wording of this message count too.
+  const asleep = (r) => String(r || "").split(".")[0] === BACKGROUND_TAB_HELP.split(".")[0];
+  if (!j || j.status !== "needs_you" || !asleep(j.reason)) return;
+  setTimeout(() => control(j.id, "resume"), 800);
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {

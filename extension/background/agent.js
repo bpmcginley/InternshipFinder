@@ -249,8 +249,10 @@ const GATE_HELP = {
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
   captcha: "The site wants you to prove you're human. Solve the check in the tab, then press Resume.",
   human_check: "This form asks a question meant to prove a person is applying, not a program. Answer that one yourself in the tab, then press Resume.",
-  background_tab: "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing. Bring the application tab back to the front, then press Resume.",
+  background_tab: "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing. Bring the application tab back to the front and it carries on by itself (or press Resume).",
 };
+// index.js resumes a job paused for this reason by itself once its tab is brought to the front.
+export const BACKGROUND_TAB_HELP = GATE_HELP.background_tab;
 
 // A posting that has been filled or pulled almost never 404s. Breezy, Lever and Greenhouse all
 // bounce the student to the company's list of other openings instead, and the run would then be
