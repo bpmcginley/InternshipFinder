@@ -2836,10 +2836,11 @@
    "added": "2026-09-13"
   },
   "baltimoreorioles": {
-   "name": "Major League Baseball",
+   "name": "Baltimore Orioles",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "bamboohr17": {
    "name": "BambooHR",
@@ -3570,7 +3571,8 @@
    "name": "Excel Sports Management",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "exoduspoint": {
    "name": "ExodusPoint",
@@ -3764,6 +3766,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "fourseasons": {
+   "name": "Four Seasons",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "freeformfuturecorp": {
    "name": "Freeform",
@@ -4836,6 +4845,13 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "octagon": {
+   "name": "Octagon",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
+  },
   "octaura": {
    "name": "Octaura",
    "quant": false,
@@ -5028,10 +5044,11 @@
    "added": "2026-09-13"
   },
   "philliesbaseballoperations": {
-   "name": "Major League Baseball",
+   "name": "Philadelphia Phillies",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "phoenixcontact": {
    "name": "Phoenix Contact",
@@ -6181,7 +6198,8 @@
    "name": "World Surf League",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "wpp": {
    "name": "WPP",
@@ -7000,7 +7018,8 @@
    "name": "United States Tennis Association",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-15"
+   "added": "2026-09-15",
+   "sector": "hospitality_sports"
   },
   "careers-usu": {
    "name": "Utah State University",
@@ -7122,7 +7141,8 @@
    "name": "Highgate",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-15"
+   "added": "2026-09-15",
+   "sector": "hospitality_sports"
   },
   "gsk-us-earlytalent": {
    "name": "GSK",
@@ -8871,10 +8891,11 @@
    "added": "2026-09-13"
   },
   "redsox": {
-   "name": "Major League Baseball",
+   "name": "Boston Red Sox",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "redwoodcu": {
    "name": "Redwood Credit Union",
@@ -8946,7 +8967,8 @@
    "name": "SF Giants",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "shieldai": {
    "name": "Shield AI",
@@ -9642,7 +9664,7 @@
   "fa-ertb-saasfaprod1.fa.ocs.oraclecloud.com|CX_2": {
    "name": "Photon",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-14"
   },
   "fa-esgu-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
@@ -9678,7 +9700,7 @@
   "fa-etqo-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "HEXAWARE",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-14"
   },
   "fa-etum-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
@@ -11279,12 +11301,26 @@
    "added": "2026-09-18",
    "sector": "retail_consumer"
   },
+  "careers.underarmour.com": {
+   "name": "Under Armour",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
+  },
   "careers.westinghousenuclear.com": {
    "name": "Westinghouse Electric Company",
    "quant": false,
    "fails": 0,
    "added": "2026-09-18",
    "sector": "energy_environment"
+  },
+  "careers.wyndhamhotels.com": {
+   "name": "Wyndham Hotels & Resorts",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "corningjobs.corning.com": {
    "name": "Corning",
@@ -11348,6 +11384,13 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
+  },
+  "jobs.royalcaribbeangroup.com": {
+   "name": "Royal Caribbean Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "jobs.ulalaunch.com": {
    "name": "United Launch Alliance",
@@ -11988,7 +12031,8 @@
    "name": "Acushnet Holdings",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "acxiomllc|wd5|AcxiomUSA": {
    "name": "Acxiom",
@@ -12436,7 +12480,8 @@
    "name": "ASM Global",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "asml|wd3|asmlext1": {
    "name": "ASML",
@@ -13551,7 +13596,8 @@
    "name": "Choice Hotels",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-18"
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "chrobinson|wd5|CHRobinson": {
    "name": "C.H. Robinson",
@@ -15999,6 +16045,13 @@
    "added": "2026-09-13",
    "sector": "education_research"
   },
+  "lifetime|wd1|lifetime": {
+   "name": "Life Time",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
+  },
   "lighting|wd3|jobs-and-careers": {
    "name": "Signify",
    "quant": false,
@@ -16039,7 +16092,8 @@
    "name": "Live Nation Entertainment",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-15"
+   "added": "2026-09-15",
+   "sector": "hospitality_sports"
   },
   "livenation|wd503|TMExternalSite": {
    "name": "Ticketmaster",
@@ -16071,6 +16125,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "loewshotels|wd5|loewshotels": {
+   "name": "Loews Hotels",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "logitech|wd5|Logitech": {
    "name": "Logitech",
@@ -16484,7 +16545,8 @@
    "name": "Maple Leaf Sports & Entertainment Partnership (MLSE)",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "mmc|wd1|mmc": {
    "name": "Marsh",
@@ -16504,6 +16566,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "mohegan|wd1|Mohegan": {
+   "name": "Mohegan",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "momentive|wd1|MC": {
    "name": "Momentive",
@@ -16631,7 +16700,8 @@
    "name": "Marriott Vacations Worldwide",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-15"
+   "added": "2026-09-15",
+   "sector": "hospitality_sports"
   },
   "myview|wd3|paradox_careers": {
    "name": "Loblaw Companies",
@@ -17156,7 +17226,7 @@
   "pennant|wd1|PennantServicesCareerSite": {
    "name": "Pennant Group",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "pentair|wd5|pentair_careers": {
@@ -17191,6 +17261,13 @@
    "fails": 0,
    "added": "2026-09-16",
    "sector": "health"
+  },
+  "pgatour|wd5|PGATOURExternal": {
+   "name": "PGA TOUR",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "pg|wd5|1000": {
    "name": "Procter & Gamble (P&G)",
@@ -17466,7 +17543,8 @@
    "name": "Texas Rangers",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "raymondjames|wd1|RaymondJamesEarlyCareers": {
    "name": "Raymond James Financial",
@@ -17918,6 +17996,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "seminolehardrock|wd503|seminolehardrockcareers": {
+   "name": "Seminole Hard Rock",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "semtech|wd1|SemtechCareers": {
    "name": "Semtech",
@@ -19408,17 +19493,26 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "wwecorp|wd5|IMG": {
+   "name": "IMG",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
+  },
   "wwecorp|wd5|tko": {
    "name": "TKO Group Holdings, Inc",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-18"
+   "added": "2026-09-18",
+   "sector": "hospitality_sports"
   },
   "wwecorp|wd5|wwecorp": {
    "name": "WWE",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13"
+   "added": "2026-09-13",
+   "sector": "hospitality_sports"
   },
   "xcelenergy|wd1|External": {
    "name": "Xcel Energy",
