@@ -107,3 +107,21 @@ def test_dead_adp_link_is_dropped():
     assert normalize({**base, "apply_url": adp + "?cid=89da4960&ccId=19000101_000001&jobId=565843"})
     # And nothing else on ADP is touched.
     assert normalize({**base, "apply_url": "https://workforcenow.adp.com/jobs/apply/posting.html?client=acme"})
+
+
+def test_a_run_that_reports_no_date_does_not_erase_the_one_we_have():
+    # iCIMS, Rippling and BambooHR only learn a posted date on a per-job detail call, and those
+    # calls are capped per board. The upsert wrote every run straight over the top, so a posting
+    # that was dated on the run that fetched its detail went back to undated on the next one.
+    from internscout.db import SessionLocal
+    from internscout.models import Listing
+    item = dict(company_name="Datewise", title="Software Engineer Intern - Summer 2027",
+                locations=["Boston, MA"], source="workday", active=True,
+                url="https://datewise.wd1.myworkdayjobs.com/careers/job/Boston/R9",
+                apply_url="https://datewise.wd1.myworkdayjobs.com/careers/job/Boston/R9")
+    run([dict(item, posted_at="2026-08-07T00:00:00+00:00")])
+    run([dict(item)])
+    with SessionLocal() as db:
+        row = db.query(Listing).filter(Listing.company_name == "Datewise").one()
+        assert row.posted_at is not None
+        assert row.posted_at.date().isoformat() == "2026-08-07"

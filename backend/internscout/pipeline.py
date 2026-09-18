@@ -86,7 +86,10 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.salary = it.get("salary")
             row.duration = it.get("duration")
             row.apply_url = it["apply_url"]
-            row.posted_at = it["posted_at"]
+            # Keep a date we already have when this run did not come with one. iCIMS, Rippling
+            # and BambooHR only learn the date on a per-job detail call and those are capped
+            # per board, so the same posting arrives dated on one run and undated on the next.
+            row.posted_at = it["posted_at"] or row.posted_at
             row.last_seen = now
             row.status = "open" if it.get("active", True) else "closed"
             row.score_parts = score_parts(

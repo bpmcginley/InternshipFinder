@@ -5,6 +5,8 @@ second domain, where the tenant is a path segment rather than a subdomain; those
 that domain in the middle field: "wf|wd1.myworkdaysite.com|WellsFargoJobs".
 """
 from __future__ import annotations
+import re
+from datetime import datetime, timedelta, timezone
 from .common import board_item, html_to_text
 from ..classify import is_internship
 from ..region import maybe_in_region
@@ -25,6 +27,35 @@ def host_of(token: str) -> tuple[str, str, str]:
 def page_base(host: str, tenant: str, site: str) -> str:
     """Where a student's link points. The two domains lay the path out differently."""
     return f"{host}/recruiting/{tenant}/{site}" if "myworkdaysite" in host else f"{host}/{site}"
+
+
+_POSTED_RE = re.compile(r"posted\s+(?:(today)|(yesterday)|(\d{1,4})(\+?)\s+days?\s+ago)", re.I)
+
+
+def parse_posted_on(text: str | None, today=None) -> str | None:
+    """The date behind Workday's "Posted 18 Days Ago", or None when the board only gives a floor.
+
+    Every posting in the list payload carries this string and we were dropping it, so 79% of the
+    Workday listings in the last export had no posted date - the largest metadata gap in the corpus,
+    and Workday is a third of it. Across 153 live postings the board said "N Days Ago" or
+    "Yesterday" for 84% of them, which is an exact date.
+
+    The rest say "30+ Days Ago", which is a floor and not a date: the posting is at least 30 days
+    old and may be a year old. A stored date is printed on the card as "Posted Aug 19" and recomputed
+    on the next run, where a floor would slide forward a day at a time and the job would look
+    permanently a month old. No date is honest about what the board told us; a wrong one is not.
+    """
+    m = _POSTED_RE.search(text or "")
+    if not m:
+        return None
+    day = today or datetime.now(timezone.utc).date()
+    if m.group(1):
+        return day.isoformat()
+    if m.group(2):
+        return (day - timedelta(days=1)).isoformat()
+    if m.group(4):
+        return None
+    return (day - timedelta(days=int(m.group(3)))).isoformat()
 
 
 def parse_workday_list(payload: dict) -> list[dict]:
@@ -71,5 +102,6 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                 pass
         out.append(board_item(co, source="workday", title=p.get("title", ""), locations=locs,
                               url=url, description=desc,
+                              posted_at=parse_posted_on(p.get("postedOn")),
                               employment_type=" ".join(p.get("bulletFields") or [])))
     return out

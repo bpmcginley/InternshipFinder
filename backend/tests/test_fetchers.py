@@ -2,7 +2,8 @@
 from internscout.sources.greenhouse import parse_greenhouse
 from internscout.sources.lever import parse_lever
 from internscout.sources.ashby import parse_ashby
-from internscout.sources.workday import parse_workday_list, parse_workday_detail, host_of
+from internscout.sources.workday import (parse_workday_list, parse_workday_detail,
+                                         parse_posted_on, host_of)
 from internscout.sources.smartrecruiters import parse_smartrecruiters, parse_smartrecruiters_detail
 from internscout.sources.workable import parse_workable
 from internscout.sources.recruitee import parse_recruitee
@@ -66,6 +67,20 @@ def test_workday():
     locs, desc = parse_workday_detail({"jobPostingInfo": {
         "location": "Cambridge, MA", "additionalLocations": ["Norwood, MA"], "jobDescription": "<p>Hi &amp; bye</p>"}})
     assert locs == ["Cambridge, MA", "Norwood, MA"] and desc == "Hi & bye"
+
+
+def test_workday_says_when_it_posted_a_job():
+    from datetime import date
+    day = date(2026, 9, 18)
+    assert parse_posted_on("Posted Today", day) == "2026-09-18"
+    assert parse_posted_on("Posted Yesterday", day) == "2026-09-17"
+    assert parse_posted_on("Posted 1 Day Ago", day) == "2026-09-17"
+    assert parse_posted_on("Posted 18 Days Ago", day) == "2026-08-31"
+    # "30+ Days Ago" is a floor, not a date, and the card prints the date we store.
+    assert parse_posted_on("Posted 30+ Days Ago", day) is None
+    assert parse_posted_on("", day) is None
+    assert parse_posted_on(None, day) is None
+    assert parse_posted_on("Posted 4 Months Ago", day) is None
 
 
 def test_smartrecruiters():
