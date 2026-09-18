@@ -8,7 +8,7 @@ from internscout.sources.workable import parse_workable
 from internscout.sources.recruitee import parse_recruitee
 from internscout.sources.bamboohr import parse_bamboohr
 from internscout.sources.rippling import parse_rippling
-from internscout.sources.oracle import parse_oracle
+from internscout.sources.oracle import parse_oracle, parse_oracle_detail
 from internscout.sources.taleo import parse_taleo
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
@@ -152,6 +152,25 @@ def test_oracle():
     ]}]}, CO, "acme.fa.oraclecloud.com", "CX_1")
     assert total == 1 and items[0]["locations"] == ["New York", "Boston"]
     assert items[0]["url"] == "https://acme.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/REQ1"
+    # The requisition id has to survive the parse, or the detail call has nothing to ask for.
+    assert items[0]["_req_id"] == "REQ1"
+
+
+def test_oracle_detail():
+    # Advert order, and CorporateDescriptionStr left out: it is the same employer boilerplate on
+    # every requisition, so keeping it would spend the 4,000-char budget on marketing copy.
+    text = parse_oracle_detail({"items": [{
+        "CorporateDescriptionStr": "<p>Acme has been making anvils since 1923.</p>",
+        "ExternalQualificationsStr": "<p>Rising junior &amp; up</p>",
+        "ExternalDescriptionStr": "<p>Design anvils</p>",
+        "ExternalResponsibilitiesStr": "<p>Draw them</p>",
+    }]})
+    assert text == "Design anvils\nDraw them\nRising junior & up"
+
+    # Most tenants leave most of these fields present and empty, and a requisition can be gone by
+    # the time we ask for it, so both have to come back empty rather than raise.
+    assert parse_oracle_detail({"items": [{"ExternalDescriptionStr": None}]}) == ""
+    assert parse_oracle_detail({}) == ""
 
 
 def test_simplify_terms():
