@@ -430,7 +430,10 @@
   // "Auto-Apply runs: 15 of 15 left" lines plus the tier, for a tooltip.
   function allowanceText(me) {
     if (!me || !me.allowance) return "";
-    const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
+    // limit null = no monthly cap on that task (the Deep Dive)
+    const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => me.allowance[k].limit == null
+      ? `${ALLOWANCE_LABELS[k]}: unlimited`
+      : `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
     lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
     if (me.plan && me.plan !== "free") lines.push((PLAN_LABELS[me.plan] || me.plan) + " plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
     if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");

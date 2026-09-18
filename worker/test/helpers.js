@@ -142,6 +142,11 @@ export function fakeFetch(jwks, gemini = geminiReply, stripe = stripeReply) {
   return fn;
 }
 
+// The Deep Dive has no monthly cap (allowance null), but the cap tests were written against its old
+// allowance of 2 a month, and they test the cap machinery rather than the Deep Dive. Passing this as
+// `config` gives it that cap back for one test.
+export const CAPPED_DEEP_DIVE = { TASKS: { ...CONFIG.TASKS, deep_dive: { ...CONFIG.TASKS.deep_dive, allowance: 2 } } };
+
 // A Worker plus helpers: api(method, path, {token, body, headers}) and token(claimOverrides)
 export async function setup({ env = {}, config = {}, gemini, stripe, now = NOW } = {}) {
   clearJwksCache();

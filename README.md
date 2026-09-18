@@ -55,9 +55,9 @@ so each signed-in user gets a monthly allowance. Current limits (they may change
 
 | Feature | School .edu account | Other accounts |
 |---|---|---|
-| Tailored resumes | 8 | 4 |
-| Auto-Apply runs | 15 | 7 |
-| Deep Dives | 2 | 1 |
+| Tailored resumes | 10 | 5 |
+| Auto-Apply runs | 20 | 10 |
+| Deep Dives | no limit | no limit |
 
 There are also small limits on how fast you can make AI calls. The extension and dashboard show
 what you have left. Allowances reset on the 1st of each month.

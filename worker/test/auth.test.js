@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CLIENT, MS_CLIENT, NOW, googleClaims, makeKeys, setup, signJwt, aiBody } from "./helpers.js";
+import { CAPPED_DEEP_DIVE, CLIENT, MS_CLIENT, NOW, googleClaims, makeKeys, setup, signJwt, aiBody } from "./helpers.js";
 import { tierOf, userHash } from "../src/auth.js";
 
 const errorOf = async (res) => (await res.json()).error;
@@ -25,7 +25,8 @@ test("verified .edu Google account -> edu tier, full allowance", async () => {
   assert.equal(status, 200);
   assert.equal(body.month, "2026-09");
   assert.equal(body.tier, "edu");
-  assert.deepEqual(body.allowance.deep_dive, { used: 0, limit: 2 });
+  assert.deepEqual(body.allowance.deep_dive, { used: 0, limit: null });   // uncapped since 2026-09-18
+  assert.deepEqual(body.allowance.resume_tailor, { used: 0, limit: 10 });
 });
 
 test("personal Gmail signs in with the general tier (half, min 1)", async () => {
@@ -35,7 +36,7 @@ test("personal Gmail signs in with the general tier (half, min 1)", async () => 
   assert.equal(body.tier, "general");
   assert.equal(body.allowance.resume_tailor.limit, 5);
   assert.equal(body.allowance.autofill.limit, 10);
-  assert.equal(body.allowance.deep_dive.limit, 1);
+  assert.equal(body.allowance.deep_dive.limit, null);
   assert.equal(body.allowance.field_match.limit, 130);
 });
 
@@ -52,7 +53,7 @@ test("EDU_EXTRA_DOMAINS counts non-.edu schools, including subdomains", async ()
 });
 
 test("general tier is enforced on /ai", async () => {
-  const w = await setup();
+  const w = await setup({ config: CAPPED_DEEP_DIVE });   // general gets half of 2: one Deep Dive
   const token = await w.token({ email: "someone@gmail.com" });
   assert.equal((await w.api("POST", "/ai", { token, body: aiBody("deep_dive", crypto.randomUUID()) })).status, 200);
   const res = await w.api("POST", "/ai", { token, body: aiBody("deep_dive", crypto.randomUUID()) });

@@ -61,11 +61,14 @@ function tableAllowance(config, task, now) {
 }
 
 // Monthly units for a task: the full table for "edu", GENERAL_ALLOWANCE_PCT of it (min 1) for "general".
+// null when the task has no monthly cap.
 export function allowanceFor(config, env, task, tier, plan = "free", now = new Date()) {
+  const units = tableAllowance(config, task, now);
+  if (units == null) return null;
   const mult = (config.PLANS[plan] || config.PLANS.free).multiplier;
   // Rounded because a multiplier can be fractional: a plan is priced against what AI actually costs,
   // not against whole numbers.
-  const base = Math.round(tableAllowance(config, task, now) * mult);
+  const base = Math.round(units * mult);
   if (tier === "edu") return base;
   const raw = Number(env.GENERAL_ALLOWANCE_PCT);
   const pct = env.GENERAL_ALLOWANCE_PCT !== undefined && env.GENERAL_ALLOWANCE_PCT !== "" && Number.isFinite(raw)
@@ -113,9 +116,10 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   // The client uses `upgrade` to decide whether to mention a paid plan; it never guesses.
   // `upgrade` tells the client whether a bigger plan exists for this student, so it never offers one
   // that is switched off or that they are already on.
-  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: canUpgrade(env, config, plan) });
+  // `tier` lets the client skip "a .edu email gets twice as much" for a student who already has one.
+  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: canUpgrade(env, config, plan), tier });
   if (run && run.calls >= config.MAX_CALLS_PER_RUN) throw cap("This run reached its call limit");
-  if (!run && used >= limit) throw cap(`Monthly ${task} allowance is used up`);
+  if (!run && limit != null && used >= limit) throw cap(`Monthly ${task} allowance is used up`);
 
   const bump = "INSERT INTO rate (user_hash, bucket, calls) VALUES (?, ?, 1) " +
     "ON CONFLICT(user_hash, bucket) DO UPDATE SET calls = calls + 1";
@@ -140,6 +144,7 @@ export async function commitRun(db, user, task, runId, admitted) {
     await db.prepare("UPDATE runs SET calls = calls + 1 WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?")
       .bind(user, month, task, runId).run();
   }
+  if (limit == null) return "unlimited";   // the X-InternScout-Remaining header for an uncapped task
   return Math.max(0, limit - used - (isNew ? 1 : 0));
 }
 

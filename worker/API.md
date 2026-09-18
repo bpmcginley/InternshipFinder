@@ -64,10 +64,10 @@ Every error is JSON `{ "error": code, "message": text }`:
       "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
       "scopes": ["openid", "email", "profile"] } ],
   "allowance": {
-    "edu":       { "resume_tailor": 10, "autofill": 20,  "deep_dive": 2,  "field_match": 260,  "short_answer": 80 },
-    "general":   { "resume_tailor": 5,  "autofill": 10,  "deep_dive": 1,  "field_match": 130,  "short_answer": 40 },
-    "supporter": { "resume_tailor": 25, "autofill": 50,  "deep_dive": 5,  "field_match": 650,  "short_answer": 200 },
-    "pro":       { "resume_tailor": 60, "autofill": 120, "deep_dive": 12, "field_match": 1560, "short_answer": 480 } },
+    "edu":       { "resume_tailor": 10, "autofill": 20,  "deep_dive": null, "field_match": 260,  "short_answer": 80 },
+    "general":   { "resume_tailor": 5,  "autofill": 10,  "deep_dive": null, "field_match": 130,  "short_answer": 40 },
+    "supporter": { "resume_tailor": 25, "autofill": 50,  "deep_dive": null, "field_match": 650,  "short_answer": 200 },
+    "pro":       { "resume_tailor": 60, "autofill": 120, "deep_dive": null, "field_match": 1560, "short_answer": 480 } },
   "payments": { "enabled": false, "plans": [] },
   "paused": false }
 ```

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aiBody, setup } from "./helpers.js";
+import { CAPPED_DEEP_DIVE, aiBody, setup } from "./helpers.js";
 import { FLASH, FLASH_LITE } from "../src/config.js";
 import { GLOBAL_USER } from "../src/limits.js";
 
@@ -8,7 +8,7 @@ const me = async (w, token) => (await w.api("GET", "/me", { token })).json();
 const geminiCalls = (w) => w.fetch.calls.filter((c) => c.url.includes("generativelanguage"));
 
 test("allowance counts distinct (task, run_id) and blocks at the cap", async () => {
-  const w = await setup();
+  const w = await setup({ config: CAPPED_DEEP_DIVE });
   const token = await w.token();
   let res = await w.api("POST", "/ai", { token, body: aiBody("deep_dive", "run-a") });
   assert.equal(res.status, 200);
@@ -256,21 +256,35 @@ test("DELETE /me removes this user's rows only", async () => {
 });
 
 test("Flash allowances halve on 2027-01-01, when Flash doubles in price; Flash-Lite ones do not", async () => {
-  const flashTasks = (a) => [a.autofill, a.resume_tailor, a.deep_dive];
+  // The Deep Dive left this list when its cap was removed (2026-09-18); it stays uncapped on both sides.
+  const flashTasks = (a) => [a.autofill, a.resume_tailor];
   const before = await setup({ now: new Date("2026-12-31T23:00:00Z") });
   let c = await (await before.api("GET", "/config")).json();
-  assert.deepEqual(flashTasks(c.allowance.edu), [20, 10, 2]);
+  assert.deepEqual(flashTasks(c.allowance.edu), [20, 10]);
+  assert.equal(c.allowance.edu.deep_dive, null);
 
   const after = await setup({ now: new Date("2027-01-01T00:30:00Z") });
   c = await (await after.api("GET", "/config")).json();
-  assert.deepEqual(flashTasks(c.allowance.edu), [10, 5, 1]);
-  assert.deepEqual(flashTasks(c.allowance.general), [5, 2, 1]);
+  assert.deepEqual(flashTasks(c.allowance.edu), [10, 5]);
+  assert.deepEqual(flashTasks(c.allowance.general), [5, 2]);
+  assert.equal(c.allowance.edu.deep_dive, null);
   assert.equal(c.allowance.edu.field_match, 260);
   assert.equal(c.allowance.edu.short_answer, 80);
 
-  // and the cap a signed-in student hits is the new one
+  // and the cap a signed-in student hits is the new one (autofill: 10 for .edu from January)
   const token = await after.token();
-  assert.equal((await me(after, token)).allowance.deep_dive.limit, 1);
-  assert.equal((await after.api("POST", "/ai", { token, body: aiBody("deep_dive", "r1") })).status, 200);
-  assert.equal((await after.api("POST", "/ai", { token, body: aiBody("deep_dive", "r2") })).status, 429);
+  assert.equal((await me(after, token)).allowance.autofill.limit, 10);
+  assert.equal((await me(after, token)).allowance.resume_tailor.limit, 5);
+});
+
+test("the Deep Dive has no monthly cap: many runs, one student, never a 429 cap", async () => {
+  const w = await setup();
+  const token = await w.token({ email: "someone@gmail.com" });   // general tier, the smallest allowance
+  for (let i = 0; i < 5; i++) {
+    const res = await w.api("POST", "/ai", { token, body: aiBody("deep_dive", "dd-" + i) });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("X-InternScout-Remaining"), "unlimited");
+  }
+  const a = (await me(w, token)).allowance.deep_dive;
+  assert.deepEqual(a, { used: 5, limit: null });
 });

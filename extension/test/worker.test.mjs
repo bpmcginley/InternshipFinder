@@ -99,6 +99,9 @@ test("error mapping gives clear student-facing messages", () => {
   assert.match(cap.message, /tailored-resume allowance/);
   assert.match(cap.message, /Oct 1/);
   assert.match(cap.message, /own key/);
+  // an .edu student is not told to get an .edu email; a general one is
+  assert.doesNotMatch(workerError(429, { error: "cap", task: "autofill", resets: "2026-10-01", tier: "edu" }).message, /\.edu email/);
+  assert.match(workerError(429, { error: "cap", task: "autofill", resets: "2026-10-01", tier: "general" }).message, /\.edu email/);
   assert.match(workerError(429, { error: "cap", message: "run limit" }).message, /call limit/);
   assert.match(workerError(429, { error: "rate", retry_after: 40 }).message, /40 seconds/);
   assert.match(cap.message, /\.edu email get twice/);
@@ -163,6 +166,9 @@ test("allowance lines from GET /me", () => {
 test("account panel: main tasks only, and a tier note", () => {
   const me = { tier: "edu", paused: false, allowance: { field_match: { used: 0, limit: 200 }, deep_dive: { used: 0, limit: 2 } } };
   assert.deepEqual(allowanceLines(me, MAIN_TASKS), ["Deep Dives: 2 of 2 left"]);
+  // The Deep Dive has no monthly cap now (the Worker sends limit: null), so it reads "unlimited"
+  const uncapped = { ...me, allowance: { deep_dive: { used: 3, limit: null } } };
+  assert.deepEqual(allowanceLines(uncapped, MAIN_TASKS), ["Deep Dives: unlimited"]);
   assert.match(tierNote(me), /School \(\.edu\)/);
   assert.match(tierNote({ ...me, tier: "general", paused: true }), /Standard.*paused/);
   assert.match(tierNote(null), /Couldn't reach/);

@@ -3,7 +3,7 @@
 // apart by the Stripe price the student actually bought.
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { NOW, aiBody, setup } from "./helpers.js";
+import { CAPPED_DEEP_DIVE, NOW, aiBody, setup } from "./helpers.js";
 
 const SECRET = "whsec_test";
 const PAID = { PAYMENTS_ENABLED: "1", STRIPE_SECRET_KEY: "sk_test_1", STRIPE_PRICE_ID: "price_1", STRIPE_WEBHOOK_SECRET: SECRET, SITE_URL: "https://site.test/app" };
@@ -208,7 +208,7 @@ describe("running out", () => {
   // The extension only offers the plan when this flag says it exists, so it must track both the
   // switch and the student's current plan.
   it("tells a free student the cap can be raised, and a supporter that it cannot", async () => {
-    const { api, db, token } = await setup({ env: PAID });
+    const { api, db, token } = await setup({ env: PAID, config: CAPPED_DEEP_DIVE });
     const t = await token();
     let n = 0;
     const spend = async () => {

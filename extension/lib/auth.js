@@ -150,7 +150,9 @@ export function allowanceLines(me, tasks) {
   if (!me || me.error || !me.allowance) return [];
   return Object.entries(me.allowance)
     .filter(([k]) => !tasks || tasks.includes(k))
-    .map(([k, v]) => `${TASK_LABELS[k] || k}: ${Math.max(0, (v.limit || 0) - (v.used || 0))} of ${v.limit || 0} left`);
+    .map(([k, v]) => v.limit == null   // no monthly cap on this task (the Deep Dive)
+      ? `${TASK_LABELS[k] || k}: unlimited`
+      : `${TASK_LABELS[k] || k}: ${Math.max(0, (v.limit || 0) - (v.used || 0))} of ${v.limit || 0} left`);
 }
 
 // The allowances a student acts on; field matches and short answers happen inside those runs.

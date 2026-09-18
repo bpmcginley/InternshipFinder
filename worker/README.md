@@ -83,7 +83,7 @@ with you.
 
 | Plan | Price | Allowance | Cost if fully used | Left over |
 |---|---|---|---|---|
-| Free (.edu) | — | 20 Auto-Apply, 10 resumes, 2 Deep Dives | ~$1.34 | — |
+| Free (.edu) | — | 20 Auto-Apply, 10 resumes; Deep Dives uncapped | ~$1.34 | — |
 | Supporter | $5/month | 2.5× that | ~$3.35 | ~27% of $4.56 net |
 | Pro | $12/month | 6× that | ~$8.04 | ~29% of $11.35 net |
 
@@ -93,8 +93,10 @@ per tailored resume and $0.02 per Deep Dive, minus Stripe's 2.9% + 30¢. A non-.
 half the allowance for the same price, which also costs half as much to serve.
 
 **From 2027-01-01** Gemini 3.8 Flash doubles in price, so `ALLOWANCE_CHANGES` in `src/config.js`
-halves every Flash task that day: free .edu becomes 10 Auto-Apply, 5 resumes, 1 Deep Dive, and the
-paid tiers scale from that (Supporter 25 / 13 / 3, Pro 60 / 30 / 6). Field matching and short answers
+halves every capped Flash task that day: free .edu becomes 10 Auto-Apply, 5 resumes, and the
+paid tiers scale from that (Supporter 25 / 13, Pro 60 / 30). The Deep Dive is a one-off worth a
+few cents, so it has no monthly cap (`allowance: null`); only the rate limits and the budget stop
+bound it. Field matching and short answers
 run on Flash-Lite and keep their allowance. A skipped rules-only application costs no unit, so each
 Auto-Apply unit spent is a run that did call the model, at nearer $0.08 than the $0.06 average; at
 double price the full-use Supporter comes to about $4.38 of AI against $4.56 net. That margin is thin,

@@ -4,22 +4,26 @@
 export const FLASH = "gemini-3.8-flash";
 export const FLASH_LITE = "gemini-3.5-flash-lite";
 
-// Per task: model, output-token ceiling, thinking ceiling, monthly allowance in units (runs)
+// Per task: model, output-token ceiling, thinking ceiling, monthly allowance in units (runs).
+// An allowance of null means no monthly cap: the rate limits and the budget stop still apply.
 export const TASKS = {
   field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 260 },
   short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 80 },
   resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 10 },
   autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 20 },
-  deep_dive:     { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 2 },
+  // The Deep Dive is done once and costs a few cents, so it is not capped (Bruce, 2026-09-18). It used
+  // to be 2 a month, and the first real one ran out after two interview replies because the extension
+  // sent no run_id and every reply counted as its own Deep Dive.
+  deep_dive:     { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: null },
 };
 
 // Allowances that change on a date (UTC), oldest first; the latest `from` on or before today wins.
 // Gemini 3.8 Flash doubles in price on 2027-01-01 (see PRICES), so every Flash task's monthly units
 // halve that day and a full month still costs what it did: a Supporter who uses every unit would
 // otherwise cost ~$8.70 of AI against $4.56 net. Flash-Lite tasks keep their allowance. The plan
-// multipliers apply on top, so the paid tiers halve too.
+// multipliers apply on top, so the paid tiers halve too. The Deep Dive has no cap, so it is not here.
 export const ALLOWANCE_CHANGES = [
-  { from: "2027-01-01", tasks: { resume_tailor: 5, autofill: 10, deep_dive: 1 } },
+  { from: "2027-01-01", tasks: { resume_tailor: 5, autofill: 10 } },
 ];
 
 // Thinking levels each model accepts, lowest first (ai.google.dev/gemini-api/docs/thinking)

@@ -82,7 +82,7 @@ export function emptyStore() {
     accounts: [],      // {domain, email, password, created}
     settings: {
       signup_email: "", password_mode: "unique", master_password: "",
-      max_tabs: 2, onboarded: false, deep_dive_at: null,
+      max_tabs: 2, onboarded: false, deep_dive_at: null, deep_dive_run: null,
       ai_mode: "balanced",       // economy | balanced | best (see PRESETS)
       tailor_resume: "review",   // off | review (you approve each one) | auto
     },

@@ -30,7 +30,15 @@ function save(now) {
 }
 window.addEventListener("beforeunload", () => save(true));
 
-const ai = (opts) => callAI({ ai: S.ai, kind: "deep_dive", ...opts });
+// One Deep Dive is one run to the Worker, however many questions it asks, so every call carries the
+// same run_id: minted on first use, kept across reloads, retired when the Deep Dive is finished so
+// the next one is a new run. Without it each interview reply was its own run, so the per-run call
+// limit never applied and, while the Deep Dive still had a monthly cap, two replies used it up.
+const runId = () => {
+  if (!S.settings.deep_dive_run) { S.settings.deep_dive_run = crypto.randomUUID(); save(); }
+  return S.settings.deep_dive_run;
+};
+const ai = (opts) => callAI({ ai: S.ai, kind: "deep_dive", run_id: runId(), ...opts });
 const M = () => ({ fast: modelFor(S, "fast"), deep: modelFor(S, "deep"), agent: modelFor(S, "interview") });
 const busy = (el, text) => { el.innerHTML = `<span class="spin"></span>${esc(text)}`; };
 
@@ -536,6 +544,7 @@ function review() {
   $("#finishall").addEventListener("click", async () => {
     S.settings.onboarded = true;
     S.settings.deep_dive_at = Date.now();
+    S.settings.deep_dive_run = null;   // the next Deep Dive is a new run
     await save(true);
     render();
     $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://bpmcginley.github.io/InternshipFinder/" target="_blank">Open the internship dashboard ↗</a>`;
