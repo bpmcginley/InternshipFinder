@@ -147,6 +147,44 @@ def relabel_sector(reg: dict, ats: str, token: str, sector: str) -> bool:
     return True
 
 
+def sector_index(reg: dict) -> dict[tuple[str, str], str]:
+    """(ats, token) -> sector for every labelled board, built once so a per-listing lookup is
+    cheap. Boards past MAX_FAILS are included on purpose: a board we have stopped fetching still
+    says who its employer is, and the listing being labelled was found somewhere else anyway."""
+    out = {}
+    for ats, entries in reg.items():
+        for token, entry in entries.items():
+            sector = entry.get("sector") or ("quant_finance" if entry.get("quant") else None)
+            if sector:
+                out[(ats, token.lower())] = sector
+    return out
+
+
+def label_sectors(reg: dict, items: list[dict]) -> int:
+    """Give a listing the sector its own board already carries.
+
+    A board walk knows the employer it asked for, so its postings arrive labelled. The same job
+    found through a GitHub list or a Google search arrives with a title and a link and nothing
+    else, and the link points straight at a board the registry has a sector for. So the label was
+    there to be read and was being dropped: 238 open listings, including 20 in government and 12
+    in health, were unlabelled while their own board sat in the registry saying what they were.
+
+    The sector is a fact about the employer, not the posting, which is why reading it off the
+    apply link is sound: the link is what says whose board this is.
+    """
+    index = sector_index(reg)
+    filled = 0
+    for it in items:
+        if it.get("sector"):
+            continue
+        ats, token = ats_of(it.get("apply_url") or it.get("url"))
+        sector = index.get((ats, (token or "").lower()))
+        if sector:
+            it["sector"] = sector
+            filled += 1
+    return filled
+
+
 def set_location(reg: dict, ats: str, token: str, location: str) -> bool:
     """Give a board the one place the seed file says its employer is.
 

@@ -2,7 +2,8 @@ from datetime import date
 
 from internscout import companies_seed
 from internscout.dedupe import merge_batch, same_job
-from internscout.discover import add_board, relabel_sector, seed_registry, set_location
+from internscout.discover import (add_board, label_sectors, relabel_sector, seed_registry,
+                                  set_location)
 from internscout.coverage import SECTOR_CLUSTER
 from internscout.normalize import normalize
 from internscout.sources.common import board_item
@@ -247,3 +248,42 @@ def test_two_offices_of_one_job_title_stay_two_listings():
     assert not same_job(phoenix["apply_url"], dallas["apply_url"])
     # A missing URL never matches anything, so an unreadable link cannot collapse two postings.
     assert not same_job(None, None) and not same_job("", "https://example.com/jobs/1")
+
+
+def test_a_listing_found_off_board_gets_the_sector_its_board_already_carries():
+    # The case: Vox Media's greenhouse board is seeded and labelled media, but this posting came
+    # through a GitHub list, which gives a title and a link and no employer metadata at all.
+    reg = {}
+    add_board(reg, "greenhouse", "voxmedia", "Vox Media", sector="media")
+    add_board(reg, "lever", "somefund", "Some Fund", quant=True)
+    add_board(reg, "greenhouse", "plain", "Plain Co")           # in the registry, no sector
+    listed = {"title": "Editorial Intern", "company_name": "Vox Media",
+              "apply_url": "https://boards.greenhouse.io/voxmedia/jobs/4321"}
+    walked = {"title": "Editorial Intern", "company_name": "Vox Media", "sector": "nonprofit",
+              "apply_url": "https://boards.greenhouse.io/voxmedia/jobs/4321"}
+    unknown = {"title": "Intern", "company_name": "Nobody",
+               "apply_url": "https://boards.greenhouse.io/nobodyatall/jobs/1"}
+    unlabelled = {"title": "Intern", "company_name": "Plain Co",
+                  "apply_url": "https://boards.greenhouse.io/plain/jobs/1"}
+    quant = {"title": "Intern", "company_name": "Some Fund",
+             "apply_url": "https://jobs.lever.co/somefund/abc"}
+    assert label_sectors(reg, [listed, walked, unknown, unlabelled, quant]) == 2
+    assert listed["sector"] == "media"
+    assert quant["sector"] == "quant_finance", "a quant board's sector is implied, not stored"
+    # A sector the fetcher already supplied is never overwritten - that one came from the board
+    # we actually asked, and this is a fallback for the listings that arrived with nothing.
+    assert walked["sector"] == "nonprofit"
+    assert "sector" not in unknown and "sector" not in unlabelled
+    # A board whose token differs only by case is the same board.
+    upper = {"title": "Intern", "apply_url": "https://boards.greenhouse.io/VoxMedia/jobs/9"}
+    assert label_sectors(reg, [upper]) == 1 and upper["sector"] == "media"
+    # A dead board still says who its employer is; the listing came from somewhere else regardless.
+    reg["greenhouse"]["voxmedia"]["fails"] = 99
+    revived = {"title": "Intern", "apply_url": "https://boards.greenhouse.io/voxmedia/jobs/7"}
+    assert label_sectors(reg, [revived]) == 1
+
+    # And the label is what rescues a title no rule could read: "Intern" alone classifies as other.
+    row = normalize(board_item({"name": "Vox Media", "sector": "media"}, source="x", title="Intern",
+                               locations=["Boston, MA"],
+                               url="https://boards.greenhouse.io/voxmedia/jobs/4321"))
+    assert row["field_tags"] == ["media"]
