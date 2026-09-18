@@ -1,12 +1,13 @@
 """Coverage report: open listings per field cluster in the baseline states (plus US-remote).
 A thin cluster tells us where to add employer seeds or search queries next.
 
-  python -m internscout.coverage [docs/data/listings] [--min 15]
+  python -m internscout.coverage [docs/data/listings] [--min 15] [--all-states]
 
 In GitHub Actions the table is also appended to the job summary.
 """
 from __future__ import annotations
 import argparse
+import collections
 import json
 import os
 from .config import BASELINE_STATES
@@ -36,19 +37,42 @@ def in_baseline(listing: dict) -> bool:
     return listing.get("state") in BASELINE_STATES
 
 
-def counts(listings: list[dict]) -> dict[str, int]:
-    live = [x for x in listings if x.get("status") == "open" and in_baseline(x)]
+def open_here(listings: list[dict], baseline_only: bool = True) -> list[dict]:
+    return [x for x in listings
+            if x.get("status") == "open" and (in_baseline(x) if baseline_only else True)]
+
+
+def counts(listings: list[dict], baseline_only: bool = True) -> dict[str, int]:
+    live = open_here(listings, baseline_only)
     return {name: sum(1 for x in live if set(x.get("field_tags") or ()) & set(tags))
             for name, tags in CLUSTERS.items()}
 
 
-def report(listings: list[dict], minimum: int = 15) -> str:
-    rows = sorted(counts(listings).items(), key=lambda kv: kv[1])
-    lines = ["| Field cluster | Open (baseline + remote) | |", "|---|---:|---|"]
+def per_tag(listings: list[dict], baseline_only: bool = True) -> collections.Counter:
+    """Listings per field tag. A cluster count says a gap exists; this says what to seed for."""
+    return collections.Counter(t for x in open_here(listings, baseline_only)
+                               for t in x.get("field_tags") or ())
+
+
+def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True) -> str:
+    rows = sorted(counts(listings, baseline_only).items(), key=lambda kv: kv[1])
+    where = "baseline + remote" if baseline_only else "whole US"
+    lines = [f"| Field cluster | Open ({where}) | |", "|---|---:|---|"]
     lines += [f"| {n} | {c} | {'**thin**' if c < minimum else ''} |" for n, c in rows]
     thin = [n for n, c in rows if c < minimum]
     lines.append("")
-    lines.append(f"Thin (< {minimum}): {', '.join(thin)}" if thin else f"Every cluster has at least {minimum}.")
+    if not thin:
+        lines.append(f"Every cluster has at least {minimum}.")
+        return "\n".join(lines)
+    lines.append(f"Thin (< {minimum}): {', '.join(thin)}")
+    # Which tags are empty is the part that can be acted on: "Health 12" is not an instruction,
+    # "nursing 0" is an employer to go and seed. Rarest first, because that is the order to work in.
+    tags = per_tag(listings, baseline_only)
+    lines.append("")
+    lines.append("Tags inside them, rarest first:")
+    for name in thin:
+        inside = sorted(CLUSTERS[name], key=lambda t: tags[t])
+        lines.append(f"  - {name}: " + ", ".join(f"{t} {tags[t]}" for t in inside))
     return "\n".join(lines)
 
 
@@ -69,8 +93,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("path", nargs="?", default=os.path.join("docs", "data", "listings"))
     ap.add_argument("--min", type=int, default=15)
+    # Worth running both ways when something is thin: thin here but healthy nationally is a New
+    # England employer to seed, thin both ways is a classifier rule or a whole source missing.
+    ap.add_argument("--all-states", action="store_true",
+                    help="count the whole country instead of the baseline states")
     args = ap.parse_args()
-    text = report(load(args.path), args.min)
+    text = report(load(args.path), args.min, not args.all_states)
     print(text)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:

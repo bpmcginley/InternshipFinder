@@ -2,7 +2,7 @@
 import json
 import os
 from internscout.classify import ALL_FIELDS
-from internscout.coverage import CLUSTERS, counts
+from internscout.coverage import CLUSTERS, counts, per_tag, report
 from internscout.export_static import shard_keys, write_shards
 from internscout.region import evaluate_locations, maybe_in_region
 
@@ -69,5 +69,26 @@ def test_coverage():
     known = set(ALL_FIELDS)
     for name, tags in CLUSTERS.items():
         assert set(tags) <= known, (name, set(tags) - known)
-    c = counts([_listing(1, ["Boston, MA"]), _listing(2, ["Austin, TX"]), _listing(3, ["Remote"])])
+    rows = [_listing(1, ["Boston, MA"]), _listing(2, ["Austin, TX"]), _listing(3, ["Remote"])]
+    c = counts(rows)
     assert c["Health"] == 2
+    # the same three listings, counted nationally: the Texas one stops being excluded
+    assert counts(rows, baseline_only=False)["Health"] == 3
+
+    # a listing carrying two tags of one cluster counts once for the cluster and once per tag,
+    # which is the point of the breakdown: it says which of the two has nothing behind it
+    both = _listing(4, ["Boston, MA"], tags=("health", "nursing"))
+    assert counts(rows + [both])["Health"] == 3
+    assert per_tag(rows + [both])["nursing"] == 1 and per_tag(rows + [both])["health"] == 3
+
+    # a closed listing is not coverage, whichever way it is counted
+    shut = _listing(5, ["Boston, MA"], status="closed")
+    assert counts(rows + [shut])["Health"] == 2
+    assert per_tag(rows + [shut], baseline_only=False)["health"] == 3
+
+    text = report(rows, minimum=15)
+    # rarest first, so the tag with nothing behind it leads and the one carrying the cluster trails
+    assert "- Health: nursing 0," in text and text.rstrip().endswith("health 2")
+    assert "**thin**" in text
+    # nothing is thin below a bar of zero, and then there is no breakdown to print
+    assert "Every cluster has at least" in report(rows, minimum=0)
