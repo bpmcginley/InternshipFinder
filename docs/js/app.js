@@ -41,7 +41,7 @@
   }
   const NOT_PLACE = new Set(["new", "city", "north", "south", "east", "west", "park", "hill", "hills", "beach", "heights", "falls", "center", "village", "island", "lake", "port", "united", "states", "usa", "hybrid", "office", "onsite", "the", "and", "area", "metro", "county", "greater"]);
   const locHay = x => x._loch || (x._loch = [...IS.regs(x).map(g => g.loc), x.location_raw || ""].join(" \n ").toLowerCase());
-  const hay = x => x._hay || (x._hay = [x.company_name, x.title, (x.field_tags || []).join(" "), (x.stage || []).join(" "), x.sector, x.location_raw, (x.region_locations || []).join(" "), x.state, x.term, x.ats, x.description, ((x.insights || {}).skills || []).map(s => s.name).join(" ")].filter(Boolean).join(" \n ").toLowerCase());
+  const hay = x => x._hay || (x._hay = [x.company_name, x.title, (x.field_tags || []).join(" "), (x.stage || []).join(" "), x.sector, x.location_raw, (x.region_locations || []).join(" "), (x.regions || []).map(g => g.loc).join(" "), x.state, x.term, x.ats, x.description, ((x.insights || {}).skills || []).map(s => s.name).join(" ")].filter(Boolean).join(" \n ").toLowerCase());
 
   // ---------- eligibility and deadline: [level, text], level bad | warn | good | "" ----------
   function checks(r, p) {
