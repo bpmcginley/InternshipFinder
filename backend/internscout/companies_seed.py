@@ -345,4 +345,31 @@ WORKDAY += [
     {'name': 'Walmart', 'ats_token': 'walmart|wd504|WalmartExternal', 'is_quant_target': False, 'sector': 'retail_consumer'},
     {'name': 'Walmart', 'ats_token': 'walmart|wd5|WalmartExternal', 'is_quant_target': False, 'sector': 'retail_consumer'},
 ]
+# SuccessFactors tenants, every one checked live on 2026-09-17: the token is the whole host.
+# These employers were already reaching students one job at a time through Google Jobs; seeding
+# them reads the whole board instead.
+SUCCESSFACTORS: list = [
+    {'name': 'Qorvo', 'ats_token': 'careers.qorvo.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Corning', 'ats_token': 'corningjobs.corning.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Edison International', 'ats_token': 'apply.edisoncareers.com', 'is_quant_target': False, 'sector': 'energy_environment'},
+    {'name': 'Entergy', 'ats_token': 'jobs.entergy.com', 'is_quant_target': False, 'sector': 'energy_environment'},
+    {'name': 'HF Sinclair', 'ats_token': 'careers.hfsinclair.com', 'is_quant_target': False, 'sector': 'energy_environment'},
+    {'name': 'Westinghouse Electric Company', 'ats_token': 'careers.westinghousenuclear.com', 'is_quant_target': False, 'sector': 'energy_environment'},
+    {'name': 'Advanced Energy', 'ats_token': 'jobs.advanced-energy.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Arkema', 'ats_token': 'jobs.arkema.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Commercial Metals Company', 'ats_token': 'jobs.cmc.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Epiroc', 'ats_token': 'www.careerprofile.epiroc.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Gulfstream Aerospace', 'ats_token': 'careers.gulfstream.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Huntington Ingalls Industries', 'ats_token': 'careers.huntingtoningalls.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Kodak', 'ats_token': 'careers.kodak.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'L3Harris Technologies', 'ats_token': 'jobs.l3harris.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Mitsubishi Heavy Industries America', 'ats_token': 'mhicareers.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Nucor', 'ats_token': 'jobs.nucor.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Paccar', 'ats_token': 'jobs.paccar.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'United Launch Alliance', 'ats_token': 'jobs.ulalaunch.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Zurich Insurance', 'ats_token': 'www.careers.zurich.com', 'is_quant_target': False, 'sector': 'insurance_finance'},
+    {'name': 'Altice USA', 'ats_token': 'www.optimumcareers.com', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Hershey', 'ats_token': 'careers.thehersheycompany.com', 'is_quant_target': False, 'sector': 'retail_consumer'},
+    {'name': 'W.W. Grainger', 'ats_token': 'jobs.grainger.com', 'is_quant_target': False, 'sector': 'retail_consumer'},
+]
 # --- end sector seeds ---

@@ -250,23 +250,47 @@ def test_successfactors():
             + row(1422800501, "Director of Sourcing", "Greensboro-Director-of-Sourcing-NC-27409",
                   "Greensboro, NC, US, 27409")
             + row(1422800502, "Summer Intern", "Shanghai-Summer-Intern-SH-201807", "Shanghai, SH, CN, 201807")
-            + tile(1424643100, "2027 Summer Internship - MBA (Rosemead)",
-                   "Rosemead-2027-Summer-Internship-MBA-%28Rosemead%29-CA-91770-3714"))
+            + tile(1424643100, "2027 Summer Internship - Business Administration (Whittier)",
+                   "Santa-Fe-Springs-2027-Summer-Internship-Business-Administration-%28Whittier%29-CA-91770-3714"))
     items = parse_successfactors(page, SF)
     # the director is not an internship; Shanghai is not US, so it drops with no US location left
-    assert [i["title"] for i in items] == ["Physical Verification Intern", "2027 Summer Internship - MBA (Rosemead)"]
+    assert [i["title"] for i in items] == ["Physical Verification Intern",
+                                           "2027 Summer Internship - Business Administration (Whittier)"]
     # a job's link appears two or three times over; it is one listing, not two or three
     assert len(items) == 2
     # the country code and the postcode after it are not part of a location a student reads
     assert items[0]["locations"] == ["Greensboro, NC"]
-    # the tile template prints no location, so the state comes out of the slug - and only the state,
-    # because a hyphenated city cannot be told from the start of the title
-    assert items[1]["locations"] == ["CA"]
+    # the tile template prints no location, so the place comes out of the slug. Taking the city as
+    # the slug's first segment would make this Santa; the title is what says where the city ends.
+    assert items[1]["locations"] == ["Santa Fe Springs, CA"]
     # the token is the host, and hrefs on the page are relative to it
     assert items[0]["url"] == "https://careers.acme.com/job/Greensboro-Physical-Verification-Intern-NC-27409/1422901500/"
     assert items[0]["source"] == "successfactors"
     # the column header is a link, not a job's location, and must not be read as one
     assert parse_successfactors('<a class="jobLocation sort">Location</a>', SF) == []
+
+    # Westinghouse ends a slug with a bare two-letter code that is not the state: its Cranberry
+    # Township jobs, which are in Pennsylvania, end in -NC. Only a code followed by a real postcode
+    # is a state, so this job keeps the city the page gave it and claims no state at all.
+    where = parse_successfactors(row(9001, "Summer Intern - Project Controls",
+                                     "Cranberry-Township-Summer-Intern-Project-Controls-NC",
+                                     "Cranberry Township, US"), SF)
+    assert where[0]["locations"] == ["Cranberry Township"]
+    # An Italian postcode is five digits too, so the state has to be a real one or Monfalcone lands
+    # in Iowa. Here the page says CZ, which is not the US, and that alone settles it.
+    assert parse_successfactors(row(9002, "Document Controller Intern",
+                                    "Prague-Document-Controller-Intern-CZ-11000", "Prague, CZ"), SF) == []
+    # ... and with no location on the page at all, the slug's 'IT' is not a state either
+    assert parse_successfactors(tile(9003, "Document Controller Intern",
+                                     "Monfalcone-Document-Controller-Intern-IT-34074"), SF) == []
+    # 'OTHER' is one tenant's placeholder for "somewhere in this state", not a city
+    other = parse_successfactors(row(9004, "Business System Intern", "OTHER-Business-System-Intern-MA-0",
+                                     "OTHER, MA, US, 0"), SF)
+    assert other[0]["locations"] == ["MA"]
+    # a city with no state on the page, but a real postcode in the slug, gets its state back
+    back = parse_successfactors(row(9005, "Summer Intern", "Chattanooga-Summer-Intern-TN-37401",
+                                    "Chattanooga, US"), SF)
+    assert back[0]["locations"] == ["Chattanooga, TN"]
 
 
 def test_usajobs():

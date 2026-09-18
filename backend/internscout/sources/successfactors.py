@@ -10,9 +10,10 @@ time to learn:
   - 25 jobs a page, paged with startrow=25, 50, 75...
   - Two templates in the wild. Qorvo and Corning use a table: one <tr class="data-row"> per job,
     with the location in a <span class="jobLocation">. Edison uses tiles, with no location markup
-    anywhere on the page - the state is only in the URL slug. Both repeat the same job's link two
-    or three times over (desktop, tablet, phone), so every link is keyed by job id and the first
-    location found for that id wins.
+    anywhere on the page - the place is only in the URL slug, which every tenant builds as
+    <city>-<title>-<ST>-<postcode>. Both templates repeat the same job's link two or three times
+    over (desktop, tablet, phone), so every link is keyed by job id and the first location found
+    for that id wins.
   - There is no posting date and no snippet on either template, so neither is reported.
 
 SuccessFactors is what large hospitals, universities, utilities and manufacturers run, which is
@@ -20,8 +21,10 @@ where the health, education and energy listings live.
 """
 from __future__ import annotations
 import re
+from urllib.parse import unquote
 from .common import board_item, html_to_text
 from ..classify import is_internship
+from ..geo import STATE_NAMES
 
 SEARCH_URL = "https://{token}/search/"
 # One unfiltered crawl would be the employer's whole board. Searching a few student-shaped words
@@ -37,15 +40,40 @@ HREF_RE = re.compile(r'href="([^"]+)"', re.I)
 JOB_RE = re.compile(r"/job/([^/\"]+)/(\d+)/")
 # Only a <span>: the column header is an <a class="jobLocation sort"> and is not a job's location.
 LOC_RE = re.compile(r'<span[^>]*class="[^"]*jobLocation[^"]*"[^>]*>(.*?)</span>', re.S | re.I)
-# 'Rosemead-2027-Summer-Internship-MBA-%28Rosemead%29-CA-91770-3714' -> CA. The city is in there
-# too, as the first segment, but a hyphenated one (Winston-Salem) cannot be told from a city
-# followed by the start of the title, and a wrong city is worse to show than no city at all.
+# 'Rosemead-2027-Summer-Internship-MBA-%28Rosemead%29-CA-91770-3714' -> CA, and everything before
+# the state is the city followed by the title. Checked against a real US state list, because an
+# Italian postcode is five digits too and 'Monfalcone-...-IT-34074' would otherwise read as a state.
 SLUG_ST_RE = re.compile(r"-([A-Z]{2})-\d{5}(?:-\d{4})?$")
+US_STATES = set(STATE_NAMES.values())
 COUNTRY_US = {"US", "USA", "UNITED STATES"}
+_SQUASH = re.compile(r"[^a-z0-9]")
 
 
-def _location(raw: str, slug: str) -> list[str]:
+def _squash(s: str) -> str:
+    return _SQUASH.sub("", s.lower())
+
+
+def _slug_place(slug: str, title: str) -> tuple[str, str]:
+    """('Pooler-Transportation-Internship-GA-31322', 'Transportation Internship') -> ('Pooler', 'GA').
+
+    Splitting the city off by taking the first segment would turn Santa Fe Springs into Santa and
+    Winston-Salem into Winston. The title is known, though, and the slug is the city followed by it,
+    so the city is however many leading segments are left once the title has been accounted for.
+    """
+    m = SLUG_ST_RE.search(slug)
+    if not m or m.group(1) not in US_STATES:
+        return "", ""
+    segs = slug[:m.start()].split("-")
+    want = _squash(unquote(title))
+    for k in range(len(segs)):
+        if _squash(unquote("".join(segs[k:]))) == want:
+            return unquote(" ".join(s for s in segs[:k] if s)), m.group(1)
+    return "", m.group(1)
+
+
+def _location(raw: str, slug: str, title: str) -> list[str]:
     """'Greensboro, NC, US, 27409' -> ['Greensboro, NC']. Non-US rows are dropped, not translated."""
+    city, st = _slug_place(slug, title)
     parts = [p.strip() for p in html_to_text(raw).split(",") if p.strip()]
     up = [p.upper() for p in parts]
     if parts:
@@ -54,13 +82,21 @@ def _location(raw: str, slug: str) -> list[str]:
         # Everything past the country code is the postcode, which we do not want.
         head = parts[:next(i for i, p in enumerate(up) if p in COUNTRY_US)]
         if not head:
-            return ["United States"]
+            return [st] if st else ["United States"]
         if len(head) == 1:
-            return ["Remote - US" if head[0].lower().startswith("remote") else head[0]]
-        return [f"{head[-2]}, {head[-1]}"]
-    # A tile-layout tenant prints no location at all, so fall back to the slug's state.
-    m = SLUG_ST_RE.search(slug)
-    return [m.group(1)] if m else []
+            if head[0].lower().startswith("remote"):
+                return ["Remote - US"]
+            # Some tenants print the city and the country but no state ('Cranberry Township, US'),
+            # and a city on its own cannot be placed in a state, so the listing would be dropped.
+            # The slug knows the state.
+            return [f"{head[0]}, {st}" if st else head[0]]
+        # 'OTHER, MA, US, 0' is one tenant's placeholder for "somewhere in this state". Printing it
+        # as a city name would be showing a student a place that does not exist.
+        return [head[-1] if _squash(head[-2]) == "other" else f"{head[-2]}, {head[-1]}"]
+    # A tile-layout tenant prints no location at all, so the slug is all there is.
+    if city and st:
+        return [f"{city}, {st}"]
+    return [st] if st else []
 
 
 def parse_successfactors(html: str, co: dict) -> list[dict]:
@@ -86,7 +122,7 @@ def parse_successfactors(html: str, co: dict) -> list[dict]:
     for rec in by_id.values():
         if not is_internship(rec["title"], ""):
             continue
-        locs = _location(rec["raw"], rec["slug"])
+        locs = _location(rec["raw"], rec["slug"], rec["title"])
         if not locs:
             continue
         out.append(board_item(co, source="successfactors", title=rec["title"], locations=locs,

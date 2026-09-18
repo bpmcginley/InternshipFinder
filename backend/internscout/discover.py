@@ -106,7 +106,7 @@ def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
     for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
-                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE"):
+                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS"):
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
                            co.get("sector"))
