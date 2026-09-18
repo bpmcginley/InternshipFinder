@@ -5,6 +5,13 @@ backend/data/probe_cache.json so CI doesn't hammer the ATS APIs.
 Probing uses its own short-timeout, high-concurrency client: these are cheap existence checks (mostly
 fast 404s), not content fetches, and reusing the 25s ingest-wide HTTP_TIMEOUT here would let a handful
 of slow/dead hosts serialize the whole run.
+
+Only some ATSes can be probed at all, because a probe is a guess at a token built from the company
+name. Counting the 2,707 boards already in the registry, the token is reachable from the name for 73%
+of ashby, 81% of jobvite, 68% of greenhouse, 65% of lever, 55% of workable and bamboohr, and 43% of
+smartrecruiters - but for **none** of workday, oracle, taleo or adp, whose tokens are tenant|site
+pairs (aaaie|wd1|csaacareers) or opaque UUIDs. No naming rule reaches those, so they are left out on
+purpose rather than forgotten; boards on them arrive through discovery or a seed.
 """
 from __future__ import annotations
 import json
@@ -52,6 +59,17 @@ def _workable(c, slug, name):
     return r.status_code == 200 and _same_name(r.json().get("name"), name) and len(r.json().get("jobs") or []) > 0
 
 
+# SmartRecruiters is keyed by an identifier that is usually the squashed company name, and it answers
+# on any case, so the lowercase slug is enough. It never 404s - an unknown company is an empty result
+# set - so the posting's own company block is what confirms the board, and that needs a posting.
+def _smartrecruiters(c, slug, name):
+    r = c.get(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings", params={"limit": 1})
+    if r.status_code != 200:
+        return False
+    posts = r.json().get("content") or []
+    return bool(posts) and _same_name((posts[0].get("company") or {}).get("name"), name)
+
+
 # Lever and Ashby have no board-name endpoint, so only the exact squashed name counts, and the board must have jobs.
 def _lever(c, slug, name):
     if slug != norm(_SUFFIX.sub(" ", name)) or len(slug) < 5:
@@ -82,7 +100,7 @@ def _jazzhr(c, slug, name):
 # JazzHR goes last: it is the only probe paying for a whole HTML page rather than a small JSON
 # existence check, so it is only reached when nothing cheaper matched.
 PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("workable", _workable),
-          ("jazzhr", _jazzhr)]
+          ("smartrecruiters", _smartrecruiters), ("jazzhr", _jazzhr)]
 
 
 def load_cache() -> dict:
