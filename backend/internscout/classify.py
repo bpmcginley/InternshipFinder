@@ -175,8 +175,7 @@ _UNDERGRAD = YEARS[:4]
 _STAGE_RULES = [
     ("co_op", re.compile(r"\bco-?op\b", re.I)),
     ("research", re.compile(r"\breu\b|research experience for undergrad|undergraduate research|student research|"
-                            r"summer research (program|fellow|intern|scholar|assistant|opportunit)|\bsurf\b|"
-                            r"\bresearch(er|ers)?\b", re.I)),
+                            r"summer research (program|fellow|intern|scholar|assistant|opportunit)|\bsurf\b", re.I)),
     ("fellowship", re.compile(r"\bfellowships?\b|\b(summer|student|undergrad(uate)?|graduate|policy|public service|"
                               r"diversity|emerging leaders?|research) fellows?\b", re.I)),
     ("early_insight", re.compile(r"\bdiscovery (program|day|week|series|internship)|\binsights? (day|week|program|series)|"
@@ -184,7 +183,10 @@ _STAGE_RULES = [
     # "Working Student" is the German Werkstudent contract: a real part-time job for someone enrolled.
     ("part_time", re.compile(r"part[- ]time (intern|student)|\b(student|intern)\b.{0,25}part[- ]time|"
                              r"student (worker|assistant|employee|aide)|work[- ]study|academic[- ]year intern|"
-                             r"semester intern|working student", re.I)),
+                             r"semester intern|working student|"
+                             # American University writes "Research/Teaching Assistant (Student)", and
+                             # Pikeville heads and tails its work-study jobs "WS - ... - FWS" / "- IWS".
+                             r"\(student\)|\b[fi]ws\b", re.I)),
     ("apprenticeship", re.compile(r"\bapprentice(ship)?s?\b", re.I)),
     # Plenty of employers never write "intern". Aramco Americas posts seventeen "<Department> -
     # 2027 Summer Student Program" and nothing else; elsewhere the role noun is simply "Student",
@@ -200,6 +202,24 @@ _STAGE_RULES = [
 _LOWER_YEARS_RE = re.compile(r"\b(freshm[ae]n|first[- ]year|sophomores?)\b", re.I)
 _PROGRAM_RE = re.compile(r"\b(program|summit|day|week|series|academy|conference|forum|experience)\b", re.I)
 _RESEARCH_AIDE_RE = re.compile(r"research (assistant|aide|technician)", re.I)
+# The bare word says what kind of student job a posting is, never that it is one. It used to sit in
+# the research rule above, where it was meant to tag "Research Scientist Intern" and "PhD Research
+# Intern" - and it did - but a stage rule also admits, so on its own it let in "VP, Research",
+# "Researcher, Interpretability", "Technical Sourcer, Research", "Research Analyst II" and "Global
+# Research - Industry & Policy Thematics - Vice President". Now it only adds research to a posting
+# something else already calls a student role.
+_RESEARCH_WORD_RE = re.compile(r"\bresearch(er|ers)?\b", re.I)
+# The export was read for the student jobs among the 925 postings the bare word alone admitted,
+# and these three wordings are what they said: a graduate assistantship ("Graduate
+# Research Assistant", "Graduate Researcher", "Graduate Assistant Non-Teaching - Institutional
+# Research"), a part-time research assistant at a university, and the student words above on any
+# research title ("Student Technician - Applied Research Laboratories", "Roadside Observational
+# Researcher (Summer Position)", "Undergraduate Part-Time Research Support"). "Graduate" alone is
+# not one of them: "Graduate Quantitative Researcher (BS/MS)" is a new-grad job.
+_ASSISTANTSHIP_RE = re.compile(r"\bgraduate (assistant|researcher|(research|teaching)(/teaching)? (assistant|scholar))\b",
+                               re.I)
+_PART_TIME_RESEARCH_RE = re.compile(r"part[- ]time.{0,20}\bresearch (assistant|aide|support)|"
+                                    r"\bresearch (assistant|aide|support)\b.{0,20}part[- ]time", re.I)
 _STUDENT_WORD_RE = re.compile(r"\b(student|undergrad(uate)?|summer)\b", re.I)
 _NEW_GRAD_RE = re.compile(r"new ?grad|early career|entry[- ]level|recent (college )?grad|university grad|"
                           r"graduate (development |rotational )?program|rotational program|leadership development program", re.I)
@@ -293,6 +313,12 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
         found.add("co_op")
     if found and re.search(r"part[- ]?time", emp, re.I):
         found.add("part_time")
+    if _RESEARCH_WORD_RE.search(title) and (_STUDENT_WORD_RE.search(title) or _ASSISTANTSHIP_RE.search(title)):
+        found.add("research")
+    if _PART_TIME_RESEARCH_RE.search(title):
+        found.update(("research", "part_time"))
+    if found and _RESEARCH_WORD_RE.search(title):
+        found.add("research")
     if not found:
         return []
     # a dated summer role ("Early Career Mechanical Engineering - Summer 2027") is an internship

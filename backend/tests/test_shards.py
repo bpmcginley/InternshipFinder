@@ -284,3 +284,11 @@ def test_a_listing_no_rule_can_place_lands_in_no_state_file(tmp_path):
     assert list(index["files"]) == ["MA"]
     kept = json.load(open(os.path.join(str(tmp_path), "listings", "MA.json"), encoding="utf-8"))
     assert [x["id"] for x in kept] == ["y"]
+
+
+def test_a_stored_research_stage_alone_is_asked_again():
+    # Stored while the bare word still admitted a posting; today's rules find no student job in it.
+    assert merged_stages(["research"], "VP, Research") == []
+    assert merged_stages(["research"], "REU Site: Computational Biology") == ["research"]
+    # a feed that said intern still keeps the research reading of the title
+    assert merged_stages(["internship", "research"], "Researcher, Interpretability") == ["internship", "research"]

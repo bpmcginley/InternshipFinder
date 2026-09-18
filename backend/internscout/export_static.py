@@ -135,6 +135,12 @@ def merged_stages(stored: list[str] | None, title: str) -> list[str]:
     Palantir posting is "Growth" and of another "Cohort 0", and only the feed says intern.
     """
     found = set(stored or []) | set(stage_of(title))
+    # A stored "research" and nothing else is asked again. No feed ever says research - it is always
+    # the title's reading - and the rule that read it once admitted "VP, Research" and "Researcher,
+    # Interpretability" on the word alone. If today's rules find no student stage in that title, the
+    # row has none, and still_student_opportunities drops it like any other stale row.
+    if found == {"research"} and not stage_of(title):
+        found = set()
     return [s for s in STAGES if s in found]
 
 

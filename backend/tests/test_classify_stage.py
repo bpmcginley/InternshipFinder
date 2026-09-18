@@ -439,3 +439,34 @@ def test_social_science_titles_reach_their_field():
         assert "psychology" not in classify(title), title
     # and human factors engineering keeps an engineering field
     assert "industrial" in classify("Human Factors Engineer Intern - SE&I")
+
+
+def test_the_word_research_alone_does_not_make_a_student_job():
+    # 925 exported postings were admitted on "research" and nothing else, and nearly all of them
+    # were staff: "VP, Research", "Researcher, Interpretability", "Research Analyst II".
+    for title in ("VP, Research", "Researcher, Interpretability", "Technical Sourcer, Research",
+                  "Research Analyst II", "Research Scientist", "Applied Researcher",
+                  "Global Research - Industry & Policy Thematics - Vice President",
+                  "Graduate Quantitative Researcher (BS/MS)", "Research Assistant"):
+        assert stage_of(title) == [], title
+    # It still says what kind of student job one is.
+    assert stage_of("Research Scientist Intern") == ["internship", "research"]
+    assert "research" in stage_of("Machine Learning Researcher", "Intern")
+
+
+def test_student_research_jobs_that_never_say_intern_are_kept():
+    for title in ("Graduate Research Assistant - Fire Protection Engineering",
+                  "Graduate Researcher - Redwing Group - Materials Science and Engineering",
+                  "Graduate Assistant Non-Teaching - Institutional Research and Data Analysis",
+                  "Student Technician - Applied Research Laboratories",
+                  "Roadside Observational Researcher (Summer Position)",
+                  "Undergraduate Part-Time Research Support"):
+        assert "research" in stage_of(title), title
+    for title in ("Part-Time Research Assistant - Astronomy Department",
+                  "Electoral Reform Research Assistant Part-Time",
+                  "Research/Teaching Assistant (Student)",
+                  "WS - Medical Humanities Research Assistant - FWS",
+                  "WS - INBRE Biotechnologies Research Assistant (Wang) - IWS"):
+        assert stage_of(title) == ["research", "part_time"], title
+    # the work-study code is a word, not a piece of one
+    assert stage_of("TFWS Research and Insights Analyst") == []
