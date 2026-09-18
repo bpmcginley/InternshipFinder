@@ -72,7 +72,8 @@ jobs:
         run: |
           git config user.name  "internscout-bot"
           git config user.email "actions@github.com"
-          git add -A docs/data backend/data/ats_registry.json backend/data/geocache.json
+          # probe_cache.json earns its name only if it survives the run that filled it.
+          git add -A docs/data backend/data/ats_registry.json backend/data/geocache.json backend/data/probe_cache.json
           if git diff --staged --quiet; then
             echo "No changes."
           else
@@ -81,6 +82,8 @@ jobs:
             for i in 1 2 3; do
               git push && break
               [ "$i" = 3 ] && exit 1
-              git pull --rebase -X theirs origin main
+              # --autostash: the run leaves other tracked files dirty, and rebase refuses to
+              # start on a dirty tree, which turned every raced push into a lost data commit.
+              git pull --rebase --autostash -X theirs origin main
             done
           fi
