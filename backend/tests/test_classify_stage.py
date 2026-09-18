@@ -276,11 +276,61 @@ def test_ehs_titles_are_environmental_jobs():
 def test_safety_boilerplate_in_a_description_is_not_an_ehs_job():
     # Every one of these bodies says it, and none of these jobs is an EHS job.
     for title, body in (
-        ("Geology Intern", "Our goal is to meet the highest employer standards by ensuring the "
-                           "health and safety of our employees, protecting the environment."),
+        ("Engineering Intern (Oil & Gas Business)", "Our goal is to meet the highest employer "
+         "standards by ensuring the health and safety of our employees."),
         ("Operations Intern, Commercial & MarComs", "Assess our boutiques while adhering to company "
                                                     "regulations, and health and safety codes."),
         ("Safety Engineer Intern", "Work with project managers and superintendents in dealing with "
                                    "all health and safety issues on site, at the project level."),
     ):
         assert "environmental" not in classify(title, body), title
+
+
+def test_a_discipline_is_findable_by_its_own_name():
+    # Every major in majors.py was run through classify as "<major> Intern". These five matched
+    # nothing, and unlike the other thirty-two there were real titles waiting behind each of them.
+    for title, tag in (
+        ("Computer Science Intern", "swe"),
+        ("Computer Science Internship - Summer 2027", "swe"),
+        ("Geology Intern", "environmental"),
+        ("Geoscience Summer Intern", "environmental"),
+        ("Geophysics Intern", "environmental"),
+        ("GIS / Geospatial Analyst Intern", "environmental"),
+        ("Geographic Information Systems Intern", "environmental"),
+        ("Health Informatics Intern", "data"),
+        ("Bioinformatics Intern", "biology"),
+        ("Speech Language Pathology Intern", "health"),
+        ("Audiology Extern", "health"),
+        ("Communication Disorders Intern", "health"),
+    ):
+        assert tag in classify(title), (title, classify(title))
+
+
+def test_the_new_discipline_words_do_not_fire_on_a_description():
+    # Two of these were written loose first and measured: a bare \bgis\b tagged anything whose body
+    # mentioned a GIS layer, and a bare "speech language" tagged "Machine Learning Researcher,
+    # Multimodal LLMs" because its body described speech and language models. Both are anchored now.
+    assert "environmental" not in classify(
+        "Civil Engineering Intern", "You will pull parcel data from our GIS and hand it to design.")
+    assert "health" not in classify(
+        "Machine Learning Researcher, Multimodal LLMs",
+        "Our models work across speech, language and vision.")
+
+
+def test_a_degree_list_in_a_description_does_not_make_a_job_a_software_job():
+    # 202 descriptions say "computer science" and every one of them is a degree requirement. The
+    # bare word put a steel internship and an SEO internship into swe, which is the tag the biggest
+    # part of the audience sorts by, so it has to lose to a comma, a slash and a preposition.
+    for title, body in (
+        ("Steel Fabrication Intern",
+         "Majors considered include, but are not limited to, the following: Civil Engineering "
+         "Mechanical Engineering Computer Science"),
+        ("SEO & On-line Marketing Specialist Intern",
+         "Perform the SEO and related projects assigned. - BS/BA in Information/Computer Science "
+         "and related field."),
+        ("Quantitative Researcher Intern",
+         "PhD or master's degree in computer science, mathematics, physics, or statistics."),
+        ("Optics Intern",
+         "For students pursuing a degree in Computer Science or a related technical field."),
+    ):
+        assert "swe" not in classify(title, body), title

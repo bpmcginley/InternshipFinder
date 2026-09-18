@@ -14,10 +14,10 @@ RULES = [
     # --- computing / quant ---
     ("quant", r"\bquant(itative)?\b|\btrader\b|\btrading\b|market mak|derivativ|\balpha\b|portfolio manag"),
     ("ml", r"\bml\b|machine learning|deep learning|\bnlp\b|computer vision|\bai\b|artificial intelligence|genai|\bllm|research scientist|reinforcement learning"),
-    ("data", r"\bdata (scien|engineer|analy|platform)|\banalytics\b|business intelligence|\bbi\b|\betl\b|data warehouse|\bdata\b"),
+    ("data", r"\bdata (scien|engineer|analy|platform)|\banalytics\b|business intelligence|\bbi\b|\betl\b|data warehouse|\bdata\b|informatics"),
     ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber"),
     ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic"),
-    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology"),
+    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien"),
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner"),
 
     # --- engineering (non-software) ---
@@ -36,7 +36,7 @@ RULES = [
     # safety of our employees" is boilerplate in the body of an oil and gas posting, a geology
     # posting and a jewellery boutique posting, so that half is anchored to the role word and only
     # fires on a title like "Environment, Safety and Health Undergraduate Intern".
-    ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources|"
+    ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources|geolog|geoscien|geophysic|geospatial|geographic information system|"
      r"occupational (health (and|&|,) )?safety|\behs\b|\bhse\b|"
      r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)"),
     ("biomedical", r"biomedical|bioengineer|medical device|clinical engineer"),
@@ -47,11 +47,11 @@ RULES = [
     ("engineering", r"\bengineer(ing|s)?\b"),
 
     # --- sciences / math / health ---
-    ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery"),
+    ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery|bioinformatic"),
     ("chemistry", r"bioanalytical|analytical sciences|\bchemist|chemical (research|analysis)|analytical chem|organic chem"),
     ("physics", r"\bphysics\b|photonic|optic|quantum (computing|research|physics)|astronom"),
     ("math", r"\bmathematic|applied math|\bstatistic|biostatistic|actuarial"),
-    ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital"),
+    ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital|speech[- ]language patholog|speech patholog|audiolog|communication disorders"),
     ("nursing", r"\bnurs(e|es|ing)\b|\bcna\b|\brn\b|patient care (tech|assistant)"),
     ("public_health", r"public health|epidemiolog|community health|global health|health (policy|equity|promotion|education|services research)"),
     # "translational" is bench-to-bedside research, and the boundary added to the languages rule
@@ -112,6 +112,37 @@ RULES = [
     ("business", r"\bbusiness\b|\bcommercial\b|\bmba\b"),
     ("retail", r"\bretail\b|merchandis|buying intern|\bfashion\b|apparel|e-?commerce|\bstores?\b"),
 ]
+
+# Every major in majors.py was run through these rules as "<major> Intern". 37 of the 92 matched
+# nothing at all, which means a listing named after that discipline never reaches the student who
+# studies it. Most of the 37 are not worth a rule: there is not one listing in 14,525 titled after
+# art history, philosophy, classics, history or any area study, and a rule for a discipline nobody
+# posts is tidy rather than useful. Five had real titles waiting, and those five are added above:
+#
+#     computer science   16 untagged titles   -> swe
+#     geology/geoscience 24                   -> environmental
+#     informatics         7                   -> data (and bioinformatics -> biology)
+#     speech pathology    5                   -> health
+#     geospatial/GIS      1                   -> environmental
+#
+# Two of the five had to be anchored before they were safe, for the reason the EHS rule above was:
+# classify reads the description as well as the title, and a description says which degree it
+# wants. A bare GIS acronym tagged any posting whose body mentioned a GIS layer, and a bare
+# "speech language" tagged "Machine Learning Researcher, Multimodal LLMs", whose body describes
+# speech and language models. "Computer science" was the worst of them: 202 bodies say it and
+# every one is a degree list - "pursuing a degree in Computer Science", "mathematics, physics, and
+# computer science" - so the bare word pulled a steel internship and an SEO internship into swe,
+# 35 listings in all. It now declines to match where a comma, a slash or a preposition has put it,
+# which keeps 33 of the 36 real titles and leaks one.
+#
+# The earth-science words were measured the same way and left unanchored. They do reach out of a
+# body, but what they reach is "Production Geology - providing a field study" in an oil and gas
+# posting and "a degree in Geosciences" on a cartography intern, which are the jobs an
+# environmental student wants; only three of the thirty-five are wrong.
+#
+# "Management" was measured too - 64 untagged titles - and left alone deliberately: the bare word
+# is "Portfolio Management" and "Waste Management" as often as it is a management trainee, and
+# there is no honest single tag for it.
 
 STAGES = ("internship", "co_op", "research", "fellowship", "early_insight", "part_time", "apprenticeship")
 YEARS = ("first_year", "sophomore", "junior", "senior", "masters", "phd")
