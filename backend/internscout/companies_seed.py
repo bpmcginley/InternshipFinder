@@ -1007,4 +1007,32 @@ WORKDAY += [
     {'name': 'Easterseals NH VT', 'ats_token': 'easterseals|wd5|ESNH_VTcareers', 'is_quant_target': False, 'sector': 'behavioral_health'},
 ]
 
+# --- hotels, teams and venues, second pass (probed and fetched live 2026-09-18) ---
+# 47 unseeded hotel groups, teams, casinos and venues were probed; five answered. Montage
+# International (Montage and Pendry resorts) had 13 rooms, culinary, food-and-beverage and
+# recreation internships, and Monumental Sports (Capitals, Wizards, Mystics) five seasonal ones in
+# marketing, media relations, editing and ticket sales. MSG Sports (Knicks, Rangers) had none on the
+# day but runs a seasonal program. Left out: Pursuit's and Mohegan's boards returned no jobs.
+GREENHOUSE += [
+    {'name': 'Monumental Sports & Entertainment', 'ats_token': 'monumentalsports', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'MSG Sports', 'ats_token': 'msgsports', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+WORKDAY += [
+    {'name': 'Montage International', 'ats_token': 'montage|wd1|Montage_International', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+
+# --- publishers and film (probed and fetched live 2026-09-18) ---
+# 44 unseeded publishers, performing-arts centres, museums and film bodies were probed; five
+# answered. Wiley had an editorial internship and Springer Nature a Nature News internship. Cengage
+# and the Academy of Motion Picture Arts and Sciences (its Gold program) had none on the day but
+# take interns each year. Left out: Elsevier's greenhouse board returned no jobs.
+JAZZHR += [
+    {'name': 'Academy of Motion Picture Arts and Sciences', 'ats_token': 'academyofmotionpictureartsandsciences', 'is_quant_target': False, 'sector': 'arts_museums'},
+]
+WORKDAY += [
+    {'name': 'Wiley', 'ats_token': 'wiley|wd1|wiley_careers', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Springer Nature', 'ats_token': 'springernature|wd3|SpringerNatureCareers', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Cengage', 'ats_token': 'cengage|wd5|CengageNorthAmericaCareers', 'is_quant_target': False, 'sector': 'media'},
+]
+
 # --- end sector seeds ---
