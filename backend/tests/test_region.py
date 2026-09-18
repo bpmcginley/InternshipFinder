@@ -177,3 +177,21 @@ def test_remote_is_only_said_where_a_location_says_it():
     assert evaluate_locations(["US - UPS CORPORATE OFFICES (GACOR)"])["state"] is None
     assert evaluate_locations(["Remote - US"])["state"] == "Remote"
     assert evaluate_locations(["Boston, MA"])["state"] == "MA"
+
+
+def test_filler_beside_a_remote_location_does_not_move_it_abroad():
+    # "Remote - US: All locations" is how a Greenhouse board writes it, and "all" was not on the
+    # list of words allowed to stand beside remote, so the posting had no US location at all and
+    # was dropped before anything else saw it. Dropbox's only 2027 SWE internship, for one.
+    for loc in ("Remote - US: All locations", "Remote USA - All Locations", "Remote - US (All Locations)",
+                "Fully Remote", "Fully Remote (US)", "Remote Worker - US",
+                "US Remote - Various", "Remote - Multiple Locations", "Remote - Continental US",
+                "Remote - US Mainland", "Remote - Lower 48", "Remote Position - USA"):
+        assert evaluate_locations([loc])["state"] == "Remote", loc
+    # "Home Office - US" and "Telework - US" say no remote word at all, so they stay what they are:
+    # somewhere in the US with no state, which is also what a UPS "home office" posting really is.
+    for loc in ("Home Office - US", "Telework - US"):
+        assert evaluate_locations([loc])["in_region"] and evaluate_locations([loc])["state"] is None
+    # and the check still keeps out the thing it is for.
+    for loc in ("Remote - Serbia", "Remote - HU", "Virtual, BR", "Remote - EMEA", "Remote - India"):
+        assert evaluate_locations([loc])["in_region"] is False, loc

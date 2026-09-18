@@ -52,11 +52,17 @@ def _split_cities(loc: str) -> list[str]:
         return [loc]  # "Brooklyn, New York" is a city and its state
     return parts
 # Words that may accompany a US-remote location. Anything left over ("Remote - HU", "Virtual, BR") is
-# a non-US qualifier, so the posting is not US-remote.
+# a non-US qualifier, so the posting is not US-remote. The second line is the plain English a board
+# writes around the word: "Remote - US: All locations" is how Greenhouse boards say it, and one
+# unlisted filler word was enough to throw the posting out of the country - not down-ranked, gone,
+# because a listing with no US location at all never passes the filter. Nothing here names a place,
+# so the check still does the job it is for: "Remote - Serbia" keeps its leftover and stays out.
 _REMOTE_NOISE = re.compile(
     r"\b(?:remote|anywhere|work from home|wfh|virtual|home ?based|hybrid|telecommute|distributed|in|the|of|"
     r"any|location|locations|only|flexible|nationwide|based|u\.?s\.?a?|united states(?: of america)?|america|"
-    r"east coast|eastern|northeast|us time ?zones?|est|et)\b|[^a-z]+", re.I)
+    r"east coast|eastern|northeast|us time ?zones?|est|et|"
+    r"all|fully|various|multiple|worker|position|"
+    r"continental|mainland|lower)\b|[^a-z]+", re.I)
 
 
 def remote_ok(loc: str) -> bool:
