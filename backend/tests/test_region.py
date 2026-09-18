@@ -231,3 +231,11 @@ def test_puerto_rico_is_its_own_state():
         assert r["in_region"] and r["state"] == "PR", (loc, r["state"])
     # but a bare "PR" among other capitals is not read as the island
     assert state_of("US - PR DEPT") is None
+
+
+def test_bare_la_is_los_angeles_but_a_louisiana_town_is_not():
+    for loc in ("LA", " LA ", "LA, CA", "LA, USA"):
+        assert state_of(loc) == "CA", loc
+    for loc in ("Baton Rouge, LA", "New Orleans, LA 70112", "Shreveport LA"):
+        assert state_of(loc) == "LA", loc
+    assert evaluate_locations(["SF", "LA"])["state"] == "CA"

@@ -95,10 +95,21 @@ _LOOSE_STATE = re.compile(r"(?<![A-Za-z])([A-Z]{2})(?![A-Za-z])")
 _FACILITY = re.compile(r"^\s*US\s*-\s*.+\(([A-Z]{2})[A-Z]{3}\)\s*$")
 
 
+# "LA" by itself is Los Angeles: the GitHub lists and startup boards write "SF", "LA", "NYC", and
+# region._MAJOR already says so. But the first pass below reads the same two capitals as Louisiana's
+# code, so the last export filed about 90 listings - Blue Origin, Netflix, TikTok, Snap, K2 Space,
+# Google - in LA.json and none of them in CA.json. One of the lot was a Louisiana employer
+# (Louisiana Blue) writing its state the same way; a bare "LA" cannot tell the two apart, and Los
+# Angeles is what it means nearly every time. "Baton Rouge, LA" names a town and is untouched.
+_LOS_ANGELES = re.compile(r"^\s*LA\s*(?:,\s*(?:CA|California|USA?|United States(?: of America)?)\s*)*$")
+
+
 def state_of(loc: str) -> str | None:
     """Two-letter state code from 'City, ST', 'US-MA-Boston', 'Boston, Massachusetts', ..."""
     if not loc:
         return None
+    if _LOS_ANGELES.match(loc):
+        return "CA"
     for tok in _TOKEN_SPLIT.split(loc):
         m = re.fullmatch(r"\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*", tok)
         if m and m.group(1).lower() in _US_STATES:
