@@ -37,7 +37,7 @@ MONTHLY_BUDGET_CENTS = "7500"
 GLOBAL_RPM = "120"
 # The paid plans are dormant until this is "1" and the Stripe secrets are set. While it is off,
 # nothing about paying is shown and the billing routes answer 404.
-PAYMENTS_ENABLED = "0"
+PAYMENTS_ENABLED = "1"
 # Shown on the upgrade buttons. Stripe charges whatever the price in your Stripe dashboard says,
 # so keep these in step with it.
 SUPPORTER_PRICE_TEXT = "$5/month"
