@@ -23,7 +23,7 @@ RULES = [
     # --- engineering (non-software) ---
     ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern"),
     ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac"),
-    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction"),
+    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
     ("chemical", r"chemical engineer|process engineer|petroleum|refin"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
@@ -38,13 +38,13 @@ RULES = [
     # fires on a title like "Environment, Safety and Health Undergraduate Intern".
     ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources|geolog|geoscien|geophysic|geospatial|geographic information system|"
      r"occupational (health (and|&|,) )?safety|\behs\b|\bhse\b|"
-     r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)"),
+     r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)|health,? safety,? (&|and) environment(al)?\W{0,5}(intern|co-?op)|safety (&|and) environment\W{0,5}(intern|co-?op)|\b(workplace|fire/life|fire (and|&) life|employee health (&|and)) safety( \w+){0,2} (intern|co-?op)|(intern|co-?op)\s*[-–,:|]\s*(\w+ ){0,2}(workplace|employee health (&|and)) safety"),
     ("biomedical", r"biomedical|bioengineer|medical device|clinical engineer"),
     # A posting that says engineering and nothing more specific is still an engineering
     # posting. classify drops this again the moment any other rule matched, so it is the
     # generic case only: "Engineering Intern", "Quality Engineering Intern", "Field Engineer
     # Intern". 1,200 listings in one export, none of which had any field tag before.
-    ("engineering", r"\bengineer(ing|s)?\b"),
+    ("engineering", r"\bengineer(ing|s)?\b|(?<!internal )(?<!risk & )(?<!risk and )\bcontrols (intern|technician|engineer|co-?op)|\b(electrical|electronics|process|embedded|manufacturing|flight|vehicle|machine|chassis|powertrain) controls\b|guidance,? navigation,? (&|and) controls|navigation, estimation,? (and|&) controls"),
 
     # --- sciences / math / health ---
     ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery|bioinformatic"),
@@ -60,15 +60,15 @@ RULES = [
     ("lab_research", r"\blab(oratory)?\b|wet lab|research technician|\breu\b|research experience for undergrad|undergraduate research|summer research|\bsurf\b"),
 
     # --- business / finance ---
-    ("finance", r"banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)"),
+    ("finance", r"banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern"),
     ("accounting", r"assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
-    ("marketing", r"\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth"),
+    ("marketing", r"\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern"),
     ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)"),
     ("sales", r"\bsales\b|business development|account executive|account manager|client relations|customer success"),
     ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations"),
-    ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement"),
-    ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse"),
+    ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b"),
+    ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern"),
     ("entrepreneurship", r"entrepreneur|\bstart-?ups?\b|incubator|accelerator|small business"),
     ("economics", r"\beconomic|econometric|policy analys"),
 
@@ -97,8 +97,8 @@ RULES = [
     ("library", r"librar(y|ian)|information science|archiv(e|es|ist|al)"),
     ("hospitality", r"hospitality|\bhotel|restaurant|culinary|food (and|&) beverage|event planning|\bevents? (intern|coordinat)|tourism"),
     ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"),
-    ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation"),
-    ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl"),
+    ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation|food safety( (&|and) quality| quality( assurance)?)?( \w+){0,2} (intern|co-?op)|quality (&|and )?food safety"),
+    ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl|(?<!high-)(?<!high )\benergy (intern|internship|assessment intern)|building energy model|advanced energy intern"),
     ("languages", r"translat(or|ion)s?\b|interpreter\b|bilingual|linguist|"
      # "interpreter\b" is deliberate: mechanistic interpretability is not an interpreting job.
      r"\besl\b|tesol\b|\btefl\b|english language (learn|cent|institute)|"
@@ -143,6 +143,17 @@ RULES = [
 # "Management" was measured too - 64 untagged titles - and left alone deliberately: the bare word
 # is "Portfolio Management" and "Waste Management" as often as it is a management trainee, and
 # there is no honest single tag for it.
+#
+# A later pass over the 1,814 open listings still tagged only "other" added the tail alternations
+# on finance (named risk desks), environmental (EHS and workplace/fire-life safety), agriculture
+# (food safety), sustainability (energy interns), operations (quality specialist/intern), engineering
+# (controls roles), civil (water and transportation), supply_chain (inbound transportation) and
+# marketing (customer experience/insights). Each is tied to a role word - "intern", "co-op",
+# "specialist" - because the bare phrases live in description boilerplate: "operational risk",
+# "a high-energy intern experience", "Health, Safety, and Environment culture", "Internal
+# Controls". Measured against every open listing, they changed 85 and rescued 47 from "other".
+# Six came from a description rather than a title: five quality roles whose bodies name a quality
+# internship, and an energy-markets intern, all of them in the right cluster.
 
 STAGES = ("internship", "co_op", "research", "fellowship", "early_insight", "part_time", "apprenticeship")
 YEARS = ("first_year", "sophomore", "junior", "senior", "masters", "phd")

@@ -352,3 +352,37 @@ def test_a_postdoc_is_a_postdoc_however_the_employer_spells_it():
     # "post" only starts a postdoc when "doc" or "bacc" follows it, so the word itself is safe.
     assert stage_of("Social Media Post Production Intern") == ["internship"]
     assert stage_of("Research Intern") == ["internship", "research"]
+
+
+def test_titles_that_used_to_land_in_other_now_reach_their_field():
+    # Real titles from the open board, every one of them tagged only "other" before.
+    for title, tag in (
+        ("Operational Risk Intern [2027 Internship Program]", "finance"),
+        ("Payment Risk Intern", "finance"),
+        ("Health, Safety, & Environment Intern - Summer 2027", "environmental"),
+        ("2027 Summer Intern - Global Workplace Safety", "environmental"),
+        ("Fire/Life Safety Summer Intern", "environmental"),
+        ("Food Safety Intern- Summer 2027", "agriculture"),
+        ("Advanced Energy Intern", "sustainability"),
+        ("Energy Internship: Summer 2027", "sustainability"),
+        ("Quality Intern (Summer 2027)", "operations"),
+        ("Controls Intern | Urbandale, IA", "engineering"),
+        ("Guidance, Navigation & Controls (GNC) Internship - Spring 2027", "engineering"),
+        ("Summer 2027 Internships - CO Water and Transportation", "civil"),
+        ("Inbound Transportation Network Internship", "supply_chain"),
+        ("Customer Experience Intern", "marketing"),
+        ("Customer Insight Intern", "marketing"),
+    ):
+        assert tag in classify(title), (title, classify(title))
+
+
+def test_the_rescue_phrases_stay_out_of_boilerplate():
+    # Each phrase is tied to a role word because the bare phrase is everywhere in bodies.
+    assert "sustainability" not in classify(
+        "C&I Sales Intern", "Be part of a supportive, high-energy intern experience.")
+    assert "environmental" not in classify(
+        "Intern - Operational Support", "Become familiar with the Health, Safety, and Environment culture.")
+    assert "finance" not in classify(
+        "Software Engineering Intern", "You will help reduce operational risk across our platform.")
+    assert "engineering" not in classify("Internal Controls Intern")
+    assert "engineering" not in classify("Process Risk and Controls Consulting Intern")
