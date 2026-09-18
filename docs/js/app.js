@@ -191,7 +191,7 @@
     const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
-    const meta = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats)].filter(Boolean).join(" · ");
+    const meta = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
     const bl = elig ? blockers(r, elig).filter(t => !/^For /.test(t)) : [];
     const tags = r.field_tags || [];
     const stages = (r.stage || []).filter(s => s !== "internship").map(s => IS.STAGE_LABEL[s] || s);
@@ -395,6 +395,15 @@
       return () => { live = false; };
     }, [ready, keysKey]);
 
+    // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
+    const wantDesc = !!f.q.trim();
+    useEffect(() => {
+      if (!ready || !wantDesc) return;
+      let live = true;
+      store.current.descs(keys).then(() => { if (live) setVer(store.current.version()); });
+      return () => { live = false; };
+    }, [ready, wantDesc, keysKey]);
+
     // sign-in
     useEffect(() => {
       const r = IS.handleRedirect();
@@ -571,6 +580,9 @@
 
     async function autoApply(list) {
       if (!info.installed) { setNote("Install the InternScout extension first."); return; }
+      // The agent tailors answers from the posting text, which is not in the list rows.
+      const ks = new Set(); list.forEach(r => IS.shardKeys(r).forEach(k => ks.add(k)));
+      await store.current.descs([...ks]);
       const payload = list.filter(r => r.apply_url).slice(0, 100).map(r => ({
         id: r.id, apply_url: r.apply_url, company: r.company_name, title: r.title,
         location: (r.region_locations || []).join("; ") || r.location_raw || "", description: r.description || "",

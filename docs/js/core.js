@@ -216,6 +216,7 @@
     let base = C.dataUrl || "./data/";
     let index = null, legacy = false, bust = false;
     const loaded = new Map();   // key -> Promise
+    const descd = new Map();    // key -> Promise (description sidecars)
     const byId = new Map();
     let version = 0;
 
@@ -224,7 +225,7 @@
     async function init(fromRaw) {
       bust = !!fromRaw;
       base = fromRaw ? C.rawDataFallback : (C.dataUrl || "./data/");
-      loaded.clear(); byId.clear(); index = null; legacy = false; version++;
+      loaded.clear(); descd.clear(); byId.clear(); index = null; legacy = false; version++;
       const bases = fromRaw ? [C.rawDataFallback] : [C.dataUrl || "./data/", C.rawDataFallback].filter(Boolean);
       for (const b of bases) {
         for (const path of ["listings/index.json", "index.json"]) {
@@ -256,8 +257,32 @@
       await Promise.all(jobs);
     }
 
+    // Descriptions live beside each shard (<file> -> <file>.desc.json, {id: text}) so the list
+    // loads without them; they are fetched only for search and Auto-Apply. Older exports carry
+    // them inline on the row, and then the sidecar simply doesn't exist.
+    async function descs(keys) {
+      if (legacy || !index) return;
+      const jobs = [];
+      for (const k of new Set(keys)) {
+        const meta = index.files[k];
+        if (!meta || descd.has(k)) continue;
+        const file = meta.desc || (meta.file || (index._dir + k + ".json")).replace(/\.json$/, ".desc.json");
+        const pr = Promise.resolve(loaded.get(k)).then(() => getJSON(base + file, bust)).then(m => {
+          let n = 0;
+          for (const id in m) {
+            const x = byId.get(id) || byId.get(Number(id));
+            if (x && !x.description && m[id]) { x.description = m[id]; delete x._hay; n++; }
+          }
+          if (n) version++;
+        }).catch(() => { /* no sidecar: descriptions are inline, or this shard has none */ });
+        descd.set(k, pr);
+        jobs.push(pr);
+      }
+      await Promise.all(jobs);
+    }
+
     return {
-      init, ensure,
+      init, ensure, descs,
       all: () => [...byId.values()],
       version: () => version,
       index: () => index,
