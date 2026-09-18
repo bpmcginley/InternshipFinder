@@ -28,6 +28,22 @@ def test_term_parse():
     assert parse_term_from_text("SWE Intern Summer 2027") == ("Summer", 2027)
 
 
+def test_a_season_with_no_year_does_not_print_the_word_none():
+    # "Year-round Intern - UX Design and Research" names a season and no year, and the term came out
+    # as "Year-round None". 649 listings in one export did. A season on its own is the honest answer.
+    def term(title, **raw):
+        return (normalize(dict({"company_name": "Acme", "title": title, "locations": ["Boston, MA"],
+                                "source": "test", "employment_type": "Intern",
+                                "url": "https://example.com/1"}, **raw)) or {}).get("term")
+    assert term("Summer Intern - Mechanical Design") == "Summer"
+    assert term("Year-round Intern - UX Design and Research") == "Year-round"
+    assert term("Software Engineer Intern, Summer 2027") == "Summer 2027"
+    assert term("Software Engineer Intern") is None
+    # and a source that says the season is "null" has said nothing at all.
+    assert term("Data Intern", season="null") is None
+    assert term("Data Intern", season="null", year=2027) is None
+
+
 def test_geo():
     g = evaluate_locations(["Boston, MA"])
     assert g["within_radius"] and g["in_city"]

@@ -157,7 +157,14 @@ def normalize(raw: dict) -> dict | None:
     us, uy = parse_term_from_text(raw.get("apply_url") or raw.get("url") or "")
     season = ps or us or season or raw.get("season")
     year = py_ or uy or year or raw.get("year")
-    term = f"{season} {year}".strip() if season else None
+    # A season on its own is worth keeping - "Summer" on a card is true, and the dashboard scores a
+    # season-only term against the student's chosen terms - but "Summer None" is not, and 649 of the
+    # 14,525 listings in the last export said exactly that. The dashboard has been deleting the word
+    # None since before this was found; now there is none to delete. And a source that hands over the
+    # string "null" for a season has told us nothing, so it is treated as nothing.
+    if season and str(season).strip().lower() in ("", "none", "null"):
+        season = None
+    term = (f"{season} {year}" if year else str(season)).strip() if season else None
 
     return {
         "company_name": company,
