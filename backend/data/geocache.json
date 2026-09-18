@@ -260,6 +260,10 @@
 42.1295,
 -80.0853
 ],
+"ewing township|NJ":[
+40.26,
+-74.7909
+],
 "exton|PA":[
 40.029,
 -75.6208
@@ -589,6 +593,7 @@
 40.7127,
 -74.006
 ],
+"new york city area|NY":null,
 "new york city m&s|NY":null,
 "new york city office|NY":null,
 "new york ny usa|NY":null,
@@ -730,6 +735,10 @@
 -74.3404
 ],
 "pittsburgh - pa - 2730 sidney street - suite 330|PA":null,
+"pittsford|NY":[
+43.091,
+-77.5153
+],
 "plainview|NY":[
 40.7765,
 -73.467
