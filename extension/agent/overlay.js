@@ -31,7 +31,23 @@
 
   const LABEL = { queued: "Queued", working: "Working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
   const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const send = (action, extra = {}) => chrome.runtime.sendMessage({ type: "control", id: job.id, action, ...extra });
+  // After the extension is reloaded or updated, this old copy of the script stays on the page with
+  // a dead connection: chrome.runtime.sendMessage throws "Extension context invalidated". Say so on
+  // the card instead of failing silently. The callback also reads lastError, so a page that goes into
+  // the back/forward cache doesn't log "message channel is closed".
+  const alive = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch { return false; } };
+  function stale() {
+    if (!host.isConnected) return;
+    $("#card").className = "card failed";
+    $("#st").textContent = "· Reload this page";
+    $("#body").innerHTML = `<div class="msg">InternScout was updated or reloaded, so this card lost its connection. Reload this page, then use the side panel to resume.</div>`;
+  }
+  function msg(m, cb) {
+    if (!alive()) { stale(); return; }
+    try { chrome.runtime.sendMessage(m, (r) => { void chrome.runtime.lastError; if (cb) cb(r); }); }
+    catch { stale(); }
+  }
+  const send = (action, extra = {}) => msg({ type: "control", id: job.id, action, ...extra });
 
   function render(j) {
     job = j;
@@ -71,12 +87,12 @@
   $("#min").onclick = () => $("#card").classList.toggle("min");
 
   chrome.runtime.onMessage.addListener((m) => { if (m && m.type === "overlay") render(m.job); });
-  chrome.runtime.sendMessage({ type: "overlay_hello" }, (r) => { void chrome.runtime.lastError; if (r && r.job) render(r.job); });
+  msg({ type: "overlay_hello" }, (r) => { if (r && r.job) render(r.job); });
 
   // A real click on a final-submit button starts confirmation-page detection.
   document.addEventListener("click", (e) => {
     if (!e.isTrusted || !job || job.status !== "ready_to_submit" || !window.ISGuard) return;
     const t = window.ISGuard.clickTarget(e.target);
-    if (t && window.ISGuard.classify(window.ISGuard.describe(t)) !== "ok") chrome.runtime.sendMessage({ type: "maybe_submitted" });
+    if (t && window.ISGuard.classify(window.ISGuard.describe(t)) !== "ok") msg({ type: "maybe_submitted" });
   }, true);
 })();
