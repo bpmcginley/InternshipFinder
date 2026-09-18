@@ -936,5 +936,12 @@ WORKDAY += [
     {'name': 'OhioHealth', 'ats_token': 'ohiohealth|wd5|OhioHealthJobs', 'is_quant_target': False, 'sector': 'health'},
     {'name': 'Essentia Health', 'ats_token': 'essentiahealth|wd1|Essentia_Health', 'is_quant_target': False, 'sector': 'health'},
 ]
+# Montefiore, found after the block above was written: its main board is site "MMC" (robots.txt
+# lists it with the MMC_Volunteer, Burke, New_Rochelle, Mount_Vernon, SLCH, Schaffer and MEAC
+# sites). Fetched 2026-09-18: MMC held one student role (Research Student); the affiliate sites held
+# none, so only MMC is seeded.
+WORKDAY += [
+    {'name': 'Montefiore', 'ats_token': 'montefiore|wd12|MMC', 'is_quant_target': False, 'sector': 'health'},
+]
 
 # --- end sector seeds ---

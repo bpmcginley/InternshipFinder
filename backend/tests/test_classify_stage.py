@@ -688,3 +688,12 @@ def test_hospital_student_titles_that_name_the_student_first():
               "Medical Assistant - gap year students welcome to apply",
               "Registered Nurse/Licensed Practical Nurse - Student Health Center Nurse"):
         assert not is_internship(t), t
+
+
+def test_a_credentialed_clinician_is_not_a_fellow():
+    # "Fellowship Trained" is what an attending surgeon is, not what a student is applying for.
+    for title in ("Outstanding Fellowship Trained Orthopaedic Trauma Surgeon Opportunity",
+                  "Fellowship-Trained Hand Surgeon", "Residency Trained Pharmacist - Fellowship Program"):
+        assert stage_of(title) == [], title
+    assert stage_of("Research Student") != []
+    assert stage_of("Arborist Apprentice (Tree Surgeon)") == ["apprenticeship"]

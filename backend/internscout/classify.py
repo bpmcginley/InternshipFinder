@@ -344,7 +344,13 @@ _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdire
 # Aerospace, Textron and the like, and none is open to a college student.
 _NEVER_STUDENT_RE = re.compile(r"post[- ]?doc|post[- ]?doctoral|post[- ]?bacc|faculty|professor|physician|attending|"
                                r"skill ?bridge|transitioning (military|service members?)|active duty service members?|"
-                               r"military transition", re.I)
+                               r"military transition|"
+                               # Credentials only a practising clinician has. Montefiore's "Outstanding
+                               # Fellowship Trained Orthopaedic Trauma Surgeon Opportunity" passed as a
+                               # fellowship on 2026-09-18. "surgeon" alone is not here: a tree-surgeon
+                               # apprenticeship is a student role. Nor is "board certified": a BCBA
+                               # fieldwork role for students working toward it may spell it out.
+                               r"fellowship[- ]trained|residency[- ]trained", re.I)
 # The job of running an internship programme is not an internship. Universities and hospitals post
 # plenty of them - "Assistant/Associate Coop Coordinator", "Manager, Internship Programs",
 # "Practicum Coordinator II for Nursing" - and they came through, because the very words that make
