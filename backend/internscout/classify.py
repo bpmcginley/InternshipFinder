@@ -505,3 +505,21 @@ SECTOR_FIELDS = {
     "social_research": "social_science",
     "economic_consulting": "economics",
 }
+
+# Employers whose research department is an economics department. The Fed titles its research
+# internships by department ("2027 Summer Intern - Research Group - Junior Intern", "Research Intern
+# - Research Group"), which names no discipline, so they matched no field and fell back to
+# government - under which an economics major never saw them. Only a title that says research and
+# nothing more specific gets this, and R&D is left out: "Digital Money and Payments Research &
+# Development" is technology work.
+_ECON_EMPLOYER_RE = re.compile(r"federal reserve|national bureau of economic research|\bnber\b|"
+                               r"bureau of economic analysis|bureau of labor statistics|"
+                               r"congressional budget office", re.I)
+_BARE_RESEARCH_RE = re.compile(r"\bresearch\b(?!\s*(&|and)\s*development)", re.I)
+
+
+def employer_research_field(company: str, title: str) -> str | None:
+    """The field a bare "research" title means at this employer, or None."""
+    if _ECON_EMPLOYER_RE.search(company or "") and _BARE_RESEARCH_RE.search(title or ""):
+        return "economics"
+    return None

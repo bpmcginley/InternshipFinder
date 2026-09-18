@@ -18,7 +18,8 @@
   "name": "Brookings Institution",
   "ats": "unsupported",
   "source_url": "https://careers-brookings.icims.com",
-  "note": "iCIMS -- unsupported ATS."
+  "note": "iCIMS -- unsupported ATS.",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "government_policy",
@@ -46,14 +47,16 @@
   "name": "Council on Foreign Relations",
   "ats": "unsupported",
   "source_url": "https://careers-cfr.icims.com",
-  "note": "iCIMS -- unsupported ATS. Also runs paid internship program described at cfr.org/career-opportunities."
+  "note": "iCIMS -- unsupported ATS. Also runs paid internship program described at cfr.org/career-opportunities.",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "government_policy",
   "name": "Federal Reserve Board",
   "ats": "unresolved",
   "source_url": "https://frbog.taleo.net/careersection/1/jobsearch.ftl",
-  "note": "Board of Governors uses a separate Taleo tenant (frbog|1) from the regional Reserve Banks' Workday system. Token matches URL pattern but live fetch throws httpx.DecodingError (gzip/WAF header mismatch on frbog.taleo.net) unrelated to token correctness -- unverified."
+  "note": "Board of Governors uses a separate Taleo tenant (frbog|1) from the regional Reserve Banks' Workday system. Token matches URL pattern but live fetch throws httpx.DecodingError (gzip/WAF header mismatch on frbog.taleo.net) unrelated to token correctness -- unverified.",
+  "recheck_2026_09_18": "rechecked 2026-09-18: legacy Taleo section (jobsearch.ftl redirects to moresearch.ftl), no REST job board and an empty portal id, and the server labels plain responses as gzip. taleo.py cannot read it."
  },
  {
   "sector": "government_policy",
@@ -95,7 +98,8 @@
   "name": "Boston Scientific",
   "ats": "unsupported",
   "source_url": "https://bostonscientific.eightfold.ai/careers",
-  "note": "Eightfold AI"
+  "note": "Eightfold AI",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "health",
@@ -109,7 +113,8 @@
   "name": "Dartmouth Health",
   "ats": "unsupported",
   "source_url": "https://careers-dartmouth-hitchcock.icims.com/jobs/intro",
-  "note": "iCIMS"
+  "note": "iCIMS",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "health",
@@ -137,7 +142,8 @@
   "name": "NYU Langone Health",
   "ats": "unsupported",
   "source_url": "https://careers-nyu.icims.com/",
-  "note": "iCIMS"
+  "note": "iCIMS",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "health",
@@ -165,7 +171,8 @@
   "name": "Sodexo",
   "ats": "unsupported",
   "source_url": "https://external-careers-sodexo.icims.com/jobs/intro",
-  "note": "iCIMS"
+  "note": "iCIMS",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "media",
@@ -193,7 +200,8 @@
   "name": "HarperCollins",
   "ats": "unsupported",
   "source_url": "https://careers-harpercollins.icims.com/jobs/intro",
-  "note": "iCIMS"
+  "note": "iCIMS",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "media",
@@ -242,7 +250,8 @@
   "name": "Boys & Girls Clubs of America",
   "ats": "unsupported",
   "source_url": "https://careers-bgca.icims.com/",
-  "note": "iCIMS -- unsupported ATS. (Separate clubjobs-bgca.icims.com also exists for local-club postings.)"
+  "note": "iCIMS -- unsupported ATS. (Separate clubjobs-bgca.icims.com also exists for local-club postings.)",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "nonprofit",
@@ -263,7 +272,8 @@
   "name": "NRDC",
   "ats": "unsupported",
   "source_url": "https://careers-nrdc.icims.com/",
-  "note": "iCIMS -- unsupported ATS."
+  "note": "iCIMS -- unsupported ATS.",
+  "recheck_2026_09_18": "now seeded: the fetcher for this system has been built."
  },
  {
   "sector": "nonprofit",
@@ -312,7 +322,8 @@
   "name": "World Wildlife Fund",
   "ats": "unsupported",
   "source_url": "https://careers-wwfus.icims.com/jobs/search",
-  "note": "iCIMS -- unsupported ATS."
+  "note": "iCIMS -- unsupported ATS.",
+  "recheck_2026_09_18": "rechecked 2026-09-18: careers-wwfus iCIMS search answers 404."
  },
  {
   "sector": "nonprofit",
@@ -396,7 +407,8 @@
   "name": "PepsiCo",
   "ats": "unsupported",
   "source_url": "https://uscareers-pepsico.icims.com/jobs/login?loginOnly=1",
-  "note": "iCIMS"
+  "note": "iCIMS",
+  "recheck_2026_09_18": "rechecked 2026-09-18: robots.txt closes the uscareers-pepsico iCIMS host."
  },
  {
   "sector": "retail_consumer",
@@ -424,7 +436,8 @@
   "name": "Wayfair",
   "ats": "unresolved",
   "source_url": "https://job-boards.greenhouse.io/wayfair",
-  "note": "Job board page exists at job-boards.greenhouse.io/wayfair but boards-api.greenhouse.io/v1/boards/wayfair/jobs returns 404; tried wayfairinc/wayfairllc/wayfair1 variants, all 404. Board may be decommissioned/renamed. Unresolved after 3 lookups."
+  "note": "Job board page exists at job-boards.greenhouse.io/wayfair but boards-api.greenhouse.io/v1/boards/wayfair/jobs returns 404; tried wayfairinc/wayfairllc/wayfair1 variants, all 404. Board may be decommissioned/renamed. Unresolved after 3 lookups.",
+  "recheck_2026_09_18": "rechecked 2026-09-18: greenhouse board \"wayfair\" answers 404."
  },
  {
   "sector": "retail_consumer",

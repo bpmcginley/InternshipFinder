@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
-from .classify import classify, stage_of, SECTOR_FIELDS
+from .classify import classify, stage_of, SECTOR_FIELDS, employer_research_field
 from .region import evaluate_locations
 
 # "Spring Boot" and "fall under" are not terms
@@ -192,6 +192,8 @@ def normalize(raw: dict) -> dict | None:
         return None
 
     tags = classify(title)  # title-only: avoids off-target tags from JD boilerplate
+    if tags == ["other"] and employer_research_field(company, title):
+        tags = [employer_research_field(company, title)]
     if tags == ["other"] and raw.get("sector") in SECTOR_FIELDS:
         tags = [SECTOR_FIELDS[raw["sector"]]]
     if raw.get("source") in PUBLIC_SOURCES:  # every posting from a government feed is government work

@@ -428,3 +428,22 @@ def test_rename_board_is_opt_in_and_fixes_a_wrong_name():
     assert not rename_board(reg, "lever", "never-heard-of-it", "X")
     seeded = [co for co in companies_seed.LEVER if co["ats_token"] == "redsox"]
     assert seeded and seeded[0].get("rename") and seeded[0]["sector"] == "hospitality_sports"
+
+
+def test_fed_research_group_interns_are_economics():
+    # The Fed titles research internships by department, so no rule named a discipline and they
+    # fell back to government. Titles are the live ones from 2026-09-18.
+    co = {"name": "The Federal Reserve System", "ats_token": "rb|wd5|FRS", "sector": "government_policy"}
+    item = lambda title: normalize(board_item(co, source="workday", title=title, locations=["New York, NY"],
+                                              url="https://example.com/1", employment_type="Intern"))
+    assert item("2027 Summer Intern - Research Group - Junior Intern")["field_tags"] == ["economics"]
+    assert item("Research Intern - Research Group")["field_tags"] == ["economics"]
+    # R&D is technology work, and a title with no research in it keeps the sector's field.
+    assert item("Coop: Digital Money and Payments Research & Development")["field_tags"] == ["government"]
+    assert item("Federal Reserve Summer Business 2027 Internship")["field_tags"] == ["government"]
+    # A title that names its discipline keeps it.
+    assert item("2027 Summer Intern - Technology Group - Junior")["field_tags"] == ["swe"]
+    # Other employers' bare research titles are untouched.
+    other = {"name": "Mass General Brigham", "ats_token": "x", "sector": "health"}
+    assert normalize(board_item(other, source="workday", title="Research Intern", locations=["Boston, MA"],
+                                url="https://example.com/2", employment_type="Intern"))["field_tags"] == ["health"]
