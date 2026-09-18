@@ -61,6 +61,10 @@
 40.7693,
 -73.1151
 ],
+"boothwyn|PA":[
+39.8309,
+-75.4397
+],
 "boston|NY":[
 42.629,
 -78.7376
@@ -102,10 +106,17 @@
 40.2588,
 -80.1867
 ],
+"canton|NY":[
+44.5956,
+-75.1691
+],
 "canton|PA":[
 41.6565,
 -76.8533
 ],
+"cap25: pittsburgh|PA":null,
+"cap26: state college|PA":null,
+"cap27: alc- harrisburg|PA":null,
 "carlisle|PA":[
 40.2015,
 -77.1891
@@ -180,6 +191,10 @@
 "connellsville|PA":[
 40.0179,
 -79.5895
+],
+"coraopolis|PA":[
+40.5175,
+-80.1643
 ],
 "corning|NY":[
 42.1435,
@@ -259,6 +274,10 @@
 "erie|PA":[
 42.1295,
 -80.0853
+],
+"etna|PA":[
+40.5036,
+-79.9484
 ],
 "ewing township|NJ":[
 40.26,
@@ -364,6 +383,10 @@
 "harrison|NJ":[
 40.7465,
 -74.1563
+],
+"hazle township|PA":[
+40.9572,
+-76.0601
 ],
 "hdh blue bell - pa - 980 jolly road|PA":null,
 "henrietta|NY":[
@@ -545,6 +568,10 @@
 "mountain top|PA":[
 40.1068,
 -75.9527
+],
+"mountainside|NJ":[
+40.6723,
+-74.3574
 ],
 "mt laurel township|NJ":[
 39.934,
@@ -970,6 +997,10 @@
 40.2068,
 -75.0996
 ],
+"warrendale|PA":[
+40.6534,
+-80.0795
+],
 "waterford|NY":[
 42.7924,
 -73.681
@@ -1005,6 +1036,10 @@
 "whitehouse station|NJ":[
 40.6154,
 -74.7704
+],
+"wilkes barre|PA":[
+41.2465,
+-75.8817
 ],
 "wilkes-barre|PA":[
 41.2465,
