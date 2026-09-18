@@ -977,4 +977,14 @@ WORKDAY += [
     {'name': 'Guggenheim Partners', 'ats_token': 'guggenheim|wd1|Guggenheim_Careers_Campus', 'is_quant_target': False, 'sector': 'insurance_finance'},
 ]
 
+# --- nonprofits, second pass (probed and fetched live 2026-09-18) ---
+# 31 unseeded charities, foundations and advocacy groups were probed. The Clinton Foundation's board
+# held five fall internships at the Presidential Center: museum, communications, education,
+# events and philanthropy. Left out: the Salvation Army's Workday hit ("Salvos") is the Australian
+# territory, whose 173 jobs are all in Australia; Greenpeace's greenhouse board is empty; and the
+# Goodwill JazzHR board is the one already rejected above.
+GREENHOUSE += [
+    {'name': 'Clinton Foundation', 'ats_token': 'clintonfoundation', 'is_quant_target': False, 'sector': 'nonprofit'},
+]
+
 # --- end sector seeds ---
