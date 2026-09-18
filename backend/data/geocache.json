@@ -37,7 +37,6 @@
 "399 park avenue-new york|NY":null,
 "41 victory blvd.|NY":null,
 "416 e 149th street|NY":null,
-"448 florham park nj|NJ":null,
 "4623 fifth ave|NY":null,
 "51 d richmond hill rd.|NY":null,
 "620 william pitt way|PA":null,
@@ -643,6 +642,7 @@
 40.7682,
 -73.5238
 ],
+"home based-pennsylvania|PA":null,
 "homer|NY":[
 42.6369,
 -76.1788
@@ -761,6 +761,7 @@
 40.5992,
 -77.5714
 ],
+"liberal arts hall|NY":null,
 "linden|NJ":[
 40.622,
 -74.2446
@@ -989,6 +990,7 @@
 "new york ny usa|NY":null,
 "new york office|NY":null,
 "new york privy hq|NY":null,
+"new york state (other|NY":null,
 "new york united states|NY":null,
 "new york \u2013 1350 avenue of the americas|NY":null,
 "new york- united states|NY":null,
@@ -1244,10 +1246,7 @@
 39.8812,
 -75.3238
 ],
-"rifton|NY":[
-41.8376,
--74.0374
-],
+"rit main location|NY":null,
 "riverdale|NY":[
 40.9006,
 -73.9064
@@ -1546,7 +1545,6 @@
 "usa - remote|PA":null,
 "usa - ridley park|PA":null,
 "usa - smithfield|PA":null,
-"usa nj - franklin lakes|NJ":null,
 "usa nj iselin|NJ":null,
 "usa ny new york city 3 times square|NY":null,
 "usa ny new york city 66 hudson blvd e|NY":null,
