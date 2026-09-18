@@ -595,3 +595,16 @@ def test_pricing_power_imaging_and_facilities_titles_reach_a_field():
     assert "finance" not in classify("Early Careers: Corporate Risk & Broking Construction Internship")
     assert "health" not in classify("Summer Internship - Seismic Imaging Technology - Houston, TX")
     assert "industrial" not in classify("Process Automation Developer Intern")
+
+
+def test_political_science_evaluation_survey_and_user_research_titles():
+    assert "social_science" in classify("2027 Summer Internship - Public Policy/Political Science (Rosemead)")
+    assert "social_science" in classify("Monitoring, Evaluation, Research, & Learning Internships and Fellowships")
+    assert "social_science" in classify("Undergraduate Research Assistant - Phone Survey")
+    assert "psychology" in classify("User Research Intern")
+    assert "psychology" in classify("Human Behavior Analytics Intern - Safety Research")
+    # a survey intern at an engineering firm is a land surveyor; the Fed's is an economist
+    assert classify("Survey Intern (Summer 2027)") == ["civil"]
+    assert classify("Student Internship - Survey") == ["civil"]
+    assert classify("Business Survey Intern") == ["economics"]
+    assert "civil" not in classify("Survey Research Intern")

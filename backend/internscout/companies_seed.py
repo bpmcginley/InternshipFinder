@@ -557,7 +557,8 @@ SMARTRECRUITERS += [
 ]
 ASHBY += [
     {'name': 'Instructure', 'ats_token': 'instructure', 'is_quant_target': False, 'sector': 'education_research'},
-    {'name': 'Morning Consult', 'ats_token': 'morningconsult', 'is_quant_target': False, 'sector': 'media'},
+    # A polling firm first: social_research rather than the media it was first seeded as.
+    {'name': 'Morning Consult', 'ats_token': 'morningconsult', 'is_quant_target': False, 'sector': 'social_research'},
     {'name': 'Berlitz', 'ats_token': 'berlitz', 'is_quant_target': False, 'sector': 'education_research'},
 ]
 
@@ -566,8 +567,10 @@ ICIMS = [
     {'name': 'Brookings Institution', 'ats_token': 'careers-brookings', 'is_quant_target': False,
      'sector': 'government_policy'},
     # Analysis Group runs two boards and the internships are split across them.
-    {'name': 'Analysis Group', 'ats_token': 'professionalcareers-analysisgroup', 'is_quant_target': False},
-    {'name': 'Analysis Group', 'ats_token': 'datasciencecareers-analysisgroup', 'is_quant_target': False},
+    {'name': 'Analysis Group', 'ats_token': 'professionalcareers-analysisgroup', 'is_quant_target': False,
+     'sector': 'economic_consulting'},
+    {'name': 'Analysis Group', 'ats_token': 'datasciencecareers-analysisgroup', 'is_quant_target': False,
+     'sector': 'economic_consulting'},
     {'name': 'Advocates', 'ats_token': 'careers-advocatesinc', 'is_quant_target': False, 'sector': 'nonprofit'},
     # Human services across central MA: disability, brain injury and behavioral health. Five
     # postings on the board the day it was added and no student role among them, which is
@@ -582,11 +585,13 @@ RECRUITEE = [
 ]
 WORKDAY += [
     # The Pew Research Center hires through the Pew Charitable Trusts' tenant.
+    # Survey research, so social_research; the Trusts' own board (TrustsExternal) stays policy.
     {'name': 'Pew Research Center', 'ats_token': 'pewtrusts|wd5|CenterExternal', 'is_quant_target': False,
-     'sector': 'government_policy'},
+     'sector': 'social_research'},
     # Likewise Compass Lexecon through FTI Consulting's. 10 economics internships on the day it was
     # added, all in Europe; the US ones post later in the season.
-    {'name': 'Compass Lexecon', 'ats_token': 'fticonsulting|wd108|CompassLexeconCareers', 'is_quant_target': False},
+    {'name': 'Compass Lexecon', 'ats_token': 'fticonsulting|wd108|CompassLexeconCareers', 'is_quant_target': False,
+     'sector': 'economic_consulting'},
     # Two boards on one tenant, both live: the staff board had 18 postings the day it was added
     # and the pre-service board, which is the corps pipeline students actually enter through,
     # had none. An empty board is registered rather than skipped - it answers 200 with a total
@@ -709,5 +714,65 @@ WORKDAY += [
 # and BrassRing were left alone above. The Pioneer Valley agencies nearest UMass are the loss
 # that matters: CHD, Gandara and BHN are all on UKG, and they are exactly who a psychology
 # undergraduate in Amherst would apply to.
+
+# --- social research and economic consulting (probed and fetched live 2026-09-18) ---
+# Social sciences was the one thin cluster: 10 open listings in the baseline states. Most of the
+# employers that hire for it were already registered but carried no sector, or one that counted
+# them elsewhere, so their "Research Assistant" and "Summer Analyst" postings reached no social-
+# science tag. These label them social_research or economic_consulting and add the boards found by
+# the name probe or on the employer's own careers page. Several had no student posting on the day
+# (SSRC, IDinsight, CFR, Vera, Kantar, Hanover, Material, Catalist); they hire interns by season.
+#
+# Not reachable: Brattle, Cornerstone Research, Keystone, Heritage, Cato, CAP, Atlantic Council,
+# Bipartisan Policy Center, CBPP, EPI, Niskanen, IPA, Westat and the Chicago Council answer a plain
+# GET of their careers page with 403, and are left alone. NERA posts through Marsh McLennan's own
+# site; Mathematica through its own host. EDF's Workday site answers 422 to the jobs API under
+# both tenant names, and the "Confidential" site discovery registered for it is closed by its
+# robots.txt, so it will age out.
+#
+# A sector counts every posting on the board towards its cluster, so it is given only where the
+# internships are the discipline. Gallup is a pollster, but its eleven open internships were
+# software, data and ML; BRG's economics internships are in Europe and its US ones are corporate
+# finance. Both stay unlabelled - labelled, they would have filled Social sciences with jobs a
+# sociology or economics major would not apply for.
+GREENHOUSE += [
+    {'name': 'Social Science Research Council', 'ats_token': 'socialscienceresearchcouncil',
+     'is_quant_target': False, 'sector': 'social_research'},
+    {'name': 'American Institutes for Research', 'ats_token': 'americaninstitutesforresearch',
+     'is_quant_target': False, 'sector': 'social_research'},
+    {'name': 'Vera Institute of Justice', 'ats_token': 'verainstituteofjustice', 'is_quant_target': False,
+     'sector': 'social_research'},
+    {'name': 'Charles River Associates', 'ats_token': 'charlesriverassociates', 'is_quant_target': False,
+     'sector': 'economic_consulting'},
+    # The careers page embeds this board; one fellowship open on the day.
+    {'name': 'Manhattan Institute', 'ats_token': 'manhattaninstituteforpolicyresearchinc',
+     'is_quant_target': False, 'sector': 'government_policy'},
+]
+ICIMS += [
+    # The third Analysis Group board, found by discovery.
+    {'name': 'Analysis Group', 'ats_token': 'analystcareers-analysisgroup', 'is_quant_target': False,
+     'sector': 'economic_consulting'},
+    {'name': 'Council on Foreign Relations', 'ats_token': 'careers-cfr', 'is_quant_target': False,
+     'sector': 'government_policy'},
+]
+JAZZHR += [
+    # One paid communications internship open on the day.
+    {'name': 'New America', 'ats_token': 'newamerica', 'is_quant_target': False, 'sector': 'government_policy'},
+    {'name': 'Brennan Center for Justice', 'ats_token': 'brennancenter', 'is_quant_target': False,
+     'sector': 'government_policy'},
+]
+LEVER += [
+    {'name': 'Catalist', 'ats_token': 'catalist', 'is_quant_target': False, 'sector': 'social_research'},
+]
+WORKDAY += [
+    {'name': 'Kantar', 'ats_token': 'kantar|wd3|KANTAR', 'is_quant_target': False, 'sector': 'social_research'},
+    {'name': 'Hanover Research', 'ats_token': 'hanoverresearch|wd5|HanoverResearch', 'is_quant_target': False,
+     'sector': 'social_research'},
+    {'name': 'Material', 'ats_token': 'material|wd1|Material_External_Career_Site', 'is_quant_target': False,
+     'sector': 'social_research'},
+]
+BAMBOOHR: list = [
+    {'name': 'IDinsight', 'ats_token': 'idinsight', 'is_quant_target': False, 'sector': 'social_research'},
+]
 
 # --- end sector seeds ---

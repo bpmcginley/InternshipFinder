@@ -44,7 +44,11 @@ RULES = [
     # --- engineering (non-software) ---
     ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern|signal processing|electric distribution|power (delivery|generation|supply|management|integrity)|signal integrity|energy storage (intern|co-?op|engineer)|energy management system"),
     ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac|machine shop|machinist"),
-    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey|\btraffic (engineer|intern|design|signal|stud(y|ies)|safety|operations)|\bsite civil\b|\bcivil (intern|co-?op)|(roadway|transportation|civil) design|transportation (bridge|systems analysis)"),
+    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey|\btraffic (engineer|intern|design|signal|stud(y|ies)|safety|operations)|\bsite civil\b|\bcivil (intern|co-?op)|(roadway|transportation|civil) design|transportation (bridge|systems analysis)|"
+     # Land surveying at engineering firms: Olsson's "Survey Internship", KCI's "Survey Intern",
+     # Michael Baker's "Survey Intern" all sat in "other". Tied to the role word straight after, so
+     # "Survey Research Intern" stays social science.
+     r"(?<!business )\bsurvey (student )?(intern|internship|technician|crew|co-?op)\b|internship\s*[-:]\s*survey\b"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
     ("chemical", r"chemical engineer|process engineer|petroleum|refin|(process|drug product|drug substance|analytical|formulation) development"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
@@ -109,7 +113,7 @@ RULES = [
     ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b|operational excellence|continuous improvement|quality management|\bqms\b|\bquality (internship|programs?|analyst)\b|\bquality control\b|site quality|(?<!engineering )(?<!engineer )\b(intern|internship)\W+quality\b(?! engineer)|\bfacilities (management|planning|planner|services|corporate|intern|internship)\b|\b(19|20)\d\d facilities intern|summer internship - facilities"),
     ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern|supplier (management|quality|development)(?! engineer)|supply management|materials? management|transportation (analyst|/storage)|fleet transportation"),
     ("entrepreneurship", r"entrepreneur|\bstart-?ups?\b|incubator|accelerator|small business"),
-    ("economics", r"\beconomic|econometric|policy analys|\beconomists?\b"),
+    ("economics", r"\beconomic|econometric|policy analys|\beconomists?\b|business survey"),   # the Fed's regional business surveys
 
     # --- design / media / arts / humanities ---
     ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design|experience design|web design|(textile|print|content|game|level|apparel|store|brand|creative|interior) design|^\W*((\d{4}|spring|summer|fall|winter)\W+)*design (intern|internship|co-?op)\b(?!\W+(electrical|water|mechanical|civil|structural)\b)"),
@@ -132,12 +136,22 @@ RULES = [
      # A BCBA fieldwork apprenticeship is a psychology role by any reading, and so is a
      # behaviour technician post: they are the commonest paid placement an undergraduate
      # psychology major can actually get. None of them say "psychology" in the title.
-     r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)|psychiatr|human factors|child (and adolescent )?development|behavio(u)?r science|suicide prevention|(?<!respiratory )(?<!recreation )(?<!recreational )(?<!activity )(?<!physical )(?<!occupational )(?<!speech )(?<!massage )\btherapist\b"),
+     r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)|psychiatr|human factors|child (and adolescent )?development|behavio(u)?r science|suicide prevention|(?<!respiratory )(?<!recreation )(?<!recreational )(?<!activity )(?<!physical )(?<!occupational )(?<!speech )(?<!massage )\btherapist\b|"
+     # User research is where psychology and cognitive-science majors go in industry: the
+     # interviews, usability studies and surveys are their methods. Kept as design too.
+     r"\bux research|user research|human behavio(u)?r|behavio(u)?ral (lab|research)"),
     ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
     # Sociology and anthropology had no tag at all, so the coverage report's social-sciences line
     # could only ever count psychology, economics and languages, and a "Survey Research Intern" or
     # "Sociology Research Intern" landed in "other". "Anthropologie" is a clothing retailer.
-    ("social_science", r"sociolog|anthropolog(y|ist|ical)|demograph|ethnograph|social science|survey research|\bpolling\b|public opinion"),
+    ("social_science", r"sociolog|anthropolog(y|ist|ical)|demograph|ethnograph|social science|survey research|\bpolling\b|public opinion|"
+     # Political science is a social science as well as a route into government, and "Public
+     # Policy/Political Science" internships were counted only under government. Monitoring and
+     # evaluation - "Monitoring, Evaluation, Research, & Learning" at IJM - is applied social
+     # research, the job a sociology or development-studies major is trained for. A phone survey
+     # is survey research; a "Survey Intern" on its own is a land surveyor (civil, below).
+     r"political scien|monitoring,? (&|and )?evaluation|program(me)? evaluation|impact evaluation|"
+     r"(phone|telephone|household) survey"),
     ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house|political scien|"
      # Policy work: "Energy Policy & Regulation Intern", "Policy & Advocacy Intern", "Policy Fellow",
      # "Policy Assistant", "Public Policy Assistant". Tied to a role word or a policy area, because
@@ -429,4 +443,11 @@ SECTOR_FIELDS = {
     # Mental-health and autism-services providers. Their clinical internships are titled by degree
     # level rather than by discipline, so the employer is the only thing that says psychology.
     "behavioral_health": "psychology",
+    # Pollsters, survey houses and evaluation shops (Gallup, Pew Research Center, SSRC, AIR) and
+    # economic consultancies (Analysis Group, CRA, Compass Lexecon, BRG). Their internships are
+    # titled "Research Assistant" or "Summer Analyst", which name no discipline, so before these
+    # two the coverage report counted them under government, media or nothing, and Social
+    # sciences read thin while the employers that hire for it most sat in the registry.
+    "social_research": "social_science",
+    "economic_consulting": "economics",
 }
