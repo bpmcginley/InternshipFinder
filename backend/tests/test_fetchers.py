@@ -12,7 +12,7 @@ from internscout.sources.oracle import parse_oracle, parse_oracle_detail
 from internscout.sources.taleo import parse_taleo, parse_taleo_detail
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
-from internscout.sources.icims import parse_icims
+from internscout.sources.icims import parse_icims, parse_icims_detail
 from internscout.sources.successfactors import parse_successfactors, parse_successfactors_detail
 from internscout.sources.eightfold import parse_eightfold, host_of as ef_host
 from internscout.sources.jazzhr import parse_jazzhr
@@ -285,6 +285,27 @@ def test_icims():
     assert items[0]["url"] == "https://acme.icims.com/jobs/7600/slug/job"
     # "International" is not an internship, but iCIMS keyword search matches it on substring
     assert parse_icims(card(7604, "International Scholar Advisor", "US-NY-New York"), CO) == []
+
+
+def test_icims_detail():
+    ld = ('{"@context":"http://schema.org","@type":"JobPosting","title":"Data Science Intern",'
+          '"datePosted":"2026-09-09T04:00:00.000Z","validThrough":"2027-09-01T04:00:00.000Z",'
+          '"description":"<h2>Overview</h2>\\n<p>Build real things.</p>"}')
+    page = ('<script type="application/ld+json">{"@type":"WebSite","name":"Acme Careers"}</script>'
+            '<script type="application/ld+json">%s</script>') % ld
+    desc, posted = parse_icims_detail(page)
+    # The WebSite block comes first on every tenant, so the JobPosting has to be looked for.
+    assert desc == "Overview\n Build real things."
+    # datePosted is a timestamp; the search card carries no date at all, so this is the only one.
+    assert posted == "2026-09-09"
+
+    # A closed job is served as a 410 with no block, and a tenant may omit the date.
+    assert parse_icims_detail('<script type="application/ld+json">{"@type":"WebSite"}</script>') == ("", None)
+    assert parse_icims_detail('<script type="application/ld+json">{"@type":"JobPosting",'
+                              '"description":"<p>Hi</p>"}</script>') == ("Hi", None)
+    assert parse_icims_detail("<html><body>Job no longer available</body></html>") == ("", None)
+    # A tenant serving something that is not JSON must not take the whole board down with it.
+    assert parse_icims_detail('<script type="application/ld+json">not json</script>') == ("", None)
 
 
 def test_eightfold():

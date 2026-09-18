@@ -3,8 +3,11 @@
 Checked live 2026-09-15. Notes that cost time to learn:
   - The token is the WHOLE subdomain, not a company slug. Prefixes vary by tenant:
     hospital-midlandhealth, careers-uhnjcareers, jobs-selectmedicalcorp, encareers-cmh.
-  - Job pages carry JSON-LD, but only a WebSite block. There is no JobPosting object, so a
-    per-job call would buy nothing the search card does not already give us. We make none.
+  - The job page carries a JobPosting JSON-LD block with the whole description and the posting
+    date - but only with in_iframe=1, the same parameter the search needs. Without it the page
+    is ten times the size and carries no JSON-LD at all, which is why an earlier check here
+    concluded there was none to have. The search card's own description is almost never filled
+    in, so this call is what gives an iCIMS listing anything to read.
   - robots.txt allows /jobs/search; only referral, login, candidate and connect are disallowed.
   - `pr` is a 0-indexed page, 20 cards per page.
   - in_iframe=1 is load-bearing. Without it the same URL returns a different layout with no
@@ -14,15 +17,18 @@ iCIMS is what most hospitals, health systems and universities run, which is wher
 health, nursing and education listings live.
 """
 from __future__ import annotations
+import json
 import re
 from .common import board_item, html_to_text
 from ..classify import is_internship
+from ..region import maybe_in_region
 
 SEARCH_URL = "https://{token}.icims.com/jobs/search"
 # One unfiltered crawl would be hundreds of pages on a big health system. Searching a few
 # student-shaped words instead keeps it to a handful of requests, then we dedupe by job id.
 KEYWORDS = ("intern", "co-op", "student", "fellow")
 MAX_PAGES = 5
+MAX_DETAIL = 25
 
 CARD_RE = re.compile(r'<li[^>]*class="[^"]*iCIMS_JobCardItem[^"]*"[^>]*>(.*?)</li>', re.S | re.I)
 LINK_RE = re.compile(r'<a\s+href="([^"]+)"[^>]*class="[^"]*iCIMS_Anchor', re.S | re.I)
@@ -38,6 +44,8 @@ ID_RE = re.compile(r"/jobs/(\d+)/")
 # employer with no internships, so we raise instead: scan_boards then records the board as failed
 # and the stale token shows up in the run summary rather than hiding as a quiet zero.
 MOVED_RE = re.compile(r"window\.top\.location\.href\s*=\s*'([^']+)'", re.I)
+LD_RE = re.compile(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', re.S | re.I)
+DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 # The card's additionalFields block is NOT a job type: which field a tenant puts there varies
 # (Midland shows Requisition ID), and feeding a req number to stage_of() is worse than sending
 # nothing. The title alone decides the stage here.
@@ -77,6 +85,21 @@ def parse_icims(html: str, co: dict) -> list[dict]:
     return out
 
 
+def parse_icims_detail(html: str) -> tuple[str, str | None]:
+    """(description, posted date) from the job page's JobPosting block. Either may be missing."""
+    for m in LD_RE.finditer(html or ""):
+        try:
+            block = json.loads(m.group(1))
+        except ValueError:
+            continue
+        if not isinstance(block, dict) or block.get("@type") != "JobPosting":
+            continue
+        # 'datePosted' arrives as a full timestamp; the day is all that is wanted, and _to_dt
+        # reads an ISO date. A closed job is served as a 410 with no block at all.
+        day = DATE_RE.match(str(block.get("datePosted") or ""))
+        return html_to_text(block.get("description")), day.group(1) if day else None
+    return "", None
+
 def fetch_icims_board(c, co: dict) -> list[dict]:
     token, seen, items = co["ats_token"], set(), []
     for kw in KEYWORDS:
@@ -99,4 +122,13 @@ def fetch_icims_board(c, co: dict) -> list[dict]:
             # A short page is the last page; iCIMS serves 20 cards when there are more.
             if len(CARD_RE.findall(r.text)) < 20:
                 break
+    for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
+        try:
+            d = c.get(it["url"], params={"in_iframe": 1})
+            if d.status_code == 200:
+                desc, posted = parse_icims_detail(d.text)
+                it["description"] = desc[:4000] or it["description"]
+                it["posted_at"] = posted or it["posted_at"]
+        except Exception:
+            pass
     return items
