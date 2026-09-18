@@ -32,6 +32,12 @@ from .sources.workday import HEADERS as WD_HEADERS
 
 CACHE_PATH = os.path.join(DATA_DIR, "probe_cache.json")
 TTL_DAYS = 45
+# A cached miss says "none of the probes that existed that day found this name". When a probe is
+# added, older misses were never asked the new question, so they are stale no matter how young:
+# the 278 names cached on 09-14 and 09-15 predate both the JazzHR and the Workday probe, and the
+# first run after Workday landed reported "+0 boards" because it was not allowed to ask any of them.
+# Move this date forward whenever PROBES grows.
+PROBES_CHANGED = "2026-09-18"
 MAX_PER_RUN = 150
 PROBE_TIMEOUT = 6.0
 PROBE_WORKERS = 24
@@ -237,7 +243,7 @@ def save_cache(cache: dict) -> None:
 
 def candidates(reg: dict, items: list[dict], cache: dict, today: date) -> list[str]:
     known = {norm(e.get("name")) for b in reg.values() for e in b.values()}
-    cutoff = (today - timedelta(days=TTL_DAYS)).isoformat()
+    cutoff = max((today - timedelta(days=TTL_DAYS)).isoformat(), PROBES_CHANGED)
     out: dict[str, str] = {}
     for it in items:
         name = (it.get("company_name") or "").strip()

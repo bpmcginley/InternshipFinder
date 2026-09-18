@@ -401,3 +401,14 @@ def test_the_workday_probe_wants_the_exact_squashed_name_and_a_board_with_jobs()
     assert pod.tried == [], "a slug that cannot be a tenant costs no requests at all"
     empty = _WdTenant("chamberlain", _BLACKROCK)
     assert _workday(empty, "chamberlain", "Chamberlain Group") is False       # answers, no jobs
+
+
+def test_a_miss_cached_before_the_probes_last_grew_is_asked_again():
+    from datetime import timedelta
+    from internscout.probe import PROBES_CHANGED, candidates
+    changed = date.fromisoformat(PROBES_CHANGED)
+    items = [{"company_name": n, "apply_url": "https://careers.example.com/x"}
+             for n in ("Old Miss", "New Miss")]
+    cache = {"oldmiss": (changed - timedelta(days=1)).isoformat(),   # asked before the new probe
+             "newmiss": changed.isoformat()}                          # asked with it
+    assert candidates({}, items, cache, changed + timedelta(days=1)) == ["Old Miss"]
