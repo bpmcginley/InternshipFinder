@@ -254,3 +254,23 @@ test("DELETE /me removes this user's rows only", async () => {
   assert.equal((await me(w, a)).allowance.autofill.used, 0);
   assert.equal((await me(w, b)).allowance.autofill.used, 1);
 });
+
+test("Flash allowances halve on 2027-01-01, when Flash doubles in price; Flash-Lite ones do not", async () => {
+  const flashTasks = (a) => [a.autofill, a.resume_tailor, a.deep_dive];
+  const before = await setup({ now: new Date("2026-12-31T23:00:00Z") });
+  let c = await (await before.api("GET", "/config")).json();
+  assert.deepEqual(flashTasks(c.allowance.edu), [20, 10, 2]);
+
+  const after = await setup({ now: new Date("2027-01-01T00:30:00Z") });
+  c = await (await after.api("GET", "/config")).json();
+  assert.deepEqual(flashTasks(c.allowance.edu), [10, 5, 1]);
+  assert.deepEqual(flashTasks(c.allowance.general), [5, 2, 1]);
+  assert.equal(c.allowance.edu.field_match, 260);
+  assert.equal(c.allowance.edu.short_answer, 80);
+
+  // and the cap a signed-in student hits is the new one
+  const token = await after.token();
+  assert.equal((await me(after, token)).allowance.deep_dive.limit, 1);
+  assert.equal((await after.api("POST", "/ai", { token, body: aiBody("deep_dive", "r1") })).status, 200);
+  assert.equal((await after.api("POST", "/ai", { token, body: aiBody("deep_dive", "r2") })).status, 429);
+});

@@ -88,6 +88,15 @@ everyday margin is much wider. The numbers come from about $0.06 per auto-filled
 per tailored resume and $0.02 per Deep Dive, minus Stripe's 2.9% + 30¢. A non-.edu account gets
 half the allowance for the same price, which also costs half as much to serve.
 
+**From 2027-01-01** Gemini 3.8 Flash doubles in price, so `ALLOWANCE_CHANGES` in `src/config.js`
+halves every Flash task that day: free .edu becomes 10 Auto-Apply, 5 resumes, 1 Deep Dive, and the
+paid tiers scale from that (Supporter 25 / 13 / 3, Pro 60 / 30 / 6). Field matching and short answers
+run on Flash-Lite and keep their allowance. A skipped rules-only application costs no unit, so each
+Auto-Apply unit spent is a run that did call the model, at nearer $0.08 than the $0.06 average; at
+double price the full-use Supporter comes to about $4.38 of AI against $4.56 net. That margin is thin,
+so check the real per-task spend in D1 after launch before the change takes effect. Nothing needs
+deploying on the day: the Worker reads the date. It does need deploying once before then.
+
 A tier is offered only when its own Stripe price id is set, so you can launch Supporter alone and add
 Pro later without touching code.
 

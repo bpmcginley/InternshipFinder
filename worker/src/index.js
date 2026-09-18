@@ -72,7 +72,7 @@ async function route(request, env, ctx, d) {
   const now = d.now();
   let who = { user: null, tier: "general" };   // set by signIn()
   const signIn = async () => (who = await authenticateUser(request, env, { fetch: d.fetch, now: now.getTime() })).user;
-  const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan));
+  const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan, now));
 
   switch (`${request.method} ${path}`) {
     case "GET /config": {
@@ -104,7 +104,7 @@ async function route(request, env, ctx, d) {
         can_manage: paymentsOn(env, d.config) && !!mine.customer,
         tier: who.tier,
         paused: await isPaused(db, env, d.config, now),
-        allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan) })),
+        allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan, now) })),
       });
     }
 

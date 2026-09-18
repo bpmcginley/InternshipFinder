@@ -50,12 +50,22 @@ export async function usageFor(db, user, month) {
   return Object.fromEntries(results.map((r) => [r.task, r.units]));
 }
 
+// The .edu free allowance for a task on a date: TASKS, overridden by any ALLOWANCE_CHANGES already in force
+function tableAllowance(config, task, now) {
+  const day = now.toISOString().slice(0, 10);
+  let units = config.TASKS[task].allowance;
+  for (const c of config.ALLOWANCE_CHANGES || []) {
+    if (day >= c.from && c.tasks[task] !== undefined) units = c.tasks[task];
+  }
+  return units;
+}
+
 // Monthly units for a task: the full table for "edu", GENERAL_ALLOWANCE_PCT of it (min 1) for "general".
-export function allowanceFor(config, env, task, tier, plan = "free") {
+export function allowanceFor(config, env, task, tier, plan = "free", now = new Date()) {
   const mult = (config.PLANS[plan] || config.PLANS.free).multiplier;
   // Rounded because a multiplier can be fractional: a plan is priced against what AI actually costs,
   // not against whole numbers.
-  const base = Math.round(config.TASKS[task].allowance * mult);
+  const base = Math.round(tableAllowance(config, task, now) * mult);
   if (tier === "edu") return base;
   const raw = Number(env.GENERAL_ALLOWANCE_PCT);
   const pct = env.GENERAL_ALLOWANCE_PCT !== undefined && env.GENERAL_ALLOWANCE_PCT !== "" && Number.isFinite(raw)
@@ -94,7 +104,7 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     throw new HttpError(429, "rate", "Daily AI call limit reached", { retry_after: Math.ceil((midnight - now.getTime()) / 1000) });
   }
 
-  const limit = allowanceFor(config, env, task, tier, plan);
+  const limit = allowanceFor(config, env, task, tier, plan, now);
   const run = await db.prepare("SELECT calls FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?")
     .bind(user, month, task, runId).first();
   const row = await db.prepare("SELECT units FROM usage WHERE user_hash = ? AND month = ? AND task = ?")

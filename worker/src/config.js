@@ -13,6 +13,15 @@ export const TASKS = {
   deep_dive:     { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 2 },
 };
 
+// Allowances that change on a date (UTC), oldest first; the latest `from` on or before today wins.
+// Gemini 3.8 Flash doubles in price on 2027-01-01 (see PRICES), so every Flash task's monthly units
+// halve that day and a full month still costs what it did: a Supporter who uses every unit would
+// otherwise cost ~$8.70 of AI against $4.56 net. Flash-Lite tasks keep their allowance. The plan
+// multipliers apply on top, so the paid tiers halve too.
+export const ALLOWANCE_CHANGES = [
+  { from: "2027-01-01", tasks: { resume_tailor: 5, autofill: 10, deep_dive: 1 } },
+];
+
 // Thinking levels each model accepts, lowest first (ai.google.dev/gemini-api/docs/thinking)
 export const THINKING_LEVELS = {
   "gemini-3.8-flash": ["low", "medium", "high"],
@@ -69,6 +78,7 @@ export const PAID_PLANS = ["supporter", "pro"];
 
 export const CONFIG = {
   TASKS,
+  ALLOWANCE_CHANGES,
   PLANS,
   THINKING_LEVELS,
   PRICES,
