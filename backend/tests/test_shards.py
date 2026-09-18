@@ -3,8 +3,8 @@ import json
 import os
 from internscout.classify import ALL_FIELDS
 from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, dormant, per_tag, report
-from internscout.export_static import (carry_first_seen, merged_stages, shard_keys,
-                                       still_student_opportunities, write_shards)
+from internscout.export_static import (carry_first_seen, carry_open_boards, merged_stages,
+                                       shard_keys, still_student_opportunities, write_shards)
 from internscout.region import evaluate_locations, maybe_in_region
 
 
@@ -212,3 +212,60 @@ def test_a_first_export_has_nothing_to_carry_and_does_not_mind(tmp_path):
     (tmp_path / "listings").mkdir()
     (tmp_path / "listings" / "MA.json").write_text("{not json", encoding="utf-8")
     assert carry_first_seen(listings, str(tmp_path)) == 0
+
+
+def _prev(**over):
+    row = {"id": "x", "apply_url": "https://x/0", "ats": "workday", "company_name": "Stryker",
+           "status": "open", "first_seen": "2026-09-16T00:00:00+00:00",
+           "last_seen": "2026-09-18T00:00:00+00:00", "regions": [], "state": "MA"}
+    row.update(over)
+    return row
+
+
+def _write_prev(tmp_path, rows):
+    shard_dir = tmp_path / "listings"
+    shard_dir.mkdir(exist_ok=True)
+    (shard_dir / "MA.json").write_text(json.dumps(rows), encoding="utf-8")
+    (shard_dir / "index.json").write_text('{"files": {}}', encoding="utf-8")
+
+
+def test_a_board_that_did_not_answer_does_not_delete_its_jobs(tmp_path):
+    # An export is only what the run managed to fetch. Between two exports on 2026-09-18, 2,341
+    # open listings vanished and 71 arrived, almost all of it Workday boards that timed out.
+    from datetime import date
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i) for i in range(10)]
+    _write_prev(tmp_path, prev)
+    # The board answered with one of its ten. That is a failed fetch, not nine closures.
+    listings = [dict(prev[0])]
+    held = carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18))
+    assert held == 9
+    assert len(listings) == 10
+    assert all(x["carried"] for x in listings[1:])
+    assert "carried" not in listings[0]   # this one was really fetched
+
+
+def test_a_board_that_merely_closed_a_job_is_left_alone(tmp_path):
+    from datetime import date
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i) for i in range(10)]
+    _write_prev(tmp_path, prev)
+    listings = [dict(r) for r in prev[:6]]   # six of ten: an employer closing jobs, not a failure
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+    assert len(listings) == 6
+
+
+def test_a_tiny_board_is_left_alone_because_churn_looks_the_same(tmp_path):
+    from datetime import date
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i) for i in range(2)]
+    _write_prev(tmp_path, prev)
+    listings = []
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+
+
+def test_a_board_that_stays_quiet_empties_out(tmp_path):
+    # The hold is not open-ended: a carried listing keeps the last_seen of the run that fetched it.
+    from datetime import date
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i,
+                  last_seen="2026-09-14T00:00:00+00:00") for i in range(10)]
+    _write_prev(tmp_path, prev)
+    listings = []
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0

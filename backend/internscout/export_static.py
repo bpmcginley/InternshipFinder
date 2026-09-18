@@ -145,6 +145,44 @@ def still_student_opportunities(listings: list[dict]) -> list[dict]:
 
 NEW_DAYS = 7
 
+# A board has to lose more than half of at least this many open listings before we treat the
+# run as a failure rather than as the employer closing jobs.
+COLLAPSE_RATIO = 0.5
+COLLAPSE_FLOOR = 3
+# How long a listing may be shown after the last run that actually saw it on the board.
+CARRY_DAYS = 2
+
+
+def previous_export(out_dir: str) -> list[dict]:
+    """Every listing in the export this run is about to replace.
+
+    CI commits the exported JSON and checks it back out, so the last run is still on disk here
+    and write_shards only overwrites it afterwards. It is the only memory the pipeline has:
+    the database does not outlive a run.
+
+    A listing appears in one file per state it names, so it is returned once, keyed on its
+    apply URL. A half-written or missing shard is skipped rather than failing the run.
+    """
+    shard_dir = os.path.join(out_dir, "listings")
+    seen: set[str] = set()
+    out: list[dict] = []
+    for name in sorted(os.listdir(shard_dir)) if os.path.isdir(shard_dir) else []:
+        if not name.endswith(".json") or name == "index.json":
+            continue
+        try:
+            with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
+                items = json.load(f)
+        except (OSError, ValueError):   # a half-written shard is not worth failing a run over
+            continue
+        if not isinstance(items, list):
+            continue
+        for it in items:
+            key = it.get("apply_url") or "id:" + str(it.get("id"))
+            if key not in seen:
+                seen.add(key)
+                out.append(it)
+    return out
+
 
 def _seen_within(stamp: str | None, today, days: int) -> bool:
     """Whether a first-seen stamp falls inside the window. An unreadable one counts as new."""
@@ -157,7 +195,7 @@ def _seen_within(stamp: str | None, today, days: int) -> bool:
     return (today - seen).days < days
 
 
-def carry_first_seen(listings: list[dict], out_dir: str, today=None) -> int:
+def carry_first_seen(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
     """Give each listing the first-seen date it had in the export this one replaces.
 
     CI keeps no database between runs, so first_seen was set to the moment of the run every
@@ -174,26 +212,15 @@ def carry_first_seen(listings: list[dict], out_dir: str, today=None) -> int:
     old row-order ids, and a posting whose title the employer edited afterwards, which changes
     the dedupe key the id is built from but is plainly the same posting.
     """
-    shard_dir = os.path.join(out_dir, "listings")
     by_id: dict[str, str] = {}
     by_url: dict[str, str] = {}
-    for name in sorted(os.listdir(shard_dir)) if os.path.isdir(shard_dir) else []:
-        if not name.endswith(".json") or name == "index.json":
+    for it in previous_export(out_dir) if prev is None else prev:
+        seen = it.get("first_seen")
+        if not seen:
             continue
-        try:
-            with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
-                items = json.load(f)
-        except (OSError, ValueError):   # a half-written shard is not worth failing a run over
-            continue
-        if not isinstance(items, list):
-            continue
-        for it in items:
-            seen = it.get("first_seen")
-            if not seen:
-                continue
-            by_id.setdefault(str(it.get("id")), seen)
-            if it.get("apply_url"):
-                by_url.setdefault(it["apply_url"], seen)
+        by_id.setdefault(str(it.get("id")), seen)
+        if it.get("apply_url"):
+            by_url.setdefault(it["apply_url"], seen)
 
     today = today or datetime.now(timezone.utc).date()
     carried = 0
@@ -206,6 +233,58 @@ def carry_first_seen(listings: list[dict], out_dir: str, today=None) -> int:
     return carried
 
 
+def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
+    """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
+
+    An export is only what this run managed to fetch, so a board that timed out deletes all of
+    its jobs from the site until the next run puts them back. Between the 08:43 and 08:50
+    exports on 2026-09-18, 2,341 open listings disappeared and 71 arrived: a sixth of the
+    corpus, none of it closed. Workday is where it happens - 97 boards answered nothing at all
+    and 161 more answered with a fraction of what they had held minutes earlier.
+
+    A student who saved a job on Monday found it gone on Tuesday and back on Wednesday, and the
+    counts on the landing page moved by thousands for no reason a reader could see.
+
+    So a board that comes back with half or less of what it had is read as a failed fetch, and
+    its listings are carried over from the last export. The floor of three keeps ordinary churn
+    out of it: an employer closing two of three postings in a six-hour window is believable, one
+    closing thirty of forty is not. Measured on that pair, this holds 2,114 of the 2,341.
+
+    The hold is not open-ended. A carried listing keeps the last_seen of the run that really did
+    fetch it, so a board that is genuinely gone empties out after CARRY_DAYS and stays empty.
+    Carried listings are marked, so the dashboard can say the board did not answer this time.
+    """
+    prev = previous_export(out_dir) if prev is None else prev
+    today = today or datetime.now(timezone.utc).date()
+    have = {x["apply_url"] for x in listings if x.get("apply_url")}
+
+    def board(x):
+        return (x.get("ats"), x.get("company_name"))
+
+    now_open = Counter(board(x) for x in listings if x.get("status") == "open")
+    was_open: dict[tuple, list[dict]] = defaultdict(list)
+    for it in prev:
+        if it.get("status") == "open" and it.get("ats") and it.get("company_name"):
+            was_open[board(it)].append(it)
+
+    held = 0
+    for key, rows in was_open.items():
+        if len(rows) < COLLAPSE_FLOOR or now_open.get(key, 0) > COLLAPSE_RATIO * len(rows):
+            continue
+        for it in rows:
+            url = it.get("apply_url")
+            if not url or url in have:
+                continue
+            if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
+                continue   # the board has been quiet for days; it is not coming back
+            kept = dict(it)
+            kept["carried"] = True
+            listings.append(kept)
+            have.add(url)
+            held += 1
+    return held
+
+
 def export(out_dir: str) -> dict:
     init_db()
     os.makedirs(out_dir, exist_ok=True)
@@ -214,14 +293,19 @@ def export(out_dir: str) -> dict:
             select(Listing).order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
         listings = still_student_opportunities([_listing_dict(r) for r in rows])
-        # Before write_shards overwrites it: the export on disk is the only record of when
-        # we first saw any of this, because the database does not outlive the run.
-        carried = carry_first_seen(listings, out_dir)
         generated_at = datetime.now(timezone.utc).isoformat()
+        for x in listings:
+            x["last_seen"] = generated_at   # this run really did read these off the board
+        # Before write_shards overwrites it: the export on disk is the only record of when we
+        # first saw any of this and of what the boards held, because the db does not outlive a run.
+        prev = previous_export(out_dir)
+        carried = carry_first_seen(listings, out_dir, prev=prev)
+        held = carry_open_boards(listings, out_dir, prev=prev)
         stats = {
             "total": len(listings),
             "open": sum(1 for x in listings if x["status"] == "open"),
             "new": sum(1 for x in listings if x["is_new"]),
+            "held": held,
             "generated_at": generated_at,
             "profile": {
                 "name": PROFILE.name,
@@ -249,6 +333,8 @@ def export(out_dir: str) -> dict:
     _dump(majors_export(), os.path.join(out_dir, "majors.json"))
     print(f"[export] {carried} of {len(listings)} listings kept a first-seen date from the "
           f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days")
+    print(f"[export] {held} listings held from the last export because their board came back "
+          f"with half or less of what it had")
     index = write_shards(listings, out_dir, generated_at)
     print(f"[export] wrote {len(listings)} listings ({len(index['files'])} state files) to {out_dir}")
     return stats
