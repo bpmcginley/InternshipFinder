@@ -354,6 +354,20 @@ def test_a_postdoc_is_a_postdoc_however_the_employer_spells_it():
     assert stage_of("Research Intern") == ["internship", "research"]
 
 
+def test_military_skillbridge_placements_are_not_student_roles():
+    # SkillBridge only takes service members still on active duty, whatever the employer calls it.
+    for title in ("DoD SkillBridge Intern – (Systems Analyst) (Active Duty Service Members)",
+                  "Boeing SkillBridge - Clearance Required - Military Internship",
+                  "Skillbridge Military Intern - Aircraft Maintenance",
+                  "Skill Bridge Intern - Marketing",
+                  "Field Service Technician Intern - Transitioning Military",
+                  "Aircraft Maintenance Technician Apprentice - Military Transition Program"):
+        assert stage_of(title) == [], title
+    # A student internship at a defence employer, or one that mentions the military, still counts.
+    assert stage_of("Military Aircraft Engineering Intern") == ["internship"]
+    assert stage_of("Bridge Engineering Intern") == ["internship"]
+
+
 def test_titles_that_used_to_land_in_other_now_reach_their_field():
     # Real titles from the open board, every one of them tagged only "other" before.
     for title, tag in (

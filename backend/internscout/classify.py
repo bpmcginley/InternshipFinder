@@ -264,7 +264,14 @@ _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdire
 # those. One is titled "Post Doc Scientist Data Science AI/ML Intern"; it goes too, because a
 # postdoc needs a finished PhD whatever else the title says, and that is already what this
 # rule did to anyone who spelled it with a hyphen.
-_NEVER_STUDENT_RE = re.compile(r"post[- ]?doc|post[- ]?doctoral|post[- ]?bacc|faculty|professor|physician|attending", re.I)
+#
+# SkillBridge is the Defense Department's programme for service members in their last months of
+# active duty; employers call the placements internships, but only someone still in uniform can
+# take one ("Military Personnel Only"). 72 of them were live on the board, from Boeing, GE
+# Aerospace, Textron and the like, and none is open to a college student.
+_NEVER_STUDENT_RE = re.compile(r"post[- ]?doc|post[- ]?doctoral|post[- ]?bacc|faculty|professor|physician|attending|"
+                               r"skill ?bridge|transitioning (military|service members?)|active duty service members?|"
+                               r"military transition", re.I)
 # The job of running an internship programme is not an internship. Universities and hospitals post
 # plenty of them - "Assistant/Associate Coop Coordinator", "Manager, Internship Programs",
 # "Practicum Coordinator II for Nursing" - and they came through, because the very words that make
