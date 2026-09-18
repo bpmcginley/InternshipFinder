@@ -83,3 +83,25 @@ def test_cause_names_status_or_error_type():
     assert run_ingest._cause(httpx.ReadTimeout("slow")) == "ReadTimeout"
     assert run_ingest._transient(_status(503)) and run_ingest._transient(httpx.ReadTimeout("x"))
     assert not run_ingest._transient(_status(404)) and not run_ingest._transient(ValueError())
+
+
+def test_a_throttled_ats_runs_in_its_own_smaller_pool(monkeypatch):
+    import threading, time
+    monkeypatch.setattr(run_ingest, "RETRY_PAUSE", 0)
+    monkeypatch.setitem(run_ingest.ATS_WORKERS, "slowats", 2)
+    live, peak, lock = [0], [0], threading.Lock()
+
+    def fetch(c, co):
+        with lock:
+            live[0] += 1
+            peak[0] = max(peak[0], live[0])
+        time.sleep(0.02)
+        with lock:
+            live[0] -= 1
+        return []
+
+    monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "slowats", fetch)
+    reg = _reg("slowats", 10)
+    run_ingest.scan_boards(reg, workers=8, verbose=False)
+    assert peak[0] <= 2
+    assert all(e["fails"] == 0 for e in reg["slowats"].values())

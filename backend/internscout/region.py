@@ -24,6 +24,9 @@ _MAJOR = {
     "durham": "NC", "nashville": "TN", "baltimore": "MD", "columbus": "OH", "st. louis": "MO",
     "kansas city": "MO", "las vegas": "NV", "washington dc": "DC", "washington d.c.": "DC",
     "new york": "NY", "new york city": "NY", "sf": "CA", "la": "CA", "dc": "DC",
+    # A board that names only the park (IBM, Cisco, NetApp, Biogen all post there) was dropped as
+    # an unplaceable location, since no state follows it.
+    "research triangle park": "NC", "rtp": "NC",
 }
 
 

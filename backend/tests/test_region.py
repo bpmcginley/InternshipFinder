@@ -239,3 +239,9 @@ def test_bare_la_is_los_angeles_but_a_louisiana_town_is_not():
     for loc in ("Baton Rouge, LA", "New Orleans, LA 70112", "Shreveport LA"):
         assert state_of(loc) == "LA", loc
     assert evaluate_locations(["SF", "LA"])["state"] == "CA"
+
+
+def test_research_triangle_park_alone_is_north_carolina():
+    for loc in ("Research Triangle Park", "RTP", "Research Triangle Park, United States"):
+        r = evaluate_locations([loc])
+        assert r["in_region"] and r["state"] == "NC", loc

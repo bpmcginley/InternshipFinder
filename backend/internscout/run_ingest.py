@@ -37,6 +37,11 @@ RETRY_MAX = 400       # a retry pass is not allowed to double the length of the 
 # runner's address range, an API change), and the registry must not read that as its boards dying.
 SYSTEMIC_SHARE = 0.5
 SYSTEMIC_MIN_BOARDS = 10
+# Workday throttles by caller, not by tenant: with the retry in place, the run of 2026-09-18 still
+# saw 70 Workday boards answer 429 (of 118 Workday failures, the rest mostly 422 for a dead site
+# name), and more boards failed transiently than the retry cap would take. So Workday boards run in
+# a pool of their own, at most this many at a time, beside the main pool rather than inside it.
+ATS_WORKERS = {"workday": 6}
 
 
 def _cause(e: Exception) -> str:
@@ -55,14 +60,24 @@ def _transient(e: Exception) -> bool:
 
 def _fetch_boards(c, jobs: list, workers: int) -> dict:
     """(ats, token) -> the board's items, or the exception it raised."""
-    res = {}
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(BOARD_FETCHERS[ats], c, co): (ats, tok) for ats, tok, co in jobs}
+    groups: dict = {}
+    for j in jobs:
+        groups.setdefault(j[0] if j[0] in ATS_WORKERS else None, []).append(j)
+    res, pools, futs = {}, [], {}
+    try:
+        for key, js in groups.items():
+            ex = ThreadPoolExecutor(max_workers=min(workers, ATS_WORKERS[key]) if key else workers)
+            pools.append(ex)
+            for ats, tok, co in js:
+                futs[ex.submit(BOARD_FETCHERS[ats], c, co)] = (ats, tok)
         for f in as_completed(futs):
             try:
                 res[futs[f]] = f.result()
             except Exception as e:
                 res[futs[f]] = e
+    finally:
+        for ex in pools:
+            ex.shutdown()
     return res
 
 
@@ -79,8 +94,9 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
     t0 = time.monotonic()
     with client() as c:
         res = _fetch_boards(c, jobs, workers)
-        again = [j for j in jobs
-                 if isinstance(res[j[0], j[1]], Exception) and _transient(res[j[0], j[1]])][:RETRY_MAX]
+        transient = [j for j in jobs
+                     if isinstance(res[j[0], j[1]], Exception) and _transient(res[j[0], j[1]])]
+        again = transient[:RETRY_MAX]
         if again:
             time.sleep(RETRY_PAUSE)
             res.update(_fetch_boards(c, again, RETRY_WORKERS))
@@ -108,7 +124,7 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
     if verbose:
         note = f"; closed by robots.txt {dict(closed)}" if closed else ""
         print(f"[boards] {len(todo)} boards in {time.monotonic() - t0:.0f}s "
-              f"({len(again)} retried); "
+              f"({len(again)} of {len(transient)} transient failures retried); "
               f"intern postings {dict(per_ats)}; failed boards {dict(failed)}{note}")
         why = {a: dict(k.most_common(4)) for a, k in sorted(causes.items(), key=lambda x: -failed[x[0]])}
         print(f"[boards] failure causes {why}")
