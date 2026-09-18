@@ -893,4 +893,19 @@ WORKDAY += [
     {'name': "Christie's", 'ats_token': 'christies|wd3|Christies_Careers', 'is_quant_target': False, 'sector': 'arts_museums'},
 ]
 
+# --- counselling providers (probed and fetched live 2026-09-18) ---
+# Social sciences is the thinnest cluster, and the third probe for it (52 pollsters and think
+# tanks, 18 economic consultancies, 32 behavioural-health providers, 19 language firms) found no
+# board for any pollster, think tank or consultancy: they run career systems probe.py cannot guess.
+# Of ten boards that did answer, only these two had a student posting on the day - Thriveworks's
+# "Registered Mental Health Intern" and Charlie Health's master's-level "Clinical Practicum Intern"
+# (remote). Catalight, Invo, Talkspace, SonderMind, Two Chairs, RWS, Propio and Babbel answered
+# with empty or intern-free boards and are left out.
+GREENHOUSE += [
+    {'name': 'Charlie Health', 'ats_token': 'charliehealth', 'is_quant_target': False, 'sector': 'behavioral_health'},
+]
+WORKDAY += [
+    {'name': 'Thriveworks', 'ats_token': 'thriveworks|wd5|Thriveworks', 'is_quant_target': False, 'sector': 'behavioral_health'},
+]
+
 # --- end sector seeds ---

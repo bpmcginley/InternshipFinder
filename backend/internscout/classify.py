@@ -206,7 +206,14 @@ RULES = [
     ("languages", r"translat(or|ion)s?\b|interpreter\b|bilingual|linguist|"
      # "interpreter\b" is deliberate: mechanistic interpretability is not an interpreting job.
      r"\besl\b|\besol\b|tesol\b|\btefl\b|english language (learn|cent|institute)|"
-     r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language"),
+     r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language|"
+     # Intelligence-community language roles name the language or the skill, never "translator":
+     # Leidos's "Chinese Language-Enabled OSINT Collector", NSA's "Cooperative Education Program -
+     # Language". Both sat in "other". Every term here needs a named language or a job word next to
+     # "language", so "Large Language Model" and PNNL's "Language Intelligence" (NLP) stay out.
+     r"language[- ]enabled|language (analyst|specialist)|\b(program|co-?op)\W+language\b|"
+     r"\b(chinese|mandarin|arabic|russian|farsi|persian|dari|pashto|urdu|korean|japanese|vietnamese|hebrew|"
+     r"spanish|french|portuguese|german|italian) (language|linguist|speaker)"),
     ("real_estate", r"real estate|property manage|\breit\b|leasing"),
     ("insurance", r"insurance|underwrit|claims (analyst|intern)|actuar"),
     # The other half of the engineering fallback above: a posting that says business and

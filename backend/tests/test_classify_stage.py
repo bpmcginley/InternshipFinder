@@ -662,3 +662,14 @@ def test_programme_lab_and_show_titles_that_fell_to_other():
     assert classify("Meteorology Intern - Crisis Management") == ["environmental"]
     assert classify("Summer Associate Internship (Mortgage Assumption Specialist)") == ["finance"]
     assert classify("Product Strategist Intern") == ["pm"]
+
+
+def test_intelligence_language_roles_but_not_language_models():
+    from internscout.classify import classify
+    assert classify("Chinese Language-Enabled OSINT Collector Intern - Junior") == ["languages"]
+    assert "languages" in classify("Cooperative Education Program - Language (Maryland)")
+    assert "languages" in classify("Arabic Language Analyst Intern")
+    # Models and NLP research say "language" too, and are not language jobs.
+    for t in ("Student Researcher - Large Language Model", "PhD Intern - Language Intelligence",
+              "Large Language Model Paid Media Co-op", "Speech Language Pathologist Intern"):
+        assert "languages" not in classify(t), t
