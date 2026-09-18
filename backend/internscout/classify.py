@@ -39,7 +39,7 @@ RULES = [
     ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber|identity (&|and) access"),
     ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic|advanced packaging|design verification|digital logic"),
     ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien|site reliability|systems? administrat|systems analyst|application analyst"),
-    ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner|product analyst"),
+    ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner|product analyst|product strateg"),
 
     # --- engineering (non-software) ---
     ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern|signal processing|electric distribution|power (delivery|generation|supply|management|integrity)|signal integrity|energy storage (intern|co-?op|engineer)|energy management system"),
@@ -65,7 +65,7 @@ RULES = [
     # A bare "Safety Intern" is the same job at a builder or a plant, and "Process Safety" and
     # "Industrial Hygiene" are its chemical-plant names. "Product", "Functional" (automotive ISO
     # 26262) and "Food" safety are not, and are left to their own rules.
-    ("environmental", r"air quality|natural resources? (intern|co-?op|management|specialist)|environmental|sustainab|climate|renewable|energy engineer|water resources|geolog|geoscien|geophysic|geospatial|geographic information system|"
+    ("environmental", r"air quality|meteorolog|atmospheric scien|natural resources? (intern|co-?op|management|specialist)|environmental|sustainab|climate|renewable|energy engineer|water resources|geolog|geoscien|geophysic|geospatial|geographic information system|"
      r"occupational (health (and|&|,) )?safety|\behs\b|\bhse\b|"
      r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)|health,? safety,? (&|and) environment(al)?\W{0,5}(intern|co-?op)|safety (&|and) environment\W{0,5}(intern|co-?op)|\b(workplace|fire/life|fire (and|&) life|employee health (&|and)) safety( \w+){0,2} (intern|co-?op)|(intern|co-?op)\s*[-–,:|]\s*(\w+ ){0,2}(workplace|employee health (&|and)) safety|industrial hygiene|process safety|contractor safety|(?<!product )(?<!functional )(?<!food )\bsafety (intern|internship|specialist intern|co-?op)\b|\bintern,? safety\b"),
     ("biomedical", r"biomedical|bioengineer|medical device|clinical engineer"),
@@ -81,7 +81,10 @@ RULES = [
     # Factors Intern", "Therapist Intern", "PhD Research Economist" and "Political Science Research
     # Associate" all said "other". "Therapist" alone is the counselling job; the respiratory,
     # physical, occupational, speech and recreation therapists are health or sports and say so.
-    ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery|bioinformatic|proteomic|metabolomic"),
+    ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery|bioinformatic|proteomic|metabolomic|"
+     # Drug makers title research internships by therapeutic area or lab ("Research - Discovery
+     # Virology", "Kite Research - Protein Science", "Research - Drug Metabolism").
+     r"virolog|oncology biomarker|protein (science|therapeutic|engineering)|drug metabolism|viral vector|\binflammation\b"),
     ("chemistry", r"bioanalytical|analytical sciences|\bchemist|chemical (research|analysis)|analytical chem|organic chem"),
     ("physics", r"\bphysics\b|photonic|optic|quantum (computing|research|physics)|astronom"),
     ("math", r"\bmathematic|applied math|\bstatistic|biostatistic|actuarial"),
@@ -99,7 +102,7 @@ RULES = [
     # is capital planning, and in "Social/Community Investments", which is giving. Together with the
     # financial-reporting phrases and engineering's R&D, test, reliability and maintenance words
     # below, this took 132 of the ~2,700 "other" titles in one export into a field.
-    ("finance", r"fraud analyst|commodit|banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)|\bpricing\b|capital markets|private markets|emerging markets|portfolio (analyst|management|implementation|and relationship)|(?<!security )\brisk (intern|internship|group)\b|corporate risk(?! (and|&) broking)|third party risk|trade risk"),
+    ("finance", r"fraud analyst|commodit|\bmortgage|\blending\b|student loans?|banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)|\bpricing\b|capital markets|private markets|emerging markets|portfolio (analyst|management|implementation|and relationship)|(?<!security )\brisk (intern|internship|group)\b|corporate risk(?! (and|&) broking)|third party risk|trade risk"),
     ("accounting", r"(?<!quality )assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep|accounts (payable|receivable)|\bpayroll\b|cost (management|accounting)|expense management|transfer pricing"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
     ("marketing", r"\bcrm (intern|co-?op|marketing|analyst|coordinator)|\bad ?ops\b|\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern|"
@@ -130,7 +133,9 @@ RULES = [
     ("publishing", r"publish|editorial|literary|\beditor\b|\bbooks?\b"),
     ("film", r"animat(or|ion)|rigging artist|production intern|\bfilm|video production|post-?production|cinematograph|production assistant|documentar"),
     ("music", r"\bmusic|record label|audio engineer|recording studio|concert"),
-    ("theater", r"theat(er|re)\b|stage manag|performing arts|\bdance\b|\bopera\b|ballet"),
+    ("theater", r"theat(er|re)\b|stage manag|performing arts|\bdance\b|\bopera\b|ballet|"
+     # Live-show crafts: Disney Live Entertainment's costume, casting and technical-direction interns.
+     r"\bcostum(e|ing)\b|\bcasting\b|technical direction|live entertainment"),
     ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|\bcounsel\b|policy intern|\battorney\b"),
     ("education", r"teaching|education|curriculum|instructor|tutor|instructional design"),
     ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate|"
@@ -158,7 +163,10 @@ RULES = [
      # rest: a "Refugee Resettlement Intern" or a "Victim Services Intern" is social work however
      # the posting spells it.
      r"\b[mb]sw\b|social services|homeless|refugee|resettlement|foster care|child welfare|"
-     r"victim (advocate|services)|domestic violence|\breentry\b|family support"),
+     r"victim (advocate|services)|domestic violence|\breentry\b|family support|"
+     # IRC's resettlement office titles its interns by programme: casework, anti-trafficking,
+     # client benefits, career and financial coaching, after-school.
+     r"\bcasework|anti-?trafficking|client benefits|financial coaching|after-?school"),
     # Sociology and anthropology had no tag at all, so the coverage report's social-sciences line
     # could only ever count psychology, economics and languages, and a "Survey Research Intern" or
     # "Sociology Research Intern" landed in "other". "Anthropologie" is a clothing retailer.
@@ -197,7 +205,7 @@ RULES = [
     ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl|(?<!high-)(?<!high )\benergy (intern|internship|assessment intern)|building energy model|advanced energy intern"),
     ("languages", r"translat(or|ion)s?\b|interpreter\b|bilingual|linguist|"
      # "interpreter\b" is deliberate: mechanistic interpretability is not an interpreting job.
-     r"\besl\b|tesol\b|\btefl\b|english language (learn|cent|institute)|"
+     r"\besl\b|\besol\b|tesol\b|\btefl\b|english language (learn|cent|institute)|"
      r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language"),
     ("real_estate", r"real estate|property manage|\breit\b|leasing"),
     ("insurance", r"insurance|underwrit|claims (analyst|intern)|actuar"),

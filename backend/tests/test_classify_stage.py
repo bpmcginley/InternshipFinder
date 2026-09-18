@@ -650,3 +650,15 @@ def test_studio_writer_and_event_titles_that_name_the_person_not_the_field():
     assert "design" not in classify("Mechanical Designer Intern")
     assert "design" not in classify("Product Definition Engineer Intern - Designer")
     assert "design" not in classify("Designer/Drafter Co-Op")
+
+
+def test_programme_lab_and_show_titles_that_fell_to_other():
+    from internscout.classify import classify
+    assert classify("Fall 2026 Casework Intern - UNPAID") == ["social_work"]
+    assert classify("ESOL Intern - Fall 2026 (UNPAID)") == ["languages"]
+    assert "languages" in classify("WIOA ESL Assistant Instructor Intern")
+    assert classify("Intern - Research - Drug Metabolism") == ["biology"]
+    assert classify("Disney Live Entertainment Talent Casting Intern, Spring 2027") == ["theater"]
+    assert classify("Meteorology Intern - Crisis Management") == ["environmental"]
+    assert classify("Summer Associate Internship (Mortgage Assumption Specialist)") == ["finance"]
+    assert classify("Product Strategist Intern") == ["pm"]
