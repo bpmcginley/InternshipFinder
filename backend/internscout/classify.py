@@ -345,11 +345,18 @@ def classify(title: str, description: str = "") -> list[str]:
     return out or ["other"]
 
 
+def never_student(title: str) -> bool:
+    """True when the title rules a student out whatever the feed calls the job: a postdoc, a
+    SkillBridge placement, the staff job that runs an internship programme."""
+    title = title or ""
+    return bool(_NEVER_STUDENT_RE.search(title)) or _runs_the_programme(title)
+
+
 def stage_of(title: str, employment_type: str = "") -> list[str]:
     """Student-opportunity stages for a posting, in STAGES order. Empty = not a student role."""
     title = title or ""
     emp = employment_type or ""
-    if _NEVER_STUDENT_RE.search(title) or _runs_the_programme(title):
+    if never_student(title):
         return []
     found = {s for s, rx in _STAGE_RULES if rx.search(title)}
     if _LOWER_YEARS_RE.search(title) and _PROGRAM_RE.search(title):

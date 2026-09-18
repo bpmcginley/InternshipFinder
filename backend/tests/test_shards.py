@@ -316,3 +316,12 @@ def test_a_stored_research_stage_alone_is_asked_again():
     assert merged_stages(["research"], "REU Site: Computational Biology") == ["research"]
     # a feed that said intern still keeps the research reading of the title
     assert merged_stages(["internship", "research"], "Researcher, Interpretability") == ["internship", "research"]
+
+
+def test_a_never_student_title_loses_the_stage_its_feed_gave_it():
+    # The feed called these internships; the title says only active-duty members or staff may apply.
+    assert merged_stages(["internship"], "Boeing SkillBridge - Military Internship") == []
+    assert merged_stages(["internship"], "Postdoctoral Research Fellow") == []
+    assert merged_stages(["internship"], "Regional Discovery Program Coach") == []
+    # a feed-only stage on a title that says nothing either way is still kept
+    assert merged_stages(["internship"], "Growth") == ["internship"]

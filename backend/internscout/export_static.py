@@ -17,7 +17,7 @@ from .db import SessionLocal, init_db
 from .models import Listing, Application
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
-from .classify import STAGES, stage_of, years_of
+from .classify import STAGES, never_student, stage_of, years_of
 from .majors import majors_export
 from .normalize import listing_id
 from .score import W
@@ -133,7 +133,13 @@ def merged_stages(stored: list[str] | None, title: str) -> list[str]:
     The stored list is kept rather than replaced, because it is the only record of what the source
     said the employment type was. Eight listings owe their whole stage to it: the title of a
     Palantir posting is "Growth" and of another "Cohort 0", and only the feed says intern.
+
+    A title no student can hold loses every stage whatever the feed said. The 6c0d9df export
+    published 13 SkillBridge placements - active-duty service members only - because the feed
+    called them internships, and the title rule that rejects them never got the last word.
     """
+    if never_student(title):
+        return []
     found = set(stored or []) | set(stage_of(title))
     # A stored "research" and nothing else is asked again. No feed ever says research - it is always
     # the title's reading - and the rule that read it once admitted "VP, Research" and "Researcher,
