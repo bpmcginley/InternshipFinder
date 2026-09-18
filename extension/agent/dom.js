@@ -241,8 +241,15 @@
       // for a character in it is a box no student could ever have typed into. So the test is the size
       // itself rather than the name: names are a list that only ever grows, and the next site's
       // honeypot will have a different one.
+      //
+      // The test is on height, and width only when there is none to speak of. Greenhouse draws the
+      // search box of every one of its comboboxes - country, school, degree, gender, veteran status -
+      // four pixels wide and twenty-two tall, and there are eight of them on an ordinary application.
+      // A rule written on width would have thrown all eight away on the sixteen hundred Greenhouse
+      // postings in the index, to catch one field on Workday. Height is where the honest gap is: no
+      // real box is under four pixels tall, and Workday's is none at all.
       const box = el.getBoundingClientRect();
-      const noRoom = box.width < 4 || box.height < 4;
+      const noRoom = box.height < 4 || box.width < 2;
       if ((kind === "text" || kind === "textarea") && (el.closest('[aria-hidden="true"]') || offDocument(el) || noRoom || /honey.?pot|^hp[_-]|beecatcher/i.test([el.name, el.id, el.className, el.getAttribute("data-automation-id") || ""].join(" ")))) continue;
       const proxy = kind === "select" && selectProxy(el);
       if (proxy && !realOptions(el) && [...proxy.querySelectorAll("input")].some((i) => i.type !== "hidden" && A.visible(i))) continue;
