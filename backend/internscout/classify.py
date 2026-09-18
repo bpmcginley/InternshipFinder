@@ -23,11 +23,11 @@ RULES = [
     # --- engineering (non-software) ---
     ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern"),
     ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac"),
-    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic"),
+    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
     ("chemical", r"chemical engineer|process engineer|petroleum|refin"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
-    ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer"),
+    ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer|human factors engineer"),
     # EHS - environment, health and safety - is the compliance arm of an environmental team, and a
     # student who wants it is an environmental science or public health major. None of its titles say
     # "environmental": 24 of them said only "other", which is the bottom of every ranking.
@@ -51,11 +51,16 @@ RULES = [
     ("engineering", r"\bengineer(ing|s)?\b|(?<!internal )(?<!risk & )(?<!risk and )\bcontrols (intern|technician|engineer|co-?op)|\b(electrical|electronics|process|embedded|manufacturing|flight|vehicle|machine|chassis|powertrain) controls\b|guidance,? navigation,? (&|and) controls|navigation, estimation,? (and|&) controls|\br&d\b|(?<!site )\breliability\b|\btest (automation|technician|equipment|(&|and) validation)|\b(system|ic) test\b|design for test|assembly (and|&) test|\bmaintenance (technician|mechanic|apprentice|intern|engineer)|(aircraft|industrial|nuclear) maintenance"),
 
     # --- sciences / math / health ---
+    # The social-science cluster was the one the coverage report marked thin (8 open in the baseline
+    # states), and part of that was vocabulary: "Research Assistant, Addiction Psychiatry", "Human
+    # Factors Intern", "Therapist Intern", "PhD Research Economist" and "Political Science Research
+    # Associate" all said "other". "Therapist" alone is the counselling job; the respiratory,
+    # physical, occupational, speech and recreation therapists are health or sports and say so.
     ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery|bioinformatic"),
     ("chemistry", r"bioanalytical|analytical sciences|\bchemist|chemical (research|analysis)|analytical chem|organic chem"),
     ("physics", r"\bphysics\b|photonic|optic|quantum (computing|research|physics)|astronom"),
     ("math", r"\bmathematic|applied math|\bstatistic|biostatistic|actuarial"),
-    ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital|speech[- ]language patholog|speech patholog|audiolog|communication disorders"),
+    ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital|speech[- ]language patholog|speech patholog|audiolog|communication disorders|respiratory therap|occupational therap|physical therap|speech[- ]language (graduate|intern|extern|therap)"),
     ("nursing", r"\bnurs(e|es|ing)\b|\bcna\b|\brn\b|patient care (tech|assistant)"),
     ("public_health", r"public health|epidemiolog|community health|global health|health (policy|equity|promotion|education|services research)"),
     # "translational" is bench-to-bedside research, and the boundary added to the languages rule
@@ -79,7 +84,7 @@ RULES = [
     ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b"),
     ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern"),
     ("entrepreneurship", r"entrepreneur|\bstart-?ups?\b|incubator|accelerator|small business"),
-    ("economics", r"\beconomic|econometric|policy analys"),
+    ("economics", r"\beconomic|econometric|policy analys|\beconomists?\b"),
 
     # --- design / media / arts / humanities ---
     ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design|experience design"),
@@ -98,9 +103,9 @@ RULES = [
      # A BCBA fieldwork apprenticeship is a psychology role by any reading, and so is a
      # behaviour technician post: they are the commonest paid placement an undergraduate
      # psychology major can actually get. None of them say "psychology" in the title.
-     r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)"),
+     r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)|psychiatr|human factors|child (and adolescent )?development|behavio(u)?r science|suicide prevention|(?<!respiratory )(?<!recreation )(?<!recreational )(?<!activity )(?<!physical )(?<!occupational )(?<!speech )(?<!massage )\btherapist\b"),
     ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
-    ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house"),
+    ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house|political scien"),
     ("arts", r"animator|\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat"),
     ("museums", r"\bmuseum|curat(or|orial)|collections (intern|management|assistant)|archiv(e|es|ist|al)|exhibit"),
     ("library", r"librar(y|ian)|information science|archiv(e|es|ist|al)"),

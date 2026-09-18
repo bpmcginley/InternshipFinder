@@ -419,3 +419,23 @@ def test_safety_verification_and_design_titles_reach_their_field():
         assert tag in classify(title), (title, classify(title))
     for title in ("Functional Safety Intern", "Product Safety Intern", "Food Safety Intern- Summer 2027"):
         assert "environmental" not in classify(title), title
+
+
+def test_social_science_titles_reach_their_field():
+    for title, tag in (("Research Assistant, Addiction Psychiatry", "psychology"),
+                       ("Aviation Human Factors Intern", "psychology"),
+                       ("School-Based Therapist Intern", "psychology"),
+                       ("Child Development Specialist", "psychology"),
+                       ("PhD Research Economist", "economics"),
+                       ("Student Trainee (Economist), CG-0199-04 (NTE 1 Year)", "economics"),
+                       ("WS - Political Science Research Associate - FWS", "government"),
+                       ("Respiratory Therapist Intern - GSL", "health"),
+                       ("Speech Language Graduate Internship", "health"),
+                       ("Surveying Intern | Charlotte, NC", "civil")):
+        assert tag in classify(title), (title, classify(title))
+    # the other therapists are not counselling jobs
+    for title in ("Respiratory Therapist Intern - GSL", "Recreation Therapist Intern",
+                  "Physical Therapist – Biomechanics Research Support"):
+        assert "psychology" not in classify(title), title
+    # and human factors engineering keeps an engineering field
+    assert "industrial" in classify("Human Factors Engineer Intern - SE&I")
