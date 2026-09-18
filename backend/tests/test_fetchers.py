@@ -13,6 +13,7 @@ from internscout.sources.taleo import parse_taleo
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
 from internscout.sources.icims import parse_icims
+from internscout.sources.successfactors import parse_successfactors
 from internscout.sources.usajobs import parse_usajobs
 from internscout.sources.nyc_jobs import parse_nyc_jobs
 from internscout.sources.github_lists import _parse
@@ -220,6 +221,52 @@ def test_icims():
     assert items[0]["url"] == "https://acme.icims.com/jobs/7600/slug/job"
     # "International" is not an internship, but iCIMS keyword search matches it on substring
     assert parse_icims(card(7604, "International Scholar Advisor", "US-NY-New York"), CO) == []
+
+
+def test_successfactors():
+    SF = {"name": "Acme", "ats_token": "careers.acme.com", "is_quant_target": False}
+
+    def row(jid, title, slug, loc):
+        # the table template: the link once for desktop and again inside the phone block, with the
+        # location printed in the phone block and again in its own column
+        where = f'<span class="jobLocation"> {loc} </span>'
+        return f"""<tr class="data-row"><td class="colTitle" headers="hdrTitle">
+        <span class="jobTitle hidden-phone"><a href="/job/{slug}/{jid}/" class="jobTitle-link">{title}</a></span>
+        <div class="jobdetail-phone visible-phone">
+        <span class="jobTitle visible-phone"><a class="jobTitle-link" href="/job/{slug}/{jid}/">{title}</a></span>
+        <span class="jobLocation visible-phone">{where}</span></div></td>
+        <td class="colLocation hidden-phone" headers="hdrLocation">{where}</td></tr>"""
+
+    def tile(jid, title, slug):
+        # the tile template: the same link three times over (desktop, tablet, phone) and no
+        # location markup anywhere on the page
+        one = (f'<a class="jobTitle-link fontcolora880bb1b" data-focus-tile=".job-id-{jid}" '
+               f'href="/job/{slug}/{jid}/"> {title} </a>')
+        return f'<li class="job-tile job-id-{jid}" data-url="/job/{slug}/{jid}/">{one}{one}{one}</li>'
+
+    page = ('<a id="hdrLocationButton" class="jobLocation sort" href="/search/?sortColumn=sort_location">Location </a>'
+            + row(1422901500, "Physical Verification Intern", "Greensboro-Physical-Verification-Intern-NC-27409",
+                  "Greensboro, NC, US, 27409")
+            + row(1422800501, "Director of Sourcing", "Greensboro-Director-of-Sourcing-NC-27409",
+                  "Greensboro, NC, US, 27409")
+            + row(1422800502, "Summer Intern", "Shanghai-Summer-Intern-SH-201807", "Shanghai, SH, CN, 201807")
+            + tile(1424643100, "2027 Summer Internship - MBA (Rosemead)",
+                   "Rosemead-2027-Summer-Internship-MBA-%28Rosemead%29-CA-91770-3714"))
+    items = parse_successfactors(page, SF)
+    # the director is not an internship; Shanghai is not US, so it drops with no US location left
+    assert [i["title"] for i in items] == ["Physical Verification Intern", "2027 Summer Internship - MBA (Rosemead)"]
+    # a job's link appears two or three times over; it is one listing, not two or three
+    assert len(items) == 2
+    # the country code and the postcode after it are not part of a location a student reads
+    assert items[0]["locations"] == ["Greensboro, NC"]
+    # the tile template prints no location, so the state comes out of the slug - and only the state,
+    # because a hyphenated city cannot be told from the start of the title
+    assert items[1]["locations"] == ["CA"]
+    # the token is the host, and hrefs on the page are relative to it
+    assert items[0]["url"] == "https://careers.acme.com/job/Greensboro-Physical-Verification-Intern-NC-27409/1422901500/"
+    assert items[0]["source"] == "successfactors"
+    # the column header is a link, not a job's location, and must not be read as one
+    assert parse_successfactors('<a class="jobLocation sort">Location</a>', SF) == []
 
 
 def test_usajobs():
