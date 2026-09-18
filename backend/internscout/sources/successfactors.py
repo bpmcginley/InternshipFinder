@@ -14,7 +14,14 @@ time to learn:
     <city>-<title>-<ST>-<postcode>. Both templates repeat the same job's link two or three times
     over (desktop, tablet, phone), so every link is keyed by job id and the first location found
     for that id wins.
-  - There is no posting date and no snippet on either template, so neither is reported.
+  - There is no posting date and no snippet on either template, so the search page alone gives a
+    listing no description at all - all 87 open SuccessFactors listings reached the dashboard with
+    nothing to classify or read. The job page has both, as schema.org microdata: a datePosted meta
+    and an itemprop="description" span. robots.txt allows /job/, and the pages are about 40 KB, so
+    like the other boards that page is fetched only for postings that might be somewhere a student
+    asked for, and capped per board.
+  - The description span has spans nested inside it, so its end is found by counting them rather
+    than by matching the first </span>, which would cut the text off at the first bold word.
 
 SuccessFactors is what large hospitals, universities, utilities and manufacturers run, which is
 where the health, education and energy listings live.
@@ -25,6 +32,7 @@ from urllib.parse import unquote
 from .common import board_item, html_to_text
 from ..classify import is_internship
 from ..geo import STATE_NAMES
+from ..region import maybe_in_region
 
 SEARCH_URL = "https://{token}/search/"
 # One unfiltered crawl would be the employer's whole board. Searching a few student-shaped words
@@ -32,6 +40,7 @@ SEARCH_URL = "https://{token}/search/"
 KEYWORDS = ("intern", "co-op", "student", "fellow")
 MAX_PAGES = 5
 PAGE_SIZE = 25
+MAX_DETAIL = 25
 
 # The class can come before or after the href, so the tag's attributes are captured whole and the
 # href is picked out of them afterwards.
@@ -44,6 +53,12 @@ LOC_RE = re.compile(r'<span[^>]*class="[^"]*jobLocation[^"]*"[^>]*>(.*?)</span>'
 # the state is the city followed by the title. Checked against a real US state list, because an
 # Italian postcode is five digits too and 'Monfalcone-...-IT-34074' would otherwise read as a state.
 SLUG_ST_RE = re.compile(r"-([A-Z]{2})-\d{5}(?:-\d{4})?$")
+DESC_OPEN_RE = re.compile(r'<span[^>]*itemprop="description"[^>]*>', re.I)
+SPAN_RE = re.compile(r"<(/?)span\b[^>]*>", re.I)
+# 'Tue Sep 15 07:00:00 UTC 2026'. Only the day is wanted, and _to_dt reads an ISO date.
+POSTED_RE = re.compile(r'itemprop="datePosted"\s+content="\w{3} (\w{3}) (\d{1,2}) [\d:]+ \w+ (\d{4})"', re.I)
+MONTHS = {m: i for i, m in enumerate(
+    "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(), 1)}
 US_STATES = set(STATE_NAMES.values())
 COUNTRY_US = {"US", "USA", "UNITED STATES"}
 _SQUASH = re.compile(r"[^a-z0-9]")
@@ -99,6 +114,22 @@ def _location(raw: str, slug: str, title: str) -> list[str]:
     return [st] if st else []
 
 
+def parse_successfactors_detail(html: str) -> tuple[str, str | None]:
+    """(description, posted date) from the job page's microdata. Either may be missing."""
+    m = DESC_OPEN_RE.search(html or "")
+    text = ""
+    if m:
+        depth, body = 1, html[m.end():]
+        for tag in SPAN_RE.finditer(body):
+            depth += -1 if tag.group(1) else 1
+            if depth == 0:
+                body = body[:tag.start()]
+                break
+        text = html_to_text(body)
+    d = POSTED_RE.search(html or "")
+    posted = f"{d.group(3)}-{MONTHS[d.group(1).title()]:02d}-{int(d.group(2)):02d}" if d else None
+    return text, posted
+
 def parse_successfactors(html: str, co: dict) -> list[dict]:
     host, by_id = co["ats_token"], {}
     anchors = list(ANCHOR_RE.finditer(html or ""))
@@ -152,4 +183,13 @@ def fetch_successfactors_board(c, co: dict) -> list[dict]:
             # A short page is the last page; SuccessFactors serves 25 links when there are more.
             if len({m.group(2) for m in JOB_RE.finditer(r.text)}) < PAGE_SIZE:
                 break
+    for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
+        try:
+            d = c.get(it["url"])
+            if d.status_code == 200:
+                desc, posted = parse_successfactors_detail(d.text)
+                it["description"] = desc[:4000]
+                it["posted_at"] = posted or it["posted_at"]
+        except Exception:
+            pass
     return items

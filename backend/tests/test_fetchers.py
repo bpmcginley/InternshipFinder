@@ -13,7 +13,7 @@ from internscout.sources.taleo import parse_taleo
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
 from internscout.sources.icims import parse_icims
-from internscout.sources.successfactors import parse_successfactors
+from internscout.sources.successfactors import parse_successfactors, parse_successfactors_detail
 from internscout.sources.eightfold import parse_eightfold, host_of as ef_host
 from internscout.sources.jazzhr import parse_jazzhr
 from internscout.sources.usajobs import parse_usajobs
@@ -372,6 +372,26 @@ def test_successfactors():
     back = parse_successfactors(row(9005, "Summer Intern", "Chattanooga-Summer-Intern-TN-37401",
                                     "Chattanooga, US"), SF)
     assert back[0]["locations"] == ["Chattanooga, TN"]
+
+
+def test_successfactors_detail():
+    page = ('<div class="jobDisplayShell" itemscope itemtype="http://schema.org/JobPosting">'
+            '<meta itemprop="datePosted" content="Tue Sep 15 07:00:00 UTC 2026">'
+            '<span itemprop="description" class="rtltextaligneligible"><span class="jobdescription">'
+            '<p>Build <span style="font-weight:bold">real</span> things.</p>'
+            '<p>Rising juniors &amp; up.</p></span></span>'
+            '<div class="footer">Apply now</div>')
+    desc, posted = parse_successfactors_detail(page)
+    # The nested spans are the point: stopping at the first </span> would cut this after "Build".
+    assert desc == "Build real things.\n Rising juniors & up."
+    # The search page has no date at all, so the job page is where one comes from.
+    assert posted == "2026-09-15"
+
+    # A tenant may serve either half, and an expired job serves neither, so both are optional.
+    assert parse_successfactors_detail('<meta itemprop="datePosted" content="Tue Sep 15 07:00:00 UTC 2026">') \
+        == ("", "2026-09-15")
+    assert parse_successfactors_detail("<div>Job no longer available</div>") == ("", None)
+    assert parse_successfactors_detail("") == ("", None)
 
 
 def test_jazzhr():
