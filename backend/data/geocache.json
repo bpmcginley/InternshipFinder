@@ -487,6 +487,10 @@
 40.9358,
 -74.1175
 ],
+"fairfield|NJ":[
+40.8837,
+-74.3069
+],
 "far rockaway|NY":[
 40.6054,
 -73.7551
@@ -799,6 +803,10 @@
 40.7959,
 -74.3149
 ],
+"london|NY":[
+43.2053,
+-75.5877
+],
 "long beach island|NJ":null,
 "long island ny|NY":null,
 "long island|NY":null,
@@ -1066,6 +1074,10 @@
 43.0408,
 -78.8661
 ],
+"north wales|PA":[
+40.2109,
+-75.2782
+],
 "ny - amherst|NY":null,
 "ny - bohemia|NY":null,
 "ny - brockport|NY":null,
@@ -1109,6 +1121,10 @@
 "oil city|PA":[
 41.4341,
 -79.7085
+],
+"ontario|NY":[
+43.2209,
+-77.283
 ],
 "oradell|NJ":[
 40.9544,
@@ -1557,8 +1573,10 @@
 40.8695,
 -72.8868
 ],
+"us - bayonne center (njbay|NJ":null,
 "us - ny|NY":null,
 "us - pittsburgh|PA":null,
+"us - ups technology headquarters & datacenter (njrar|NJ":null,
 "us > new jersey > mt laurel|NJ":null,
 "us > new york > albany|NY":null,
 "us > new york > fishkill|NY":null,
