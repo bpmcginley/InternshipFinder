@@ -631,10 +631,19 @@ GREENHOUSE += [
 # place it is, which board_item adds when a posting names no state. Without that, 25 of these 34
 # postings are dropped for having no US location at all.
 #
-# Ten more tenants answer but had nothing today, and are left out rather than fetched forever for
-# nothing: smithcollege|wd5|smithcollege, wesleyan|wd5|careers, risd|wd5|RISD, colby|wd5|ColbyCareers,
-# suffolk|wd1|External, vassar|wd1|Vassar-External, endicott|wd1|Endicott, pace|wd1|Orion,
-# montclair|wd1|JobOpportunities, amherst|wd5|FSL_Employment_Opportunities (the Five Colleges).
+# Fourteen more tenants answer but had nothing today, and are left out rather than fetched forever
+# for nothing: smithcollege|wd5|smithcollege, wesleyan|wd5|careers, risd|wd5|RISD,
+# colby|wd5|ColbyCareers, suffolk|wd1|External, vassar|wd1|Vassar-External, endicott|wd1|Endicott,
+# pace|wd1|Orion, montclair|wd1|JobOpportunities, amherst|wd5|FSL_Employment_Opportunities (the
+# Five Colleges), and four the new Workday probe turned up on 2026-09-18:
+# trinity|wd1|Trinity_University, holycross|wd12|Careers, colby|wd5|ColbySummerJobs and
+# unioncollege|wd5|UnionCollegeCareers. The last two are second sites on tenants already named
+# here, which is the shape to expect: a school splits student jobs, summer jobs and staff jobs
+# across sites, and only one of them is ever the student one.
+#
+# The probe finds these because its bar is a posting matching "intern", and the fetcher's bar is
+# classification. All four cleared the first and none cleared the second, so they are boards, but
+# not boards worth a request every six hours. Re-check them rather than re-probing them.
 #
 # williams|wd5|External is Williams Companies of Tulsa, not Williams College. It is already in the
 # registry as an energy employer, which is what it is; do not re-seed it as a school.
