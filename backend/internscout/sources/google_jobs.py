@@ -35,7 +35,8 @@ def is_daily_run(hour_utc: int) -> bool:
 
 
 def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
-                      max_searches: int | None = None) -> list[dict]:
+                      max_searches: int | None = None, focus_queries: list[str] | None = None,
+                      focus_searches: int = 0) -> list[dict]:
     """Query Google Jobs. Stays inside the SerpApi quota by capping searches per run and
     rotating which queries are used (day-based offset), so all disciplines get covered
     across runs instead of always hitting the same few."""
@@ -66,6 +67,15 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
         return []
     # rotate the query window each day so coverage spreads over time
     day = datetime.date.today().toordinal()
+    # Searches held back every day for the thinnest field. The main list gives one query to every
+    # location per run, so a field with five queries in the list came up about one day in six;
+    # these run every day, each on a different metro, before the main plan spends the rest.
+    focus: list[tuple[str, str]] = []
+    if focus_queries and focus_searches > 0 and locations:
+        n = min(focus_searches, max_searches)
+        focus = [(focus_queries[(day * n + i) % len(focus_queries)], locations[(day + i) % len(locations)])
+                 for i in range(n)]
+        max_searches -= n
     if len(locations) > max_searches:  # more wanted metros than searches: rotate them by day too
         s = day % len(locations)
         locations = (locations[s:] + locations[:s])[:max_searches]
@@ -74,47 +84,43 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     start = (turn * per_loc) % max(1, len(queries))
     rotated = queries[start:] + queries[:start]
     picked = rotated[:per_loc]
-    print(f"[google_jobs] {len(picked)} quer(ies) x {len(locations)} location(s) "
-          f"= {len(picked) * len(locations)} searches (cap {max_searches})")
+    pairs = focus + [(q, loc) for loc in locations for q in picked][:max(0, max_searches)]
+    print(f"[google_jobs] {len(focus)} focus search(es), then {len(picked)} quer(ies) x {len(locations)} "
+          f"location(s) (cap {max_searches})")
     out: list[dict] = []
     seen = set()
-    used = 0
     with client() as c:
-        for loc in locations:
-            for q in picked:
-                if used >= max_searches:
-                    break
-                used += 1
-                try:
-                    r = c.get(URL, params={
-                        "engine": "google_jobs", "q": q, "location": loc,
-                        "hl": "en", "api_key": api_key,
+        for q, loc in pairs:   # already capped at the day's budget
+            try:
+                r = c.get(URL, params={
+                    "engine": "google_jobs", "q": q, "location": loc,
+                    "hl": "en", "api_key": api_key,
+                })
+                r.raise_for_status()
+                for j in r.json().get("jobs_results", []):
+                    opts = j.get("apply_options") or []
+                    link = (opts[0].get("link") if opts else None) or j.get("share_link")
+                    key = (j.get("company_name", ""), j.get("title", ""))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    out.append({
+                        "company_name": j.get("company_name", ""),
+                        "title": j.get("title", ""),
+                        "locations": [j.get("location") or loc],
+                        "season": None, "year": None,
+                        "url": link, "apply_url": link,
+                        "posted_at": None,
+                        "description": (j.get("description") or "")[:3000],
+                        "active": True,
+                        "source": "google_jobs",
+                        "source_url": link,
                     })
-                    r.raise_for_status()
-                    for j in r.json().get("jobs_results", []):
-                        opts = j.get("apply_options") or []
-                        link = (opts[0].get("link") if opts else None) or j.get("share_link")
-                        key = (j.get("company_name", ""), j.get("title", ""))
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        out.append({
-                            "company_name": j.get("company_name", ""),
-                            "title": j.get("title", ""),
-                            "locations": [j.get("location") or loc],
-                            "season": None, "year": None,
-                            "url": link, "apply_url": link,
-                            "posted_at": None,
-                            "description": (j.get("description") or "")[:3000],
-                            "active": True,
-                            "source": "google_jobs",
-                            "source_url": link,
-                        })
-                except httpx.HTTPStatusError as e:
-                    print(f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}")
-                    if e.response.status_code == 429:   # quota gone: the rest will fail the same way
-                        print("[google_jobs] out of searches; stopping for this run")
-                        return out
-                except Exception as e:
-                    print(f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}")
+            except httpx.HTTPStatusError as e:
+                print(f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}")
+                if e.response.status_code == 429:   # quota gone: the rest will fail the same way
+                    print("[google_jobs] out of searches; stopping for this run")
+                    return out
+            except Exception as e:
+                print(f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}")
     return out

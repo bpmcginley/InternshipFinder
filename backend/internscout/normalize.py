@@ -194,6 +194,8 @@ def normalize(raw: dict) -> dict | None:
     tags = classify(title)  # title-only: avoids off-target tags from JD boilerplate
     if tags == ["other"] and employer_research_field(company, title):
         tags = [employer_research_field(company, title)]
+    if tags == ["other"] and raw.get("field_hint"):   # a source that knows the field, e.g. a USAJOBS series
+        tags = [raw["field_hint"]]
     if tags == ["other"] and raw.get("sector") in SECTOR_FIELDS:
         tags = [SECTOR_FIELDS[raw["sector"]]]
     if raw.get("source") in PUBLIC_SOURCES:  # every posting from a government feed is government work

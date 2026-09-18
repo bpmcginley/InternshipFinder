@@ -18,6 +18,7 @@ from .sources.base import client
 from .sources.common import RobotsDisallowed
 from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
+from .config import GOOGLE_JOBS_FOCUS_QUERIES, GOOGLE_JOBS_FOCUS_SEARCHES
 from .discover import (load_registry, save_registry, seed_registry, discover, boards,
                        label_boards, label_sectors, record_result, prune)
 from .probe import probe_boards
@@ -158,7 +159,9 @@ def main():
             found += discover(reg, items)
             raw += items
         if args.google or do_all:
-            items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, google_jobs_locations(), max_searches=GOOGLE_JOBS_MAX_SEARCHES)
+            items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, google_jobs_locations(), max_searches=GOOGLE_JOBS_MAX_SEARCHES,
+                                      focus_queries=GOOGLE_JOBS_FOCUS_QUERIES,
+                                      focus_searches=GOOGLE_JOBS_FOCUS_SEARCHES)
             found += discover(reg, items)
             raw += items
         if raw:

@@ -64,3 +64,22 @@ def test_budget_caps_searches_and_results_are_parsed(monkeypatch):
     items = gj.fetch_google_jobs(["museum internship", "arts internship"], locs)
     assert len(searches) == 3                       # 100 / 31
     assert len(items) == 3 and items[0]["source"] == "google_jobs" and items[0]["apply_url"] == "https://x.test/1"
+
+
+def test_focus_searches_run_first_and_come_out_of_the_same_budget(monkeypatch):
+    searches = []
+
+    def handler(req):
+        if req.url.path == "/account.json":
+            return httpx.Response(200, json={"searches_per_month": 250, "total_searches_left": 200})
+        searches.append((req.url.params["q"], req.url.params["location"]))
+        return httpx.Response(200, json={"jobs_results": []})
+    _patch(monkeypatch, handler)
+    locs = ["Boston, Massachusetts", "New York, New York", "Hartford, Connecticut", "Providence, Rhode Island",
+            "Manchester, New Hampshire", "Portland, Maine"]
+    gj.fetch_google_jobs(["museum internship"], locs, focus_queries=["psychology internship", "economics internship"],
+                         focus_searches=2)
+    assert len(searches) == 8                       # 250 / 31: the focus pair does not add to it
+    assert {q for q, _ in searches[:2]} == {"psychology internship", "economics internship"}
+    assert searches[0][1] != searches[1][1]         # each focus search on a different metro
+    assert all(q == "museum internship" for q, _ in searches[2:])

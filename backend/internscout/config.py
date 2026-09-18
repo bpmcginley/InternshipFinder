@@ -122,6 +122,25 @@ GOOGLE_JOBS_QUERIES = [
     "engineering co-op 2027",
     "data analyst internship 2027",
 ]
+# Searches spent on these every day before the list above gets the rest of the budget. Social
+# sciences is the one field under the coverage report's line of 15, and the list above reaches it
+# about one day in six. Two a day is a quarter of the free plan's eight. When another field becomes
+# the thinnest, swap these queries for its own.
+GOOGLE_JOBS_FOCUS_QUERIES = [
+    "psychology research assistant internship",
+    "policy research internship think tank",
+    "economics internship undergraduate",
+    "political science internship",
+    "sociology research internship",
+    "behavioral science internship",
+    "social science research assistant",
+    "international relations internship",
+    "psychology internship undergraduate",
+    "anthropology archaeology internship",
+    "survey research internship",
+    "linguistics translation internship",
+]
+GOOGLE_JOBS_FOCUS_SEARCHES = int(os.environ.get("SERPAPI_FOCUS_SEARCHES", "2"))
 # Google Jobs is location-driven; one search per location per query (watch your SerpApi quota).
 GOOGLE_JOBS_LOCATIONS = [
     "Boston, Massachusetts",

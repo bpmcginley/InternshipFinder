@@ -593,6 +593,22 @@ def test_usajobs():
     assert "United States Citizens" in a["description"] and "Lead tours" in a["description"]
 
 
+def test_usajobs_series_names_the_field_a_bare_title_leaves_out():
+    from internscout.normalize import normalize
+    def hit(title, code):
+        return {"MatchedObjectDescriptor": {
+            "PositionTitle": title, "PositionURI": "https://www.usajobs.gov/GetJob/ViewDetails/2",
+            "OrganizationName": "Census Bureau", "PositionSchedule": [{"Name": "Full-time"}],
+            "PositionLocation": [{"LocationName": "Suitland, Maryland", "CountryCode": "United States"}],
+            "JobCategory": [{"Name": "x", "Code": code}]}}
+    items, _ = parse_usajobs({"SearchResult": {"SearchResultItems": [
+        hit("Student Trainee", "0184"), hit("Student Trainee (Economist)", "0101"), hit("Student Trainee", "2210")]}})
+    tags = [normalize(i)["field_tags"] for i in items]
+    assert tags[0] == ["social_science", "government"]     # sociology series
+    assert tags[1] == ["economics", "government"]          # the title wins when it names a field
+    assert tags[2] == ["government"]                       # IT series: no hint
+
+
 def test_nyc_jobs():
     from datetime import date
     row = lambda **kw: {"job_id": "1", "agency": "DEPT OF PARKS & RECREATION", "posting_type": "Internal",
