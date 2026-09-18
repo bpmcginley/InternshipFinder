@@ -17,7 +17,7 @@ from .sources.base import client
 from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
 from .discover import (load_registry, save_registry, seed_registry, discover, boards,
-                       label_sectors, record_result, prune)
+                       label_boards, label_sectors, record_result, prune)
 from .probe import probe_boards
 from .geo import save_cache
 from .pipeline import run
@@ -89,11 +89,14 @@ def main():
             raw += scan_boards(reg, args.workers)
         if args.public or do_all:  # government feeds: no ATS boards to discover from these
             raw += fetch_usajobs() + fetch_nyc_jobs()
+        # Boards first, so the listings below can be labelled off them in the same run.
+        named = label_boards(reg)
         # Last, so it sees every item from every source in this run.
         labelled = label_sectors(reg, raw)
         dropped = prune(reg)
         save_registry(reg)
         print(f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead, "
+              f"+{named} boards labelled by name, "
               f"{labelled} listings labelled from their board; "
               f"{ {a: len(b) for a, b in reg.items()} }")
 

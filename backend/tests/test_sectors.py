@@ -2,8 +2,8 @@ from datetime import date
 
 from internscout import companies_seed
 from internscout.dedupe import merge_batch, same_job
-from internscout.discover import (add_board, label_sectors, relabel_sector, seed_registry,
-                                  set_location)
+from internscout.discover import (add_board, label_boards, label_sectors, relabel_sector,
+                                  sector_from_name, seed_registry, set_location)
 from internscout.coverage import SECTOR_CLUSTER
 from internscout.normalize import normalize
 from internscout.sources.common import board_item
@@ -287,3 +287,46 @@ def test_a_listing_found_off_board_gets_the_sector_its_board_already_carries():
                                locations=["Boston, MA"],
                                url="https://boards.greenhouse.io/voxmedia/jobs/4321"))
     assert row["field_tags"] == ["media"]
+
+
+def test_a_university_board_is_labelled_from_the_employers_own_name():
+    # Every one of these was sitting unlabelled in the registry.
+    for name in ("Ohio State University", "Ivy Tech Community College", "Dallas College",
+                 "Stevens Institute of Technology", "Worcester Polytechnic Institute",
+                 "University System of New Hampshire", "The University of Edinburgh"):
+        assert sector_from_name(name) == "education_research", name
+    # A university health system hires nurses: health wins over education in the same name.
+    for name in ("St. Luke's University Health Network", "Cooper University Health Care",
+                 "Medical University of South Carolina", "University Health Network"):
+        assert sector_from_name(name) == "health", name
+    # An endowment arm is neither, and a name cannot settle which, so it is left alone.
+    assert sector_from_name("University of Virginia Investment Management Company (UVIMCO)") is None
+    # Names that say nothing about a sector stay saying nothing. "Universal" is not "university",
+    # and "Collegiate" is not "college", which is why both patterns are anchored on word breaks.
+    for name in ("Universal Studios", "Stripe", "Collegiate Peaks Bank", "", "Vox Media"):
+        assert sector_from_name(name) is None, name
+
+
+def test_labelling_boards_by_name_never_argues_with_a_sector_we_already_have():
+    reg = {}
+    add_board(reg, "workday", "osu|wd1|osucareers", "Ohio State University")
+    add_board(reg, "icims", "careers-cooperhealth", "Cooper University Health Care")
+    add_board(reg, "greenhouse", "voxmedia", "Vox Media")
+    # A seeded sector stands, even where the name would have suggested a different one.
+    add_board(reg, "workday", "musc|wd1|musc", "Medical University of South Carolina",
+              sector="education_research")
+    # A quant board is already labelled quant_finance by add_board, so it is already protected.
+    add_board(reg, "lever", "somefund", "Some University Endowment Fund", quant=True)
+    assert label_boards(reg) == 2
+    assert reg["workday"]["osu|wd1|osucareers"]["sector"] == "education_research"
+    assert reg["icims"]["careers-cooperhealth"]["sector"] == "health"
+    assert "sector" not in reg["greenhouse"]["voxmedia"]
+    assert reg["workday"]["musc|wd1|musc"]["sector"] == "education_research"
+    assert reg["lever"]["somefund"]["sector"] == "quant_finance"
+    # Idempotent: a second pass has nothing left to do.
+    assert label_boards(reg) == 0
+    # And the label reaches a listing found off-board, which is the point of doing it at all.
+    item = {"title": "Intern",
+            "apply_url": "https://careers-cooperhealth.icims.com/jobs/1234/intern/job"}
+    assert label_sectors(reg, [item]) == 1
+    assert item["sector"] == "health"

@@ -147,6 +147,56 @@ def relabel_sector(reg: dict, ats: str, token: str, sector: str) -> bool:
     return True
 
 
+# A university is the one kind of employer that reliably names its own sector, and 57 boards
+# in the registry were unlabelled, with 435 open listings sitting on them - the largest
+# unlabelled group there is, and the one feeding the Education cluster that the coverage
+# report keeps putting a single point above thin. Seeding them by hand would have meant 57
+# lines that go stale the next time discovery finds a university, which it does most runs.
+#
+# The order matters, and it is the whole reason this is three patterns rather than one. A
+# finance arm is not something a name can settle, so it is left alone rather than guessed at:
+# University of Virginia Investment Management Company runs an endowment. A university health
+# system is health rather than education: St. Luke's University Health Network and Cooper
+# University Health Care hire nurses, not teaching assistants.
+#
+# Checked against all 3,156 boards in the registry: 67 names match, all 67 are genuinely
+# educational or university health systems, and none of the 9 that already carried a sector
+# disagreed with what this would have given them.
+_SECTOR_NAME_SKIP_RE = re.compile(r"credit union|\bbank\b|investment|asset management|"
+                                  r"\bcapital\b|ventures?\b", re.I)
+_SECTOR_NAME_HEALTH_RE = re.compile(r"\bhealth\b|hospital|\bmedical\b|\bclinic|cancer|"
+                                    r"medicine", re.I)
+_SECTOR_NAME_EDU_RE = re.compile(r"\buniversit(y|ies)\b|\bcollege\b|institute of technology|"
+                                 r"\bpolytechnic\b|\bschool of\b|community college", re.I)
+
+
+def sector_from_name(name: str) -> str | None:
+    """The sector an employer name states outright, or None when it states none.
+
+    Deliberately narrow: this reads names, and a name is only good evidence in the one case
+    where institutions are required to say what they are. Everything else stays unlabelled."""
+    name = name or ""
+    if not _SECTOR_NAME_EDU_RE.search(name) or _SECTOR_NAME_SKIP_RE.search(name):
+        return None
+    return "health" if _SECTOR_NAME_HEALTH_RE.search(name) else "education_research"
+
+
+def label_boards(reg: dict) -> int:
+    """Fill in the sector for boards whose employer name says it. Never overwrites: a sector
+    already on a board came from the seed file or from a fetcher, and both know better than a
+    name does."""
+    filled = 0
+    for entries in reg.values():
+        for entry in entries.values():
+            if entry.get("sector"):
+                continue
+            sector = sector_from_name(entry.get("name") or "")
+            if sector:
+                entry["sector"] = sector
+                filled += 1
+    return filled
+
+
 def sector_index(reg: dict) -> dict[tuple[str, str], str]:
     """(ats, token) -> sector for every labelled board, built once so a per-listing lookup is
     cheap. Boards past MAX_FAILS are included on purpose: a board we have stopped fetching still
