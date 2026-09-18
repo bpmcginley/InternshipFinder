@@ -386,3 +386,22 @@ def test_the_rescue_phrases_stay_out_of_boilerplate():
         "Software Engineering Intern", "You will help reduce operational risk across our platform.")
     assert "engineering" not in classify("Internal Controls Intern")
     assert "engineering" not in classify("Process Risk and Controls Consulting Intern")
+
+
+def test_investment_testing_and_rnd_titles_reach_their_field():
+    for title, tag in (("Financial Reporting Intern (Spring 2027)", "finance"),
+                       ("Wealth and Investment Management Intern", "finance"),
+                       ("Investments Intern - Bank Loans", "finance"),
+                       ("Financial Due Diligence Intern - Summer 2027", "finance"),
+                       ("R&D Intern - Catholyte", "engineering"),
+                       ("Reliability Testing and Failure Analysis Intern", "engineering"),
+                       ("Design for Test Intern, BS - Summer 2027", "engineering"),
+                       ("Military DoD SkillBridge Internship - Maintenance Technician", "engineering"),
+                       ("Advanced Packaging Intern", "hardware"),
+                       ("Site Reliability Internship - Spring 2027", "swe")):
+        assert tag in classify(title), (title, classify(title))
+    # the word alone is not enough where it means something else
+    assert "finance" not in classify("2027 Platform Internship, Non-Investment (US)")
+    assert "finance" not in classify("Community Relations and Social Investments Intern - WI")
+    assert "finance" not in classify("Investment Planning Co-Op Engineer - Fall 2027")
+    assert "engineering" not in classify("Site Reliability Internship - Spring 2027")

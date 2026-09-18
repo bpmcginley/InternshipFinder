@@ -16,8 +16,8 @@ RULES = [
     ("ml", r"\bml\b|machine learning|deep learning|\bnlp\b|computer vision|\bai\b|artificial intelligence|genai|\bllm|research scientist|reinforcement learning"),
     ("data", r"\bdata (scien|engineer|analy|platform)|\banalytics\b|business intelligence|\bbi\b|\betl\b|data warehouse|\bdata\b|informatics"),
     ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber"),
-    ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic"),
-    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien"),
+    ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic|advanced packaging"),
+    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien|site reliability"),
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner"),
 
     # --- engineering (non-software) ---
@@ -44,7 +44,7 @@ RULES = [
     # posting. classify drops this again the moment any other rule matched, so it is the
     # generic case only: "Engineering Intern", "Quality Engineering Intern", "Field Engineer
     # Intern". 1,200 listings in one export, none of which had any field tag before.
-    ("engineering", r"\bengineer(ing|s)?\b|(?<!internal )(?<!risk & )(?<!risk and )\bcontrols (intern|technician|engineer|co-?op)|\b(electrical|electronics|process|embedded|manufacturing|flight|vehicle|machine|chassis|powertrain) controls\b|guidance,? navigation,? (&|and) controls|navigation, estimation,? (and|&) controls"),
+    ("engineering", r"\bengineer(ing|s)?\b|(?<!internal )(?<!risk & )(?<!risk and )\bcontrols (intern|technician|engineer|co-?op)|\b(electrical|electronics|process|embedded|manufacturing|flight|vehicle|machine|chassis|powertrain) controls\b|guidance,? navigation,? (&|and) controls|navigation, estimation,? (and|&) controls|\br&d\b|(?<!site )\breliability\b|\btest (automation|technician|equipment|(&|and) validation)|\b(system|ic) test\b|design for test|assembly (and|&) test|\bmaintenance (technician|mechanic|apprentice|intern|engineer)|(aircraft|industrial|nuclear) maintenance"),
 
     # --- sciences / math / health ---
     ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery|bioinformatic"),
@@ -60,7 +60,12 @@ RULES = [
     ("lab_research", r"\blab(oratory)?\b|wet lab|research technician|\breu\b|research experience for undergrad|undergraduate research|summer research|\bsurf\b"),
 
     # --- business / finance ---
-    ("finance", r"banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern"),
+    # "Investment(s)" on its own is the asset-management desk ("Investments Intern - Bank Loans",
+    # "Wealth and Investment Management Intern"), except at a utility, where "Investment Planning"
+    # is capital planning, and in "Social/Community Investments", which is giving. Together with the
+    # financial-reporting phrases and engineering's R&D, test, reliability and maintenance words
+    # below, this took 132 of the ~2,700 "other" titles in one export into a field.
+    ("finance", r"banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)"),
     ("accounting", r"assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
     ("marketing", r"\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern"),
