@@ -24,6 +24,7 @@ import re
 
 from .common import board_item
 from ..classify import is_internship
+from ..region import board_state, place_bare_cities
 
 URL = "https://{tenant}.applytojob.com/apply"
 
@@ -40,11 +41,13 @@ def _text(s: str) -> str:
 
 
 def parse_jazzhr(page: str, co: dict) -> list[dict]:
-    out, seen = [], set()
+    out, seen, board = [], set(), []
     for chunk in _ITEM_SPLIT.split(page or "")[1:]:
         link = _LINK_RE.search(chunk)
         if not link:
             continue
+        loc = _LOC_RE.search(chunk)
+        board.append(_text(loc.group("loc")) if loc else None)
         title = _text(link.group("title"))
         if not title or not is_internship(title):
             continue
@@ -52,9 +55,9 @@ def parse_jazzhr(page: str, co: dict) -> list[dict]:
         if url in seen:
             continue
         seen.add(url)
-        loc = _LOC_RE.search(chunk)
         out.append(board_item(co, source="jazzhr", title=title,
                               locations=[_text(loc.group("loc"))] if loc else [], url=url))
+    place_bare_cities(out, board_state(board))
     return out
 
 

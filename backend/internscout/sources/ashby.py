@@ -2,6 +2,7 @@
 from __future__ import annotations
 from .common import board_item
 from ..classify import is_internship
+from ..region import board_state, place_bare_cities
 
 URL = "https://api.ashbyhq.com/posting-api/job-board/{token}"
 _US = {None, "", "us", "usa", "united states", "united states of america"}
@@ -14,10 +15,11 @@ def _addr(a: dict | None) -> str | None:
 
 
 def parse_ashby(payload: dict, co: dict) -> list[dict]:
-    out = []
+    out, board = [], []
     for j in payload.get("jobs", []):
         if j.get("isListed") is False:
             continue
+        board.append(j.get("location"))
         title = j.get("title", "")
         emp = j.get("employmentType") or ""
         if not is_internship(title, emp):
@@ -33,6 +35,7 @@ def parse_ashby(payload: dict, co: dict) -> list[dict]:
                               url=j.get("jobUrl"), apply_url=j.get("applyUrl") or j.get("jobUrl"),
                               posted_at=j.get("publishedAt"), description=j.get("descriptionPlain") or "",
                               employment_type=emp))
+    place_bare_cities(out, board_state(board))
     return out
 
 

@@ -13,6 +13,7 @@ from .config import PROFILE
 from .normalize import normalize
 from .dedupe import merge_batch
 from .discover import ats_of
+from .region import place_bare_cities
 from .score import score_parts
 
 
@@ -34,6 +35,7 @@ def _field_ok(tags) -> bool:
 
 def run(raw_items: list[dict], *, verbose=True) -> dict:
     init_db()
+    placed = place_bare_cities(raw_items)
     normalized = []
     for raw in raw_items:
         n = normalize(raw)
@@ -115,7 +117,7 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
         db.commit()
 
     if verbose:
-        print(f"[pipeline] {stats}")
+        print(f"[pipeline] {stats}; {placed} bare town names placed by their board")
         print("[pipeline] by state:", dict(Counter(it["geo"]["state"] for it in merged.values()).most_common()))
         print("[pipeline] by source:", dict(Counter(s for it in merged.values() for s, _ in it["_sources"]).most_common()))
     return stats

@@ -8,6 +8,7 @@ from __future__ import annotations
 from .base import client
 from .common import board_item
 from ..classify import is_internship
+from ..region import board_state, place_bare_cities
 
 URL = "https://api.{region}lever.co/v0/postings/{slug}?mode=json"
 
@@ -19,9 +20,10 @@ def url_of(token: str) -> str:
 
 
 def parse_lever(payload: list, co: dict) -> list[dict]:
-    out = []
+    out, board = [], []
     for j in payload or []:
         cats = j.get("categories") or {}
+        board.append(cats.get("location"))
         title = j.get("text", "")
         if not is_internship(title, cats.get("commitment") or ""):
             continue
@@ -34,6 +36,7 @@ def parse_lever(payload: list, co: dict) -> list[dict]:
                               posted_at=created / 1000 if created else None,
                               description=j.get("descriptionPlain") or "",
                               employment_type=cats.get("commitment") or ""))
+    place_bare_cities(out, board_state(board))
     return out
 
 

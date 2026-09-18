@@ -4,7 +4,7 @@ from __future__ import annotations
 from .base import client
 from .common import board_item, html_to_text
 from ..classify import is_internship
-from ..region import maybe_in_region
+from ..region import board_state, maybe_in_region, place_bare_cities
 
 LIST_URL = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 JOB_URL = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{id}"
@@ -12,18 +12,20 @@ MAX_DETAIL = 25
 
 
 def parse_greenhouse(payload: dict, co: dict) -> list[dict]:
-    out = []
+    out, board = [], []
     for j in payload.get("jobs", []):
+        loc = (j.get("location") or {}).get("name")
+        board.append(loc)
         title = j.get("title", "")
         if not is_internship(title):
             continue
-        loc = (j.get("location") or {}).get("name")
         it = board_item(co, source="greenhouse", title=title, locations=[loc],
                         url=j.get("absolute_url"),
                         posted_at=j.get("first_published") or j.get("updated_at"),
                         description=html_to_text(j.get("content")))
         it["_gh_id"] = j.get("id")
         out.append(it)
+    place_bare_cities(out, board_state(board))
     return out
 
 

@@ -1,4 +1,5 @@
-from internscout.region import evaluate_locations, in_region, state_of
+from internscout.region import (board_state, evaluate_locations, in_region, place_bare_cities,
+                                state_of)
 from internscout.discover import ats_of, add_board, discover
 
 
@@ -59,6 +60,35 @@ def test_comma_city_lists():
     assert evaluate_locations(["Boston, MA, United States"])["region_locations"] == ["Boston, MA, United States"]
     g = evaluate_locations(["Remote - US"])
     assert g["regions"] == [{"loc": "Remote - US", "kind": "remote", "state": "Remote"}]
+
+
+def test_board_state_needs_agreement():
+    # Eliot's board: forty-six postings say Massachusetts and nothing says anything else.
+    assert board_state(["Danvers, MA", "Lynn, MA", "Boston, MA", "Lexington"]) == "MA"
+    assert board_state(["Boston, MA", "Boston, MA"]) is None           # too little to go on
+    assert board_state(["Boston, MA", "Austin, TX", "Denver, CO"]) is None  # hires in three states
+    assert board_state(["Lexington", "Danvers", "Saugus"]) is None     # says nothing at all
+    assert board_state(["Remote", "Remote - US", "Remote"]) is None
+
+
+def test_place_bare_cities_reads_towns_in_the_board_state():
+    items = [{"locations": ["Lexington"]}, {"locations": ["Danvers", "Boston, MA"]},
+             {"locations": ["Remote - US"]}, {"locations": ["London"]}, {"locations": []}]
+    assert place_bare_cities(items, "MA") == 2
+    assert items[0]["locations"] == ["Lexington, MA"]
+    assert items[1]["locations"] == ["Danvers, MA", "Boston, MA"]   # one already said where it was
+    assert items[2]["locations"] == ["Remote - US"]                # remote is not a town
+    assert items[3]["locations"] == ["London"]                     # and neither is another country
+    assert place_bare_cities(items, None) == 0                     # no state, no change
+
+
+def test_a_bare_town_the_board_places_is_a_listing_we_keep():
+    # "Lexington" alone is not to be trusted: geo._AMBIGUOUS lists it, and Kentucky's is the big one.
+    assert in_region(["Lexington"]) is False
+    items = [{"locations": ["Lexington"]}]
+    place_bare_cities(items, "MA")
+    geo = evaluate_locations(items[0]["locations"])
+    assert geo["in_region"] and geo["state"] == "MA" and geo["within_radius"]
 
 
 def test_ats_of():

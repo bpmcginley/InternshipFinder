@@ -3,6 +3,7 @@ new_england (ME, NH, VT, MA, RI, CT), nyc_metro (50 mi of Midtown), us (any othe
 "United States") or remote. A posting is kept if ANY of its locations is in the US."""
 from __future__ import annotations
 import re
+from collections import Counter, defaultdict
 from .config import REGION, wanted_states
 from .geo import (REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, _US_COUNTRY_RE,  # noqa: F401
                   city_of, haversine_miles, locate, state_of)
@@ -114,6 +115,86 @@ def classify_location(loc: str) -> dict | None:
         dist = min(haversine_miles(h[1], h[2], lat, lng) for h in REGION.hubs)
     return {"kind": kind, "state": st, "lat": lat, "lng": lng, "distance": dist,
             "in_city": f"{city_of(loc)}|{st}" in IN_CITY, "remote": remote}
+
+
+# A bare town name we may place: letters and the punctuation town names carry, at most four words.
+_PLACE_RE = re.compile(r"^[A-Za-z][A-Za-z.'\-’]*(?:[ \-][A-Za-z.'\-’]+){0,3}$")
+# How many of a board's other postings must name a state before we trust it to speak for the rest.
+_AGREE_MIN = 3
+
+
+def _stated(loc: str) -> str | None:
+    """The state a single location names, by the same reading classify_location uses."""
+    hit = locate(loc)
+    return (hit and hit[2]) or _state(loc)
+
+
+def board_state(locations) -> str | None:
+    """The one state a board's postings all name, or None if they disagree or barely say.
+
+    Called by each board parser with every posting's location, internship or not: the postings we
+    are about to throw away are most of the evidence, and after the parser returns they are gone.
+    """
+    states = Counter(st for loc in locations
+                     for part in split_locations([loc] if isinstance(loc, str) else loc)
+                     for st in [_stated(part)] if st)
+    if len(states) != 1:
+        return None
+    (state, named), = states.items()
+    return state if named >= _AGREE_MIN else None
+
+
+def place_bare_cities(raw_items: list[dict], state: str | None = None) -> int:
+    """Read a board's bare town names in the state the rest of that board agrees on.
+
+    Eliot Community Human Services posts 189 jobs as "Danvers", "Lynn", "Lexington" - the town and
+    nothing else. Forty-six of them do name a state, all of them Massachusetts, and the rest are
+    towns within an hour of those. On its own "Lexington" is not to be trusted - geo._AMBIGUOUS
+    lists it for good reason, Kentucky's being twenty times the size - so every posting on that
+    board was dropped for having no readable location, the only psychology internship in the
+    baseline states among them. The employer's own board is the evidence that settles it, and it
+    only settles it when nothing on the board disagrees: one state, named at least _AGREE_MIN times.
+
+    With a `state` this places one board's postings, which is how the parsers call it. Without one
+    it groups by employer and reads each group's own locations, which is all a source that mixes
+    employers together can offer. A posting placed this way can still be in the wrong town of the
+    right state, which costs nothing we measure; a board that hires in two states never qualifies,
+    which is the case worth being careful about. Returns how many locations were placed.
+    """
+    groups = [(state, raw_items)]
+    if state is None:
+        by_board = defaultdict(list)
+        for raw in raw_items:
+            key = (raw.get("company_name") or "").strip().lower()
+            if key:
+                by_board[key].append(raw)
+        groups = [(board_state([it.get("locations") or [] for it in items]), items)
+                  for items in by_board.values()]
+
+    placed = 0
+    for st, items in groups:
+        if not st:
+            continue
+        for it in items:
+            out = []
+            for loc in (it.get("locations") or []):
+                fixed = _with_state(loc, st)
+                placed += fixed != loc
+                out.append(fixed)
+            it["locations"] = out
+    return placed
+
+
+def _with_state(loc, state: str):
+    """"Lexington" -> "Lexington, MA", leaving anything that already reads as somewhere alone."""
+    if not isinstance(loc, str):
+        return loc
+    bare = loc.strip()
+    if "," in bare or _stated(bare) or REMOTE_RE.search(bare) or _NON_US.search(bare):
+        return loc
+    if not _PLACE_RE.match(bare) or _US_COUNTRY_RE.search(bare):
+        return loc
+    return f"{bare}, {state}"
 
 
 def evaluate_locations(locations) -> dict:
