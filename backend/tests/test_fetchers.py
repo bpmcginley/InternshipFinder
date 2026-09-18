@@ -9,7 +9,7 @@ from internscout.sources.recruitee import parse_recruitee
 from internscout.sources.bamboohr import parse_bamboohr
 from internscout.sources.rippling import parse_rippling
 from internscout.sources.oracle import parse_oracle, parse_oracle_detail
-from internscout.sources.taleo import parse_taleo
+from internscout.sources.taleo import parse_taleo, parse_taleo_detail
 from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
 from internscout.sources.icims import parse_icims
@@ -192,6 +192,30 @@ def test_taleo():
     assert total == 3 and len(items) == 1
     assert items[0]["locations"] == ["Hunt Valley, Maryland"] and items[0]["posted_at"] == "2026-09-01"
     assert items[0]["url"] == "https://acme.taleo.net/careersection/ext/jobdetail.ftl?job=342925"
+
+
+def test_taleo_detail():
+    # The career section serializes the whole page into this one field: the advert's blocks,
+    # each twice, among labels and flags, percent-encoded, with ":" escaped.
+    body = "!|!".join([
+        "ftlx0", "descRequisition", "true", "342925",
+        "!*!%3Cp%3EBuild real things at Acme%5C: rovers.%3C/p%3E",
+        "!*!%3Cp%3EBuild real things at Acme%5C: rovers.%3C/p%3E",
+        "!*!%3Cul%3E%3Cli%3ERising juniors %26amp; up.%3C/li%3E%3C/ul%3E",
+        "!*!%3Cul%3E%3Cli%3ERising juniors %26amp; up.%3C/li%3E%3C/ul%3E",
+        "Acme pays $20 per hour.",            # a plain-text field: no markup, so not the advert
+        "Acme is an equal opportunity employer.",
+        "US-Maryland-Hunt Valley", "Internship / Co-Op", "csrftoken", "isListEmpty", "false",
+    ])
+    page = '<input type="hidden" name="initialHistory" id="initialHistory" value="%s" />' % body
+    desc = parse_taleo_detail(page)
+    assert desc == "Build real things at Acme: rovers.\nRising juniors & up."
+    # The boilerplate the employer typed as plain text stays out, and so do the labels.
+    assert "equal opportunity" not in desc and "csrftoken" not in desc
+
+    # A page without the field is not an error - an expired job is served as an empty shell.
+    assert parse_taleo_detail("<html><body>Job no longer available</body></html>") == ""
+    assert parse_taleo_detail("") == ""
 
 
 def test_adp():

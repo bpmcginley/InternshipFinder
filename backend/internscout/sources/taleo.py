@@ -1,18 +1,32 @@
 """Taleo career sections (state agencies, health systems, insurers). Token: "tenant|section" or
 "tenant|section|portal", e.g. "textron|textron|8140753014". The portal id is read from the public
-search page when the token lacks it. Searched server-side by keyword; Taleo job pages carry no
-structured description, so items have none."""
+search page when the token lacks it. Searched server-side by keyword.
+
+The search results carry no description, and the job page renders its own from a hidden field
+rather than serving it as markup: the career section stores the whole page state in one
+percent-encoded, "!|!"-separated string called initialHistory, and the description is the part of
+it that contains HTML. Fields the employer wrote as plain text - pay ranges, EEO and export-control
+statements - carry no markup and so stay out, which is the boilerplate we would have dropped
+anyway. Every block is serialized twice, and ":" arrives escaped, since it separates the pieces.
+
+No tenant serves a robots.txt at all (checked on textron, massanf and hyatt: 404), and the page is
+80-400 KB, so it is fetched on the same terms as the other boards - only for postings that might be
+somewhere a student asked for, capped per board."""
 from __future__ import annotations
 import json
 import re
-from .common import board_item
+import urllib.parse
+from .common import board_item, html_to_text
 from ..classify import is_internship
+from ..region import maybe_in_region
 
 BASE = "https://{tenant}.taleo.net/careersection"
 KEYWORDS = ("intern", "internship", "co-op", "student")
 MAX_PAGES = 8   # 25 per page
+MAX_DETAIL = 25
 HEADERS = {"Content-Type": "application/json", "tz": "GMT-04:00", "tzname": "America/New_York"}
 _PORTAL = re.compile(r"portal[^0-9]{0,20}(\d{6,})")
+_HISTORY = re.compile(r'name="initialHistory"[^>]*value="([^"]*)"')
 
 
 def _body(keyword: str, page: int) -> dict:
@@ -64,6 +78,21 @@ def parse_taleo(payload: dict, co: dict, tenant: str, section: str) -> tuple[lis
     return out, int((payload.get("pagingData") or {}).get("totalCount") or 0)
 
 
+def parse_taleo_detail(html: str) -> str:
+    """The requisition's own text, out of the career section's serialized page state."""
+    m = _HISTORY.search(html or "")
+    if not m:
+        return ""
+    blocks: list[str] = []
+    for part in m.group(1).split("!|!"):
+        if "%3C" not in part:          # a part with no markup in it is a label or a flag, not the advert
+            continue
+        part = part[3:] if part.startswith("!*!") else part
+        if part not in blocks:         # each block is serialized twice
+            blocks.append(part)
+    return "\n".join(html_to_text(urllib.parse.unquote(b).replace("\\:", ":")) for b in blocks)
+
+
 def _portal(c, tenant: str, section: str) -> str:
     r = c.get(f"{BASE.format(tenant=tenant)}/{section}/jobsearch.ftl", params={"lang": "en"})
     r.raise_for_status()
@@ -88,4 +117,12 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
                 seen.setdefault(it["url"], it)
             if page * 25 >= total:
                 break
-    return list(seen.values())
+    out = list(seen.values())
+    for it in [i for i in out if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
+        try:
+            d = c.get(it["url"])
+            if d.status_code == 200:
+                it["description"] = parse_taleo_detail(d.text)[:4000]
+        except Exception:
+            pass
+    return out
