@@ -44,7 +44,9 @@ def test_runs_the_programme():
               "Fellowship Coordinator", "Intern and Volunteer Supervisor",
               "Advisor, Co-op and Experiential Learning", "Intern & Special Programs Coordinator",
               # "<staff noun> of|for" only counts ahead of the student word, hence both of these
-              "Coordinator of Student Internships", "Director of Public Sector Internships"):
+              "Coordinator of Student Internships", "Director of Public Sector Internships",
+              # a youth soccer coach; "Discovery Program" is not a first-year insight programme here
+              "Regional Discovery Program Coach"):
         assert stage_of(t) == [], t
 
     # ...but the same words describe real student roles, and then the student word heads the title:
@@ -58,6 +60,7 @@ def test_runs_the_programme():
               "Quality Coordinator Intern Summer 2027, Idaho",
               # "for" here belongs to the product, not to a programme being administered
               "Summer Intern - Product Manager for Allegion Home",
+              "Visiting Engineer: Research Coach Intern", "Football Coaches Intern",
               # work-study is a student job whatever the role is called
               "Federal Work Study possible: Art@Work Graduate Coordinator"):
         assert is_internship(t), t

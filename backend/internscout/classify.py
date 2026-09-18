@@ -284,7 +284,10 @@ _NEVER_STUDENT_RE = re.compile(r"post[- ]?doc|post[- ]?doctoral|post[- ]?bacc|fa
 # "assistant" is deliberately not a staff word: a research assistant is a student.
 _SEP = r"\s*([-,:(/|–—]|$)"
 _STAFF_ROLE = (r"coordinator|supervisor|administrator|advis[eo]r|counselor|preceptor|liaison|"
-               r"recruiter|manager|director")
+               r"recruiter|manager|director|"
+               # FC Cincinnati's "Regional Discovery Program Coach" coaches children's soccer;
+               # "Discovery Program" made it look like a first-year insight programme.
+               r"coach")
 _STUDENT_ROLE = (r"interns?|internships?|co-?ops?|externs?|externships?|trainees?|apprentices?|"
                  r"fellows?|fellowships?|student (worker|assistant|employee|aide)")
 _STAFF_ROLE_RE = re.compile(rf"\b({_STAFF_ROLE})\b", re.I)
