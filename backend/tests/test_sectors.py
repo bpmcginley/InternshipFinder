@@ -1,7 +1,7 @@
 from datetime import date
 
 from internscout import companies_seed
-from internscout.dedupe import merge_batch
+from internscout.dedupe import merge_batch, same_job
 from internscout.discover import add_board, relabel_sector, seed_registry, set_location
 from internscout.coverage import SECTOR_CLUSTER
 from internscout.normalize import normalize
@@ -206,3 +206,44 @@ def test_the_college_boards_are_seeded_with_their_campus():
     # Cornell Cooperative Extension is every county in New York and deliberately has no one place.
     cce = next(c for c in companies_seed.WORKDAY if c["ats_token"] == "cornell|wd1|CCECareerPage")
     assert "location" not in cce
+
+
+def _posting(title, url, where="Boston, MA", source="workday"):
+    co = {"name": "Acme", "ats_token": "x"}
+    raw = board_item(co, source=source, title=title, locations=[where], url=url,
+                     employment_type="Intern")
+    raw["apply_url"] = url
+    return normalize(raw)
+
+
+def test_a_posting_seen_twice_is_one_listing_even_when_only_one_source_read_the_term():
+    # The board says "coinbase.com/careers/positions/8168315?gh_jid=8168315" and the embed link
+    # Google Jobs hands back says "boards.greenhouse.io/embed/job_app?token=8168315". Same job.
+    # One title carries the term and the other does not, so they landed under two dedupe keys.
+    termed = _posting("Software Engineer Intern, Summer 2027",
+                      "https://www.coinbase.com/careers/positions/8168315?gh_jid=8168315")
+    blank = _posting("Software Engineer Intern",
+                     "https://boards.greenhouse.io/embed/job_app?token=8168315", source="google_jobs")
+    assert termed["dedupe_key"] != blank["dedupe_key"]
+    merged = merge_batch([termed, blank])
+    assert len(merged) == 1
+    kept = list(merged.values())[0]
+    assert kept["term"] == "Summer 2027" and len(kept["_sources"]) == 2
+    # and the query a source adds to say how it arrived is not what makes it a different job.
+    assert same_job("https://careers.qorvo.com/job/Chandler-Analog-AZ-85226/1421977600/",
+                    "https://careers.qorvo.com/job/Chandler-Analog-AZ-85226/1421977600/?ats=successfactors")
+
+
+def test_two_offices_of_one_job_title_stay_two_listings():
+    # Ryan Companies posts "Safety Engineer Intern" in Phoenix and in Dallas. Only one title says
+    # the term, so the naive fix - trust the title, ignore the URL - would have thrown one away.
+    phoenix = _posting("Safety Engineer Intern",
+                       "https://ryancompanies.wd5.myworkdayjobs.com/rc/job/Phoenix/Safety_R101",
+                       where="Phoenix, AZ")
+    dallas = _posting("Safety Engineer Intern - Summer 2027",
+                      "https://ryancompanies.wd5.myworkdayjobs.com/rc/job/Dallas/Safety_R102",
+                      where="Dallas, TX")
+    assert len(merge_batch([phoenix, dallas])) == 2
+    assert not same_job(phoenix["apply_url"], dallas["apply_url"])
+    # A missing URL never matches anything, so an unreadable link cannot collapse two postings.
+    assert not same_job(None, None) and not same_job("", "https://example.com/jobs/1")
