@@ -74,8 +74,19 @@ def split_locations(locations) -> list[str]:
     return out
 
 
+# "Chicago" and "Chicago, United States" name the same city and no state, but only the first reached
+# the map above: the comma made _state read the country as if it were a region of its own.
+_JUST_COUNTRY = re.compile(r"^(?:the\s+)?(?:u\.?\s?s\.?\s?a?\.?|united states(?: of america)?|america)$", re.I)
+
+
+def _city_only(loc: str) -> bool:
+    """True for a bare city, and for a city whose only companion is the country."""
+    parts = [p.strip() for p in loc.split(",") if p.strip()]
+    return len(parts) == 1 or all(_JUST_COUNTRY.match(p) for p in parts[1:])
+
+
 def _state(loc: str) -> str | None:
-    return state_of(loc) or ("," not in loc and _MAJOR.get(city_of(loc))) or None
+    return state_of(loc) or (_city_only(loc) and _MAJOR.get(city_of(loc))) or None
 
 
 def maybe_in_region(loc: str) -> bool:
@@ -212,7 +223,12 @@ def evaluate_locations(locations) -> dict:
         "on_site": bool(on_site),                  # has a non-remote US location
         "within_radius": bool(local),              # has a New England / NYC-metro location
         "in_city": any(h["in_city"] for h in local),
-        "state": (best and best["state"]) or stated or ("Remote" if region else None),
+        # "Remote" only where a location actually says so. A US location we could not pin to a state
+        # ("United States", "US - UPS CORPORATE OFFICES (GACOR)") is somewhere in the US, not remote,
+        # and the old fallback put on-site listings under a label that was simply untrue - visible
+        # in the card's location line and in what the dashboard searches.
+        "state": (best and best["state"]) or stated
+        or ("Remote" if any(h["kind"] == "remote" for _, h in region) else None),
         "region_locations": [l for l, _ in region],
         # one entry per US location, so the dashboard can filter and show the right one
         "regions": [{"loc": l, "kind": h["kind"], "state": h["state"] or ("Remote" if h["kind"] == "remote" else None)}

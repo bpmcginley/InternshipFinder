@@ -158,3 +158,22 @@ def test_a_location_the_new_pass_reads_is_sharded_by_its_state():
     ev = evaluate_locations(["(USA) NY WATKINS GLEN 03221 WM SUPERCENTER"])
     assert ev["state"] == "NY"
     assert [g["state"] for g in ev["regions"]] == ["NY"]
+
+
+def test_a_city_next_to_its_country_is_still_just_a_city():
+    # The major-city map was only consulted when the string had no comma at all, so a board that
+    # wrote the country after the city ("Chicago, United States") lost the state the map knew.
+    assert evaluate_locations(["Chicago, United States"])["state"] == "IL"
+    assert evaluate_locations(["Los Angeles, USA"])["state"] == "CA"
+    assert evaluate_locations(["Chicago"])["state"] == "IL"
+    # but a real second place is still a second place, and an unknown city still has no state.
+    assert evaluate_locations(["Chicago, Illinois"])["state"] == "IL"
+    assert evaluate_locations(["United States"])["state"] is None
+
+
+def test_remote_is_only_said_where_a_location_says_it():
+    # A US location we cannot pin to a state is somewhere in the US, not remote.
+    assert evaluate_locations(["United States"])["state"] is None
+    assert evaluate_locations(["US - UPS CORPORATE OFFICES (GACOR)"])["state"] is None
+    assert evaluate_locations(["Remote - US"])["state"] == "Remote"
+    assert evaluate_locations(["Boston, MA"])["state"] == "MA"
