@@ -2,7 +2,10 @@
 from internscout.sources.greenhouse import parse_greenhouse
 from internscout.sources.lever import parse_lever
 from internscout.sources.ashby import parse_ashby
+from internscout.sources.common import RobotsDisallowed
 from internscout.sources.workday import (CORE_OFFSET, DRY_PAGES, PAGE,
+                                         robots_allows, robots_blocks,
+                                         robots_rules,
                                          fetch_workday_board,
                                          parse_workday_list, parse_workday_detail,
                                          parse_posted_on, host_of)
@@ -624,10 +627,10 @@ class _Missing:
 
 
 class _Page:
-    """One canned Workday list response."""
+    """One canned Workday answer: a list payload, or the text of a robots.txt."""
 
-    def __init__(self, payload):
-        self._payload = payload
+    def __init__(self, payload, text="", status_code=200):
+        self._payload, self.text, self.status_code = payload, text, status_code
 
     def raise_for_status(self):
         pass
@@ -651,8 +654,8 @@ class _Board:
                                        "locationsText": "Boston, MA"}
                                       for i, t in enumerate(window, off)]})
 
-    def get(self, url, headers=None):
-        return _Missing()   # the list payload already names a state
+    def get(self, url, headers=None, timeout=None):
+        return _Missing()   # no robots.txt and no detail page: neither is under test here
 
 
 def _deepco():
@@ -687,3 +690,89 @@ def test_a_gap_before_the_first_two_hundred_does_not_stop_the_read():
               + ["Marketing Intern"] * 60)
     board = _Board(titles)
     assert len(fetch_workday_board(board, _deepco())) == 80
+
+
+class _Robots:
+    """A Workday host serving one robots.txt and nothing else."""
+
+    def __init__(self, body):
+        self.body, self.posted = body, False
+
+    def get(self, url, headers=None, timeout=None):
+        if url.endswith("/robots.txt"):
+            return _Page(None, text=self.body)
+        return _Missing()   # the detail call: the list payload already names a state
+
+    def post(self, url, headers=None, json=None):
+        self.posted = True
+        return _Page({"total": 1, "jobPostings": [{"title": "Software Engineer Intern",
+                                                   "externalPath": "/job/1",
+                                                   "locationsText": "Boston, MA"}]})
+
+
+# The real thing, from blackrock.wd1.myworkdayjobs.com on 2026-09-18.
+_BLACKROCK = """Sitemap: https://blackrock.wd1.myworkdayjobs.com/BlackRock_Professional/siteMap.xml
+
+User-agent: *
+Allow: /BlackRock_Professional/
+Disallow: /BlackRock_AIG/
+Disallow: /BlackRock_Early_Careers_Program/
+Disallow: /refreshFacet/
+"""
+
+
+def _co(token):
+    return {"name": "Testco", "ats_token": token, "is_quant_target": False,
+            "sector": None, "location": None}
+
+
+def test_a_board_its_own_host_closes_in_robots_is_not_fetched():
+    # 109 of the 1,245 Workday boards in the registry are closed by name by their own host,
+    # among them boards called Mizuho_Confidential and Employee_Referral_Portal.
+    host = _Robots(_BLACKROCK)
+    try:
+        fetch_workday_board(host, _co("blackrock|wd1|BlackRock_Early_Careers_Program"))
+    except RobotsDisallowed:
+        pass
+    else:
+        raise AssertionError("a closed board was fetched")
+    assert not host.posted, "not one job request may go out to a board we may not read"
+
+
+def test_the_open_board_on_the_same_host_is_still_fetched():
+    # A host serves several boards and answers differently for them, so the verdict is per
+    # board and not per host.
+    host = _Robots(_BLACKROCK)
+    assert len(fetch_workday_board(host, _co("blackrock2|wd1|BlackRock_Professional"))) == 1
+
+
+def test_a_board_on_the_second_workday_domain_is_read_as_before():
+    # There the tenant is a path segment on a host shared by every tenant on the pod, so the
+    # host robots.txt is not the tenant to write and there is nothing to ask.
+    host = _Robots("User-agent: *\nDisallow: /\n")
+    token = "wf|wd1.myworkdaysite.com|WellsFargoJobs"
+    assert len(fetch_workday_board(host, _co(token))) == 1
+
+
+def test_robots_rules_prefers_the_group_that_names_us():
+    text = ("User-agent: *\nDisallow: /\n\n"
+            "User-agent: InternScout\nAllow: /Careers/\n")
+    assert robots_rules(text, "InternScout/0.2") == [("allow", "/Careers/")]
+    assert robots_rules(text, "SomeoneElse/1.0") == [("disallow", "/")]
+
+
+def test_robots_rules_keeps_two_user_agent_lines_sharing_one_group():
+    text = "User-agent: a\nUser-agent: b\nDisallow: /x/\n"
+    assert robots_rules(text, "b/1.0") == [("disallow", "/x/")]
+
+
+def test_a_longer_allow_reopens_what_a_blanket_disallow_closed():
+    rules = robots_rules("User-agent: *\nDisallow: /\nAllow: /Careers/\n")
+    assert robots_blocks(rules, "/Faculty/")
+    assert not robots_blocks(rules, "/Careers/")
+
+
+def test_a_host_that_serves_no_robots_file_forbids_nothing():
+    # Nothing said is nothing forbidden, and a tenant that has gone away answers 422 here.
+    board = _Board(["Software Engineer Intern"] * 3)
+    assert len(fetch_workday_board(board, _co("norobots|wd1|External"))) == 3

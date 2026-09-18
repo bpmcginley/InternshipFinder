@@ -8,6 +8,14 @@ from ..geo import REMOTE_RE, _NON_US, state_of
 DESC_CHARS = 4000
 
 
+class RobotsDisallowed(Exception):
+    """A board whose host tells us in robots.txt not to read it.
+
+    Raised instead of returning nothing so the run can tell "the employer said no" apart from
+    "the board was empty today", and so the board ages out of the registry the way a dead one does.
+    """
+
+
 def html_to_text(s: str | None) -> str:
     if not s:
         return ""

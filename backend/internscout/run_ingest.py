@@ -14,6 +14,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, BOARD_FETCHERS
 from .sources.base import client
+from .sources.common import RobotsDisallowed
 from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
 from .discover import (load_registry, save_registry, seed_registry, discover, boards,
@@ -27,7 +28,7 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
     """Fetch every registered board in parallel; records success/failure in the registry."""
     todo = [(ats, tok, e) for ats, tok, e in boards(reg) if ats in BOARD_FETCHERS]
     out: list[dict] = []
-    per_ats, failed = Counter(), Counter()
+    per_ats, failed, closed = Counter(), Counter(), Counter()
     t0 = time.monotonic()
     with client() as c, ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {
@@ -44,12 +45,18 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
                 record_result(reg, ats, tok, True)
                 out += items
                 per_ats[ats] += len(items)
+            except RobotsDisallowed:
+                # Not a failure to report as one, but the board still has to leave the registry,
+                # and record_result is what ages a board out.
+                record_result(reg, ats, tok, False)
+                closed[ats] += 1
             except Exception:
                 record_result(reg, ats, tok, False)
                 failed[ats] += 1
     if verbose:
+        note = f"; closed by robots.txt {dict(closed)}" if closed else ""
         print(f"[boards] {len(todo)} boards in {time.monotonic() - t0:.0f}s; "
-              f"intern postings {dict(per_ats)}; failed boards {dict(failed)}")
+              f"intern postings {dict(per_ats)}; failed boards {dict(failed)}{note}")
     return out
 
 
