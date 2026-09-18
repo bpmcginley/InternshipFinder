@@ -68,7 +68,11 @@ RULES = [
     ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate"),
     ("architecture", r"architect(ure|ural)|urban plan|landscape"),
     ("urban_planning", r"urban plan|city plan|regional plan|planning intern|transportation planning|zoning|\bgis\b|housing (policy|development)|community development"),
-    ("psychology", r"psycholog|behavioral (health|science)|mental health|counsel(ing|or)\b|\baba\b|cognitive science"),
+    ("psychology", r"psycholog|behavioral (health|science)|mental health|counsel(ing|or)\b|\baba\b|cognitive science|"
+     # A BCBA fieldwork apprenticeship is a psychology role by any reading, and so is a
+     # behaviour technician post: they are the commonest paid placement an undergraduate
+     # psychology major can actually get. None of them say "psychology" in the title.
+     r"\bbcba\b|\bbcaba\b|\brbt\b|applied behavio(u)?r|behavio(u)?r(al)? (analyst|analysis|technician)"),
     ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
     ("government", r"government|public (sector|service|affairs|administration)|legislative|congressional|municipal|\bfederal\b|state house"),
     ("arts", r"animator|\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat"),
@@ -78,7 +82,10 @@ RULES = [
     ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"),
     ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation"),
     ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl"),
-    ("languages", r"translat(or|ion)|interpreter\b|bilingual|linguist"),
+    ("languages", r"translat(or|ion)|interpreter\b|bilingual|linguist|"
+     # "interpreter\b" is deliberate: mechanistic interpretability is not an interpreting job.
+     r"\besl\b|tesol\b|\btefl\b|english language (learn|cent|institute)|"
+     r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language"),
     ("real_estate", r"real estate|property manage|\breit\b|leasing"),
     ("insurance", r"insurance|underwrit|claims (analyst|intern)|actuar"),
     ("retail", r"\bretail\b|merchandis|buying intern|\bfashion\b|apparel|e-?commerce|store operations"),

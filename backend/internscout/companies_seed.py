@@ -511,4 +511,36 @@ JAZZHR: list = [
     {'name': 'Gulf Management', 'ats_token': 'gulfmanagement', 'is_quant_target': False},
 ]
 
+# --- thin-cluster seeds (probed and fetched live 2026-09-18) ---
+GREENHOUSE += [
+    {'name': 'ITHAKA', 'ats_token': 'ithaka', 'is_quant_target': False, 'sector': 'education_research'},          # 0 today
+    {'name': 'BrainPOP', 'ats_token': 'brainpop', 'is_quant_target': False, 'sector': 'education_research'},       # 0
+    {'name': 'IXL Learning', 'ats_token': 'ixllearning', 'is_quant_target': False, 'sector': 'education_research'},# 0
+    {'name': 'Teaching Lab', 'ats_token': 'teachinglab', 'is_quant_target': False, 'sector': 'education_research'},# 0
+    {'name': 'Achievement First', 'ats_token': 'achievementfirst', 'is_quant_target': False,
+     'sector': 'education_research'},                                                                             # 0
+    {'name': 'Genius Sports', 'ats_token': 'geniussports', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'OpenTable', 'ats_token': 'opentable', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    # 6 economics-tagged roles on the day it was added: the only board in the data that has them.
+    {'name': 'Charles River Associates', 'ats_token': 'charlesriverassociates', 'is_quant_target': False},
+    # 12 "Clinical Apprentice - BCBA Fieldwork Program" posts, which is the whole psychology cluster.
+    {'name': 'Centria Autism', 'ats_token': 'centriaautism', 'is_quant_target': False, 'sector': 'health'},
+]
+SMARTRECRUITERS += [
+    {'name': 'Uncommon Schools', 'ats_token': 'uncommonschools', 'is_quant_target': False,
+     'sector': 'education_research'},
+    {'name': 'Hyatt Hotels', 'ats_token': 'hyatthotels', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Norwegian Cruise Line', 'ats_token': 'norwegiancruiseline', 'is_quant_target': False,
+     'sector': 'hospitality_sports'},
+    {'name': 'Sodexo', 'ats_token': 'sodexo', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    # 12 personal-trainer internships, the largest single source of sports placements found so far.
+    {'name': 'Equinox', 'ats_token': 'equinox', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+    {'name': 'Sportradar', 'ats_token': 'sportradar', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+ASHBY += [
+    {'name': 'Instructure', 'ats_token': 'instructure', 'is_quant_target': False, 'sector': 'education_research'},
+    {'name': 'Morning Consult', 'ats_token': 'morningconsult', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Berlitz', 'ats_token': 'berlitz', 'is_quant_target': False, 'sector': 'education_research'},
+]
+
 # --- end sector seeds ---

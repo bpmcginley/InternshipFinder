@@ -101,6 +101,33 @@ def test_new_field_tags():
     assert classify("Marketing Intern") == ["marketing"]
 
 
+def test_behaviour_analysis_is_psychology():
+    # A psychology major's likeliest paid placement is a BCBA fieldwork or behaviour technician
+    # post, and not one of these titles contains the word "psychology". Before this rule they
+    # classified as 'other' and the coverage report read psychology 0 with Centria Autism's
+    # twelve apprenticeships sitting in the data.
+    for title in ["Clinical Apprentice - BCBA Fieldwork Program", "Registered Behavior Technician Intern",
+                  "Applied Behavior Analysis Intern", "Behavior Analyst Fieldwork Trainee",
+                  "RBT Summer Intern", "ABA Therapy Intern"]:
+        assert "psychology" in classify(title), (title, classify(title))
+    # Analytics about how customers behave is not behaviour analysis.
+    assert "psychology" not in classify("Behavioral Analytics Intern")
+    assert "psychology" not in classify("Consumer Behavior Research Intern")
+
+
+def test_language_teaching_is_languages():
+    # Every one of these is an open listing the rule used to miss: a languages major is hired to
+    # teach English far more often than to translate anything.
+    for title in ["WIOA ESL Assistant Instructor Intern", "Work Study Office Aide - English Language Center",
+                  "English Language Learning Intern (Fall 2026- UNPAID)", "Localization Intern",
+                  "TESOL Practicum Student", "Spanish Language Tutor"]:
+        assert "languages" in classify(title), (title, classify(title))
+    # And these are the open listings that made the bare word "language" unusable in the rule.
+    for title in ["Student Researcher - Large Language Model - Seed", "PhD Intern - Language Intelligence",
+                  "Research Fellow - Mechanistic Interpretability", "Speech Language Pathologist (or SLP Intern)"]:
+        assert "languages" not in classify(title), (title, classify(title))
+
+
 def test_years():
     assert years_of("2027 Internship - Quantitative Researcher (PhD)") == ["phd"]
     assert years_of("Campus Quantitative Researcher, UG/MS (Intern)") == ["first_year", "sophomore", "junior", "senior", "masters"]
