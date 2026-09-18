@@ -116,7 +116,8 @@ def save_registry(reg: dict) -> None:
         json.dump(out, f, indent=1, ensure_ascii=False)
 
 
-def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, sector: str | None = None) -> bool:
+def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, sector: str | None = None,
+              location: str | None = None) -> bool:
     sector = sector or ("quant_finance" if quant else None)
     boards = reg.setdefault(ats, {})
     lower = {t.lower(): t for t in boards}
@@ -125,10 +126,14 @@ def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, s
         entry["quant"] = entry.get("quant", False) or quant
         if sector and not entry.get("sector"):
             entry["sector"] = sector
+        if location and not entry.get("location"):
+            entry["location"] = location
         return False
     boards[token] = {"name": name or token, "quant": quant, "fails": 0, "added": date.today().isoformat()}
     if sector:
         boards[token]["sector"] = sector
+    if location:
+        boards[token]["location"] = location
     return True
 
 
@@ -142,6 +147,21 @@ def relabel_sector(reg: dict, ats: str, token: str, sector: str) -> bool:
     return True
 
 
+def set_location(reg: dict, ats: str, token: str, location: str) -> bool:
+    """Give a board the one place the seed file says its employer is.
+
+    Only a seed may call this. A board that writes "Boston Campus" is telling us where it is and
+    trusting us to know the rest, which is a thing a person can check once and a parser cannot
+    guess; it is exactly the sort of answer that belongs in the seed file beside the token.
+    """
+    boards = reg.get(ats) or {}
+    key = {t.lower(): t for t in boards}.get(token.lower())
+    if not key or boards[key].get("location") == location:
+        return False
+    boards[key]["location"] = location
+    return True
+
+
 def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
@@ -150,9 +170,11 @@ def seed_registry(reg: dict) -> int:
                 "EIGHTFOLD", "ICIMS", "ICIMS_SITE", "JAZZHR"):
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
-                           co.get("sector"))
+                           co.get("sector"), co.get("location"))
             if co.get("sector"):
                 relabel_sector(reg, ats.lower(), co["ats_token"], co["sector"])
+            if co.get("location"):
+                set_location(reg, ats.lower(), co["ats_token"], co["location"])
     return n
 
 

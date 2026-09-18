@@ -32,7 +32,8 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
         futs = {
             ex.submit(BOARD_FETCHERS[ats], c,
                       {"name": e["name"], "ats_token": tok, "is_quant_target": e.get("quant", False),
-                       "sector": e.get("sector") or ("quant_finance" if e.get("quant") else None)}): (ats, tok)
+                       "sector": e.get("sector") or ("quant_finance" if e.get("quant") else None),
+                       "location": e.get("location")}): (ats, tok)
             for ats, tok, e in todo
         }
         for f in as_completed(futs):

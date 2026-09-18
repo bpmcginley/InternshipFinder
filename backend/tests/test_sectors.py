@@ -2,7 +2,7 @@ from datetime import date
 
 from internscout import companies_seed
 from internscout.dedupe import merge_batch
-from internscout.discover import add_board, relabel_sector, seed_registry
+from internscout.discover import add_board, relabel_sector, seed_registry, set_location
 from internscout.coverage import SECTOR_CLUSTER
 from internscout.normalize import normalize
 from internscout.sources.common import board_item
@@ -151,3 +151,58 @@ def test_sector_fills_untagged_titles():
     assert item("Research Intern")["field_tags"] == ["health"]
     assert "health" not in item("Software Engineering Intern")["field_tags"]   # a title match wins
     assert item("Research Intern", dict(co, sector=None))["field_tags"] == ["other"]
+
+
+def test_a_seed_may_say_where_its_employer_is():
+    reg = {}
+    add_board(reg, "workday", "emerson|wd5|x", "Emerson College", location="Boston, MA")
+    assert reg["workday"]["emerson|wd5|x"]["location"] == "Boston, MA"
+    add_board(reg, "workday", "plain|wd1|y", "Plain")
+    assert "location" not in reg["workday"]["plain|wd1|y"]
+    # A second sighting fills it in but does not overwrite, same as sector; only the seed may move it.
+    add_board(reg, "workday", "plain|wd1|y", "Plain", location="Boston, MA")
+    assert reg["workday"]["plain|wd1|y"]["location"] == "Boston, MA"
+    assert set_location(reg, "workday", "PLAIN|WD1|Y", "Cambridge, MA")   # case is not the point
+    assert reg["workday"]["plain|wd1|y"]["location"] == "Cambridge, MA"
+    assert not set_location(reg, "workday", "plain|wd1|y", "Cambridge, MA")   # nothing to do
+    assert not set_location(reg, "workday", "never-heard-of-it", "Boston, MA")
+
+
+def test_a_campus_posting_keeps_the_state_its_seed_knows():
+    # "L - 2 West 13th Street" is a real New School building and no US location a parser can read,
+    # so the posting was dropped for having no region at all - 25 of the 34 postings on the eight
+    # college boards seeded here.
+    co = {"name": "The New School", "ats_token": "x", "sector": "education_research",
+          "location": "New York, NY"}
+    raw = board_item(co, source="workday", title="BFA Photo Events Student Assistant",
+                     locations=["L - 2 West 13th Street"], url="https://example.com/1",
+                     employment_type="Intern")
+    assert raw["locations"] == ["L - 2 West 13th Street", "New York, NY"]
+    n = normalize(raw)
+    assert n and n["geo"]["in_region"] and n["geo"]["state"] == "NY"
+    # and the building is still what the card shows.
+    assert n["geo"]["location_raw"].startswith("L - 2 West 13th Street")
+
+
+def test_the_seeds_place_never_overrides_one_the_posting_named():
+    co = {"name": "The New School", "ats_token": "x", "location": "New York, NY"}
+    for locs in (["Boston, MA"], ["Parsons Paris"], ["Remote"], ["Chicago, Illinois"]):
+        raw = board_item(co, source="workday", title="Intern", locations=locs, url="u")
+        assert raw["locations"] == locs
+    # An employer with no seeded place is untouched either way.
+    raw = board_item({"name": "Plain", "ats_token": "x"}, source="workday", title="Intern",
+                     locations=["Main Campus"], url="u")
+    assert raw["locations"] == ["Main Campus"]
+
+
+def test_the_college_boards_are_seeded_with_their_campus():
+    colleges = {c["ats_token"]: c for c in companies_seed.WORKDAY
+                if c["ats_token"].split("|")[0] in
+                {"amherst", "babson", "berklee", "emerson", "rit", "unioncollege", "newschool"}}
+    assert len(colleges) == 7
+    for c in colleges.values():
+        assert c["sector"] == "education_research"
+        assert c["location"], c["name"]
+    # Cornell Cooperative Extension is every county in New York and deliberately has no one place.
+    cce = next(c for c in companies_seed.WORKDAY if c["ats_token"] == "cornell|wd1|CCECareerPage")
+    assert "location" not in cce

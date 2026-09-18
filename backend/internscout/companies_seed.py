@@ -580,6 +580,34 @@ JAZZHR += [
 ]
 
 
+# --- college boards (each searched live for "intern" on 2026-09-18; the count is what came back) ---
+# A student job on a campus is the one internship a first-year can actually get, and Workday is
+# where the Northeast schools keep them. 18 of the 74 schools checked have a tenant; these eight
+# are the ones with postings today. Every one of them writes its locations the way the campus says
+# them - "Amherst Campus", "RIT Main Location", "L - 2 West 13th Street" - so each carries the one
+# place it is, which board_item adds when a posting names no state. Without that, 25 of these 34
+# postings are dropped for having no US location at all.
+#
+# Ten more tenants answer but had nothing today, and are left out rather than fetched forever for
+# nothing: smithcollege|wd5|smithcollege, wesleyan|wd5|careers, risd|wd5|RISD, colby|wd5|ColbyCareers,
+# suffolk|wd1|External, vassar|wd1|Vassar-External, endicott|wd1|Endicott, pace|wd1|Orion,
+# montclair|wd1|JobOpportunities, amherst|wd5|FSL_Employment_Opportunities (the Five Colleges).
+#
+# williams|wd5|External is Williams Companies of Tulsa, not Williams College. It is already in the
+# registry as an energy employer, which is what it is; do not re-seed it as a school.
+WORKDAY += [
+    {'name': 'Amherst College', 'ats_token': 'amherst|wd5|Amherst_Jobs', 'is_quant_target': False, 'sector': 'education_research', 'location': 'Amherst, MA'},
+    {'name': 'Babson College', 'ats_token': 'babson|wd1|Student_Staffing', 'is_quant_target': False, 'sector': 'education_research', 'location': 'Wellesley, MA'},
+    {'name': 'Berklee College of Music', 'ats_token': 'berklee|wd1|BerkleeStudentEmployment', 'is_quant_target': False, 'sector': 'education_research', 'location': 'Boston, MA'},
+    {'name': 'Emerson College', 'ats_token': 'emerson|wd5|Emerson_College_Staff', 'is_quant_target': False, 'sector': 'education_research', 'location': 'Boston, MA'},
+    {'name': 'Rochester Institute of Technology', 'ats_token': 'rit|wd12|careers', 'is_quant_target': False, 'sector': 'education_research', 'location': 'Rochester, NY'},
+    {'name': 'Union College', 'ats_token': 'unioncollege|wd5|UnionCollegeStudentCareers', 'is_quant_target': False, 'sector': 'education_research', 'location': 'Schenectady, NY'},
+    {'name': 'The New School', 'ats_token': 'newschool|wd1|External', 'is_quant_target': False, 'sector': 'education_research', 'location': 'New York, NY'},
+    # Cornell Cooperative Extension is every county in New York and no one campus, so it is seeded
+    # without a place: its postings name the county themselves, and a fallback would have to lie.
+    {'name': 'Cornell Cooperative Extension', 'ats_token': 'cornell|wd1|CCECareerPage', 'is_quant_target': False, 'sector': 'education_research'},
+]
+
 # --- employers whose board was found but cannot be fetched (checked in a browser 2026-09-18) ---
 # Their careers pages render in JavaScript, so a plain GET sees nothing; loading them in a real
 # browser and reading where the apply links go gives the board for each. None is seedable:
