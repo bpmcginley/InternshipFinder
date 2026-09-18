@@ -18,6 +18,12 @@ REMOTE_RE = re.compile(r"\b(remote|anywhere|work from home|wfh|virtual)\b", re.I
 _US_STATES = {"al","ak","az","ar","ca","co","ct","de","fl","ga","hi","id","il","in","ia",
  "ks","ky","la","me","md","ma","mi","mn","ms","mo","mt","ne","nv","nh","nj","nm","ny","nc",
  "nd","oh","ok","or","pa","ri","sc","sd","tn","tx","ut","vt","va","wa","wv","wi","wy","dc"}
+# Puerto Rico hires for the pharmaceutical and medical-device plants there (Amgen in Juncos, Lilly
+# and Medtronic, 13 open listings in one export). The dashboard's state picker and the Worker's
+# /demand already offer PR, but nothing here read it, so every one of them sat in the country-only
+# shard. It is read by name and as a whole "San Juan, PR" piece, never by the loose capitals pass
+# below, where "PR" is as likely to mean public relations.
+_US_STATES.add("pr")
 STATE_NAMES = {
     "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
     "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA",
@@ -30,7 +36,7 @@ STATE_NAMES = {
     "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
     "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT",
     "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI",
-    "wyoming": "WY", "district of columbia": "DC",
+    "wyoming": "WY", "district of columbia": "DC", "puerto rico": "PR",
 }
 _STATE_NAME_RE = re.compile(
     r"\b(" + "|".join(sorted(STATE_NAMES, key=len, reverse=True)) + r")\b", re.I)
@@ -110,7 +116,7 @@ def state_of(loc: str) -> str | None:
     # the word "or" in a sentence, and it runs only when both passes above came back empty, so no
     # answer that already works can change.
     for m in _LOOSE_STATE.finditer(loc):
-        if m.group(1).lower() in _US_STATES:
+        if m.group(1).lower() in _US_STATES and m.group(1) != "PR":
             return m.group(1)
     # UPS names every site "US - <building> (<state><3 letters>)": "US - UPS CORPORATE OFFICES
     # (GACOR)", "US - JEFFERSON HUB (ILJEF)", "US - OLYMPIC (CAOLY)". 30 open listings said nothing

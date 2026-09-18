@@ -142,6 +142,7 @@ STATE_METROS = {
     "SD": "Sioux Falls, South Dakota", "TN": "Nashville, Tennessee", "TX": "Dallas, Texas",
     "UT": "Salt Lake City, Utah", "VA": "Arlington, Virginia", "WA": "Seattle, Washington",
     "WV": "Charleston, West Virginia", "WI": "Milwaukee, Wisconsin", "WY": "Cheyenne, Wyoming",
+    "PR": "San Juan, Puerto Rico",
 }
 
 

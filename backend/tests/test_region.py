@@ -222,3 +222,12 @@ def test_a_ups_site_code_names_its_state():
     # the shape has to be exact: a parenthesised word elsewhere is not a site code
     assert evaluate_locations(["United States (HYBRID)"])["state"] is None
     assert evaluate_locations(["US - ZZ TOP HUB (ZZTOP)"])["state"] is None
+
+
+def test_puerto_rico_is_its_own_state():
+    for loc in ("Gurabo, Puerto Rico, United States of America", "San Juan, PR", "Juncos, PR 00777",
+                "US Home Office Puerto Rico"):
+        r = evaluate_locations([loc])
+        assert r["in_region"] and r["state"] == "PR", (loc, r["state"])
+    # but a bare "PR" among other capitals is not read as the island
+    assert state_of("US - PR DEPT") is None
