@@ -258,3 +258,29 @@ def test_translational_medicine_is_not_a_translation_job():
     assert classify("Spanish Translator Intern") == ["languages"]
     assert classify("Translations Coordinator Intern") == ["languages"]
     assert classify("Localization Intern") == ["languages"]
+
+
+def test_ehs_titles_are_environmental_jobs():
+    # 24 of these said only "other", which sorts below everything. They are the compliance arm of an
+    # environmental team and the major that wants them is environmental science or public health.
+    for title in ("EHS Intern", "HSE Intern", "HSE/Safety Intern", "2027 EHS Safety Intern",
+                  "EHS Corporate Intern", "2027 Intern- EHS - Williamsport, PA",
+                  "EHS (Environment, Health, & Safety) Intern", "Health and Safety Intern",
+                  "Health & Safety Intern", "HEALTH AND SAFETY SKILLBRIDGE INTERN",
+                  "Environment, Safety and Health Undergraduate Intern - Fall 2026",
+                  "Occupational Health & Safety Intern- CO", "Occupational Safety Intern",
+                  "Risk Control/Occupational Safety Internship Summer 2027"):
+        assert "environmental" in classify(title), title
+
+
+def test_safety_boilerplate_in_a_description_is_not_an_ehs_job():
+    # Every one of these bodies says it, and none of these jobs is an EHS job.
+    for title, body in (
+        ("Geology Intern", "Our goal is to meet the highest employer standards by ensuring the "
+                           "health and safety of our employees, protecting the environment."),
+        ("Operations Intern, Commercial & MarComs", "Assess our boutiques while adhering to company "
+                                                    "regulations, and health and safety codes."),
+        ("Safety Engineer Intern", "Work with project managers and superintendents in dealing with "
+                                   "all health and safety issues on site, at the project level."),
+    ):
+        assert "environmental" not in classify(title, body), title

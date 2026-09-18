@@ -28,7 +28,17 @@ RULES = [
     ("chemical", r"chemical engineer|process engineer|petroleum|refin"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
     ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer"),
-    ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources"),
+    # EHS - environment, health and safety - is the compliance arm of an environmental team, and a
+    # student who wants it is an environmental science or public health major. None of its titles say
+    # "environmental": 24 of them said only "other", which is the bottom of every ranking.
+    #
+    # The acronyms are safe anywhere, but the spelled-out phrase is not: "ensuring the health and
+    # safety of our employees" is boilerplate in the body of an oil and gas posting, a geology
+    # posting and a jewellery boutique posting, so that half is anchored to the role word and only
+    # fires on a title like "Environment, Safety and Health Undergraduate Intern".
+    ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources|"
+     r"occupational (health (and|&|,) )?safety|\behs\b|\bhse\b|"
+     r"(health|safety) ?(and|&|,) ?(safety|health)( \w+){0,2} (intern|co-?op)"),
     ("biomedical", r"biomedical|bioengineer|medical device|clinical engineer"),
     # A posting that says engineering and nothing more specific is still an engineering
     # posting. classify drops this again the moment any other rule matched, so it is the
