@@ -496,3 +496,19 @@ def test_sociology_anthropology_and_survey_work_are_social_science():
     # the retailer is not the discipline
     assert "social_science" not in classify("Anthropologie Buying Intern - Home")
     assert "social_science" in majors_export()["fields"]
+
+
+def test_plain_function_names_reach_their_field():
+    assert "accounting" in classify("Accounts Payable Intern - Summer 2027")
+    assert "accounting" in classify("Payroll Intern")
+    assert "law" in classify("Real Property Attorney Intern")
+    assert "hr" in classify("HRIS Intern - Summer 2027")
+    assert "hr" in classify("Learning & Development Intern")
+    assert "civil" in classify("Transportation/Traffic Intern - Summer 2027")
+    assert "mechanical" in classify("Machine Shop Intern - Summer 2027")
+    assert "media" in classify("Urban Outfitters Photo Studio Intern")
+    assert "chemical" in classify("Intern - PDM - Formulation & Process Development")
+    assert "agriculture" in classify("Sensory and Products Research Intern - Summer 2027")
+    # network traffic is not road work
+    assert "civil" not in classify("Research Intern - SDN Traffic Intelligence & Control")
+    assert "civil" not in classify("Software Engineer Intern - Global Traffic Architecture")

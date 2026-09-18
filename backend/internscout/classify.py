@@ -11,6 +11,10 @@ from __future__ import annotations
 import re
 
 RULES = [
+    # Several rules end with the plain name of a function the tag already covers, found in titles
+    # that fell to "other": accounts payable, payroll, attorney, HRIS, learning & development,
+    # traffic engineering (road work only - "SDN Traffic" is networking), machinist, photo studio
+    # and styling, process/analytical/formulation development, and sensory science.
     # --- computing / quant ---
     ("quant", r"\bquant(itative)?\b|\btrader\b|\btrading\b|market mak|derivativ|\balpha\b|portfolio manag"),
     ("ml", r"\bml\b|machine learning|deep learning|\bnlp\b|computer vision|\bai\b|artificial intelligence|genai|\bllm|research scientist|reinforcement learning"),
@@ -22,10 +26,10 @@ RULES = [
 
     # --- engineering (non-software) ---
     ("electrical", r"\belectrical\b|mixed[- ]signal|physical design|\brf\b|power electronics|lighting design|electrical engineer|\bpower systems\b|\bee\b intern"),
-    ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac"),
-    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey"),
+    ("mechanical", r"\bmechanical\b|product development engineer|design release|life ?cycle engineer|mechanical engineer|\bme\b intern|thermal|manufactur|\bcad\b|autocad|solidworks|hvac|machine shop|machinist"),
+    ("civil", r"\bstructural\b|commissioning|civil engineer|structural engineer|geotechnical|transportation engineer|\bconstruction|preconstruction|water (and|&) transportation|surface transportation( \w+){0,2} (intern|co-?op)|(intern|internships?)\s*[-–,:|]\s*(\w+ ){0,2}surface transportation|highway design|\bbridge (design|cadd|inspect)|geomatic|\bsurveying\b|land survey|\btraffic (engineer|intern|design|signal|stud(y|ies)|safety|operations)"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
-    ("chemical", r"chemical engineer|process engineer|petroleum|refin"),
+    ("chemical", r"chemical engineer|process engineer|petroleum|refin|(process|drug product|drug substance|analytical|formulation) development"),
     ("materials", r"materials (science|engineer)|metallurg|polymer"),
     ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer|human factors engineer"),
     # EHS - environment, health and safety - is the compliance arm of an environmental team, and a
@@ -75,7 +79,7 @@ RULES = [
     # financial-reporting phrases and engineering's R&D, test, reliability and maintenance words
     # below, this took 132 of the ~2,700 "other" titles in one export into a field.
     ("finance", r"banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)"),
-    ("accounting", r"assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep"),
+    ("accounting", r"assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep|accounts (payable|receivable)|\bpayroll\b"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
     ("marketing", r"\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern|"
      # Market research is the marketing department's research, and it was landing in "other" with
@@ -84,7 +88,7 @@ RULES = [
      r"market (research|intelligence|insights?)|consumer insights?|community manager"),
     ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)"),
     ("sales", r"\bsales\b|business development|account executive|account manager|client relations|customer success"),
-    ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations"),
+    ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations|\bhris\b|learning (and|&) development|\bl&d\b|team relations|total rewards|compensation (and|&) benefits"),
     ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b"),
     ("supply_chain", r"supply chain|logistic|procurement|sourcing|inventory|purchasing|distribution center|warehouse|inbound transportation|transportation network( \w+){0,2} intern"),
     ("entrepreneurship", r"entrepreneur|\bstart-?ups?\b|incubator|accelerator|small business"),
@@ -92,13 +96,13 @@ RULES = [
 
     # --- design / media / arts / humanities ---
     ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design|experience design"),
-    ("media", r"journalis|editorial|\bwriting intern|content creat|video|film|photograph|broadcast|podcast|creative"),
+    ("media", r"journalis|editorial|\bwriting intern|content creat|video|film|photograph|broadcast|podcast|creative|photo studio|\bstyl(ing|ist)\b"),
     ("journalism", r"journalis|reporter|newsroom|\bnews\b|editorial"),
     ("publishing", r"publish|editorial|literary|\beditor\b|\bbooks?\b"),
     ("film", r"animat(or|ion)|rigging artist|production intern|\bfilm|video production|post-?production|cinematograph|production assistant|documentar"),
     ("music", r"\bmusic|record label|audio engineer|recording studio|concert"),
     ("theater", r"theat(er|re)\b|stage manag|performing arts|\bdance\b|\bopera\b|ballet"),
-    ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|\bcounsel\b|policy intern"),
+    ("law", r"\blegal\b|\blaw\b|paralegal|compliance|regulatory|\bcounsel\b|policy intern|\battorney\b"),
     ("education", r"teaching|education|curriculum|instructor|tutor|instructional design"),
     ("nonprofit", r"nonprofit|non-profit|social impact|community outreach|volunteer coordinat|development associate|"
      # "Community Impact Intern", "Community Engagement Grant Intern", "Community Partnerships
@@ -129,7 +133,7 @@ RULES = [
     ("library", r"librar(y|ian)|information science|archiv(e|es|ist|al)"),
     ("hospitality", r"hospitality|\bhotel|restaurant|culinary|food (and|&) beverage|event planning|\bevents? (intern|coordinat)|tourism"),
     ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"),
-    ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation|food safety( (&|and) quality| quality( assurance)?)?( \w+){0,2} (intern|co-?op)|quality (&|and )?food safety"),
+    ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation|food safety( (&|and) quality| quality( assurance)?)?( \w+){0,2} (intern|co-?op)|quality (&|and )?food safety|\bsensory\b"),
     ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl|(?<!high-)(?<!high )\benergy (intern|internship|assessment intern)|building energy model|advanced energy intern"),
     ("languages", r"translat(or|ion)s?\b|interpreter\b|bilingual|linguist|"
      # "interpreter\b" is deliberate: mechanistic interpretability is not an interpreting job.
