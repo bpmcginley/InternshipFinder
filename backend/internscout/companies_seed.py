@@ -580,6 +580,22 @@ JAZZHR += [
 ]
 
 
+# --- boards found behind a Greenhouse embed URL (checked live 2026-09-18) ---
+# 22 listings in the last export apply through "boards.greenhouse.io/embed/job_app?token=N", which
+# names the job and not the board, so discovery reads nothing from it and the employer's other
+# postings never arrive. One request each says who they are: the URL answers 301 to
+# "job-boards.greenhouse.io/embed/job_app?for=<board>&token=N", and the board is sitting in for=.
+#
+# Doing that on every run would be 76 requests for 4 boards, so it is not worth a fetcher; doing it
+# once is worth these three. (The fourth, "earlytalentcerebras", answers 404 on the board API - it
+# exists only as an embed.) The same trick on 54 Workable /j/<id>/apply URLs found 24 boards and
+# every one of them was already registered, so that form is left alone.
+GREENHOUSE += [
+    {'name': 'Dropbox', 'ats_token': 'dropbox', 'is_quant_target': False, 'sector': None},
+    {'name': 'Squarepoint Capital', 'ats_token': 'squarepointcapital', 'is_quant_target': True, 'sector': 'quant_finance'},
+    {'name': 'StepStone Group', 'ats_token': 'stepstone', 'is_quant_target': False, 'sector': 'insurance_finance'},
+]
+
 # --- college boards (each searched live for "intern" on 2026-09-18; the count is what came back) ---
 # A student job on a campus is the one internship a first-year can actually get, and Workday is
 # where the Northeast schools keep them. 18 of the 74 schools checked have a tenant; these eight
