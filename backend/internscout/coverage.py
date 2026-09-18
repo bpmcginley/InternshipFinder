@@ -49,6 +49,31 @@ CLUSTERS = {
 SECTOR_CLUSTER = {sector: name for sector, field in SECTOR_FIELDS.items()
                   for name, tags in CLUSTERS.items() if field in tags}
 
+# A thin cluster reads as "go and seed more employers there", and twice now that has been the
+# wrong instruction: see the nonprofit case above. The other way to get it wrong is a source that
+# is built and switched off. USAJOBS and Google Jobs both need a key, both print one line into a
+# 3,000-line log when they do not have it, and both are aimed squarely at the clusters that come
+# up thin. So they are named next to the counts instead of being left to be rediscovered.
+KEYED_SOURCES = (
+    ("USAJOBS", ("USAJOBS_API_KEY", "USAJOBS_EMAIL"),
+     "federal Pathways: government, public policy, social work, psychology"),
+    ("Google Jobs", ("SERPAPI_KEY",),
+     "the field-by-field searches, the only source that goes looking for a cluster by name"),
+)
+
+
+def dormant(env: dict | None = None) -> list[str]:
+    """Sources that are built and contributing nothing because a key is unset, with what each
+    covers. In CI these come from the repo secrets, so the report says what that run actually had."""
+    env = os.environ if env is None else env
+    out = []
+    for name, keys, covers in KEYED_SOURCES:
+        missing = [k for k in keys if not (env.get(k) or "").strip()]
+        if missing:
+            out.append(f"{name} ({' and '.join(missing)} unset) - {covers}")
+    return out
+
+
 def in_baseline(listing: dict) -> bool:
     for g in listing.get("regions") or []:
         if g["state"] in BASELINE_STATES or g["kind"] == "remote":
@@ -77,7 +102,8 @@ def per_tag(listings: list[dict], baseline_only: bool = True) -> collections.Cou
                                for t in x.get("field_tags") or ())
 
 
-def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True) -> str:
+def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True,
+           env: dict | None = None) -> str:
     rows = sorted(counts(listings, baseline_only).items(), key=lambda kv: kv[1])
     where = "baseline + remote" if baseline_only else "whole US"
     lines = [f"| Field cluster | Open ({where}) | |", "|---|---:|---|"]
@@ -86,8 +112,16 @@ def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True) 
     lines.append("")
     if not thin:
         lines.append(f"Every cluster has at least {minimum}.")
+        lines += [f"Switched off even so: {line}" for line in dormant(env)]
         return "\n".join(lines)
     lines.append(f"Thin (< {minimum}): {', '.join(thin)}")
+    # Before seeding anything: a source with no key contributes zero, and no number of new
+    # employers fills a gap that a switched-off source was meant to fill.
+    off = dormant(env)
+    if off:
+        lines.append("")
+        lines.append("Sources built but switched off, which may be why:")
+        lines += [f"  - {line}" for line in off]
     # Which tags are empty is the part that can be acted on: "Health 12" is not an instruction,
     # "nursing 0" is an employer to go and seed. Rarest first, because that is the order to work in.
     tags = per_tag(listings, baseline_only)

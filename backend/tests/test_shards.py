@@ -2,7 +2,7 @@
 import json
 import os
 from internscout.classify import ALL_FIELDS
-from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, per_tag, report
+from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, dormant, per_tag, report
 from internscout.export_static import (merged_stages, shard_keys,
                                        still_student_opportunities, write_shards)
 from internscout.region import evaluate_locations, maybe_in_region
@@ -87,12 +87,12 @@ def test_coverage():
     assert counts(rows + [shut])["Health"] == 2
     assert per_tag(rows + [shut], baseline_only=False)["health"] == 3
 
-    text = report(rows, minimum=15)
+    text = report(rows, minimum=15, env=_ALL_KEYS)
     # rarest first, so the tag with nothing behind it leads and the one carrying the cluster trails
     assert "- Health: nursing 0," in text and text.rstrip().endswith("health 2")
     assert "**thin**" in text
     # nothing is thin below a bar of zero, and then there is no breakdown to print
-    assert "Every cluster has at least" in report(rows, minimum=0)
+    assert "Every cluster has at least" in report(rows, minimum=0, env=_ALL_KEYS)
 def test_coverage_counts_the_employers_sector():
     # Every sector the classifier can fall back on has to land in some cluster, or listings from those
     # employers would be counted by nobody.
@@ -146,3 +146,29 @@ def test_a_stored_stage_is_added_to_and_not_trusted_alone():
     assert merged_stages(["internship", "part_time"], "Data Analyst") == ["internship", "part_time"]
     # and the order is STAGES order, whichever side a stage came from.
     assert merged_stages(["research"], "Summer Intern") == ["internship", "research"]
+
+
+_ALL_KEYS = {"USAJOBS_API_KEY": "k", "USAJOBS_EMAIL": "a@b.c", "SERPAPI_KEY": "k"}
+
+
+def test_the_report_says_when_a_source_is_switched_off_rather_than_unseeded():
+    # "Social sciences 8" reads as an instruction to go and seed more employers. It was not: the
+    # two sources aimed at that cluster were built and had no key, so they contributed nothing and
+    # no amount of seeding would have moved the number.
+    assert dormant(_ALL_KEYS) == []
+    off = dormant({"SERPAPI_KEY": "k"})
+    assert len(off) == 1 and off[0].startswith("USAJOBS (USAJOBS_API_KEY and USAJOBS_EMAIL unset)")
+    # Half a key is no key: USAJOBS sends the email as its User-Agent and 403s without it.
+    assert len(dormant({**_ALL_KEYS, "USAJOBS_EMAIL": "  "})) == 1
+    assert len(dormant({})) == 2
+
+    rows = [_listing(1, ["Boston, MA"])]
+    text = report(rows, minimum=15, env={})
+    assert "Sources built but switched off" in text
+    assert "USAJOBS (USAJOBS_API_KEY and USAJOBS_EMAIL unset)" in text and "SERPAPI_KEY" in text
+    # It sits above the tag breakdown, because it decides whether that list is worth working from.
+    assert text.index("switched off") < text.index("Tags inside them")
+    assert "switched off" not in report(rows, minimum=15, env=_ALL_KEYS)
+
+    # A healthy table says so too, rather than implying every source ran.
+    assert "Switched off even so: USAJOBS" in report(rows, minimum=0, env={})
