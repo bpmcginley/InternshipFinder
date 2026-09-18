@@ -30,6 +30,11 @@ RULES = [
     ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer"),
     ("environmental", r"environmental|sustainab|climate|renewable|energy engineer|water resources"),
     ("biomedical", r"biomedical|bioengineer|medical device|clinical engineer"),
+    # A posting that says engineering and nothing more specific is still an engineering
+    # posting. classify drops this again the moment any other rule matched, so it is the
+    # generic case only: "Engineering Intern", "Quality Engineering Intern", "Field Engineer
+    # Intern". 1,200 listings in one export, none of which had any field tag before.
+    ("engineering", r"\bengineer(ing|s)?\b"),
 
     # --- sciences / math / health ---
     ("biology", r"\bbiolog|biotech|genomic|molecular|microbiolog|neuroscience|immunolog|cell (culture|biology)|life sciences|pharma|drug discovery"),
@@ -180,6 +185,8 @@ def classify(title: str, description: str = "") -> list[str]:
             tags.append(tag)
     seen = set()
     out = [t for t in tags if not (t in seen or seen.add(t))]
+    if "engineering" in out and len(out) > 1:
+        out.remove("engineering")   # a fallback, so anything more specific wins outright
     # Never drop an internship just because our vocabulary missed it.
     return out or ["other"]
 

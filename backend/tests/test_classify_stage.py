@@ -185,3 +185,16 @@ def test_a_field_word_inside_a_longer_word_is_not_a_match():
     assert classify("AutoCAD Design Intern") == ["mechanical"]
     assert classify("Cloud Engineer Intern") == ["swe"]
     assert classify("Preconstruction Intern") == ["civil"]
+
+def test_engineering_is_the_fallback_for_a_title_with_no_discipline():
+    # 1,200 listings in one export said "engineering" and nothing a discipline rule could read,
+    # so they carried no field tag at all and scored zero for every engineering major.
+    assert classify("Engineering Intern") == ["engineering"]
+    assert classify("Quality Engineering Intern") == ["engineering"]
+    assert classify("Field Engineer Intern") == ["engineering"]
+    # Anything more specific wins outright - the generic tag is never a second opinion.
+    assert classify("Mechanical Engineering Intern") == ["mechanical"]
+    assert classify("Software Engineering Intern") == ["swe"]
+    assert classify("Data Engineering Intern") == ["data"]
+    assert classify("Sales Engineer Intern") == ["sales"]
+    assert "engineering" in ALL_FIELDS

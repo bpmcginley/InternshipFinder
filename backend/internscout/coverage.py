@@ -35,7 +35,7 @@ CLUSTERS = {
     "Business": ("finance", "accounting", "consulting", "marketing", "sales", "hr", "operations",
                  "supply_chain", "entrepreneurship", "pm", "real_estate", "insurance", "retail"),
     "Engineering": ("mechanical", "electrical", "civil", "chemical", "industrial", "aerospace",
-                    "hardware", "materials", "environmental"),
+                    "hardware", "materials", "environmental", "engineering"),
     "Sciences": ("biology", "chemistry", "physics", "lab_research", "math", "agriculture", "sustainability"),
     "Social sciences": ("psychology", "economics", "languages"),
     "Tech & data": ("swe", "ml", "data", "security", "quant"),
