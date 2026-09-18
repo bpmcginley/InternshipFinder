@@ -29,13 +29,18 @@ export async function writeTailored(key, value, store = chrome.storage.local) {
   try {
     const all = (await store.get(KEY))[KEY] || {};
     all[key] = { at: Date.now(), value };
-    // Newest first, oldest evicted. A dozen writes can land in the same millisecond and tie on `at`,
-    // and a stable sort would then keep the twelve oldest, so position breaks the tie: later wins.
+    // Oldest evicted. A dozen writes can land in the same millisecond and tie on `at`, and a stable
+    // sort would then keep the twelve oldest, so position breaks the tie: later in the object wins,
+    // because a new key is appended to the end of it. That only holds while the object is ordered
+    // oldest first, which is why what is kept is turned back the right way round before it is
+    // stored - written newest first, the very next tie would read the order backwards and evict
+    // the newest entry instead.
     const keep = Object.entries(all)
       .map((entry, i) => [entry, i])
       .sort((a, b) => b[0][1].at - a[0][1].at || b[1] - a[1])
       .slice(0, MAX)
-      .map(([entry]) => entry);
+      .map(([entry]) => entry)
+      .reverse();
     await store.set({ [KEY]: Object.fromEntries(keep) });
   } catch {
     /* nothing to do: the caller already has the tailored resume */

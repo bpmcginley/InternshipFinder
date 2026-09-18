@@ -103,6 +103,25 @@ test("a tailored resume is stored, read back, and capped at 12 entries", async (
   assert.equal(await readTailored("n19", st), null);
 });
 
+test("entries written in the same millisecond still evict oldest first", async () => {
+  // The real case: a dozen tailorings in a row all stamp the same `at`, so `at` decides nothing and
+  // the order of the stored object is the only thing left to go on. The test above hits this only
+  // when the machine is fast enough for the writes to tie, which is why it is pinned down here.
+  const st = fakeStore();
+  const now = Date.now;
+  Date.now = () => 1_800_000_000_000;
+  try {
+    for (let i = 0; i < 20; i++) await writeTailored(`n${i}`, { summary: `r${i}` }, st);
+  } finally {
+    Date.now = now;
+  }
+  const kept = Object.keys(st.raw().tailor_cache);
+  assert.equal(kept.length, 12);
+  assert.deepEqual(kept.slice().sort(), Array.from({ length: 12 }, (_, i) => `n${i + 8}`).sort());
+  assert.equal(await readTailored("n7", st), null, "everything older than the last twelve is gone");
+  assert.deepEqual(await readTailored("n19", st), { summary: "r19" });
+});
+
 test("a broken cache costs an AI call, never the tailoring", async () => {
   const st = fakeStore();
   st.break(true);
