@@ -1,0 +1,60 @@
+name: Tests
+
+# The three suites that guard the parts a student actually touches: the ingest and tagging rules,
+# the Worker that holds the AI key and the caps, and the extension that fills their applications.
+# They ran nowhere automatically before this: the extension's only ran on a release tag, by which
+# point a break is already tagged, and the backend's and the Worker's ran only on a laptop.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run tests
+        working-directory: backend
+        run: python -m pytest tests/ -q
+
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run tests
+        working-directory: worker
+        run: node --test test/
+
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run tests
+        run: node --test extension/test/*.test.mjs
