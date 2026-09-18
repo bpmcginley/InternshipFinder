@@ -249,7 +249,7 @@ const GATE_HELP = {
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
   captcha: "The site wants you to prove you're human. Solve the check in the tab, then press Resume.",
   human_check: "This form asks a question meant to prove a person is applying, not a program. Answer that one yourself in the tab, then press Resume.",
-  background_tab: "Chrome slows down tabs you've switched away from, and this page stopped responding. Bring the application tab back to the front and it carries on by itself (or press Resume).",
+  background_tab: "Chrome slows down tabs you've switched away from, and this page stopped responding. Bring the application tab back to the front and it carries on by itself. If the tab is waiting on you (a pop-up, a sign-in), deal with that first, then press Resume.",
 };
 // index.js resumes a job paused for this reason by itself once its tab is brought to the front.
 export const BACKGROUND_TAB_HELP = GATE_HELP.background_tab;
