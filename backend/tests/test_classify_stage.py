@@ -636,3 +636,17 @@ def test_fundraising_and_casework_titles_that_never_say_nonprofit_or_social_work
     # the near misses: research grants and social media are neither
     assert "nonprofit" not in classify("Research Grant Funded Lab Intern")
     assert "social_work" not in classify("Social Media Services Intern")
+
+
+def test_studio_writer_and_event_titles_that_name_the_person_not_the_field():
+    from internscout.classify import classify
+    assert classify("Co-op, Designer") == ["design"]
+    assert classify("Tech Art Intern") == ["design"]
+    assert classify("Retoucher /Digital Artist Intern") == ["design"]
+    assert classify("Technical Writer Intern") == ["communications"]
+    assert classify("2027 Meetings & Events Summer Internship Program") == ["hospitality"]
+    assert classify("WS - Art Studio Monitor - FWS") == ["arts"]
+    # drafting seats stay engineering
+    assert "design" not in classify("Mechanical Designer Intern")
+    assert "design" not in classify("Product Definition Engineer Intern - Designer")
+    assert "design" not in classify("Designer/Drafter Co-Op")

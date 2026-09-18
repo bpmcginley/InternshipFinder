@@ -107,7 +107,9 @@ RULES = [
      # everything else the research word no longer carries: "Market Research Insights Intern",
      # "Intern, Market Intelligence (LCS)", "Market Researcher". So is running a brand's community.
      r"market (research|intelligence|insights?)|consumer insights?|community manager"),
-    ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)"),
+    ("communications", r"publicist|\bcommunications|public relations|\bpr\b intern|media relations|speechwrit|press (office|intern|secretary)|"
+     # Writers were landing in "other": "Content Writer Intern", "Technical Writer Intern".
+     r"(content|technical|staff|copy|grant) ?writer\b|\bcopywrit"),
     ("sales", r"\bsales\b|business development|account executive|account manager|client relations|customer success|(account|sales|business) development representative"),
     ("hr", r"people partner|people, engagement|employee (and|&) workplace|human resources|\bhr\b|recruit|talent acquisition|people operations|\bhris\b|learning (and|&) development|\bl&d\b|team relations|total rewards|compensation (and|&) benefits|\bhuman resource\b|(?<!personal )\btraining (intern|co-?op|coordinator)\b|talent (management|development)"),
     ("operations", r"\boperations\b|\bcoo\b|shared services|order management|service installation|operations intern|business operations|project manage|process improvement|procurement|\bquality (assurance |control |systems )?(specialist|intern|co-?op)\b|operational excellence|continuous improvement|quality management|\bqms\b|\bquality (internship|programs?|analyst)\b|\bquality control\b|site quality|(?<!engineering )(?<!engineer )\b(intern|internship)\W+quality\b(?! engineer)|\bfacilities (management|planning|planner|services|corporate|intern|internship)\b|\b(19|20)\d\d facilities intern|summer internship - facilities"),
@@ -116,7 +118,13 @@ RULES = [
     ("economics", r"\beconomic|econometric|policy analys|\beconomists?\b|business survey"),   # the Fed's regional business surveys
 
     # --- design / media / arts / humanities ---
-    ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design|experience design|web design|(textile|print|content|game|level|apparel|store|brand|creative|interior) design|^\W*((\d{4}|spring|summer|fall|winter)\W+)*design (intern|internship|co-?op)\b(?!\W+(electrical|water|mechanical|civil|structural)\b)"),
+    ("design", r"\bux\b|\bui\b|user experience|user research|product design|graphic design|industrial design|\bfigma\b|visual design|interaction design|experience design|web design|(textile|print|content|game|level|apparel|store|brand|creative|interior) design|^\W*((\d{4}|spring|summer|fall|winter)\W+)*design (intern|internship|co-?op)\b(?!\W+(electrical|water|mechanical|civil|structural)\b)|"
+     # Studio and creative roles that name the person, not the discipline: "Co-op, Designer",
+     # "Retouch/Digital Artist Intern", "Tech Art Intern", "Art Director Intern". A CAD
+     # "Designer/Drafter" is an engineering job and is left to the engineering rules, and so is any
+     # "Mechanical/Electrical/Structural Designer" or engineer title: those are drafting seats.
+     r"^(?!.*\b(engineer\w*|mechanical|electrical|structural|civil|drafter|drafting|cad|piping|hvac)\b).*\bdesigner\b|digital artist|\bretouch|art director|set design|\btech(nical)? art(ist)?\b|"
+     r"design research|human[- ]cent(er|re)d design|design thinking"),
     ("media", r"journalis|editorial|\bwriting intern|content creat|video|film|photograph|broadcast|podcast|creative|photo studio|\bstyl(ing|ist)\b"),
     ("journalism", r"journalis|reporter|newsroom|\bnews\b|editorial"),
     ("publishing", r"publish|editorial|literary|\beditor\b|\bbooks?\b"),
@@ -169,7 +177,7 @@ RULES = [
      # Policy" intern writes internal rules, not public ones.
      r"public policy|(energy|health|economic|social|justice|climate|environmental|education|housing|tax|trade|foreign) policy|"
      r"policy (&|and) (advocacy|regulation|research)|(?<!it )(?<!service )(?<!security )(?<!product )\bpolicy (intern|fellow|assistant|analyst|associate)"),
-    ("arts", r"animator|\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat"),
+    ("arts", r"animator|\bmuseum|gallery|curator|fine arts|theat(er|re)\b|\bmusic\b|performing arts|arts (admin|management)|animation|illustrat|art studio|(center|centre) for the arts"),
     ("museums", r"\bmuseum|curat(or|orial)|collections (intern|management|assistant)|archiv(e|es|ist|al)|exhibit"),
     ("library", r"librar(y|ian)|information science|archiv(e|es|ist|al)"),
     ("hospitality", r"hospitality|\bhotel|restaurant|culinary|food (and|&) beverage|event planning|\bevents? (intern|coordinat)|tourism"
@@ -178,7 +186,7 @@ RULES = [
      # experience" (retailers call shoppers guests) and not a patient concierge (a clinic job).
      r"|front desk|guest (services|relations)|\bf&b\b|housekeeping|\bresorts?\b|(?<!patient )concierge"
      r"|banquet|catering|\bfestivals?\b|\bconcessions?\b|ticket (sales|operations|office)"
-     r"|premium (client|seating|services)"),
+     r"|premium (client|seating|services)|meetings (&|and) events|event (production|operations|management)"),
     ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"
      # Team and club boards name the sport or the job, not "sports": Life Time's personal-training
      # interns, the Red Sox's scouting and ballpark roles, the PGA TOUR's and Titleist's programs.
