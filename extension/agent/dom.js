@@ -54,6 +54,25 @@
   const HINT_RE = /^(no file (selected|chosen)|accepted file types|allowed (file )?types|max(imum)? (file )?size|file size|supported formats|total \d+ files? (selected|attached|uploaded)|drag (and|&) drop|drop (your )?files? here)\b/i;
   const useful = (t) => !!t && !HINT_RE.test(t) && !(GENERIC_LABEL_RE.test(t) && !/r[eé]sum[eé]|\bcv\b|cover|transcript|letter|portfolio|writing|photo|certificat/i.test(t));
 
+  // The question over a group of options, when it is drawn inside the group's own box. Ashby puts it in
+  // the <fieldset> as <label class="…question-title" for="<question id>">, not a <legend>, and every
+  // caption search below skips text inside the box it starts from (that is where option labels live).
+  // So each Ashby Yes/No arrived with no label at all, and the model had to guess which one asked about
+  // work authorization and which about sponsorship; the first live run answered both backwards.
+  // Anything holding an option, or a label for one, is an option's text and not the question.
+  function innerCaption(box, opts) {
+    if (!box) return null;
+    const ids = new Set(opts.map((o) => o.id).filter(Boolean));
+    for (const l of box.querySelectorAll('legend, label, [class*="title"], [class*="question"], h3, h4')) {
+      if (opts.some((o) => l.contains(o) || o.contains(l))) continue;
+      if (l.htmlFor && ids.has(l.htmlFor)) continue;
+      if (l.closest("label") && l.closest("label") !== l && ids.has(l.closest("label").htmlFor)) continue;
+      const t = txt(l);
+      if (useful(t) && t.length < 400) return l;
+    }
+    return null;
+  }
+
   function questionLabel(el, scope = el) {
     const lb = el.getAttribute("aria-labelledby");
     if (lb) { const t = byIds(lb, rootOf(el)); if (useful(t)) return t; }
@@ -298,10 +317,13 @@
         if (!scope) { scope = el.parentElement; while (scope && !els.every((r) => scope.contains(r))) scope = scope.parentElement; }
         rec.els = els;
         rec.options = els.map(optLabel);
-        rec.label = questionLabel(scope || el, scope || el);
+        const cap = innerCaption(container, els);
+        rec.label = cap ? txt(cap) : questionLabel(scope || el, scope || el);
         rec.value = (els.find((r) => r.checked || r.getAttribute("aria-checked") === "true") && optLabel(els.find((r) => r.checked || r.getAttribute("aria-checked") === "true"))) || "";
         rec.el = key;
-        rec.required = els.some((r) => r.required || r.getAttribute("aria-required") === "true") || REQUIRED_MARK_RE.test(rec.label);
+        // Ashby marks a required question only with a class on its title (no asterisk, no attribute).
+        rec.required = els.some((r) => r.required || r.getAttribute("aria-required") === "true") || REQUIRED_MARK_RE.test(rec.label)
+          || !!(cap && /(^|[\s_-])required([\s_-]|$)/i.test(cap.getAttribute("class") || ""));
       } else {
         rec.el = el;
         rec.label = questionLabel(el);
