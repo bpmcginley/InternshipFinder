@@ -42,6 +42,7 @@ NAVIGATION
 
 ACCOUNTS
 - If the site needs an account, follow the ACCOUNT line: sign in if one exists, otherwise create one with the given email. Use fill_secret for EVERY password and confirm-password field; never type a password with fill. Tick required account terms/privacy checkboxes.
+- Always take the email route ("Sign in with email", "Use your email"), never "Sign in with Google/Apple/LinkedIn/Facebook". Those need the student's own Google or Apple password, which InternScout does not have and must never ask for, and they open the provider's own window where nothing here can follow.
 - Email verification, SMS or 2FA → pause_for_user with a short instruction.
 - CAPTCHA PRESENT on a form: it is the human's to solve at submit time. Fill everything else, then call ready_to_submit and put "solve the CAPTCHA" in double_check. Only pause_for_user if the CAPTCHA must be solved before you can continue (e.g. before Next or Sign in).
 
@@ -121,8 +122,13 @@ async function waitForTab(tabId, timeout = 25000) {
 // Workforce Now's recruitment page stops answering scripts altogether, and Chrome neither returns a
 // result nor reports an error. Every trip into the page therefore gets a deadline, because a run
 // that is merely waiting looks exactly like a run that is working, and says nothing to the student.
+//
+// The deadline is long because missing it has to mean something. Workday blocks its own main thread
+// in bursts while it hydrates - long enough that a trivial script sent into a perfectly healthy
+// Workday page can go unanswered for the better part of a minute, and answer instantly a moment
+// later. A deadline short enough to catch ADP quickly would end every Workday application.
 export const FROZEN_PAGE = "The page stopped responding. Open the tab and reload it, then Retry.";
-export function toPage(p, ms = 15000) {
+export function toPage(p, ms = 30000) {
   let t;
   return Promise.race([
     Promise.resolve(p).finally(() => clearTimeout(t)),
@@ -139,6 +145,15 @@ async function inject(tabId) {
         await toPage(chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", files: PAGE_FILES }));
         break;
       } catch (err) {
+        // A page busy enough to miss one deadline is usually a page that is busy, not broken, so wait
+        // and ask again before saying anything to the student. No reload here, unlike the error-page
+        // case below: this runs before every snapshot, including halfway through an application, and
+        // a reload there would throw away everything the student had already filled in.
+        if (err.message === FROZEN_PAGE) {
+          if (attempt >= 2) throw err;
+          await sleep(4000);
+          continue;
+        }
         // Chrome's own error page (network blip, site block): reload a couple of times before giving up.
         if (!/error page/i.test(err.message) || attempt >= 2) {
           throw /error page/i.test(err.message) ? new Error("The site showed a load error (it may block automated browsing or be down). Open the tab, then Retry.") : err;

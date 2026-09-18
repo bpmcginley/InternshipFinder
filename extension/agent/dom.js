@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 12; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 13; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -233,7 +233,17 @@
       }
       // Anti-spam honeypots ("Please leave this field blank", BambooHR) sit in an aria-hidden box;
       // filling one gets the application silently discarded.
-      if ((kind === "text" || kind === "textarea") && (el.closest('[aria-hidden="true"]') || offDocument(el) || /honey.?pot|^hp[_-]/i.test([el.name, el.id, el.className].join(" ")))) continue;
+      //
+      // Workday's is not hidden by any of those means and is not named after a honeypot either. Its
+      // sign-in page carries an input called "website", data-automation-id="beecatcher", drawn
+      // display:block and visibility:visible at full opacity, in the middle of the form - one pixel
+      // wide and none tall. Nothing about it reads as hidden except its size, and a box with no room
+      // for a character in it is a box no student could ever have typed into. So the test is the size
+      // itself rather than the name: names are a list that only ever grows, and the next site's
+      // honeypot will have a different one.
+      const box = el.getBoundingClientRect();
+      const noRoom = box.width < 4 || box.height < 4;
+      if ((kind === "text" || kind === "textarea") && (el.closest('[aria-hidden="true"]') || offDocument(el) || noRoom || /honey.?pot|^hp[_-]|beecatcher/i.test([el.name, el.id, el.className, el.getAttribute("data-automation-id") || ""].join(" ")))) continue;
       const proxy = kind === "select" && selectProxy(el);
       if (proxy && !realOptions(el) && [...proxy.querySelectorAll("input")].some((i) => i.type !== "hidden" && A.visible(i))) continue;
       if (kind === "file") {
