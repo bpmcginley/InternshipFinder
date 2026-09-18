@@ -903,3 +903,34 @@ def test_a_robots_url_that_answers_with_a_web_page_forbids_nothing():
     host = _Host("<!DOCTYPE html><html><body>Disallow: /</body></html>")
     assert fetch_icims_board(host, _co("careers-html")) == []
     assert host.asked
+
+
+class _OracleTenant:
+    """An Oracle tenant answering findReqs by keyword; robots.txt and details are absent."""
+
+    def __init__(self, by_keyword):
+        self.by_keyword, self.keywords = by_keyword, []
+
+    def get(self, url, headers=None, timeout=None):
+        if "findReqs" not in url:
+            return _Missing()
+        kw = url.split("keyword=")[1].split(",")[0]
+        self.keywords.append(kw)
+        reqs = [{"Id": i, "Title": t, "PrimaryLocation": "New Hyde Park, NY, United States",
+                 "PrimaryLocationCountry": "US", "ShortDescriptionStr": "x"}
+                for i, t in self.by_keyword.get(kw, [])]
+        return _Page({"items": [{"TotalJobsCount": len(reqs), "requisitionList": reqs}]})
+
+
+def test_a_hospital_oracle_tenant_is_also_searched_for_student_roles():
+    from internscout.sources.oracle import fetch_oracle_board
+    tenant = _OracleTenant({"intern": [("1", "Pharmacy Intern")],
+                            "student": [("1", "Pharmacy Intern"), ("2", "Nursing Student Technician - FlexStaff")]})
+    co = {"name": "Hosp", "ats_token": "hosp.fa.oraclecloud.com|CX_2", "is_quant_target": False,
+          "sector": "health", "location": None}
+    out = fetch_oracle_board(tenant, co)
+    assert sorted(x["title"] for x in out) == ["Nursing Student Technician - FlexStaff", "Pharmacy Intern"]
+    assert tenant.keywords == ["intern", "student"]
+    tenant.keywords = []
+    fetch_oracle_board(tenant, dict(co, sector="insurance_finance"))
+    assert tenant.keywords == ["intern"]

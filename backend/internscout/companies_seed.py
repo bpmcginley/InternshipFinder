@@ -916,4 +916,25 @@ ICIMS += [
      'rename': True},
 ]
 
+# --- hospital systems for nursing and allied-health students (probed and fetched live 2026-09-18) ---
+# The baseline states held one nursing listing. 70 unseeded systems were probed and 11 answered on
+# Workday. These 10 are fetched with the health sector's extra "student" search (see
+# workday.EXTRA_SEARCH), which is what finds ChristianaCare's Student Nurse Extern and Essentia's
+# student nurse internship and "Current Students Only" roles. HCA and Albany Med had no student
+# posting on the day; student-nurse externships post in January-March, so they stay seeded.
+# Left out: Montefiore, whose board the probe found (site "MMC_Volunteer") held only youth-program
+# roles; its real careers site still needs finding.
+WORKDAY += [
+    {'name': 'HCA Healthcare', 'ats_token': 'hcahealthcare|wd3|hcacareers', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Albany Med', 'ats_token': 'albanymed|wd5|Albany_Med', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'ChristianaCare', 'ats_token': 'christianacare|wd5|CCHS', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'South Shore Health', 'ats_token': 'southshorehealth|wd5|SSH_Careers', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Sutter Health', 'ats_token': 'sutterhealth|wd1|SH', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Houston Methodist', 'ats_token': 'houstonmethodist|wd12|GTI', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Trinity Health', 'ats_token': 'trinityhealth|wd1|Jobs', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'AdventHealth', 'ats_token': 'adventhealth|wd12|AH_External_Career_Site', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'OhioHealth', 'ats_token': 'ohiohealth|wd5|OhioHealthJobs', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Essentia Health', 'ats_token': 'essentiahealth|wd1|Essentia_Health', 'is_quant_target': False, 'sector': 'health'},
+]
+
 # --- end sector seeds ---

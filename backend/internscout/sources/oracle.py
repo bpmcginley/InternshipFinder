@@ -23,7 +23,11 @@ from ..region import maybe_in_region
 
 API = ("https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true"
        "&expand=requisitionList.secondaryLocations"
-       "&finder=findReqs;siteNumber={site},keyword=intern,limit={limit},offset={offset},sortBy=POSTING_DATES_DESC")
+       "&finder=findReqs;siteNumber={site},keyword={keyword},limit={limit},offset={offset},sortBy=POSTING_DATES_DESC")
+# Hospitals title student jobs without "intern": Northwell's "Nursing Student Technician" is found
+# only by keyword=student (checked live 2026-09-18: 31 results, one page). Same rule as
+# workday.EXTRA_SEARCH, and only for these sectors, so other tenants cost what they did before.
+EXTRA_KEYWORDS = {"health": ("student",), "behavioral_health": ("student",)}
 # The id has to arrive quoted, and ById is the only finder this resource accepts - requisitionId,
 # the name the docs use elsewhere, is rejected as an invalid finder rather than ignored.
 DETAIL = ("https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?onlyData=true"
@@ -68,15 +72,20 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
     require_robots(c, f"https://{host}",
                    "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
                    co["ats_token"])
-    out, offset = [], 0
-    while offset < MAX_OFFSET:
-        r = c.get(API.format(host=host, site=site, limit=PAGE, offset=offset))
-        r.raise_for_status()
-        items, total = parse_oracle(r.json(), co, host, site)
-        out += items
-        offset += PAGE
-        if offset >= total:
-            break
+    out, seen = [], set()
+    for keyword in ("intern",) + EXTRA_KEYWORDS.get(co.get("sector"), ()):
+        offset = 0
+        while offset < MAX_OFFSET:
+            r = c.get(API.format(host=host, site=site, keyword=keyword, limit=PAGE, offset=offset))
+            r.raise_for_status()
+            items, total = parse_oracle(r.json(), co, host, site)
+            for it in items:
+                if it["_req_id"] not in seen:
+                    seen.add(it["_req_id"])
+                    out.append(it)
+            offset += PAGE
+            if offset >= total:
+                break
     # A teaser the employer did bother to write is left alone; the call is for the ones with nothing.
     todo = [i for i in out if not (i["description"] or "").strip()
             and any(maybe_in_region(l) for l in i["locations"])]
