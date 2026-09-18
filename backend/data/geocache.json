@@ -136,6 +136,7 @@
 40.0478,
 -75.4421
 ],
+"bethlehem ii|PA":null,
 "bethlehem|PA":[
 40.6179,
 -75.3787
@@ -208,6 +209,10 @@
 "burlington|NJ":[
 40.0712,
 -74.8649
+],
+"butler|PA":[
+40.8605,
+-79.8971
 ],
 "cambridge office|NY":null,
 "camp hill|PA":[
@@ -1188,9 +1193,12 @@
 "pa - havertown|PA":null,
 "pa - hawley|PA":null,
 "pa - hazle township|PA":null,
+"pa - hummelstown|PA":null,
 "pa - king of prussia|PA":null,
 "pa - lancaster|PA":null,
 "pa - lansdale|PA":null,
+"pa - mechanicsburg|PA":null,
+"pa - middletown|PA":null,
 "pa - nazareth|PA":null,
 "pa - pennsburg|PA":null,
 "pa - philadelphia (19103|PA":null,
@@ -1201,6 +1209,7 @@
 "pa - pittsburgh (15222|PA":null,
 "pa - pittsburgh|PA":null,
 "pa - pottstown|PA":null,
+"pa - richeyville|PA":null,
 "pa - selinsgrove|PA":null,
 "pa - springfield|PA":null,
 "pa - sunbury|PA":null,
