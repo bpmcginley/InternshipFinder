@@ -6,6 +6,8 @@
 import { HttpError } from "./http.js";
 
 const API = "https://api.stripe.com/v1/";
+// The same version the webhook endpoint is set to, so events and API replies share one shape.
+const STRIPE_API_VERSION = "2026-08-26.dahlia";
 const ACTIVE = new Set(["active", "trialing"]);
 // Stripe rejects a signature this far from its timestamp; the same window stops a replayed webhook.
 const SIG_TOLERANCE_S = 300;
@@ -50,6 +52,9 @@ async function stripe(env, path, form, fetchImpl, idempotencyKey) {
   const headers = {
     Authorization: "Bearer " + env.STRIPE_SECRET_KEY,
     "Content-Type": "application/x-www-form-urlencoded",
+    // Pinned, so the account's default version cannot silently change what these calls return.
+    // Managed Payments needs 2025-03-31.basil or later; this matches the webhook endpoint.
+    "Stripe-Version": STRIPE_API_VERSION,
   };
   if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
   const res = await fetchImpl(API + path, { method: "POST", headers, body: new URLSearchParams(form).toString() });
@@ -85,6 +90,7 @@ async function savePlan(db, user, { plan, status, customer, subscription, period
   ).bind(user, plan, status, customer || null, subscription || null, periodEnd || null, now.toISOString()).run();
 }
 
+const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
 const siteUrl = (env) => (env.SITE_URL || "https://bpmcginley.github.io/InternshipFinder").replace(/\/+$/, "");
 
 // Checkout for a paid tier. client_reference_id carries the hash back on the webhook, so a
@@ -113,6 +119,10 @@ export async function checkout(db, env, config, user, plan, now, fetchImpl) {
     "subscription_data[metadata][plan]": plan,
     allow_promotion_codes: "true",
   };
+  // Stripe as merchant of record: it works out and remits sales tax/VAT for the student's country,
+  // handles disputes and refunds, and needs an eligible tax code on each product. Off until Bruce
+  // activates it at dashboard.stripe.com/settings/managed-payments, or Stripe rejects the session.
+  if (managedPayments(env)) form["managed_payments[enabled]"] = "true";
   if (existing.customer) form.customer = existing.customer;
   const session = await stripe(env, "checkout/sessions", form, fetchImpl);
   return { url: session.url };

@@ -38,6 +38,11 @@ GLOBAL_RPM = "120"
 # The paid plans are dormant until this is "1" and the Stripe secrets are set. While it is off,
 # nothing about paying is shown and the billing routes answer 404.
 PAYMENTS_ENABLED = "1"
+# Stripe Managed Payments: Stripe is the merchant of record, so it charges and remits sales tax or
+# VAT for the student's country and handles disputes. Needs Managed Payments activated at
+# dashboard.stripe.com/settings/managed-payments and an eligible tax code on both products, or
+# Stripe refuses the checkout session. "0" sends plain checkout sessions.
+STRIPE_MANAGED_PAYMENTS = "1"
 # Shown on the upgrade buttons. Stripe charges whatever the price in your Stripe dashboard says,
 # so keep these in step with it.
 SUPPORTER_PRICE_TEXT = "$5/month"

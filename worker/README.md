@@ -109,6 +109,14 @@ Pro later without touching code.
    cancelling should put it back to `free`.
 7. Only then repeat steps 1–5 with the live keys.
 
+**Stripe as merchant of record.** `STRIPE_MANAGED_PAYMENTS = "1"` (the default) asks Stripe to sell
+the plans itself under [Managed Payments](https://docs.stripe.com/payments/managed-payments/how-it-works):
+it adds and remits the student's local sales tax or VAT, handles disputes and issues the receipts.
+Two things must be true first, or Stripe refuses every checkout session: Managed Payments is
+activated at `dashboard.stripe.com/settings/managed-payments`, and each product has a tax code marked
+"Eligible for Managed Payments" (ours use `txcd_10105003`, AI as a service). Set it to `"0"` to send
+plain checkout sessions, where you owe the tax yourself.
+
 To switch them off again, set `PAYMENTS_ENABLED = "0"` and deploy. Existing subscribers keep their plan
 row but stop being charged only once you cancel their subscriptions in Stripe, so cancel there too.
 

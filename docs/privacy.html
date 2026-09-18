@@ -144,6 +144,7 @@
     <ul>
       <li><strong>Stripe handles the payment, not us.</strong> Pressing Supporter or Pro sends you to Stripe's own checkout page. Your card number, billing name and billing email go to Stripe and are never sent to, or seen by, our server. Changing or cancelling happens on Stripe's own billing page too.</li>
       <li>All Stripe learns about you from us is your hashed ID, so a payment can be matched to an account without Stripe being told which student it is.</li>
+      <li>Stripe is the seller of record for the paid plans, so its checkout also asks for your name and billing address to work out sales tax or VAT. That stays with Stripe; we are never sent it.</li>
       <li>What we keep: your hashed ID, which plan you are on and whether it is active, the Stripe customer and subscription IDs, the date it is paid through, and the IDs of payment events we've already processed (so a repeated message can't charge or credit you twice).</li>
       <li>Stripe processes payments under <a href="https://stripe.com/privacy" target="_blank" rel="noopener">its own privacy policy</a>.</li>
       <li>While a subscription is live, <strong>Delete my data</strong> is refused with a message asking you to cancel first, so nothing keeps billing a card for an account that no longer exists here. Cancel on Stripe's billing page, then delete.</li>

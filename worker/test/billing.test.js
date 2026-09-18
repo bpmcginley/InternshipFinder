@@ -65,6 +65,16 @@ describe("checkout", () => {
     assert.ok(!call.init.body.includes("umass.edu"));
   });
 
+  it("asks Stripe to be merchant of record only when told to", async () => {
+    for (const [flag, want] of [["1", "true"], ["0", null], [undefined, null]]) {
+      const { api, token, fetch } = await setup({ env: { ...PAID, STRIPE_MANAGED_PAYMENTS: flag } });
+      assert.equal((await api("POST", "/billing/checkout", { token: await token() })).status, 200);
+      const call = fetch.calls.find((c) => c.url.includes("checkout/sessions"));
+      assert.equal(new URLSearchParams(call.init.body).get("managed_payments[enabled]"), want, String(flag));
+      assert.equal(call.init.headers["Stripe-Version"], "2026-08-26.dahlia");
+    }
+  });
+
   it("needs a signed-in student", async () => {
     const { api } = await setup({ env: PAID });
     assert.equal((await api("POST", "/billing/checkout")).status, 401);
