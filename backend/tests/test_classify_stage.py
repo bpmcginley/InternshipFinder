@@ -170,3 +170,18 @@ def test_a_field_word_inside_a_longer_word_is_not_a_match():
     # and "counsel" is a lawyer, while "counseling" and "counselor" are not.
     assert classify("Social Work / Counseling Intern") == ["psychology", "social_work"]
     assert classify("General Counsel Intern") == ["law"]
+    # The same fault in six more tags, found by running every rule over all 13,601 exported
+    # titles and keeping the matches whose preceding character is a letter.
+    assert classify("Underwriting Internship - Summer 2027") == ["insurance"]   # not ...WRITING INTERN
+    assert classify("Telecommunications Intern") == ["other"]                   # not tele...COMMUNICATIONS
+    assert classify("2027 Fulfillment Intern") == ["other"]                     # not fu...LLM...ent
+    assert classify("HCAD Intern- High School") == ["other"]                    # a county appraiser
+    assert classify("ShureCloud Marketing Intern") == ["marketing"]             # a product, not a cloud
+    assert classify("3D Asset Reconstruction Intern") == ["other"]              # not pre/construction
+    # and each of those words still counts when it is a word.
+    assert classify("Editorial Writing Intern")[0] == "media"
+    assert "communications" in classify("Marketing Communications Intern")
+    assert classify("LLMs Inference Intern") == ["ml"]
+    assert classify("AutoCAD Design Intern") == ["mechanical"]
+    assert classify("Cloud Engineer Intern") == ["swe"]
+    assert classify("Preconstruction Intern") == ["civil"]
