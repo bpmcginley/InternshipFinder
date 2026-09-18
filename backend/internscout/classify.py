@@ -44,7 +44,9 @@ RULES = [
     ("health", r"health systems|value (and|&) access|\bnursing\b|clinical|public health|epidemiolog|healthcare|health care|patient|medical (assistant|research)|hospital"),
     ("nursing", r"\bnurs(e|es|ing)\b|\bcna\b|\brn\b|patient care (tech|assistant)"),
     ("public_health", r"public health|epidemiolog|community health|global health|health (policy|equity|promotion|education|services research)"),
-    ("clinical_research", r"clinical (research|trials?|studies)|research coordinator|\bcrc\b"),
+    # "translational" is bench-to-bedside research, and the boundary added to the languages rule
+    # above leaves it with nothing; it belongs here, beside the phrases it is always written with.
+    ("clinical_research", r"clinical (research|trials?|studies)|research coordinator|\bcrc\b|translational (medicine|research|science)"),
     ("lab_research", r"\blab(oratory)?\b|wet lab|research technician|\breu\b|research experience for undergrad|undergraduate research|summer research|\bsurf\b"),
 
     # --- business / finance ---
@@ -87,7 +89,7 @@ RULES = [
     ("sports", r"\bsports?\b|athletic|recreation|fitness|kinesiolog|exercise science"),
     ("agriculture", r"agricultur|agronom|horticultur|food science|animal science|veterinar|\bfarm\b|forestry|wildlife|conservation"),
     ("sustainability", r"sustainab|climate|renewable|clean energy|conservation|environmental (policy|justice|education)|energy efficiency|recycl"),
-    ("languages", r"translat(or|ion)|interpreter\b|bilingual|linguist|"
+    ("languages", r"translat(or|ion)s?\b|interpreter\b|bilingual|linguist|"
      # "interpreter\b" is deliberate: mechanistic interpretability is not an interpreting job.
      r"\besl\b|tesol\b|\btefl\b|english language (learn|cent|institute)|"
      r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language"),

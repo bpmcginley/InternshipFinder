@@ -243,3 +243,18 @@ def test_business_is_the_fallback_for_a_title_with_no_function():
     # The suppression rule covers both fallbacks now, and a title that is only both keeps both.
     assert classify("Business Engineering Intern") == ["engineering", "business"]
     assert "business" in ALL_FIELDS
+
+
+def test_translational_medicine_is_not_a_translation_job():
+    # "translat(or|ion)" had no right edge, so "Translational" matched it, and the two listings the
+    # languages tag had in the baseline states were both bench-to-bedside research.
+    assert classify("Sr. Data Scientist, Translational Research") == ["data", "clinical_research"]
+    assert classify(
+        "2027 Future Talent Program - Discovery, Preclinical and Translational Medicine - Intern"
+    ) == ["health", "clinical_research"]
+    assert classify("Translational Science Intern") == ["clinical_research"]
+    # and the words the rule is actually for still read as languages.
+    assert classify("Translation Intern") == ["languages"]
+    assert classify("Spanish Translator Intern") == ["languages"]
+    assert classify("Translations Coordinator Intern") == ["languages"]
+    assert classify("Localization Intern") == ["languages"]
