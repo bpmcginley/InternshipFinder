@@ -55,6 +55,10 @@
 "915 broadway|NY":null,
 "954 jewett ave.|NY":null,
 "abu dhabi|NY":null,
+"adirondacks|NY":[
+41.3173,
+-74.1234
+],
 "albany ny|NY":[
 42.651,
 -73.921
@@ -589,6 +593,7 @@
 43.0183,
 -78.9636
 ],
+"greater buffalo|NY":null,
 "greencastle|PA":[
 39.7904,
 -77.7278
@@ -734,6 +739,10 @@
 39.8467,
 -75.7117
 ],
+"kings county|NY":[
+40.6456,
+-73.9559
+],
 "kingston|NY":[
 41.9288,
 -74.0024
@@ -789,6 +798,10 @@
 -77.5714
 ],
 "liberal arts hall|NY":null,
+"lincoln park|NJ":[
+40.9243,
+-74.3021
+],
 "linden|NJ":[
 40.622,
 -74.2446
@@ -1086,6 +1099,7 @@
 40.2109,
 -75.2782
 ],
+"north westchester county|NY":null,
 "ny - amherst|NY":null,
 "ny - bohemia|NY":null,
 "ny - brockport|NY":null,
@@ -1370,6 +1384,7 @@
 40.9885,
 -73.8086
 ],
+"schuylkill county/columbia county|PA":null,
 "scottsville|NY":[
 43.0259,
 -77.7453
@@ -1797,6 +1812,7 @@
 40.2425,
 -74.839
 ],
+"york county|PA":null,
 "york pa-op ctr|PA":null,
 "york|PA":[
 39.9625,

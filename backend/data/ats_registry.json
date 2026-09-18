@@ -2986,6 +2986,13 @@
    "added": "2026-09-18",
    "sector": "economic_consulting"
   },
+  "charliehealth": {
+   "name": "Charlie Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "behavioral_health"
+  },
   "checkr": {
    "name": "Checkr",
    "quant": false,
@@ -6536,10 +6543,11 @@
    "added": "2026-09-15"
   },
   "careers-hhsys": {
-   "name": "Star Dental Partners",
+   "name": "HH Health System",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-15"
+   "added": "2026-09-15",
+   "sector": "health"
   },
   "careers-humanscale": {
    "name": "Humanscale",
@@ -9570,7 +9578,7 @@
   "fa-ertb-saasfaprod1.fa.ocs.oraclecloud.com|CX_2": {
    "name": "Photon",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14"
   },
   "fa-esgu-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
@@ -9606,7 +9614,7 @@
   "fa-etqo-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "HEXAWARE",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14"
   },
   "fa-etum-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
@@ -16959,7 +16967,7 @@
   "pennant|wd1|PennantServicesCareerSite": {
    "name": "Pennant Group",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13"
   },
   "pentair|wd5|pentair_careers": {
@@ -18414,6 +18422,13 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "media"
+  },
+  "thriveworks|wd5|Thriveworks": {
+   "name": "Thriveworks",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "behavioral_health"
   },
   "thyssenkruppmaterialsna|wd12|1": {
    "name": "thyssenkrupp",
