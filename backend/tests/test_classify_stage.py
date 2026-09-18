@@ -198,3 +198,28 @@ def test_engineering_is_the_fallback_for_a_title_with_no_discipline():
     assert classify("Data Engineering Intern") == ["data"]
     assert classify("Sales Engineer Intern") == ["sales"]
     assert "engineering" in ALL_FIELDS
+
+
+def test_a_posting_that_names_the_store_is_retail():
+    # Target posts its store leadership programme once per city, thirty of them in one export,
+    # and the retail rule only knew "store operations".
+    assert classify("Store Executive Intern (Store Leadership Intern) - Raleigh, NC") == ["retail"]
+    assert classify("Stores Executive Internship (Store Leadership Intern) - Omaha, NE") == ["retail"]
+    assert "retail" in classify("Store Analytics Intern")
+    # and the one title in the export where "Cloud" is a town in Minnesota, not a platform.
+    assert classify("Store Executive Intern (Store Leadership Intern) - St. Cloud, MN") == ["retail"]
+    assert classify("Cloud Engineer Intern") == ["swe"]
+
+
+def test_research_stage_reads_the_word_itself():
+    # 549 postings said "research" or "researcher" and got nothing but "internship", against 73
+    # that the REU/SURF wording caught, so the stage filter could not see the work it is for.
+    for title in ("Research Scientist Intern", "Quantitative Researcher Intern",
+                  "AI Research Intern - Foundation Models", "Research Assistant Intern",
+                  "2027 Formal Methods Researcher Graduate Intern"):
+        assert "research" in stage_of(title), title
+    # The wordings that never say "research" still work.
+    assert stage_of("REU Site: Computational Biology") == ["research"]
+    assert "research" in stage_of("Summer Undergraduate Research Fellowship (SURF)")
+    # and a posting with no research in it is untouched.
+    assert stage_of("Software Engineering Intern") == ["internship"]

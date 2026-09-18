@@ -17,7 +17,7 @@ RULES = [
     ("data", r"\bdata (scien|engineer|analy|platform)|\banalytics\b|business intelligence|\bbi\b|\betl\b|data warehouse|\bdata\b"),
     ("security", r"surveillance analyst|detection engineer|privacy engineer|\bsecurity\b|cryptograph|\bappsec\b|penetration|infosec|cyber"),
     ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic"),
-    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology"),
+    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology"),
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner"),
 
     # --- engineering (non-software) ---
@@ -93,7 +93,7 @@ RULES = [
      r"language (access|instruct|teacher|tutor)|localiz(ation|ing)|localisation|world languages|foreign language"),
     ("real_estate", r"real estate|property manage|\breit\b|leasing"),
     ("insurance", r"insurance|underwrit|claims (analyst|intern)|actuar"),
-    ("retail", r"\bretail\b|merchandis|buying intern|\bfashion\b|apparel|e-?commerce|store operations"),
+    ("retail", r"\bretail\b|merchandis|buying intern|\bfashion\b|apparel|e-?commerce|\bstores?\b"),
 ]
 
 STAGES = ("internship", "co_op", "research", "fellowship", "early_insight", "part_time", "apprenticeship")
@@ -103,7 +103,8 @@ _UNDERGRAD = YEARS[:4]
 _STAGE_RULES = [
     ("co_op", re.compile(r"\bco-?op\b", re.I)),
     ("research", re.compile(r"\breu\b|research experience for undergrad|undergraduate research|student research|"
-                            r"summer research (program|fellow|intern|scholar|assistant|opportunit)|\bsurf\b", re.I)),
+                            r"summer research (program|fellow|intern|scholar|assistant|opportunit)|\bsurf\b|"
+                            r"\bresearch(er|ers)?\b", re.I)),
     ("fellowship", re.compile(r"\bfellowships?\b|\b(summer|student|undergrad(uate)?|graduate|policy|public service|"
                               r"diversity|emerging leaders?|research) fellows?\b", re.I)),
     ("early_insight", re.compile(r"\bdiscovery (program|day|week|series|internship)|\binsights? (day|week|program|series)|"
