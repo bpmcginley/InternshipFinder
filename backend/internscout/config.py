@@ -130,6 +130,12 @@ GOOGLE_JOBS_LOCATIONS = [
     "Providence, Rhode Island",
     "Manchester, New Hampshire",
     "Portland, Maine",
+    # NJ and VT are baseline states too, and had no metro here, so Google never searched them.
+    # On the free 250-a-month plan the daily budget is 8 searches and each location gets one query,
+    # so six locations left two unspent; these use them. (On a plan under 8 a day the locations
+    # rotate by day, and each would come up every eighth day rather than every sixth.)
+    "Newark, New Jersey",
+    "Burlington, Vermont",
 ]
 # The metro searched for each state students pick (baseline states are covered above).
 STATE_METROS = {
