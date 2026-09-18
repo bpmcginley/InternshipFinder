@@ -330,3 +330,74 @@ def test_labelling_boards_by_name_never_argues_with_a_sector_we_already_have():
             "apply_url": "https://careers-cooperhealth.icims.com/jobs/1234/intern/job"}
     assert label_sectors(reg, [item]) == 1
     assert item["sector"] == "health"
+
+
+# The real thing, from blackrock.wd1.myworkdayjobs.com on 2026-09-18: a tenant naming its own
+# sites, three of them, one open.
+_BLACKROCK = """Sitemap: https://blackrock.wd1.myworkdayjobs.com/BlackRock_Professional/siteMap.xml
+
+User-agent: *
+Allow: /BlackRock_Professional/
+Disallow: /BlackRock_AIG/
+Disallow: /BlackRock_Early_Careers_Program/
+Disallow: /refreshFacet/
+"""
+
+
+def test_a_workday_tenant_names_its_own_sites_in_robots():
+    # The half of a Workday token that no rule could guess is not guessed: the tenant publishes
+    # it. refreshFacet is an API path, not a site, and the two closed boards stay closed.
+    from internscout.probe import wd_sites
+
+    assert wd_sites(_BLACKROCK) == ["BlackRock_Professional"]
+    assert wd_sites("User-agent: *\nAllow: /Careers/\nAllow: /Faculty/\n") == ["Careers", "Faculty"]
+    assert wd_sites("") == []
+
+
+class _WdTenant:
+    """A Workday pod: one tenant exists, with one site that has postings on it."""
+
+    def __init__(self, tenant, robots, jobs_on=()):
+        self.tenant, self.robots, self.jobs_on = tenant, robots, set(jobs_on)
+        self.tried = []
+
+    def get(self, url, params=None):
+        live = url.startswith("https://%s.wd1." % self.tenant)
+        body, code = (self.robots, 200) if live else ("", 422)
+        return type("R", (), {"status_code": code, "text": body})()
+
+    def post(self, url, headers=None, json=None):
+        site = url.split("/")[-2]
+        self.tried.append(site)
+        posts = [{"title": "Intern"}] if site in self.jobs_on else []
+        return type("R", (), {"status_code": 200,
+                              "json": lambda s, p=posts: {"jobPostings": p}})()
+
+
+def test_the_workday_probe_returns_the_whole_token():
+    # Every other probe answers True and the slug is the token. Workday's is a triple, and the
+    # tenant is the squashed name with the suffixes off - Chamberlain Group is chamberlain.
+    from internscout.probe import _workday
+
+    pod = _WdTenant("chamberlain", _BLACKROCK, jobs_on=["BlackRock_Professional"])
+    assert _workday(pod, "chamberlain", "Chamberlain Group") == "chamberlain|wd1|BlackRock_Professional"
+
+
+def test_the_workday_probe_never_asks_a_site_the_tenant_closed():
+    # The same robots.txt that tells us the site names tells us which of them to leave alone,
+    # and a probe that ignored it would be the one thing reintroducing boards we just dropped.
+    from internscout.probe import _workday
+
+    pod = _WdTenant("blackrock", _BLACKROCK, jobs_on=["BlackRock_Early_Careers_Program"])
+    assert _workday(pod, "blackrock", "BlackRock") is False
+    assert pod.tried == ["BlackRock_Professional"], "only the open site may be asked"
+
+
+def test_the_workday_probe_wants_the_exact_squashed_name_and_a_board_with_jobs():
+    from internscout.probe import _workday
+
+    pod = _WdTenant("chamberlain", _BLACKROCK, jobs_on=["BlackRock_Professional"])
+    assert _workday(pod, "chamberlain-group", "Chamberlain Group") is False   # the hyphen slug
+    assert pod.tried == [], "a slug that cannot be a tenant costs no requests at all"
+    empty = _WdTenant("chamberlain", _BLACKROCK)
+    assert _workday(empty, "chamberlain", "Chamberlain Group") is False       # answers, no jobs

@@ -8,10 +8,15 @@ of slow/dead hosts serialize the whole run.
 
 Only some ATSes can be probed at all, because a probe is a guess at a token built from the company
 name. Counting the 2,707 boards already in the registry, the token is reachable from the name for 73%
-of ashby, 81% of jobvite, 68% of greenhouse, 65% of lever, 55% of workable and bamboohr, and 43% of
-smartrecruiters - but for **none** of workday, oracle, taleo or adp, whose tokens are tenant|site
-pairs (aaaie|wd1|csaacareers) or opaque UUIDs. No naming rule reaches those, so they are left out on
-purpose rather than forgotten; boards on them arrive through discovery or a seed.
+of ashby, 81% of jobvite, 68% of greenhouse, 65% of lever, 55% of workable and bamboohr - but not
+for oracle, taleo or adp, whose tokens are opaque (fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com|CX_1)
+or plain UUIDs. No naming rule reaches those, so they are left out on purpose rather than
+forgotten; boards on them arrive through discovery or a seed.
+
+Workday used to be in that list and is not any more: its token is a tenant|pod|site triple, but the
+tenant half follows the squashed-name rule and the site half does not have to be guessed at all,
+because the tenant's own robots.txt names its sites. See _workday. SmartRecruiters has left the
+list from the other end - its API host tells us not to read it, so we no longer ask it anything.
 """
 from __future__ import annotations
 import json
@@ -22,6 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from .config import DATA_DIR, USER_AGENT
 from .discover import add_board, ats_of
+from .sources.common import robots_blocks, robots_rules
+from .sources.workday import HEADERS as WD_HEADERS
 
 CACHE_PATH = os.path.join(DATA_DIR, "probe_cache.json")
 TTL_DAYS = 45
@@ -59,17 +66,6 @@ def _workable(c, slug, name):
     return r.status_code == 200 and _same_name(r.json().get("name"), name) and len(r.json().get("jobs") or []) > 0
 
 
-# SmartRecruiters is keyed by an identifier that is usually the squashed company name, and it answers
-# on any case, so the lowercase slug is enough. It never 404s - an unknown company is an empty result
-# set - so the posting's own company block is what confirms the board, and that needs a posting.
-def _smartrecruiters(c, slug, name):
-    r = c.get(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings", params={"limit": 1})
-    if r.status_code != 200:
-        return False
-    posts = r.json().get("content") or []
-    return bool(posts) and _same_name((posts[0].get("company") or {}).get("name"), name)
-
-
 # Lever and Ashby have no board-name endpoint, so only the exact squashed name counts, and the board must have jobs.
 def _lever(c, slug, name):
     if slug != norm(_SUFFIX.sub(" ", name)) or len(slug) < 5:
@@ -83,6 +79,48 @@ def _ashby(c, slug, name):
         return False
     r = c.get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}")
     return r.status_code == 200 and len(r.json().get("jobs") or []) > 0
+
+
+# Workday's token is a tenant|pod|site triple, which used to put it out of reach of a name probe.
+# Only the tenant has to be guessed: it is the squashed company name for 623 of the 1,245 boards in
+# the registry, and "group", "inc" and the rest come off the same way they do everywhere here
+# (Chamberlain Group -> chamberlain). The site half is not guessed at all. Every tenant gets its own
+# host and its own robots.txt, and that file lists the tenant's sites by name, in Sitemap lines and
+# in Allow rules - so we read the sites off the board itself, and skip any the same file closes.
+#
+# A tenant that does not exist is cheap to rule out: every pod answers 422 to an unknown subdomain
+# rather than hanging, so all four cost about a second together, which is why this sits above the
+# JazzHR probe rather than below it.
+#
+# Measured live 2026-09-18 against the registry: 28 of 70 known Workday employers found from the
+# name alone, and 0 of 70 employers whose board is on some other ATS produced a Workday token.
+PODS = ("wd1", "wd5", "wd3", "wd12")
+MAX_WD_SITES = 4
+_SITEMAP = re.compile(r"^\s*Sitemap:\s*https://[^/\s]+/([^/\s]+)/siteMap\.xml", re.M | re.I)
+
+
+def wd_sites(body: str) -> list[str]:
+    """The sites a tenant publishes, in the order its robots.txt lists them, minus the closed ones."""
+    rules = robots_rules(body)
+    named = dict.fromkeys(_SITEMAP.findall(body)
+                          + [v.strip("/") for f, v in rules if f == "allow" and v.count("/") == 2])
+    return [s for s in named if s and not robots_blocks(rules, f"/{s}/")]
+
+
+def _workday(c, slug, name):
+    if slug != norm(_SUFFIX.sub(" ", name)) or len(slug) < 4:
+        return False
+    for pod in PODS:
+        host = f"https://{slug}.{pod}.myworkdayjobs.com"
+        r = c.get(f"{host}/robots.txt")
+        if r.status_code != 200 or "<html" in r.text[:400].lower():
+            continue
+        for site in wd_sites(r.text)[:MAX_WD_SITES]:
+            j = c.post(f"{host}/wday/cxs/{slug}/{site}/jobs", headers=WD_HEADERS,
+                       json={"appliedFacets": {}, "limit": 1, "offset": 0, "searchText": "intern"})
+            if j.status_code == 200 and (j.json().get("jobPostings") or []):
+                return f"{slug}|{pod}|{site}"   # a board with nothing on it proves nothing
+    return False
 
 
 # JazzHR answers 200 for every subdomain anyone ever types at it: a made-up tenant serves a JazzHR
@@ -100,7 +138,7 @@ def _jazzhr(c, slug, name):
 # JazzHR goes last: it is the only probe paying for a whole HTML page rather than a small JSON
 # existence check, so it is only reached when nothing cheaper matched.
 PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("workable", _workable),
-          ("smartrecruiters", _smartrecruiters), ("jazzhr", _jazzhr)]
+          ("workday", _workday), ("jazzhr", _jazzhr)]
 
 
 # A Greenhouse board embedded in the employer's own careers page leaves no token in the apply URL:
@@ -216,8 +254,11 @@ def _probe_one(c, name: str) -> tuple[str, str] | None:
     for slug in slugs_for(name):
         for ats, fn in PROBES:
             try:
-                if fn(c, slug, name):
-                    return ats, slug
+                hit = fn(c, slug, name)
+                if hit:
+                    # Most probes answer True and the slug is the token; Workday answers with the
+                    # tenant|pod|site triple it resolved, which no slug could have spelled.
+                    return ats, (hit if isinstance(hit, str) else slug)
             except Exception:
                 continue
     return None
