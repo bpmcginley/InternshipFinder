@@ -149,11 +149,10 @@ RULES = [
 # (food safety), sustainability (energy interns), operations (quality specialist/intern), engineering
 # (controls roles), civil (water and transportation), supply_chain (inbound transportation) and
 # marketing (customer experience/insights). Each is tied to a role word - "intern", "co-op",
-# "specialist" - because the bare phrases live in description boilerplate: "operational risk",
-# "a high-energy intern experience", "Health, Safety, and Environment culture", "Internal
-# Controls". Measured against every open listing, they changed 85 and rescued 47 from "other".
-# Six came from a description rather than a title: five quality roles whose bodies name a quality
-# internship, and an energy-markets intern, all of them in the right cluster.
+# "specialist" - so that it stays safe if classify is ever handed a description, where the bare
+# phrases are boilerplate: "operational risk", "a high-energy intern experience", "Health,
+# Safety, and Environment culture", "Internal Controls". normalize classifies the title alone,
+# and on titles, against every open listing, they changed 95 and rescued 76 from "other".
 
 STAGES = ("internship", "co_op", "research", "fellowship", "early_insight", "part_time", "apprenticeship")
 YEARS = ("first_year", "sophomore", "junior", "senior", "masters", "phd")

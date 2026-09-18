@@ -178,3 +178,18 @@ def test_a_listing_keeps_its_id_when_the_next_run_rebuilds_the_database():
     # A different posting is a different id; the same one twice is not.
     assert listing_id("a|b||") != listing_id("a|c||")
     assert len(listing_id("a|b||")) == 16
+
+
+def test_a_shouted_title_is_shown_in_title_case_and_keeps_its_id():
+    from internscout.normalize import normalize, readable_title
+    assert readable_title("STUDENT TRAINEE (ACCOUNTING)") == "Student Trainee (Accounting)"
+    assert readable_title("INTERN - SOCIAL WORK (MSW/MA) - UNPAID") == "Intern - Social Work (MSW/MA) - Unpaid"
+    assert readable_title("2027 IT SUMMER INTERNSHIP - IT INTERN") == "2027 IT Summer Internship - IT Intern"
+    assert readable_title("HEALTH AND SAFETY SKILLBRIDGE INTERN") == "Health and Safety Skillbridge Intern"
+    # an employer's own mixed case is theirs to keep
+    assert readable_title("IT Intern - IBD Support") == "IT Intern - IBD Support"
+    raw = {"company_name": "Defense Finance and Accounting Service", "title": "STUDENT TRAINEE (AUDITING)",
+           "locations": ["Indianapolis, IN"], "apply_url": "https://www.usajobs.gov/job/1"}
+    loud, quiet = normalize(dict(raw)), normalize(dict(raw, title="Student Trainee (Auditing)"))
+    assert loud["title"] == "Student Trainee (Auditing)"
+    assert loud["dedupe_key"] == quiet["dedupe_key"]

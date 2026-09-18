@@ -145,6 +145,36 @@ def _dead_url(url: str) -> bool:
     return "workforcenow.adp.com" in u and "recruitment.html" in u and "cid=" not in u
 
 
+# Some boards shout: USAJOBS sends every federal title in capitals ("STUDENT TRAINEE (ACCOUNTING)",
+# "PHYSICAL SCIENTIST (ENVIRONMENTAL)"), and so do a few employers ("INTERN - SOCIAL WORK (MSW/MA) -
+# UNPAID"). 89 open listings in one export, and in a list of mixed-case titles they read as alarms.
+# Only a title with no lower-case letter at all is touched, so a deliberate "IT Intern" or "Summer
+# Analyst - IBD" is left exactly as the employer wrote it. The listing id hashes the lower-cased
+# title, so it does not move.
+_KEEP_CAPS = frozenset("""
+    AI AWS CAD CEO CFO CNA CS DOD DOE EE EHS EMT ER GIS GS HR HVAC IBD ICU II III IT IV LPN MA MBA
+    ME ML MS MSW NASA NY NYC PHD PR QA RN ROTC SQL STEM UI US USA UX VA
+""".split())
+_SMALL = frozenset("a an and as at by for in of on or the to with".split())
+_WORD = re.compile(r"[A-Za-z][A-Za-z']*")
+
+
+def readable_title(title: str) -> str:
+    """An all-capitals title in title case, keeping acronyms. Anything else unchanged."""
+    if not title or any(ch.islower() for ch in title) or sum(ch.isalpha() for ch in title) < 6:
+        return title
+
+    def word(m: re.Match) -> str:
+        w = m.group(0)
+        if w in _KEEP_CAPS or len(w) == 1 or not re.search(r"[AEIOUY]", w):
+            return w                   # an acronym, an initial, or a vowel-less "MSW" / "HR"
+        if w.lower() in _SMALL and m.start() > 0:
+            return w.lower()
+        return w.capitalize()
+
+    return _WORD.sub(word, title)
+
+
 def normalize(raw: dict) -> dict | None:
     """raw fields expected: company_name, title, locations[list], season, year,
     apply_url, source, source_url, posted_at, active(bool), description(optional).
@@ -193,7 +223,7 @@ def normalize(raw: dict) -> dict | None:
 
     return {
         "company_name": company,
-        "title": title,
+        "title": readable_title(title),
         "description": raw.get("description"),
         "field_tags": tags,
         "stage": stages,
