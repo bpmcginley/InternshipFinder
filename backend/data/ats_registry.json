@@ -11570,7 +11570,7 @@
   "airliquidehr|wd3|airgasexternalcareer": {
    "name": "Airgas",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "airliquidehr|wd3|AirLiquideExternalCareer": {
@@ -12494,7 +12494,7 @@
   "bmo|wd3|Privileged": {
    "name": "BMO",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "bnl|wd1|externa": {
@@ -12774,7 +12774,7 @@
   "canadiantirecorporation|wd3|Enterprise_External_Careers_Site": {
    "name": "Canadian Tire Corporation, Limited",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "capgroup|wd1|capitalgroupcareers": {
@@ -13106,7 +13106,7 @@
   "clearwateranalytics|wd1|Clearwater_Analytics_Careers": {
    "name": "CWAN",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "clio|wd3|ClioCareerSite": {
@@ -13142,7 +13142,7 @@
   "cmegroup|wd1|cme_careers": {
    "name": "CME Group",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "cna|wd1|CNA_Careers": {
@@ -13191,7 +13191,7 @@
   "colpipe|wd1|Search": {
    "name": "Colonial Pipeline Company",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "commercebank|wd1|CommerceJobs": {
@@ -13569,7 +13569,7 @@
   "dollartree|wd5|dollartreeus": {
    "name": "Dollar Tree",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "doterra|wd1|doTERRACareers": {
@@ -14096,6 +14096,13 @@
    "added": "2026-09-18",
    "sector": "insurance_finance"
   },
+  "fmr|wd1|targeted": {
+   "name": "Fidelity Investments",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "insurance_finance"
+  },
   "fnbcorp|wd501|FNBCORP": {
    "name": "First National Bank",
    "quant": false,
@@ -14366,7 +14373,7 @@
   "gilead|wd1|gileadcareers": {
    "name": "Gilead Sciences",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "gilead|wd1|kitepharmacareers": {
@@ -14505,6 +14512,12 @@
   },
   "gsk|wd5|GSKCareers": {
    "name": "GSK",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-09-18"
+  },
+  "gtsgbu|wd3|Careers": {
+   "name": "Hitachi",
    "quant": false,
    "fails": 1,
    "added": "2026-09-18"
@@ -14699,6 +14712,12 @@
    "added": "2026-09-13",
    "sector": "education_research"
   },
+  "hntb|wd5|hntb_careers": {
+   "name": "HNTB",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-18"
+  },
   "hntb|wd5|hntb_university_careers": {
    "name": "HNTB",
    "quant": false,
@@ -14727,7 +14746,7 @@
   "hpe|wd5|acjobsite": {
    "name": "Hewlett Packard Enterprise",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "hpe|wd5|Jobsathpe": {
@@ -14823,7 +14842,7 @@
   "idexcorp|wd5|idex_careers": {
    "name": "IDEX",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "igsenergy|wd1|IGS": {
@@ -15090,7 +15109,7 @@
   "jci|wd5|JCI_Confidential": {
    "name": "Johnson Controls",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18"
   },
   "jd|wd103|Campus_Career_Site": {
@@ -15344,7 +15363,7 @@
   "livenation|wd503|LNExternalSite": {
    "name": "Live Nation Entertainment",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15"
   },
   "livenation|wd503|TMExternalSite": {
@@ -15400,7 +15419,7 @@
   "lplfinancial|wd1|External": {
    "name": "LPL Financial Holdings",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "lplfinancial|wd1|university": {
@@ -15532,7 +15551,7 @@
   "marvell|wd1|MarvellCareers": {
    "name": "Marvell",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-17"
   },
   "marvell|wd1|MarvellCareers2": {
@@ -16405,6 +16424,13 @@
   "pewtrusts|wd5|TrustsExternal": {
    "name": "Pew Research Center",
    "quant": false,
+   "fails": 0,
+   "added": "2026-09-18",
+   "sector": "government_policy"
+  },
+  "pewtrusts|wd5|TrustsExternal": {
+   "name": "Pew Research Center",
+   "quant": false,
    "fails": 1,
    "added": "2026-09-15",
    "sector": "government_policy"
@@ -16603,13 +16629,13 @@
   "pwc|wd3|Global_Campus_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 0,
+   "fails": 3,
    "added": "2026-09-15"
   },
   "pwc|wd3|Global_Experienced_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13"
   },
   "pwc|wd3|US_Entry_Level_Careers": {
@@ -16761,7 +16787,7 @@
   "relx|wd3|ElsevierJobs": {
    "name": "Elsevier",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-13"
   },
   "relx|wd3|LexisNexisLegal": {
@@ -17454,7 +17480,7 @@
   "statestreet|wd1|Global": {
    "name": "State Street",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-18",
    "sector": "insurance_finance"
   },
@@ -17967,7 +17993,7 @@
   "uasys|wd5|uasys": {
    "name": "University of Arkansas",
    "quant": false,
-   "fails": 2,
+   "fails": 0,
    "added": "2026-09-15"
   },
   "ubc|wd10|ubcstaffjobs": {
@@ -18133,7 +18159,13 @@
   "usventure|wd1|usvexternal": {
    "name": "U.S. Venture",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
+   "added": "2026-09-18"
+  },
+  "utaustin|wd1|UTstaff": {
+   "name": "University of Texas - Austin",
+   "quant": false,
+   "fails": 0,
    "added": "2026-09-18"
   },
   "utaustin|wd1|utstudent": {
@@ -18399,7 +18431,7 @@
   "wellington|wd5|external": {
    "name": "Wellington Management",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-17"
   },
   "welocalize|wd1|welocalize": {

@@ -1,7 +1,6 @@
 {
 "00052 - new york corporate buying office|NY":null,
 "1 w. 125th street|NY":null,
-"1012 garrison ave.|NY":null,
 "1045 westchester avenue|NY":null,
 "1177 avenue of the americas-new york|NY":null,
 "130 north 18th street - one logan square|PA":null,
@@ -10,16 +9,17 @@
 "2486 grand concourse|NY":null,
 "300 creekview ave|NJ":null,
 "359 e. 204th st.|NY":null,
-"38-10 junction blvd.|NY":null,
 "385 e. fordham rd|NY":null,
 "399 park avenue-new york|NY":null,
 "416 e 149th street|NY":null,
 "620 william pitt way|PA":null,
-"6901 fourth ave|NY":null,
-"738 a east 233rd st|NY":null,
 "8001 flatlands ave|NY":null,
 "84 w. fordham rd.|NY":null,
 "915 broadway|NY":null,
+"albany ny|NY":[
+42.651,
+-73.921
+],
 "aliquippa|PA":[
 40.6102,
 -80.2677
@@ -872,6 +872,10 @@
 "new york - 104 w 40th|NY":null,
 "new york - 1166|NY":null,
 "new york - 499 park|NY":null,
+"new york - manhattan|NY":[
+40.7815,
+-73.9591
+],
 "new york - new york city|NY":[
 40.7127,
 -74.006
@@ -947,6 +951,8 @@
 40.6379,
 -74.1856
 ],
+"ny office or remote - us|NY":null,
+"ny office|NY":null,
 "ny-melville|NY":null,
 "ny-montgomery|NY":null,
 "ny-new york|NY":[
@@ -1136,6 +1142,7 @@
 40.9093,
 -74.0733
 ],
+"rockefeller center|NY":null,
 "rome|NY":[
 43.2102,
 -75.4584
@@ -1235,7 +1242,7 @@
 ],
 "somerset|PA":[
 40.0084,
--79.0786
+-79.0781
 ],
 "south new jersey|NJ":null,
 "south plainfield|NJ":[
@@ -1396,6 +1403,7 @@
 40.603,
 -74.6874
 ],
+"utica-rome ny hybrid|NY":null,
 "utica|NY":[
 43.1009,
 -75.2327
