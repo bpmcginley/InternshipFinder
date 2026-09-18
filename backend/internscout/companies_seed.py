@@ -944,4 +944,37 @@ WORKDAY += [
     {'name': 'Montefiore', 'ats_token': 'montefiore|wd12|MMC', 'is_quant_target': False, 'sector': 'health'},
 ]
 
+# --- league offices (probed and fetched live 2026-09-18) ---
+# Hospitality & sports had 37 open listings in the baseline states. 46 unseeded hotel, venue,
+# food-service and league employers were probed; most answered on no board probe.py reads. MLB's
+# board (31 jobs) and NASCAR's (111) had no internship on the day. Both run summer internship
+# programs that post later in the year. Left out: Major League Soccer (its greenhouse board is
+# empty), and Sweetgreen, Hopper and Sonder, which hire no sports or hospitality students.
+GREENHOUSE += [
+    {'name': 'Major League Baseball', 'ats_token': 'majorleaguebaseball', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+WORKDAY += [
+    {'name': 'NASCAR', 'ats_token': 'nascar|wd1|NASCAR', 'is_quant_target': False, 'sector': 'hospitality_sports'},
+]
+
+# --- museums, auction houses and public media (probed and fetched live 2026-09-18) ---
+# Only three employers carried the arts_museums sector. 59 museums, orchestras, theatres,
+# libraries and public broadcasters were probed; most run their own sites, and five answered.
+# SFMOMA had two archives internships on the day. Christie's and WNET had none, but both run
+# internship programs every year. Sotheby's was already in the registry, discovered from a listing
+# and labeled arts; seeding it keeps it if the registry is ever rebuilt from the seed file. The "Guggenheim" hit is Guggenheim Partners, not the museum: its campus board held 12
+# investment-banking internships, and only its other board (guggenheiminvestment) was in the
+# registry, so it is seeded here as finance.
+LEVER += [
+    {'name': 'SFMOMA', 'ats_token': 'sfmoma', 'is_quant_target': False, 'sector': 'arts_museums'},
+]
+GREENHOUSE += [
+    {'name': "Sotheby's", 'ats_token': 'sothebys', 'is_quant_target': False, 'sector': 'arts_museums'},
+]
+WORKDAY += [
+    {'name': "Christie's", 'ats_token': 'christies|wd3|Christies_Careers', 'is_quant_target': False, 'sector': 'arts_museums'},
+    {'name': 'WNET', 'ats_token': 'wnet|wd1|WNETCareers', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Guggenheim Partners', 'ats_token': 'guggenheim|wd1|Guggenheim_Careers_Campus', 'is_quant_target': False, 'sector': 'insurance_finance'},
+]
+
 # --- end sector seeds ---
