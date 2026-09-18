@@ -295,8 +295,9 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId }) => {
 // also press Resume. The short wait lets the page draw a frame before the next snapshot.
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const j = await jobForTab(tabId);
-  // Matched on the opening sentence, so jobs paused under the older wording of this message count too.
-  const asleep = (r) => String(r || "").split(".")[0] === BACKGROUND_TAB_HELP.split(".")[0];
+  // Matched on the opening sentence, current or earlier wording, so jobs paused before an update count too.
+  const first = (r) => String(r || "").split(".")[0];
+  const asleep = (r) => [BACKGROUND_TAB_HELP, "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing."].some((h) => first(h) === first(r));
   if (!j || j.status !== "needs_you" || !asleep(j.reason)) return;
   setTimeout(() => control(j.id, "resume"), 800);
 });

@@ -249,7 +249,7 @@ const GATE_HELP = {
   email_verification: "This site emailed you a verification code. Enter it in the tab, then press Resume.",
   captcha: "The site wants you to prove you're human. Solve the check in the tab, then press Resume.",
   human_check: "This form asks a question meant to prove a person is applying, not a program. Answer that one yourself in the tab, then press Resume.",
-  background_tab: "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing. Bring the application tab back to the front and it carries on by itself (or press Resume).",
+  background_tab: "Chrome slows down tabs you've switched away from, and this page stopped responding. Bring the application tab back to the front and it carries on by itself (or press Resume).",
 };
 // index.js resumes a job paused for this reason by itself once its tab is brought to the front.
 export const BACKGROUND_TAB_HELP = GATE_HELP.background_tab;
@@ -437,6 +437,8 @@ async function loop(id) {
   const fails = {};
   let pending = job.pending || null;
   let steps = job.steps || 0;
+  // Snapshots in a row that came back identical while the tab was asleep. See the gate below.
+  let sleepy = 0, sleepText = null;
 
   while (true) {
     job = await getJob(id);
@@ -526,7 +528,15 @@ async function loop(id) {
     // A sleeping tab still runs its scripts, just slowly, so its DOM is real and a CAPTCHA or a
     // login wall found in it is real too. Name that instead when there is one: it is the more
     // useful thing to tell the student, and bringing the tab forward is part of answering it anyway.
-    const gate = gateIn(frames) || (asleep ? { kind: "background_tab", reason: "this tab is asleep in the background" } : null);
+    // A background tab used to pause the run at once. That broke running more than one application at
+    // a time (the max_tabs setting), since only one tab per window is ever in front, so every other
+    // job stopped at its first step. A hidden tab still runs its scripts and its DOM is live, only
+    // slower, and on most forms the run gets there. So carry on, and pause only when sleep is actually
+    // stopping progress: the page has come back unchanged three snapshots running while asleep.
+    if (asleep) { sleepy = snap.text === sleepText ? sleepy + 1 : 0; sleepText = snap.text; }
+    else { sleepy = 0; sleepText = null; }
+    const stuckAsleep = asleep && sleepy >= 2;
+    const gate = gateIn(frames) || (stuckAsleep ? { kind: "background_tab", reason: "this tab is asleep in the background and the page stopped changing" } : null);
     if (gate) {
       await appendLog(job.id, { kind: "gate", text: `Paused: ${gate.reason}` });
       await updateJob(id, { status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
