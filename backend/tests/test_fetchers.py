@@ -7,7 +7,7 @@ from internscout.sources.smartrecruiters import parse_smartrecruiters, parse_sma
 from internscout.sources.workable import parse_workable
 from internscout.sources.recruitee import parse_recruitee
 from internscout.sources.bamboohr import parse_bamboohr
-from internscout.sources.rippling import parse_rippling
+from internscout.sources.rippling import parse_rippling, parse_rippling_detail
 from internscout.sources.oracle import parse_oracle, parse_oracle_detail
 from internscout.sources.taleo import parse_taleo, parse_taleo_detail
 from internscout.sources.adp import parse_adp
@@ -131,6 +131,23 @@ def test_bamboohr():
     assert len(items) == 1 and items[0]["locations"] == ["Providence, RI"] and items[0]["_bh_id"] == 1
 
 
+def test_bamboohr_plain_location():
+    # The other shape: no atsLocation values at all, and no country field anywhere. An empty
+    # atsLocation is still a dict, so reading it in preference to this one lost the job entirely.
+    items = parse_bamboohr({"result": [
+        {"id": 3, "jobOpeningName": "Robotics Co-op", "employmentStatusLabel": "Intern",
+         "atsLocation": {"country": None, "state": None, "province": None, "city": None},
+         "location": {"city": "Bedford", "state": "Massachusetts"}},
+        {"id": 4, "jobOpeningName": "Sales Intern", "employmentStatusLabel": "Intern",
+         "atsLocation": {"country": None, "state": None, "province": None, "city": None},
+         "location": {"city": "Haarlem", "state": "Netherlands"}},   # 'state' holds the country
+        {"id": 5, "jobOpeningName": "Design Intern", "employmentStatusLabel": "Intern",
+         "location": {"city": None, "state": None}, "isRemote": True},
+    ]}, CO, "acme")
+    assert [i["locations"] for i in items] == [["Bedford, Massachusetts"], ["Remote - US"]]
+    assert [i["_bh_id"] for i in items] == [3, 5]
+
+
 def test_rippling():
     items = parse_rippling([
         {"uuid": "u1", "name": "IT Intern", "url": "https://ats.rippling.com/acme/jobs/u1",
@@ -140,6 +157,22 @@ def test_rippling():
         {"uuid": "u2", "name": "Account Manager", "url": "x", "workLocation": {"label": "Boston, MA"}},
     ], CO)
     assert len(items) == 1 and items[0]["locations"] == ["Boston, MA", "Remote - US"]
+    assert items[0]["_rp_uuid"] == "u1", "the job call needs the uuid, which only the list carries"
+
+
+def test_rippling_detail():
+    desc, posted = parse_rippling_detail({
+        "createdOn": "2026-09-14T08:54:48.317000-07:00",
+        "description": {"company": "<p>Acme is a great place to work.</p>",
+                        "role": "<p>Build real things.</p><p>Rising juniors &amp; up.</p>"}})
+    # 'company' is the same boilerplate on every job, so it stays out of the 4,000-character budget.
+    assert desc == "Build real things.\n Rising juniors & up."
+    # createdOn is the only posting date Rippling gives; the board list has none.
+    assert posted == "2026-09-14"
+
+    # A tenant may leave either half out, and a job that has gone answers with nothing.
+    assert parse_rippling_detail({"description": {"company": "<p>Acme.</p>"}}) == ("", None)
+    assert parse_rippling_detail({}) == ("", None)
 
 
 def test_oracle():

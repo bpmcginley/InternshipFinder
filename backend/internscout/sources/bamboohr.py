@@ -1,7 +1,16 @@
-"""BambooHR careers JSON: <slug>.bamboohr.com/careers/list, with a detail call for descriptions."""
+"""BambooHR careers JSON: <slug>.bamboohr.com/careers/list, with a detail call for descriptions.
+
+Each row carries two location fields and a tenant fills one or the other, never both. atsLocation
+has a country; the plain location has no country field at all and puts one in 'state' for jobs
+outside the US ("Haarlem, Netherlands"). Reading only atsLocation lost every job posted the other
+way, because the empty shape is still a dict and so still wins an `or`: those jobs came out with
+no location, which dropped them from the export and, before that, from the detail call that gives
+a listing its description.
+"""
 from __future__ import annotations
 from .common import board_item, html_to_text
 from ..classify import is_internship
+from ..geo import STATE_NAMES
 from ..region import maybe_in_region
 
 LIST_URL = "https://{token}.bamboohr.com/careers/list"
@@ -16,10 +25,15 @@ def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
         title, emp = j.get("jobOpeningName", ""), j.get("employmentStatusLabel") or ""
         if not is_internship(title, emp):
             continue
-        loc = j.get("atsLocation") or j.get("location") or {}
-        if (loc.get("country") or "").strip().lower() not in _US:
-            continue
-        names = [", ".join(x for x in (loc.get("city"), loc.get("state") or loc.get("province")) if x)]
+        ats, plain = j.get("atsLocation") or {}, j.get("location") or {}
+        city = ats.get("city") or plain.get("city")
+        state = ats.get("state") or ats.get("province") or plain.get("state")
+        if ats.get("country"):
+            if ats["country"].strip().lower() not in _US:
+                continue
+        elif state and state.strip().lower() not in STATE_NAMES:
+            continue     # no country field to go on, so a state that is not one of the 50 is abroad
+        names = [", ".join(x for x in (city, state) if x)]
         if j.get("isRemote"):
             names.append("Remote - US")
         it = board_item(co, source="bamboohr", title=title, locations=names,
