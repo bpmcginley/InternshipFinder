@@ -14,6 +14,7 @@ from .adp import fetch_adp_board
 from .jobvite import fetch_jobvite_board
 from .icims import fetch_icims_board
 from .successfactors import fetch_successfactors_board
+from .eightfold import fetch_eightfold_board
 from .google_jobs import fetch_google_jobs
 from .usajobs import fetch_usajobs
 from .nyc_jobs import fetch_nyc_jobs
@@ -35,6 +36,7 @@ BOARD_FETCHERS = {
     "jobvite": fetch_jobvite_board,
     "icims": fetch_icims_board,
     "successfactors": fetch_successfactors_board,
+    "eightfold": fetch_eightfold_board,
 }
 __all__ = ["fetch_github_lists", "fetch_greenhouse", "fetch_lever", "fetch_google_jobs", "fetch_usajobs",
            "fetch_nyc_jobs", "BOARD_FETCHERS"]

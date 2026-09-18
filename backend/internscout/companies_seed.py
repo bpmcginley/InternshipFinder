@@ -372,4 +372,23 @@ SUCCESSFACTORS: list = [
     {'name': 'Hershey', 'ats_token': 'careers.thehersheycompany.com', 'is_quant_target': False, 'sector': 'retail_consumer'},
     {'name': 'W.W. Grainger', 'ats_token': 'jobs.grainger.com', 'is_quant_target': False, 'sector': 'retail_consumer'},
 ]
+
+# Eightfold tenants, all five checked live on 2026-09-17. Four of them were already in our data one
+# job at a time through Google Jobs; Micron came from probing, and it is also on Workday, which is
+# fine - the same role from two sources collapses on the dedupe key and keeps both links.
+# The token is the tenant, and where the employer's website is not <tenant>.com it is pinned after
+# a pipe, because the Eightfold API requires it and answers 422 without it.
+EIGHTFOLD: list = [
+    {'name': 'John Deere', 'ats_token': 'johndeere', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Eaton', 'ats_token': 'eaton', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Micron Technology', 'ats_token': 'micron', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Boston Scientific', 'ats_token': 'bostonscientific', 'is_quant_target': False,
+     'sector': 'health'},
+    {'name': 'PayPal', 'ats_token': 'paypal', 'is_quant_target': False,
+     'sector': 'insurance_finance'},
+]
+
 # --- end sector seeds ---

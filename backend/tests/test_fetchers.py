@@ -14,6 +14,7 @@ from internscout.sources.adp import parse_adp
 from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
 from internscout.sources.icims import parse_icims
 from internscout.sources.successfactors import parse_successfactors
+from internscout.sources.eightfold import parse_eightfold, host_of as ef_host
 from internscout.sources.usajobs import parse_usajobs
 from internscout.sources.nyc_jobs import parse_nyc_jobs
 from internscout.sources.github_lists import _parse
@@ -221,6 +222,47 @@ def test_icims():
     assert items[0]["url"] == "https://acme.icims.com/jobs/7600/slug/job"
     # "International" is not an internship, but iCIMS keyword search matches it on substring
     assert parse_icims(card(7604, "International Scholar Advisor", "US-NY-New York"), CO) == []
+
+
+def test_eightfold():
+    EF = {"name": "Acme", "ats_token": "acme", "is_quant_target": False}
+
+    def pos(i, name, std, dept="", path=None):
+        return {"id": i, "name": name, "standardizedLocations": std, "department": dept,
+                "postedTs": 1788276561, "positionUrl": path if path is not None else f"/careers/job/{i}"}
+
+    payload = {"data": {"count": 7, "positions": [
+        pos(1, "2027 Intern - Product Engineering", ["IL,US"]),
+        pos(2, "Supply Management Intern", ["Moline, IL, US", "Des Moines, IA, US"]),
+        pos(3, "Manufacturing Intern", ["Winston-Salem, NC, US"]),
+        pos(4, "Graduate Engineer Internship", ["Slough, England, GB"]),
+        pos(5, "Manager, Internal Controls", ["Austin, TX, US"]),
+        pos(6, "Process Development Intern", ["Arden Hills, MN, US"], path=""),
+        pos(7, "Summer Intern", ["Somewhere, ZZ, US"]),
+    ]}}
+    out = parse_eightfold(payload, EF)
+    by_title = {i["title"]: i for i in out}
+
+    # a two-part standardized location is a state with no city, which the geo labeler can still place
+    assert by_title["2027 Intern - Product Engineering"]["locations"] == ["IL"]
+    # a job open in two places keeps both
+    assert by_title["Supply Management Intern"]["locations"] == ["Moline, IL", "Des Moines, IA"]
+    # a hyphenated city survives: only the last two parts are the state and country
+    assert by_title["Manufacturing Intern"]["locations"] == ["Winston-Salem, NC"]
+    # the search is a relevance search, so it returns near misses; they are not internships
+    assert "Manager, Internal Controls" not in by_title
+    # non-US rows are dropped rather than translated, and so is a two-letter code that is not a state
+    assert "Graduate Engineer Internship" not in by_title
+    assert "Summer Intern" not in by_title
+    # positionUrl is site-relative; with none, the link is rebuilt from the job id
+    assert by_title["Supply Management Intern"]["url"] == "https://acme.eightfold.ai/careers/job/2"
+    assert by_title["Process Development Intern"]["url"] == "https://acme.eightfold.ai/careers/job/6"
+    assert by_title["Manufacturing Intern"]["posted_at"] == 1788276561
+
+    # the employer's own website is a required API parameter and is assumed from the tenant,
+    # unless a seed pins it
+    assert ef_host("johndeere") == ("johndeere", "johndeere.com")
+    assert ef_host("wf|wellsfargo.com") == ("wf", "wellsfargo.com")
 
 
 def test_successfactors():

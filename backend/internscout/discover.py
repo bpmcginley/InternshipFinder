@@ -42,6 +42,10 @@ PATTERNS = [
     ("taleo", re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I)),
     ("adp", re.compile(r"workforcenow\.adp\.com/.*?[?&]cid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", re.I)),
     ("jobvite", re.compile(r"jobs\.jobvite\.com/(?:careers/)?([A-Za-z0-9_-]+)", re.I)),
+    # The employer's own website is a required parameter of the Eightfold API and is not in the
+    # URL, so a discovered token is the tenant alone and eightfold.py assumes <tenant>.com;
+    # a seed can pin the real one with "tenant|domain.com" when that guess is wrong.
+    ("eightfold", re.compile(r"https?://([a-z0-9-]+)\.eightfold\.ai/", re.I)),
     # The whole subdomain is the tenant: hospital-midlandhealth, careers-uhnjcareers, jobs-selectmedicalcorp.
     ("icims", re.compile(r"https?://([a-z0-9-]+)\.icims\.com", re.I)),
 ]
@@ -49,7 +53,7 @@ _BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1",
                "j", "api", "www", "app", "careers", "rest"}
 ATS_HOSTS = [  # recognised even when no token can be extracted
     ("icims", "icims.com"), ("taleo", "taleo.net"), ("oracle", "oraclecloud.com"),
-    ("successfactors", "successfactors"), ("jobvite", "jobvite.com"),
+    ("successfactors", "successfactors"), ("jobvite", "jobvite.com"), ("eightfold", "eightfold.ai"),
     ("workable", "workable.com"), ("bamboohr", "bamboohr.com"), ("adp", "adp.com"),
     ("greenhouse", "gh_jid="),
 ]
@@ -126,7 +130,7 @@ def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
     for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
-                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS"):
+                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS", "EIGHTFOLD"):
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
                            co.get("sector"))
