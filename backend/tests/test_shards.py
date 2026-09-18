@@ -3,7 +3,7 @@ import json
 import os
 from internscout.classify import ALL_FIELDS
 from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, per_tag, report
-from internscout.export_static import shard_keys, write_shards
+from internscout.export_static import shard_keys, still_student_opportunities, write_shards
 from internscout.region import evaluate_locations, maybe_in_region
 
 
@@ -117,3 +117,17 @@ def test_coverage_counts_the_employers_sector():
     # The breakdown has to account for the difference, and count only what no tag already covered.
     text = report([aclu, _listing(4, ["Boston, MA"], tags=("nonprofit",), sector="nonprofit")], minimum=15)
     assert "- Nonprofit & social work: social_work 0, nonprofit 1, plus 1 from employers in that sector" in text
+
+
+def test_a_row_that_would_no_longer_be_admitted_is_not_published():
+    # normalize() has refused new-grad postings for a while, but 46 of them were already in the
+    # store from before it did, and an export publishes what is stored. stage_of() answers [] for
+    # every one of them, which is the same answer that would have kept them out.
+    from internscout.classify import stage_of
+    stale = ["Software Engineer, New Grad", "2027 Early Career Software Engineer",
+             "Trader Trainee (September 2027)", "Campus Police Officer",
+             "Adjunct Faculty-Off-Campus Advisor", "Data Science Trainee"]
+    keep = ["Software Engineer Intern", "Research Assistant - Summer 2027",
+            "Manufacturing Co-op (Spring 2027)"]
+    rows = [{"id": i, "title": t, "stage": stage_of(t)} for i, t in enumerate(stale + keep)]
+    assert [x["title"] for x in still_student_opportunities(rows)] == keep

@@ -110,6 +110,20 @@ def _listing_dict(row: Listing) -> dict:
     }
 
 
+def still_student_opportunities(listings: list[dict]) -> list[dict]:
+    """The listings that would still be admitted today, by the test normalize applies on the way in.
+
+    normalize() refuses anything stage_of() cannot name a student stage for, so no new-grad job can
+    enter. A row already in the store never meets that test again, though, and the rules have
+    tightened since some of them arrived: the last export published 46 listings with no stage at
+    all, and every one was a job this is not for - "Software Engineer, New Grad" at nine companies,
+    "Trader Trainee", "Campus Police Officer", "Adjunct Faculty-Off-Campus Advisor". The plan is
+    student opportunities only, so the same question is asked again here, where it costs nothing
+    and answers for old rows as well as new ones.
+    """
+    return [x for x in listings if x["stage"]]
+
+
 def export(out_dir: str) -> dict:
     init_db()
     os.makedirs(out_dir, exist_ok=True)
@@ -117,12 +131,12 @@ def export(out_dir: str) -> dict:
         rows = db.scalars(
             select(Listing).order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
-        listings = [_listing_dict(r) for r in rows]
+        listings = still_student_opportunities([_listing_dict(r) for r in rows])
         generated_at = datetime.now(timezone.utc).isoformat()
         stats = {
-            "total": len(rows),
-            "open": sum(1 for r in rows if r.status == "open"),
-            "new": sum(1 for r in rows if r.is_new),
+            "total": len(listings),
+            "open": sum(1 for x in listings if x["status"] == "open"),
+            "new": sum(1 for x in listings if x["is_new"]),
             "generated_at": generated_at,
             "profile": {
                 "name": PROFILE.name,
@@ -136,7 +150,7 @@ def export(out_dir: str) -> dict:
                 "nyc_radius_miles": REGION.nyc_radius_miles,
             },
             "by_state": dict(Counter(k for x in listings if x["status"] == "open" for k in shard_keys(x)).most_common()),
-            "by_ats": dict(Counter(r.ats for r in rows if r.status == "open").most_common()),
+            "by_ats": dict(Counter(x["ats"] for x in listings if x["status"] == "open").most_common()),
             "by_field": dict(Counter(t for x in listings if x["status"] == "open" for t in x["field_tags"]).most_common()),
             "by_stage": dict(Counter(s for x in listings if x["status"] == "open" for s in x["stage"]).most_common()),
             "by_sector": dict(Counter(x["sector"] for x in listings if x["status"] == "open" and x.get("sector")).most_common()),
