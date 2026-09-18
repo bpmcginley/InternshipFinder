@@ -15,6 +15,7 @@ from internscout.sources.jobvite import parse_jobvite, parse_jobvite_detail
 from internscout.sources.icims import parse_icims
 from internscout.sources.successfactors import parse_successfactors
 from internscout.sources.eightfold import parse_eightfold, host_of as ef_host
+from internscout.sources.jazzhr import parse_jazzhr
 from internscout.sources.usajobs import parse_usajobs
 from internscout.sources.nyc_jobs import parse_nyc_jobs
 from internscout.sources.github_lists import _parse
@@ -333,6 +334,44 @@ def test_successfactors():
     back = parse_successfactors(row(9005, "Summer Intern", "Chattanooga-Summer-Intern-TN-37401",
                                     "Chattanooga, US"), SF)
     assert back[0]["locations"] == ["Chattanooga, TN"]
+
+
+def test_jazzhr():
+    def item(slug, title, loc=None, dept="Engineering"):
+        # the real shape: the location and department are nested <li>s inside the job's own <li>,
+        # which is why the parser splits on the opening tag instead of matching a balanced one
+        where = f"<li><i class='fa fa-map-marker'></i>{loc}</li>" if loc else ""
+        return f"""<li class="list-group-item">
+        <h3 class='list-group-item-heading'>
+            <a href="https://acme.applytojob.com/apply/{slug}/{title.replace(' ', '-')}">
+                {title}                                    </a>
+        </h3>
+        <ul class='list-inline list-group-item-text'>
+            {where}
+            <li><i class='fa fa-sitemap'></i>{dept}</li>
+        </ul></li>"""
+
+    page = ("<div class='list-group'>"
+            + item("aB1", "Back-End Engineering Intern", "Atlanta, GA")
+            + item("aB2", "Account Director", "Atlanta, GA")
+            + item("aB3", "Finance Department - 2027 Summer Student Program", "Houston, TX")
+            + item("aB4", "AlphaLab &amp; Portfolio  Operations Intern")
+            + "</div>")
+    items = parse_jazzhr(page, CO)
+    # the director is not a student role; the summer student programme is, though it never says
+    # "intern" - seventeen of Aramco Americas' postings are worded exactly that way
+    assert [i["title"] for i in items] == ["Back-End Engineering Intern",
+                                           "Finance Department - 2027 Summer Student Program",
+                                           "AlphaLab & Portfolio Operations Intern"]
+    assert items[0]["locations"] == ["Atlanta, GA"]
+    assert items[0]["source"] == "jazzhr"
+    assert items[0]["url"] == "https://acme.applytojob.com/apply/aB1/Back-End-Engineering-Intern"
+    # a board may omit the location entirely, and that is not a reason to drop the job
+    assert items[2]["locations"] == []
+    # JazzHR serves no description on the board page, so we report none rather than inventing one
+    assert items[0]["description"] == ""
+    # an employer with nothing open serves the page with no items at all
+    assert parse_jazzhr("<div class='list-group'></div>", CO) == []
 
 
 def test_usajobs():

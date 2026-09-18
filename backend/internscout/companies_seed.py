@@ -391,4 +391,56 @@ EIGHTFOLD: list = [
      'sector': 'insurance_finance'},
 ]
 
+
+# JazzHR boards, the small-employer end of the market: one page holds the whole board, so a
+# tenant costs a single request however many jobs it has. These are the tenants our own data
+# already pointed at, resolved to the employer names JazzHR serves on the board - the subdomain
+# is often not the company (neboagency is Nebo, aramcoservices is Aramco Americas).
+JAZZHR: list = [
+    {'name': 'Nebo', 'ats_token': 'neboagency', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Aramco Americas', 'ats_token': 'aramcoservices', 'is_quant_target': False,
+     'sector': 'energy_environment'},
+    {'name': 'Ragle Inc', 'ats_token': 'ragleinc', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Bee Sweet Citrus', 'ats_token': 'beesweetcitrus', 'is_quant_target': False,
+     'sector': 'energy_environment'},
+    {'name': 'ROUSH', 'ats_token': 'roush', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
+    {'name': 'Aerotech', 'ats_token': 'aerotech', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Nova-Tech Engineering', 'ats_token': 'novatechengineering', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Engenious Design', 'ats_token': 'engeniousdesign', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Rantec Power Systems', 'ats_token': 'rantecpowersystemsinc', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Foxconn Industrial Internet', 'ats_token': 'foxconnggroup', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'DEKA Research & Development', 'ats_token': 'deka', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'Advanced Robotics for Manufacturing', 'ats_token': 'arminstitute', 'is_quant_target': False,
+     'sector': 'engineering_manufacturing'},
+    {'name': 'National Reconnaissance Office', 'ats_token': 'nro', 'is_quant_target': False,
+     'sector': 'government_policy'},
+    {'name': 'Innovation Works', 'ats_token': 'innovationworks', 'is_quant_target': False,
+     'sector': 'nonprofit'},
+    {'name': 'Specialisterne', 'ats_token': 'specialisterne', 'is_quant_target': False,
+     'sector': 'nonprofit'},
+    {'name': 'Spherix Global Insights', 'ats_token': 'spherixglobalinsights', 'is_quant_target': False,
+     'sector': 'health'},
+    {'name': 'Open Road Integrated Media', 'ats_token': 'openroadmedia', 'is_quant_target': False,
+     'sector': 'media'},
+    {'name': 'ZGF Architects', 'ats_token': 'zgfarchitects', 'is_quant_target': False},
+    {'name': 'Emerging Tech', 'ats_token': 'emergingtech', 'is_quant_target': False},
+    {'name': 'Stellar Science', 'ats_token': 'stellarscience', 'is_quant_target': False},
+    {'name': 'SimIS', 'ats_token': 'simisinc', 'is_quant_target': False},
+    {'name': 'Black Cape', 'ats_token': 'blackcape', 'is_quant_target': False},
+    {'name': 'CloudFit Software', 'ats_token': 'cloudfitsoftware', 'is_quant_target': False},
+    {'name': 'Geo Owl', 'ats_token': 'geoowl', 'is_quant_target': False},
+    {'name': 'IntelliGenesis', 'ats_token': 'intelligenesis', 'is_quant_target': False},
+    {'name': 'Innovative Systems', 'ats_token': 'innovativesystems', 'is_quant_target': False},
+    {'name': 'Naver U.Hub', 'ats_token': 'naveruhubinc', 'is_quant_target': False},
+    {'name': 'Prospect Equities', 'ats_token': 'prospectequities', 'is_quant_target': False},
+    {'name': 'Gulf Management', 'ats_token': 'gulfmanagement', 'is_quant_target': False},
+]
+
 # --- end sector seeds ---

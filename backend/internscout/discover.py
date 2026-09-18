@@ -48,6 +48,8 @@ PATTERNS = [
     ("eightfold", re.compile(r"https?://([a-z0-9-]+)\.eightfold\.ai/", re.I)),
     # The whole subdomain is the tenant: hospital-midlandhealth, careers-uhnjcareers, jobs-selectmedicalcorp.
     ("icims", re.compile(r"https?://([a-z0-9-]+)\.icims\.com", re.I)),
+    # JazzHR: the tenant is the subdomain and the board is always at /apply.
+    ("jazzhr", re.compile(r"https?://([a-z0-9-]+)\.applytojob\.com", re.I)),
 ]
 _BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1", "oneclick-ui",
                "j", "api", "www", "app", "careers", "rest"}
@@ -55,7 +57,7 @@ ATS_HOSTS = [  # recognised even when no token can be extracted
     ("icims", "icims.com"), ("taleo", "taleo.net"), ("oracle", "oraclecloud.com"),
     ("successfactors", "successfactors"), ("jobvite", "jobvite.com"), ("eightfold", "eightfold.ai"),
     ("workable", "workable.com"), ("bamboohr", "bamboohr.com"), ("adp", "adp.com"),
-    ("greenhouse", "gh_jid="),
+    ("greenhouse", "gh_jid="), ("jazzhr", "applytojob.com"),
 ]
 
 
@@ -130,7 +132,8 @@ def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
     n = 0
     for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
-                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS", "EIGHTFOLD"):
+                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS",
+                "EIGHTFOLD", "ICIMS", "JAZZHR"):
         for co in getattr(seed, ats, []):
             n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
                            co.get("sector"))
