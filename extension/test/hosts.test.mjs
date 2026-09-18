@@ -18,11 +18,13 @@ test("real board hostnames fall inside the granted patterns", () => {
   // Taken from the live listing data; every one of these is a subdomain, which is what "*." covers.
   for (const h of ["boeing.wd1.myworkdayjobs.com", "job-boards.greenhouse.io", "jobs.ashbyhq.com",
                    "jobs.lever.co", "careers-sig.icims.com", "textron.taleo.net",
-                   "egug.fa.us2.oraclecloud.com", "jobs.smartrecruiters.com", "apply.workable.com"]) {
+                   "egug.fa.us2.oraclecloud.com", "jobs.smartrecruiters.com", "apply.workable.com",
+                   "johndeere.eightfold.ai"]) {
     assert.ok(isAtsHost(`https://${h}/job/1`), h);
   }
   // Employer-run careers sites are the case the optional permission exists for
-  for (const h of ["www.tesla.com", "amazon.jobs", "cityjobs.nyc.gov", "johndeere.eightfold.ai"]) {
+  // careers.amd.com is an iCIMS Career Site: the same product as icims.com, on the employer's host.
+  for (const h of ["www.tesla.com", "amazon.jobs", "cityjobs.nyc.gov", "careers.amd.com"]) {
     assert.ok(!isAtsHost(`https://${h}/job/1`), h);
   }
   assert.equal(ATS_HOSTS.length, new Set(ATS_HOSTS).size, "no duplicate domains");

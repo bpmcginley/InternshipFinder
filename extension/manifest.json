@@ -33,7 +33,8 @@
     "https://*.adp.com/*",
     "https://*.successfactors.com/*",
     "https://*.paylocity.com/*",
-    "https://*.applytojob.com/*"
+    "https://*.applytojob.com/*",
+    "https://*.eightfold.ai/*"
   ],
   "optional_host_permissions": [
     "<all_urls>"

@@ -5,15 +5,21 @@
 // round a student forum that warning is the whole first impression, so the manifest now grants only
 // the applicant-tracking systems below and asks for anything else at the moment it is needed.
 //
-// These 18 domains carry 87% of the listings we index (measured over docs/data/listings, 2026-09-15).
-// The rest sit on ~220 employer-owned hosts -- tesla.com, amazon.jobs, cityjobs.nyc.gov -- a tail that
-// grows with every employer added and so cannot be enumerated in a manifest that only changes at a
-// store review. Those are handled by an in-context request for that one site.
+// These 19 domains carry 81% of the listings we index: 8,211 of the 10,142 open postings in
+// docs/data/listings on 2026-09-18, counted once per listing rather than once per state shard. The
+// other 1,931 sit on 161 employer-owned hosts -- lifeattiktok.com, careers.qorvo.com, www.tesla.com,
+// careers.jhuapl.edu -- and no single one of them is more than 1.5% of the data. That tail grows
+// with every employer added, and a good part of it is by design: an employer running an iCIMS or
+// SuccessFactors career site serves it from its own domain. It cannot be enumerated in a manifest
+// that only changes at a store review, so those are handled by an in-context request for that one
+// site.
 export const ATS_HOSTS = [
   "myworkdayjobs.com", "myworkdaysite.com", "greenhouse.io", "lever.co", "ashbyhq.com",
   "smartrecruiters.com", "oraclecloud.com", "icims.com", "taleo.net", "workable.com",
   "rippling.com", "bamboohr.com", "jobvite.com", "recruitee.com", "adp.com",
   "successfactors.com", "paylocity.com", "applytojob.com",
+  // An ATS like the rest, though its boards read as employer subdomains: micron.eightfold.ai.
+  "eightfold.ai",
 ];
 
 // Match patterns for manifest.json "host_permissions". Every board we have seen on these systems is on
