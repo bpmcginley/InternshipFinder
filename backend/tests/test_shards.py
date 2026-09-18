@@ -325,3 +325,41 @@ def test_a_never_student_title_loses_the_stage_its_feed_gave_it():
     assert merged_stages(["internship"], "Regional Discovery Program Coach") == []
     # a feed-only stage on a title that says nothing either way is still kept
     assert merged_stages(["internship"], "Growth") == ["internship"]
+
+
+def test_state_files_are_slim_and_descriptions_ride_in_a_sidecar(tmp_path):
+    # A first visit loaded 8.15 MB of rows, half of it descriptions the list view never shows.
+    from datetime import date
+    from internscout.export_static import previous_export
+    full = dict(_listing("a1", ["Boston, MA"]), apply_url="https://x/a1", description="Help run clinics.",
+                region_locations=["Boston, MA"], location_raw="Boston, MA",
+                score_parts={"source": 0.9, "field": 0.5, "fresh": 1.0})
+    closed = dict(_listing("c1", ["Boston, MA"], status="closed"), apply_url="https://x/c1",
+                  description=None, location_raw="Boston, MA")
+    nowhere = dict(_listing("n1", ["Remote - US"]), apply_url="https://x/n1", regions=[],
+                   state="Remote", location_raw="Anywhere", description="Remote role.")
+    stale = tmp_path / "listings"
+    stale.mkdir()
+    (stale / "WY.desc.json").write_text("{}")
+    index = write_shards([full, closed, nowhere], str(tmp_path), "now")
+    assert not (stale / "WY.desc.json").exists()               # a state with nothing left loses both files
+    assert index["files"]["MA"]["desc"] == "listings/MA.desc.json"
+    rows = {r["id"]: r for r in json.loads((stale / "MA.json").read_text(encoding="utf-8"))}
+    a = rows["a1"]
+    assert "description" not in a and "region_locations" not in a
+    assert "location_raw" not in a                              # it has regions, so no fallback is needed
+    assert a["score_parts"] == {"source": 0.9}
+    remote = json.loads((stale / "remote.json").read_text(encoding="utf-8"))[0]
+    assert remote["location_raw"] == "Anywhere"                 # no regions: the fallback stays
+    assert json.loads((stale / "MA.desc.json").read_text(encoding="utf-8")) == {"a1": "Help run clinics."}
+    # The next run reads the export back, and a carried listing must not lose its description.
+    back = {x["id"]: x for x in previous_export(str(tmp_path))}
+    assert back["a1"]["description"] == "Help run clinics."
+    assert back["n1"]["description"] == "Remote role."
+    assert not back["c1"].get("description")
+
+
+def test_the_coverage_report_reads_a_folder_with_sidecars(tmp_path):
+    from internscout.coverage import load
+    write_shards([dict(_listing("a1", ["Boston, MA"]), description="x")], str(tmp_path), "now")
+    assert [x["id"] for x in load(str(tmp_path / "listings"))] == ["a1"]

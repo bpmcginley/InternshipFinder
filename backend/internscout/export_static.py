@@ -2,6 +2,7 @@
 
 Produces:
   <out>/listings/<ST>.json    - the listings in one state; remote.json (US-remote), US.json (country only)
+  <out>/listings/<ST>.desc.json - {id: description} for that file's open listings, fetched on demand
   <out>/listings/index.json   - per-file counts by field and stage, so the dashboard loads only picked states
   <out>/stats.json            - counts + generated_at + profile summary
   <out>/majors.json           - majors -> field tags for the profile picker
@@ -61,7 +62,32 @@ def _dump(obj, path: str, indent=None) -> None:
         json.dump(obj, f, indent=indent, separators=None if indent else (",", ":"), ensure_ascii=False)
 
 
+# The dashboard renders a list from these rows and needs none of this per row. Measured on
+# MA.json: the description was 48% of every row's bytes, region_locations 5% and score_parts 4.6%,
+# and a first visit loaded 8.15 MB (1.55 MB gzipped) of it before showing a single card. The
+# dashboard scores with score_parts["source"] alone, and reads location_raw only as the fallback
+# when a listing has no regions. The description is still needed - for the search box and the
+# Auto-Apply payload - so it moves to a sidecar the dashboard fetches only when it needs one.
+ROW_ONLY_IN_SIDECAR = ("description", "region_locations")
+
+
+def shard_row(x: dict) -> dict:
+    """A listing as a state file carries it: everything the list view reads, nothing else."""
+    row = {k: v for k, v in x.items() if k not in ROW_ONLY_IN_SIDECAR}
+    parts = x.get("score_parts")
+    if isinstance(parts, dict):
+        row["score_parts"] = {"source": parts["source"]} if "source" in parts else {}
+    if x.get("regions"):
+        row.pop("location_raw", None)
+    return row
+
+
+def desc_file(key: str) -> str:
+    return f"{key}.desc.json"
+
+
 def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
+    """Write <ST>.json (slim rows) and <ST>.desc.json ({id: description} for its open rows)."""
     shard_dir = os.path.join(out_dir, "listings")
     os.makedirs(shard_dir, exist_ok=True)
     shards: dict[str, list] = defaultdict(list)
@@ -70,16 +96,20 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
             shards[k].append(x)
     index = {"generated_at": generated_at, "files": {}}
     for k, items in sorted(shards.items()):
-        _dump(items, os.path.join(shard_dir, f"{k}.json"))
+        _dump([shard_row(x) for x in items], os.path.join(shard_dir, f"{k}.json"))
+        _dump({x["id"]: x["description"] for x in items if x["status"] == "open" and x.get("description")},
+              os.path.join(shard_dir, desc_file(k)))
         live = [x for x in items if x["status"] == "open"]
         index["files"][k] = {
-            "file": f"listings/{k}.json", "count": len(items), "open": len(live),
+            "file": f"listings/{k}.json", "desc": f"listings/{desc_file(k)}",
+            "count": len(items), "open": len(live),
             "by_field": dict(Counter(t for x in live for t in x["field_tags"]).most_common()),
             "by_stage": dict(Counter(s for x in live for s in x["stage"]).most_common()),
             "by_sector": dict(Counter(x["sector"] for x in live if x.get("sector")).most_common()),
         }
-    for name in os.listdir(shard_dir):  # a state with no listings left
-        if name.endswith(".json") and name != "index.json" and name[:-5] not in shards:
+    for name in os.listdir(shard_dir):  # a state with no listings left, and its sidecar
+        stem = name[:-len(".desc.json")] if name.endswith(".desc.json") else name[:-5]
+        if name.endswith(".json") and name != "index.json" and stem not in shards:
             os.remove(os.path.join(shard_dir, name))
     _dump(index, os.path.join(shard_dir, "index.json"), indent=1)
     return index
@@ -187,8 +217,21 @@ def previous_export(out_dir: str) -> list[dict]:
     shard_dir = os.path.join(out_dir, "listings")
     seen: set[str] = set()
     out: list[dict] = []
-    for name in sorted(os.listdir(shard_dir)) if os.path.isdir(shard_dir) else []:
-        if not name.endswith(".json") or name == "index.json":
+    names = sorted(os.listdir(shard_dir)) if os.path.isdir(shard_dir) else []
+    # The descriptions live in the sidecars now. A carried listing is put back exactly as it is
+    # returned here, so without them every board that failed a fetch would lose its descriptions.
+    descs: dict[str, str] = {}
+    for name in names:
+        if name.endswith(".desc.json"):
+            try:
+                with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
+                    got = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if isinstance(got, dict):
+                descs.update(got)
+    for name in names:
+        if not name.endswith(".json") or name == "index.json" or name.endswith(".desc.json"):
             continue
         try:
             with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
@@ -201,6 +244,8 @@ def previous_export(out_dir: str) -> list[dict]:
             key = it.get("apply_url") or "id:" + str(it.get("id"))
             if key not in seen:
                 seen.add(key)
+                if not it.get("description") and descs.get(str(it.get("id"))):
+                    it["description"] = descs[str(it.get("id"))]
                 out.append(it)
     return out
 

@@ -146,7 +146,8 @@ def load(path: str) -> list[dict]:
             return json.load(f)
     by_id = {}
     for name in sorted(os.listdir(path)):
-        if name.endswith(".json") and name != "index.json":
+        # <ST>.desc.json is {id: description}, the sidecar export_static writes beside each state.
+        if name.endswith(".json") and name != "index.json" and not name.endswith(".desc.json"):
             with open(os.path.join(path, name), encoding="utf-8") as f:
                 by_id.update((x["id"], x) for x in json.load(f))
     return list(by_id.values())
