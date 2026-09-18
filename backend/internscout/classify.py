@@ -294,7 +294,17 @@ _STAGE_RULES = [
     # like "Senior Product Manager, GPTZero - Students" - and so is "working", which is part_time.
     ("internship", re.compile(r"\bintern(ship)?s?\b|summer (analyst|associate|scholar|20[2-3]\d)|"
                               r"\bextern(ship)?s?\b|\bpracticum\b|student trainee|\bsummer students?\b|"
-                              r"(?<!working )\bstudent\b(?=\s*([-,:(/|–—]|$))", re.I)),
+                              r"(?<!working )\bstudent\b(?=\s*([-,:(/|–—]|$))|"
+                              # Hospitals name the student before the job, or tail it with a site or
+                              # shift code: Mass General Brigham's "PACU Certified Nursing Assistant/
+                              # Nursing Student BWFH" and "Patient Care Assistant (EMK Students Only)",
+                              # Brown Health's "Pathology Tech Student PD", and the "Student Nurse
+                              # Technician" most systems post each spring. All of them fell through
+                              # the rule above. "Nursing students" in the plural is left out, as the
+                              # plural is above: it is a job teaching them.
+                              r"\bstudent nurse\b(?!\s+(educator|instructor|placement|liaison|faculty))|"
+                              r"\b(nursing|rn) student\b(?!s)|\bstudents only\b|"
+                              r"\bstudent\b(?=\s+(?-i:[A-Z]{2,5})\s*([-,:(/|–—]|$))", re.I)),
 ]
 _LOWER_YEARS_RE = re.compile(r"\b(freshm[ae]n|first[- ]year|sophomores?)\b", re.I)
 _PROGRAM_RE = re.compile(r"\b(program|summit|day|week|series|academy|conference|forum|experience)\b", re.I)

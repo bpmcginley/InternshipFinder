@@ -673,3 +673,18 @@ def test_intelligence_language_roles_but_not_language_models():
     for t in ("Student Researcher - Large Language Model", "PhD Intern - Language Intelligence",
               "Large Language Model Paid Media Co-op", "Speech Language Pathologist Intern"):
         assert "languages" not in classify(t), t
+
+
+def test_hospital_student_titles_that_name_the_student_first():
+    from internscout.classify import is_internship
+    for t in ("Student Nurse Technician", "Nurse Technician - Student Nurse",
+              "PACU Certified Nursing Assistant/ Nursing Student BWFH",
+              "3 East RN Student Certified Nursing Assistant BWFH",
+              "Patient Care Assistant (EMK Students Only)", "Pathology Tech Student PD"):
+        assert is_internship(t), t
+    # Jobs that teach, place or serve students are not places for one.
+    for t in ("Student Nurse Educator", "Clinical Instructor - Nursing Students",
+              "Assistant Director, Student Admissions", "Student Success Coordinator",
+              "Medical Assistant - gap year students welcome to apply",
+              "Registered Nurse/Licensed Practical Nurse - Student Health Center Nurse"):
+        assert not is_internship(t), t

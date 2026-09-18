@@ -108,15 +108,22 @@ def parse_workday_detail(payload: dict) -> tuple[list[str], str]:
     return [l for l in locs if l], html_to_text(info.get("jobDescription"))
 
 
-def fetch_workday_board(c, co: dict) -> list[dict]:
-    if not robots_allows(c, co["ats_token"]):
-        raise RobotsDisallowed(co["ats_token"])
-    host, tenant, site = host_of(co["ats_token"])
-    api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
+# Hospitals rarely write "intern". Their student jobs are "Student Nurse Technician", "PACU
+# Certified Nursing Assistant/ Nursing Student", "Apprentice Nurse Program", "Pathology Tech
+# Student PD", and searchText="intern" never returns them. Nine Northeast health systems were
+# seeded and the baseline states held one nursing listing. Checked live on 2026-09-18: a
+# "student" search on Baystate, Beth Israel Lahey, Mass General Brigham and Brown Health turned up
+# student roles that the "intern" search had missed. "extern" is no use, because Workday
+# fuzzy-matches it to "external". The extra search runs only for these sectors, so other boards
+# cost what they did before.
+EXTRA_SEARCH = {"health": ("student",), "behavioral_health": ("student",)}
+
+
+def _search(c, api: str, text: str) -> list[dict]:
     postings, offset, total, dry = [], 0, None, 0
     while True:
         r = c.post(f"{api}/jobs", headers=HEADERS,
-                   json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": "intern"})
+                   json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": text})
         r.raise_for_status()
         data = r.json()
         page = data.get("jobPostings") or []
@@ -130,6 +137,21 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
             break
         if offset >= CORE_OFFSET and dry >= DRY_PAGES:
             break   # the matches have run out; the rest of this board is "internal" and "overseas"
+    return postings
+
+
+def fetch_workday_board(c, co: dict) -> list[dict]:
+    if not robots_allows(c, co["ats_token"]):
+        raise RobotsDisallowed(co["ats_token"])
+    host, tenant, site = host_of(co["ats_token"])
+    api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
+    postings, seen = [], set()
+    for text in ("intern",) + EXTRA_SEARCH.get(co.get("sector"), ()):
+        for p in _search(c, api, text):
+            key = p.get("externalPath") or p.get("title")
+            if key not in seen:
+                seen.add(key)
+                postings.append(p)
 
     out = []
     for i, p in enumerate(postings):

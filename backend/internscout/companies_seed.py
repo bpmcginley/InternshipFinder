@@ -907,5 +907,13 @@ GREENHOUSE += [
 WORKDAY += [
     {'name': 'Thriveworks', 'ats_token': 'thriveworks|wd5|Thriveworks', 'is_quant_target': False, 'sector': 'behavioral_health'},
 ]
+# careers-hhsys is HH Health System (Huntsville Hospital and Marshall Medical Centers, Alabama):
+# the board's own title and locations say so. Discovery registered it on 2026-09-18 under "Star
+# Dental Partners", the employer on whatever apply link it was found through, so its seven RN
+# apprentice and student-nurse postings were shown under a dental group, with no sector.
+ICIMS += [
+    {'name': 'HH Health System', 'ats_token': 'careers-hhsys', 'is_quant_target': False, 'sector': 'health',
+     'rename': True},
+]
 
 # --- end sector seeds ---

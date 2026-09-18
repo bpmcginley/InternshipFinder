@@ -694,6 +694,35 @@ def test_a_gap_before_the_first_two_hundred_does_not_stop_the_read():
     assert len(fetch_workday_board(board, _deepco())) == 80
 
 
+
+class _SearchBoard(_Board):
+    """A board whose answer depends on searchText, as a real Workday search does."""
+
+    def __init__(self, by_text):
+        self.by_text, self.texts, self.offsets = by_text, [], []
+
+    def post(self, url, headers=None, json=None):
+        self.texts.append(json["searchText"])
+        self.titles = self.by_text.get(json["searchText"], [])
+        return _Board.post(self, url, headers, json)
+
+
+def test_a_hospital_board_is_also_searched_for_student_roles():
+    # "Student Nurse Technician" never comes back from searchText="intern". Health boards get
+    # a second "student" search, and a posting both searches return is kept once.
+    board = _SearchBoard({"intern": ["Pharmacy Intern"],
+                          "student": ["Pharmacy Intern", "Student Nurse Technician"]})
+    co = dict(_deepco(), sector="health")
+    out = fetch_workday_board(board, co)
+    assert sorted(x["title"] for x in out) == ["Pharmacy Intern", "Student Nurse Technician"]
+    assert board.texts == ["intern", "student"]
+
+
+def test_other_boards_are_searched_once():
+    board = _SearchBoard({"intern": ["Software Engineer Intern"], "student": ["Student Nurse Technician"]})
+    assert len(fetch_workday_board(board, _deepco())) == 1
+    assert board.texts == ["intern"]
+
 class _Robots:
     """A Workday host serving one robots.txt and nothing else."""
 
