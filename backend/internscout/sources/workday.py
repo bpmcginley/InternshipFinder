@@ -1,6 +1,8 @@
 """Workday career sites via the CXS JSON API (the same calls the site's own UI makes).
 
-Token: "tenant|wdN|site", e.g. "modernatx|wd1|M_tx".
+Token: "tenant|wdN|site", e.g. "modernatx|wd1|M_tx". Workday serves the same boards from a
+second domain, where the tenant is a path segment rather than a subdomain; those tokens carry
+that domain in the middle field: "wf|wd1.myworkdaysite.com|WellsFargoJobs".
 """
 from __future__ import annotations
 from .common import board_item, html_to_text
@@ -15,7 +17,14 @@ HEADERS = {"Accept": "application/json", "Content-Type": "application/json"}
 
 def host_of(token: str) -> tuple[str, str, str]:
     tenant, wd, site = token.split("|")
+    if "." in wd:
+        return f"https://{wd}", tenant, site
     return f"https://{tenant}.{wd}.myworkdayjobs.com", tenant, site
+
+
+def page_base(host: str, tenant: str, site: str) -> str:
+    """Where a student's link points. The two domains lay the path out differently."""
+    return f"{host}/recruiting/{tenant}/{site}" if "myworkdaysite" in host else f"{host}/{site}"
 
 
 def parse_workday_list(payload: dict) -> list[dict]:
@@ -30,7 +39,7 @@ def parse_workday_detail(payload: dict) -> tuple[list[str], str]:
 
 def fetch_workday_board(c, co: dict) -> list[dict]:
     host, tenant, site = host_of(co["ats_token"])
-    api = f"{host}/wday/cxs/{tenant}/{site}"
+    api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
     postings, offset, total = [], 0, None
     while True:
         r = c.post(f"{api}/jobs", headers=HEADERS,
@@ -48,7 +57,7 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
     out = []
     for i, p in enumerate(postings):
         path = p.get("externalPath") or ""
-        url = f"{host}/{site}{path}"
+        url = f"{base}{path}"
         text = p.get("locationsText") or ""
         locs, desc = [text], ""
         multi = "location" in text.lower()   # "3 Locations"

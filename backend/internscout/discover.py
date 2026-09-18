@@ -20,7 +20,12 @@ PATTERNS = [
     ("greenhouse", re.compile(r"boards-api\.greenhouse\.io/v1/boards/([A-Za-z0-9_-]+)", re.I)),
     ("lever", re.compile(r"jobs\.lever\.co/([A-Za-z0-9_.-]+)", re.I)),
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/([A-Za-z0-9_.%-]+)", re.I)),
-    ("workday", re.compile(r"https?://([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)", re.I)),
+    ("workday", re.compile(r"https?://(?P<t>[a-z0-9-]+)\.(?P<wd>wd\d+)\.myworkdayjobs\.com/"
+                          r"(?:[a-z]{2}-[A-Z]{2}/)?(?P<s>[A-Za-z0-9_-]+)", re.I)),
+    # Workday's other domain, where the tenant is a path segment instead of a subdomain:
+    # wd1.myworkdaysite.com/recruiting/wf/WellsFargoJobs. Same CXS API underneath.
+    ("workday", re.compile(r"https?://(?P<wd>wd\d+\.myworkdaysite\.com)/(?:[a-z]{2}-[A-Z]{2}/)?"
+                          r"recruiting/(?P<t>[A-Za-z0-9_-]+)/(?P<s>[A-Za-z0-9_-]+)", re.I)),
     ("smartrecruiters", re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)", re.I)),
     ("workable", re.compile(r"apply\.workable\.com/([A-Za-z0-9_-]+)", re.I)),
     ("recruitee", re.compile(r"https?://([a-z0-9-]+)\.recruitee\.com", re.I)),
@@ -52,11 +57,15 @@ def ats_of(url: str | None) -> tuple[str, str | None]:
         m = pat.search(url)
         if m:
             token = "|".join(m.groups())
-            last = m.groups()[-1]
-            if last.lower() in _BAD_TOKENS:
+            # The last group is the part that names the board, except on Workday, where it is the
+            # career site's name - and that is legitimately a plain word: careers, search, External.
+            # Checking it against _BAD_TOKENS threw away every Workday board whose site is named
+            # after what it is, which is most of them. There the tenant is what has to look real.
+            check = m.group("t") if ats == "workday" else m.groups()[-1]
+            if check.lower() in _BAD_TOKENS:
                 continue
             if ats == "workday":
-                token = f"{m.group(1).lower()}|{m.group(2).lower()}|{m.group(3)}"
+                token = f"{m.group('t').lower()}|{m.group('wd').lower()}|{m.group('s')}"
             elif ats == "taleo":
                 token = f"{m.group(1).lower()}|{m.group(2)}"
             elif ats == "adp":

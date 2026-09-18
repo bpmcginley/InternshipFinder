@@ -68,6 +68,15 @@ def test_ats_of():
     assert ats_of("https://jobs.ashbyhq.com/ramp/1234") == ("ashby", "ramp")
     assert ats_of("https://modernatx.wd1.myworkdayjobs.com/en-US/M_tx/job/Cambridge/Intern_R1") == \
         ("workday", "modernatx|wd1|M_tx")
+    # a career site named after what it is ("careers", "search") is not a bad token on Workday:
+    # there the tenant is what has to look real, and most sites are named this way
+    assert ats_of("https://allegion.wd5.myworkdayjobs.com/careers/job/Intern_R1") == \
+        ("workday", "allegion|wd5|careers")
+    assert ats_of("https://brunswick.wd1.myworkdayjobs.com/en-US/search/job/Intern_R2") == \
+        ("workday", "brunswick|wd1|search")
+    # Workday's second domain: the tenant is a path segment, and the domain rides in the token
+    assert ats_of("https://wd1.myworkdaysite.com/recruiting/wf/WellsFargoJobs/job/Intern_R3") == \
+        ("workday", "wf|wd1.myworkdaysite.com|WellsFargoJobs")
     assert ats_of("https://jobs.smartrecruiters.com/BoschGroup/7440") == ("smartrecruiters", "BoschGroup")
     # the whole subdomain is the iCIMS tenant, prefix and all
     assert ats_of("https://careers-foo.icims.com/jobs/1/intern/job") == ("icims", "careers-foo")
