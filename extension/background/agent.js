@@ -459,21 +459,33 @@ async function loop(id) {
     // same rules-first principle: a turn spent telling the model to attach the file it was always
     // going to attach is a turn nobody gets back. Same choice of file as the upload tool makes.
     const resume = (job.tailored && job.tailored.status === "approved" && job.tailored.file) || store.files.resume || null;
-    const pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
+    let pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
       .flatMap((r) => r.result || []);
 
     let frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
-    if (!frames.some((f) => f.elements.length || f.buttons.length)) {
-      await sleep(2500);
+    // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
+    // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
+    //
+    // Wait on the whole "nothing here" condition, not just on an empty frame, because a dead link and
+    // a page that has not drawn itself yet look identical in one snapshot and only time tells them
+    // apart. Workable is the clearest case: for its first few seconds a live job page is a header and
+    // a "Cookie settings" button - enough to pass "this frame has something in it", and enough to fail
+    // every test for a live application - so a real posting was being handed back to the student as a
+    // dead one. Waiting costs a few seconds on links that really are dead; not waiting cost the
+    // application.
+    for (let i = 0; i < 4 && (deadPage(frames) || (!frames.some((f) => f.elements.length) && frames.some((f) => f.busy))); i++) {
+      await sleep(i ? 2000 : 2500);
       await inject(tabId);
       frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
-    // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
-    // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
-    for (let i = 0; i < 4 && !frames.some((f) => f.elements.length) && frames.some((f) => f.busy); i++) {
-      await sleep(2000);
-      await inject(tabId);
-      frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+    // fastFill ran before that wait, so on a page that had not drawn itself yet it was handed an empty
+    // form and filled nothing. Now that the fields exist, give the rules their turn: every field the
+    // profile can answer here is a field the model does not have to, and that is the student's
+    // allowance. Re-snapshot afterwards so the model is shown the values that were just typed.
+    if (!pre.length && frames.some((f) => f.elements.length)) {
+      pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
+        .flatMap((r) => r.result || []);
+      if (pre.length) frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
     // A page Chrome has put to sleep answers every snapshot with whatever was on screen when the
     // student left, so acting on it would be acting on a photograph. Say so instead of guessing.

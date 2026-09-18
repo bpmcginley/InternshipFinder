@@ -298,6 +298,12 @@ test("a page with nothing to fill and no way forward is not sent to the model", 
 
   // No frames at all means the page was not readable; that is a different story.
   assert.equal(deadPage([]), false);
+
+  // Workable's job page for its first few seconds: the site's own furniture, drawn before the job is.
+  // This is indistinguishable from the ADP case above and it is meant to be - the point is that being
+  // sure needs a second look a few seconds later, which is why runJob waits on this whole condition
+  // and not merely on a frame with nothing in it at all.
+  assert.equal(deadPage([f({ buttons: [{ text: "Cookie settings" }, { text: "Help" }, { text: "View all jobs" }] })]), true);
 });
 
 // A click the page never answered. Qorvo draws "Apply now" as a dropdown whose menu is bound by a
