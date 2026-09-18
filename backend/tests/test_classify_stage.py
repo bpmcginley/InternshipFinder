@@ -512,3 +512,24 @@ def test_plain_function_names_reach_their_field():
     # network traffic is not road work
     assert "civil" not in classify("Research Intern - SDN Traffic Intelligence & Control")
     assert "civil" not in classify("Software Engineer Intern - Global Traffic Architecture")
+
+
+def test_operations_training_and_signal_titles_reach_a_field():
+    assert "hr" in classify("Human Resource Intern")
+    assert "hr" in classify("Technical Training Intern")
+    assert classify("Continuous Improvement Engineering Intern") == ["industrial", "operations"]
+    assert "operations" in classify("Operational Excellence Intern - Summer 2027")
+    assert "operations" in classify("Summer 2027 Intern - Quality Management (QMS)")
+    assert "biology" in classify("Empress: Proteomics Co-Op")
+    assert "civil" in classify("Site Civil Intern")
+    assert "environmental" in classify("Intern Air Quality")
+    assert "swe" in classify("Systems Administrator Intern")
+    assert "marketing" in classify("CRM Intern")
+    assert "sales" in classify("Account Development Representative Intern - Phoenix")
+    assert "data" in classify("Decision Science Analyst Intern")
+    assert "electrical" in classify("Digital Signal Processing Intern")
+    # the role word matters
+    assert "marketing" not in classify("CRM Clinical Field Intern - Summer 2027")
+    assert "hr" not in classify("Indigenous Training Internship Program")
+    assert "environmental" not in classify(
+        "Banking - Commercial Banking - Natural Resources & Energy,  Summer Analyst, Houston - US, 2027")
