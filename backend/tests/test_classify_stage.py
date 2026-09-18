@@ -533,3 +533,30 @@ def test_operations_training_and_signal_titles_reach_a_field():
     assert "hr" not in classify("Indigenous Training Internship Program")
     assert "environmental" not in classify(
         "Banking - Commercial Banking - Natural Resources & Energy,  Summer Analyst, Houston - US, 2027")
+
+
+def test_management_analyst_quality_and_design_titles_reach_a_field():
+    assert "supply_chain" in classify("Summer Intern - Global Supply Management")
+    assert "supply_chain" in classify("Materials Management Intern (Summer 2027)")
+    assert "hr" in classify("Talent Management Intern")
+    assert "accounting" in classify("Cost Management Intern - Spring 2027")
+    assert "security" in classify("Summer Associate Internship (Identity & Access Management)")
+    assert "swe" in classify("Summer 2027 Systems Analyst Intern")
+    assert "pm" in classify("Product Analyst Intern")
+    assert "finance" in classify("Fraud Analyst Intern")
+    assert "health" in classify("Revenue Cycle Analyst Intern")
+    assert "operations" in classify("Summer 2027 Internship: Quality (Anderson, SC)")
+    assert "agriculture" in classify("Quality & Food Safety (QFS) Intern - Summer 2027")
+    assert "agriculture" in classify("Vegetable Seed Production Research Intern")
+    assert classify("Design Intern - Summer 2027") == ["design"]
+    assert classify("Game Design Intern") == ["design"]
+    assert "civil" in classify("Roadway Design Intern")
+    # engineering design and quality engineering are not these
+    assert "design" not in classify("Analog Design Intern")
+    assert "design" not in classify("Mechanical Design Intern")
+    assert "design" not in classify("Design Intern - Electrical (Year Round)")
+    assert classify("Intern - Quality Engineer") == ["engineering"]
+    assert "supply_chain" not in classify("Supplier Quality Engineering Intern")
+    # quality assurance is not audit assurance
+    assert "accounting" not in classify("Quality Assurance Engineering Intern - Summer 2027")
+    assert "accounting" in classify("Audit & Assurance Intern")
