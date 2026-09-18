@@ -48,7 +48,11 @@ Claude never handles keys. Run these yourself:
    - `npx wrangler secret put GEMINI_API_KEY` (a paid-tier key, so Google doesn't train on prompts)
    - `npx wrangler secret put HASH_SALT` (any long random string; changing it resets everyone's usage)
    - `npx wrangler secret put DEMAND_TOKEN` (any long random string; CI uses it to read state counts)
-5. `npm run deploy`. Note the `*.workers.dev` URL it prints.
+5. `npm run deploy`. Note the `*.workers.dev` URL it prints. This applies `schema.sql` to the live
+   database first (every statement is `CREATE TABLE IF NOT EXISTS`, so it is safe to repeat) and then
+   deploys. Always deploy this way rather than with `wrangler deploy` on its own: a commit that adds a
+   table and code that reads it would otherwise ship without the table, and every request that
+   touches it would answer 500. That is exactly what happened to `/me` when the billing tables landed.
 6. Put that URL in `extension/lib/config.js` (`WORKER_URL`) and in the dashboard's `CONFIG.workerUrl`.
 7. GitHub repo secrets for the ingest workflow: `INTERNSCOUT_DEMAND_URL` (the Worker URL plus `/demand`)
    and `INTERNSCOUT_DEMAND_TOKEN` (the same value as `DEMAND_TOKEN`).
