@@ -624,3 +624,15 @@ def test_hotel_venue_and_team_titles_that_never_say_hospitality_or_sports():
     assert "sports" not in classify("Summer 2027 Intern- Innovation Group- Scouting/Business Research")
     assert "hospitality" not in classify("Intern, Digital Product Management (Platforms & Guest Experience)")
     assert "hospitality" not in classify("Patient Concierge Intern - Spring 2027")
+
+
+def test_fundraising_and_casework_titles_that_never_say_nonprofit_or_social_work():
+    from internscout.classify import classify
+    assert classify("Philanthropy Intern - Spring 2027") == ["nonprofit"]
+    assert classify("Fall 2026 Grants Management Intern - UNPAID") == ["nonprofit"]
+    assert classify("Internship - Fundraising") == ["nonprofit"]
+    assert classify("Refugee Resettlement Intern (Fall 2026)") == ["social_work"]
+    assert "social_work" in classify("MSW Clinical Internship")
+    # the near misses: research grants and social media are neither
+    assert "nonprofit" not in classify("Research Grant Funded Lab Intern")
+    assert "social_work" not in classify("Social Media Services Intern")

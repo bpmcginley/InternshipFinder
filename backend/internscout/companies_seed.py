@@ -840,4 +840,57 @@ SUCCESSFACTORS += [
     {'name': 'Royal Caribbean Group', 'ats_token': 'jobs.royalcaribbeangroup.com', 'is_quant_target': False, 'sector': 'hospitality_sports'},
 ]
 
+# --- nonprofits, foundations, publishers and arts (probed and fetched live 2026-09-18) ---
+# Nonprofit & social work had 35 open listings in the baseline states. sector_gaps.json had
+# marked Boys & Girls Clubs, NRDC, the Council on Foreign Relations, HarperCollins, NYU Langone
+# and Dartmouth Health "unsupported iCIMS"; the iCIMS fetcher has since been built, so they are
+# seeded here. Checked and left out: World Wildlife Fund (its iCIMS board 404s), Yale New Haven
+# (robots.txt closes its iCIMS host), Partners In Health (403), a "goodwill" JazzHR board that
+# could not be tied to any particular Goodwill, and greenhouse "fox", which is a veterinary group,
+# not Fox Corporation. Most of these had no student posting on the day; they hire interns
+# seasonally and each fetch is one request.
+GREENHOUSE += [
+    {'name': 'GiveDirectly', 'ats_token': 'givedirectly', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Code for America', 'ats_token': 'codeforamerica', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'DonorsChoose', 'ats_token': 'donorschoose', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Mozilla Foundation', 'ats_token': 'mozillafoundation', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Acumen', 'ats_token': 'acumen', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'One Acre Fund', 'ats_token': 'oneacrefund', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'A24', 'ats_token': 'a24', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Ogilvy', 'ats_token': 'ogilvy', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'R/GA', 'ats_token': 'rga', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'IDEO', 'ats_token': 'ideo', 'is_quant_target': False, 'sector': 'arts_museums'},
+]
+LEVER += [
+    {'name': 'Ashoka', 'ats_token': 'ashoka', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'charity: water', 'ats_token': 'charitywater', 'is_quant_target': False, 'sector': 'nonprofit'},
+]
+JAZZHR += [
+    {'name': 'IREX', 'ats_token': 'irex', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'CalMatters', 'ats_token': 'calmatters', 'is_quant_target': False, 'sector': 'media'},
+]
+ASHBY += [
+    {'name': 'Artsy', 'ats_token': 'artsy', 'is_quant_target': False, 'sector': 'arts_museums'},
+]
+ICIMS += [
+    {'name': 'Boys & Girls Clubs of America', 'ats_token': 'careers-bgca', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'NRDC', 'ats_token': 'careers-nrdc', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Council on Foreign Relations', 'ats_token': 'careers-cfr', 'is_quant_target': False, 'sector': 'government_policy'},
+    {'name': 'HarperCollins', 'ats_token': 'careers-harpercollins', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'NYU Langone Health', 'ats_token': 'careers-nyu', 'is_quant_target': False, 'sector': 'health'},
+    {'name': 'Dartmouth Health', 'ats_token': 'careers-dartmouth-hitchcock', 'is_quant_target': False, 'sector': 'health'},
+]
+WORKDAY += [
+    {'name': 'World Vision', 'ats_token': 'worldvision|wd1|WorldVisionInternational', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Teach For America', 'ats_token': 'teachforamerica|wd1|TFA_Careers', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'City Year', 'ats_token': 'cityyear|wd5|CityYear', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'ALSAC St. Jude', 'ats_token': 'alsacstjude|wd1|careersalsacstjude', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Gates Foundation', 'ats_token': 'gatesfoundation|wd1|Gates', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Ford Foundation', 'ats_token': 'fordfoundation|wd1|FordFoundationCareerPage', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'PATH', 'ats_token': 'path|wd1|External', 'is_quant_target': False, 'sector': 'nonprofit'},
+    {'name': 'Scholastic', 'ats_token': 'scholastic|wd5|External', 'is_quant_target': False, 'sector': 'media'},
+    {'name': 'Wiley', 'ats_token': 'wiley|wd1|wiley_careers', 'is_quant_target': False, 'sector': 'media'},
+    {'name': "Christie's", 'ats_token': 'christies|wd3|Christies_Careers', 'is_quant_target': False, 'sector': 'arts_museums'},
+]
+
 # --- end sector seeds ---

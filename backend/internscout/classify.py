@@ -129,7 +129,12 @@ RULES = [
      # "Community Impact Intern", "Community Engagement Grant Intern", "Community Partnerships
      # Intern" are the giving and outreach side of an employer, and all sat in "other". Advocacy is
      # too, except at an insurer, where "Client Advocacy" and "Benefits Advocacy" are service desks.
-     r"community (impact|engagement|partnerships?|involvement|relations|investments?)|(?<!client )(?<!care )(?<!benefits )\badvocacy\b"),
+     r"community (impact|engagement|partnerships?|involvement|relations|investments?)|(?<!client )(?<!care )(?<!benefits )\badvocacy\b|"
+     # Fundraising is the one department every nonprofit has and no company does, and its interns
+     # are titled by the craft: "Philanthropy Intern", "Grants Intern", "Annual Fund Intern". A
+     # grant at a lab or a bank is research funding or a tax credit, so grants needs a craft word.
+     r"philanthrop|fundrais|\bgrants? (writ|management|intern|assistant|associate)|\bgrant ?writ|annual (fund|giving)|"
+     r"donor (relations|engagement|stewardship)|major gifts|volunteer (program|engagement|management)"),
     ("architecture", r"architect(ure|ural)|urban plan|landscape"),
     ("urban_planning", r"urban plan|city plan|regional plan|planning intern|transportation planning|zoning|\bgis\b|housing (policy|development)|community development"),
     ("psychology", r"psycholog|behavioral (health|science)|\bmental health|counsel(ing|or)\b|\baba\b|cognitive science|"
@@ -140,7 +145,12 @@ RULES = [
      # User research is where psychology and cognitive-science majors go in industry: the
      # interviews, usability studies and surveys are their methods. Kept as design too.
      r"\bux research|user research|human behavio(u)?r|behavio(u)?ral (lab|research)"),
-    ("social_work", r"social work|case manag|human services|youth (program|development)|family services"),
+    ("social_work", r"social work|case manag|human services|youth (program|development)|family services|"
+     # MSW and BSW placements name the degree, not the field, and the people they serve name the
+     # rest: a "Refugee Resettlement Intern" or a "Victim Services Intern" is social work however
+     # the posting spells it.
+     r"\b[mb]sw\b|social services|homeless|refugee|resettlement|foster care|child welfare|"
+     r"victim (advocate|services)|domestic violence|\breentry\b|family support"),
     # Sociology and anthropology had no tag at all, so the coverage report's social-sciences line
     # could only ever count psychology, economics and languages, and a "Survey Research Intern" or
     # "Sociology Research Intern" landed in "other". "Anthropologie" is a clothing retailer.
