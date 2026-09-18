@@ -66,6 +66,13 @@ jobs:
 
       - name: Coverage report
         working-directory: backend
+        # The report names the keyed sources that are switched off, so it has to be handed the same
+        # keys the ingest step was. Without them it read every one as unset and told us to go and get
+        # two keys the run above had just used to fetch 119 federal postings.
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+          USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
         run: python -m internscout.coverage "${{ github.workspace }}/docs/data/listings"
 
       - name: Commit updated data
