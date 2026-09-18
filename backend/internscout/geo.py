@@ -35,13 +35,46 @@ STATE_NAMES = {
 _STATE_NAME_RE = re.compile(
     r"\b(" + "|".join(sorted(STATE_NAMES, key=len, reverse=True)) + r")\b", re.I)
 _US_COUNTRY_RE = re.compile(r"\b(united states|u\.s\.a?\.?|usa|us)\b", re.I)
-_NON_US = re.compile(r"\b(london|dublin|ireland|amsterdam|netherlands|canada|toronto|vancouver|"
+_FOREIGN = re.compile(r"\b(london|dublin|ireland|amsterdam|netherlands|canada|toronto|vancouver|"
  r"montreal|ontario|quebec|india|bangalore|bengaluru|hyderabad|singapore|australia|sydney|"
  r"germany|berlin|munich|france|paris|japan|tokyo|china|shanghai|beijing|hong kong|israel|"
  r"tel aviv|mexico|brazil|spain|madrid|poland|warsaw|uk|united kingdom|england|scotland|"
  r"wales|europe|emea|apac|latam|switzerland|zurich|sweden|denmark|norway|finland|korea|"
  r"seoul|taiwan|philippines|vietnam|argentina|colombia|chile|portugal|lisbon|italy|milan|"
  r"romania|ukraine|czech|prague|austria|vienna|belgium|brussels|luxembourg|uae|dubai)\b", re.I)
+
+# Half the cities above have a namesake in the US, and several are where students are hired:
+# Dublin, OH is Cardinal Health and Wendy's, Ontario, CA is an Inland Empire logistics hub, Warsaw,
+# IN is Zimmer Biomet, New London, CT is Electric Boat, and "Vienna, VA; United States" is Tysons.
+# The word alone threw every one of them out of the country, state code and all, and a posting with
+# no other location was dropped outright. A location that names one of these towns and then a US
+# state - "Dublin, OH", "New Berlin, WI 53151", "Paris, Texas, USA" - is that town. Only the
+# namesakes are let through, so "Bangalore, IN" is still India and not Indiana.
+_US_NAMESAKES = frozenset({"london", "dublin", "paris", "vienna", "berlin", "milan", "warsaw", "madrid",
+                           "toronto", "mexico", "ontario", "vancouver", "lisbon", "amsterdam", "wales",
+                           "brussels", "belgium", "prague"})
+_TOWN_STATE = re.compile(r"^\s*([^,;|]+?)\s*,\s*([A-Za-z][A-Za-z ]*?)(?:\s+\d{5}(?:-\d{4})?)?"
+                         r"\s*(?:,\s*(?:us|usa|u\.s\.a?\.?|united states(?: of america)?)\s*)?$", re.I)
+
+
+class _NotUS:
+    """_FOREIGN, except for a US namesake followed by its state. Callers use it as a regex."""
+
+    def search(self, loc: str):
+        m = _FOREIGN.search(loc)
+        if not m:
+            return None
+        town = _TOWN_STATE.match(loc)
+        if town:
+            words = [w.lower() for w in _FOREIGN.findall(town.group(1))]
+            st = town.group(2).strip()
+            is_state = (len(st) == 2 and st.isupper() and st.lower() in _US_STATES) or st.lower() in STATE_NAMES
+            if is_state and words and all(w in _US_NAMESAKES for w in words):
+                return None
+        return m
+
+
+_NON_US = _NotUS()
 
 
 def looks_us(loc: str) -> bool:
@@ -53,6 +86,7 @@ def looks_us(loc: str) -> bool:
 
 _TOKEN_SPLIT = re.compile(r"[,\-–/()|]")
 _LOOSE_STATE = re.compile(r"(?<![A-Za-z])([A-Z]{2})(?![A-Za-z])")
+_FACILITY = re.compile(r"^\s*US\s*-\s*.+\(([A-Z]{2})[A-Z]{3}\)\s*$")
 
 
 def state_of(loc: str) -> str | None:
@@ -78,6 +112,13 @@ def state_of(loc: str) -> str | None:
     for m in _LOOSE_STATE.finditer(loc):
         if m.group(1).lower() in _US_STATES:
             return m.group(1)
+    # UPS names every site "US - <building> (<state><3 letters>)": "US - UPS CORPORATE OFFICES
+    # (GACOR)", "US - JEFFERSON HUB (ILJEF)", "US - OLYMPIC (CAOLY)". 30 open listings said nothing
+    # else and sat in the country-only shard. The code has to close the string and follow "US -",
+    # so nothing without that exact shape is read this way.
+    m = _FACILITY.search(loc)
+    if m and m.group(1).lower() in _US_STATES:
+        return m.group(1)
     return None
 
 

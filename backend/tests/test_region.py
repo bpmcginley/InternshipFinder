@@ -148,7 +148,9 @@ def test_state_of_reads_a_code_the_board_did_not_set_apart():
     assert state_of("US Headquarters") is None
     assert state_of("Remote - anywhere in the US or nearby") is None
     assert state_of("Walmart") is None
-    assert state_of("US - UPS CORPORATE OFFICES (GACOR)") is None
+    # letters glued into a word are not a code; a UPS site code that closes the string is read on
+    # purpose by its own pass (test_a_ups_site_code_names_its_state), so this is one that does not
+    assert state_of("US - GACOR OFFICES") is None
     # and the earlier passes still answer first, so a real "City, ST" is unchanged.
     assert state_of("Boston, MA") == "MA"
     assert state_of("Hartford, Connecticut") == "CT"
@@ -174,7 +176,7 @@ def test_a_city_next_to_its_country_is_still_just_a_city():
 def test_remote_is_only_said_where_a_location_says_it():
     # A US location we cannot pin to a state is somewhere in the US, not remote.
     assert evaluate_locations(["United States"])["state"] is None
-    assert evaluate_locations(["US - UPS CORPORATE OFFICES (GACOR)"])["state"] is None
+    assert evaluate_locations(["US Headquarters"])["state"] is None
     assert evaluate_locations(["Remote - US"])["state"] == "Remote"
     assert evaluate_locations(["Boston, MA"])["state"] == "MA"
 
@@ -195,3 +197,28 @@ def test_filler_beside_a_remote_location_does_not_move_it_abroad():
     # and the check still keeps out the thing it is for.
     for loc in ("Remote - Serbia", "Remote - HU", "Virtual, BR", "Remote - EMEA", "Remote - India"):
         assert evaluate_locations([loc])["in_region"] is False, loc
+
+
+def test_a_us_town_named_after_a_foreign_city_is_in_its_state():
+    # Each of these was thrown out of the country by the foreign-city word alone.
+    for loc, st in (("Dublin, OH", "OH"), ("Ontario, CA", "CA"), ("Warsaw, IN 46580", "IN"),
+                    ("New London, CT", "CT"), ("Paris, Texas, USA", "TX"), ("Vancouver, WA", "WA"),
+                    ("New Berlin, WI 53151", "WI")):
+        r = evaluate_locations([loc])
+        assert r["in_region"] and r["state"] == st, (loc, r["state"])
+    assert evaluate_locations(["Vienna, VA; United States"])["state"] == "VA"
+
+
+def test_the_foreign_city_is_still_foreign():
+    # "IN" is India's code as well as Indiana's; only the namesake towns are let through.
+    for loc in ("Bangalore, IN", "Hyderabad, IN", "Dublin, Ireland", "London, UK", "Toronto, ON",
+                "Vancouver, BC", "Paris, France", "London", "Remote - Canada"):
+        assert not evaluate_locations([loc])["in_region"], loc
+
+
+def test_a_ups_site_code_names_its_state():
+    assert evaluate_locations(["US - UPS CORPORATE OFFICES (GACOR)"])["state"] == "GA"
+    assert evaluate_locations(["US - JEFFERSON HUB (ILJEF)"])["state"] == "IL"
+    # the shape has to be exact: a parenthesised word elsewhere is not a site code
+    assert evaluate_locations(["United States (HYBRID)"])["state"] is None
+    assert evaluate_locations(["US - ZZ TOP HUB (ZZTOP)"])["state"] is None
