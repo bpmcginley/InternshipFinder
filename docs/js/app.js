@@ -25,7 +25,8 @@
   const prevent = fn => e => { e.preventDefault(); fn(e); };
 
   // ---------- search ----------
-  // Every word must appear; -word excludes; "quoted phrase" matches exactly. Place words match locations only.
+  // Every word must appear; -word excludes; "quoted phrase" matches exactly. Place words (city or state
+  // names seen in a few listings' locations) match the location, company and title, not the description.
   const parseQuery = q => (q.match(/-?"[^"]+"|\S+/g) || []).map(t => { const neg = t.length > 1 && t[0] === "-"; return { t: (neg ? t.slice(1) : t).replace(/"/g, "").toLowerCase(), neg }; }).filter(x => x.t);
   const PLACES = { "new england": { states: ["MA", "CT", "RI", "NH", "VT", "ME"] }, "nyc metro": { kind: "nyc_metro" }, "new york city": { kind: "nyc_metro" }, nyc: { kind: "nyc_metro" }, remote: { kind: "remote" } };
   Object.entries(IS.US_STATES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
@@ -39,8 +40,11 @@
     }
     return { rest, places };
   }
-  const NOT_PLACE = new Set(["new", "city", "north", "south", "east", "west", "park", "hill", "hills", "beach", "heights", "falls", "center", "village", "island", "lake", "port", "united", "states", "usa", "hybrid", "office", "onsite", "the", "and", "area", "metro", "county", "greater"]);
+  const NOT_PLACE = new Set(["new", "city", "north", "south", "east", "west", "park", "hill", "hills", "beach", "heights", "falls", "center", "village", "island", "lake", "port", "united", "states", "usa", "hybrid", "office", "onsite", "the", "and", "area", "metro", "county", "greater",
+    // words the boards put in a "location" that are not places
+    "home", "work", "from", "remote", "headquarters", "campus", "corporate", "global", "site", "main", "street", "plant", "laboratory", "lab", "hospital", "university", "college", "school", "medical", "health", "nursing", "research", "science", "technology", "building", "floor", "suite"]);
   const locHay = x => x._loch || (x._loch = [...IS.regs(x).map(g => g.loc), x.location_raw || ""].join(" \n ").toLowerCase());
+  const placeHay = x => x._plach || (x._plach = [locHay(x), x.company_name, x.title].filter(Boolean).join(" | ").toLowerCase());
   const hay = x => x._hay || (x._hay = [x.company_name, x.title, (x.field_tags || []).join(" "), (x.stage || []).join(" "), x.sector, x.location_raw, (x.region_locations || []).join(" "), (x.regions || []).map(g => g.loc).join(" "), x.state, x.term, x.ats, x.description, ((x.insights || {}).skills || []).map(s => s.name).join(" ")].filter(Boolean).join(" \n ").toLowerCase());
 
   // ---------- eligibility and deadline: [level, text], level bad | warn | good | "" ----------
@@ -534,9 +538,10 @@
       let r = inView.slice();
       if (f.q.trim()) {
         const { rest, places } = splitPlaces(f.q), terms = parseQuery(rest);
-        const words = new Set(); r.forEach(x => locHay(x).split(/[^a-z]+/).forEach(t => { if (t.length >= 3 && !NOT_PLACE.has(t)) words.add(t); }));
+        const seen = new Map(); r.forEach(x => new Set(locHay(x).split(/[^a-z]+/)).forEach(t => { if (t.length >= 3 && !NOT_PLACE.has(t)) seen.set(t, (seen.get(t) || 0) + 1); }));
+        const words = new Set(); seen.forEach((n, t) => { if (n >= 3) words.add(t); });
         r = r.filter(x => places.every(pl => IS.regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state)) !== pl.neg) &&
-          terms.every(({ t, neg }) => (words.has(t) ? locHay(x) : hay(x)).includes(t) !== neg));
+          terms.every(({ t, neg }) => (words.has(t) ? placeHay(x) : hay(x)).includes(t) !== neg));
       }
       if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
       if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
