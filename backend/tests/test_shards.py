@@ -3,7 +3,7 @@ import json
 import os
 from internscout.classify import ALL_FIELDS
 from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, dormant, per_tag, report
-from internscout.export_static import (merged_stages, shard_keys,
+from internscout.export_static import (carry_first_seen, merged_stages, shard_keys,
                                        still_student_opportunities, write_shards)
 from internscout.region import evaluate_locations, maybe_in_region
 
@@ -172,3 +172,43 @@ def test_the_report_says_when_a_source_is_switched_off_rather_than_unseeded():
 
     # A healthy table says so too, rather than implying every source ran.
     assert "Switched off even so: USAJOBS" in report(rows, minimum=0, env={})
+
+
+def test_a_listing_remembers_when_we_first_saw_it(tmp_path):
+    # The database does not outlive a CI run, so first_seen was the moment of the run and is_new
+    # was true for all 13,652 listings in the last export. The badge was on every card.
+    from datetime import date
+    shard_dir = tmp_path / "listings"
+    shard_dir.mkdir()
+    (shard_dir / "MA.json").write_text(json.dumps([
+        {"id": "aaaa", "apply_url": "https://x/1", "first_seen": "2026-09-01T00:00:00+00:00"},
+        {"id": "bbbb", "apply_url": "https://x/2", "first_seen": "2026-09-17T00:00:00+00:00"},
+        {"id": "9999", "apply_url": "https://x/3", "first_seen": "2026-09-02T00:00:00+00:00"},
+    ]), encoding="utf-8")
+    (shard_dir / "index.json").write_text('{"files": {}}', encoding="utf-8")
+
+    today = date(2026, 9, 18)
+    listings = [
+        {"id": "aaaa", "apply_url": "https://x/1", "first_seen": "2026-09-18", "is_new": True},
+        {"id": "bbbb", "apply_url": "https://x/2", "first_seen": "2026-09-18", "is_new": True},
+        # Same posting, but the employer edited the title, so the id moved: the URL still finds it.
+        {"id": "cccc", "apply_url": "https://x/3", "first_seen": "2026-09-18", "is_new": True},
+        # Genuinely first seen today.
+        {"id": "dddd", "apply_url": "https://x/4", "first_seen": "2026-09-18", "is_new": True},
+    ]
+    assert carry_first_seen(listings, str(tmp_path), today=today) == 3
+    assert listings[0]["first_seen"].startswith("2026-09-01")
+    assert listings[2]["first_seen"].startswith("2026-09-02")   # matched on the URL, not the id
+    assert listings[3]["first_seen"] == "2026-09-18"            # nothing to carry
+    # New means first seen inside the window, so the badge stops meaning "every listing".
+    assert [x["is_new"] for x in listings] == [False, True, False, True]
+
+
+def test_a_first_export_has_nothing_to_carry_and_does_not_mind(tmp_path):
+    listings = [{"id": "aaaa", "apply_url": "https://x/1", "first_seen": "2026-09-18"}]
+    assert carry_first_seen(listings, str(tmp_path)) == 0
+    assert listings[0]["is_new"] is True
+    # An unreadable shard is skipped rather than failing the run.
+    (tmp_path / "listings").mkdir()
+    (tmp_path / "listings" / "MA.json").write_text("{not json", encoding="utf-8")
+    assert carry_first_seen(listings, str(tmp_path)) == 0

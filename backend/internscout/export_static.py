@@ -143,6 +143,69 @@ def still_student_opportunities(listings: list[dict]) -> list[dict]:
     return [x for x in listings if x["stage"]]
 
 
+NEW_DAYS = 7
+
+
+def _seen_within(stamp: str | None, today, days: int) -> bool:
+    """Whether a first-seen stamp falls inside the window. An unreadable one counts as new."""
+    if not stamp:
+        return True
+    try:
+        seen = datetime.fromisoformat(stamp.replace("Z", "+00:00")).date()
+    except ValueError:
+        return True
+    return (today - seen).days < days
+
+
+def carry_first_seen(listings: list[dict], out_dir: str, today=None) -> int:
+    """Give each listing the first-seen date it had in the export this one replaces.
+
+    CI keeps no database between runs, so first_seen was set to the moment of the run every
+    time and is_new - which the pipeline sets on insert and clears on update - was never once
+    cleared. All 13,652 listings in the last export carried first_seen of that morning and
+    is_new true. The New badge sat on every card, the New-only filter removed nothing, and
+    the sort that breaks ties on first_seen had nothing to break them with.
+
+    The last export is still on disk when this runs - CI commits it and checks it out again -
+    so it is the record the database is not. A listing found there keeps the date it had.
+
+    Matched on the id first, and on the apply URL when the id misses. The URL catches the two
+    cases the id cannot: the run this ships in, where the previous export still carries the
+    old row-order ids, and a posting whose title the employer edited afterwards, which changes
+    the dedupe key the id is built from but is plainly the same posting.
+    """
+    shard_dir = os.path.join(out_dir, "listings")
+    by_id: dict[str, str] = {}
+    by_url: dict[str, str] = {}
+    for name in sorted(os.listdir(shard_dir)) if os.path.isdir(shard_dir) else []:
+        if not name.endswith(".json") or name == "index.json":
+            continue
+        try:
+            with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
+                items = json.load(f)
+        except (OSError, ValueError):   # a half-written shard is not worth failing a run over
+            continue
+        if not isinstance(items, list):
+            continue
+        for it in items:
+            seen = it.get("first_seen")
+            if not seen:
+                continue
+            by_id.setdefault(str(it.get("id")), seen)
+            if it.get("apply_url"):
+                by_url.setdefault(it["apply_url"], seen)
+
+    today = today or datetime.now(timezone.utc).date()
+    carried = 0
+    for x in listings:
+        seen = by_id.get(str(x.get("id"))) or by_url.get(x.get("apply_url") or "")
+        if seen:
+            x["first_seen"] = seen
+            carried += 1
+        x["is_new"] = _seen_within(x.get("first_seen"), today, NEW_DAYS)
+    return carried
+
+
 def export(out_dir: str) -> dict:
     init_db()
     os.makedirs(out_dir, exist_ok=True)
@@ -151,6 +214,9 @@ def export(out_dir: str) -> dict:
             select(Listing).order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
         listings = still_student_opportunities([_listing_dict(r) for r in rows])
+        # Before write_shards overwrites it: the export on disk is the only record of when
+        # we first saw any of this, because the database does not outlive the run.
+        carried = carry_first_seen(listings, out_dir)
         generated_at = datetime.now(timezone.utc).isoformat()
         stats = {
             "total": len(listings),
@@ -181,6 +247,8 @@ def export(out_dir: str) -> dict:
         os.remove(legacy)
     _dump(stats, os.path.join(out_dir, "stats.json"), indent=2)
     _dump(majors_export(), os.path.join(out_dir, "majors.json"))
+    print(f"[export] {carried} of {len(listings)} listings kept a first-seen date from the "
+          f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days")
     index = write_shards(listings, out_dir, generated_at)
     print(f"[export] wrote {len(listings)} listings ({len(index['files'])} state files) to {out_dir}")
     return stats
