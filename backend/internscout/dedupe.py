@@ -75,7 +75,7 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
             # region locations can differ per source: keep the union
             g = cur["geo"] = dict(cur["geo"])
             g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
-    return _fold_untermed(out)
+    return _fold_same_url(_fold_untermed(out))   # was: return _fold_untermed(out)
 
 
 def _fold_untermed(out: dict[str, dict]) -> dict[str, dict]:
@@ -111,6 +111,55 @@ def _fold_untermed(out: dict[str, dict]) -> dict[str, dict]:
                           "within_radius", "distance_miles"):
                     cur[f] = it[f]
             for f in ("apply_url", "sector", "description"):
+                if not cur.get(f) and it.get(f):
+                    cur[f] = it[f]
+            g = cur["geo"] = dict(cur["geo"])
+            g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
+    return out
+
+
+def _fold_same_url(out: dict[str, dict]) -> dict[str, dict]:
+    """Fold a curated list's copy of a posting into the employer's own row for it.
+
+    The dedupe key is built from the title, and the GitHub lists write their own: Waymo's board says
+    "2027 Summer Intern, BS/MS, Software Engineer" and the list says "Software Engineer Intern -
+    BS/MS", both pointing at the one Workday URL. Two keys, so the student saw the job twice - 540
+    apply URLs carried two or three open rows in the 2026-09-19 export, 4% of the board.
+
+    A row is folded only into a row that a board fetcher produced for the same URL. That is what
+    makes the URL a single posting's own page rather than a careers page several list entries
+    share, so two list rows that merely share a link are left alone, and so are two board rows.
+    The employer's title, company name and key win (the id stays what the board gives it), and a
+    term the board row could not read is taken from the list row. Rows whose terms disagree are
+    not the same thing to apply to and are left as they were.
+    """
+    from .sources import BOARD_FETCHERS   # here, not at the top: sources imports half the package
+
+    def from_board(it):
+        return any(src in BOARD_FETCHERS for src, _ in it["_sources"])
+
+    by_url: dict[str, list[str]] = defaultdict(list)
+    for k, it in out.items():
+        canon = _canon_job(it.get("apply_url"))
+        if canon:
+            by_url[canon].append(k)
+    for keys in by_url.values():
+        boards = [k for k in keys if from_board(out[k])]
+        if len(keys) < 2 or len(boards) != 1:
+            continue
+        cur = out[boards[0]]
+        for key in [k for k in keys if k != boards[0]]:
+            it = out[key]
+            if any(cur.get(f) and it.get(f) and cur[f] != it[f] for f in ("season", "year")):
+                continue
+            out.pop(key)
+            cur["_sources"].extend(it["_sources"])
+            for f in ("season", "year"):           # "Summer" from the board, "Summer 2027" from the list
+                if not cur.get(f) and it.get(f):
+                    cur[f] = it[f]
+            season, year = cur.get("season"), cur.get("year")   # the same wording normalize() gives a term
+            cur["term"] = (f"{season} {year}" if year else str(season)).strip() if season else None
+            for f in ("sector", "description", "salary", "duration", "posted_at"):
                 if not cur.get(f) and it.get(f):
                     cur[f] = it[f]
             g = cur["geo"] = dict(cur["geo"])

@@ -257,3 +257,50 @@ def test_an_untermed_posting_over_a_year_old_is_dropped():
     assert not _zombie(datetime(2025, 10, 1, tzinfo=timezone.utc), None, None, now)
     assert not _zombie(datetime(2024, 1, 1, tzinfo=timezone.utc), "Summer", 2027, now)   # a term decides, not the date
     assert not _zombie(None, None, None, now)
+
+
+# --- a curated list's copy of a posting folds into the employer's own row ---------------------
+def _posting(title, url, where="Boston, MA", source="workday", company="Acme"):
+    from internscout.normalize import normalize
+    from internscout.sources.common import board_item
+    raw = board_item({"name": company, "ats_token": "x"}, source=source, title=title,
+                     locations=[where], url=url, employment_type="Intern")
+    raw["apply_url"] = url
+    return normalize(raw)
+
+
+WAYMO = "https://waymo.wd1.myworkdayjobs.com/waymo/job/Mountain-View/Software-Engineer-Intern_R1"
+
+
+def test_a_lists_retitled_copy_of_a_board_posting_is_one_listing():
+    from internscout.dedupe import merge_batch
+    board = _posting("2027 Summer Intern, BS/MS, Software Engineer", WAYMO)
+    listed = _posting("Software Engineer Intern - BS/MS", WAYMO, source="simplify")
+    assert board["dedupe_key"] != listed["dedupe_key"]
+    for batch in ([board, listed], [listed, board]):      # whichever arrives first
+        merged = merge_batch([dict(x) for x in batch])
+        assert list(merged) == [board["dedupe_key"]]       # the employer's row and its id are kept
+        kept = merged[board["dedupe_key"]]
+        assert kept["title"] == board["title"]
+        assert {s for s, _ in kept["_sources"]} == {"workday", "simplify"}
+
+
+def test_the_board_row_takes_a_term_only_the_list_knew():
+    from internscout.dedupe import merge_batch
+    board = _posting("Sophomore Internship Program - Software Engineer", WAYMO)
+    listed = _posting("Software Engineer Intern, Summer 2027", WAYMO, source="simplify")
+    kept = merge_batch([board, listed])[board["dedupe_key"]]
+    assert (kept["season"], kept["year"], kept["term"]) == ("Summer", 2027, "Summer 2027")
+
+
+def test_rows_that_share_a_link_but_no_board_row_are_left_alone():
+    from internscout.dedupe import merge_batch
+    # A careers page two list entries both point at: nothing says it is one posting.
+    page = "https://example.com/careers/internships"
+    a = _posting("Software Engineer Intern", page, source="simplify")
+    b = _posting("Product Manager Intern", page, source="simplify")
+    assert len(merge_batch([a, b])) == 2
+    # Two terms of one posting are two things to apply to, board row or not.
+    fall = _posting("Data Intern - Fall 2026", WAYMO)
+    spring = _posting("Data Analyst Intern, Spring 2027", WAYMO, source="simplify")
+    assert len(merge_batch([fall, spring])) == 2
