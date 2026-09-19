@@ -6966,9 +6966,8 @@
   "careers-lmi": {
    "name": "LMI ",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-lynker": {
    "name": "Lynker",
@@ -14173,10 +14172,9 @@
   "christianacare|wd5|CCHS": {
    "name": "ChristianaCare",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-09-19"
+   "sector": "health"
   },
   "christies|wd3|Christies_Careers": {
    "name": "Christie's",
@@ -15289,9 +15287,8 @@
   "fhlbtopeka|wd1|FHLBT": {
    "name": "FHLBank Topeka",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "fifththird|wd5|53careers": {
    "name": "Fifth Third Bank",
@@ -17621,10 +17618,9 @@
   "nike|wd1|nke": {
    "name": "Nike",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-09-19"
+   "sector": "hospitality_sports"
   },
   "nio|wd3|NIO_Careers": {
    "name": "Nio",
