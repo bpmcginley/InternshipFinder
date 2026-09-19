@@ -471,6 +471,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "DatologyAI": {
+   "name": "DatologyAI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-19"
+  },
   "decagon": {
    "name": "Decagon",
    "quant": false,
@@ -6960,8 +6966,9 @@
   "careers-lmi": {
    "name": "LMI ",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-09-19"
   },
   "careers-lynker": {
    "name": "Lynker",
@@ -9570,10 +9577,9 @@
   "ebcs.fa.em2.oraclecloud.com|CX_1": {
    "name": "Arcadis",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "energy_environment",
-   "last_fail": "2026-09-19"
+   "sector": "energy_environment"
   },
   "ebgj.fa.us2.oraclecloud.com|CX_1": {
    "name": "Texas Instruments",
@@ -9584,9 +9590,8 @@
   "ebwb.fa.us2.oraclecloud.com|CX": {
    "name": "Hologic",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ebwg.fa.us2.oraclecloud.com|CX": {
    "name": "ACI Worldwide ",
@@ -9609,9 +9614,8 @@
   "ecge.fa.us2.oraclecloud.com|CX_1003": {
    "name": "Blue Shield of California",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ecnf.fa.us2.oraclecloud.com|CX": {
    "name": "Tradeweb",
@@ -9664,9 +9668,8 @@
   "eeho.fa.us2.oraclecloud.com|CX_45001": {
    "name": "Oracle",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "eeik.fa.us2.oraclecloud.com|CX_1": {
    "name": "University of Wyoming",
@@ -9703,9 +9706,8 @@
   "efds.fa.em5.oraclecloud.com|CX_1": {
    "name": "Ford Motor Company",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "efet.fa.us2.oraclecloud.com|CX_1009": {
    "name": "Hilton Worldwide",
@@ -9748,9 +9750,8 @@
   "egug.fa.us2.oraclecloud.com|CX_1": {
    "name": "American Express",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "egup.fa.us2.oraclecloud.com|CX": {
    "name": "Vertiv",
@@ -9834,10 +9835,9 @@
   "ejwl.fa.us2.oraclecloud.com|CX": {
    "name": "Marriott International",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-09-19"
+   "sector": "hospitality_sports"
   },
   "ekaw.fa.us2.oraclecloud.com|CX": {
    "name": "Securitas",
@@ -9951,10 +9951,9 @@
   "eppr.fa.us2.oraclecloud.com|CX_2": {
    "name": "Northwell Health",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "health",
-   "last_fail": "2026-09-19"
+   "sector": "health"
   },
   "erqh.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Atlantic Health System",
@@ -10128,9 +10127,8 @@
   "fa-exby-saasfaprod1.fa.ocs.oraclecloud.com|CX_1013": {
    "name": "BC Pensions",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-exhh-saasfaprod1.fa.ocs.oraclecloud.com|StaplesInc": {
    "name": "Staples",
@@ -10142,9 +10140,8 @@
   "fa-exjq-saasfaprod1.fa.ocs.oraclecloud.com|SHEIN": {
    "name": "SHEIN",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-exki-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Fanatics",
@@ -10247,9 +10244,8 @@
   "hcut.fa.ap2.oraclecloud.com|CX_1": {
    "name": "APL Logistics",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hcwp.fa.us2.oraclecloud.com|CX_1": {
    "name": "Coherent ",
@@ -10340,9 +10336,8 @@
   "jpmc.fa.oraclecloud.com|CX_1001": {
    "name": "JPMorgan Chase",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-14"
   }
  },
  "recruitee": {
