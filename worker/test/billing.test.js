@@ -195,6 +195,47 @@ describe("webhook", () => {
     assert.equal(me.can_upgrade, true);
   });
 
+  // The event id is recorded before the plan row is written. If that write fails, Stripe retries,
+  // and the retry must not be waved through as a repeat or the student paid for nothing.
+  it("applies the retry of an event whose first attempt failed", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    const prepare = db.prepare;
+    db.prepare = (q) => {
+      if (q.startsWith("INSERT INTO plans")) throw new Error("D1 is down");
+      return prepare(q);
+    };
+    assert.equal((await post(api, completed(user))).status, 500);
+    db.prepare = prepare;
+    const again = await post(api, completed(user));
+    assert.equal(again.status, 200);
+    assert.notEqual((await again.json()).repeat, true);
+    assert.equal((await (await api("GET", "/me", { token: await token() })).json()).plan, "supporter");
+  });
+
+  // Stripe does not deliver in order. A late "updated: active" after the subscription ended must not
+  // hand the plan back.
+  it("reads a subscription's state from Stripe rather than from a possibly stale update event", async () => {
+    let live = "active";
+    const { api, db, token, fetch } = await setup({
+      env: PAID,
+      stripe: (url) => url.includes("subscriptions/")
+        ? Response.json({ id: "sub_1", status: live, customer: "cus_1", current_period_end: 1794000000 })
+        : Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" }),
+    });
+    const user = await whoami(api, token, db);
+    await post(api, completed(user));
+    live = "canceled";
+    await post(api, {
+      id: "evt_late", type: "customer.subscription.updated",
+      data: { object: { id: "sub_1", customer: "cus_1", status: "active", metadata: { user_hash: user } } },
+    });
+    assert.equal((await (await api("GET", "/me", { token: await token() })).json()).plan, "free");
+    const read = fetch.calls.filter((c) => c.url.includes("subscriptions/sub_1")).pop();
+    assert.equal(read.init.method, "GET");
+    assert.equal(read.init.body, undefined);
+  });
+
   it("ignores an unpaid session and an unknown event type", async () => {
     const { api, db, token } = await setup({ env: PAID });
     const user = await whoami(api, token, db);

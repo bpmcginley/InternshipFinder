@@ -48,7 +48,7 @@ function need(env, config) {
   if (!paymentsOn(env, config)) throw new HttpError(404, "not_found", "Paid plans are not turned on");
 }
 
-async function stripe(env, path, form, fetchImpl, idempotencyKey) {
+async function stripe(env, path, form, fetchImpl, idempotencyKey, method = "POST") {
   const headers = {
     Authorization: "Bearer " + env.STRIPE_SECRET_KEY,
     "Content-Type": "application/x-www-form-urlencoded",
@@ -57,7 +57,7 @@ async function stripe(env, path, form, fetchImpl, idempotencyKey) {
     "Stripe-Version": STRIPE_API_VERSION,
   };
   if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const res = await fetchImpl(API + path, { method: "POST", headers, body: new URLSearchParams(form).toString() });
+  const res = await fetchImpl(API + path, method === "GET" ? { method, headers } : { method, headers, body: new URLSearchParams(form).toString() });
   const text = await res.text();
   let data = null;
   try {
@@ -202,7 +202,19 @@ export function planFrom(env, config, o, fallback = "supporter") {
 }
 
 export async function applyEvent(db, env, config, event, now, fetchImpl) {
-  if (!(await firstTime(db, String(event.id || crypto.randomUUID()), now))) return { ok: true, repeat: true };
+  const id = String(event.id || crypto.randomUUID());
+  if (!(await firstTime(db, id, now))) return { ok: true, repeat: true };
+  try {
+    return await applyFresh(db, env, config, event, now, fetchImpl);
+  } catch (e) {
+    // The id was recorded before the change was made. If the change then failed, forget the id, or
+    // Stripe's retry would be waved through as a repeat and a student who paid would stay on free.
+    await db.prepare("DELETE FROM stripe_events WHERE id = ?").bind(id).run().catch(() => {});
+    throw e;
+  }
+}
+
+async function applyFresh(db, env, config, event, now, fetchImpl) {
   const o = (event.data && event.data.object) || {};
 
   if (event.type === "checkout.session.completed") {
@@ -227,13 +239,21 @@ export async function applyEvent(db, env, config, event, now, fetchImpl) {
     const user = (o.metadata && o.metadata.user_hash) ||
       (await db.prepare("SELECT user_hash FROM plans WHERE subscription = ?").bind(o.id || "").first() || {}).user_hash;
     if (!user) return { ok: true, ignored: true };
-    const status = event.type === "customer.subscription.deleted" ? "canceled" : (o.status || "canceled");
+    // Stripe does not promise events in order, and a retried "updated: active" can land hours after
+    // the "deleted" that ended the subscription, which would hand the plan back for good. So an
+    // update is only a nudge: what the subscription is now is read from Stripe. If that read fails,
+    // the event's own copy is the best we have.
+    const live = event.type === "customer.subscription.updated" && o.id
+      ? await stripe(env, "subscriptions/" + encodeURIComponent(o.id), {}, fetchImpl, null, "GET").catch(() => null)
+      : null;
+    const sub = live && live.id === o.id ? live : o;
+    const status = event.type === "customer.subscription.deleted" ? "canceled" : (sub.status || "canceled");
     await savePlan(db, user, {
-      plan: ACTIVE.has(status) ? planFrom(env, config, o) : "free",
+      plan: ACTIVE.has(status) ? planFrom(env, config, sub) : "free",
       status,
-      customer: o.customer,
+      customer: sub.customer || o.customer,
       subscription: o.id,
-      periodEnd: endOf(o),
+      periodEnd: endOf(sub),
     }, now);
     return { ok: true };
   }

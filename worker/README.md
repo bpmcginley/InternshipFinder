@@ -141,6 +141,12 @@ row but stop being charged only once you cancel their subscriptions in Stripe, s
 - Global monthly budget: `MONTHLY_BUDGET_CENTS` in `wrangler.toml` ($75). Keep the Google Cloud
   budget alert in step with it. It is the backstop that stops AI before a surprise bill arrives, so
   raise it and a per-student allowance together only once you have real usage numbers.
+- What one account may cost in a month: `USER_BUDGET_CENTS` in `src/config.js` ($3 free, $4.50
+  Supporter, $11 Pro). It sits well above what a full allowance costs, so honest use never meets
+  it; it is what stops one modified client from spending the whole global budget through the
+  uncapped Deep Dive. Keep each paid row under what the plan brings in after Stripe's cut.
+- Token totals and the cache hit rate for a month:
+  `npx wrangler d1 execute internscout --remote --command "SELECT * FROM tokens"` (`cached / prompt`).
 - AI calls per minute across everyone: `GLOBAL_RPM`. This is the guard against a busy hour spending
   the whole Gemini per-minute quota, which would answer every student with upstream errors instead
   of turning away only the newest arrivals. Read your account's real number at

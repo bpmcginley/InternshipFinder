@@ -70,3 +70,32 @@ test("SSE reader keeps the last usageMetadata", async () => {
   const stream = new Response(text).body;
   assert.deepEqual(await readUsageFromSSE(stream), { promptTokenCount: 9 });
 });
+
+test("sanitizer keeps only the part kinds the extension sends; a file by reference never gets through", () => {
+  const out = sanitizeRequest({
+    contents: [
+      { role: "user", extra: 1, parts: [
+        { text: "hi", thoughtSignature: "sig" },
+        { fileData: { fileUri: "https://www.youtube.com/watch?v=x", mimeType: "video/mp4" } },
+        { inlineData: { mimeType: "application/pdf", data: "QUJD", junk: 1 } },
+        { functionResponse: { name: "f", id: "1", response: { result: "ok" }, parts: [{ fileData: { fileUri: "gs://x" } }] } },
+        { executableCode: { code: "print(1)" } },
+      ] },
+      { role: "model", parts: [{ functionCall: { name: "f", id: "1", args: { a: 1 } } }] },
+      { role: "user", parts: [{ fileData: { fileUri: "https://example.com/big.pdf" } }] },
+    ],
+    systemInstruction: { parts: [{ text: "be brief" }, { fileData: { fileUri: "gs://y" } }] },
+  }, "deep_dive", CONFIG);
+  assert.deepEqual(out.contents, [
+    { role: "user", parts: [
+      { text: "hi", thoughtSignature: "sig" },
+      { inlineData: { mimeType: "application/pdf", data: "QUJD" } },
+      { functionResponse: { name: "f", id: "1", response: { result: "ok" } } },
+    ] },
+    { role: "model", parts: [{ functionCall: { name: "f", id: "1", args: { a: 1 } } }] },
+  ]);
+  assert.deepEqual(out.systemInstruction, { parts: [{ text: "be brief" }] });
+  assert.ok(!JSON.stringify(out).includes("fileUri"));
+  assert.throws(() => sanitizeRequest({ contents: [{ role: "user", parts: [{ fileData: { fileUri: "gs://z" } }] }] }, "deep_dive", CONFIG),
+                (e) => e.status === 400);
+});

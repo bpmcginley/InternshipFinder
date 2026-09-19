@@ -100,7 +100,12 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
 
 ### `DELETE /me` (auth)
-Deletes every usage, demand and plan row for this user. Returns `{ "ok": true }`.
+Deletes this user's demand and plan rows and every usage, run and spend row from earlier months. Returns `{ "ok": true }`.
+
+This month's usage, run, spend and rate rows stay until the month ends: they are a hashed ID and
+numbers, and deleting them on request would let an account at its cap reset it by deleting and
+signing in again. A `forget` row marks the account, and the daily cron removes the rest once the
+month is over.
 
 While a subscription is active it returns `409 subscribed` instead: cancelling in Stripe has to come
 first, so nothing keeps billing a card for an account that no longer exists here.
@@ -121,6 +126,15 @@ Body:
   - A multi-call Auto-Apply or Deep Dive run costs 1 unit.
   - Each run is capped at `MAX_CALLS_PER_RUN` calls (config; default 60). Past that, the Worker returns `429 cap`.
   - A missing `run_id` means every call is its own run.
+- **Account ceiling:** each account may cost at most `USER_BUDGET_CENTS[plan]` a month over all tasks
+  (config; free 300, supporter 450, pro 1100 cents; a `general` free account gets `GENERAL_ALLOWANCE_PCT`
+  of the free row). Past it the Worker returns `429 cap` with `resets`. This is what bounds the
+  uncapped Deep Dive; a student using the extension as built never reaches it.
+- **Body size:** `TASKS[task].maxBodyBytes` (200 KB for `field_match` and `short_answer`, 1.5 MB for
+  `resume_tailor` and `autofill`); only `deep_dive` may use the full `MAX_BODY_BYTES`. Over it: `400 bad_request`.
+- **Parts:** a part may carry `text`, `inlineData`, `functionCall`, `functionResponse` (`response` only)
+  and `thoughtSignature`. Anything else is dropped, `fileData` above all: a `fileUri` makes Gemini
+  fetch a file by reference, so a tiny request could cost a million input tokens.
 - **Rate limits:** 10 calls/min and 300 calls/day per user, counted over all tasks. On top of that,
   `GLOBAL_RPM` calls/min across every user together; over that the Worker returns `503 busy` without
   spending the caller's rate bucket or allowance.
@@ -128,7 +142,11 @@ Body:
 - **Success headers:**
   - `X-InternScout-Model`
   - `X-InternScout-Remaining`: units left for this task this month
-- **Cost tracking:** each call's `usageMetadata` tokens are priced from the config table and added to the month's budget. Prompts and replies are never stored or logged.
+- **Cost tracking:** an estimate (body size plus a full-length reply) is charged to the month's budget and the
+  account's `spend` row before Gemini is called, then corrected to the priced `usageMetadata` afterwards; a
+  Gemini failure gives the unit and the estimate back. Every limit is one conditional write, so a parallel
+  burst cannot pass a cap between a read and a write. Token totals per month (calls, prompt, cached, output)
+  go in `tokens`; `cached / prompt` is the cache hit rate. Prompts and replies are never stored or logged.
 
 ### `POST /demand` (auth)
 Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (max 60). Replaces the user's row. Returns `{ "ok": true }`.

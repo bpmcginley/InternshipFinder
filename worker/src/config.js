@@ -4,13 +4,15 @@
 export const FLASH = "gemini-3.8-flash";
 export const FLASH_LITE = "gemini-3.5-flash-lite";
 
-// Per task: model, output-token ceiling, thinking ceiling, monthly allowance in units (runs).
+// Per task: model, output-token ceiling, thinking ceiling, monthly allowance in units (runs), and the
+// largest request body. Only the Deep Dive carries a PDF; the other tasks send text, so a body far
+// bigger than they ever build is a modified client, and input tokens are what a call costs.
 // An allowance of null means no monthly cap: the rate limits and the budget stop still apply.
 export const TASKS = {
-  field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 260 },
-  short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 80 },
-  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 10 },
-  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 20 },
+  field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 260, maxBodyBytes: 200_000 },
+  short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 80, maxBodyBytes: 200_000 },
+  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 10, maxBodyBytes: 1_500_000 },
+  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 20, maxBodyBytes: 1_500_000 },
   // The Deep Dive is done once and costs a few cents, so it is not capped (Bruce, 2026-09-18). It used
   // to be 2 a month, and the first real one ran out after two interview replies because the extension
   // sent no run_id and every reply counted as its own Deep Dive.
@@ -77,6 +79,14 @@ export const PLANS = {
   pro: { multiplier: 6, priceText: "$12/month", priceEnv: "STRIPE_PRICE_ID_PRO", textEnv: "PRO_PRICE_TEXT", label: "Pro", rate: PRO_RATE },
 };
 
+// What one account may cost in a month, in cents, whatever tasks it is spent on. A full free .edu
+// allowance costs about $1.50 and a Deep Dive a few cents more, so these sit well clear of honest use;
+// the paid rows stay under what the plan brings in after Stripe's cut ($4.56 and $11.35). A "general"
+// free account gets GENERAL_ALLOWANCE_PCT of the free row, like its allowances. This is what bounds a
+// task with no unit cap (the Deep Dive): without it one modified client could spend the whole
+// MONTHLY_BUDGET_CENTS and pause AI for everyone.
+export const USER_BUDGET_CENTS = { free: 300, supporter: 450, pro: 1100 };
+
 // The paid plans, cheapest first. Order is what the dashboard shows.
 export const PAID_PLANS = ["supporter", "pro"];
 
@@ -84,6 +94,7 @@ export const CONFIG = {
   TASKS,
   ALLOWANCE_CHANGES,
   PLANS,
+  USER_BUDGET_CENTS,
   THINKING_LEVELS,
   PRICES,
   FALLBACK_PRICE,

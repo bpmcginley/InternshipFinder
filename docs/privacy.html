@@ -79,7 +79,7 @@
         <li>AI requests pass through our server to Google's paid Gemini API. We don't store them, and they aren't used to train AI.</li>
         <li>We keep only a scrambled sign-in ID, your monthly usage counts and the states you picked.</li>
         <li>We never see your password.</li>
-        <li>You can delete all of it at any time.</li>
+        <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
       </ul>
     </div>
 
@@ -131,6 +131,7 @@
         <tbody>
           <tr><td>Hashed sign-in ID</td><td>To tie your usage counts together without knowing who you are.</td></tr>
           <tr><td>Monthly usage counts per AI task (for example, "3 tailored resumes in September"), with a random ID for each run</td><td>To enforce the monthly allowance.</td></tr>
+          <tr><td>One number per month: roughly what your AI use has cost us, in cents</td><td>So a single account can't use up the budget that pays for everyone's AI. It is removed when the month ends.</td></tr>
           <tr><td>Short-term call counters (per minute and per day)</td><td>To stop abuse.</td></tr>
           <tr><td>The states you picked, and when you last changed them</td><td>So the scanner fetches fuller listings where students are looking. The scanner only gets totals per state, never who picked what. Picks stop counting after 90 days without activity.</td></tr>
         </tbody>
@@ -152,7 +153,7 @@
 
     <h2 id="delete">Delete your data</h2>
     <ol>
-      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. This removes all usage and state rows tied to your hashed ID right away. If you use AI features again later, new counts start from zero.</li>
+      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record and everything from earlier months are removed right away. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
       <li><strong>In your browser:</strong> clear site data for <code>bpmcginley.github.io</code>. In Chrome, click the icon left of the address bar, then <em>Site settings</em>, then <em>Delete data</em>. This removes your dashboard profile and saved statuses.</li>
       <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li>
     </ol>

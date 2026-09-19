@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CAPPED_DEEP_DIVE, aiBody, setup } from "./helpers.js";
 import { FLASH, FLASH_LITE } from "../src/config.js";
-import { GLOBAL_USER } from "../src/limits.js";
+import { GLOBAL_USER, cleanup } from "../src/limits.js";
 
 const me = async (w, token) => (await w.api("GET", "/me", { token })).json();
 const geminiCalls = (w) => w.fetch.calls.filter((c) => c.url.includes("generativelanguage"));
@@ -224,7 +224,7 @@ test("prompt text, email, name and token never reach the DB or the logs", async 
   assert.match(dump.usage[0].user_hash, /^[0-9a-f]{64}$/);
 });
 
-test("DELETE /me removes this user's rows only", async () => {
+test("DELETE /me removes this user's states at once and leaves other students alone", async () => {
   const w = await setup();
   const a = await w.token();
   const b = await w.token({ sub: "other-student" });
@@ -239,20 +239,118 @@ test("DELETE /me removes this user's rows only", async () => {
   const res = await w.api("DELETE", "/me", { token: a });
   assert.deepEqual(await res.json(), { ok: true });
   const after = w.db.dump();
-  // The deployment-wide rate counter is keyed "*" and holds a call count, not a person. Like budget
-  // it is nobody's personal data, so it is not a user's to delete -- exclude it before checking that
-  // every per-user row for the deleted student is gone.
-  const mine = (rows) => rows.filter((r) => r.user_hash !== GLOBAL_USER);
-  for (const t of ["usage", "runs", "rate", "demand"]) {
-    const rows = mine(after[t]);
-    const users = new Set(rows.map((r) => r.user_hash));
-    assert.equal(users.size, 1, t);
-    assert.equal(rows.length, mine(before[t]).length / 2, t);
-  }
+  assert.equal(after.demand.length, 1, "the deleted student's states go right away");
+  assert.equal(after.forget.length, 1, "and the account is marked for the month-end sweep");
+  assert.deepEqual(Object.keys(after.forget[0]).sort(), ["month", "user_hash"]);
   assert.equal(after.budget.length, 1, "spend is not per-user and stays");
   assert.ok(after.rate.some((r) => r.user_hash === GLOBAL_USER), "the global rate counter is not a user's to delete");
-  assert.equal((await me(w, a)).allowance.autofill.used, 0);
   assert.equal((await me(w, b)).allowance.autofill.used, 1);
+});
+
+// Deleting used to wipe this month's counters too, so an account at its cap could delete itself,
+// sign in again and start the month over, as often as it liked.
+test("DELETE /me cannot be used to reset this month's limits; the counters go when the month ends", async () => {
+  const w = await setup({ config: CAPPED_DEEP_DIVE });
+  const token = await w.token();
+  for (const run of ["a", "b"]) assert.equal((await w.api("POST", "/ai", { token, body: aiBody("deep_dive", run) })).status, 200);
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("deep_dive", "c") })).status, 429);
+
+  assert.equal((await w.api("DELETE", "/me", { token })).status, 200);
+  const res = await w.api("POST", "/ai", { token, body: aiBody("deep_dive", "d") });
+  assert.equal(res.status, 429, "still at the cap after deleting");
+  assert.equal((await res.json()).error, "cap");
+  assert.equal((await me(w, token)).allowance.deep_dive.used, 2);
+
+  // Earlier months hold no limit worth protecting, so they go at once.
+  await w.db.prepare("INSERT INTO usage (user_hash, month, task, units) SELECT user_hash, '2026-08', task, units FROM usage").run();
+  assert.equal((await w.api("DELETE", "/me", { token })).status, 200);
+  assert.deepEqual(w.db.dump().usage.map((r) => r.month), ["2026-09"]);
+
+  // The daily cron in the new month finishes the job.
+  await cleanup(w.db, new Date("2026-10-01T00:10:00Z"));
+  const swept = w.db.dump();
+  for (const t of ["usage", "runs", "spend", "forget"]) assert.equal(swept[t].length, 0, t);
+});
+
+// The Deep Dive has no unit cap and a fresh run_id is free, so before this ceiling a modified client
+// could label every call deep_dive and spend the whole month's budget from one free account.
+test("one account cannot spend past its own monthly ceiling, whatever task it names", async () => {
+  const w = await setup({ config: { USER_BUDGET_CENTS: { free: 0.5 } } });   // each fake call costs 0.1875c
+  const token = await w.token();
+  const statuses = [];
+  for (let i = 0; i < 5; i++) statuses.push((await w.api("POST", "/ai", { token, body: aiBody("deep_dive", "dd-" + i) })).status);
+  assert.deepEqual(statuses, [200, 200, 200, 429, 429]);
+  const err = await (await w.api("POST", "/ai", { token, body: aiBody("field_match", "fm") })).json();
+  assert.equal(err.error, "cap");
+  assert.ok(err.resets, "the client words it as a monthly limit");
+  assert.equal(geminiCalls(w).length, 3, "a refused call never reaches Gemini");
+  const dump = w.db.dump();
+  assert.equal(dump.usage.find((r) => r.task === "deep_dive").units, 3, "a refused call gives its unit back");
+  assert.ok(Math.abs(dump.spend[0].cents - 3 * 0.1875) < 1e-9);
+  assert.deepEqual(Object.keys(dump.spend[0]).sort(), ["cents", "month", "user_hash"]);
+
+  // Someone else is not affected, and a general account gets half the ceiling.
+  const other = await w.token({ sub: "other-student" });
+  assert.equal((await w.api("POST", "/ai", { token: other, body: aiBody("deep_dive", "x") })).status, 200);
+  const general = await w.token({ sub: "not-edu", email: "someone@gmail.com", hd: undefined });
+  const got = [];
+  for (let i = 0; i < 3; i++) got.push((await w.api("POST", "/ai", { token: general, body: aiBody("deep_dive", "g-" + i) })).status);
+  assert.deepEqual(got, [200, 200, 429]);
+});
+
+test("the real ceilings leave room for a full allowance and stay under what a plan brings in", async () => {
+  const { CONFIG } = await import("../src/config.js");
+  assert.ok(CONFIG.USER_BUDGET_CENTS.free >= 200 && CONFIG.USER_BUDGET_CENTS.free < CONFIG.MONTHLY_BUDGET_CENTS / 10);
+  assert.ok(CONFIG.USER_BUDGET_CENTS.supporter <= 456);
+  assert.ok(CONFIG.USER_BUDGET_CENTS.pro <= 1135);
+});
+
+// admit() used to read the counters and write them afterwards, so a burst sent at once all read
+// "one left" and all passed.
+test("a parallel burst cannot slip past the monthly cap or the per-minute limit", async () => {
+  const w = await setup({ config: CAPPED_DEEP_DIVE });
+  const token = await w.token();
+  const burst = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+    w.api("POST", "/ai", { token, body: aiBody("deep_dive", "burst-" + i) })));
+  assert.equal(burst.filter((r) => r.status === 200).length, 2);
+  assert.equal((await me(w, token)).allowance.deep_dive.used, 2);
+
+  const r = await setup();
+  const t2 = await r.token();
+  const fast = await Promise.all(Array.from({ length: 25 }, () => r.api("POST", "/ai", { token: t2, body: aiBody("field_match") })));
+  assert.equal(fast.filter((x) => x.status === 200).length, 10);
+  assert.equal(geminiCalls(r).length, 10);
+});
+
+test("only the Deep Dive may send a large body", async () => {
+  const w = await setup();
+  const token = await w.token();
+  const big = "x".repeat(300_000);
+  const small = await w.api("POST", "/ai", { token, body: aiBody("field_match", "r1", big) });
+  assert.equal(small.status, 400);
+  assert.equal((await small.json()).error, "bad_request");
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("deep_dive", "r2", big) })).status, 200);
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("autofill", "r3", big) })).status, 200);
+  assert.equal(geminiCalls(w).length, 2);
+});
+
+test("a Gemini failure gives back the unit, the run and the estimate", async () => {
+  const w = await setup({ gemini: () => Response.json({ error: { status: "UNAVAILABLE" } }, { status: 503 }) });
+  const token = await w.token();
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("autofill", "run-1") })).status, 502);
+  const dump = w.db.dump();
+  assert.equal(dump.runs.length, 0);
+  assert.equal((await me(w, token)).allowance.autofill.used, 0);
+  assert.ok(dump.budget.every((r) => r.spend_cents === 0));
+  assert.ok(dump.spend.every((r) => r.cents === 0));
+});
+
+test("token totals are kept per month as numbers only", async () => {
+  const w = await setup();
+  const token = await w.token();
+  await w.api("POST", "/ai", { token, body: aiBody("field_match", "a") });
+  await w.api("POST", "/ai?stream=1", { token, body: aiBody("field_match", "b") });
+  assert.deepEqual(w.db.dump().tokens, [{ month: "2026-09", calls: 2, prompt: 2000, cached: 0, output: 600 }]);
 });
 
 test("Flash allowances halve on 2027-01-01, when Flash doubles in price; Flash-Lite ones do not", async () => {

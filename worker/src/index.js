@@ -3,7 +3,7 @@ import { CONFIG } from "./config.js";
 import { HttpError, json } from "./http.js";
 import { authenticateUser, providers } from "./auth.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
-import { addSpend, admit, allowanceFor, cleanup, commitRun, deleteUser, isPaused, monthOf, usageFor } from "./limits.js";
+import { admit, allowanceFor, cleanup, deleteUser, isPaused, monthOf, release, remainingOf, settle, usageFor } from "./limits.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
@@ -113,7 +113,7 @@ async function route(request, env, ctx, d) {
       if (await blocksDeletion(db, user)) {
         throw new HttpError(409, "subscribed", "Cancel your paid plan first, then delete your data.");
       }
-      await deleteUser(db, user);
+      await deleteUser(db, user, now);
       await deletePlan(db, user);
       return json({ ok: true });
     }
@@ -153,24 +153,32 @@ async function route(request, env, ctx, d) {
       }
       // no run_id: every call is its own run
       const runId = body.run_id != null ? String(body.run_id) : "solo-" + crypto.randomUUID();
+      const taskMax = d.config.TASKS[task].maxBodyBytes;
+      if (taskMax && bytes > taskMax) throw new HttpError(400, "bad_request", "Request body is too large for this task");
       const gem = sanitizeRequest(body.request, task, d.config);
       const model = d.config.TASKS[task].model;
       const stream = url.searchParams.get("stream") === "1";
 
       const { plan } = await planOf(db, user);
-      const admitted = await admit(db, env, d.config, user, task, runId, now, who.tier, plan);
-      const upstream = await callGemini(model, gem, stream, env, d.fetch);
-      const remaining = await commitRun(db, user, task, runId, admitted);
+      // The estimate is charged before Gemini is called and corrected after, so a call whose Worker
+      // is cut off mid-reply (the student closes the tab) is still paid for in the books.
+      const estimate = estimateCents(model, bytes, gem.generationConfig.maxOutputTokens, d.config, now);
+      const admitted = await admit(db, env, d.config, user, task, runId, now, who.tier, plan, estimate);
+      let upstream;
+      try {
+        upstream = await callGemini(model, gem, stream, env, d.fetch);
+      } catch (e) {
+        await release(db, user, task, runId, admitted);
+        throw e;
+      }
       later(ctx, touchSeen(db, user, now));
 
-      const headers = { "X-InternScout-Model": model, "X-InternScout-Remaining": String(remaining) };
-      const price = (usage) => usage
-        ? costCents(model, usage, d.config, now)
-        : estimateCents(model, bytes, gem.generationConfig.maxOutputTokens, d.config, now);
+      const headers = { "X-InternScout-Model": model, "X-InternScout-Remaining": String(remainingOf(admitted)) };
+      const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
 
       if (stream) {
         const [client, meter] = upstream.body.tee();
-        later(ctx, readUsageFromSSE(meter).then((u) => addSpend(db, admitted.month, price(u))));
+        later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u)));
         return new Response(client, {
           status: 200,
           headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
@@ -181,7 +189,7 @@ async function route(request, env, ctx, d) {
       try {
         usage = JSON.parse(text).usageMetadata || null;
       } catch {}
-      later(ctx, addSpend(db, admitted.month, price(usage)));
+      later(ctx, settle(db, user, admitted, price(usage), usage));
       return new Response(text, { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
     }
 

@@ -9,14 +9,48 @@ const GEN_KEYS = ["temperature", "topP", "topK", "stopSequences", "responseMimeT
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
+// What a part may carry. Everything the extension sends is here. What is not: fileData, whose fileUri
+// makes Gemini fetch a file or a video by reference, so a 200-byte request could cost a million input
+// tokens and no body-size limit would notice; and executableCode and friends, which we never use.
+function cleanPart(part) {
+  if (!isObj(part)) return null;
+  const out = {};
+  if (typeof part.text === "string") out.text = part.text;
+  if (isObj(part.inlineData) && typeof part.inlineData.data === "string") {
+    out.inlineData = { mimeType: String(part.inlineData.mimeType || ""), data: part.inlineData.data };
+  }
+  if (isObj(part.functionCall)) {
+    const { name, id, args } = part.functionCall;
+    out.functionCall = { name, ...(id != null ? { id } : {}), args: isObj(args) ? args : {} };
+  }
+  if (isObj(part.functionResponse)) {
+    // `response` only: a function response can also carry parts of its own, fileData among them.
+    const { name, id, response } = part.functionResponse;
+    out.functionResponse = { name, ...(id != null ? { id } : {}), response: isObj(response) ? response : {} };
+  }
+  if (!Object.keys(out).length) return null;
+  if (typeof part.thoughtSignature === "string") out.thoughtSignature = part.thoughtSignature;
+  if (part.thought === true) out.thought = true;
+  return out;
+}
+
+function cleanContent(c) {
+  if (!isObj(c) || !Array.isArray(c.parts)) return null;
+  const parts = c.parts.map(cleanPart).filter(Boolean);
+  if (!parts.length) return null;
+  return { ...(typeof c.role === "string" ? { role: c.role } : {}), parts };
+}
+
 // Keeps only contents, systemInstruction, tools, toolConfig and generationConfig; clamps tokens and thinking.
 export function sanitizeRequest(body, task, config) {
   const cfg = config.TASKS[task];
-  if (!isObj(body) || !Array.isArray(body.contents) || body.contents.length === 0) {
+  const contents = isObj(body) && Array.isArray(body.contents) ? body.contents.map(cleanContent).filter(Boolean) : [];
+  if (contents.length === 0) {
     throw new HttpError(400, "bad_request", "request.contents must be a non-empty array");
   }
-  const out = { contents: body.contents };
-  if (isObj(body.systemInstruction)) out.systemInstruction = body.systemInstruction;
+  const out = { contents };
+  const sys = cleanContent(body.systemInstruction);
+  if (sys) out.systemInstruction = sys;
 
   // Function tools only: Google Search grounding and similar tools are billed per use
   if (Array.isArray(body.tools)) {

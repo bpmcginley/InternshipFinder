@@ -476,7 +476,7 @@
     }
     function closeSetup() { if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); }
     async function deleteData() {
-      const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your usage counts and chosen states from our server" : "") + "? This can't be undone.";
+      const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       if (!window.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
