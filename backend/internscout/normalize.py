@@ -199,12 +199,29 @@ def listing_id(dedupe_key: str) -> str:
 MAX_UNTERMED_AGE_DAYS = 365
 
 
-def _zombie(posted, season, year, now=None) -> bool:
+# The first version of this rule looked at the posting's own date and nothing else, and the review
+# that followed replayed it on the database: it took down 170 postings that are open today. Neuralink,
+# Point72, OpenAI, Palantir and Anthropic keep one "Software Engineer Intern" requisition up for years
+# and hire every class through it, and Greenhouse's first_published and Lever's createdAt are the day
+# that requisition was first made, so it looks older every year. What tells the two apart is the board,
+# not the posting. Felix Magazine's newest posting of any kind is from 2017, Integrated Resources' from
+# 2017, Codeage's from 2018: nobody is there. Neuralink's board had a new posting ten days before this
+# was written. So a fetcher that reads the whole board hands over the date of its newest posting
+# ("board_newest", see sources.common.stamp_board_newest), and an old untermed posting on a board that
+# is still being added to is an evergreen one and stays. A source that cannot say (a search feed, a
+# list) is judged by the posting's date as before.
+#   was: def _zombie(posted, season, year, now=None) -> bool:
+def _zombie(posted, season, year, now=None, board_newest=None) -> bool:
     if not posted or season or year:
         return False
     now = now or datetime.now(timezone.utc)
     if posted.tzinfo is None:
         posted = posted.replace(tzinfo=timezone.utc)
+    if board_newest is not None:
+        if board_newest.tzinfo is None:
+            board_newest = board_newest.replace(tzinfo=timezone.utc)
+        if (now - board_newest).days <= MAX_UNTERMED_AGE_DAYS:
+            return False
     return (now - posted).days > MAX_UNTERMED_AGE_DAYS
 
 
@@ -345,7 +362,8 @@ def normalize(raw: dict) -> dict | None:
     term = (f"{season} {year}" if year else str(season)).strip() if season else None
 
     posted = _to_dt(raw.get("posted_at") or raw.get("date_posted"))
-    if _zombie(posted, season, year):
+    # was: if _zombie(posted, season, year):   (the board's newest date is the second opinion, above)
+    if _zombie(posted, season, year, board_newest=_to_dt(raw.get("board_newest"))):
         return None
 
     return {

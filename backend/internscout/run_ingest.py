@@ -85,8 +85,16 @@ def _fetch_boards(c, jobs: list, workers: int) -> dict:
     return res
 
 
-def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -> list[dict]:
-    """Fetch every registered board in parallel; records success/failure in the registry."""
+# was: def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -> list[dict]:
+def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
+                systemic_guard: bool = True) -> list[dict]:
+    """Fetch every registered board in parallel; records success/failure in the registry.
+
+    systemic_guard=False is for scripts/verify_registry.py's second look, which is handed only the
+    boards that just failed. Every ATS in that set is failing on all of its boards by construction,
+    so with the guard on, ten dead boards of one ATS could never be dropped. With it off a failure
+    counts unless it is a transient one (429, 5xx, a timeout), which says nothing about the board.
+    """
     todo = [(ats, tok, e) for ats, tok, e in boards(reg) if ats in BOARD_FETCHERS]
     jobs = [(ats, tok, {"name": e["name"], "ats_token": tok, "is_quant_target": e.get("quant", False),
                         "sector": e.get("sector") or ("quant_finance" if e.get("quant") else None),
@@ -113,13 +121,16 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -
             causes.setdefault(ats, Counter())[_cause(r)] += 1
     systemic = {a for a, n in failed.items()
                 if size[a] >= SYSTEMIC_MIN_BOARDS and n >= SYSTEMIC_SHARE * size[a]}
+    if not systemic_guard:
+        systemic = set()
     for (ats, tok), r in res.items():
         if isinstance(r, RobotsDisallowed):
             # Not a failure to report as one, but the board still has to leave the registry,
             # and record_result is what ages a board out.
             record_result(reg, ats, tok, False)
         elif isinstance(r, Exception):
-            if ats not in systemic:
+            # was: if ats not in systemic:
+            if ats not in systemic and (systemic_guard or not _transient(r)):
                 record_result(reg, ats, tok, False)
         else:
             record_result(reg, ats, tok, True)

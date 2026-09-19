@@ -18,6 +18,10 @@ def arm(entries):
                                             # already failed in today's ingest could never be dropped here
 
 
+# Arming writes MAX_FAILS - 1 on every board, and a board the scan neither passed nor failed (its ATS
+# tripped the systemic guard, or its second failure was a throttle) used to be saved that way: one bad
+# day from deletion, for having been checked. What each board had is kept here and put back at the end.
+before = {(a, t): (v.get("fails", 0), v.get("last_fail")) for a, e in reg.items() for t, v in e.items()}
 arm(e for entries in reg.values() for e in entries.values())
 scan_boards(reg)
 dead = [(a, t) for a, e in reg.items() for t, v in e.items() if v["fails"] >= MAX_FAILS]
@@ -29,13 +33,25 @@ if dead:
     time.sleep(20)
     again = {a: {t: reg[a][t] for aa, t in dead if aa == a} for a in {a for a, _ in dead}}
     arm(e for entries in again.values() for e in entries.values())
-    scan_boards(again, verbose=False)
+    # was: scan_boards(again, verbose=False). `again` holds only boards that failed, so every ATS in it
+    # fails on all its boards, the systemic guard skipped them all, and ten or more dead boards of one
+    # ATS were "kept ... (answered on the second try)" without having answered.
+    scan_boards(again, verbose=False, systemic_guard=False)
     spared = [(a, t) for a, t in dead if reg[a][t]["fails"] < MAX_FAILS]
     for a, t in spared:
-        print(f"kept {a}:{t} (answered on the second try)")
+        # was: always "(answered on the second try)"
+        how = "answered on the second try" if reg[a][t]["fails"] == 0 else "throttled on the second try, left as it was"
+        print(f"kept {a}:{t} ({how})")
     dead = [d for d in dead if d not in spared]
 for a, t in dead:
     del reg[a][t]
     print(f"dropped {a}:{t}")
+for a, e in reg.items():
+    for t, v in e.items():
+        if v.get("fails", 0) and (a, t) in before:      # never answered, never dropped: as it was
+            v["fails"], last = before[a, t]
+            v.pop("last_fail", None)
+            if last:
+                v["last_fail"] = last
 save_registry(reg)
 print(f"{len(dead)} dropped; {sum(len(e) for e in reg.values())} boards remain")

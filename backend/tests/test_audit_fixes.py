@@ -197,7 +197,44 @@ def test_the_student_roles_that_look_like_them_stay():
     for t in ("Summer Associate 2027", "2027 Summer Associate - Investment Banking", "Audit Intern - Summer 2027",
               "Summer 2027 - IEF - Systems Engineering - Collegiate Associate in GAC (Savannah)",
               "CGSR Undergraduate Research Associate - Spring 2027", "Software Engineering Intern - Summer 2027 Start",
-              "Early Career Mechanical Engineering - Summer 2027", "MS Graduate Student Intern - Summer 2027"):
+              "MS Graduate Student Intern - Summer 2027"):
+        assert stage_of(t), t
+    # was: the tuple also held "Early Career Mechanical Engineering - Summer 2027". The review read the
+    # posting: it is a full-time job, so it moved to the test below.
+
+
+# --- the review of those rules: too blunt one way, too narrow the other ---------------------
+def test_a_board_that_files_a_posting_under_intern_is_believed():
+    from internscout.classify import stage_of
+    for title, emp in (("2027 Baseball Operations Associate", "Internship/Co-op"), ("Marketing Associate", "Intern"),
+                       ("Research Associate", "Intern"), ("Sales Associate", "Part-time Internship"),
+                       ("Data Analyst - Summer 2027 Start", "Internship")):
+        assert stage_of(title, emp), title
+    assert not stage_of("Marketing Associate", "Full-time")
+
+
+def test_student_associates_the_first_rule_threw_out():
+    from internscout.classify import stage_of
+    for t in ("Summer 2027 Associate - Investment Banking", "Summer 2027 MBA Associate", "MBA Associate, Summer 2027",
+              "Seasonal Associate - Summer 2027", "Summer Research Associate", "REU - Research Associate",
+              "SURF Research Associate", "Summer Associate, starting June 2027",
+              "CGSR Research Associate Graduate - Spring 2027"):
+        assert stage_of(t), t
+    for t in ("Risk Consulting Associate - Summer 2027", "Civil Associate I, Summer 2027"):   # still full time
+        assert not stage_of(t), t
+
+
+def test_full_time_jobs_that_rode_in_on_a_dated_summer():
+    from internscout.classify import stage_of
+    for t in ("Early Career Electrical Engineer- Summer 2027", "Early Career Mechanical Engineering- Summer 2027",
+              "Commercial Graduate - Summer 2027", "Graduate Management Consultant - Summer 2027",
+              "Traffic EIT, Summer 2027", "Capacity Portfolio Representative, Starting Spring/Summer 2027",
+              "Audit Staff - Summer 2027", "Financial Analyst - Summer 2027 Full Time", "Engineer I - Summer 2027"):
+        assert not stage_of(t), t
+    # The dated internships beside them on the same board stay, and so does anything that says intern.
+    for t in ("Summer 2027: Supply Chain (Greenville, SC)", "Impact Strategy & Project Management - Summer 2027",
+              "Summer 2027 - System Engineer - Central Utility Plant", "Software Engineer Intern I - Summer 2027",
+              "2027 Commercial Banking Summer Internship - Early Careers", "Graduate Research Assistant - Fall 2026"):
         assert stage_of(t), t
 
 
@@ -257,6 +294,50 @@ def test_an_untermed_posting_over_a_year_old_is_dropped():
     assert not _zombie(datetime(2025, 10, 1, tzinfo=timezone.utc), None, None, now)
     assert not _zombie(datetime(2024, 1, 1, tzinfo=timezone.utc), "Summer", 2027, now)   # a term decides, not the date
     assert not _zombie(None, None, None, now)
+
+
+def test_an_old_posting_on_a_board_still_being_added_to_is_evergreen():
+    from internscout.normalize import _zombie
+    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+    old = datetime(2024, 8, 15, tzinfo=timezone.utc)                          # Point72's intern requisition
+    assert not _zombie(old, None, None, now, board_newest=datetime(2026, 9, 8, tzinfo=timezone.utc))
+    assert not _zombie(old, None, None, now, board_newest=datetime(2026, 9, 8))          # naive is UTC
+    assert _zombie(old, None, None, now, board_newest=datetime(2017, 9, 4, tzinfo=timezone.utc))   # Felix Magazine
+    assert _zombie(old, None, None, now)                                       # a source that cannot say
+
+
+def test_the_board_fetchers_say_how_fresh_the_board_is():
+    from internscout.sources.greenhouse import parse_greenhouse
+    from internscout.sources.lever import parse_lever
+    from internscout.sources.ashby import parse_ashby
+    from internscout.normalize import normalize
+    co = {"name": "Acme", "ats_token": "acme"}
+    gh = parse_greenhouse({"jobs": [
+        {"id": 1, "title": "Software Engineer Intern", "location": {"name": "Boston, MA"}, "absolute_url": "https://x.test/1",
+         "first_published": "2024-08-15T00:00:00Z", "updated_at": "2024-08-15T00:00:00Z"},
+        {"id": 2, "title": "Staff Accountant", "location": {"name": "Boston, MA"}, "absolute_url": "https://x.test/2",
+         "first_published": "2026-09-08T00:00:00Z", "updated_at": "2026-09-10T00:00:00Z"}]}, co)
+    assert len(gh) == 1 and gh[0]["board_newest"].startswith("2026-09-10")
+    assert normalize(gh[0]) is not None, "an evergreen requisition on a live board stays"
+    del gh[0]["board_newest"]
+    assert normalize(gh[0]) is None
+    lv = parse_lever([{"text": "Data Intern", "categories": {"location": "Boston, MA"}, "hostedUrl": "https://x.test/3",
+                       "createdAt": 1600000000000},
+                      {"text": "Controller", "categories": {"location": "Boston, MA"}, "createdAt": 1788000000000}], co)
+    assert len(lv) == 1 and lv[0]["board_newest"].startswith("2026-08")
+    ab = parse_ashby({"jobs": [{"title": "Design Intern", "location": "Boston, MA", "jobUrl": "https://x.test/4",
+                                "publishedAt": "2024-01-01T00:00:00Z"},
+                               {"title": "Counsel", "location": "Boston, MA", "publishedAt": "2026-09-01T00:00:00Z"}]}, co)
+    assert len(ab) == 1 and ab[0]["board_newest"].startswith("2026-09-01")
+
+
+def test_us_towns_that_share_a_name_with_a_foreign_city():
+    from internscout.geo import looks_us
+    for loc in ("Brisbane, CA", "Brisbane, California", "Belgrade, ME", "Belgrade, MT", "Stockholm, ME", "Copenhagen, NY"):
+        assert looks_us(loc), loc
+    # A bare foreign city stamped with its board's state is still foreign.
+    for loc in ("Brisbane, MA", "Stockholm, NY", "Shenzhen, CA", "Brisbane, Australia", "Belgrade, Serbia"):
+        assert not looks_us(loc), loc
 
 
 # --- a curated list's copy of a posting folds into the employer's own row ---------------------

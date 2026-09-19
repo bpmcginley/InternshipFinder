@@ -1,6 +1,6 @@
 """Ashby public job-board API."""
 from __future__ import annotations
-from .common import board_item
+from .common import board_item, stamp_board_newest
 from ..classify import is_internship
 from ..region import board_state, place_bare_cities
 
@@ -36,6 +36,7 @@ def parse_ashby(payload: dict, co: dict) -> list[dict]:
                               posted_at=j.get("publishedAt"), description=j.get("descriptionPlain") or "",
                               employment_type=emp))
     place_bare_cities(out, board_state(board))
+    stamp_board_newest(out, [j.get("publishedAt") for j in payload.get("jobs", [])])   # see normalize._zombie
     return out
 
 

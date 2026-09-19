@@ -2,7 +2,7 @@
 internship postings that might be in region."""
 from __future__ import annotations
 from .base import client
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, stamp_board_newest
 from ..classify import is_internship
 from ..region import board_state, maybe_in_region, place_bare_cities
 
@@ -26,6 +26,8 @@ def parse_greenhouse(payload: dict, co: dict) -> list[dict]:
         it["_gh_id"] = j.get("id")
         out.append(it)
     place_bare_cities(out, board_state(board))
+    # Every job's dates, not only the internships': is anyone still adding to this board?
+    stamp_board_newest(out, [d for j in payload.get("jobs", []) for d in (j.get("first_published"), j.get("updated_at"))])
     return out
 
 

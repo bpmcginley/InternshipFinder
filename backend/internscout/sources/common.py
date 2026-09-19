@@ -2,6 +2,7 @@
 from __future__ import annotations
 import html
 import re
+from datetime import timezone
 
 from ..config import USER_AGENT
 from ..geo import REMOTE_RE, _NON_US, state_of
@@ -102,6 +103,29 @@ def html_to_text(s: str | None) -> str:
     s = html.unescape(s)
     s = re.sub(r"[ \t\xa0]+", " ", s)
     return re.sub(r"\n\s*\n+", "\n", s).strip()
+
+
+def stamp_board_newest(items: list[dict], dates) -> list[dict]:
+    """Write the date of the board's newest posting, of any kind, onto each of its items.
+
+    `dates` is every date the board's list call gave, internships or not, in whatever form the ATS
+    uses. normalize() reads the stamp to tell an evergreen requisition on a board that is still being
+    added to from a posting on a board nobody has touched in years (see normalize._zombie).
+    """
+    from ..normalize import _to_dt      # here, not at the top: normalize pulls in classify and region
+    newest = None
+    for d in dates:
+        dt = _to_dt(d)
+        if dt is None:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if newest is None or dt > newest:
+            newest = dt
+    if newest is not None:
+        for it in items:
+            it["board_newest"] = newest.isoformat()
+    return items
 
 
 def board_item(co: dict, *, source: str, title: str, locations: list, url: str | None,

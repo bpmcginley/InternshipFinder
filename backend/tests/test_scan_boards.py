@@ -78,6 +78,20 @@ def test_robots_closed_boards_age_even_when_the_ats_is_systemic(monkeypatch):
     assert all(e["fails"] == 1 for e in reg["fakeats"].values())
 
 
+def test_the_second_look_counts_dead_boards_but_not_throttled_ones(monkeypatch):
+    # verify_registry's second pass: every board it is handed failed, so the guard must be off.
+    monkeypatch.setattr(run_ingest, "RETRY_PAUSE", 0)
+
+    def fetch(c, co):
+        raise _status(429 if co["ats_token"] == "t0" else 404)
+
+    monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "fakeats", fetch)
+    reg = _reg("fakeats", 12)
+    run_ingest.scan_boards(reg, workers=4, verbose=False, systemic_guard=False)
+    assert reg["fakeats"]["t0"]["fails"] == 0, "a throttle says nothing about the board"
+    assert all(e["fails"] == 1 for t, e in reg["fakeats"].items() if t != "t0")
+
+
 def test_cause_names_status_or_error_type():
     assert run_ingest._cause(_status(429)) == "429"
     assert run_ingest._cause(httpx.ReadTimeout("slow")) == "ReadTimeout"

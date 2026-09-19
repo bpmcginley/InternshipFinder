@@ -6,7 +6,7 @@ serves them. Plenty of EU-hosted boards advertise US internships, so they are wo
 """
 from __future__ import annotations
 from .base import client
-from .common import board_item
+from .common import board_item, stamp_board_newest
 from ..classify import is_internship
 from ..region import board_state, place_bare_cities
 
@@ -37,6 +37,7 @@ def parse_lever(payload: list, co: dict) -> list[dict]:
                               description=j.get("descriptionPlain") or "",
                               employment_type=cats.get("commitment") or ""))
     place_bare_cities(out, board_state(board))
+    stamp_board_newest(out, [j.get("createdAt") for j in payload or []])   # see normalize._zombie
     return out
 
 

@@ -352,6 +352,44 @@ _START_DATE_RE = re.compile(r"\b(summer|fall|spring|winter)\s+20\d\d\s+start\b|\
 _FT_ASSOCIATE_RE = re.compile(r"(?<!summer )(?<!winter )\bassociate\b", re.I)
 _DEGREE_GRADUATE_RE = re.compile(r"\b(phd|bs/ms|bs|ba|ms|mba|masters?|bachelors?)\s+graduates?\b(?! (student|research|assistant))", re.I)
 _COLLEGE_WORD_RE = re.compile(r"\b(college|collegiate|undergrad(uate)?|work[- ]?study|fws|ws|fellow(ship)?|trainee|apprentice(ship)?|extern(ship)?)\b", re.I)
+# The review of the rule above found it too blunt in one direction and too narrow in the other.
+#
+# Too blunt. It looked at the title alone, so a posting whose employment type is "Internship/Co-op"
+# was thrown out for saying associate: the Red Sox's "2027 Baseball Operations Associate", and any
+# "Marketing Associate" or "Research Associate" a board files under Intern. The employment type now
+# settles it (see stage_of). It also knew only "Summer Associate" with the two words side by side,
+# and these student wordings went with the full-time ones:
+#   a season anywhere before the word   "Summer 2027 Associate - Investment Banking", "Summer Research Associate"
+#   an MBA or seasonal class            "MBA Associate, Summer 2027", "Seasonal Associate - Summer 2027"
+#   an undergraduate research scheme    "REU - Research Associate", "SURF Research Associate"
+#   a graduate student's research post  "CGSR Research Associate Graduate - Spring 2027" (Livermore)
+# and a start date is no objection to a title that already says summer associate or summer analyst
+# ("Summer Associate, starting June 2027").
+_STUDENT_ASSOCIATE_RE = re.compile(r"\b(summer|winter)\b.*\bassociate\b|\b(mba|seasonal|reu|surf)\b|"
+                                   r"\bresearch associate graduate\b", re.I)
+_SUMMER_ROLE_RE = re.compile(r"\b(summer|winter)\s+(associate|analyst|scholar)\b", re.I)
+# Too narrow. A bare "Summer 2027" admits a title by itself, and these were open on the live board
+# with nothing else student about them. Each was read; the descriptions say full time:
+#   WSP            "Early Career Electrical Engineer- Summer 2027", "Early Career Mechanical Engineering-
+#                  Summer 2027" ("a Full-Time Early Career Mechanical Engineer ... starting in Summer of
+#                  2027 ... 0 to 1 years of relevant post education experience"). The comment further
+#                  down, and two tests, called the second one a summer internship. It is not.
+#   Rystad Energy  "Commercial Graduate - Summer 2027", "Graduate Management Consultant - Summer 2027"
+#                  (a 12-14 month graduate programme)
+#   Michael Baker  "Traffic EIT, Summer 2027" (an engineer in training has the degree already)
+#   C.H. Robinson  "Capacity Portfolio Representative, Starting Spring/Summer 2027"
+# and the reviewer's "Audit Staff - Summer 2027", "Financial Analyst - Summer 2027 Full Time" and
+# "Engineer I - Summer 2027". "Early Careers" with an s is a department and heads real internships
+# ("2027 Commercial Banking Summer Internship - Early Careers"); those all say intern and never get
+# here. "Graduate" beside research, student, assistant or fellow is a graduate student and stays.
+_FT_DATED_RE = re.compile(r"\bearly career\b|\bfull[- ]?time\b|\bstaff\b|\beit\b|"
+                          r"\bgraduate\b(?! (student|research|assistant|fellow|intern|co-?op))(?<!associate graduate)|"
+                          r"\b(engineer|analyst|accountant|scientist|developer|consultant|designer|specialist) (i|ii|iii|1|2)\b|"
+                          r"\bstarting\s+(spring|summer|fall|winter)/(spring|summer|fall|winter)\s+20\d\d\b", re.I)
+# Only beside a dated season, which is what let these in; "Graduate Teaching Assistant" and "Student
+# Staff" carry no date and are not this rule's business.
+_SEASON_YEAR_RE = re.compile(r"\b(spring|summer|fall|winter)(/(spring|summer|fall|winter))?\s+20\d\d\b", re.I)
+_EMP_STUDENT_RE = re.compile(r"\bintern|\bco-?op\b", re.I)
 _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdirector\b|\bsenior\b|\bstaff\b|\bprincipal\b|\blead\b", re.I)
 # The separator is optional and it is not always a hyphen. Employers write "Post Doctoral
 # Research Fellow" and "Post Doc Research Associate" as often as they write "Postdoctoral",
@@ -480,23 +518,39 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
         found.add("research")
     if _PART_TIME_RESEARCH_RE.search(title):
         found.update(("research", "part_time"))
+    # Livermore's name for a graduate student's research post ("CGSR Research Associate Graduate -
+    # Spring 2027"). Its undergraduate twin already reads as research; this one named no student word
+    # we knew and was never admitted at all.
+    if re.search(r"\bresearch associate graduate\b", title, re.I):
+        found.add("research")
     if found and _RESEARCH_WORD_RE.search(title):
         found.add("research")
     if not found:
         return []
-    # a dated summer role ("Early Career Mechanical Engineering - Summer 2027") is an internship
+    # a dated summer role ("Summer 2027: Supply Chain") is an internship
+    # (was: the example here was "Early Career Mechanical Engineering - Summer 2027". That posting is a
+    # full-time job - see _FT_DATED_RE - and is now turned away below.)
     explicit = re.search(r"\bintern(ship)?s?\b|\bco-?op\b|\bsummer 20[2-3]\d\b", title, re.I)
     if _NEW_GRAD_RE.search(title) and not explicit:
         return []
     # For a new-grad job the summer date is a start date, not a term: "Additive Engineer (New Grad
     # Summer 2027)", "New Grad Civil Engineer I - Summer 2027", "Sales Analyst (Recent Grad - Summer
     # 2027 Start)" all came through on it. So with these words only a student word keeps a title in.
-    # "Early career" is not among them: "Early Career Mechanical Engineering - Summer 2027" is a
-    # summer internship.
+    # (was: '"Early career" is not among them: "Early Career Mechanical Engineering - Summer 2027" is a
+    # summer internship.' It is not; the posting says full time. Early career beside a dated season is
+    # handled by _FT_DATED_RE below, and the words stay out of this list so that an early-career title
+    # that also says intern is untouched.)
     if _NEW_GRAD_STRONG_RE.search(title) and not _STUDENT_TERM_RE.search(title):
         return []
-    if not _STUDENT_TERM_RE.search(title) and not _COLLEGE_WORD_RE.search(title) and (
-            _START_DATE_RE.search(title) or _FT_ASSOCIATE_RE.search(title) or _DEGREE_GRADUATE_RE.search(title)):
+    # was: if not _STUDENT_TERM_RE.search(title) and not _COLLEGE_WORD_RE.search(title) and (
+    #              _START_DATE_RE.search(title) or _FT_ASSOCIATE_RE.search(title) or _DEGREE_GRADUATE_RE.search(title)):
+    # The same three tests, each with the exemption the review found it needed, a fourth for the dated
+    # full-time wordings, and none of it when the board itself files the posting under intern or co-op.
+    if not _EMP_STUDENT_RE.search(emp) and not _STUDENT_TERM_RE.search(title) and not _COLLEGE_WORD_RE.search(title) and (
+            (_START_DATE_RE.search(title) and not _SUMMER_ROLE_RE.search(title))
+            or (_FT_ASSOCIATE_RE.search(title) and not _STUDENT_ASSOCIATE_RE.search(title))
+            or _DEGREE_GRADUATE_RE.search(title)
+            or (_SEASON_YEAR_RE.search(title) and _FT_DATED_RE.search(title))):
         return []
     if _NON_INTERN_RE.search(title) and not explicit:
         return []

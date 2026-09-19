@@ -101,12 +101,31 @@ _FOREIGN_MORE = re.compile(
     r"new zealand|south africa|hungary|bulgaria|serbia|croatia|estonia|latvia|lithuania|sri lanka|nepal)\b", re.I)
 
 
+# The list above answers before the namesake rule below is asked, and the review found the US towns it
+# swallowed: Brisbane, CA is the biotech town beside South San Francisco, Belgrade is in Maine (our home
+# region) and in Montana. Unlike _US_NAMESAKES these are let through only with the state the town is
+# really in, because region.place_bare_cities stamps a bare foreign city with its board's state and
+# "Brisbane, MA" or "Stockholm, NY" is still that. Frankfort, KY is spelled with an o and needs nothing.
+_MORE_US_TOWNS = {"brisbane": {"CA"}, "belgrade": {"ME", "MT"}, "stockholm": {"ME", "NJ"}, "copenhagen": {"NY"},
+                  "oslo": {"MN"}, "manila": {"UT", "AR"}}
+
+
+def _us_town_of_that_name(loc: str) -> bool:
+    town = _TOWN_STATE.match(loc or "")
+    if not town:
+        return False
+    st = town.group(2).strip()
+    code = st if (len(st) == 2 and st.isupper()) else STATE_NAMES.get(st.lower(), "")
+    return code in _MORE_US_TOWNS.get(town.group(1).strip().lower(), ())
+
+
 class _NotUS:
     """_FOREIGN, except for a US namesake followed by its state. Callers use it as a regex."""
 
     def search(self, loc: str):
         hit = _FOREIGN_CITY_CODE.search(loc) or _FOREIGN_MORE.search(loc)
-        if hit:
+        # was: if hit: return hit
+        if hit and not _us_town_of_that_name(loc):
             return hit
         m = _FOREIGN.search(loc)
         if not m:

@@ -30,7 +30,10 @@ def test_not_student_roles():
         assert stage_of(t) == [], t
     assert not is_internship("Software Engineer (New Grad)")
     assert is_internship("New Grad / Intern Software Engineer")   # explicit intern wins
-    assert stage_of("Early Career Mechanical Engineering- Summer 2027") == ["internship"]
+    # was: assert stage_of("Early Career Mechanical Engineering- Summer 2027") == ["internship"]
+    # Changed on the posting's own words. WSP's own description of it: "a Full-Time Early Career Mechanical Engineer ... starting in Summer of 2027".
+    assert stage_of("Early Career Mechanical Engineering- Summer 2027") == []
+    assert stage_of("Early Career Mechanical Engineering Intern - Summer 2027") == ["internship"]
     assert "finance" in classify("2027 Corporate Banking Summer Analyst")
     assert "operations" in classify("PGIM: 2027 Operations, Internship Program")
 
@@ -708,8 +711,9 @@ def test_a_summer_start_date_does_not_make_a_new_grad_job_an_internship():
                   "Summer 2027 - Data Scientist (New Grad)"):
         assert stage_of(title) == [], title
     # A title that also offers an internship or a co-op stays.
-    for title in ("Photonics Characterization Intern & New Grad", "New Grad / Intern Software Engineer",
-                  "Early Career Mechanical Engineering- Summer 2027"):
+    # was: the tuple ended with "Early Career Mechanical Engineering- Summer 2027", which offers neither an
+    # internship nor a co-op (WSP's own description of it: "a Full-Time Early Career Mechanical Engineer ... starting in Summer of 2027").
+    for title in ("Photonics Characterization Intern & New Grad", "New Grad / Intern Software Engineer"):
         assert stage_of(title) != [], title
 
 
