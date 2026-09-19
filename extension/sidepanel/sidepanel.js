@@ -36,7 +36,10 @@ function jobCard(j) {
       h += `<div class="q">Tailored resume ready for review</div>${t.summary ? `<div class="msg small"><b>Summary:</b> ${esc(t.summary)}</div>` : ""}`;
       if (t.changes && t.changes.length) h += `<ul>${t.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>`;
       if (t.diff && t.diff.length) h += `<details><summary>Before → after (${t.diff.length})</summary>${t.diff.map((d) => `<div class="small" style="margin:6px 0"><s>${esc(d.before)}</s><br>${esc(d.after)}</div>`).join("")}</details>`;
-      btns.push(["preview_tailored", "Preview PDF"], ["approve_tailored", "Use tailored", "primary"], ["skip_tailored", "Use my original"]);
+      // A Word resume is tailored in place and comes back as a .docx, which a tab cannot show.
+      const word = /\.docx$/i.test((t.file && t.file.name) || "");
+      if (t.note) h += `<div class="msg small">${esc(t.note)}</div>`;
+      btns.push(["preview_tailored", word ? "Download Word file" : "Preview PDF"], ["approve_tailored", "Use tailored", "primary"], ["skip_tailored", "Use my original"]);
     } else if (j.question) {
       h += `<div class="q">${esc(j.question)}</div>${j.reason ? `<div class="small">${esc(j.reason)}</div>` : ""}<textarea data-ans="${j.id}" placeholder="Answer (saved to your profile for next time)">${esc(drafts[j.id] || "")}</textarea>`;
       btns.push(["answer", "Answer & continue", "primary"]);
@@ -95,7 +98,13 @@ async function renderQueue() {
       const r = await send({ type: "get_tailored", id });
       if (!r || !r.file) return;
       const bin = atob(r.file.b64), bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-      chrome.tabs.create({ url: URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })) });
+      const url = URL.createObjectURL(new Blob([bytes], { type: r.file.type || "application/pdf" }));
+      // PDFs open in a tab as before. Chrome cannot display a .docx, so that one is downloaded.
+      if (/\.docx$/i.test(r.file.name || "")) {
+        const a = document.createElement("a");
+        a.href = url; a.download = r.file.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else chrome.tabs.create({ url });
     } else if (act === "allow_host") {
       const j = jobs.find((x) => x.id === id);
       // Declining is a real answer: leave the job where it is rather than starting a run that cannot work.

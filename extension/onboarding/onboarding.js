@@ -120,7 +120,7 @@ function setup() {
       <p class="small muted" id="modeblurb" style="margin:0"></p>`}
     </div>
     <div class="card"><h3>Tailored resumes</h3>
-      <p class="small muted" style="margin-top:0">Before each application, the AI rewords your existing resume bullets toward the posting and makes a clean one-page-style PDF. It can't add jobs, skills or numbers you didn't list; changed numbers are thrown out automatically. About 1 to 5 cents per job.</p>
+      <p class="small muted" style="margin-top:0">Before each application, the AI rewords your existing resume bullets toward the posting and keeps your own layout: a Word resume is edited in place, and a PDF is rebuilt to match its fonts, sections and spacing. It can't add jobs, skills or numbers you didn't list; changed numbers are thrown out automatically. About 1 to 5 cents per job.</p>
       <label class="f"><span>When applying</span><select id="tailor">
         <option value="review">Tailor it, and let me approve each one (recommended)</option>
         <option value="auto">Tailor it and use it automatically</option>

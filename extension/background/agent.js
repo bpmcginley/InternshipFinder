@@ -393,11 +393,15 @@ export const isRunning = (id) => running.has(id);
 export async function runJob(id) {
   if (running.has(id)) return;
   running.add(id);
+  // Chrome stops an idle MV3 service worker after 30 s, and a slow AI reply counts as idle.
+  // Calling any extension API resets that timer, so a job in progress is not cut off mid-step.
+  const keepalive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch {} }, 20000);
   try {
     await loop(id);
   } catch (e) {
     await updateJob(id, { status: "failed", reason: String((e && e.message) || e), activity: "" });
   } finally {
+    clearInterval(keepalive);
     running.delete(id);
   }
 }
