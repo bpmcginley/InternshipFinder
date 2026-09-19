@@ -1,8 +1,8 @@
 // Service worker entry: message router, scheduler (max N tabs), notifications, submit detection.
-import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs } from "./queue.js";
+import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile } from "./queue.js";
 import { runJob, resumeJob, isRunning, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
-import { getToken, authStatus, signIn, signOut, ensureToken, getMe } from "../lib/auth.js";
+import { getToken, authStatus, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
 import { spend } from "../lib/usage.js";
 
 const ONBOARDING = "onboarding/onboarding.html";
@@ -205,6 +205,12 @@ async function handle(m, sender, fromPage) {
     case "auth:signout":
       await signOut();
       return { ok: true };
+    case "auth:delete": {
+      // DELETE /me on the Worker, then sign out. A refusal (a live subscription) is passed back as it is.
+      const r = await deleteServerData();
+      if (r.ok) await signOut();
+      return r;
+    }
     case "auth:status":
       return authStatus();
     case "auth:me": {
@@ -221,8 +227,7 @@ async function handle(m, sender, fromPage) {
       return control(m.id, m.action, m.answer);
     }
     case "get_tailored": {
-      const j = await getJob(m.id);
-      return { file: (j && j.tailored && j.tailored.file) || null };
+      return { file: await getTailoredFile(m.id) };   // was: getJob(m.id).tailored.file, when the bytes sat on the job
     }
     case "open_deep_dive":
       await openDeepDive();

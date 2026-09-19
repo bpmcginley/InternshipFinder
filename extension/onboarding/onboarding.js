@@ -198,13 +198,24 @@ async function fillAccount(msg) {
   }
   const lines = allowanceLines(a.me, MAIN_TASKS);
   box.innerHTML = `
-    <p class="small" style="margin:0 0 8px">Signed in${a.provider ? ` with ${esc(PROVIDER_LABELS[a.provider] || a.provider)}` : ""}${a.email ? ` as <b>${esc(a.email)}</b>` : ""}. <a href="#" id="signout">Sign out</a></p>
+    <p class="small" style="margin:0 0 8px">Signed in${a.provider ? ` with ${esc(PROVIDER_LABELS[a.provider] || a.provider)}` : ""}${a.email ? ` as <b>${esc(a.email)}</b>` : ""}. <a href="#" id="signout">Sign out</a> &middot; <a href="#" id="deldata">Delete my data</a></p>
     ${lines.length ? `<ul class="small" style="margin:0 0 6px;padding-left:18px">${lines.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
     <p class="small ${!a.me || a.me.error ? "err" : "muted"}" style="margin:0">${esc(tierNote(a.me))}</p>${note}`;
   $("#signout").addEventListener("click", async (e) => {
     e.preventDefault();
     await chrome.runtime.sendMessage({ type: "auth:signout" });
     fillAccount();
+  });
+  // The privacy page tells students to press "Delete my data" in the extension, and there was no such
+  // control here: lib/auth.js had deleteServerData() with nothing calling it. It removes what the
+  // server holds (chosen states, plan record, earlier months) and signs out. What is in this browser
+  // - profile, files, saved logins - is the student's own copy and goes when the extension is removed.
+  $("#deldata").addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (!confirm("Delete what InternScout's server holds about you (your chosen states, plan record and past months' counts)? This month's counts stay until the month ends. Your profile and files in this browser are not touched.")) return;
+    const r = await chrome.runtime.sendMessage({ type: "auth:delete" });
+    if (r && r.ok) { alert("Deleted. You have been signed out."); fillAccount(); }
+    else alert(r && r.error === "subscribed" ? (r.message || "Cancel your paid plan first, then delete your data.") : "Couldn't delete right now" + (r && r.message ? ": " + r.message : ". Check your connection and try again."));
   });
 }
 

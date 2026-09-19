@@ -7,7 +7,7 @@ import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, 
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
-import { getJob, updateJob, appendLog, saveMsgs, loadMsgs } from "./queue.js";
+import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
 // Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
 // here (in the worker) as well as in the page, and this keeps one copy with one set of tests.
@@ -476,7 +476,9 @@ async function loop(id) {
     // The resume goes in with the contact details when the page has one obvious box for it, on the
     // same rules-first principle: a turn spent telling the model to attach the file it was always
     // going to attach is a turn nobody gets back. Same choice of file as the upload tool makes.
-    const resume = (job.tailored && job.tailored.status === "approved" && job.tailored.file) || store.files.resume || null;
+    // The job carries the tailored file's name only; its bytes are fetched here (see queue.js).
+    // Was: (... && job.tailored.file) || store.files.resume || null
+    const resume = (job.tailored && job.tailored.status === "approved" && job.tailored.file && await getTailoredFile(job.id)) || store.files.resume || null;
     let pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
       .flatMap((r) => r.result || []);
 
@@ -691,7 +693,8 @@ async function execTool(u, ctx) {
       r = await act(tabId, input.ref, "check", { checked: !!input.checked });
       break;
     case "upload": {
-      const tailored = input.file === "resume" && job.tailored && job.tailored.status === "approved" && job.tailored.file;
+      // Was: ... && job.tailored.file; the bytes now live off the job (see queue.js).
+      const tailored = input.file === "resume" && job.tailored && job.tailored.status === "approved" && job.tailored.file && await getTailoredFile(job.id);
       const file = tailored || store.files[input.file];
       if (!file || !file.b64) return { content: `No ${input.file} file saved. Skip unless required; if required, ask_user.`, isError: true };
       r = await act(tabId, input.ref, "upload", { file: { name: file.name, type: file.type, b64: file.b64 } });

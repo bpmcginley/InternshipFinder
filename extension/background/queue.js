@@ -11,7 +11,27 @@ function withLock(fn) {
 async function read() {
   return (await chrome.storage.local.get(KEY))[KEY] || { jobs: {}, order: [] };
 }
+// A tailored resume's bytes are kept under a key of their own, not on the job. They used to sit on
+// the job as tailored.file.b64, up to a megabyte each, and every update - each log line, each
+// "activity" change, several a second while a form fills - reads the whole queue and writes it back.
+// With a few tailored jobs queued that was megabytes through chrome.storage per log line, which is
+// what made the side panel lag. write() moves the bytes out the moment a patch puts them on a job
+// (so callers still hand updateJob the whole file, and a queue saved by an older version is migrated
+// on its first write), and getTailoredFile() is how anything that needs the bytes asks for them.
+const BLOB = (id) => "tailored_" + id;
 async function write(q) {
+  for (const j of Object.values(q.jobs)) {
+    const f = j.tailored && j.tailored.file;
+    if (!f || !f.b64) continue;
+    const { b64, ...meta } = f;
+    try {
+      await chrome.storage.local.set({ [BLOB(j.id)]: b64 });
+      j.tailored = { ...j.tailored, file: meta };
+    } catch (e) {
+      // Storage refused the file. The job must not be lost over it: it goes on with the original resume.
+      j.tailored = { status: "failed", error: "The browser had no room to keep the tailored resume, so your original is used." };
+    }
+  }
   await chrome.storage.local.set({ [KEY]: q });
   for (const f of listeners) try { f(q); } catch (e) {}
 }
@@ -19,6 +39,15 @@ async function write(q) {
 export const onQueueChange = (fn) => listeners.add(fn);
 export const getQueue = read;
 export async function getJob(id) { return (await read()).jobs[id]; }
+// The tailored file with its bytes, or null. A job saved before the bytes moved still has them on it.
+export async function getTailoredFile(id) {
+  const j = await getJob(id);
+  const f = j && j.tailored && j.tailored.file;
+  if (!f) return null;
+  if (f.b64) return f;
+  const b64 = (await chrome.storage.local.get(BLOB(id)))[BLOB(id)];
+  return b64 ? { ...f, b64 } : null;
+}
 
 export function publicJob(j) {
   if (!j) return null;
@@ -72,7 +101,7 @@ export function removeJob(id) {
     const q = await read();
     delete q.jobs[id];
     q.order = q.order.filter((x) => x !== id);
-    await chrome.storage.local.remove("msgs_" + id);
+    await chrome.storage.local.remove(["msgs_" + id, BLOB(id)]);   // was: only "msgs_" + id
     await write(q);
   });
 }
