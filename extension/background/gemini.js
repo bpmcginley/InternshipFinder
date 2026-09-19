@@ -167,8 +167,72 @@ export function workerError(status, data = {}) {
 // when the server stayed busy across every retry. Pausing keeps the run resumable; failing loses it.
 export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused", "busy"]);
 
+// Puts a streamed Gemini reply back together as one generateContent reply, so fromResponse reads it
+// like any other. Each chunk carries a few parts; text that was split across chunks is joined again.
+// A part with a thoughtSignature closes the text before it, because the signature belongs to that part.
+export function stitchChunks(chunks) {
+  const parts = [];
+  let finishReason, usageMetadata, promptFeedback, seen = false;
+  for (const c of chunks) {
+    if (!c || typeof c !== "object") continue;
+    if (c.usageMetadata) usageMetadata = c.usageMetadata;
+    if (c.promptFeedback) promptFeedback = c.promptFeedback;
+    const cand = (c.candidates || [])[0];
+    if (!cand) continue;
+    seen = true;
+    if (cand.finishReason) finishReason = cand.finishReason;
+    for (const p of (cand.content && cand.content.parts) || []) {
+      if (p.thought) continue;
+      const last = parts[parts.length - 1];
+      const plain = (x) => x && x.text != null && !x.functionCall;
+      if (plain(p) && plain(last) && !last.thoughtSignature) {
+        last.text += p.text;
+        if (p.thoughtSignature) last.thoughtSignature = p.thoughtSignature;
+      } else parts.push({ ...p });
+    }
+  }
+  return {
+    candidates: seen ? [{ content: { role: "model", parts }, ...(finishReason ? { finishReason } : {}) }] : [],
+    ...(usageMetadata ? { usageMetadata } : {}), ...(promptFeedback ? { promptFeedback } : {}),
+    complete: !!finishReason,
+  };
+}
+
+// Reads a text/event-stream body to the end and returns the JSON of every "data:" line.
+export async function readSSE(res) {
+  const chunks = [];
+  const take = (line) => {
+    if (!line.startsWith("data:")) return;
+    const t = line.slice(5).trim();
+    if (!t || t === "[DONE]") return;
+    try { chunks.push(JSON.parse(t)); } catch (e) { /* a cut-off last line: stitchChunks reports it as incomplete */ }
+  };
+  if (res.body && res.body.getReader) {
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split(/\r?\n/);
+      buf = lines.pop();
+      lines.forEach(take);
+    }
+    buf += dec.decode();
+    if (buf) take(buf);
+  } else (await res.text()).split(/\r?\n/).forEach(take);
+  return chunks;
+}
+
+const isSSE = (res) => /event-stream/i.test((res.headers && res.headers.get && res.headers.get("content-type")) || "");
+
 // Sends the same Gemini body to WORKER_URL/ai and parses the reply with the Gemini parser.
 // refreshToken(): called once after a 401; returns a new token or null.
+//
+// The call asks for a streamed reply (?stream=1). Chrome ends an extension service worker whose
+// fetch has had no response for 30 seconds, and a tailored resume or a Deep Dive step can take longer
+// than that to finish. A stream answers as soon as Gemini starts, and the pieces are joined here.
+// Errors (401, 429, 503...) still come back as plain JSON, exactly as before.
 export async function callWorker({ url, token, refreshToken, task, run_id, signal, fetchImpl = fetch, sleepImpl = sleep, ...opts }) {
   if (!token) throw workerError(401, { error: "auth" });
   const body = JSON.stringify(buildWorkerRequest({ task, run_id, ...opts }));
@@ -176,7 +240,7 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
   for (let attempt = 0; attempt < 4; attempt++) {
     let res;
     try {
-      res = await fetchImpl(`${url}/ai`, {
+      res = await fetchImpl(`${url}/ai?stream=1`, {
         method: "POST",
         signal,
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -187,6 +251,23 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
       lastErr = workerError(502, { error: "upstream" });
       await sleepImpl(1500 * 2 ** attempt);
       continue;
+    }
+    if (res.ok && isSSE(res)) {
+      let whole;
+      try {
+        whole = stitchChunks(await readSSE(res));
+      } catch (e) {
+        if (signal && signal.aborted) throw e;
+        whole = null;
+      }
+      // A stream that stopped before Gemini said it was finished is a dropped connection, not an
+      // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
+      if (!whole || (!whole.complete && !whole.promptFeedback)) {
+        lastErr = workerError(502, { error: "upstream" });
+        await sleepImpl(1500 * 2 ** attempt);
+        continue;
+      }
+      return fromResponse(whole);
     }
     const data = await res.json().catch(() => ({}));
     if (res.ok) return fromResponse(data);

@@ -1,7 +1,7 @@
 // InternScout Worker routing: request building, error mapping, token expiry, store migration.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES } from "../background/gemini.js";
+import { buildWorkerRequest, callWorker, workerError, taskFor, NEEDS_YOU_CODES, stitchChunks, readSSE } from "../background/gemini.js";
 import { decodeJwt, isExpired, parseRedirect, buildAuthUrl, pickProvider, allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { emptyStore, upgradeStore, migrate, hasKey, modelFor, EMPTY_FACTS, STORE_VERSION } from "../lib/store.js";
 import { postingGone, deadPage, pageGone, noChange, toPage, pageBulk, FROZEN_PAGE } from "../background/agent.js";
@@ -40,7 +40,7 @@ test("callWorker posts with the bearer token and parses the Gemini reply", async
   const fetchImpl = async (url, init) => { calls.push({ url, init }); return res(200, reply("OK")); };
   const out = await callWorker({ url: "https://w.example", token: "T1", task: "deep_dive", run_id: "dd", fetchImpl, ...opts });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://w.example/ai");
+  assert.equal(calls[0].url, "https://w.example/ai?stream=1");
   assert.equal(calls[0].init.headers.authorization, "Bearer T1");
   const body = JSON.parse(calls[0].init.body);
   assert.equal(body.task, "deep_dive");
@@ -353,4 +353,64 @@ test("a page that never answers is given up on rather than waited for", async ()
   await assert.rejects(toPage(new Promise(() => {}), 20), (e) => e.message === FROZEN_PAGE);
   // The page's own errors still reach the caller unchanged.
   await assert.rejects(toPage(Promise.reject(new Error("no such tab")), 50), /no such tab/);
+});
+
+// ---- streamed replies (?stream=1)
+const sse = (chunks, { cut = 0 } = {}) => {
+  let text = chunks.map((c) => `data: ${JSON.stringify(c)}` + "\r\n\r\n").join("");
+  if (cut) text = text.slice(0, -cut);
+  const bytes = new TextEncoder().encode(text);
+  // Small, odd-sized pieces, so a line (and a multi-byte character) is split across reads.
+  const body = new ReadableStream({ start(c) { for (let i = 0; i < bytes.length; i += 7) c.enqueue(bytes.slice(i, i + 7)); c.close(); } });
+  return { ok: true, status: 200, headers: new Headers({ "content-type": "text/event-stream" }), body, json: async () => { throw new Error("not json"); } };
+};
+const chunk = (parts, extra = {}) => ({ candidates: [{ content: { role: "model", parts }, ...extra }], usageMetadata: { promptTokenCount: 5 } });
+
+test("a streamed reply is joined back into one answer", async () => {
+  const fetchImpl = async () => sse([
+    chunk([{ text: "thinking...", thought: true }]),
+    chunk([{ text: "Hello, caf" }]),
+    chunk([{ text: "é wor" }]),
+    chunk([{ text: "ld", thoughtSignature: "SIG" }], { finishReason: "STOP" }),
+  ]);
+  const out = await callWorker({ url: "u", token: "t", task: "resume_tailor", fetchImpl, ...opts });
+  assert.deepEqual(out.content, [{ type: "text", text: "Hello, café world", _sig: "SIG" }]);
+  assert.equal(out.stop_reason, "end_turn");
+  assert.equal(out.usage.promptTokenCount, 5);
+});
+
+test("a streamed tool call keeps its arguments and signature", async () => {
+  const fetchImpl = async () => sse([
+    chunk([{ text: "Filling the form." }]),
+    chunk([{ functionCall: { name: "fill", args: { selector: "#email", value: "a@b.edu" } }, thoughtSignature: "S2" }], { finishReason: "STOP" }),
+  ]);
+  const out = await callWorker({ url: "u", token: "t", task: "autofill", fetchImpl, ...opts });
+  assert.equal(out.stop_reason, "tool_use");
+  assert.equal(out.content[0].text, "Filling the form.");
+  assert.deepEqual(out.content[1].input, { selector: "#email", value: "a@b.edu" });
+  assert.equal(out.content[1]._sig, "S2");
+});
+
+test("a stream cut off before the finish is retried, never acted on", async () => {
+  let n = 0;
+  const slept = [];
+  const fetchImpl = async () => (n++ === 0
+    ? sse([chunk([{ text: "half a res" }]), chunk([{ text: "ume" }], { finishReason: "STOP" })], { cut: 40 })
+    : sse([chunk([{ text: "whole" }], { finishReason: "STOP" })]));
+  const out = await callWorker({ url: "u", token: "t", task: "resume_tailor", fetchImpl, sleepImpl: async (ms) => slept.push(ms), ...opts });
+  assert.equal(n, 2);
+  assert.equal(slept.length, 1);
+  assert.deepEqual(out.content, [{ type: "text", text: "whole" }]);
+});
+
+test("MAX_TOKENS and a blocked prompt come through a stream unchanged", async () => {
+  const long = await callWorker({ url: "u", token: "t", task: "deep_dive", fetchImpl: async () => sse([chunk([{ text: "a" }], { finishReason: "MAX_TOKENS" })]), ...opts });
+  assert.equal(long.stop_reason, "max_tokens");
+  await assert.rejects(callWorker({ url: "u", token: "t", task: "deep_dive", fetchImpl: async () => sse([{ promptFeedback: { blockReason: "SAFETY" } }]), ...opts }), /blocked: SAFETY/);
+});
+
+test("stitchChunks and readSSE on their own", async () => {
+  assert.deepEqual(stitchChunks([]), { candidates: [], complete: false });
+  const got = await readSSE({ text: async () => "event: x" + "\n" + "data: {\"a\":1}" + "\n\n" + "data: [DONE]" + "\n" });
+  assert.deepEqual(got, [{ a: 1 }]);
 });
