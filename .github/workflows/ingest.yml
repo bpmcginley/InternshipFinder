@@ -7,7 +7,9 @@ on:
   workflow_dispatch:            # manual "Run workflow" button
   push:
     branches: [main]
-    paths: ["backend/**", "!backend/data/**", ".github/workflows/ingest.yml"]
+    # tests and one-off scripts never change what an ingest produces, so a push of only those
+    # no longer starts a full run (2026-09 audit; was: every file under backend/ except data/)
+    paths: ["backend/**", "!backend/data/**", "!backend/tests/**", "!backend/scripts/**", ".github/workflows/ingest.yml"]
 
 permissions:
   contents: write               # allow committing the data back

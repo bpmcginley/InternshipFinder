@@ -7,8 +7,12 @@ from .classify import classify, stage_of, SECTOR_FIELDS, employer_research_field
 from .region import evaluate_locations
 
 # "Spring Boot" and "fall under" are not terms
-_SEASON_RE = re.compile(r"\b(summer|fall(?!\s+(?:under|within|into|in|on|behind|short|outside|off)\b)|autumn|winter|"
-                        r"spring(?!\s*(?:boot|framework|mvc|cloud|batch|data)\b)|year[- ]round|academic year)\b", re.I)
+# ...and neither are "Silver Spring, MD", "Cold Spring Harbor", "Fall River, MA" or "Winter Park, FL":
+# a posting in Silver Spring was being given the term "Spring", and then dropped as out of cycle.
+_SEASON_RE = re.compile(r"\b(summer|fall(?!\s+(?:under|within|into|in|on|behind|short|outside|off|river)\b)|autumn|"
+                        r"winter(?!\s+(?:park|haven|garden|springs)\b)|"
+                        r"(?<!silver\s)(?<!cold\s)spring(?!\s*(?:boot|framework|mvc|cloud|batch|data|hill|valley|lake|house|harbor)\b)(?!,\s*tx\b)|"
+                        r"year[- ]round|academic year)\b", re.I)
 _SEASON_NAME = {"autumn": "Fall", "year round": "Year-round", "year-round": "Year-round", "academic year": "Year-round"}
 _YEAR_RE = re.compile(r"\b(20[2-3]\d)\b")  # 2020-2039, avoids matching job-id digits
 
@@ -22,12 +26,64 @@ def parse_term_from_text(text: str):
     year = int(y.group(1)) if y else None
     return season, year
 
+# A season and a year written next to each other ("Summer 2027", "2027 Summer"). This is the only
+# form a DESCRIPTION is trusted for: a lone year in one is as likely to be "founded in 2021" or
+# "graduating in 2028" as the term, and it used to override the title.
+_TERM_PAIR_RE = re.compile(
+    r"\b(summer|fall|autumn|winter|spring)\s+(?:of\s+)?(20[2-3]\d)\b|\b(20[2-3]\d)\s+(summer|fall|autumn|winter|spring)\b", re.I)
+
+
+def parse_term_pair(text: str):
+    """(season, year) only when the two are written together; (None, None) otherwise."""
+    for m in _TERM_PAIR_RE.finditer(text or ""):
+        word, year = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        return _SEASON_NAME.get(word.lower(), word.capitalize()), int(year)
+    return None, None
+
+
+_GRAD_CONTEXT = re.compile(r"(graduat\w*|class of|degree|enrolled|completion|founded|since|established|copyright|\(c\))[^.]{0,40}$", re.I)
+
+
+def lone_description_year(text: str, today: datetime | None = None):
+    """A year standing alone in a description, if it can only be the term's year.
+
+    "Our summer interns start in June 2027" is worth having; "founded in 2021", "graduating in
+    2028" and "(c) 2025" are not. So the year has to be this year or next, and must not follow a
+    graduation or founding word in the same sentence.
+    """
+    now = (today or datetime.now(timezone.utc)).year
+    for m in _YEAR_RE.finditer(text or ""):
+        y = int(m.group(1))
+        if now <= y <= now + 1 and not _GRAD_CONTEXT.search(text[max(0, m.start() - 60):m.start()]):
+            return y
+    return None
+
+
 _SALARY_RE = re.compile(
     r'\$\s?\d[\d,]*(?:\.\d+)?\s?[kK]?'
     r'(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?'
     r'(?:\s?(?:/|per\s)?\s?(?:hour|hr|year|yr|annum|annually|month|mo|week|wk|day))?',
     re.I)
 _DURATION_RE = re.compile(r'\b(\d{1,2})\s?[-\u2013]?\s?week', re.I)
+
+
+# The first dollar figure in a posting is often not the pay: "401(k) match up to $5,000", "$2,500
+# tuition reimbursement", "$250,000 donated", "$3 billion in assets". A card that says an intern
+# earns $250,000 is worse than a card that says nothing, so a figure is skipped when the words just
+# before it are about benefits or the company, or when it is followed by million/billion; and a
+# figure with no unit (no /hr, /year, k) is believed only when pay words are close by.
+_NOT_PAY_BEFORE = re.compile(r"(401\s?\(?k\)?|match|bonus|tuition|reimburs\w*|relocation|scholarship|award\w*|grant\w*|"
+                             r"revenue|funding|raised|donat\w*|assets|valuation|prize|referral|"
+                             r"sign[- ]on|signing|discount)[^.$]{0,40}$", re.I)
+_NOT_PAY_AFTER = re.compile(r"^\s?(million|billion|trillion|mm\b|m\b|b\b|bn\b|\+?\s?(in|of)\s+(assets|revenue|sales|funding))", re.I)
+_PAY_NEAR = re.compile(r"(salary|pay\b|paid|compensation|wage|rate|range|stipend|earn|hourly|annual|base|per hour)", re.I)
+
+
+def _is_pay(text: str, m, has_unit: bool) -> bool:
+    before, after = text[max(0, m.start() - 60):m.start()], text[m.end():m.end() + 30]
+    if _NOT_PAY_AFTER.search(after) or _NOT_PAY_BEFORE.search(before):
+        return False
+    return has_unit or bool(_PAY_NEAR.search(text[max(0, m.start() - 80):m.end() + 40]))
 
 
 def extract_salary(text: str):
@@ -37,7 +93,7 @@ def extract_salary(text: str):
         low = val.lower()
         has_unit = any(u in low for u in ("hour", "hr", "year", "yr", "annum", "month", "mo", "week", "wk", "day", "k"))
         digits = re.sub(r"[^\d]", "", val.split("-")[0])
-        if has_unit or (digits.isdigit() and int(digits) >= 1000):
+        if (has_unit or (digits.isdigit() and int(digits) >= 1000)) and _is_pay(text, m, has_unit):
             return val[:120]
     return None
 
@@ -65,6 +121,32 @@ _TITLE_TAILS = re.compile(r"[\s,]*(united states|u\.?s\.?a?\.?)\s*$", re.I)
 _TITLE_LOC = re.compile(r"[\s,]*[a-z][a-z]+(?:\s[a-z]+){0,2},\s*[a-z]{2}\s*$", re.I)
 
 
+_US_CODES = frozenset(("al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms mo mt ne nv nh nj nm "
+                       "ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy dc pr").split())
+_ROLE_WORD = re.compile(r"\b(interns?|internship|co-?op|engineer(?:ing)?|analyst|student|research(?:er)?|program|"
+                        r"assistant|associate|developer|scientist|trainee|fellow(?:ship)?|apprentice)\b")
+
+
+def _strip_title_loc(t: str) -> str:
+    """Take a trailing "City, ST" off a lower-cased title, without taking the job with it.
+
+    _TITLE_LOC alone reads any two letters after a comma as a state and up to three words before
+    it as a city, so "Research, ML" and "Summer 2027 Student Intern, AI" normalized to nothing and
+    "Marketing Intern, NY" lost its only words; every such title at one company then shared a
+    dedupe key and merged into one row. Two checks: the code has to be a real state, and if the
+    "city" holds a job word, only the ", ST" goes.
+    """
+    m = _TITLE_LOC.search(t)
+    if not m:
+        return t
+    tail = m.group(0).rstrip()
+    if tail[-2:] not in _US_CODES:
+        return t
+    if _ROLE_WORD.search(tail):
+        return re.sub(r",\s*[a-z]{2}\s*$", " ", t)
+    return t[:m.start()] + " "
+
+
 def normalize_company(name: str) -> str:
     n = (name or "").lower()
     n = _COMPANY_STRIP.sub(" ", n)
@@ -75,7 +157,7 @@ def normalize_company(name: str) -> str:
 def normalize_title(title: str) -> str:
     t = title.lower()
     t = _TITLE_TAILS.sub(" ", t)
-    t = _TITLE_LOC.sub(" ", t)
+    t = _strip_title_loc(t)   # was _TITLE_LOC.sub(" ", t); see _strip_title_loc for why
     t = _SUFFIX.sub(" ", t)
     t = _NOISE.sub(" ", t)
     return _WS.sub(" ", t).strip()
@@ -141,7 +223,13 @@ def _dead_url(url: str) -> bool:
     reaches us second-hand from search feeds, which carry it the way it was posted rather than the
     way it works. A listing nobody can open is worse than one we never had.
     """
-    u = (url or "").lower()
+    u = (url or "").strip().lower()
+    # The dashboard puts apply_url straight into an href, and several sources are lists anyone can
+    # edit. A link that is not plain http(s) - javascript:, data:, a bare path - is never a job page,
+    # so it is dropped here rather than trusted to every page that renders it. (Added 2026-09 audit;
+    # no listing had one at the time. An empty url is still allowed, as before.)
+    if u and not u.startswith(("http://", "https://")):
+        return True
     return "workforcenow.adp.com" in u and "recruitment.html" in u and "cid=" not in u
 
 
@@ -212,10 +300,24 @@ def normalize(raw: dict) -> dict | None:
     # Precedence for term: an explicit season/year in the TITLE is most authoritative,
     # then the apply URL (many ATS slugs encode e.g. "2026-Summer-Intern"), then the
     # source's default cycle mapping.
-    ps, py_ = parse_term_from_text(f"{title} {raw.get('description','') or ''}")
+    # The title and the description used to be read as one string, so the first year anywhere in
+    # the description won: "Software Intern" at a company "founded in 2021" became Summer 2021 and
+    # was dropped as a past cycle. Now the title speaks first, then the URL, and the description is
+    # believed only where it writes a season and a year together, and only if that season agrees
+    # with the one already found. A season word alone in the description still counts, as before,
+    # and a year alone in it counts only when lone_description_year says it can be the term's.
+    #   was: ps, py_ = parse_term_from_text(f"{title} {description}")
+    desc = raw.get("description", "") or ""
+    ts, ty = parse_term_from_text(title)
     us, uy = parse_term_from_text(raw.get("apply_url") or raw.get("url") or "")
-    season = ps or us or season or raw.get("season")
-    year = py_ or uy or year or raw.get("year")
+    ds, dy = parse_term_pair(desc)
+    ls, _ = parse_term_from_text(desc)
+    ps = ts or us or ds or ls
+    if ds and ps != ds:
+        dy = None
+    py_ = ty or uy or dy or lone_description_year(desc)
+    season = ps or season or raw.get("season")
+    year = py_ or year or raw.get("year")
     # A season on its own is worth keeping - "Summer" on a card is true, and the dashboard scores a
     # season-only term against the student's chosen terms - but "Summer None" is not, and 649 of the
     # 14,525 listings in the last export said exactly that. The dashboard has been deleting the word

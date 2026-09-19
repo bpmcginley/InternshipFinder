@@ -56,7 +56,10 @@ def _transient(e: Exception) -> bool:
     if isinstance(e, httpx.HTTPStatusError):
         s = e.response.status_code
         return s == 429 or s >= 500
-    return isinstance(e, (httpx.TimeoutException, httpx.RemoteProtocolError, httpx.ReadError))
+    # ConnectError (DNS, refused, TLS) was missing, so a board that could not be reached for a
+    # moment was never retried. NetworkError is the parent of ConnectError, ReadError and WriteError.
+    return isinstance(e, (httpx.TimeoutException, httpx.RemoteProtocolError, httpx.ReadError,
+                          httpx.ConnectError, httpx.NetworkError))
 
 
 def _fetch_boards(c, jobs: list, workers: int) -> dict:

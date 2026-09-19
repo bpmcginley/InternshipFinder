@@ -63,10 +63,51 @@ _TOWN_STATE = re.compile(r"^\s*([^,;|]+?)\s*,\s*([A-Za-z][A-Za-z ]*?)(?:\s+\d{5}
                          r"\s*(?:,\s*(?:us|usa|u\.s\.a?\.?|united states(?: of america)?)\s*)?$", re.I)
 
 
+# Two more ways a foreign posting was filed under a US state, both found in the 2026-09 audit.
+#
+# 1. ISO country codes that are also state codes. "Pune, IN" was Indiana, "Berlin, DE" Delaware,
+#    "Toronto, CA" California, "Bogota, CO" Colorado and "Casablanca, MA" Massachusetts. Berlin and
+#    Toronto even passed the namesake rule above, because DE and CA are real states. These are the
+#    large hiring cities of each colliding country, matched only with their own country's code, so
+#    "Ontario, CA" (the Inland Empire one) and "Vancouver, WA" are untouched.
+_FOREIGN_CITY_CODE = re.compile(
+    r"\b(?:"
+    r"(?:pune|mumbai|new delhi|delhi|chennai|gurgaon|gurugram|noida|kolkata|ahmedabad|bangalore|bengaluru|hyderabad|"
+    r"jaipur|kochi|coimbatore|indore|chandigarh|thane|navi mumbai|mysore|mysuru|trivandrum|vadodara)\s*,\s*IN"
+    r"|(?:berlin|munich|hamburg|frankfurt(?: am main)?|stuttgart|cologne|dusseldorf|düsseldorf|walldorf|leipzig|"
+    r"dresden|nuremberg|hannover|bonn|karlsruhe|mannheim)\s*,\s*DE"
+    r"|(?:toronto|vancouver|montreal|montréal|ottawa|calgary|edmonton|mississauga|waterloo|winnipeg|markham|burnaby|"
+    r"kitchener|halifax|quebec(?: city)?|victoria|saskatoon|regina|brampton|oakville)\s*,\s*CA"
+    r"|(?:bogota|bogotá|medellin|medellín|cali|barranquilla|cartagena)\s*,\s*CO"
+    r"|(?:casablanca|rabat|tangier|marrakech|marrakesh)\s*,\s*MA"
+    r"|(?:jerusalem|haifa|herzliya|petah tikva|ra'?anana|netanya|beer sheva|yokneam)\s*,\s*IL"
+    r"|(?:buenos aires|cordoba|córdoba|rosario|mendoza)\s*,\s*AR"
+    r"|(?:jakarta|bandung|surabaya|bali)\s*,\s*ID"
+    r"|(?:panama city|panama)\s*,\s*PA"
+    r"|(?:tunis)\s*,\s*TN"
+    r")(?![A-Za-z])", re.I)
+# 2. Big foreign cities and countries _FOREIGN never listed. A bare "Quezon City" on a Massachusetts
+#    employer's board was stamped "Quezon City, MA" by region.place_bare_cities, which asks this
+#    module whether a name is foreign. Only names with no US town worth confusing them with: Lima,
+#    Rome, Athens, Melbourne, Hamburg, Cairo, Peru and Wellington are left out on purpose.
+_FOREIGN_MORE = re.compile(
+    r"\b(pune|mumbai|new delhi|chennai|gurgaon|gurugram|noida|kolkata|ahmedabad|quezon city|manila|makati|taguig|cebu|"
+    r"bogota|bogotá|medellin|medellín|casablanca|rabat|jakarta|kuala lumpur|bangkok|ho chi minh|hanoi|"
+    r"sao paulo|são paulo|rio de janeiro|buenos aires|lagos|nairobi|johannesburg|cape town|istanbul|ankara|riyadh|"
+    r"doha|abu dhabi|karachi|lahore|dhaka|shenzhen|guangzhou|chengdu|hangzhou|osaka|kyoto|yokohama|brisbane|auckland|"
+    r"calgary|edmonton|mississauga|winnipeg|frankfurt|dusseldorf|düsseldorf|barcelona|budapest|bucharest|belgrade|"
+    r"zagreb|helsinki|oslo|stockholm|copenhagen|gothenburg|krakow|wroclaw|gdansk|kyiv|tallinn|vilnius|"
+    r"malaysia|indonesia|thailand|pakistan|bangladesh|nigeria|kenya|egypt|saudi arabia|qatar|morocco|costa rica|"
+    r"new zealand|south africa|hungary|bulgaria|serbia|croatia|estonia|latvia|lithuania|sri lanka|nepal)\b", re.I)
+
+
 class _NotUS:
     """_FOREIGN, except for a US namesake followed by its state. Callers use it as a regex."""
 
     def search(self, loc: str):
+        hit = _FOREIGN_CITY_CODE.search(loc) or _FOREIGN_MORE.search(loc)
+        if hit:
+            return hit
         m = _FOREIGN.search(loc)
         if not m:
             return None
@@ -104,12 +145,19 @@ _FACILITY = re.compile(r"^\s*US\s*-\s*.+\(([A-Z]{2})[A-Z]{3}\)\s*$")
 _LOS_ANGELES = re.compile(r"^\s*LA\s*(?:,\s*(?:CA|California|USA?|United States(?: of America)?)\s*)*$")
 
 
+_WASHINGTON_DC = re.compile(r"\bwashington\s*,?\s+d\.?\s?c\.?(?![A-Za-z])", re.I)
+
+
 def state_of(loc: str) -> str | None:
     """Two-letter state code from 'City, ST', 'US-MA-Boston', 'Boston, Massachusetts', ..."""
     if not loc:
         return None
     if _LOS_ANGELES.match(loc):
         return "CA"
+    # "Washington DC", "Washington, D.C." and "Washington D.C. Metro" all fell through to the state
+    # NAME pass below and came back WA; only the exact spelling "Washington, DC" gave DC.
+    if _WASHINGTON_DC.search(loc):
+        return "DC"
     for tok in _TOKEN_SPLIT.split(loc):
         m = re.fullmatch(r"\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*", tok)
         if m and m.group(1).lower() in _US_STATES:

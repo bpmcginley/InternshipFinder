@@ -48,6 +48,12 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     if max_searches is None:
         max_searches = int(os.environ.get("SERPAPI_MAX_SEARCHES", "12"))
     now = datetime.datetime.now(datetime.timezone.utc)
+    # A push to backend/ starts a full ingest too. Between 00:00 and 06:00 UTC that run passed the
+    # once-a-day test below and spent the day's paid searches a second time (and a third, for the
+    # next push). The 250-search plan at 8 a day has no room for that, so a push never searches.
+    if os.environ.get("GITHUB_EVENT_NAME") == "push" and not os.environ.get("SERPAPI_EVERY_RUN"):
+        print("[google_jobs] push-triggered run; paid searches are left to the scheduled run")
+        return []
     if not os.environ.get("SERPAPI_EVERY_RUN") and not is_daily_run(now.hour):
         print("[google_jobs] runs once a day (first run after 00:00 UTC); skipping this run")
         return []

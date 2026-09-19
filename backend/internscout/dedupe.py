@@ -2,7 +2,7 @@
 from __future__ import annotations
 import re
 from collections import defaultdict
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 # A Greenhouse job carries its number in the query and the rest of the URL varies by how it was
 # found: the board says "coinbase.com/careers/positions/8168315?gh_jid=8168315" and the embed link
@@ -12,6 +12,8 @@ _GH_ID = re.compile(r"(?:gh_jid|token)=(\d+)")
 # the apply link. Neither changes which job it is.
 _LOCALE = re.compile(r"/[a-z]{2}-[A-Z]{2}(?=/)")
 _APPLY_TAIL = re.compile(r"/appl(?:y|ication)/?$")
+# Query parameters that say which job a link opens, on the boards that put the id there.
+_ID_PARAMS = frozenset({"job", "pid", "jobid", "job_id", "reqid", "req_id", "requisitionid", "jk"})
 
 
 def same_job(a: str | None, b: str | None) -> bool:
@@ -36,7 +38,14 @@ def _canon_job(url: str | None) -> str | None:
         return None
     # The query is where a source writes how it arrived - ?icims=1, ?ats=successfactors, ?embed=true
     # - and never where the job id lives on these boards, so it is dropped.
-    return s.netloc.lower() + _APPLY_TAIL.sub("", _LOCALE.sub("", s.path)).rstrip("/")
+    # (2026-09 audit: "never" was wrong for two boards. Taleo writes every job as
+    # .../jobdetail.ftl?job=123456 and Microsoft as .../careers?pid=123, so with the whole query gone
+    # all 119 Textron postings came out as one URL, and two of them with the same title - one with a
+    # term, one without - would have been folded into a single listing. The params that name the job
+    # are kept; everything else is still dropped, as before.)
+    ids = sorted((k.lower(), v) for k, v in parse_qsl(s.query) if k.lower() in _ID_PARAMS and v)
+    tail = "?" + "&".join("%s=%s" % kv for kv in ids) if ids else ""
+    return s.netloc.lower() + _APPLY_TAIL.sub("", _LOCALE.sub("", s.path)).rstrip("/") + tail
 
 
 def merge_batch(items: list[dict]) -> dict[str, dict]:

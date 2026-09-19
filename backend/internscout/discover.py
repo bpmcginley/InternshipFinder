@@ -102,18 +102,47 @@ def ats_of(url: str | None) -> tuple[str, str | None]:
 
 
 def load_registry() -> dict:
+    """The board registry, or {} when there is no file yet.
+
+    A file that is there but will not parse is an error, not an empty registry. It used to come back
+    as {} (was: `except (OSError, ValueError): return {}`), and the run went on to discover a few
+    boards and save them over the top - months of verified boards replaced by a dozen, with a green
+    tick. A bad merge or a write cut short is the likely way to get there, so the run stops and says so.
+    """
     try:
         with open(REGISTRY_PATH, encoding="utf-8") as f:
             return json.load(f)
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return {}
+    except ValueError as e:
+        raise RuntimeError(f"{REGISTRY_PATH} is not valid JSON ({e}); restore it from git before running") from e
+
+
+def _board_count(reg: dict) -> int:
+    return sum(len(b) for b in reg.values() if isinstance(b, dict))
 
 
 def save_registry(reg: dict) -> None:
+    """Write the registry whole or not at all.
+
+    Written to a temp file and moved into place, so a run killed mid-write (the CI job has a time
+    limit) leaves the old file rather than half of a new one. And a registry that has lost more than
+    half its boards since it was read is refused: prune() takes a handful at a time, so a drop that
+    size is a bug upstream. REGISTRY_ALLOW_SHRINK=1 is the override for a deliberate clean-out.
+    """
     os.makedirs(DATA_DIR, exist_ok=True)
     out = {ats: dict(sorted(boards.items(), key=lambda kv: kv[0].lower())) for ats, boards in sorted(reg.items())}
-    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
+    try:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
+            had = _board_count(json.load(f))
+    except (OSError, ValueError):
+        had = 0
+    if had >= 200 and _board_count(out) * 2 < had and not os.environ.get("REGISTRY_ALLOW_SHRINK"):
+        raise RuntimeError(f"refusing to save a registry of {_board_count(out)} boards over one of {had}")
+    tmp = REGISTRY_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=1, ensure_ascii=False)
+    os.replace(tmp, REGISTRY_PATH)
 
 
 def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, sector: str | None = None,
@@ -300,10 +329,25 @@ def boards(reg: dict):
                 yield ats, token, entry
 
 
-def record_result(reg: dict, ats: str, token: str, ok: bool) -> None:
+def record_result(reg: dict, ats: str, token: str, ok: bool, today: date | None = None) -> None:
+    """Count a failed fetch against a board, at most once per calendar day.
+
+    MAX_FAILS was written as "4 failed runs", and the ingest runs four times a day, so one bad day
+    at an ATS - an outage, a rate limit, a DNS blip on the runner - was enough to delete a board
+    from the registry for good. Counting days instead of runs keeps the same number but makes it
+    mean four different days with no success between them. (Was: fails += 1 on every call.)
+    """
     entry = reg.get(ats, {}).get(token)
-    if entry is not None:
-        entry["fails"] = 0 if ok else entry.get("fails", 0) + 1
+    if entry is None:
+        return
+    if ok:
+        entry["fails"] = 0
+        entry.pop("last_fail", None)
+        return
+    day = (today or date.today()).isoformat()
+    if entry.get("last_fail") != day:
+        entry["fails"] = entry.get("fails", 0) + 1
+        entry["last_fail"] = day
 
 
 def prune(reg: dict) -> int:

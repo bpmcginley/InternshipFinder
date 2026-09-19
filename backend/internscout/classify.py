@@ -338,6 +338,20 @@ _NEW_GRAD_RE = re.compile(r"new ?grad|early career|entry[- ]level|recent (colleg
                           r"graduate (development |rotational )?program|rotational program|leadership development program", re.I)
 _NEW_GRAD_STRONG_RE = re.compile(r"new[- ]?grad|recent (college )?grad|university grad|entry[- ]level", re.I)
 _STUDENT_TERM_RE = re.compile(r"\bintern(ship)?s?\b|\bco-?op\b|\bstudents?\b", re.I)
+# Three more wordings where the dated season is when a full-time job begins, found on the live board
+# in the 2026-09 audit. None of them says new grad, so the rule above let them through:
+#   a start date        "Operations Management Development Program - Summer 2027 Start"
+#   an associate class  "Risk Consulting Associate - Summer 2027", "Civil Associate I, Summer 2027"
+#                       (Grant Thornton and RSM post the intern twin as "... Intern - Summer 2027")
+#   a finished degree   "2027 PhD Graduate - Rotational Discovery Program"
+# "Summer Associate" is the law and banking word for an intern and is left alone, and so is any title
+# with a college word in it ("Collegiate Associate", "Undergraduate Research Associate", work-study).
+_START_DATE_RE = re.compile(r"\b(summer|fall|spring|winter)\s+20\d\d\s+start\b|\b20\d\d\s+start\b|"
+                            r"\bstart(ing|s)?\s+(date\s*:?\s*)?(in\s+)?((summer|fall|spring|winter|january|june|july|"
+                            r"august|september)\s+)?20\d\d\b", re.I)
+_FT_ASSOCIATE_RE = re.compile(r"(?<!summer )(?<!winter )\bassociate\b", re.I)
+_DEGREE_GRADUATE_RE = re.compile(r"\b(phd|bs/ms|bs|ba|ms|mba|masters?|bachelors?)\s+graduates?\b(?! (student|research|assistant))", re.I)
+_COLLEGE_WORD_RE = re.compile(r"\b(college|collegiate|undergrad(uate)?|work[- ]?study|fws|ws|fellow(ship)?|trainee|apprentice(ship)?|extern(ship)?)\b", re.I)
 _NON_INTERN_RE = re.compile(r"\brecruiter\b|\bmanager\b|\bfull[- ]?time\b|\bdirector\b|\bsenior\b|\bstaff\b|\bprincipal\b|\blead\b", re.I)
 # The separator is optional and it is not always a hyphen. Employers write "Post Doctoral
 # Research Fellow" and "Post Doc Research Associate" as often as they write "Postdoctoral",
@@ -480,6 +494,9 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
     # "Early career" is not among them: "Early Career Mechanical Engineering - Summer 2027" is a
     # summer internship.
     if _NEW_GRAD_STRONG_RE.search(title) and not _STUDENT_TERM_RE.search(title):
+        return []
+    if not _STUDENT_TERM_RE.search(title) and not _COLLEGE_WORD_RE.search(title) and (
+            _START_DATE_RE.search(title) or _FT_ASSOCIATE_RE.search(title) or _DEGREE_GRADUATE_RE.search(title)):
         return []
     if _NON_INTERN_RE.search(title) and not explicit:
         return []

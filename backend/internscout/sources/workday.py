@@ -154,13 +154,22 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                 postings.append(p)
 
     out = []
+    # The cap used to be "i < MAX_DETAIL": the posting's place in the list, not the calls made. On a
+    # big board most of the first MAX_DETAIL postings are out of region and make no call, so the
+    # budget went unspent while every "2 Locations" posting further down kept that text as its only
+    # location and was dropped as unreadable. Now the calls themselves are counted, and a
+    # multi-location posting, which is lost without its detail page, has a reserve of its own.
+    calls = multi_calls = 0
     for i, p in enumerate(postings):
         path = p.get("externalPath") or ""
         url = f"{base}{path}"
         text = p.get("locationsText") or ""
         locs, desc = [text], ""
         multi = "location" in text.lower()   # "3 Locations"
-        if i < MAX_DETAIL and (multi or maybe_in_region(text)):
+        wanted = multi or maybe_in_region(text)
+        if wanted and (calls < MAX_DETAIL or (multi and multi_calls < MAX_DETAIL)):
+            calls += 1
+            multi_calls += multi
             try:
                 d = c.get(f"{api}{path}", headers=HEADERS)
                 if d.status_code == 200:
