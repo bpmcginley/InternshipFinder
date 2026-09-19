@@ -19,7 +19,11 @@ async function read() {
 // (so callers still hand updateJob the whole file, and a queue saved by an older version is migrated
 // on its first write), and getTailoredFile() is how anything that needs the bytes asks for them.
 const BLOB = (id) => "tailored_" + id;
-async function write(q) {
+// was: write(q). `fresh` is the one job whose patch has just put a file on it (updateJob says which).
+// Any other job still carrying bytes is one saved by an older version, and if the move fails for it
+// the bytes stay where they already were: the review found that a failed migration write threw away
+// a resume the student had already approved, and perhaps already uploaded.
+async function write(q, fresh = null) {
   for (const j of Object.values(q.jobs)) {
     const f = j.tailored && j.tailored.file;
     if (!f || !f.b64) continue;
@@ -28,6 +32,7 @@ async function write(q) {
       await chrome.storage.local.set({ [BLOB(j.id)]: b64 });
       j.tailored = { ...j.tailored, file: meta };
     } catch (e) {
+      if (j.id !== fresh) continue; // an older job: leave its file on it, as it was, and try again next write
       // Storage refused the file. The job must not be lost over it: it goes on with the original resume.
       j.tailored = { status: "failed", error: "The browser had no room to keep the tailored resume, so your original is used." };
     }
@@ -86,8 +91,9 @@ export function updateJob(id, patch) {
   return withLock(async () => {
     const q = await read();
     if (!q.jobs[id]) return null;
+    const had = !!(q.jobs[id].tailored && q.jobs[id].tailored.file && q.jobs[id].tailored.file.b64);
     Object.assign(q.jobs[id], typeof patch === "function" ? patch(q.jobs[id]) : patch, { updated: Date.now() });
-    await write(q);
+    await write(q, had ? null : id);   // was: await write(q);
     return q.jobs[id];
   });
 }

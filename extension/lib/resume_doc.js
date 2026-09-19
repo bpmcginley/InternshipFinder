@@ -8,7 +8,8 @@
 // rows are never editable. Anything that fails a check falls back to the original text.
 // This file is ASCII only; every other character is written as a \u escape.
 import { hasNewNumbers } from "./tailoring.js";
-import { plain } from "./pdf_layout.js";
+// was: import { plain } from "./pdf_layout.js";
+import { lossless, parseRich, plain } from "./pdf_layout.js";
 
 const str = (v, max) => String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 const num = (v, lo, hi, dflt) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt; };
@@ -18,8 +19,20 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 
 // Model JSON -> a document the renderer can trust: every size clamped, every list capped, every
 // string flattened. Returns null when there is not enough of a resume in it to be worth drawing.
+// Why a page cannot be redrawn, in words for the student, or "" when it can. The renderer draws one
+// column of text. A two-column page, a sidebar, a photo, icons or a skills bar chart would come back
+// straightened out into something the student never made, which is the opposite of keeping their
+// format, so the reader is asked to say what it sees (SYSTEM_LAYOUT) and such a resume is left alone.
+export function layoutRefusal(raw) {
+  if (!raw || typeof raw !== "object") return "";
+  if (Number(raw.columns) > 1) return "it is laid out in columns";
+  if (raw.graphics === true) return "it has a photo, icons or other graphics";
+  return "";
+}
+
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return null;
+  if (layoutRefusal(raw)) return null;
   const s = raw.style && typeof raw.style === "object" ? raw.style : {};
   const h = s.heading && typeof s.heading === "object" ? s.heading : {};
   const body = num(s.body_size, 8, 12, 10.5), margin = num(s.margin_in, 0.3, 1.25, 0.6);
@@ -34,7 +47,9 @@ export function normalizeLayout(raw) {
     name_bold: bool(s.name_bold, true),
     name_caps: bool(s.name_caps, false),
     heading: { caps: bool(h.caps, true), bold: bool(h.bold, true), rule: pick(h.rule, ["below", "above", "none"], "below"), align: pick(h.align, ["left", "center"], "left") },
-    bullet: str(s.bullet == null ? "\u2022" : s.bullet, 2),
+    // was: bullet: str(s.bullet == null ? "\u2022" : s.bullet, 2). A glyph the fonts cannot draw
+    // (a Wingdings arrow, a check mark) came out as nothing; it is a round bullet now.
+    bullet: lossless(str(s.bullet == null ? "\u2022" : s.bullet, 2)) ? str(s.bullet == null ? "\u2022" : s.bullet, 2) : "\u2022",
     bullet_indent: num(s.bullet_indent, 0, 30, 10),
     margin_in: margin,
     margin_top_in: num(s.margin_top_in, 0.3, 1.25, margin),
@@ -89,7 +104,11 @@ export function layoutMatchesProfile(doc, store) {
 
 const SKILLS_RE = /skill|technolog|languages|tools|proficien|competenc|software/i;
 const SUMMARY_RE = /summary|objective|profile|about/i;
-const kindOf = (title) => (SUMMARY_RE.test(title) ? "summary" : SKILLS_RE.test(title) ? "skills" : "other");
+// was: ... SKILLS_RE.test(title) ? "skills" : "other". "Software Engineering Experience", "Technology
+// Projects" and "Professional Profile & Work Experience" matched, and a section read as skills or
+// summary has its entries frozen or its lines rewritten: the wrong rules for a list of jobs.
+const JOBS_RE = /experience|project|employment|work|research|leadership|activit|education/i;
+const kindOf = (title) => (JOBS_RE.test(title) ? "other" : SUMMARY_RE.test(title) ? "summary" : SKILLS_RE.test(title) ? "skills" : "other");
 
 // What the model sees: indexed so its answer can be mapped back and checked. Rows go along as
 // read-only context ("under"), so it knows which role a bullet belongs to.
@@ -106,11 +125,35 @@ export function docTailorInput(doc) {
 }
 
 // A reworded string keeps bold/italic marks only if the original had some and the new ones pair up.
+//
+// was: a reply with no marks at all was accepted as it came, so "**Backend:** built a REST API" went
+// out as plain text whenever the model forgot the stars, which it often does. The student's marks are
+// put back around the same words (remark). And a star the student typed ("A* search") is not a mark:
+// such a bullet keeps its star or keeps its old wording.
+const styled = (s) => parseRich(s).some((x) => x.b || x.i);
+function remark(next, orig) {
+  const star = (x) => (x.b && x.i ? "***" : x.b ? "**" : x.i ? "*" : "");
+  const segs = parseRich(orig).filter((x) => x.text.trim());
+  if (segs.length && star(segs[0]) && segs.every((x) => star(x) === star(segs[0]))) return star(segs[0]) + next + star(segs[0]);
+  let out = next;
+  for (const x of segs) {
+    const st = star(x), t = x.text.trim();
+    if (!st || t.length < 2) continue;
+    const at = out.indexOf(t);
+    if (at < 0 || out.indexOf(t, at + 1) >= 0) continue;                       // gone, or said twice: leave it
+    if (/[A-Za-z0-9]/.test(out[at - 1] || "") && /[A-Za-z0-9]/.test(t[0])) continue;   // inside another word
+    out = out.slice(0, at) + st + t + st + out.slice(at + t.length);
+  }
+  return out;
+}
 function marks(next, orig) {
-  if (!orig.includes("*")) return next.replace(/\*+/g, "");
+  const literal = plain(orig).includes("*");
+  if (!styled(orig)) return literal ? (!styled(next) && plain(next).includes("*") ? next : orig) : next.replace(/\*+/g, "");
+  if (literal) return styled(next) && plain(next).includes("*") ? next : orig;
   const runs = next.match(/\*+/g) || [];
-  const ok = runs.length % 2 === 0 && runs.every((r, i) => (i % 2 ? r === runs[i - 1] : true));
-  return ok ? next : next.replace(/\*+/g, "");
+  const ok = runs.length > 0 && runs.length % 2 === 0 && runs.every((r, i) => (i % 2 ? r === runs[i - 1] : true));
+  // was: return ok ? next : next.replace(/\*+/g, "");
+  return ok ? next : remark(next.replace(/\*+/g, ""), orig);
 }
 const tidy = (v) => String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
 // The page was laid out around the original lengths; a bullet that grows a lot reflows the page.
@@ -118,7 +161,8 @@ const fits = (next, orig) => plain(next).length <= Math.min(400, plain(orig).len
 
 // "**Languages:** Python, Java, C++" reordered to the model's order, and nothing else: same label,
 // same items (the student's own strings), same separator. Returns the original if anything differs.
-function reorderSkills(orig, next) {
+// (exported for lib/docx.js, which had no such check on a Word resume's skills lines)
+export function reorderSkills(orig, next) {
   const m = /^(.*?:\**\s*)(.+)$/.exec(orig);
   const label = m ? m[1] : "", list = m ? m[2] : orig;
   const sep = [" | ", "; ", ", ", " \u2022 ", " \u00b7 "].find((x) => list.includes(x));
@@ -180,7 +224,14 @@ export function applyDocTailoring(doc, out) {
       }
       // One weak bullet may be dropped from an entry with 3+; anything else missing goes back in.
       const missing = e.bullets.map((_, j) => j).filter((j) => !used.has(j));
-      if (missing.length > 1 || e.bullets.length <= 2) for (const j of missing) bullets.push(e.bullets[j]);
+      // was: if (missing.length > 1 || e.bullets.length <= 2) for (const j of missing) bullets.push(e.bullets[j]);
+      const back = missing.length > 1 || e.bullets.length <= 2 ? missing : [];
+      for (const j of back) bullets.push(e.bullets[j]);
+      // A bullet that was left out is a change too; the review list showed nothing for it.
+      if (!back.length) for (const j of missing) diff.push({ where, before: plain(e.bullets[j]), after: "(left out)", dropped: true });
+      // So is a new order: a resume whose only edit was the order of its bullets said "0 changes".
+      const order = [...used, ...back];
+      if (order.some((j, n) => n && j < order[n - 1])) diff.push({ where, before: "(bullet order)", after: "Bullets reordered, most relevant first", moved: true });
       return { ...e, text, bullets };
     });
     return { ...sec, lines, entries };

@@ -137,8 +137,14 @@ export function upgradeStore(stored) {
   return s;
 }
 
+// was: chrome.storage.local.get(null). That reads everything the extension keeps, and since the
+// tailored resumes moved out of the queue that means every tailored_<id> file, the tailor cache
+// (twelve more files) and each job's messages: megabytes, on every queue change in the side panel
+// and on every step of the agent, to use one key of a few kilobytes. The review measured 3.6 MB
+// read for a 1.6 KB store. Only the store and the three keys a first-version install had are asked for.
+const STORE_KEYS = ["store", "internscout", "ai", "files"];
 export async function loadStore() {
-  const raw = await chrome.storage.local.get(null);
+  const raw = await chrome.storage.local.get(STORE_KEYS);
   if (raw.store && raw.store.version === STORE_VERSION) return deepMerge(emptyStore(), raw.store);
   if (raw.store && raw.store.version === 2) {
     const s = upgradeStore(raw.store);

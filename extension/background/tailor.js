@@ -1,9 +1,13 @@
 // One AI call per job: reword the candidate's existing resume content toward the posting, check it,
 // and hand back a file that looks like the resume the student uploaded.
 //
-// Three ways to build that file, tried in this order. Each one falls through to the next on any
-// problem that is about the file (not about the account: a cap or a sign-in error stops here, since
-// trying again would only hit it again):
+// Three ways to build that file, tried in this order. (was: "Each one falls through to the next on
+// any problem that is about the file". The review showed what that meant: a student with a Word or
+// PDF resume whose format could not be kept was handed the fixed template instead, and with
+// "use automatically" on it was sent to the employer without anyone having seen it. Now, when 1 or 2
+// cannot keep the format, automatic mode uses the student's own file untouched, and review mode
+// still offers the template but says plainly that it is not their layout. See tailorResume.)
+// A cap or a sign-in error always stops here, since trying again would only hit it again.
 //   1. Word original -> the same .docx with only the reworded bullets changed (lib/docx.js).
 //   2. PDF original  -> a PDF drawn from a description of the original's own layout: its font family,
 //      sizes, alignment, heading style, and every section in the student's order (lib/resume_doc.js,
@@ -15,8 +19,10 @@ import { callAI, jsonOf } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { modelFor } from "../lib/store.js";
 import { renderResume, toB64 } from "../lib/pdf.js";
-import { renderLayoutFit } from "../lib/pdf_layout.js";
-import { applyDocTailoring, docTailorInput, layoutMatchesProfile, normalizeLayout } from "../lib/resume_doc.js";
+// was: import { renderLayoutFit } from "../lib/pdf_layout.js";
+import { lossless, renderLayoutFit, sameLink, siteOf, urisIn } from "../lib/pdf_layout.js";
+// was: import { applyDocTailoring, docTailorInput, layoutMatchesProfile, normalizeLayout } from "../lib/resume_doc.js";
+import { applyDocTailoring, docTailorInput, docText, layoutMatchesProfile, layoutRefusal, normalizeLayout } from "../lib/resume_doc.js";
 import { DOCX_TYPE, applyDocxTailoring, bulletGroups, docxTailorInput, openDocx, saveDocx } from "../lib/docx.js";
 import { applyTailoring, tailorInput } from "../lib/tailoring.js";
 import { readTailored, tailorKey, writeTailored } from "../lib/tailor_cache.js";
@@ -59,6 +65,7 @@ const SYSTEM_DOCX = `You tailor a student's resume to one job posting. You are g
 - reorder bullets within one group, most relevant first;
 - leave out at most one clearly irrelevant bullet from a group that has 3 or more.
 A group of short items (skills, coursework) may only be reordered. Plain text only.
+A bullet may list "keep": words that are bold, italic, a link, or set after a tab in the file. Keep each of them exactly as written and in the same place in the bullet, and reword only around them; a rewording that changes them is thrown away.
 ${RULES}
 
 Reply with JSON only, listing only the groups you changed:
@@ -68,7 +75,9 @@ When you list a group's bullets, list every bullet you are keeping, in the new o
 
 const SYSTEM_LAYOUT = `You transcribe a resume PDF into JSON so it can be redrawn looking the same. Copy every word exactly as printed: never fix, shorten, reorder or leave out anything, and never add anything. Mark bold text as **bold** and italic text as *italic*.
 
-{"style": {
+{"columns": <how many side-by-side columns of body text the page has: 1 for an ordinary resume (dates set against the right margin do not count), 2 or more for a sidebar or a two-column design>,
+ "graphics": true|false,                // true if the page has a photo, icons, logos, skill bars, shaded boxes or a coloured sidebar
+ "style": {
    "font": "serif" | "sans",            // Times, Garamond, Georgia, Cambria, Computer Modern = serif; Arial, Helvetica, Calibri = sans
    "body_size": <pt>, "name_size": <pt>, "heading_size": <pt>, "contact_size": <pt>,
    "name_align": "left"|"center"|"right", "contact_align": "left"|"center"|"right",
@@ -98,9 +107,17 @@ const isAccountError = (e) => NEEDS_YOU_CODES.has(e && e.code);
 
 // One cached, checked AI call. build(out) turns the model's JSON into {bytes, name, type, diff} or
 // null when nothing usable came back.
-async function tailorWith(store, job, system, prompt, build, extra) {
+// BUILD names the code that turns a reply into a file. It is part of the cache key, so a file built
+// by an older, faultier version of lib/docx.js or lib/pdf_layout.js is not handed out again.
+const BUILD = "format-2";
+// was: tailorWith(store, job, system, prompt, build, extra) and tailorKey(model, system, prompt).
+// The key was made of words only. Two Word files with the same bullets but a different font, or the
+// same PDF re-read into a different layout, shared one key, and the student who uploaded a new file
+// was handed the tailored copy of the old one. `salt` carries what the file is (see the callers); it
+// goes into the key and not into the prompt.
+async function tailorWith(store, job, system, prompt, build, extra, salt = "") {
   const model = modelFor(store, "tailor");
-  const key = await tailorKey(model, system, prompt);
+  const key = await tailorKey(model, system, `${prompt}\n${BUILD}\n${salt}`);
   const hit = await readTailored(key);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
   const resp = await callAI({ ai: store.ai, model, kind: "tailor", run_id: job.run_id, max_tokens: 4000, system, messages: [{ role: "user", content: prompt }] });
@@ -114,6 +131,7 @@ async function tailorWith(store, job, system, prompt, build, extra) {
     diff: made.diff,
     created: Date.now(),
     ...extra,
+    ...(made.note ? { note: made.note } : {}),
   };
   await writeTailored(key, tailored);
   return { ...tailored, cost_usd: resp.cost_usd || 0 };
@@ -123,13 +141,14 @@ async function tailorWith(store, job, system, prompt, build, extra) {
 async function tailorDocx(store, job, orig) {
   const opened = await openDocx(orig.b64);
   const parsed = bulletGroups(opened.xml);
-  if (parsed.groups.reduce((n, g) => n + g.items.length, 0) < 3) return null; // not a bulleted resume we can read
+  // was: ... < 3) return null;
+  if (parsed.groups.reduce((n, g) => n + g.items.length, 0) < 3) return { why: "it has fewer than three bullets that could be read" }; // not a bulleted resume we can read
   const prompt = `${jobText(job)}\n\nCANDIDATE\n${voiceOf(store)}\n\nRESUME BULLET GROUPS (JSON)\n${JSON.stringify(docxTailorInput(parsed))}`;
   return tailorWith(store, job, SYSTEM_DOCX, prompt, async (out) => {
     const { xml, diff } = applyDocxTailoring(opened.xml, parsed, out);
     const bytes = await saveDocx(opened, xml);
     return { bytes, diff, name: `${baseName(store)}_Resume.docx`, type: DOCX_TYPE };
-  }, { format: "docx", note: "This is your own Word file with only the bullets below changed. Open it to check it still fits the page." });
+  }, { format: "docx", note: "This is your own Word file with only the bullets below changed. Open it to check it still fits the page." }, await fingerprint(orig));
 }
 
 // ---------- 2. PDF original, redrawn from its own layout ----------
@@ -143,11 +162,23 @@ async function fingerprint(file) {
 
 // The layout of one uploaded resume, read once. A resume that could not be read is remembered too
 // ({doc: null}), so an unreadable scan costs one call, not one call per application.
+//
+// Three things the review found in the first version, all from remembering the verdict and not the
+// reading. The check against the profile ran before saving, so a student who uploaded the resume
+// first and filled in the profile second was remembered as "not their resume" for good; it runs on
+// every use now, on the saved reading. A reply that was cut short or was not JSON was remembered
+// for good as well; with no reason attached it is now tried again after an hour. A refusal with a
+// reason (columns, graphics) is a fact about the file and is kept.
+const LAYOUT_RETRY_MS = 60 * 60 * 1000;
 async function layoutOf(store, job, orig) {
   const fp = await fingerprint(orig);
   let saved = null;
   try { saved = (await chrome.storage.local.get(LAYOUT_KEY))[LAYOUT_KEY]; } catch { /* read it again below */ }
-  if (saved && saved.fp === fp) return { doc: saved.doc, cost_usd: 0 };
+  // was: if (saved && saved.fp === fp) return { doc: saved.doc, cost_usd: 0 };
+  if (saved && saved.fp === fp && (saved.doc || saved.why || Date.now() - (saved.created || 0) < LAYOUT_RETRY_MS)) {
+    if (saved.doc && !layoutMatchesProfile(saved.doc, store)) return { doc: null, why: MISMATCH, cost_usd: 0 };
+    return { doc: saved.doc, why: saved.why || (saved.doc ? "" : UNREAD), cost_usd: 0 };
+  }
   const resp = await callAI({
     ai: store.ai, model: modelFor(store, "tailor"), kind: "tailor", run_id: job.run_id, max_tokens: 6000, system: SYSTEM_LAYOUT,
     messages: [{ role: "user", content: [
@@ -155,24 +186,37 @@ async function layoutOf(store, job, orig) {
       { type: "text", text: "Transcribe this resume into the JSON described. JSON only." },
     ] }],
   });
-  let doc = null;
-  try { doc = normalizeLayout(jsonOf(resp)); } catch { doc = null; }
-  if (doc && !layoutMatchesProfile(doc, store)) doc = null;
-  try { await chrome.storage.local.set({ [LAYOUT_KEY]: { fp, doc, created: Date.now() } }); } catch { /* costs a call next time, nothing else */ }
-  return { doc, cost_usd: resp.cost_usd || 0 };
+  let doc = null, why = "";
+  // was: try { doc = normalizeLayout(jsonOf(resp)); } catch { doc = null; }
+  try { const raw = jsonOf(resp); why = layoutRefusal(raw); doc = normalizeLayout(raw); } catch { doc = null; }
+  // was: if (doc && !layoutMatchesProfile(doc, store)) doc = null;   (before saving; see above)
+  try { await chrome.storage.local.set({ [LAYOUT_KEY]: { fp, doc, why, created: Date.now() } }); } catch { /* costs a call next time, nothing else */ }
+  if (doc && !layoutMatchesProfile(doc, store)) return { doc: null, why: MISMATCH, cost_usd: resp.cost_usd || 0 };
+  return { doc, why: why || (doc ? "" : UNREAD), cost_usd: resp.cost_usd || 0 };
 }
+const MISMATCH = "what was read from it does not match the name, employers and schools in your profile";
+const UNREAD = "its layout could not be read";
 
+const PDF_NOTE = "Rebuilt to match your PDF's layout. Preview it and check names and dates before using it.";
 async function tailorPdf(store, job, orig) {
-  if (orig.b64.length > MAX_PDF_B64) return null;
-  const { doc, cost_usd } = await layoutOf(store, job, orig);
-  if (!doc) return cost_usd ? { fallthrough_cost: cost_usd } : null;
+  // was: if (orig.b64.length > MAX_PDF_B64) return null;
+  if (orig.b64.length > MAX_PDF_B64) return { why: "the file is too large to read" };
+  const { doc: read, why, cost_usd } = await layoutOf(store, job, orig);
+  // was: if (!doc) return cost_usd ? { fallthrough_cost: cost_usd } : null;
+  if (!read) return { fallthrough_cost: cost_usd, why };
+  // The eight built-in PDF fonts draw Western European text only. A name or a word in any other
+  // script used to come out changed or missing, silently (see lossless in lib/pdf_layout.js).
+  if (!lossless(docText(read))) return { fallthrough_cost: cost_usd, why: "it uses letters the PDF builder cannot draw; upload a Word version of it and those are kept" };
+  const doc = { ...read, links: urisIn(orig.b64) };
   const prompt = `${jobText(job)}\n\nCANDIDATE\n${voiceOf(store)}\n\nRESUME (JSON)\n${JSON.stringify(docTailorInput(doc))}`;
   const made = await tailorWith(store, job, SYSTEM_DOC, prompt, async (out) => {
     const applied = applyDocTailoring(doc, out);
-    const { bytes } = renderLayoutFit(applied.doc);
-    return { bytes, diff: applied.diff, name: `${baseName(store)}_Resume.pdf`, type: "application/pdf" };
-  }, { format: "pdf_layout", note: "Rebuilt to match your PDF's layout. Preview it and check names and dates before using it." });
-  return made ? { ...made, cost_usd: (made.cost_usd || 0) + cost_usd } : { fallthrough_cost: cost_usd };
+    const { bytes, linked } = renderLayoutFit(applied.doc);
+    const lost = doc.links.filter((u) => !linked.some((l) => sameLink(l, u)));
+    const note = lost.length ? `${PDF_NOTE} ${lost.length === 1 ? "One link" : `${lost.length} links`} from your PDF could not be carried over (${[...new Set(lost.map((u) => siteOf(u) || "email"))].join(", ")}): the words are there but are not clickable.` : "";
+    return { bytes, diff: applied.diff, note, name: `${baseName(store)}_Resume.pdf`, type: "application/pdf" };
+  }, { format: "pdf_layout", note: PDF_NOTE }, `${await fingerprint(orig)}\n${JSON.stringify(doc)}`);
+  return made ? { ...made, cost_usd: (made.cost_usd || 0) + cost_usd } : { fallthrough_cost: cost_usd, why: "the reply could not be used" };
 }
 
 // ---------- 3. The fixed template, from the profile (the original path, unchanged) ----------
@@ -205,19 +249,34 @@ async function tailorFromProfile(store, job) {
 
 export async function tailorResume(store, job) {
   const orig = store.files && store.files.resume;
-  let spent = 0;
+  let spent = 0, why = "", keeps = false;
   if (orig && orig.b64) {
     const isDocx = /\.docx$/i.test(orig.name || "") || orig.type === DOCX_TYPE;
     const isPdf = orig.type === "application/pdf" || /\.pdf$/i.test(orig.name || "");
+    keeps = isDocx || isPdf;
     try {
       const made = isDocx ? await tailorDocx(store, job, orig) : isPdf ? await tailorPdf(store, job, orig) : null;
       if (made && made.file) return made;
       if (made && made.fallthrough_cost) spent = made.fallthrough_cost;
+      why = (made && made.why) || (made === null ? "the reply could not be used" : "");
     } catch (e) {
       if (isAccountError(e)) throw e;
       // A file we could not read is not a reason to go without a tailored resume: use the template.
+      // (Still true in review mode. In automatic mode, see below.)
+      why = "the file could not be read";
+      if (e && e.cost_usd) spent += Number(e.cost_usd) || 0;
     }
   }
+  // The student has a Word or PDF resume and its format could not be kept. With "use automatically"
+  // on, nobody looks before it is uploaded, and a resume in our template is not the one they chose
+  // to send: their own file goes, untouched, and the template call is not made (or paid for).
+  if (keeps && store.settings && store.settings.tailor_resume === "auto") {
+    const e = new Error(`your resume's own format could not be kept: ${why || "the file could not be read"}`);
+    e.cost_usd = spent;
+    throw e;
+  }
   const made = await tailorFromProfile(store, job);
-  return { ...made, cost_usd: (made.cost_usd || 0) + spent };
+  // was: return { ...made, cost_usd: (made.cost_usd || 0) + spent };
+  const note = keeps ? `We could not keep your own file's format for this one (${why || "the file could not be read"}). This version uses InternScout's standard layout, not yours, and is built from your profile. Use it only if you are happy with how it looks.` : "";
+  return { ...made, format: "template", ...(note ? { note } : {}), cost_usd: (made.cost_usd || 0) + spent };
 }

@@ -374,14 +374,31 @@ async function tailorStep(id, job, store) {
   await updateJob(id, { activity: "Tailoring your resume to this posting…" });
   try {
     const { cost_usd, reused, ...t } = await tailorResume(store, job);
+    // Nothing worth changing for this posting: the student's own file is the better thing to send than
+    // a re-saved or redrawn copy of it, and there is nothing to ask them to review.
+    if (!Array.isArray(t.diff) || !t.diff.length) {
+      job = await updateJob(id, (j) => ({ tailored: { status: "skipped", error: "nothing to change" }, cost_usd: (j.cost_usd || 0) + cost_usd }));
+      await appendLog(id, { kind: "tailor", text: "Your resume already fits this posting as written. Using your original." });
+      return job;
+    }
     const auto = store.settings.tailor_resume === "auto";
     job = await updateJob(id, (j) => ({ tailored: { ...t, status: auto ? "approved" : "pending" }, cost_usd: (j.cost_usd || 0) + cost_usd }));
+    // The queue can refuse the file (no room left in the browser's storage) and hands back
+    // tailored.status "failed". This step used to carry on regardless: it logged "used automatically"
+    // while the original went out, or paused the job on "Review the tailored resume" with nothing
+    // in the side panel to review.
+    if (job && job.tailored && job.tailored.status === "failed") {
+      await appendLog(id, { kind: "tailor", text: `${job.tailored.error || "The tailored resume could not be kept."} Using your original.` });
+      return job;
+    }
     await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${reused ? ", reused from an earlier run at no cost" : ""}${auto ? ", used automatically" : ""}.` });
     if (!auto) job = await updateJob(id, { status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
   } catch (e) {
     const msg = String((e && e.message) || e);
-    job = await updateJob(id, { tailored: { status: "failed", error: msg } });
-    await appendLog(id, { kind: "tailor", text: `Couldn't tailor the resume (${e && e.code ? msg : msg.slice(0, 80)}). Using your original.` });
+    // was: job = await updateJob(id, { tailored: { status: "failed", error: msg } });
+    // A failure can still have cost something (the layout of a PDF was read before it was refused).
+    job = await updateJob(id, (j) => ({ tailored: { status: "failed", error: msg }, cost_usd: (j.cost_usd || 0) + (Number(e && e.cost_usd) || 0) }));
+    await appendLog(id, { kind: "tailor", text: `Couldn't tailor the resume (${e && e.code ? msg : msg.slice(0, 160)}). Using your original.` });   // was: msg.slice(0, 80), which cut the reason off
   }
   return job;
 }

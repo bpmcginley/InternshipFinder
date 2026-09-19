@@ -60,3 +60,16 @@ test("when storage refuses the file the job survives and falls back to the origi
   assert.ok((await getJob(id)), "the job is still queued");
   assert.equal(await getTailoredFile(id), null);
 });
+
+test("an older job whose file cannot be moved keeps it, approved as it was", async () => {
+  data.queue = { order: ["old2"], jobs: { old2: { id: "old2", status: "running", log: [], tailored: { status: "approved", file: file() } } } };
+  refuse = "tailored_";
+  await appendLog("old2", { kind: "note", text: "x" });
+  refuse = null;
+  assert.equal((await getJob("old2")).tailored.status, "approved");
+  assert.equal((await getTailoredFile("old2")).b64, BYTES);
+  await appendLog("old2", { kind: "note", text: "y" });            // storage is back: it moves now
+  assert.equal(data.queue.jobs.old2.tailored.file.b64, undefined);
+  assert.equal(data.tailored_old2, BYTES);
+  await removeJob("old2");
+});

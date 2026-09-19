@@ -1,8 +1,8 @@
 // A tailored resume has to look like the one the student uploaded, and may only reword what is on it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { encode, parseRich, plain, renderLayout, renderLayoutFit, widthIn, wrapRich } from "../lib/pdf_layout.js";
-import { applyDocTailoring, docTailorInput, docText, layoutMatchesProfile, normalizeLayout } from "../lib/resume_doc.js";
+import { encode, lossless, parseRich, plain, renderLayout, renderLayoutFit, siteOf, widthIn, wrapRich } from "../lib/pdf_layout.js";
+import { applyDocTailoring, docTailorInput, docText, layoutMatchesProfile, layoutRefusal, normalizeLayout } from "../lib/resume_doc.js";
 import { crc32, entryBytes, readZip, withContent, writeZip } from "../lib/zip.js";
 import { applyDocxTailoring, bulletGroups, docxTailorInput, openDocx, saveDocx } from "../lib/docx.js";
 import { toB64 } from "../lib/pdf.js";
@@ -100,7 +100,10 @@ test("doc tailoring: reword kept, invented numbers and header rows refused, skil
   assert.equal(next.sections[2].entries[0].bullets[0], "Managed a $2,000 club budget now"); // stray marks removed
   assert.equal(next.sections[3].lines[0], "**Languages:** R, Python, MATLAB");
   assert.equal(next.sections[3].lines[1], doc.sections[3].lines[1]);
-  assert.equal(diff.length, 3);
+  // was: assert.equal(diff.length, 3). The bullet that was left out and the new order are listed now too.
+  assert.equal(diff.length, 5);
+  assert.deepEqual(diff.filter((d) => d.dropped).map((d) => d.before), ["Kept the lab notebook"]);
+  assert.equal(diff.filter((d) => d.moved).length, 1);
   assert.ok(docText(next).includes("Biology Club"));
   assert.deepEqual(applyDocTailoring(doc, "garbage").doc.sections, doc.sections);
 });
@@ -157,7 +160,9 @@ test("docx: only the reworded words change; formatting, order of slots and other
     { g: 0, bullets: [{ from: 1, text: "Maintained lab notebook & <protocols>" }, { from: 0, text: "Ran 400 PCR assays weekly" }, { from: 2, text: "Ordered supplies for the team" }] },
     { g: 1, bullets: [{ from: 1, text: "Presented results at a poster session" }, { from: 0, text: "Modeled tides in **Python**" }] },
   ] });
-  assert.equal(diff.length, 1); // the 400 was refused; the ** marks are not a change
+  // was: assert.equal(diff.length, 1). Both groups were reordered, and that is listed now.
+  assert.equal(diff.filter((d) => !d.moved).length, 1); // the 400 was refused; the ** marks are not a change
+  assert.equal(diff.filter((d) => d.moved).length, 2);
   const after = docxTailorInput(bulletGroups(xml));
   assert.deepEqual(after[0].bullets.map((b) => b.text), ["Maintained lab notebook & <protocols>", "Ran 40 PCR assays weekly", "Ordered supplies for the team"]);
   assert.deepEqual(after[1].bullets.map((b) => b.text), ["Presented results at a poster session", "Modeled tides in Python"]);
@@ -171,6 +176,123 @@ test("docx: only the reworded words change; formatting, order of slots and other
   const back = await openDocx(toB64(saved));
   assert.equal(back.xml, xml);
   assert.equal(new TextDecoder().decode(await entryBytes(back.entries[2])), "<w:styles>Garamond</w:styles>");
+});
+
+// ---------- the review of the format-keeping paths ----------
+// A bullet made of several runs: [text, run properties] pairs, a "\t" text being a tab.
+const RUNS = (parts, { level = 0 } = {}) =>
+  `<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="${level}"/><w:numId w:val="1"/></w:numPr></w:pPr>` +
+  parts.map(([text, rpr = "", link = false]) => {
+    const run = `<w:r w:rsidR="00B2">${rpr ? `<w:rPr>${rpr}</w:rPr>` : ""}${text === "\t" ? "<w:tab/>" : `<w:t xml:space="preserve">${text}</w:t>`}</w:r>`;
+    return link ? `<w:hyperlink r:id="rId5">${run}</w:hyperlink>` : run;
+  }).join("") + "</w:p>";
+const HEAD = P("Sam Lee", { bold: true }) + P("EXPERIENCE", { bold: true }) + P("Kim Lab", { bold: true });
+const tailorDoc = async (body, groups) => {
+  const opened = await openDocx(toB64(await docx(body)));
+  const parsed = bulletGroups(opened.xml);
+  return { ...applyDocxTailoring(opened.xml, parsed, { groups }), input: docxTailorInput(parsed), before: opened.xml };
+};
+
+test("docx: a bold lead-in, an italic title, a link and a tabbed date keep their look", async () => {
+  const body = HEAD +
+    RUNS([["Backend: ", "<w:b/>"], ["built a REST API in Flask"]]) +
+    RUNS([["Co-authored a paper in "], ["Nature Methods", "<w:i/>"], [" on assay design"]]) +
+    RUNS([["Published the code at "], ["github.com/sam/tides", '<w:rStyle w:val="Hyperlink"/>', true]]) +
+    RUNS([["Led weekly review sessions"], ["\t"], ["Fall 2025"]]);
+  const { xml, diff, input } = await tailorDoc(body, [{ g: 0, bullets: [
+    { from: 0, text: "Backend: developed a REST API in Flask" },
+    { from: 1, text: "Co-wrote a paper in Nature Methods on assay design" },
+    { from: 2, text: "Released the code at github.com/sam/tides" },
+    { from: 3, text: "Ran weekly review sessions Fall 2025" }] }]);
+  assert.equal(diff.length, 4);
+  assert.ok(xml.includes('<w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Backend: </w:t>'), "bold lead-in untouched");
+  assert.ok(xml.includes('<w:t xml:space="preserve">developed a REST API in Flask</w:t>'));
+  assert.ok(xml.includes('<w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Nature Methods</w:t>'), "italic title untouched");
+  assert.ok(xml.includes('<w:hyperlink r:id="rId5"><w:r w:rsidR="00B2"><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">github.com/sam/tides</w:t></w:r></w:hyperlink>'), "link untouched");
+  assert.ok(xml.includes('<w:t xml:space="preserve">Ran weekly review sessions</w:t></w:r><w:r w:rsidR="00B2"><w:tab/></w:r><w:r w:rsidR="00B2"><w:t xml:space="preserve">Fall 2025</w:t>'), "date still after its tab");
+  // The model is told which words are fixed.
+  assert.deepEqual(input[0].bullets.map((b) => b.keep || []), [["Backend:"], ["Nature Methods"], ["github.com/sam/tides"], ["Fall 2025"]]);
+});
+
+test("docx: words that would cross from one look into another are not used", async () => {
+  const body = HEAD +
+    RUNS([["Backend: ", "<w:b/>"], ["built a REST API in Flask"]]) +
+    RUNS([["Led weekly review sessions"], ["\t"], ["Fall 2025"]]) +
+    RUNS([["Ordered supplies for the team"]]);
+  const { xml, diff, before } = await tailorDoc(body, [{ g: 0, bullets: [
+    { from: 2, text: "Purchased supplies for the team" },
+    { from: 0, text: "Server work: developed a REST API in Flask" },     // rewrites the bold lead-in and the plain text at once
+    { from: 1, text: "Ran weekly review sessions" }] }]);                  // loses the date
+  const texts = docxTailorInput(bulletGroups(xml))[0].bullets.map((b) => b.text);
+  // was (before the review): one such bullet threw the whole group's edit away. The rest still applies.
+  assert.deepEqual(texts, ["Purchased supplies for the team", "Backend: built a REST API in Flask", "Led weekly review sessions Fall 2025"]);
+  assert.deepEqual(diff.filter((d) => !d.moved).map((d) => d.after), ["Purchased supplies for the team"]);
+  assert.equal((xml.match(/<w:b\/>/g) || []).length, (before.match(/<w:b\/>/g) || []).length);
+});
+
+test("docx: a skills line is only reordered, a typed star survives, sub-bullets stay under their parent", async () => {
+  const skills = HEAD + RUNS([["Languages: ", "<w:b/>"], ["Python, Java, C++"]]) + RUNS([["Tools: Git, Docker, Linux"]]) + RUNS([["Implemented A* search in C"]]);
+  const a = await tailorDoc(skills, [{ g: 0, bullets: [
+    { from: 0, text: "Languages: C++, Python, Kubernetes, Go" },
+    { from: 1, text: "Tools: AWS, Terraform, Docker" },
+    { from: 2, text: "Implemented A* pathfinding in C" }] }]);
+  assert.deepEqual(docxTailorInput(bulletGroups(a.xml))[0].bullets.map((b) => b.text), ["Languages: C++, Python, Java", "Tools: Docker, Git, Linux", "Implemented A* pathfinding in C"]);
+  assert.ok(!/Kubernetes|Terraform|AWS/.test(a.xml));
+
+  const nested = HEAD + RUNS([["Ran the assay pipeline"]]) + RUNS([["Wrote the plate reader script"]], { level: 1 }) + RUNS([["Trained two new students"]], { level: 1 });
+  const b = await tailorDoc(nested, [{ g: 0, bullets: [{ from: 1, text: "Wrote the plate reader script" }, { from: 0, text: "Operated the assay pipeline" }] }]);
+  const after = bulletGroups(b.xml);
+  assert.deepEqual(after.groups[0].items.map((i) => after.paras[i].text), ["Operated the assay pipeline", "Wrote the plate reader script", "Trained two new students"]);
+  assert.equal(b.diff.filter((d) => d.dropped || d.moved).length, 0);
+});
+
+test("pdf: stars the student typed, marks the model forgot, and sections that only sound like skills", () => {
+  assert.equal(plain("Implemented A* search in C"), "Implemented A* search in C");
+  assert.deepEqual(parseRich("2*3 and 4*5").map((x) => [x.text, x.i]), [["2*3 and 4*5", false]]);
+  assert.deepEqual(parseRich("**a *b***").map((x) => [x.text, x.b, x.i]), [["a ", true, false], ["b", true, true]]);
+  assert.equal(plain("**GPA:**3.9"), "GPA:3.9");
+  const r = raw();
+  r.sections[1].entries[0].bullets[1] = "Implemented A* search for the lab robot";
+  r.sections.push({ title: "Software Engineering Experience", entries: [{ rows: [{ left: "**Acme**" }], bullets: ["Built a thing", "Tested a thing", "Shipped a thing"] }] });
+  const doc = normalizeLayout(r);
+  assert.equal(docTailorInput(doc)[4].kind, "other");
+  const { doc: next } = applyDocTailoring(doc, { entries: [{ s: 1, e: 0, bullets: [
+    { from: 0, text: "Performed 40 PCR assays weekly for a 3-person team" },
+    { from: 1, text: "Implemented A search for the lab robot" },
+    { from: 2, text: "Ordered supplies" }] }] });
+  assert.equal(next.sections[1].entries[0].bullets[0], "Performed 40 PCR assays weekly for a **3-person** team");
+  assert.equal(next.sections[1].entries[0].bullets[1], "Implemented A* search for the lab robot");
+});
+
+test("pdf: a resume the renderer cannot draw faithfully is refused, not flattened", () => {
+  assert.equal(normalizeLayout({ ...raw(), columns: 2 }), null);
+  assert.equal(normalizeLayout({ ...raw(), graphics: true }), null);
+  assert.ok(normalizeLayout({ ...raw(), columns: 1, graphics: false }));
+  assert.match(layoutRefusal({ columns: 2 }), /columns/);
+  assert.ok(lossless("Jos\u00e9 \u2013 ok \u2022 \u2192"));
+  assert.ok(!lossless("Wi\u015bniewski") && !lossless("\u4e2d\u6587") && !lossless("\u0141ukasz"));
+  assert.equal(encode("\u0141ukasz"), "Lukasz"); // was "ukasz"
+});
+
+test("pdf: a long right-hand text is drawn whole, and printed addresses are links again", () => {
+  const r = raw();
+  r.sections[1].entries[0].rows[0].right = "Amherst, Massachusetts | September 2025 to Present | Part time, twelve hours a week, Zebrafish";
+  r.header.contact = ["jose@example.edu | linkedin.com/in/joselee | GitHub | ASP.NET"];
+  const doc = { ...normalizeLayout(r), links: ["https://github.com/joselee"] };
+  const { bytes, linked } = renderLayout(doc);
+  const pdf = latin(bytes);
+  assert.ok(pdf.includes("Zebrafish"), "the second line of the right column is drawn");
+  assert.deepEqual(linked, ["mailto:jose@example.edu", "https://linkedin.com/in/joselee", "https://github.com/joselee", "https://ASP.NET"]);
+  assert.equal((pdf.match(/\/Subtype \/Link/g) || []).length, 4);
+  assert.ok(/\/Annots \[(\d+ 0 R ?){4}\]/.test(pdf));
+  const xref = Number(/startxref\n(\d+)/.exec(pdf)[1]);
+  assert.equal(pdf.slice(xref, xref + 4), "xref");
+  assert.equal(siteOf("https://www.linkedin.com/in/x"), "linkedin");
+  // In the body only a full address is a link: "ASP.NET" and "Socket.io" are skills.
+  const body = raw();
+  body.header.contact = ["555-0100"];
+  body.sections[3].lines = ["**Web:** ASP.NET, Socket.io, https://jose.dev"];
+  assert.deepEqual(renderLayout(normalizeLayout(body)).linked, ["https://jose.dev"]);
 });
 
 test("docx: one bullet may drop from three, and paragraphs it cannot read are left alone", async () => {

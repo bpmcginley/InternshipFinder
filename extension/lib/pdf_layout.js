@@ -32,10 +32,28 @@ const FOLD = {
   "\u2192": "->", "\u2190": "<-", "\u2265": ">=", "\u2264": "<=", "\u2248": "~", "\u2212": "-", "\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2015": "\u2014",
   "\u00a0": " ", "\u2009": " ", "\u200a": " ", "\u2002": " ", "\u2003": " ", "\u202f": " ", "\u200b": "", "\ufeff": "", "\t": " ", "\n": " ", "\r": " ",
 };
+// Letters Unicode gives no accent-free spelling for, so the NFKD fold below dropped them whole:
+// "\u0141ukasz" was drawn as "ukasz". Folding them is still a change to somebody's name, which is why
+// lossless() below does not count these (or any NFKD fold) as faithful.
+const LETTERS = { "\u0141": "L", "\u0142": "l", "\u0110": "D", "\u0111": "d", "\u0131": "i", "\u0126": "H", "\u0127": "h", "\u0166": "T", "\u0167": "t", "\u014a": "N", "\u014b": "n" };
+// True when every character can be drawn as itself: it is in WinAnsi, or it is one of the
+// typographic folds above (a bullet shape, an arrow, a kind of space). Chinese, Cyrillic, Greek and
+// Polish or Turkish accents are not, and the review showed them vanishing or changing without a
+// word. The caller (background/tailor.js) does not rebuild such a resume; the original is kept.
+export function lossless(s) {
+  for (const c of String(s ?? "")) {
+    if (FOLD[c] != null) continue;
+    const k = c.codePointAt(0);
+    if ((k >= 0x20 && k <= 0x7e) || (k >= 0xa0 && k <= 0xff) || HIGH.includes(c)) continue;
+    return false;
+  }
+  return true;
+}
 export function encode(s) {
   let out = "";
   for (const c of String(s ?? "")) {
-    for (const ch of FOLD[c] != null ? FOLD[c] : c) {
+    // was: for (const ch of FOLD[c] != null ? FOLD[c] : c) {
+    for (const ch of FOLD[c] != null ? FOLD[c] : LETTERS[c] != null ? LETTERS[c] : c) {
       const k = ch.codePointAt(0);
       if ((k >= 0x20 && k <= 0x7e) || (k >= 0xa0 && k <= 0xff)) { out += ch; continue; }
       const hi = HIGH.indexOf(ch);
@@ -56,15 +74,27 @@ export function widthIn(font, s, size) {
 
 // "a **b** *c*" -> [{text, b, i}]. One star toggles italic, two bold, three both. A star that never
 // closes only restyles the rest of that one string, which is the cheapest way to be wrong.
+//
+// was: every star toggled a style, so "Implemented A* search in C" lost its star and went italic from
+// there on. A run of stars now opens a style only when it looks like a mark: text follows it directly,
+// a run of the same length closes it later, and a single star does not sit in the middle of a word
+// ("2*3"). Anything else is a star the student typed, and is drawn.
 export function parseRich(s) {
   const out = [], str = String(s ?? "");
   let b = false, i = false, buf = "";
+  const open = { 1: false, 2: false, 3: false };
   const flush = () => { if (buf) out.push({ text: buf, b, i }); buf = ""; };
+  const closes = (from, n) => new RegExp("(^|[^*])(?:[*]{" + n + "}|[*]{3})(?![*])").test(str.slice(from));
   for (let k = 0; k < str.length; k++) {
     if (str[k] !== "*") { buf += str[k]; continue; }
     let n = 1;
     while (str[k + n] === "*") n++;
+    if (n === 3 && !open[3] && open[1] && open[2]) { flush(); open[1] = open[2] = false; b = false; i = false; k += 2; continue; }   // "**a *b***"
+    const after = str[k + n] || "", before = str[k - 1] || "";
+    const mark = n <= 3 && (open[n] || (after && !/\s/.test(after) && !(n === 1 && /[A-Za-z0-9]/.test(before)) && closes(k + n, n)));
+    if (!mark) { buf += str.slice(k, k + n); k += n - 1; continue; }
     flush();
+    open[n] = !open[n];
     if (n === 1) i = !i; else if (n === 2) b = !b; else { b = !b; i = !i; }
     k += n - 1;
   }
@@ -120,9 +150,30 @@ class StyledDoc {
     this.pages = [];
     this.newPage();
   }
-  newPage() { this.ops = []; this.pages.push(this.ops); this.y = this.H - this.my; }
+  // was: newPage() { this.ops = []; this.pages.push(this.ops); this.y = this.H - this.my; }
+  newPage() { this.ops = []; this.pages.push(this.ops); this.links = []; (this.linksBy = this.linksBy || []).push(this.links); this.y = this.H - this.my; }
   ensure(h) { if (this.y - h < this.my) this.newPage(); }
-  line(x, y, ln, size, color) {
+  // The rebuilt PDF had no links at all: a recruiter could not click the student's email, LinkedIn or
+  // GitHub. A printed address is a link again: an email or an http(s) address anywhere, a bare domain
+  // ("janedoe.dev", "linkedin.com/in/jane") only on the contact lines, where "ASP.NET" and
+  // "Socket.io" are not. A word such as "LinkedIn" is linked when the original file carried a link to
+  // that site (this.uris, read from the student's PDF by background/tailor.js).
+  linkOf(text, bare) {
+    const t = text.replace(/^[(\[<|]+|[)\]>|,;.]+$/g, "");
+    if (/^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(t)) return "mailto:" + t;
+    if (/^https?:\/\/[^\s]+$/i.test(t)) return t;
+    if (bare && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|dev|io|me|org|net|edu|app|ai|co|tech|xyz|page|site)(\/[^\s]*)?$/i.test(t)) return "https://" + t;
+    const k = t.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return (k.length >= 4 && (this.uris || []).find((u) => siteOf(u) === k)) || null;
+  }
+  line(x, y, ln, size, color, bare = false) {
+    let px = x;
+    for (const a of ln.atoms) {
+      px += a.lead || 0;
+      const uri = this.linkOf(a.text, bare);
+      if (uri) { this.links.push({ rect: [px, y - size * 0.22, px + a.w, y + size * 0.78], uri }); (this.linked = this.linked || []).push(uri); }
+      px += a.w;
+    }
     // Runs of one font go out as one string; the pen moves by the measured width in between.
     const rgb = hexRgb(color);
     let cx = x, i = 0;
@@ -147,12 +198,19 @@ class StyledDoc {
     for (const f of FONT_ORDER) objs.push(`<< /Type /Font /Subtype /Type1 /BaseFont /${f} /Encoding /WinAnsiEncoding >>`);
     const fonts = FONT_ORDER.map((_, i) => `/F${i + 1} ${i + 3} 0 R`).join(" ");
     const kids = [];
-    for (const ops of this.pages) {
+    this.pages.forEach((ops, p) => {
       const stream = ops.join("\n");
       objs.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-      objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources << /Font << ${fonts} >> >> /Contents ${objs.length} 0 R >>`);
+      const contents = objs.length, annots = [];
+      for (const l of (this.linksBy && this.linksBy[p]) || []) {
+        const uri = l.uri.replace(/[^\x20-\x7e]/g, "").replace(/[\\()]/g, "\\$&");
+        objs.push(`<< /Type /Annot /Subtype /Link /Rect [${l.rect.map((v) => v.toFixed(2)).join(" ")}] /Border [0 0 0] /A << /S /URI /URI (${uri}) >> >>`);
+        annots.push(objs.length);
+      }
+      // was: ... /Contents ${objs.length} 0 R >>  (no /Annots)
+      objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources << /Font << ${fonts} >> >> /Contents ${contents} 0 R${annots.length ? ` /Annots [${annots.map((n) => `${n} 0 R`).join(" ")}]` : ""} >>`);
       kids.push(objs.length);
-    }
+    });
     objs[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>`;
     let out = "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n";
     const offsets = objs.map((o, i) => { const at = out.length; out += `${i + 1} 0 obj\n${o}\nendobj\n`; return at; });
@@ -165,23 +223,54 @@ class StyledDoc {
   }
 }
 
+// The link addresses inside a PDF, from its bytes as base64. A resume that prints "LinkedIn" and
+// hides the address behind it keeps that address only here. This reads link annotations stored as
+// plain objects, which is how Word, Google Docs and most resume builders write them; a PDF that packs
+// its objects into compressed streams (LaTeX does) gives none, and its hidden links cannot be carried
+// over. background/tailor.js tells the student when that happens.
+export function urisIn(b64) {
+  let bin = "";
+  try { bin = atob(String(b64 || "")); } catch { return []; }
+  const found = [];
+  for (const m of bin.matchAll(/\/URI\s*\(((?:[^\\()]|\\[\s\S])*)\)/g)) {
+    const u = m[1].replace(/\\([\s\S])/g, "$1");
+    if (/^(https?:\/\/|mailto:)[\x21-\x7e]+$/i.test(u) && u.length <= 300 && !found.includes(u)) found.push(u);
+  }
+  return found.slice(0, 12);
+}
+// Two spellings of one address: "https://www.linkedin.com/in/jane/" and "linkedin.com/in/jane".
+export const sameLink = (a, b) => {
+  const n = (u) => String(u).toLowerCase().replace(/^(https?:\/\/|mailto:)/, "").replace(/^www\./, "").replace(/\/+$/, "");
+  return n(a) === n(b);
+};
+
+// "https://www.linkedin.com/in/jane" -> "linkedin": the word a resume prints in place of the address.
+export const siteOf = (uri) => {
+  const host = (/^[a-z]+:\/\/([^\/?#]+)/i.exec(String(uri)) || ["", ""])[1].toLowerCase().replace(/^www\./, "");
+  const parts = host.split(".");
+  return parts.length >= 2 ? parts[parts.length - 2] : "";
+};
+
 // doc: a normalized resume document (lib/resume_doc.js normalizeLayout). scale shrinks type and
 // spacing together, margins a little. Returns {bytes, pages}.
 export function renderLayout(doc, scale = 1) {
   const st = doc.style, fam = st.font === "serif" ? "serif" : "sans";
   const d = new StyledDoc(st.page, st.margin_in * 72, Math.max(26, st.margin_top_in * 72 * scale));
   const L = d.mx, R = d.W - d.mx, body = st.body_size * scale, lead = body * st.line_gap;
-  const put = (s, size, { align = "left", base = {}, color, lh = size * st.line_gap } = {}) => {
+  d.uris = Array.isArray(doc.links) ? doc.links : [];
+  // was: no `bare` option, and d.line(..., ln, size, color)
+  const put = (s, size, { align = "left", base = {}, color, lh = size * st.line_gap, bare = false } = {}) => {
     for (const ln of wrapRich(s, fam, size, R - L, base)) {
       d.ensure(lh); d.y -= lh;
-      d.line(align === "center" ? L + (R - L - ln.w) / 2 : align === "right" ? R - ln.w : L, d.y, ln, size, color);
+      d.line(align === "center" ? L + (R - L - ln.w) / 2 : align === "right" ? R - ln.w : L, d.y, ln, size, color, bare);
     }
   };
 
   const h = doc.header;
   if (h.name) put(st.name_caps ? h.name.toUpperCase() : h.name, st.name_size * scale, { align: st.name_align, base: { b: st.name_bold }, color: st.accent, lh: st.name_size * scale * 1.05 });
   if (h.contact.length) d.y -= body * 0.2;
-  for (const c of h.contact) put(c, st.contact_size * scale, { align: st.contact_align });
+  // was: put(c, st.contact_size * scale, { align: st.contact_align })
+  for (const c of h.contact) put(c, st.contact_size * scale, { align: st.contact_align, bare: true });
 
   const glyph = wrapRich(st.bullet, fam, body, 40)[0] || null;
   for (const sec of doc.sections) {
@@ -199,13 +288,17 @@ export function renderLayout(doc, scale = 1) {
       if (n || sec.lines.length) d.y -= body * st.entry_gap;
       d.ensure(lead * Math.min(3, e.rows.length + (e.bullets.length ? 1 : 0)));
       for (const row of e.rows) {
-        const right = wrapRich(row.right, fam, body, (R - L) * 0.6)[0] || null;
-        const left = wrapRich(row.left, fam, body, R - L - (right ? right.w + 10 : 0));
-        (left.length ? left : [null]).forEach((ln, k) => {
+        // was: const right = wrapRich(row.right, ...)[0] || null, drawn on the first line only. A right-hand
+        // text too long for one line ("Amherst, MA | September 2025 - Present | Part time") lost
+        // everything after the first wrapped line, and nothing said so. Every line is drawn now.
+        const rights = wrapRich(row.right, fam, body, (R - L) * 0.6);
+        const rw = rights.reduce((m, r) => Math.max(m, r.w), 0);
+        const left = wrapRich(row.left, fam, body, R - L - (rw ? rw + 10 : 0));
+        for (let k = 0; k < Math.max(left.length, rights.length, 1); k++) {
           d.ensure(lead); d.y -= lead;
-          if (ln) d.line(L, d.y, ln, body);
-          if (!k && right) d.line(R - right.w, d.y, right, body);
-        });
+          if (left[k]) d.line(L, d.y, left[k], body);
+          if (rights[k]) d.line(R - rights[k].w, d.y, rights[k], body);
+        }
       }
       if (e.text) put(e.text, body);
       for (const b of e.bullets) {
@@ -218,7 +311,8 @@ export function renderLayout(doc, scale = 1) {
       }
     });
   }
-  return { bytes: d.bytes(), pages: d.pages.length };
+  // was: return { bytes: d.bytes(), pages: d.pages.length };
+  return { bytes: d.bytes(), pages: d.pages.length, linked: d.linked || [] };
 }
 
 // A reworded bullet that wraps one line further must not push a one-page resume onto a second page,

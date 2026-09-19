@@ -215,6 +215,9 @@ async function fillAccount(msg) {
     if (!confirm("Delete what InternScout's server holds about you (your chosen states, plan record and past months' counts)? This month's counts stay until the month ends. Your profile and files in this browser are not touched.")) return;
     const r = await chrome.runtime.sendMessage({ type: "auth:delete" });
     if (r && r.ok) { alert("Deleted. You have been signed out."); fillAccount(); }
+    // An expired sign-in came back as {error: "auth"} with no message, and was reported as a
+    // connection problem while the box went on saying "Signed in", so every retry failed the same way.
+    else if (r && r.error === "auth") { alert("Your sign-in has expired. Sign in again, then press Delete my data."); fillAccount(); }
     else alert(r && r.error === "subscribed" ? (r.message || "Cancel your paid plan first, then delete your data.") : "Couldn't delete right now" + (r && r.message ? ": " + r.message : ". Check your connection and try again."));
   });
 }
