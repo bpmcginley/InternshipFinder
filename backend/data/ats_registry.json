@@ -15287,8 +15287,9 @@
   "fhlbtopeka|wd1|FHLBT": {
    "name": "FHLBank Topeka",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-09-19"
   },
   "fifththird|wd5|53careers": {
    "name": "Fifth Third Bank",
@@ -17618,9 +17619,10 @@
   "nike|wd1|nke": {
    "name": "Nike",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "hospitality_sports"
+   "sector": "hospitality_sports",
+   "last_fail": "2026-09-19"
   },
   "nio|wd3|NIO_Careers": {
    "name": "Nio",
