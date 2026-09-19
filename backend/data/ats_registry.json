@@ -16134,9 +16134,8 @@
   "hp|wd5|EXTEU-AC-CareerSite": {
    "name": "Hewlett Packard (HP)",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-19"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "hq|wd12|Securian_External": {
    "name": "Securian Financial Group",
@@ -17619,10 +17618,9 @@
   "nike|wd1|nke": {
    "name": "Nike",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-09-19"
+   "sector": "hospitality_sports"
   },
   "nio|wd3|NIO_Careers": {
    "name": "Nio",
