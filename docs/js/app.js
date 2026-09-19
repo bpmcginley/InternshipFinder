@@ -13,6 +13,9 @@
   const ATS = { greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", workday: "Workday", smartrecruiters: "SmartRecruiters", icims: "iCIMS", icims_site: "iCIMS", oracle: "Oracle", bamboohr: "BambooHR", workable: "Workable", taleo: "Taleo" };
   const ACTIVE = ["queued", "working", "needs_you", "ready_to_submit"];
   const PAGE = 150;
+  // Descriptions run about 1 KB per open listing. Up to this many open listings they are downloaded
+  // without asking (the eight default states and remote are about 3,200).
+  const DESC_AUTO = 5000;
 
   const DAY = IS.DAY;
   const daysAgo = iso => { if (!iso) return null; const t = new Date(iso).getTime(); return isNaN(t) ? null : Math.max(0, Math.floor((Date.now() - t) / DAY)); };
@@ -83,22 +86,26 @@
   const blockers = (r, p) => checks(r, p).filter(c => c[0] === "bad").map(c => c[1]);
 
   // ---------- extension ----------
+  const same = next => prev => { try { return JSON.stringify(prev) === JSON.stringify(next) ? prev : next; } catch (e) { return next; } };
   function useExtension() {
     const [info, setInfo] = useState({ checked: false, installed: false });
     const [queue, setQueue] = useState({ order: [], jobs: {} });
     const [profile, setProfile] = useState(null);
+    // The ping repeats every 20 s and nearly always brings back what we already have. Keeping the old
+    // object when nothing changed lets React skip the render; without it the whole page, table
+    // included, was redrawn three times every 20 s.
     const ping = useCallback(async () => {
       const r = await IS.ext.call({ type: "ping" }, 1500);
-      if (r && r.error === "reload_page") { setInfo({ checked: true, installed: false, stale: true }); return; }
+      if (r && r.error === "reload_page") { setInfo(same({ checked: true, installed: false, stale: true })); return; }
       if (r && r.ok) {
-        setInfo({ checked: true, installed: true, ...r });
-        const q = await IS.ext.call({ type: "get_queue" }); if (q && q.queue) setQueue(q.queue);
-        if (r.onboarded) { const p = await IS.ext.call({ type: "get_profile_summary" }); if (p && !p.error) setProfile(p); }
-      } else setInfo({ checked: true, installed: false });
+        setInfo(same({ checked: true, installed: true, ...r }));
+        const q = await IS.ext.call({ type: "get_queue" }); if (q && q.queue) setQueue(same(q.queue));
+        if (r.onboarded) { const p = await IS.ext.call({ type: "get_profile_summary" }); if (p && !p.error) setProfile(same(p)); }
+      } else setInfo(same({ checked: true, installed: false }));
     }, []);
     useEffect(() => {
       const off = IS.ext.on(d => {
-        if (d.__internscout === "push" && d.queue) setQueue(d.queue);
+        if (d.__internscout === "push" && d.queue) setQueue(same(d.queue));
         if (d.__internscout === "hello") ping();
         if (d.__internscout === "gone") setInfo({ checked: true, installed: false, stale: true });
       });
@@ -195,7 +202,8 @@
         h("div", { className: "meta", style: { marginTop: 9 } }, h("a", { href: IS.reportUrl(r), target: "_blank", rel: "noopener" }, "Report a wrong tag or dead link"))));
   }
 
-  function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, onAuto, open, onWhy, elig, patterns }) {
+  // Memoised: ticking one checkbox or typing in the search box used to redraw all 150 rows.
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, onAuto, open, onWhy, elig, patterns }) {
     const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
@@ -230,6 +238,21 @@
           !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", onClick: () => onAuto([r]) }, "Auto-Apply")),
           h("div", null, h("a", { className: "report", href: IS.reportUrl(r), target: "_blank", rel: "noopener", title: "Wrong tag, dead link or not a student role? Tell us." }, "Report")))),
       open && h("tr", { className: "why" }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns }))));
+  });
+
+  // The list is filtered and re-sorted on every change to the search text, so the box keeps its own
+  // text and hands it over once typing pauses instead of on every key.
+  function SearchBox({ value, onChange }) {
+    const [text, setText] = useState(value);
+    const sent = useRef(value);
+    useEffect(() => { if (value !== sent.current) { sent.current = value; setText(value); } }, [value]);
+    useEffect(() => {
+      if (text === sent.current) return;
+      const t = setTimeout(() => { sent.current = text; onChange(text); }, 200);
+      return () => clearTimeout(t);
+    }, [text]);
+    return h("input", { type: "text", "aria-label": "Search", placeholder: 'Search: nursing boston -unpaid "research assistant"', value: text,
+      onChange: e => setText(e.target.value), onKeyDown: e => { if (e.key === "Enter") { sent.current = text; onChange(text); } } });
   }
 
   // ---------- landing ----------
@@ -405,7 +428,14 @@
     }, [ready, keysKey, retry]);
 
     // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
-    const wantDesc = !!f.q.trim();
+    // Each description file is about the size of its listing file (MA: 0.9 MB), so they are fetched only
+    // for a real search (2+ letters), and only on their own while the chosen states stay under
+    // DESC_AUTO listings. Past that the search covers titles, companies and fields until the student
+    // asks for descriptions too.
+    const [descAll, setDescAll] = useState(false);
+    const searching = f.q.trim().length >= 2;
+    const descOpen = useMemo(() => keys.reduce((a, k) => a + ((index && index.files && index.files[k] && index.files[k].open) || 0), 0), [keys, index]);
+    const wantDesc = searching && (descOpen <= DESC_AUTO || descAll);
     useEffect(() => {
       if (!ready || !wantDesc) return;
       let live = true;
@@ -612,6 +642,8 @@
     const selectable = shown.filter(r => r.apply_url && !jobs[String(r.id)]);
     const allChecked = selectable.length > 0 && selectable.every(r => sel.has(r.id));
 
+    const autoRef = useRef(null);
+    const onAutoRow = useCallback(list => autoRef.current && autoRef.current(list), []);
     async function autoApply(list) {
       if (!info.installed) { setNote("Install the InternScout extension first."); return; }
       // The agent tailors answers from the posting text, which is not in the list rows.
@@ -633,6 +665,8 @@
       IS.ext.call({ type: "open_panel" });
       setTimeout(() => setNote(""), 9000);
     }
+
+    autoRef.current = autoApply;
 
     // admin only: trigger the scanner workflow with a GitHub token kept in this browser
     async function rescan() {
@@ -717,7 +751,7 @@
       note && h("div", { className: "notice", role: "status" }, note),
 
       h("div", { className: "filters" },
-        h("div", { className: "field search" }, h("input", { type: "text", "aria-label": "Search", placeholder: 'Search: nursing boston -unpaid "research assistant"', value: f.q, onChange: e => upd("q", e.target.value) })),
+        h("div", { className: "field search" }, h(SearchBox, { value: f.q, onChange: v => upd("q", v) })),
         h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
           saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`)))),
         h(MultiSelect, { placeholder: "Field", options: opts.fields, selected: f.fields, onChange: v => upd("fields", v) }),
@@ -738,6 +772,8 @@
         h("span", { className: "spacer" }),
         canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
 
+      searching && !wantDesc && h("div", { className: "notice" }, `Searching titles, companies and fields in ${keys.length} states. `,
+        h("button", { type: "button", className: "btn quiet", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)"),
       failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setRetry(n => n + 1) }, "Try again")),
       err ? h("div", { className: "sheet empty" }, "Couldn't load listings: ", err)
@@ -750,7 +786,7 @@
                 sortTh("company", "Company and role"), h("th", null, "Field"), h("th", null, "Location"), h("th", null, "Term"),
                 sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", null, "Your status"), h("th", null))),
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, onAuto: autoApply, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
+                checked: sel.has(r.id), onCheck: check, canAuto, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
 
       h("footer", null,
