@@ -290,6 +290,64 @@ describe("deleting data", () => {
   });
 });
 
+// From the independent review of the audit fixes (September 2026).
+describe("what Stripe still holds", () => {
+  const subReply = (status) => (url) => url.includes("subscriptions/")
+    ? Response.json({ id: url.split("subscriptions/")[1], status: status(), customer: "cus_1", current_period_end: 1794000000 })
+    : Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" });
+
+  it("ignores a late event about an earlier subscription", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    await post(api, completed(user, { subscription: "sub_2" }));
+    const late = await post(api, {
+      id: "evt_old", type: "customer.subscription.deleted",
+      data: { object: { id: "sub_1", customer: "cus_1", status: "canceled", metadata: { user_hash: user } } },
+    });
+    assert.equal((await late.json()).ignored, true);
+    assert.equal((await (await api("GET", "/me", { token: await token() })).json()).plan, "supporter");
+    assert.equal((await db.dump()).plans[0].subscription, "sub_2");
+  });
+
+  it("reads the new subscription with GET, never an empty update", async () => {
+    const { api, db, token, fetch } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    await post(api, completed(user));
+    const reads = fetch.calls.filter((c) => c.url.includes("subscriptions/"));
+    assert.ok(reads.length >= 1);
+    for (const c of reads) assert.equal(c.init.method, "GET");
+  });
+
+  it("a failed renewal still blocks Delete my data and a second checkout", async () => {
+    let live = "active";
+    const { api, db, token } = await setup({ env: PAID, stripe: subReply(() => live) });
+    const user = await whoami(api, token, db);
+    await post(api, completed(user));
+    live = "past_due";
+    await post(api, { id: "evt_pd", type: "customer.subscription.updated", data: { object: { id: "sub_1", customer: "cus_1", status: "past_due", metadata: { user_hash: user } } } });
+    assert.equal((await (await api("GET", "/me", { token: await token() })).json()).plan, "free");
+
+    const del = await api("DELETE", "/me", { token: await token() });
+    assert.equal(del.status, 409);
+    assert.equal((await del.json()).error, "subscribed");
+    const buy = await api("POST", "/billing/checkout", { token: await token() });
+    assert.equal(buy.status, 409);
+
+    live = "canceled";                                     // the student cancels in the portal
+    await post(api, { id: "evt_end", type: "customer.subscription.deleted", data: { object: { id: "sub_1", customer: "cus_1", status: "canceled", metadata: { user_hash: user } } } });
+    assert.equal((await api("POST", "/billing/checkout", { token: await token() })).status, 200);
+    assert.equal((await api("DELETE", "/me", { token: await token() })).status, 200);
+  });
+
+  it("measures a request body in bytes, not characters", async () => {
+    const { api, token } = await setup({ env: PAID, config: { MAX_BODY_BYTES: 120 } });
+    const ok = await api("POST", "/billing/checkout", { token: await token(), body: { plan: "supporter", pad: "a".repeat(60) } });
+    assert.equal(ok.status, 200);
+    const wide = await api("POST", "/billing/checkout", { token: await token(), body: { plan: "supporter", pad: "中".repeat(60) } });
+    assert.equal(wide.status, 400);                        // 60 characters, 180 bytes
+  });
+});
+
 // The user_hash never leaves the Worker, so tests read it from a row the student's own call wrote.
 async function whoami(api, token, db) {
   await api("POST", "/demand", { token: await token(), body: { states: ["MA"] } });

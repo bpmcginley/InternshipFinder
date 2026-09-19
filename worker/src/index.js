@@ -39,14 +39,18 @@ async function readJson(request, maxBytes, optional = false) {
     throw new HttpError(400, "bad_request", "Request body is too large");
   }
   const text = await request.text();
-  if (text.length > maxBytes) throw new HttpError(400, "bad_request", "Request body is too large");
+  // was: text.length, which counts UTF-16 units. A body sent chunked (no Content-Length to check) and
+  // written in three-byte characters came in at three times the cap, and the cost estimate made from
+  // "bytes" was a third of what it should be.
+  const size = new TextEncoder().encode(text).length;
+  if (size > maxBytes) throw new HttpError(400, "bad_request", "Request body is too large");
   // Some routes take a body only to carry an optional choice, so no body means "use the default"
   // rather than a mistake.
   if (optional && !text.trim()) return { body: {}, bytes: 0 };
   try {
     const body = JSON.parse(text);
     if (body === null || typeof body !== "object") throw new Error();
-    return { body, bytes: text.length };
+    return { body, bytes: size };   // was: bytes: text.length
   } catch {
     throw new HttpError(400, "bad_request", "Body must be a JSON object");
   }

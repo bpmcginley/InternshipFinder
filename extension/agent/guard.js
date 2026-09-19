@@ -121,6 +121,16 @@
     return { allowed: true };
   }
 
+  // The stored account password goes into a password box and nowhere else. fill_secret takes a ref
+  // the model chose, and nothing checked what that ref was: pointed at a text box (by mistake, or by a
+  // page written to make it), the password was typed in the clear, and the next snapshot read the box
+  // back and sent its value to the model and into the job log. d: {tag, type}.
+  function allowSecret(d) {
+    const tag = String((d && d.tag) || "").toLowerCase(), type = String((d && d.type) || "").toLowerCase();
+    if (tag === "input" && type === "password") return { allowed: true };
+    return { allowed: false, reason: "a stored password is only typed into a password box" };
+  }
+
   // ---- DOM helpers (browser only) ----
   function describe(el) {
     const tag = (el.tagName || "").toLowerCase();
@@ -303,7 +313,8 @@
   };
   const consentGiveaway = (el, text) => !!consentWidget(el) && !CONSENT_OK_RE.test(text || "");
 
-  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
+  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

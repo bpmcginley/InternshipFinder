@@ -8,6 +8,16 @@ const filled = { filledFields: 5 };
 const empty = { filledFields: 0 };
 const btn = (text, extra = {}) => ({ text, value: "", ariaLabel: "", title: "", type: "button", automationId: "", ...extra });
 
+test("the stored password is typed into a password box and nowhere else", () => {
+  assert.equal(G.allowSecret({ tag: "INPUT", type: "password" }).allowed, true);
+  for (const d of [{ tag: "INPUT", type: "text" }, { tag: "INPUT", type: "email" }, { tag: "INPUT", type: "" },
+    { tag: "TEXTAREA", type: "textarea" }, { tag: "DIV", type: undefined }, {}, null]) {
+    const v = G.allowSecret(d);
+    assert.equal(v.allowed, false, JSON.stringify(d));
+    assert.match(v.reason, /password box/);
+  }
+});
+
 test("final submit variants are always refused", () => {
   for (const t of ["Submit", "Submit Application", "SUBMIT APPLICATION", "Submit my application",
     "Send application", "Send my application", "Finish application", "Complete your application",

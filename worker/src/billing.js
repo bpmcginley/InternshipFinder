@@ -108,6 +108,12 @@ export async function checkout(db, env, config, user, plan, now, fetchImpl) {
       ? `You are already on the ${wanted.label || plan} plan.`
       : "You already have a plan. Use Manage plan to switch.");
   }
+  // planOf() calls a subscription whose payment failed "free", and it is: nothing extra is granted.
+  // But Stripe still holds it and is still retrying the card, so a second checkout here would leave
+  // the student with two subscriptions once the retry goes through.
+  if (await liveSubscription(db, user)) {
+    throw new HttpError(409, "already", "Your last payment did not go through, and Stripe is still retrying it. Use Manage plan to update your card or cancel.");
+  }
   const form = {
     mode: "subscription",
     "line_items[0][price]": priceIdOf(env, config, plan),
@@ -223,7 +229,11 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
     // The session says nothing about when the subscription renews; read that from the subscription.
     let periodEnd = null, status = "active", plan = (o.metadata || {}).plan;
     if (o.subscription) {
-      const sub = await stripe(env, "subscriptions/" + encodeURIComponent(o.subscription), {}, fetchImpl).catch(() => null);
+      // was: stripe(env, "subscriptions/" + ..., {}, fetchImpl) - with no method given that is a POST,
+      // an empty UPDATE of the subscription. A restricted key with read-only Subscriptions (the right
+      // key for this Worker) answers 403, the catch swallowed it, and the plan was saved "active" with
+      // no renewal date and without ever looking at which price was bought.
+      const sub = await stripe(env, "subscriptions/" + encodeURIComponent(o.subscription), {}, fetchImpl, null, "GET").catch(() => null);
       if (sub) {
         periodEnd = endOf(sub);
         status = sub.status || status;
@@ -239,6 +249,13 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
     const user = (o.metadata && o.metadata.user_hash) ||
       (await db.prepare("SELECT user_hash FROM plans WHERE subscription = ?").bind(o.id || "").first() || {}).user_hash;
     if (!user) return { ok: true, ignored: true };
+    // An event about a subscription that is not the one on file. The student's first subscription
+    // ended and they bought another; a late "deleted" or "updated" for the first one (a new event id,
+    // so the repeat check does not stop it) used to overwrite the row and put a paying student on free.
+    const held = await db.prepare("SELECT subscription, status FROM plans WHERE user_hash = ?").bind(user).first();
+    if (held && held.subscription && o.id && held.subscription !== o.id && ACTIVE.has(held.status)) {
+      return { ok: true, ignored: true };
+    }
     // Stripe does not promise events in order, and a retried "updated: active" can land hours after
     // the "deleted" that ended the subscription, which would hand the plan back for good. So an
     // update is only a nudge: what the subscription is now is read from Stripe. If that read fails,
@@ -263,9 +280,19 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
 
 // DELETE /me while a subscription is live would leave Stripe billing a card for an account that no
 // longer exists here, so the student cancels first. Nothing is deleted behind their back.
+// was: return (await planOf(db, user)).plan !== "free". planOf() reports "free" for every status but
+// active and trialing, so a subscription whose renewal had failed (past_due, unpaid, incomplete) did
+// not block: the row was deleted, Stripe's retry then charged the card, and the next event re-created
+// a row for someone who had asked to be forgotten. What matters is whether Stripe still holds one.
 export async function blocksDeletion(db, user) {
   const { plan } = await planOf(db, user);
-  return plan !== "free";
+  return plan !== "free" || (await liveSubscription(db, user));
+}
+
+const ENDED = new Set(["canceled", "incomplete_expired"]);
+async function liveSubscription(db, user) {
+  const row = await db.prepare("SELECT subscription, status FROM plans WHERE user_hash = ?").bind(user).first();
+  return !!(row && row.subscription && !ENDED.has(row.status));
 }
 
 export async function deletePlan(db, user) {

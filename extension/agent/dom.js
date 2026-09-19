@@ -244,7 +244,10 @@
       }
       case "password": return el.value ? "(filled)" : "";
       case "rich_text": return cut(txt(el), 300);
-      default: return cut(el.value || "", 400);
+      // was: default: return cut(el.value || "", 400);
+      // A box the stored password was typed into never has its value read back, whatever its type is
+      // now: a "show password" eye turns a password box into a text box, and the value went to the model.
+      default: return el.getAttribute && el.getAttribute("data-is-secret") ? (el.value ? "(filled)" : "") : cut(el.value || "", 400);
     }
   }
 
@@ -560,6 +563,11 @@
         G.installClickBlock(document);
         A.mouseClick(t);
         return { ok: true };
+      }
+      if (action === "fill" && p.secret) {
+        const verdict = G.allowSecret({ tag: el.tagName, type: el.type });
+        if (!verdict.allowed) return { ok: false, blocked: true, error: "BLOCKED: " + verdict.reason + ". Use fill_secret on the password field itself." };
+        el.setAttribute("data-is-secret", "1");
       }
       if (action === "fill") r = ["select", "react_select", "listbox", "radio_group", "combobox"].includes(rec.kind) ? await pick(rec, p.text) : await fillText(rec, p.text, p.secret);
       else if (action === "select") r = ["text", "textarea", "rich_text", "password"].includes(rec.kind) ? await fillText(rec, p.option) : await pick(rec, p.option);
