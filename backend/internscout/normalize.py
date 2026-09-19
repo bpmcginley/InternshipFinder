@@ -191,6 +191,23 @@ def listing_id(dedupe_key: str) -> str:
     return hashlib.sha256(dedupe_key.encode("utf-8")).hexdigest()[:16]
 
 
+# A posting with no term that went up more than a year ago is not an opening, it is a page nobody
+# took down: 241 of the open listings in the 2026-09 export were that, the oldest from 2013 (Felix
+# Magazine's "Intern/Volunteer" roles, still live on its board). Nothing was checking age at all. A
+# listing that names a term is left to the term rules, whatever its date says - boards re-use old
+# requisitions for next summer's class - and one with no date is left alone too.
+MAX_UNTERMED_AGE_DAYS = 365
+
+
+def _zombie(posted, season, year, now=None) -> bool:
+    if not posted or season or year:
+        return False
+    now = now or datetime.now(timezone.utc)
+    if posted.tzinfo is None:
+        posted = posted.replace(tzinfo=timezone.utc)
+    return (now - posted).days > MAX_UNTERMED_AGE_DAYS
+
+
 def _to_dt(ts):
     if ts is None:
         return None
@@ -326,6 +343,10 @@ def normalize(raw: dict) -> dict | None:
     if season and str(season).strip().lower() in ("", "none", "null"):
         season = None
     term = (f"{season} {year}" if year else str(season)).strip() if season else None
+
+    posted = _to_dt(raw.get("posted_at") or raw.get("date_posted"))
+    if _zombie(posted, season, year):
+        return None
 
     return {
         "company_name": company,

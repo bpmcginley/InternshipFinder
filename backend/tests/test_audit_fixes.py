@@ -246,3 +246,14 @@ def test_a_registry_that_lost_most_of_its_boards_is_not_saved(tmp_path, monkeypa
     small = {"greenhouse": {k: v for k, v in list(big["greenhouse"].items())[:280]}}
     discover.save_registry(small)                     # an ordinary prune still saves
     assert not (tmp_path / "registry.json.tmp").exists()
+
+
+# ---------- age ----------
+def test_an_untermed_posting_over_a_year_old_is_dropped():
+    from internscout.normalize import _zombie
+    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+    assert _zombie(datetime(2013, 2, 1, tzinfo=timezone.utc), None, None, now)
+    assert _zombie(datetime(2025, 9, 1), None, None, now)                      # a naive date is read as UTC
+    assert not _zombie(datetime(2025, 10, 1, tzinfo=timezone.utc), None, None, now)
+    assert not _zombie(datetime(2024, 1, 1, tzinfo=timezone.utc), "Summer", 2027, now)   # a term decides, not the date
+    assert not _zombie(None, None, None, now)
