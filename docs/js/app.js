@@ -61,7 +61,11 @@
     const cit = IS.citizenRule(r);
     if (cit) {
       const t = cit === "citizen" ? "U.S. citizens only" : "U.S. citizens or permanent residents only", c = p && p.citizenship;
-      const ok = c && (/\bu\.?\s?s\.?a?\b|united states|american/i.test(c) || (cit !== "citizen" && /permanent|green card/i.test(c)));
+      // "U.S. permanent resident" and "needs a U.S. visa" both contain "U.S.", so rule those out first.
+      const resident = /permanent|green card|lawful/i.test(c || "");
+      const notCitizen = resident || /visa|\bf-?1\b|\bj-?1\b|\bh-?1b?\b|\bopt\b|\bcpt\b|international|non-?citizen|not a (u\.?\s?s\.? )?citizen/i.test(c || "");
+      const citizen = !notCitizen && /\bu\.?\s?s\.?a?\b|united states|american/i.test(c || "");
+      const ok = citizen || (cit !== "citizen" && resident);
       out.push(c ? [ok ? "good" : "bad", t] : ["warn", t]);
     }
     if (x.clearance || (r.restrictions || []).includes("clearance")) out.push(["warn", "Needs a security clearance"]);
@@ -293,9 +297,9 @@
     if (step === 1) body = h(F, null,
       h("h3", null, "About you"),
       !majors && h("div", { className: "meta" }, "The major list didn't load. Pick the fields you're interested in below instead."),
-      majors && h("label", { className: "lbl" }, "Major(s)", h(MultiSelect, { wide: true, label: "Majors", placeholder: "Start typing, e.g. Nursing", options: majorOpts, selected: d.majors, onChange: v => set("majors", v) })),
-      majors && h("label", { className: "lbl" }, "Minor(s) ", h("span", { className: "muted" }, "optional"), h(MultiSelect, { wide: true, label: "Minors", placeholder: "Start typing", options: minorOpts, selected: d.minors, onChange: v => set("minors", v) })),
-      h("label", { className: "lbl" }, undeclared ? "Fields you're interested in" : h(F, null, "Other fields you're interested in ", h("span", { className: "muted" }, "optional")),
+      majors && h("div", { className: "lbl" }, "Major(s)", h(MultiSelect, { wide: true, label: "Majors", placeholder: "Start typing, e.g. Nursing", options: majorOpts, selected: d.majors, onChange: v => set("majors", v) })),
+      majors && h("div", { className: "lbl" }, "Minor(s) ", h("span", { className: "muted" }, "optional"), h(MultiSelect, { wide: true, label: "Minors", placeholder: "Start typing", options: minorOpts, selected: d.minors, onChange: v => set("minors", v) })),
+      h("div", { className: "lbl" }, undeclared ? "Fields you're interested in" : h(F, null, "Other fields you're interested in ", h("span", { className: "muted" }, "optional")),
         h(MultiSelect, { wide: true, label: "Fields", placeholder: undeclared ? "e.g. Health, Museums, Data" : "Add a field", options: fieldOpts, selected: d.fields, onChange: v => set("fields", v) })),
       h("div", { className: "row2" },
         h("label", { className: "lbl" }, "Class year",
@@ -390,14 +394,15 @@
     }, [reload]);
 
     const keys = useMemo(() => f.states.length ? f.states : IS.profileKeys(p), [f.states, p]);
+    const [failedKeys, setFailedKeys] = useState([]); const [retry, setRetry] = useState(0);
     const keysKey = keys.slice().sort().join(",");
     useEffect(() => {
       if (!ready) return;
       let live = true;
       setLoading(true);
-      store.current.ensure(keys).then(() => { if (live) { setVer(store.current.version()); setLoading(false); } });
+      store.current.ensure(keys).then(bad => { if (live) { setVer(store.current.version()); setLoading(false); setFailedKeys(bad || []); } });
       return () => { live = false; };
-    }, [ready, keysKey]);
+    }, [ready, keysKey, retry]);
 
     // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
     const wantDesc = !!f.q.trim();
@@ -422,10 +427,25 @@
     useEffect(() => { if (auth.token && p) IS.postDemand(auth.token, p); }, [auth.token, p]);
     const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
     const [me, setMe] = useState(null);
+    // A token lasts about an hour. When it runs out, stop showing "Signed in": take a fresh one from
+    // the extension if it has one, otherwise show the sign-in buttons again.
+    const dropToken = useCallback(() => {
+      IS.signOut(); setAuth(a => ({ ...a, token: null }));
+      if (info.installed) IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.tokenOk(r.token)) setAuth(a => ({ ...a, token: r.token, source: "extension" })); });
+    }, [info.installed]);
     useEffect(() => {
       setMe(null);
-      if (auth.token) IS.fetchMe(auth.token).then(setMe);
-    }, [auth.token]);
+      if (!auth.token) return;
+      let live = true, last = Date.now();
+      const load = () => IS.fetchMe(auth.token).then(m => { if (!live) return; if (m) setMe(m); else if (!IS.tokenOk(auth.token)) dropToken(); });
+      load();
+      const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
+      const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
+      // Coming back to the tab after an Auto-Apply run: the "left this month" text should be current.
+      const onVis = () => { if (document.visibilityState === "visible" && Date.now() - last > 60000) { last = Date.now(); load(); } };
+      document.addEventListener("visibilitychange", onVis);
+      return () => { live = false; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); };
+    }, [auth.token, dropToken]);
 
     // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
     // moment later, so check once now and once shortly after before saying anything.
@@ -457,7 +477,7 @@
       if (p) {
         const body = IS.bridgeProfile(p), k = JSON.stringify(body);
         if (synced.current !== k) { synced.current = k; IS.ext.call({ type: "profile:set", profile: body }, 3000); }
-      } else if (!synced.current) {
+      } else if (!synced.current && !IS.profileDeleted()) {
         synced.current = "asked";
         IS.ext.call({ type: "profile:get" }, 3000).then(r => {
           const got = r && IS.fromBridgeProfile(r.profile);
@@ -480,9 +500,15 @@
       if (!window.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
+      // Statuses and saved searches are the student's own tracker, so they go only if they say so.
+      if ((Object.keys(appStates).length || saved.length || ghToken) && window.confirm("Also delete your applied/saved statuses and saved searches from this browser? Cancel keeps them.")) {
+        setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
+        try { localStorage.removeItem("internscout.gh_token"); } catch (e) { } setGhToken("");
+      }
       setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
-      setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.");
+      setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : (r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.")
+        + (info.installed ? " The extension keeps its own copy: use Delete my data in its settings too." : ""));
     }
 
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
@@ -553,12 +579,15 @@
       else if (f.paid === "no_unpaid") r = r.filter(x => IS.payOf(x) !== "unpaid");
       if (f.hide_citizen) r = r.filter(x => !IS.citizenBlocked(x, p ? p.work_auth : ""));
       if (f.eligible && elig) r = r.filter(x => !scores.get(x.id).mismatch && !blockers(x, elig).length);
-      if (f.status) r = r.filter(x => x.status === f.status);
+      // Looking at your own applications: a posting that has since closed still belongs in the list.
+      if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
       if (f.new_only) r = r.filter(x => x.is_new);
       if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
       else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
       const S = x => scores.get(x.id);
-      const newer = (a, b) => (b.posted_at || b.first_seen || "").localeCompare(a.posted_at || a.first_seen || "");
+      // Dated postings first, newest first. first_seen is only the scan that found the row, which is
+      // today for nearly everything, so using it for undated rows put every undated posting on top.
+      const newer = (a, b) => (b.posted_at ? 1 : 0) - (a.posted_at ? 1 : 0) || (b.posted_at || "").localeCompare(a.posted_at || "") || (b.first_seen || "").localeCompare(a.first_seen || "");
       if (f.sort === "score") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || (S(b).score - S(a).score) || (b.first_seen || "").localeCompare(a.first_seen || ""));
       else if (f.sort === "new") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || newer(a, b));
       else if (f.sort === "company") r.sort((a, b) => a.company_name.localeCompare(b.company_name));
@@ -709,6 +738,8 @@
         h("span", { className: "spacer" }),
         canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
 
+      failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
+        h("button", { type: "button", className: "btn quiet", onClick: () => setRetry(n => n + 1) }, "Try again")),
       err ? h("div", { className: "sheet empty" }, "Couldn't load listings: ", err)
         : loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
           : rows.length === 0 ? h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")

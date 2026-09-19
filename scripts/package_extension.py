@@ -9,6 +9,7 @@ Leaves out tests, fixtures, *.test.* files, OS junk and signing keys.
 from __future__ import annotations
 import fnmatch
 import json
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -19,6 +20,9 @@ DIST = ROOT / "dist"
 
 SKIP_DIRS = {"test", "tests", "fixtures", "__pycache__", "node_modules", ".git"}
 SKIP_FILES = ["*.test.*", ".DS_Store", "Thumbs.db", "desktop.ini", "*.pem", "*.crx", "*.zip"]
+
+
+LOCAL_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])[:/]")
 
 
 def included(rel: Path) -> bool:
@@ -33,14 +37,22 @@ def build(webstore: bool = False) -> Path:
     itself and may refuse a manifest that carries one."""
     manifest = json.loads((EXT / "manifest.json").read_text(encoding="utf-8"))
     version = manifest["version"]
+    # The dashboard bridge also matches localhost so the dashboard can be developed against the
+    # unpacked folder. In a build that students install, that would let any page served from any local
+    # port (another dev tool, a malicious app's local server) ask the extension for the sign-in token
+    # and the resume summary, so both zips carry the real dashboard origin only.
+    for cs in manifest.get("content_scripts", []):
+        cs["matches"] = [m for m in cs.get("matches", []) if not LOCAL_RE.match(m)]
+    assert all(cs["matches"] for cs in manifest.get("content_scripts", [])), "a content script lost every match"
     DIST.mkdir(exist_ok=True)
     out = DIST / f"internscout-extension-{version}{'-webstore' if webstore else ''}.zip"
     files = sorted(p for p in EXT.rglob("*") if p.is_file() and included(p.relative_to(EXT)))
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for p in files:
             rel = p.relative_to(EXT).as_posix()
-            if webstore and rel == "manifest.json":
-                manifest.pop("key", None)
+            if rel == "manifest.json":
+                if webstore:
+                    manifest.pop("key", None)
                 zf.writestr(rel, json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
             else:
                 zf.write(p, rel)

@@ -72,7 +72,11 @@
     stages: [], terms: ["Summer 2027"], paid_only: false, states: [], remote: true, work_auth: "",
   });
   const loadProfile = () => { const p = ls.get(PROFILE_KEY, null); return p && typeof p === "object" ? { ...emptyProfile(), ...p } : null; };
-  const saveProfile = p => { const out = { ...p, v: 1, updated: new Date().toISOString() }; ls.set(PROFILE_KEY, out); return out; };
+  // Set by "Delete my data" and cleared by the next save. Without it the next page load asked the
+  // extension for its copy of the profile and the deleted profile was back.
+  const DELETED_KEY = "internscout.profile.deleted";
+  const saveProfile = p => { const out = { ...p, v: 1, updated: new Date().toISOString() }; ls.set(PROFILE_KEY, out); ls.del(DELETED_KEY); return out; };
+  const profileDeleted = () => !!ls.get(DELETED_KEY, false);
 
   // ---------- locations ----------
   const REMOTE_RE = /\b(remote|anywhere|work from home|virtual)\b/i;
@@ -220,7 +224,16 @@
     const byId = new Map();
     let version = 0;
 
-    function add(list) { for (const x of list || []) if (x && x.id != null && !byId.has(x.id)) byId.set(x.id, x); version++; }
+    // apply_url ends up in an href and in the Auto-Apply queue, so anything that is not plain http(s)
+    // (javascript:, data:) is dropped here, once, before any of the page sees it.
+    function add(list) {
+      for (const x of list || []) {
+        if (!x || x.id == null || byId.has(x.id)) continue;
+        if (x.apply_url && !/^https?:\/\//i.test(x.apply_url)) x.apply_url = "";
+        byId.set(x.id, x);
+      }
+      version++;
+    }
 
     async function init(fromRaw) {
       bust = !!fromRaw;
@@ -243,18 +256,29 @@
       throw last || new Error("No listing data found");
     }
 
+    // Resolves to the keys that could not be loaded, so the page can say so instead of showing
+    // "no listings" for a state whose file simply failed to download.
+    const failed = new Set();
     async function ensure(keys) {
-      if (legacy || !index) return;
+      if (legacy || !index) return [];
       const jobs = [];
       for (const k of new Set(keys)) {
         const meta = index.files[k];
-        if (!meta || loaded.has(k)) continue;
+        if (!meta) continue;
+        // Already asked for: wait for it as well. Skipping a shard still in flight painted the list
+        // without its rows when states were changed quickly.
+        if (loaded.has(k)) { jobs.push(loaded.get(k)); continue; }
         const file = meta.file || (index._dir + k + ".json");
-        const pr = getJSON(base + file, bust).then(add).catch(e => { loaded.delete(k); console.warn("InternScout: couldn't load", file, e); });
+        const get = () => getJSON(base + file, bust);
+        // One quiet retry: a dropped connection is the usual reason a shard fails.
+        const pr = get().catch(() => new Promise(r => setTimeout(r, 1200)).then(get))
+          .then(d => { failed.delete(k); add(d); })
+          .catch(e => { loaded.delete(k); failed.add(k); console.warn("InternScout: couldn't load", file, e); });
         loaded.set(k, pr);
         jobs.push(pr);
       }
       await Promise.all(jobs);
+      return [...new Set(keys)].filter(k => failed.has(k));
     }
 
     // Descriptions live beside each shard (<file> -> <file>.desc.json, {id: text}) so the list
@@ -427,7 +451,7 @@
   // loaded yet, or an older page meets a tier it doesn't know.
   const PLAN_LABELS = { supporter: "Supporter", pro: "Pro" };
   const leftOf = (me, task) => { const a = me && me.allowance && me.allowance[task]; return a ? Math.max(0, (a.limit || 0) - (a.used || 0)) : null; };
-  // "Auto-Apply runs: 15 of 15 left" lines plus the tier, for a tooltip.
+  // "Auto-Apply runs: 20 of 20 left" lines plus the tier, for a tooltip.
   function allowanceText(me) {
     if (!me || !me.allowance) return "";
     // limit null = no monthly cap on that task (the Deep Dive)
@@ -469,7 +493,7 @@
         if (r.status === 409) return { server: false, blocked: true };
       } catch (e) { server = false; }
     }
-    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent");
+    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.set(DELETED_KEY, true);
     ss.del(TOKEN_KEY);
     return { server };
   }
@@ -489,7 +513,7 @@
     WEIGHTS, PART_LABEL, profileFields, score,
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
-    workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData,
+    workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };

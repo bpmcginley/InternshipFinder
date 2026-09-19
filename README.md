@@ -36,7 +36,9 @@ Works in Chrome, Edge and Brave on a computer.
 
 ### 4. Sign in (for AI features)
 Click **Sign in with Google** or **Sign in with Microsoft** in the extension or on the dashboard.
-Any account works. Sign-in happens on Google's or Microsoft's own page, so we never see your
+Any Google account or personal Microsoft account works. School Microsoft logins (like the
+@umass.edu Outlook one) don't work yet, so use Google with your @umass.edu address for the larger
+allowance. Sign-in happens on Google's or Microsoft's own page, so we never see your
 password. A school account with a verified .edu email (like your @umass.edu account) gets the
 full allowance below; other accounts get half. You need it only for AI features (Auto-Apply,
 tailored resumes, Deep Dive). Search never needs it.
@@ -63,8 +65,11 @@ There are also small limits on how fast you can make AI calls. The extension and
 what you have left. Allowances reset on the 1st of each month.
 
 If the whole project's AI budget runs out in a month, AI features pause for everyone until the
-next month. Search keeps working. If costs grow, an optional supporter plan may be added just to
-break even. Search will stay free.
+next month. Search keeps working. Optional Supporter ($5/month) and Pro ($12/month) plans raise
+your allowance and exist only to cover the AI bill. Search will stay free.
+
+On January 1, 2027 Google doubles the price of the model behind Auto-Apply, tailored resumes and
+the Deep Dive, so the Auto-Apply and tailored-resume allowances halve on that date.
 
 Hit your cap? Under **Advanced** in the extension you can use your own Gemini or Anthropic API key.
 
