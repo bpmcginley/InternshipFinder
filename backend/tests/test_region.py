@@ -1,5 +1,5 @@
 from internscout.region import (board_state, evaluate_locations, in_region, place_bare_cities,
-                                state_of)
+                                pretty_location, state_of)
 from internscout.discover import ats_of, add_board, discover
 
 
@@ -245,3 +245,41 @@ def test_research_triangle_park_alone_is_north_carolina():
     for loc in ("Research Triangle Park", "RTP", "Research Triangle Park, United States"):
         r = evaluate_locations([loc])
         assert r["in_region"] and r["state"] == "NC", loc
+
+
+def test_a_canadian_province_code_is_not_california():
+    # Workday writes the country first, so "CA-QC-..." used to split on the dash and read as
+    # California. Eleven listings shipped in CA.json that way: RTX in Quebec, Cenovus in
+    # Newfoundland. None of the province codes is also a US state code.
+    for loc in ("CA-QC-MIRABEL-M01 ~ 12800 Rue Henri-Fabre", "CA-NL-St. John's",
+                "CA-ON-Toronto", "CA-BC-Vancouver - 1055 W Georgia", "CA-AB-Calgary"):
+        assert not in_region(loc), loc
+        assert evaluate_locations([loc])["regions"] == [], loc
+    # and California itself is untouched
+    for loc in ("US-CA-San Jose", "Irvine, CA - ON SITE", "Ontario, CA", "Los Angeles, CA"):
+        r = evaluate_locations([loc])
+        assert r["in_region"] and r["state"] == "CA", loc
+
+
+def test_an_ats_site_code_is_shown_as_a_place():
+    assert pretty_location("US-CT-WINDSOR LOCKS-B1 ~ 1 Hamilton Rd ~ BLDG 1") == "Windsor Locks, CT"
+    assert pretty_location("USA IL Chicago 800 W Fulton") == "Chicago, IL"
+    assert pretty_location("US-MA-Boston") == "Boston, MA"
+    assert pretty_location("USA-NY-New York-PLANT 4") == "New York, NY"
+    assert pretty_location("US, Oregon, Hillsboro") == "Hillsboro, OR"       # state named, city last
+    assert pretty_location("US, Dayton, OH") == "Dayton, OH"                 # same shape, reversed
+    assert pretty_location("(USA) OH HAMILTON 02441 WM SUPERCENTER") == "Hamilton, OH"
+    assert pretty_location("PA - Pittsburgh (15222)") == "Pittsburgh, PA"
+    # anything it cannot read comes back exactly as it went in
+    for loc in ("Boston, MA", "Cambridge, MA or Remote", "Remote - US", "United States",
+                "10367 - Connecticut CVS Pharmacy, L.L.C.", "US - UPS CORPORATE OFFICES (GACOR)",
+                "US Home Office California", "US, Ireland, Dublin", ""):
+        assert pretty_location(loc) == loc, loc
+
+
+def test_the_raw_location_survives_the_pretty_label():
+    raw = "US-CT-WINDSOR LOCKS-B1 ~ 1 Hamilton Rd ~ BLDG 1"
+    r = evaluate_locations([raw])
+    assert r["regions"] == [{"loc": "Windsor Locks, CT", "kind": "new_england", "state": "CT"}]
+    assert r["region_locations"] == ["Windsor Locks, CT"]
+    assert r["location_raw"] == raw

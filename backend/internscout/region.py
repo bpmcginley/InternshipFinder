@@ -6,7 +6,7 @@ import re
 from collections import Counter, defaultdict
 from .config import REGION, wanted_states
 from .geo import (REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, _US_COUNTRY_RE,  # noqa: F401
-                  city_of, haversine_miles, locate, state_of)
+                  city_of, haversine_miles, locate, pretty_location, state_of)
 
 IN_CITY = {"boston|MA", "cambridge|MA", "new york|NY", "new york city|NY", "nyc|NY",
            "manhattan|NY", "brooklyn|NY", "queens|NY", "bronx|NY", "long island city|NY"}
@@ -238,9 +238,16 @@ def evaluate_locations(locations) -> dict:
         # in the card's location line and in what the dashboard searches.
         "state": (best and best["state"]) or stated
         or ("Remote" if any(h["kind"] == "remote" for _, h in region) else None),
-        "region_locations": [l for l, _ in region],
+        # The two display strings below run through geo.pretty_location, which rewrites an ATS site
+        # code into "City, ST" and leaves anything it cannot read alone. Workday slugs were 4.6% of
+        # the region strings in the last export and the dashboard printed them raw in its Location
+        # column. The untouched original is still here, in location_raw at the bottom of this dict.
+        # was: "region_locations": [l for l, _ in region],
+        "region_locations": [pretty_location(l) for l, _ in region],
         # one entry per US location, so the dashboard can filter and show the right one
-        "regions": [{"loc": l, "kind": h["kind"], "state": h["state"] or ("Remote" if h["kind"] == "remote" else None)}
+        # was: "regions": [{"loc": l, ...
+        "regions": [{"loc": pretty_location(l), "kind": h["kind"],
+                     "state": h["state"] or ("Remote" if h["kind"] == "remote" else None)}
                     for l, h in region],
         "best_distance": best["distance"] if best else None,
         "lat": best["lat"] if best else None,

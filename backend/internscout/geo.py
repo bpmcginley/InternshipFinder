@@ -119,10 +119,23 @@ def _us_town_of_that_name(loc: str) -> bool:
     return code in _MORE_US_TOWNS.get(town.group(1).strip().lower(), ())
 
 
+# 3. Workday writes a Canadian site with the country first: "CA-QC-MIRABEL-M01 ~ 12800 Rue Henri
+#    Fabre", "CA-NL-St. John's". state_of below splits that on the dash, reads the leading "CA" as
+#    California and files the listing in CA.json - 11 of them in the last export, RTX's Quebec plants
+#    and Cenovus Energy in Newfoundland, served to students who filtered for California. None of the
+#    13 province codes is also a US state code, so a "CA-<province>" prefix is Canada and nothing
+#    else. Anchored at the start, because a US Workday string reads "US-CA-..." and because
+#    "Irvine, CA - ON SITE" has to stay in California.
+_CA_PROVINCE = re.compile(r"^\s*CA[-–](AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?=[-–\s]|$)")
+
+
 class _NotUS:
     """_FOREIGN, except for a US namesake followed by its state. Callers use it as a regex."""
 
     def search(self, loc: str):
+        province = _CA_PROVINCE.match(loc or "")
+        if province:
+            return province
         hit = _FOREIGN_CITY_CODE.search(loc) or _FOREIGN_MORE.search(loc)
         # was: if hit: return hit
         if hit and not _us_town_of_that_name(loc):
@@ -216,6 +229,61 @@ def city_of(loc: str) -> str:
         return m.group(1).strip().lower()
     s = _PREFIX.sub("", s)
     return re.sub(r"\s+", " ", s.split(",")[0].strip().strip("()")).lower()
+
+
+# Workday and a handful of other boards write the location as a site code instead of a place:
+# "US-CT-WINDSOR LOCKS-B1 ~ 1 Hamilton Rd ~ BLDG 1", "USA IL Chicago 800 W Fulton". 1,557 of the
+# 34,202 region strings in the last export read like that, and the dashboard prints them verbatim in
+# its Location column. This turns the ones it can read into "Windsor Locks, CT" and hands back the
+# original untouched for everything else, so a string it cannot parse is never mangled. The original
+# is kept either way: region.evaluate_locations puts it in location_raw.
+_SITE_TAIL = re.compile(r"\s*[~|]\s*.*$")                     # " ~ 1 Hamilton Rd ~ BLDG 1"
+_BLDG_TAIL = re.compile(r"\s*[-–]\s*(?:[A-Z]{0,3}\d[A-Z0-9]*|BLDG\b.*|PLANT\b.*|SITE\b.*)$", re.I)
+_STREET_TAIL = re.compile(r"\s+\d{2,}\s+[A-Za-z].*$")          # "Chicago 800 W Fulton"
+_DASH_SLUG = re.compile(r"^\s*USA?\s*[-–]\s*([A-Z]{2})\s*[-–]\s*(.+)$")
+_SPACE_SLUG = re.compile(r"^\s*USA?\s+([A-Z]{2})\s+(.+)$")
+_READS_AS_PLACE = re.compile(r"^\s*[A-Za-z][A-Za-z .'`-]*[A-Za-z.]\s*,\s*[A-Z]{2}(?![A-Za-z])")
+# Three more shapes the same Location column showed raw, in falling order of volume: Intel and AMD
+# put the country first ("US, Oregon, Hillsboro", "US, Dayton, OH" - either field can be the state);
+# Walmart writes the store number and banner after the town ("(USA) OH HAMILTON 02441 WM
+# SUPERCENTER"); and a few boards append the ZIP in brackets ("PA - Pittsburgh (15222)").
+_COUNTRY_FIRST = re.compile(r"^\s*USA?\s*,\s*([^,]+)\s*,\s*([^,]+?)\s*$")
+_PAREN_USA = re.compile(r"^\s*\(USA?\)\s+([A-Z]{2})\s+(.+)$")
+_ZIP_SUFFIX = re.compile(r"^\s*([A-Z]{2})\s*[-–]\s*(.+?)\s*\(\d{5}(?:-\d{4})?\)\s*$")
+
+
+def _state_code(text: str) -> str:
+    """'OR' from 'Oregon' or from 'OR'; empty string when the text is not a state."""
+    t = (text or "").strip()
+    if len(t) == 2 and t.isalpha() and t.lower() in _US_STATES:
+        return t.upper()
+    return STATE_NAMES.get(t.lower(), "")
+
+
+def pretty_location(loc: str) -> str:
+    """'Windsor Locks, CT' from an ATS site code; the string unchanged when it already names a place."""
+    s = (loc or "").strip()
+    if not s or _READS_AS_PLACE.match(s):
+        return loc
+    body = _SITE_TAIL.sub("", s).strip()
+    m = _DASH_SLUG.match(body) or _SPACE_SLUG.match(s) or _PAREN_USA.match(body)
+    if m:
+        state, city = m.group(1), m.group(2).strip()
+    elif _ZIP_SUFFIX.match(body):                       # "PA - Pittsburgh (15222)"
+        state, city = _ZIP_SUFFIX.match(body).group(1, 2)
+    else:
+        comma = _COUNTRY_FIRST.match(body)              # "US, Oregon, Hillsboro", "US, Dayton, OH"
+        if not comma:
+            return loc
+        a, b = comma.group(1).strip(), comma.group(2).strip()
+        state, city = (_state_code(a), b) if _state_code(a) else (_state_code(b), a)
+        if not state:
+            return loc
+    city = _STREET_TAIL.sub("", _BLDG_TAIL.sub("", city)).strip()
+    city = re.sub(r"\s+", " ", city).strip(" ,-–")
+    if not city or state.lower() not in _US_STATES:
+        return loc
+    return f"{city.title() if city.isupper() or city.islower() else city}, {state}"
 
 
 # (lat, lng) keyed by "city|ST". NE towns only need entries when distance or the
