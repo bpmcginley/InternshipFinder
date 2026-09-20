@@ -7,6 +7,8 @@ import { spend } from "../lib/usage.js";
 
 const ONBOARDING = "onboarding/onboarding.html";
 const PANEL = "sidepanel/sidepanel.html";
+// The feedback form the dashboard already points students at (docs/index.html window.CONFIG.formUrl).
+const FEEDBACK_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
 const ports = new Set();
 const lastStatus = new Map();
 
@@ -316,6 +318,17 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const s = await loadStore(); // also migrates v0.1 storage
   if (reason === "install" || !s.settings.onboarded) openDeepDive();
 });
+
+// An uninstall is the only thing a student does that the extension can never report: the profile is
+// gone before any of our code runs again. Chrome will open one page on removal, so point it at the
+// same feedback form the dashboard uses and read the answers in one place. Set on every worker start
+// rather than in onInstalled alone, because anyone who installed before 0.4.2 never sees another
+// install event and would carry no URL at all. It writes a string inside Chrome — no network, nothing
+// to await. The guard is for old Chromium builds and for Firefox, which expose chrome.runtime but
+// not setUninstallURL; calling a missing method here would throw on every worker start.
+// was: "...guarded because the API is absent outside a real extension (tests, non-Chrome)" - not
+// true of this file, which already calls chrome.tabs.onActivated unguarded 17 lines above.
+if (chrome.runtime.setUninstallURL) chrome.runtime.setUninstallURL(FEEDBACK_FORM, () => void chrome.runtime.lastError);
 
 // Service worker (re)start: jobs marked working lost their loop; requeue them.
 (async () => {

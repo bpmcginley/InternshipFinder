@@ -176,7 +176,7 @@
     const posted = daysAgo(r.posted_at), seen = daysAgo(r.first_seen), cs = checks(r, elig);
     const tags = r.field_tags || [];
     const why = {
-      field: !ctx.p ? "No profile yet: any known field counts" : tags.some(t => ctx.direct.has(t)) ? "Matches your major or fields" : tags.some(t => ctx.related.has(t)) ? "Related to your major" : "Outside your fields",
+      field: !(ctx.direct.size || ctx.related.size) ? (ctx.p ? "No major or fields on your profile yet: any known field counts" : "No profile yet: any known field counts") : tags.some(t => ctx.direct.has(t)) ? "Matches your major or fields" : tags.some(t => ctx.related.has(t)) ? "Related to your major" : "Outside your fields",
       fit: sc.mismatch ? "Not open to your class year" : !ctx.p ? "" : `${(r.stage || []).map(s => IS.STAGE_LABEL[s] || s).join(", ") || "Stage unknown"} · ${IS.termText(r.term) || "term not listed"}`,
       location: "",
       freshness: posted != null ? "Counted from the day it was posted"
@@ -218,7 +218,12 @@
         canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": "Select " + r.company_name, checked,
           disabled: !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
         h("td", { className: "c-co" },
-          h("div", { className: "co" }, r.company_name, r.is_new && h("span", { className: "new" }, "New")),
+          // was: h("div", { className: "co" }, r.company_name, r.is_new && h("span", { className: "new" }, "New")),
+          // is_new only means we first saw the row inside the new-listing window; the export keeps
+          // closed rows too, and 886 of the shard rows in the 2026-09-19 export were closed and still
+          // carried is_new. That put a New badge on the same line as the posting's own "Closed" note.
+          // A badge that says New has to mean new and still open.
+          h("div", { className: "co" }, r.company_name, r.is_new && r.status === "open" && h("span", { className: "new" }, "New")),
           h("div", { className: "role" }, r.title),
           (meta || r.status === "closed") && h("div", { className: "meta" }, meta, r.status === "closed" && h("span", { className: "closed" }, (meta ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
@@ -256,16 +261,45 @@
   }
 
   // ---------- landing ----------
-  function Landing({ open, setOpen, onSetup, hasProfile, nationwide }) {
+  // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide }) {
+  // `plans` is the Worker's /config payments.plans, so the prices shown here are the ones Stripe is
+  // actually configured with rather than a second copy that can drift.
+  function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans }) {
     if (!open) return h("div", { className: "landing-mini" },
-      h("span", null, "Free internship, co-op and research search for UMass students. Not affiliated with UMass Amherst."),
+      // was: h("span", null, "Free internship, co-op and research search for UMass students. Not affiliated with UMass Amherst."),
+      // Search really is free, so "free … search" stands; it is scoped now so it can't be read as a
+      // claim about the paid AI plans that went live on 2026-09-19.
+      h("span", null, "Free internship, co-op and research search for UMass students, no sign-in needed. Not affiliated with UMass Amherst."),
       h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(true) }, "About InternScout"));
     return h("section", { className: "landing", "aria-label": "About InternScout" },
       h("div", { className: "landing-main" },
         h("h2", null, "Internships, co-ops and research for your major, anywhere in the US"),
         h("p", null, "InternScout gathers student opportunities from employer career sites and public job boards",
           nationwide ? ` (${nationwide.toLocaleString()} open right now)` : "", " and ranks them for your major, class year and the states you pick."),
-        h("p", { className: "fine" }, "Free, made by a UMass student, not affiliated with UMass Amherst.")),
+        // was: h("p", { className: "fine" }, "Free, made by a UMass student, not affiliated with UMass Amherst.")),
+        // Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so a flat
+        // "Free" is no longer true of the whole product. Search and this dashboard still are. The
+        // price text comes from /config, and when /config hasn't answered yet we name no figure
+        // rather than hardcode one that could go stale against Stripe.
+        // was: h("p", { className: "fine" }, "Search and this dashboard are free, with no sign-in. The AI extras (Auto-Apply, tailored resumes, the Deep Dive) come with a free monthly allowance",
+        // was:   plans && plans.length ? `; ${plans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" and ")} raise it` : "; optional paid plans raise it",
+        // was:   ". Made by a UMass student, not affiliated with UMass Amherst.")),
+        // The Deep Dive is out of the capped list: worker/src/config.js gives it `allowance: null`,
+        // which config.js:10 defines as "no monthly cap", and worker/src/limits.js:106 returns null
+        // for it one line before the plan multiplier, so no paid plan raises it. The same page
+        // already says so the other way round - core.js allowanceText renders "Deep Dives:
+        // unlimited" in the tooltip on this dashboard. The allowance itself is per account
+        // (worker/src/index.js GET /me) and every /ai call signs the user in, so "on a free account"
+        // keeps the "no sign-in" clause from being read across the whole sentence.
+        h("p", { className: "fine" }, "Search and this dashboard are free, with no sign-in. Auto-Apply and tailored resumes come with a free monthly allowance on a free account",
+          plans && plans.length ? `; ${plans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" and ")} raise it` : "; optional paid plans raise it",
+        // was: ". The Deep Dive is one-time, runs on the same free account, and has no monthly cap. ..."
+        // Two over-claims. "No monthly cap" was true only of the unit allowance: worker/src/config.js
+        // says USER_BUDGET_CENTS "is what bounds a task with no unit cap (the Deep Dive)", and records
+        // honest use reaching it. And nothing enforces "one-time": onboarding.js clears the run id when
+        // a Dive finishes ("the next Deep Dive is a new run") and this same file offers an onboarded
+        // student the button again, so it is a habit, not a limit.
+          ". The Deep Dive has no monthly run allowance of its own, though a per-account AI budget still applies, and it runs on the same free account. Made by a UMass student, not affiliated with UMass Amherst.")),
       h("div", { className: "landing-cols" },
         h("div", null, h("h3", null, "How it works"),
           h("ul", null,
@@ -286,7 +320,10 @@
   const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
   const GRAD_YEARS = Array.from({ length: 9 }, (_, i) => 2026 + i);
 
-  function Setup({ initial, majors, index, stats, firstTime, onSave, onClose, onDelete, signedIn }) {
+  // was: function Setup({ initial, majors, index, stats, firstTime, onSave, onClose, onDelete, signedIn }) {
+  // statsReady says the stats.json fetch has settled. stats === null alone cannot tell "still
+  // downloading" from "failed", and coverage() below words those two cases differently.
+  function Setup({ initial, majors, index, stats, statsReady, firstTime, onSave, onClose, onDelete, signedIn }) {
     const [d, setD] = useState(() => ({ ...IS.emptyProfile(), ...(initial || {}) }));
     const [step, setStep] = useState(1);
     const [stagesTouched, setStagesTouched] = useState(!!(initial && initial.stages && initial.stages.length));
@@ -304,6 +341,81 @@
       return list.filter(t => t !== "other").map(t => ({ value: t, label: IS.fieldLabel(t), count: counts[t] != null ? counts[t] : undefined }))
         .sort((a, b) => a.label.localeCompare(b.label));
     }, [majors, stats]);
+
+    // What the numbers beside a field actually are. stats.json's by_field is built in
+    // backend/internscout/export_static.py from rows where status == "open", one tally per field tag
+    // on the listing, so it counts OPEN listings nationwide in the last scan, not everything ever
+    // seen. A listing tagged both "swe" and "ml" is tallied under each, so adding a major's tags
+    // together inflates the figure: in the export now in docs/data/stats.json (generated_at 2026-09-18)
+    // swe 2,097 + ml 776 is not 2,873 distinct roles, and the export carries no way to take the union.
+    // was: ...so the headline is the largest single tag and says so, rather than a sum that would
+    // flatter us.  -- no longer what the code does. coverage() below heads on the student's OWN primary
+    // tag when the export has it, and names the widest sibling beside it, because heading on the widest
+    // tag showed a Nursing student "98 open listings tagged Health" and never the 16 tagged Nursing.
+    // Still one tag's count, never a sum.
+    const byField = (stats && stats.by_field) || null;
+    const biggest = tags => { let best = null; for (const t of tags) { const n = byField && byField[t]; if (typeof n === "number" && (!best || n > best.n)) best = { tag: t, n }; } return best; };
+    const nOpen = n => `${n.toLocaleString()} open listing${n === 1 ? "" : "s"}`;
+    const mineFields = useMemo(() => IS.profileFields(d, majors), [d.majors, d.minors, d.fields, majors]);
+    // The student's own tag (majors.json tags[0] of their first major, or the first field they picked
+    // if their major carries no tags). mineFields.direct is a Set, so it can only be maximised, and
+    // the maximum is a sibling tag: a Nursing student's direct set holds both nursing (16 open in
+    // docs/data/stats.json, generated_at 2026-09-18) and health (98), and health is what a maximum
+    // returns. See IS.primaryField in core.js.
+    const primary = useMemo(() => IS.primaryField(d, majors), [d.majors, d.fields, majors]);
+    // InternScout promises every major and keeps that promise, but the coverage behind it is lopsided:
+    // was: // in the 2026-09-19 export swe has 2,097 open while nursing, museums, music and theater are in
+    // in the export now in docs/data/stats.json (generated_at 2026-09-18) swe has 2,097 open while
+    // nursing (16), museums (5), music (3) and theater (2) are in
+    // single or double digits. Showing the student their own number in step 1, before they spend
+    // three steps on a profile, means nobody is ambushed, and the figure rights itself as the
+    // scanner's coverage grows. Below this many a bare number reads like a promise, so under it we
+    // say plainly that the list is thin instead of leaving the student to discover it.
+    const THIN = 25;
+    function coverage() {
+      const direct = [...mineFields.direct].filter(t => t !== "other");
+      if (!direct.length) return h("div", { className: "meta" },
+        "Pick a major or a field and we'll show how many open listings we have for it right now. The same count sits beside each field in the list above.");
+      // was: if (!byField) return h("div", { className: "meta" }, "Today's listing counts didn't load, so we can't show how deep your field is right now.");
+      // stats is null both before IS.loadStats() settles and after it fails (core.js loadStats
+      // returns null when every base URL throws), so the old line told a student on a slow
+      // connection that the counts had failed while stats.json was still downloading. statsReady is
+      // set in the .then, which runs on success and on failure alike.
+      if (!byField) return h("div", { className: "meta" }, statsReady
+        ? "Today's listing counts didn't load, so we can't show how deep your field is right now."
+        : "Checking today's listing counts…");
+      const best = biggest(direct), rel = biggest([...mineFields.related].filter(t => t !== "other"));
+      // was: const name = IS.fieldLabel(best ? best.tag : direct[0]);
+      // The headline and the THIN test run on the student's own tag, not on the biggest of their
+      // tags. A primary tag absent from by_field counts as 0 instead of falling back to the maximum:
+      // backend/internscout/export_static.py:397 builds by_field with Counter over open listings
+      // only, so a missing key means nothing open carries that tag, which is the case this line
+      // exists to report.
+      const head = primary && direct.includes(primary)
+        ? { tag: primary, n: typeof byField[primary] === "number" ? byField[primary] : 0 }
+        : best;
+      const name = IS.fieldLabel(head ? head.tag : direct[0]);
+      const nat = stats && stats.open ? ` of ${stats.open.toLocaleString()} open nationwide` : "";
+      // was: const many = best && direct.length > 1 ? " That's the largest of your field tags, not a total: one listing can carry several." : "";
+      // When the student's own tag is not their biggest, both numbers are named: dropping the bigger
+      // one would undersell the list, and dropping the smaller one is the ambush this line exists to
+      // prevent. `many` only claims "the largest" in the case where the headline really is.
+      const wider = best && head && best.tag !== head.tag && best.n > head.n
+        ? ` Your widest field tag, ${IS.fieldLabel(best.tag)}, has ${nOpen(best.n)}; one listing can carry several tags, so the two don't add up.` : "";
+      const many = !wider && head && direct.length > 1 ? " That's the largest of your field tags, not a total: one listing can carry several." : "";
+      const also = rel && rel.n > (best ? best.n : 0) ? ` The related field ${IS.fieldLabel(rel.tag)} has ${nOpen(rel.n)}.` : "";
+      // was: if (!best || !best.n) return h("div", { className: "meta" },
+      // was:   `Nothing open tagged ${name} in today's scan${nat}. The scanner runs daily and this number moves with it, so the profile is still worth setting up, but we won't pretend the list is there yet.` + also);
+      if (!head || !head.n) return h("div", { className: "meta" },
+        `Nothing open tagged ${name} in today's scan${nat}. The scanner runs daily and this number moves with it, so the profile is still worth setting up, but we won't pretend the list is there yet.` + wider + also);
+      // was: if (best.n < THIN) return h("div", { className: "meta" },
+      // was:   `We have very few right now: ${nOpen(best.n)} tagged ${name}${nat}.` + many + also);
+      if (head.n < THIN) return h("div", { className: "meta" },
+        `We have very few right now: ${nOpen(head.n)} tagged ${name}${nat}.` + wider + many + also);
+      // was: return h("div", { className: "meta" }, `${nOpen(best.n)} tagged ${name} right now${nat}.` + many + also);
+      return h("div", { className: "meta" }, `${nOpen(head.n)} tagged ${name} right now${nat}.` + wider + many + also);
+    }
+
     const undeclared = !d.majors.length || d.majors.some(n => /Undeclared|BDIC/.test(n));
     const [season, gyear] = (d.grad_term || "").split(" ");
     const setGrad = (s, y) => set("grad_term", s && y ? `${s} ${y}` : s || y ? `${s || "Spring"} ${y || ""}`.trim() : "");
@@ -324,6 +436,7 @@
       majors && h("div", { className: "lbl" }, "Minor(s) ", h("span", { className: "muted" }, "optional"), h(MultiSelect, { wide: true, label: "Minors", placeholder: "Start typing", options: minorOpts, selected: d.minors, onChange: v => set("minors", v) })),
       h("div", { className: "lbl" }, undeclared ? "Fields you're interested in" : h(F, null, "Other fields you're interested in ", h("span", { className: "muted" }, "optional")),
         h(MultiSelect, { wide: true, label: "Fields", placeholder: undeclared ? "e.g. Health, Museums, Data" : "Add a field", options: fieldOpts, selected: d.fields, onChange: v => set("fields", v) })),
+      coverage(),
       h("div", { className: "row2" },
         h("label", { className: "lbl" }, "Class year",
           h(Sel, { label: "Class year", value: d.class_year, onChange: setYear }, opt("", "Choose…"), IS.YEARS.map(([k, l]) => opt(k, l)))),
@@ -337,7 +450,7 @@
         h("div", { className: "checks" }, IS.STAGES.map(([k, l]) => h("label", { key: k, className: "check" },
           h("input", { type: "checkbox", checked: d.stages.includes(k), onChange: () => { setStagesTouched(true); toggle("stages", k); } }), " ", l)))),
       h("fieldset", null, h("legend", null, "Terms"),
-        h("div", { className: "checks" }, IS.TERMS.map(t => h("label", { key: t, className: "check" },
+        h("div", { className: "checks" }, [...IS.TERMS, ...d.terms.filter(t => !IS.TERMS.includes(t))].map(t => h("label", { key: t, className: "check" },
           h("input", { type: "checkbox", checked: d.terms.includes(t), onChange: () => toggle("terms", t) }), " ", t)))),
       h("label", { className: "check" }, h("input", { type: "checkbox", checked: !!d.paid_only, onChange: e => set("paid_only", e.target.checked) }),
         " Paid roles only ", h("span", { className: "muted" }, "(hides roles marked unpaid; many postings don't say)")));
@@ -379,6 +492,9 @@
     const [p, setP] = useState(IS.loadProfile);
     const [majors, setMajors] = useState(null);
     const [stats, setStats] = useState(null);
+    // Separate from stats because IS.loadStats() resolves with null on failure (core.js), so the
+    // value alone cannot say whether the fetch is still in flight.
+    const [statsReady, setStatsReady] = useState(false);
     const [index, setIndex] = useState(null);
     const [legacy, setLegacy] = useState(false);
     const [ready, setReady] = useState(0);
@@ -413,7 +529,10 @@
     useEffect(() => {
       reload(false);
       IS.loadMajors().then(setMajors);
-      IS.loadStats().then(setStats);
+      // was: IS.loadStats().then(setStats);
+      // loadStats never rejects (core.js catches every base and returns null), so this .then is the
+      // one place that knows the fetch has settled, whichever way it went.
+      IS.loadStats().then(s => { setStats(s); setStatsReady(true); });
     }, [reload]);
 
     const keys = useMemo(() => f.states.length ? f.states : IS.profileKeys(p), [f.states, p]);
@@ -538,7 +657,7 @@
       setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
       setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : (r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.")
-        + (info.installed ? " The extension keeps its own copy: use Delete my data in its settings too." : ""));
+        + (info.installed ? " The extension keeps its own copy of your profile and files: removing it at chrome://extensions deletes that copy." : ""));
     }
 
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
@@ -706,9 +825,17 @@
     const upgrades = me && me.can_upgrade ? payPlans.filter(pl => pl.multiplier > myMult) : [];
     const upgradeTitle = pl => `Optional. Covers the AI bill and gives you ${pl.multiplier}× your monthly `
       + "AI allowance. Stripe takes the payment; we never see your card. Cancel any time.";
-    const signInTitle = "Optional. Search works without it. Any Google or Microsoft account works; a school .edu email gets more AI use. Signing in also lets your chosen states count toward where we scan in more detail.";
+    // was: const signInTitle = "Optional. Search works without it. Any Google or Microsoft account works; a school .edu email gets more AI use. Signing in also lets your chosen states count toward where we scan in more detail.";
+    // The old wording left "more AI use" vague and the button beside it said "(UMass email)", which
+    // together read as a school requirement. worker/src/auth.js only asks for a verified address on a
+    // .edu domain, from Google or Microsoft alike, and GENERAL_ALLOWANCE_PCT is "50", so .edu is
+    // exactly double and everyone else still gets an allowance. Say both plainly.
+    const signInTitle = "Optional and free. Search and this dashboard work without it. Any Google or Microsoft account works, from any school or none; a verified .edu address doubles your free monthly AI allowance. Signing in also lets your chosen states count toward where we scan in more detail.";
     const signInBtn = auth.cfg && !auth.token && auth.cfg.providers.map(pr =>
-      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
+      // was: h("button", { ... }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
+      // The " (UMass email)" suffix was wrong twice over: no account has to be UMass, and nothing has
+      // to be .edu at all. A .edu only doubles the allowance, which the tooltip now says.
+      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
 
     return h("div", { className: "wrap" },
       h("header", { className: "top" },
@@ -733,8 +860,10 @@
             jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,
             jobCounts.ready_to_submit ? h("span", { className: "count ok" }, `${jobCounts.ready_to_submit} ready`) : null))),
 
-      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
-      setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
+      // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
+      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
+      // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
+      setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
 
       h("section", { className: "figures" },
         h("div", { className: "fig" }, h("div", { className: "n" }, figures.open), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
@@ -746,7 +875,18 @@
           h("div", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : ""))),
 
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
-      info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
+      // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
+      // The extension is free to install, but its Auto-Apply spends the monthly AI allowance, so
+      // calling the whole thing "free" stopped being the full story on 2026-09-19. The Deep Dive does
+      // not: worker/src/config.js gives deep_dive `allowance: null`, i.e. no monthly cap.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on your free monthly AI allowance. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // The allowance exists only per account: worker/src/index.js signs the user in on every
+      // POST /ai and serves the counts from GET /me. This notice sits under copy that promises
+      // search is free with no sign-in, so the account has to be named here or it reads as carried
+      // over. The account is free, which is why that word stays.
+      info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
 
@@ -791,7 +931,12 @@
 
       h("footer", null,
         h("div", null, `${shown.length} of ${rows.length} shown. Your profile and progress are saved in this browser.`, canAuto ? " Auto-Apply never presses Submit; you do." : "",
-          " InternScout is free, made by a UMass student, and not affiliated with UMass Amherst."),
+          // was: " InternScout is free, made by a UMass student, and not affiliated with UMass Amherst."),
+          // Same correction as the landing copy: paid plans are live, so the footer can't say the
+          // product is simply free. Prices come from /config; with no /config yet we name no figure.
+          " Search and this dashboard are free with no sign-in; the AI extras have a free monthly allowance"
+          + (payPlans.length ? `, and ${payPlans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" or ")} raise it` : ", and optional paid plans raise it")
+          + ". Made by a UMass student, not affiliated with UMass Amherst."),
         h("nav", { className: "links", "aria-label": "Footer" },
           h("a", { href: "privacy.html" }, "Privacy"),
           h("a", { href: "terms.html" }, "Terms"),

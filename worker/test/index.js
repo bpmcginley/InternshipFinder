@@ -4,3 +4,4 @@ import "./billing.test.js";
 import "./ai.test.js";
 import "./demand.test.js";
 import "./gemini.test.js";
+import "./limits.test.js";

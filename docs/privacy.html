@@ -5,6 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Privacy policy · InternScout</title>
 <meta name="description" content="What data InternScout touches, where it goes, and how to delete it."/>
+<!-- Link previews and a tab icon. Chrome Web Store review opens these two pages straight from the
+     listing, and a policy page that renders as a blank favicon and an untitled card reads as
+     abandoned. icon128.png and icon48.png sit in this same docs/ folder (copied from
+     extension/icons), so a plain relative path is all GitHub Pages needs. -->
+<meta property="og:title" content="Privacy policy · InternScout"/>
+<meta property="og:description" content="What data InternScout touches, where it goes, and how to delete it."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://bpmcginley.github.io/InternshipFinder/privacy.html"/>
+<!-- Facebook rejects an og:image under 200x200 and X wants 144x144+, so the 128x128 favicon made a
+     forwarded link to this page a title-only card. og-preview.png is the same 1200x630 card
+     index.html and install.html use (scripts/make_og_image.py); absolute, because a relative
+     og:image is a second, independent reason a scraper comes back with no image. -->
+<!-- was: <meta property="og:image" content="icon128.png"/> and twitter:card "summary" -->
+<meta property="og:image" content="https://bpmcginley.github.io/InternshipFinder/og-preview.png"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="icon" href="icon128.png"/>
+<link rel="apple-touch-icon" href="icon128.png"/>
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
@@ -68,16 +85,37 @@
 
   <main>
     <h1>Privacy policy</h1>
-    <p class="meta">Last updated September 17, 2026</p>
-    <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p>
+    <!-- The page tells people the date at the top is how they know it changed, so it moves with the
+         AI-transmission and chosen-states corrections made today. -->
+    <!-- was: <p class="meta">Last updated September 17, 2026</p> -->
+    <p class="meta">Last updated September 19, 2026</p>
+    <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
+         the whole product "free" without qualification is no longer true. Search still is. -->
+    <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
+    <p class="lede">InternScout is an internship search tool made by a UMass Amherst student. Searching is free and needs no sign-in; AI features have a free monthly allowance, and optional paid plans raise it. This page explains what data it uses, where that data goes, and how to delete it.</p>
 
     <div class="box">
       <h3>The short version</h3>
       <ul>
         <li>Searching needs no account.</li>
-        <li>Your profile, resume and files stay in your browser and the extension.</li>
+        <!-- This bullet said files "stay" on the device, which extension/background/tailor.js line 185
+             and extension/onboarding/onboarding.js line 68 both contradict: a PDF resume is sent to
+             the AI whole, as base64. Storage and transmission are two different promises; only the
+             storage one was ever true. -->
+        <!-- was: <li>Your profile, resume and files stay in your browser and the extension.</li> -->
+        <li>Your profile, resume and files are stored only in your browser and the extension. We never keep a copy.</li>
+        <li>Stored is not the same as never sent. The Deep Dive and resume tailoring do send your resume and some other files to the AI, in the request itself. Details below.</li>
         <li>AI requests pass through our server to Google's paid Gemini API. We don't store them, and they aren't used to train AI.</li>
-        <li>We keep only a scrambled sign-in ID, your monthly usage counts and the states you picked.</li>
+        <!-- "only" stopped being true once paid plans went live: a subscriber also has a plan row. -->
+        <!-- was: <li>We keep only a scrambled sign-in ID, your monthly usage counts and the states you picked.</li> -->
+        <!-- "Nothing else." is contradicted by this same page three sections down: the What we store
+             table lists a monthly cost figure in cents and per-minute and per-day call counters, and
+             the paid-plan section lists the Stripe customer and subscription IDs, the paid-through
+             date and the IDs of payment events already processed. A one-line summary that the page
+             itself disproves is worse than none, so this one points at the full list instead of
+             closing the subject off. -->
+        <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage counts, the states you picked, and — only if you subscribe — which plan you are on. Nothing else.</li> -->
+        <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li>
         <li>We never see your password.</li>
         <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
       </ul>
@@ -87,26 +125,107 @@
     <ul>
       <li>You don't need an account or sign-in to search.</li>
       <li>The dashboard is a static page hosted on GitHub Pages. The listings are public job posts.</li>
-      <li>Your saved statuses (like Interested or Applied), filters and profile are saved in your browser's local storage. They are not sent to us.</li>
+      <!-- "They are not sent to us" swept the chosen states in with everything else, and docs/js/core.js
+           line 440 posts those states to the Worker's /demand endpoint. What the endpoint accepts is
+           narrow and worth stating exactly: worker/src/demand.js cleanStates() rejects anything that is
+           not a USPS code or REMOTE, so no listing id, status or filter could travel that route even by
+           accident. The statuses themselves really never leave, which is why this is split in two. -->
+      <!-- was: <li>Your saved statuses (like Interested or Applied), filters and profile are saved in your browser's local storage. They are not sent to us.</li> -->
+      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong></li>
+      <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
       <li>GitHub hosts the page and may keep normal web server logs under its own policy. The dashboard also loads fonts and code libraries from public servers (such as Google Fonts).</li>
       <li>We don't use analytics, ad trackers or cookies of our own.</li>
     </ul>
 
     <h2>Your profile and files</h2>
     <ul>
-      <li>Your majors, class year, chosen states, work authorization, resume, transcript, cover letter, writing samples and saved answers stay on your device. They live in browser storage (dashboard) or Chrome extension storage.</li>
-      <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. They are never sent to us or to the AI.</li>
+      <!-- Second copy of the "stays on your device" claim, corrected the same way as the short version.
+           "chosen states" is dropped from this list because those do go to the server (see Searching
+           listings above); leaving it here is what made the two sections contradict each other. -->
+      <!-- was: <li>Your majors, class year, chosen states, work authorization, resume, transcript, cover letter, writing samples and saved answers stay on your device. They live in browser storage (dashboard) or Chrome extension storage.</li> -->
+      <li>Your majors, class year, work authorization, resume, transcript, cover letter, writing samples and saved answers are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of any of it, and nothing here is uploaded for safekeeping or backup.</li>
+      <li><strong>Some of these files are sent to the AI when you run a feature that reads them.</strong> They go inside the request, through our Worker to Google's Gemini API, and are not stored at either end — see <a href="#ai">AI features</a>. Which file goes depends on the feature and on the file's format:
+        <ul>
+          <li><strong>The Deep Dive</strong> reads your resume and CV to fill in your profile, and your cover letter and writing samples to learn your writing voice. A PDF is sent as the file itself. A Word or plain-text file is read on your device first and only the text it contains is sent, up to 60,000 characters.</li>
+          <li><strong>Tailoring your resume</strong> sends your resume when it is a PDF: the whole PDF goes, so the AI can transcribe its layout and the tailored copy can keep it. That reading is cached on your device and reused, so the file is sent once per resume, not once per application. If your resume is a Word file, the extension opens it locally and sends only the bullet text — <em>that file never leaves your device</em>.</li>
+          <li><strong>Your transcript is never sent to the AI.</strong> It is only ever attached to an employer's own form when their site asks for one.</li>
+        </ul>
+      </li>
+      <!-- The old line claimed the sign-up email was never sent to the AI. It is: agent.js accountLine()
+           puts it into the ACCOUNT line of every Auto-Apply snapshot, because the agent has to know
+           which address to register or sign in with. The password claim is correct and stays — the
+           fill_secret tool (agent.js line 720) fills it from local storage and the value never enters
+           the conversation, which is why the tool description tells the model it will not see it. -->
+      <!-- was: <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. They are never sent to us or to the AI.</li> -->
+      <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. <strong>The passwords are never sent to us or to the AI</strong> — the extension types them into the page itself, and the AI is only told to ask for one, never given it. The sign-up email address <em>is</em> included in each Auto-Apply request, because the AI has to know which address to register or sign in with.</li>
       <li>Chrome does not encrypt extension storage. Anyone who can use your computer account could read it.</li>
       <li>We have no copy of any of this. If you clear it, it's gone.</li>
     </ul>
 
-    <h2>AI features</h2>
+    <!-- id added so the files section above can link straight here. -->
+    <!-- was: <h2>AI features</h2> -->
+    <h2 id="ai">AI features</h2>
     <p>Tailored resumes, the Deep Dive, Auto-Apply and short answers use AI. Here is what happens when you run one:</p>
     <ol>
-      <li>The extension sends the text the task needs to our server, a Cloudflare Worker. For example: parts of your resume and profile, and the questions on an application page.</li>
+      <!-- "parts of your resume and profile, and the questions on an application page" was a fair
+           description of the tailoring call and a bad one of Auto-Apply. Each turn sends the snapshot
+           built by extension/agent/dom.js snapshot() and formatted by background/agent.js
+           formatSnapshot(), which is a good deal more than the questions: the URL, the title, the
+           headings, any visible error text, and — when the page has fewer than four form fields, so
+           there is nothing else to go on — up to 2,500 characters of the page's visible text. Listing
+           it out is the only honest way to describe an agent that reads the page it is working on. -->
+      <!-- was: <li>The extension sends the text the task needs to our server, a Cloudflare Worker. For example: parts of your resume and profile, and the questions on an application page.</li> -->
+      <!-- "Every AI task sends your profile" and "here it is in full" were both too strong, and the
+           second was what made the first tempting. The profile only goes on two of the AI paths:
+           extension/background/agent.js line 616 puts profileForModel(store) in the Auto-Apply system
+           prompt, and extension/onboarding/onboarding.js interviewSystem() puts the profile minus
+           voice and saved answers in the interview's. The other paths do not: tailor.js line 104
+           defines voiceOf() as career goal plus voice summary and that is all tailorDocx() and
+           tailorPdf() send about the student, and onboarding.js extract(), the voice step and
+           distill() each send only their own files, samples or transcript. Naming the feature next to
+           the data is the only way this stays true as features are added. -->
+      <!-- was: <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, so here it is in full. Every AI task sends your profile: your name, contact details, education, experience, the stories from your Deep Dive and your writing voice. On top of that: -->
+      <!-- Second pass, 2026-09-19: "Only two ... Everything else sends much less" was an overclaim that the tailoring bullet below disproves in its own last clause - the no-resume path sends experience and education, two of the five items that sentence used to define "your profile". The count and the reassurance both go; the per-feature bullets carry it. -->
+      <!-- was: ...so here is what each one sends. Only two of them send your profile - your name, contact details, education, experience and the stories from your Deep Dive. Those two are Auto-Apply, which sends all of it including your writing voice, and the Deep Dive's interview step, which sends all of it except your voice and your saved answers. Everything else sends much less: -->
+      <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, and it is not the same for every feature, so here is what each one sends. Two of them send your whole stored profile — your name, contact details, education, experience and the stories from your Deep Dive: Auto-Apply, which adds your writing voice, and the Deep Dive's interview step, which leaves out your voice and your saved answers. The rest each send only what their own bullet names below, which for one tailoring path is still most of your experience and education:
+        <ul>
+          <!-- Three things the old bullet left out, all of which a reader would want counted as
+               "sent": extension/background/agent.js formatSnapshot() also writes each field's
+               required marker, placeholder= and maxlength=; agent.js line 607 pushes a "Pre-filled:"
+               line listing what the extension already typed; and agent.js jobIntro() sends the
+               posting itself on the first turn, capped at 5,000 characters of description. -->
+          <!-- was: <li><strong>Auto-Apply</strong> sends a snapshot of the application page on each step: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options and its own error. It also sends the buttons on the page, and your sign-up email for that site. When a page has fewer than four fields — a sign-in wall, an interstitial, a page that failed to load — it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li> -->
+          <li><strong>Auto-Apply</strong> sends your whole profile on every turn, and the sign-up email it uses for that site. On the first turn it also sends the posting: company, title, location, apply link and the first 5,000 characters of the description. Then, on each step, a snapshot of the application page: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options, whether it is required, its placeholder text, its length limit and its own error. It also sends the buttons on the page and a list of anything the extension has already filled in for you. When a page has fewer than four fields — a sign-in wall, an interstitial, a page that failed to load — it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li>
+          <!-- "your profile" was true of one of the three tailoring paths only. In
+               extension/background/tailor.js, tailorDocx() and tailorPdf() both build their prompt as
+               jobText(job) + voiceOf(store) + the resume, and line 104 defines voiceOf() as exactly
+               {career_goal, voice} — no name, contact details, education or experience. Only
+               tailorFromProfile(), the path taken when there is no resume file, sends
+               tailorInput(store), and even that is experience, projects, skills, education, career
+               goal and voice: the name and contact details are put on the PDF here on the device. -->
+          <!-- was: <li><strong>Tailored resumes</strong> send the job posting's title, company and description, your profile, and your resume — the whole PDF if it is a PDF, or just its bullet text if it is a Word file.</li> -->
+          <!-- Second pass, 2026-09-19: the previous sentence promised the name, contact details and education are not sent here, which is false for a PDF resume. extension/background/tailor.js layoutOf() sends {type:"document", media_type:"application/pdf", data: orig.b64} - the whole file, with everything printed on it. The stored profile really is withheld; the file is not, and the two are different claims. -->
+          <!-- was: ...or just its bullet text if it is a Word file. Your name, contact details and education are not sent on this path. If you have no resume on file... -->
+          <li><strong>Tailored resumes</strong> send the job posting's title, company and the first 6,000 characters of its description, your career goal and your writing voice, and your resume — the whole PDF file if it is a PDF, or just its bullet text if it is a Word file. Your stored profile is not sent on this path, but the resume file is: a PDF goes whole, so whatever is printed on it — your name, your contact details, your education — goes with it, and a Word file is read here on your device and only its bullet text is sent. If you have no resume on file, the fixed template is built instead from your experience, projects, skills, education, career goal and voice; your name and contact details are printed onto it here on your device and never leave it.</li>
+          <!-- The Deep Dive is four separate calls that send four different things, and rolling them
+               into one sentence was how "the files listed above" came to stand for all of them. Read
+               off extension/onboarding/onboarding.js: extract() sends only the resume and CV document
+               blocks plus its extraction prompt, interviewSystem() sends the profile with voice and
+               saved answers destructured out, the voice step sends the samples, the cover letter and
+               up to 20,000 characters of the student's own chat replies, and distill() sends the
+               transcript plus the existing stories and goals. -->
+          <!-- was: <li><strong>The Deep Dive</strong> sends the files listed above and your answers from the interview step.</li> -->
+          <li><strong>The Deep Dive</strong> sends something different at each step. <em>Read my resume</em> sends your resume and CV files and nothing else — on a first run there is no profile yet, because that call is what fills it in. <em>The interview</em> sends your profile (all of it except your writing voice and your saved answers) along with the conversation so far. <em>Analyze my writing</em> sends your writing samples, your cover letter and up to 20,000 characters of your own interview replies. <em>Finish &amp; save stories</em> sends the interview transcript plus the stories and goals you already have.</li>
+        </ul>
+      </li>
       <li>The Worker checks your sign-in and your monthly allowance.</li>
       <li>It forwards the request to Google's <strong>paid</strong> Gemini API and passes the reply back to you.</li>
     </ol>
+    <!-- Worth saying plainly, because the list above reads worse than the behaviour is. The only
+         always-on content script in extension/manifest.json is the dashboard bridge; the agent reads
+         an application page by injecting into the tab it opened for that job, on the application-site
+         domains the manifest lists. -->
+    <p>Auto-Apply only reads a page while it is working on an application you started, in the tab it opened for that job. It does not watch your other tabs, and nothing is sent for a page you merely have open.</p>
     <ul>
       <li><strong>We don't store or log</strong> what you send or what the AI replies. The Worker only records that a task ran and how many tokens it used, so we can track cost.</li>
       <li><strong>No training.</strong> We use Google's paid API. Under Google's terms for paid services, Google does not use your prompts or replies to improve its products. Google may keep them for a limited time to detect abuse, under its own terms.</li>
@@ -124,7 +243,12 @@
     </ul>
 
     <h2>What we store</h2>
-    <p>This is everything our server keeps about you:</p>
+    <!-- "everything" was not true while the paid-plan section further down this page lists four more
+         things kept about a subscriber (plan, Stripe customer and subscription IDs, paid-through
+         date, processed event IDs). Saying which reader the table is complete for costs one clause
+         and stops the two sections contradicting each other. -->
+    <!-- was: <p>This is everything our server keeps about you:</p> -->
+    <p>If you have never joined a paid plan, this is everything our server keeps about you. If you have, add the plan and billing records listed under <a href="#paid">If you join a paid plan</a>.</p>
     <div class="table">
       <table>
         <thead><tr><th scope="col">Data</th><th scope="col">Why</th></tr></thead>
@@ -134,14 +258,33 @@
           <tr><td>One number per month: roughly what your AI use has cost us, in cents</td><td>So a single account can't use up the budget that pays for everyone's AI. It is removed when the month ends.</td></tr>
           <tr><td>Short-term call counters (per minute and per day)</td><td>To stop abuse.</td></tr>
           <tr><td>The states you picked, and when you last changed them</td><td>So the scanner fetches fuller listings where students are looking. The scanner only gets totals per state, never who picked what. Picks stop counting after 90 days without activity.</td></tr>
+          <!-- Added because the table claims to be the whole list and this row was missing from it:
+               worker/src/limits.js deleteUser() inserts a `forget` row (your hashed ID and the month
+               you deleted in) inside the same batch as the deletions, and cleanup() uses it to sweep
+               the counts that had to be kept, then deletes the row itself once the month is past. -->
+          <tr><td>If you press Delete my data: your hashed ID and the month you did it in</td><td>So the counts that have to survive until the month ends are swept automatically once it does. This marker is deleted with them.</td></tr>
         </tbody>
       </table>
     </div>
-    <p>We also keep one total of AI spend for the month. It isn't linked to anyone.</p>
+    <!-- There is a second whole-service total now: worker/src/limits.js daySpend()/addDaySpend()
+         keep one per day, and admit() stops AI for the rest of the day when it reaches the day's
+         share of the budget. Like the monthly one it is stored against a sentinel that is not a
+         hashed account, so it says nothing about any individual — but the table above is introduced
+         as the complete list, so leaving it unmentioned made that introduction stale. -->
+    <!-- was: <p>We also keep one total of AI spend for the month. It isn't linked to anyone.</p> -->
+    <!-- Second pass, 2026-09-19: the day total is not service-wide. worker/src/limits.js charges it inside `if (plan === "free")`, and the comment above that line says a paid call neither reads nor writes the row, so it measures the free tier's share of the month. -->
+    <!-- was: ...one for the month, and one for the current day, so a single busy day can't empty the month's budget. These are service-wide figures. -->
+    <p>Separately from the table, we keep running totals of what AI costs the whole service: one for the month across the whole service, and one for the day's free-allowance share, so a single busy day can't empty the month's budget. Neither is tied to a person. Neither is linked to any account, and neither says anything about who used what.</p>
     <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
 
-    <h2>If you join a paid plan</h2>
-    <p>The paid plans are optional, and only appear when they are switched on. Search and the free AI allowance never need one.</p>
+    <!-- Given an id so the "What we store" paragraph above can link here instead of asking the
+         reader to go hunting for the section that completes that table. -->
+    <!-- was: <h2>If you join a paid plan</h2> -->
+    <h2 id="paid">If you join a paid plan</h2>
+    <!-- The plans are switched on as of 2026-09-19, so "only appear when they are switched on" now
+         describes a state nobody is in and reads as hedging. -->
+    <!-- was: <p>The paid plans are optional, and only appear when they are switched on. Search and the free AI allowance never need one.</p> -->
+    <p>The paid plans are optional. Supporter is $5/month and Pro is $12/month; both raise your monthly AI allowance and nothing else. Search and the free AI allowance never need one.</p>
     <ul>
       <li><strong>Stripe handles the payment, not us.</strong> Pressing Supporter or Pro sends you to Stripe's own checkout page. Your card number, billing name and billing email go to Stripe and are never sent to, or seen by, our server. Changing or cancelling happens on Stripe's own billing page too.</li>
       <li>All Stripe learns about you from us is your hashed ID, so a payment can be matched to an account without Stripe being told which student it is.</li>
@@ -177,7 +320,13 @@
     <p>If this policy changes, we'll update the date at the top. Big changes will also get a notice on the dashboard.</p>
 
     <h2>Contact</h2>
-    <p>Questions or requests: <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p>
+    <!-- A GitHub issue was the only route offered, which needs a GitHub account and publishes whatever
+         you write. That is the wrong default for a privacy request, and the Chrome Web Store wants a
+         support contact that any user can actually reach. The feedback form (the same one the
+         dashboard uses, docs/index.html window.CONFIG.formUrl) needs no account and is not public. -->
+    <!-- was: <p>Questions or requests: <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p> -->
+    <p>Questions, privacy requests or anything else: <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">use the InternScout feedback form</a>. It needs no account and only the person running InternScout reads it. Expect a reply within a few days; this is a one-student project, not a support desk.</p>
+    <p>For bugs you don't mind discussing in the open, you can also <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p>
   </main>
 
   <footer>

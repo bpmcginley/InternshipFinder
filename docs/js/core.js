@@ -42,7 +42,17 @@
     masters: ["internship", "co_op", "fellowship", "research"],
     phd: ["research", "internship", "fellowship"],
   };
-  const TERMS = ["Summer 2027", "Fall 2026", "Spring 2027", "Year-round"];
+  // The terms still worth applying for, worked out from today's date so the list never goes stale
+  // (it was a fixed list that ended at Summer 2027, while the data already had Winter and Fall 2027).
+  // Each season stays on the list until about a month after it starts: [season, last month shown, 0-11].
+  const SEASONS = [["Winter", 0], ["Spring", 1], ["Summer", 5], ["Fall", 9]];
+  function upcomingTerms(now) {
+    const out = [], y0 = now.getFullYear(), m0 = now.getMonth();
+    for (let y = y0; out.length < 5; y++) for (const [season, last] of SEASONS) if ((y > y0 || last >= m0) && out.length < 5) out.push(`${season} ${y}`);
+    return out;
+  }
+  const TERMS = [...upcomingTerms(new Date()), "Year-round"];
+  const DEFAULT_TERM = TERMS.find(t => t.startsWith("Summer"));
   const WORK_AUTH = [
     ["citizen", "U.S. citizen"],
     ["permanent", "U.S. permanent resident (green card)"],
@@ -69,7 +79,7 @@
   const PROFILE_KEY = "internscout.profile.v1";
   const emptyProfile = () => ({
     v: 1, majors: [], minors: [], fields: [], class_year: "", grad_term: "",
-    stages: [], terms: ["Summer 2027"], paid_only: false, states: [], remote: true, work_auth: "",
+    stages: [], terms: [DEFAULT_TERM], paid_only: false, states: [], remote: true, work_auth: "",
   });
   const loadProfile = () => { const p = ls.get(PROFILE_KEY, null); return p && typeof p === "object" ? { ...emptyProfile(), ...p } : null; };
   // Set by "Delete my data" and cleared by the next save. Without it the next page load asked the
@@ -152,6 +162,26 @@
     for (const n of p.minors || []) { const m = byName.get(n); if (m) m.tags.forEach(t => related.add(t)); }
     direct.forEach(t => related.delete(t));
     return { direct, related };
+  }
+
+  // The single tag a student's own coverage should be judged by. profileFields above returns a Set,
+  // which loses both order and which major a tag came from, so anything reading it can only take a
+  // maximum, and the maximum is the wrong number here. majors.json lists a major's own field first
+  // and its broader siblings after ("Nursing" is ["nursing", "health"], "Art (Studio)" is
+  // ["arts", "design"]), and in docs/data/stats.json (generated_at 2026-09-18) nursing has 16 open
+  // against health's 98, so the largest tag is usually a sibling shared with dozens of other majors.
+  // tags[0] is the field the student actually came for. "Exploratory / Undeclared" and "Individual
+  // Concentration (BDIC)" are the only two majors in majors.json with an empty tags array, so for
+  // them the answer is the first field the student picked by hand.
+  function primaryField(p, majorsData) {
+    if (!p) return null;
+    const byName = new Map(((majorsData && majorsData.majors) || []).map(m => [m.name, m]));
+    for (const n of p.majors || []) {
+      const m = byName.get(n), t = m && (m.tags || []).find(x => x && x !== "other");
+      if (t) return t;
+    }
+    for (const t of p.fields || []) if (t && t !== "other") return t;
+    return null;
   }
 
   function termFit(x, terms) {
@@ -458,7 +488,10 @@
     const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => me.allowance[k].limit == null
       ? `${ALLOWANCE_LABELS[k]}: unlimited`
       : `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
-    lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
+    // was: lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
+    // worker/src/auth.js grants the "edu" tier on a verified .edu address from Microsoft as well as
+    // Google, so naming only Google told half the students here that they couldn't qualify.
+    lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google or Microsoft account with a verified .edu email gets twice as much.");
     if (me.plan && me.plan !== "free") lines.push((PLAN_LABELS[me.plan] || me.plan) + " plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
     if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");
     return lines.join("\n");
@@ -506,11 +539,14 @@
   }
 
   window.IS = {
-    C, DAY, US_STATES, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, WORK_AUTH,
+    C, DAY, US_STATES, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
     fieldLabel, keyLabel, termText, ls, ss,
     emptyProfile, loadProfile, saveProfile, profileKeys, demandStates,
     regs, shardKeys, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
-    WEIGHTS, PART_LABEL, profileFields, score,
+    // was: WEIGHTS, PART_LABEL, profileFields, score,
+    // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the
+    // student's own tag, not the biggest one in the Set profileFields returns.
+    WEIGHTS, PART_LABEL, profileFields, primaryField, score,
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,

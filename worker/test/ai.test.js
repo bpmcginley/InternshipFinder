@@ -300,7 +300,12 @@ test("one account cannot spend past its own monthly ceiling, whatever task it na
 
 test("the real ceilings leave room for a full allowance and stay under what a plan brings in", async () => {
   const { CONFIG } = await import("../src/config.js");
-  assert.ok(CONFIG.USER_BUDGET_CENTS.free >= 200 && CONFIG.USER_BUDGET_CENTS.free < CONFIG.MONTHLY_BUDGET_CENTS / 10);
+  // was: assert.ok(CONFIG.USER_BUDGET_CENTS.free >= 200 && CONFIG.USER_BUDGET_CENTS.free < CONFIG.MONTHLY_BUDGET_CENTS / 10);
+  // The free row halved to 150 on 2026-09-19 so the month reaches twice as many students, so the old
+  // floor of 200 is the policy this test was written against rather than the thing it is checking.
+  // 134 is what a full free .edu allowance costs (20 Auto-Apply at ~$0.06 plus 10 resumes), which is
+  // the claim in the test's name and the number that has to stay below the ceiling.
+  assert.ok(CONFIG.USER_BUDGET_CENTS.free >= 134 && CONFIG.USER_BUDGET_CENTS.free < CONFIG.MONTHLY_BUDGET_CENTS / 10);
   assert.ok(CONFIG.USER_BUDGET_CENTS.supporter <= 456);
   assert.ok(CONFIG.USER_BUDGET_CENTS.pro <= 1135);
 });
@@ -385,4 +390,66 @@ test("the Deep Dive has no monthly cap: many runs, one student, never a 429 cap"
   }
   const a = (await me(w, token)).allowance.deep_dive;
   assert.deepEqual(a, { used: 5, limit: null });
+});
+
+// The month's stop is cumulative, so before the day's share the whole $75 could go on launch day and
+// every student who arrived after that met a dead product until the 1st.
+test("the day's share of the budget pauses AI until tomorrow, not until next month", async () => {
+  const w = await setup({ env: { DAILY_BUDGET_CENTS: "1" } });
+  const token = await w.token();
+  await w.db.prepare("INSERT INTO spend (user_hash, month, cents) VALUES (?, '2026-09-14', 1)").bind(GLOBAL_USER).run();
+
+  const res = await w.api("POST", "/ai", { token, body: aiBody() });
+  assert.equal(res.status, 503);
+  const err = await res.json();
+  assert.equal(err.error, "paused");
+  assert.match(err.message, /tomorrow/, "not 'until next month': the month is fine, today is not");
+  assert.match(err.message, /Search still works/);
+  assert.ok(err.retry_after > 0 && err.retry_after <= 86400);
+  assert.equal(geminiCalls(w).length, 0);
+  assert.equal((await me(w, token)).paused, true, "/me must not offer AI that /ai then refuses");
+  assert.equal((await (await w.api("GET", "/config")).json()).paused, true);
+  assert.equal(w.db.dump().budget.length, 0, "the month itself is nowhere near spent");
+
+  // Tomorrow the same deployment is open again, which is the whole difference from the monthly stop.
+  w.setNow(new Date("2026-09-15T09:00:00Z"));
+  const fresh = await w.token();
+  assert.equal((await w.api("POST", "/ai", { token: fresh, body: aiBody("field_match", "next-day") })).status, 200);
+  assert.equal((await me(w, fresh)).paused, false);
+
+  const zero = await setup({ env: { DAILY_BUDGET_CENTS: "0" } });
+  assert.equal((await zero.api("POST", "/ai", { token: await zero.token(), body: aiBody() })).status, 503);
+});
+
+// The default has to follow MONTHLY_BUDGET_CENTS, or raising the month would leave the day behind and
+// the day would quietly become the real limit.
+test("the day's ceiling defaults to a thirtieth of the month's budget", async () => {
+  const w = await setup({ env: { MONTHLY_BUDGET_CENTS: "30" } });   // so a day's share is 1c
+  const token = await w.token();
+  await w.db.prepare("INSERT INTO spend (user_hash, month, cents) VALUES (?, '2026-09-14', 1)").bind(GLOBAL_USER).run();
+  const res = await w.api("POST", "/ai", { token, body: aiBody() });
+  assert.equal(res.status, 503);
+  assert.match((await res.json()).message, /tomorrow/, "the month has $0.29 left, so this is the day's stop");
+});
+
+// The estimate is charged to the day at admission, so without the same correction the month's figure
+// gets that runs of Gemini failures would burn a day's AI on calls that cost nothing.
+test("a failed Gemini call gives back the day's share, not just the month's", async () => {
+  const w = await setup({ gemini: () => Response.json({ error: { status: "UNAVAILABLE" } }, { status: 503 }) });
+  const token = await w.token();
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody("autofill", "run-1") })).status, 502);
+  const day = w.db.dump().spend.find((r) => r.user_hash === GLOBAL_USER);
+  assert.ok(day, "the day's row was charged at admission");
+  assert.equal(day.month, "2026-09-14");
+  assert.equal(day.cents, 0, "a call Gemini never answered must not burn the day for good");
+});
+
+test("the day's figure is settled to what the call really cost, like the month's", async () => {
+  const w = await setup();
+  const token = await w.token();
+  await w.api("POST", "/ai", { token, body: aiBody("resume_tailor", "x") });
+  const { spend_cents } = await w.db.prepare("SELECT spend_cents FROM budget WHERE month = '2026-09'").first();
+  const day = await w.db.prepare("SELECT cents FROM spend WHERE user_hash = '*' AND month = '2026-09-14'").first();
+  assert.ok(spend_cents > 0);
+  assert.ok(Math.abs(day.cents - spend_cents) < 1e-9, `${day.cents} vs ${spend_cents}`);
 });

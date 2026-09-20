@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Terms of use · InternScout</title>
 <meta name="description" content="The rules for using InternScout, in plain words."/>
+<!-- Link previews and a tab icon, same as privacy.html. Chrome Web Store review opens both pages
+     from the listing, and icon128.png sits in this same docs/ folder, so a plain relative path works. -->
+<meta property="og:title" content="Terms of use · InternScout"/>
+<meta property="og:description" content="The rules for using InternScout, in plain words."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://bpmcginley.github.io/InternshipFinder/terms.html"/>
+<!-- Facebook rejects an og:image under 200x200 and X wants 144x144+, so the 128x128 favicon made a
+     forwarded link to this page a title-only card. og-preview.png is the same 1200x630 card
+     index.html and install.html use (scripts/make_og_image.py); absolute, because a relative
+     og:image is a second, independent reason a scraper comes back with no image. -->
+<!-- was: <meta property="og:image" content="icon128.png"/> and twitter:card "summary" -->
+<meta property="og:image" content="https://bpmcginley.github.io/InternshipFinder/og-preview.png"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="icon" href="icon128.png"/>
+<link rel="apple-touch-icon" href="icon128.png"/>
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
@@ -64,8 +79,13 @@
 
   <main>
     <h1>Terms of use</h1>
-    <p class="meta">Last updated September 17, 2026</p>
-    <p class="lede">InternScout is a free tool made by a UMass Amherst student. By using the dashboard or the extension, you agree to these terms.</p>
+    <!-- Moved with the paid-plan corrections below, so the date still means what the page says it means. -->
+    <!-- was: <p class="meta">Last updated September 17, 2026</p> -->
+    <p class="meta">Last updated September 19, 2026</p>
+    <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so "a free
+         tool" flat out is no longer accurate. Search genuinely is free and always has been. -->
+    <!-- was: <p class="lede">InternScout is a free tool made by a UMass Amherst student. By using the dashboard or the extension, you agree to these terms.</p> -->
+    <p class="lede">InternScout is a tool made by a UMass Amherst student. Search is free and needs no sign-in, AI features have a free monthly allowance, and optional paid plans raise that allowance. By using the dashboard or the extension, you agree to these terms.</p>
 
     <div class="box">
       <h3>The short version</h3>
@@ -73,7 +93,14 @@
         <li>It's provided as-is, with no guarantees.</li>
         <li>Listings can be stale or wrong. Check with the employer.</li>
         <li>Auto-Apply never submits for you. You review and submit.</li>
-        <li>AI use has fair-use monthly caps, and they may change.</li>
+        <!-- The "Search is free." half was added when paid plans went live (worker/wrangler.toml
+             line 40 is PAYMENTS_ENABLED = "1"), because the next bullet now names two paid plans and
+             a short version that mentions money without saying what stays free reads as a
+             bait-and-switch. The original is kept in the comment below it, the way every other
+             replacement in this file records what it replaced. -->
+        <!-- was: <li>AI use has fair-use monthly caps, and they may change.</li> -->
+        <li>Search is free. AI use has fair-use monthly caps, and they may change.</li>
+        <li>Optional Supporter ($5/month) and Pro ($12/month) plans raise the AI allowance. Stripe takes the payment.</li>
         <li>Don't misuse it.</li>
         <li>It isn't run by UMass Amherst, and it may change or shut down.</li>
       </ul>
@@ -105,11 +132,15 @@
       <li>There are also short-term limits on how fast you can make AI calls.</li>
       <li>If the project's total AI budget for the month runs out, AI features pause for everyone until the next month. Search keeps working.</li>
       <li><strong>Caps, limits and features may change at any time.</strong></li>
-      <li>Optional paid plans raise the allowance for students who want more. They are optional, and search stays free. See below.</li>
+      <!-- was: <li>Optional paid plans raise the allowance for students who want more. They are optional, and search stays free. See below.</li> -->
+      <li>Optional paid plans raise the allowance for students who want more: Supporter at $5/month, Pro at $12/month. They are optional, and search stays free. See below.</li>
     </ul>
 
     <h2>Paid plans (optional)</h2>
-    <p>This only applies if you choose to subscribe, and only when the plans are switched on. If you don't see a Supporter or Pro button, there is nothing to pay.</p>
+    <!-- Both plans are live as of 2026-09-19, so the "if you don't see a button" escape hatch describes
+         a state nobody is in any more. The terms of a live plan should not read as conditional. -->
+    <!-- was: <p>This only applies if you choose to subscribe, and only when the plans are switched on. If you don't see a Supporter or Pro button, there is nothing to pay.</p> -->
+    <p>This section only applies if you choose to subscribe. The plans are live: Supporter is $5/month and Pro is $12/month. Nothing charges you unless you subscribe, and you can use InternScout indefinitely without ever doing so.</p>
     <ul>
       <li>They exist to cover AI costs. A plan raises your monthly AI allowance; it does not change the listings, unlock search, or move you up any queue.</li>
       <li>The dashboard shows each plan's price and exactly how much AI use it buys before you pay. A school .edu email still doubles whatever your plan gives you.</li>
@@ -151,7 +182,12 @@
     </ul>
 
     <h2>Contact</h2>
-    <p>Questions: <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p>
+    <!-- Same reasoning as the privacy page: a GitHub issue needs an account and is public, which is no
+         use for a billing or refund question. The feedback form is the dashboard's own
+         (docs/index.html window.CONFIG.formUrl) and needs neither. -->
+    <!-- was: <p>Questions: <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p> -->
+    <p>Questions about these terms, a subscription or a refund: <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">use the InternScout feedback form</a>. It needs no account and only the person running InternScout reads it. Expect a reply within a few days; this is a one-student project, not a support desk.</p>
+    <p>For bugs you don't mind discussing in the open, you can also <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p>
   </main>
 
   <footer>

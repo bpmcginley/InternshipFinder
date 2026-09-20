@@ -4,6 +4,10 @@ import { canUpgrade } from "./billing.js";
 
 export const monthOf = (d) => d.toISOString().slice(0, 7);
 
+// The UTC day, for the day's share of the budget. Ten characters against a month's seven, so a day
+// key and a month key can never name the same row even where they share a column.
+export const dayOf = (d) => d.toISOString().slice(0, 10);
+
 export const nextMonth = (d) =>
   new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
 
@@ -13,13 +17,36 @@ export function budgetCents(env, config) {
   return v !== undefined && v !== "" && Number.isFinite(Number(v)) ? Number(v) : config.MONTHLY_BUDGET_CENTS;
 }
 
+// The same shape one step down: the DAILY_BUDGET_CENTS var wins over config, and "0" pauses AI for
+// the rest of today. A null in config means a thirtieth of whatever the monthly figure is (250c of
+// the $75 month), so raising MONTHLY_BUDGET_CENTS raises the day with it and the two cannot drift.
+// Without this, a month with no daily smoothing can all go on launch day: at ~$0.06 an auto-filled
+// application and a 150c per-account ceiling, about fifty heavy free accounts empty the $75, and
+// every student who arrives after them meets a dead product until the 1st.
+export function dailyBudgetCents(env, config) {
+  const v = env.DAILY_BUDGET_CENTS;
+  if (v !== undefined && v !== "" && Number.isFinite(Number(v))) return Number(v);
+  const c = config.DAILY_BUDGET_CENTS;
+  return c != null && Number.isFinite(c) ? c : budgetCents(env, config) / 30;
+}
+
 export async function spend(db, month) {
   const row = await db.prepare("SELECT spend_cents FROM budget WHERE month = ?").bind(month).first();
   return row ? row.spend_cents : 0;
 }
 
-export async function isPaused(db, env, config, now) {
-  return (await spend(db, monthOf(now))) >= budgetCents(env, config);
+// Answers for the day's stop as well as the month's, so /config and /me never tell a student AI is
+// available on a day whose share is already spent and then have /ai turn them away with a 503.
+// was: export async function isPaused(db, env, config, now) {
+// `plan` because admit() applies the day's stop to free plans only (see the day's charge there), so
+// asking without it would tell a paying student AI is paused on a day that /ai would serve them.
+// The default is "free": /config is answered before anyone has signed in, and there the free answer
+// is the honest one. A caller that knows the student's plan should pass it.
+export async function isPaused(db, env, config, now, plan = "free") {
+  // was: return (await spend(db, monthOf(now))) >= budgetCents(env, config);
+  if ((await spend(db, monthOf(now))) >= budgetCents(env, config)) return true;
+  if (plan !== "free") return false;
+  return (await daySpend(db, dayOf(now))) >= dailyBudgetCents(env, config);
 }
 
 export async function addSpend(db, month, cents) {
@@ -33,6 +60,42 @@ export async function addSpend(db, month, cents) {
 // The deployment-wide rate bucket shares the rate table under a sentinel that no real user_hash can
 // collide with (those are sha256 hex), so the existing bucket-prefix cleanup sweeps it for free.
 export const GLOBAL_USER = "*";
+
+// was: // Today's deployment-wide spend shares the `spend` table under that same sentinel. A day key
+// Today's spend by free accounts (admit() charges this row for free plans only, so a paid student is
+// never paused by it) shares the `spend` table under that same sentinel. A day key
+// ("2026-09-14") cannot collide with the month key a real account's row carries ("2026-09"), and the
+// month-end sweep in cleanup() already drops every spend row from a past month, so these are cleaned
+// up for free and at most thirty of them exist at once. A table of its own would mean a D1 migration
+// against the live database for a number that is thrown away every month anyway.
+export async function daySpend(db, day) {
+  const row = await db.prepare("SELECT cents FROM spend WHERE user_hash = ? AND month = ?").bind(GLOBAL_USER, day).first();
+  return row ? row.cents : 0;
+}
+
+// was: export async function addDaySpend(db, day, cents) {
+// was:   if (!(cents > 0)) return;
+// was:   await db.prepare(
+// was:     "INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, ?) " +
+// was:     "ON CONFLICT(user_hash, month) DO UPDATE SET cents = cents + excluded.cents",
+// was:   ).bind(GLOBAL_USER, day, cents).run();
+// was: }
+// Adds `cents` to the day's row unless that row is already at `limit`, and answers whether it went
+// in. One statement, the shape bumpUnder further down uses, because the pair it replaces (read the
+// figure in admit(), write it seven D1 round trips later) let every call in a burst read the same
+// stale figure and every one of them pass: at the 120 calls a minute GLOBAL_RPM allows and ~6c an
+// estimate, one minute could put ~720c against a 250c day. false means the day is spent and nothing
+// was written, so a caller acting on false must not give anything back here.
+// A limit of 0 is "no AI today" and must refuse even when no row exists yet, which the INSERT on its
+// own would not: an insert of 0 cents into an empty day counts as a change and would pass.
+export async function addDaySpendUnder(db, day, cents, limit) {
+  if (!(limit > 0)) return false;
+  const r = await db.prepare(
+    "INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, ?) " +
+    "ON CONFLICT(user_hash, month) DO UPDATE SET cents = cents + excluded.cents WHERE cents < ?",
+  ).bind(GLOBAL_USER, day, cents > 0 ? cents : 0, limit).run();
+  return r.meta.changes > 0;
+}
 
 // Whole-deployment ceiling per minute; the GLOBAL_RPM var wins over config. "0" turns AI off now.
 export function globalRpm(env, config) {
@@ -110,18 +173,37 @@ async function bumpUnder(db, user, bucket, limit) {
 export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free", estimate = 0) {
   const rate = (config.PLANS[plan] || config.PLANS.free).rate || config.RATE;
   const month = monthOf(now);
+  const today = dayOf(now);
   if ((await spend(db, month)) >= budgetCents(env, config)) {
     throw new HttpError(503, "paused", "AI features are paused until next month because the budget is used up. Search still works.");
   }
+  // was: // Checked after the month's stop so a genuinely empty month still says "until next month". This one
+  // was: // only costs the student the rest of today, which is the whole point of it: before the day's share
+  // was: // existed the month could be emptied in an afternoon and the next student had nothing until the 1st.
+  // was: if ((await daySpend(db, today)) >= dailyBudgetCents(env, config)) {
+  // was:   const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  // was:   throw new HttpError(503, "paused",
+  // was:                       "AI features are paused until tomorrow because today's share of the budget is used up. Search still works.",
+  // was:                       { retry_after: Math.ceil((midnight - now.getTime()) / 1000) });
+  // was: }
+  // The day's stop moved to the bottom of this function, where charging the day and checking it are
+  // the same statement; reading it here and writing it seven round trips later was a read-then-act a
+  // burst could walk straight through. It still comes after the month's stop above, so a genuinely
+  // empty month still says "until next month" rather than "until tomorrow".
 
   const iso = now.toISOString();
   const minute = "m:" + iso.slice(0, 16);
-  const day = "d:" + iso.slice(0, 10);
+  // was: const day = "d:" + iso.slice(0, 10);
+  // `dayBucket`, not `day`: this is the rate table's key ("d:2026-09-14"), while `today` above and
+  // `admitted.day` below are the plain date ("2026-09-14") that the spend table keys on. The two
+  // sat a few lines apart under names that both read as "day".
+  const dayBucket = "d:" + iso.slice(0, 10);
   const untilNextMinute = 60 - now.getUTCSeconds();
   if (!(await bumpUnder(db, user, minute, rate.perMinute))) {
     throw new HttpError(429, "rate", "Too many AI calls this minute", { retry_after: untilNextMinute });
   }
-  if (!(await bumpUnder(db, user, day, rate.perDay))) {
+  // was: if (!(await bumpUnder(db, user, day, rate.perDay))) {
+  if (!(await bumpUnder(db, user, dayBucket, rate.perDay))) {
     const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
     throw new HttpError(429, "rate", "Daily AI call limit reached", { retry_after: Math.ceil((midnight - now.getTime()) / 1000) });
   }
@@ -131,7 +213,8 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   if (!(await bumpUnder(db, GLOBAL_USER, minute, globalRpm(env, config)))) {
     // Not their doing, so it does not come out of their own minute or day either.
     await db.prepare("UPDATE rate SET calls = calls - 1 WHERE user_hash = ? AND bucket IN (?, ?) AND calls > 0")
-      .bind(user, minute, day).run();
+      // was: .bind(user, minute, day).run();
+      .bind(user, minute, dayBucket).run();
     throw new HttpError(503, "busy", "InternScout is handling a lot of AI requests right now. Try again in a minute.",
                         { retry_after: untilNextMinute });
   }
@@ -169,7 +252,13 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   ).bind(...runKey, config.MAX_CALLS_PER_RUN).run();
   if (call.meta.changes === 0) throw cap("This run reached its call limit");
 
-  const admitted = { month, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
+  // was: const admitted = { month, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
+  // was: const admitted = { month, day: today, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
+  // `day` rides along with `month` so settle() and release() can correct the day's figure from the
+  // same record; reading the clock again there would put the correction on the wrong day at midnight.
+  // It starts null and is set only where the day's row is actually charged, below, so "the day was
+  // charged" and "the day gets corrected" are one fact rather than two conditions kept in step.
+  const admitted = { month, day: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
   // The account's own ceiling. Without it the only thing between one modified client and the whole
   // month's budget is the daily rate limit: a task with no unit cap, a fresh run_id per call and a
   // large body would pause AI for everyone. It is set well above what a full allowance costs, so a
@@ -186,7 +275,46 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     }
     admitted.metered = true;
   }
+  // The day's share is the FREE tier's share of the month, not the whole deployment's (Bruce,
+  // 2026-09-19). A Supporter or Pro student has already paid for their AI, and two things already
+  // bound them: their own USER_BUDGET_CENTS row, charged just above, and the month's stop at the top
+  // of this function. Neither moves when free accounts drain the day, and a day's share is 250c at
+  // the $75 month -- about 41 auto-filled applications for the whole deployment -- while one Pro
+  // plan sells 120 a month, so without this a paying student would meet "paused until tomorrow" on
+  // a ceiling they did not drain and could not have. A paid call therefore neither reads nor writes
+  // this row, and `admitted.day` stays null, which is what keeps release() and settle() off it too.
+  // Charging it and checking it are one statement (addDaySpendUnder), so the burst that walked
+  // through the old read-then-act can overshoot by at most the one estimate that crossed the line.
+  if (plan === "free") {
+    if (!(await addDaySpendUnder(db, today, admitted.estimate, dailyBudgetCents(env, config)))) {
+      // Nothing reached the day's row, so nothing comes back from it. What does have to come back is
+      // the account's own row, charged a few lines up when this account is metered, and the unit and
+      // the call this run took. The month's figure is added below, so it has nothing to correct yet.
+      if (admitted.metered && admitted.estimate > 0) {
+        await db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?")
+          .bind(admitted.estimate, user, month).run();
+      }
+      // release() deliberately keeps the rate counts, because its usual caller is a call that was
+      // made. This one was not: it is refused here, before Gemini. So the buckets come back the same
+      // way the global-busy branch above returns them, including the shared minute -- otherwise a
+      // student retrying into a paused day would burn their own 300-a-day allowance on refusals and
+      // eat GLOBAL_RPM slots that paying students, who are exempt from this stop, still need.
+      await db.prepare("UPDATE rate SET calls = calls - 1 WHERE user_hash = ? AND bucket IN (?, ?) AND calls > 0")
+        .bind(user, minute, dayBucket).run();
+      await db.prepare("UPDATE rate SET calls = calls - 1 WHERE user_hash = ? AND bucket = ? AND calls > 0")
+        .bind(GLOBAL_USER, minute).run();
+      await release(db, user, task, runId, { ...admitted, estimate: 0 });
+      const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+      throw new HttpError(503, "paused",
+                          "AI features are paused until tomorrow because today's share of the budget is used up. Search still works.",
+                          { retry_after: Math.ceil((midnight - now.getTime()) / 1000) });
+    }
+    admitted.day = today;
+  }
   await addSpend(db, month, admitted.estimate);
+  // was: // Charged to the day as well as the month, so the ceiling above sees the estimate that has just
+  // was: // been committed; settle() and release() correct both figures together.
+  // was: await addDaySpend(db, today, admitted.estimate);
   return admitted;
 }
 
@@ -199,7 +327,8 @@ export function remainingOf(admitted) {
 // Gemini refused or could not be reached: give back the unit, the call and the estimate. The rate
 // buckets keep their count, since the call was made.
 export async function release(db, user, task, runId, admitted) {
-  const { month, isNew, estimate, metered } = admitted;
+  // was: const { month, isNew, estimate, metered } = admitted;
+  const { month, day, isNew, estimate, metered } = admitted;
   const stmts = [];
   if (isNew) {
     stmts.push(db.prepare("DELETE FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?").bind(user, month, task, runId));
@@ -210,6 +339,18 @@ export async function release(db, user, task, runId, admitted) {
   }
   if (estimate > 0) {
     stmts.push(db.prepare("UPDATE budget SET spend_cents = MAX(0, spend_cents - ?) WHERE month = ?").bind(estimate, month));
+    // was: // The day's figure is deployment-wide like the month's, so it comes back whether or not this
+    // was: // account is metered. Skipping it would let a run of Gemini failures pause AI for the rest of a
+    // was: // day on calls that never cost anything.
+    // was: stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?").bind(estimate, GLOBAL_USER, day));
+    // `day` is set by admit() only where it charged the day's row, which it does only for a free
+    // plan, so this gives back exactly what was taken and a paid call cannot drive the row below
+    // what free accounts really spent. Where it is set the refund matters whether or not the account
+    // is metered: without it a run of Gemini failures would pause AI for the rest of a day on calls
+    // that never cost anything.
+    if (day) {
+      stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?").bind(estimate, GLOBAL_USER, day));
+    }
     if (metered) stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?").bind(estimate, user, month));
   }
   await db.batch(stmts);
@@ -219,13 +360,32 @@ export async function release(db, user, task, runId, admitted) {
 // and for the account, and adds the call's token counts to the month's totals (numbers only), so the
 // share of input served from Gemini's cache can be read off one row.
 export async function settle(db, user, admitted, cents, usage) {
-  const { month, estimate, metered } = admitted;
+  // was: const { month, estimate, metered } = admitted;
+  const { month, day, estimate, metered } = admitted;
   const delta = (cents > 0 ? cents : 0) - estimate;
   const stmts = [];
   if (delta !== 0) {
     stmts.push(db.prepare(
       "INSERT INTO budget (month, spend_cents) VALUES (?, MAX(0, ?)) " +
       "ON CONFLICT(month) DO UPDATE SET spend_cents = MAX(0, spend_cents + ?)").bind(month, delta, delta));
+    // was: // The same correction for the day, upserted rather than updated because an estimate of 0 leaves
+    // was: // no row for the day to update. Without it the day's share would keep whatever the estimate
+    // was: // guessed, which for a cheap call is several times what it really cost.
+    // was: stmts.push(db.prepare(
+    // was:   "INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, MAX(0, ?)) " +
+    // was:   "ON CONFLICT(user_hash, month) DO UPDATE SET cents = MAX(0, cents + ?)").bind(GLOBAL_USER, day, delta, delta));
+    // The same correction for the day, and only where admit() charged it: `day` is the date for a
+    // free plan and null for a paid one, so the correction mirrors the charge and a paid call cannot
+    // drag the row below what free accounts really spent. Without this correction the day's share
+    // would keep whatever the estimate guessed, which for a cheap call is several times its cost.
+    // Left as an upsert rather than an update so a missing row is created rather than silently
+    // dropped; after a free admission the row always exists, since the charge inserts it even for an
+    // estimate of 0.
+    if (day) {
+      stmts.push(db.prepare(
+        "INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, MAX(0, ?)) " +
+        "ON CONFLICT(user_hash, month) DO UPDATE SET cents = MAX(0, cents + ?)").bind(GLOBAL_USER, day, delta, delta));
+    }
     if (metered) {
       stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents + ?) WHERE user_hash = ? AND month = ?").bind(delta, user, month));
     }
@@ -257,7 +417,11 @@ export async function deleteUser(db, user, now = new Date()) {
   ]);
 }
 
-// Daily cron: old rate buckets, last month's runs and per-account spend, usage older than a year.
+// was: // Daily cron: old rate buckets, last month's runs and per-account spend, usage older than a year.
+// Daily cron: old rate buckets, last month's runs and per-account spend, usage older than a year. The
+// `spend` sweep takes the day's-share rows with it, because a day in a past month sorts below that
+// month's own key ("2026-09-14" < "2026-10"); today's row is longer than the current month's key and
+// so is never swept out from under a live day.
 export async function cleanup(db, now) {
   const day = new Date(now.getTime() - 2 * 86400e3).toISOString().slice(0, 10);
   const yearAgo = monthOf(new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), 1)));

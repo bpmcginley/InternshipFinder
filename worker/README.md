@@ -4,8 +4,15 @@ The product's only server: a Cloudflare Worker with a D1 database. It checks Goo
 sign-in, calls Gemini with the project's key, enforces monthly caps and the global budget, and counts
 the states students pick. The request/response contract is in [API.md](API.md).
 
-It stores only hashed IDs, usage counters, chosen states and monthly spend (`schema.sql`). Never
-prompts, replies, emails or tokens. Workers Logs stay off for the same reason.
+<!-- was: It stores only hashed IDs, usage counters, chosen states and monthly spend (`schema.sql`). Never -->
+<!-- was: It stores only hashed IDs, usage counters, chosen states and spend totals, monthly and daily (`schema.sql`). -->
+<!-- "only" was still wrong: schema.sql's `plans` table holds a Stripe customer id, a subscription id
+     and a status, and `stripe_events` holds event ids. Those are third-party account identifiers, not
+     hashed IDs or counters, and a Web Store reviewer reads this file. schema.sql:73 already says as
+     much beside the table; this sentence now matches it. -->
+It stores hashed IDs, usage counters, chosen states, spend totals monthly and daily, and -- for a paid
+plan -- the Stripe customer and subscription ids and the plan's status (`schema.sql`). Never prompts,
+replies, emails or tokens. Workers Logs stay off for the same reason.
 
 ## Files
 
@@ -13,7 +20,8 @@ prompts, replies, emails or tokens. Workers Logs stay off for the same reason.
 |---|---|
 | `src/index.js` | Routes, CORS, daily cleanup cron |
 | `src/auth.js` | ID token checks (JWKS, `iss`, `aud`, `exp`), `edu`/`general` tier, user hash |
-| `src/limits.js` | Monthly allowance, per-minute/day rate limits, budget |
+<!-- was: | `src/limits.js` | Monthly allowance, per-minute/day rate limits, budget | -->
+| `src/limits.js` | Monthly allowance, per-minute/day rate limits, monthly and daily budget |
 | `src/gemini.js` | Builds the Gemini request, clamps tokens and thinking, prices usage |
 | `src/demand.js` | `POST /demand` and CI-only `GET /demand` |
 | `src/billing.js` | Optional paid plans: Stripe Checkout, the billing portal, webhook checks |
@@ -74,12 +82,31 @@ Both need these redirect URIs:
 - `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`. The `"key"` in `extension/manifest.json`
   gives the store install and every Load unpacked copy this same ID, so one redirect covers both.
 
-## Paid plans (Bruce, only when AI spend needs covering)
+<!-- was: ## Paid plans (Bruce, only when AI spend needs covering) -->
+## Paid plans (live)
 
-Two tiers, both optional, both dormant until you turn them on: `PAYMENTS_ENABLED = "0"` in
-`wrangler.toml`, so `/config` says `payments: { enabled: false }`, the dashboard shows no upgrade
-button and all three `/billing/*` routes return 404. Claude does none of these steps — keys stay
-with you.
+<!-- was: Two tiers, both optional, both dormant until you turn them on: `PAYMENTS_ENABLED = "0"` in -->
+<!-- was: `wrangler.toml`, so `/config` says `payments: { enabled: false }`, the dashboard shows no upgrade -->
+<!-- was: button and all three `/billing/*` routes return 404. Claude does none of these steps — keys stay -->
+<!-- was: with you. -->
+Both tiers are switched on and selling (Bruce confirmed 2026-09-19 that they stay on at launch).
+`wrangler.toml` carries `PAYMENTS_ENABLED = "1"`, `STRIPE_MANAGED_PAYMENTS = "1"`,
+<!-- was: `SUPPORTER_PRICE_TEXT = "$5/month"` and `PRO_PRICE_TEXT = "$12/month"`, so `/config` answers -->
+<!-- was: `payments: { enabled: true, plans: [...] }` with those price strings, the dashboard shows the upgrade -->
+`SUPPORTER_PRICE_TEXT = "$5/month"` and `PRO_PRICE_TEXT = "$12/month"`, so, with `STRIPE_SECRET_KEY`
+and at least one price id also set (the paragraph below, and the other half of the switch),
+`/config` answers `payments: { enabled: true, plans: [...] }` with those price strings, the dashboard shows the upgrade
+button, and all three billing routes are live: `POST /billing/checkout`, `POST /billing/portal` and
+the Stripe-signed `POST /billing/webhook`. That is why the product is no longer free to describe:
+copy anywhere that calls InternScout simply free is now wrong.
+
+Two things still gate a tier even with payments on, and both are secrets rather than code: nothing is
+offered at all unless `STRIPE_SECRET_KEY` is set, and a tier is offered only while its own price id
+(`STRIPE_PRICE_ID` for Supporter, `STRIPE_PRICE_ID_PRO` for Pro) is set. Unsetting one hides that tier
+and makes its checkout 404 again, without a deploy.
+
+The steps below are how this was turned on, and how to redo it against a new Stripe account or when
+rotating from test keys to live ones. Claude does none of them — keys stay with you.
 
 | Plan | Price | Allowance | Cost if fully used | Left over |
 |---|---|---|---|---|
@@ -141,9 +168,28 @@ row but stop being charged only once you cancel their subscriptions in Stripe, s
 - Global monthly budget: `MONTHLY_BUDGET_CENTS` in `wrangler.toml` ($75). Keep the Google Cloud
   budget alert in step with it. It is the backstop that stops AI before a surprise bill arrives, so
   raise it and a per-student allowance together only once you have real usage numbers.
-- What one account may cost in a month: `USER_BUDGET_CENTS` in `src/config.js` ($3 free, $4.50
-  Supporter, $11 Pro). It sits well above what a full allowance costs, so honest use never meets
-  it; it is what stops one modified client from spending the whole global budget through the
+<!-- was: - What may be spent in one day: `DAILY_BUDGET_CENTS`, as a var or in `src/config.js`. Left `null` it -->
+<!-- was:   is a thirtieth of the monthly figure, $2.50 a day at $75, and it moves when the month does. It -->
+<!-- was:   exists because the monthly stop is cumulative: without a day's share the whole month can go on -->
+<!-- was:   launch day and every student after that finds AI dead until the 1st. A day that runs out answers -->
+<!-- was:   `/ai` with 503 `paused` until midnight UTC and leaves search alone; `"0"` turns AI off for today. -->
+- What the **free tier** may spend in one day: `DAILY_BUDGET_CENTS`, as a var or in `src/config.js`.
+  Left `null` it is a thirtieth of the monthly figure, $2.50 a day at $75, and it moves when the
+  month does. It exists because the monthly stop is cumulative: without a day's share the whole
+  month can go on launch day and every student after that finds AI dead until the 1st. A day that
+  runs out answers `/ai` with 503 `paused` until midnight UTC and leaves search alone; `"0"` turns
+  AI off for today. It applies to free accounts only (Bruce, 2026-09-19): a Supporter or Pro student
+  has paid for their AI and is bounded by their own `USER_BUDGET_CENTS` row and by the monthly stop,
+  so a ceiling free accounts drained never tells a paying student "AI is paused until tomorrow".
+  Their spend is not counted against this row at all, which is why it reads as the free tier's share
+  of the month rather than the deployment's whole day.
+<!-- was: - What one account may cost in a month: `USER_BUDGET_CENTS` in `src/config.js` ($3 free, $4.50 -->
+<!-- was:   Supporter, $11 Pro). It sits well above what a full allowance costs, so honest use never meets -->
+- What one account may cost in a month: `USER_BUDGET_CENTS` in `src/config.js` ($1.50 free, $4.50
+  Supporter, $11 Pro). The free row halved on 2026-09-19 so the same $75 reaches twice as many
+  students; at $1.34 for a full free .edu allowance it still sits above honest use, but not far, so
+  it is the one row to revisit once real per-student spend is in D1. It is what stops one modified
+  client from spending the whole global budget through the
   uncapped Deep Dive. Keep each paid row under what the plan brings in after Stripe's cut.
 - Token totals and the cache hit rate for a month:
   `npx wrangler d1 execute internscout --remote --command "SELECT * FROM tokens"` (`cached / prompt`).

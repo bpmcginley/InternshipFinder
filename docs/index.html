@@ -4,7 +4,54 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>InternScout</title>
-<meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick."/>
+<!-- was: <meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick."/> -->
+<!-- Paid plans went live 2026-09-19 (worker/wrangler.toml: PAYMENTS_ENABLED=1, Supporter $5/month,
+     Pro $12/month), so "free" standing alone now overstates it. What is still true, and is the reason
+     most students stay, is that search, ranking and this dashboard cost nothing and ask for no account;
+     only the AI allowance is what money buys. Both halves have to be in the one sentence a search
+     result or a link preview shows. -->
+<!-- was: <meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in needed; paid plans only add AI."/> -->
+<!-- That wording was 164 characters and the qualifier was its tail. Google cuts a description at
+     roughly 155-160, so the snippet on the result page ended at "...the states you pick." - the bare
+     "Free" claim the sentence was lengthened to qualify. This one is 152 characters, so the qualifier
+     survives. og:description below keeps the full 164, because Discord, Slack and iMessage show far
+     more of a blurb than a search result does. -->
+<meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in; paid plans add AI."/>
+
+<!-- Link previews. Before today a link pasted into a group chat, Discord or a text message rendered as
+     a bare grey URL: no title, no image, no blurb. Nearly every install starts with one student sending
+     this link to another, so these nine tags sit between a share and an install.
+     og:image is the absolute URL of docs/og-preview.png, a 1200x630 card that scripts/make_og_image.py
+     builds. It pointed at icon128.png until 2026-09-19, and icon128.png is genuinely 128x128: Facebook's
+     scraper rejects any og:image under 200x200 and X's card needs at least 144x144, so on both of those
+     the link still came back as a title-only card with no thumbnail - the bare preview these tags exist
+     to end. The URL is absolute because the OG spec asks for one; the old relative form did resolve
+     against og:url, but only on scrapers that bother to resolve it. icon128.png keeps the rel=icon and
+     rel=apple-touch-icon links below, which is the job a 128px square is the right size for.
+     was: "og:image is document-relative on purpose: the site is served from the /InternshipFinder/
+     project path on github.io, so a root-relative /icon128.png would 404, and scrapers resolve a
+     relative image against the absolute og:url below." -->
+<meta property="og:title" content="InternScout · internships ranked for your major"/>
+<meta property="og:description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in needed; paid plans only add AI."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://bpmcginley.github.io/InternshipFinder/"/>
+<!-- was: <meta property="og:image" content="icon128.png"/> -->
+<meta property="og:image" content="https://bpmcginley.github.io/InternshipFinder/og-preview.png"/>
+<!-- was: <meta name="twitter:card" content="summary"/> -->
+<!-- summary renders a square thumbnail, and a centre crop of a 1200x630 card keeps only x=285-915,
+     which cuts the icon plate scripts/make_og_image.py draws at x=80-296 and the "Search free. Apply
+     faster." line it draws at x=84. summary_large_image shows the 1.91:1 card whole. -->
+<meta name="twitter:card" content="summary_large_image"/>
+<!-- was: "Both files already sit in docs/, copied from extension/icons, and are genuinely 48x48 and
+     128x128: 48 is the size a browser tab renders, and 128 is the largest we have, so it serves the
+     iOS home-screen bookmark and the link preview both." -->
+<!-- Both files already sit in docs/, copied from extension/icons, and are genuinely 48x48 and 128x128:
+     48 is the size a browser tab renders, and 128 is the largest icon we ship, so it serves the iOS
+     home-screen bookmark. It no longer serves the link preview: 128x128 is under Facebook's 200x200
+     floor, so og:image above points at og-preview.png instead. -->
+<link rel="icon" type="image/png" sizes="48x48" href="icon48.png"/>
+<link rel="icon" type="image/png" sizes="128x128" href="icon128.png"/>
+<link rel="apple-touch-icon" href="icon128.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet"/>
@@ -227,7 +274,10 @@
     workflow: "ingest.yml",
     dataUrl: "./data/",
     rawDataFallback: "https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/",
-    // Sign-in stays hidden while this is an *.example.workers.dev placeholder.
+    // was: // Sign-in stays hidden while this is an *.example.workers.dev placeholder.
+    // The placeholder guard is still in js/core.js - workerOn() returns false for any
+    // *.example.workers.dev host - but the URL below is no longer one, so sign-in, /me,
+    // /demand and the billing calls are all live on this page.
     workerUrl: "https://internscout-api.bpmcginley.workers.dev",
     // Google Form, with the listing ID pre-filled. Same form as .github/ISSUE_TEMPLATE/config.yml.
     formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform?usp=pp_url&entry.306779001={id}",

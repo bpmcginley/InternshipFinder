@@ -107,7 +107,12 @@ async function route(request, env, ctx, d) {
         can_upgrade: canUpgrade(env, d.config, mine.plan),
         can_manage: paymentsOn(env, d.config) && !!mine.customer,
         tier: who.tier,
-        paused: await isPaused(db, env, d.config, now),
+        // isPaused takes a plan because the day's stop only applies to free accounts (limits.js).
+        // `mine.plan` is already loaded above for plan/can_upgrade/allowance, so without passing it
+        // here /me told a Supporter or Pro "AI is paused" on a day that POST /ai would have served
+        // them. /config keeps the default, which is the honest answer before anyone has signed in.
+        // was: paused: await isPaused(db, env, d.config, now),
+        paused: await isPaused(db, env, d.config, now, mine.plan),
         allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan, now) })),
       });
     }

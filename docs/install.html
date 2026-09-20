@@ -5,6 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Install the extension · InternScout</title>
 <meta name="description" content="How to install the InternScout Auto-Apply extension by hand, until it's in the Chrome Web Store."/>
+
+<!-- Link previews, same reasoning as index.html: this page is the one students actually forward, and
+     until today it forwarded as a bare grey URL. The description here is written for the preview rather
+     than reused from the meta above, because a link landing in a group chat has to answer "how long is
+     this going to take me" and "will it work on my phone" before anyone taps it.
+     og:image is the absolute URL of docs/og-preview.png, the same 1200x630 card index.html points at
+     (built by scripts/make_og_image.py), so a forwarded link looks identical whichever page it came
+     from. It pointed at icon128.png until 2026-09-19, which is genuinely 128x128: Facebook's scraper
+     rejects an og:image under 200x200 and X's card needs at least 144x144, so those two showed a
+     title-only card with no thumbnail. The URL is absolute because the OG spec asks for one.
+     icon128.png still serves the rel=icon and rel=apple-touch-icon links below.
+     was: "og:image is document-relative because the site lives under the /InternshipFinder/ project
+     path on github.io; scrapers resolve it against og:url." -->
+<meta property="og:title" content="Install InternScout Auto-Apply"/>
+<meta property="og:description" content="Load the InternScout Auto-Apply extension by hand in about three minutes. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/>
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://bpmcginley.github.io/InternshipFinder/install.html"/>
+<!-- was: <meta property="og:image" content="icon128.png"/> -->
+<meta property="og:image" content="https://bpmcginley.github.io/InternshipFinder/og-preview.png"/>
+<!-- was: <meta name="twitter:card" content="summary"/> -->
+<!-- Same card as index.html, so the same card type: summary would centre-crop 1200x630 to a square
+     and cut the icon and the tagline off it. -->
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="icon" type="image/png" sizes="48x48" href="icon48.png"/>
+<link rel="icon" type="image/png" sizes="128x128" href="icon128.png"/>
+<link rel="apple-touch-icon" href="icon128.png"/>
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
@@ -54,6 +80,34 @@
   footer a{color:var(--ink2)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (max-width:480px){h1{font-size:28px}.lede{font-size:17px}ol.steps>li{padding-left:46px}}
+
+  /* Share control. .btn above was written for the <a> on step 1, so a real <button> needs the border
+     and font reset to land in the same place visually. */
+  button.btn{border:0;font:600 16px var(--sans);cursor:pointer}
+  .share-row{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin:6px 0 4px}
+  .share-note{color:var(--ink3);font-size:14px;overflow-wrap:anywhere}
+  /* Chrome, Edge and Brave on a phone or tablet have no chrome://extensions Developer mode, so they
+     cannot load an extension from a folder, which is what step 5 below asks for. A student who opens
+     this page on a phone is reading seven steps they cannot perform. Show them that first, and give
+     them the one useful action: send the link to the laptop they will install from.
+     The query now tests the hardware only, because the copy in .phonebar is about the hardware. It
+     also used to fire at (max-width:640px), which is a window size and not a device: an ordinary
+     desktop browser in a side-by-side window matches it, and so does a 1280px window at 200% browser
+     zoom, which is 640 CSS px and is the low-vision case. Those readers were told the seven steps
+     underneath would not work for them, which is false and is contradicted by the steps themselves.
+     was: pointer:coarse with hover:none means touch and no mouse; a Windows touchscreen laptop reports
+     a coarse pointer but also hover:hover, so it installs extensions fine and still never sees this.
+     That credited the wrong half: `pointer` describes the PRIMARY pointing device, so a touchscreen
+     laptop reports pointer:fine because its trackpad is primary -- it is `any-pointer` that would read
+     coarse. The pair matches only where touch is the primary input and nothing hovers, which is a phone
+     or a tablet. A detachable in tablet mode does match, and that is accepted: it cannot install a
+     Chrome extension either. */
+  .phonebar{display:none}
+  /* was: @media (max-width:640px),(pointer:coarse) and (hover:none){.phonebar{display:block}} */
+  @media (pointer:coarse) and (hover:none){.phonebar{display:block}}
+  .phonebar{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--amber);border-radius:4px;padding:14px 18px 16px;margin:0 0 24px}
+  .phonebar h2{font:600 18px/1.3 var(--sans);margin:0 0 4px;padding:0;border:0}
+  .phonebar p{margin:0 0 10px;font-size:15px}
 </style>
 </head>
 <body>
@@ -71,6 +125,27 @@
   <main>
     <h1>Install the extension</h1>
     <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop</p>
+
+    <!-- Phone-only banner. Hidden on desktop by CSS, not by script, so it is right even before the
+         page's JavaScript runs. See the .phonebar rules for why the media query is written as it is. -->
+    <aside class="phonebar">
+      <h2>This one needs a laptop</h2>
+      <!-- was: <p>Chrome, Edge and Brave on phones and tablets can't install extensions at all, so the steps below
+         won't work here. Send yourself the link and open it on your laptop. Searching still works on this
+         phone: the <a href="index.html">dashboard</a> needs no extension and no account.</p> -->
+      <!-- "can't install extensions at all" is disprovable in ten seconds: Brave for Android ships a
+           small fixed list of extensions you can turn on. What is true of all three browsers on all
+           phones and tablets is that none of them expose the chrome://extensions Developer mode this
+           page needs, so none can load an extension from a folder - which is step 5 below. -->
+      <p>Chrome, Edge and Brave on phones and tablets can't load an extension from a folder, so the steps
+         below won't work here. Send yourself the link and open it on your laptop. Searching still works on
+         this phone: the <a href="index.html">dashboard</a> needs no extension and no account.</p>
+      <div class="share-row">
+        <button class="btn" type="button" data-share>Send this to my laptop</button>
+        <span class="share-note" role="status" aria-live="polite"></span>
+      </div>
+    </aside>
+
     <p class="lede">The InternScout Auto-Apply extension isn't in the Chrome Web Store yet. Until it is, you install it by hand. These steps show you how.</p>
     <p>You don't need the extension to search. The <a href="index.html">dashboard</a> works on its own. The extension adds your Deep Dive profile and Auto-Apply, which fills out applications and stops at the submit button.</p>
 
@@ -106,6 +181,15 @@
         <p>Click the InternScout icon and choose <strong>Sign in with Google (UMass email)</strong> or <strong>Sign in with Microsoft</strong>. Any Google account or personal Microsoft account works. A Google account with a .edu email gets twice the monthly AI use. We never see your password.</p>
         <p>School Microsoft accounts (like your @umass.edu Outlook login) don't work yet: they ask for your school's IT approval. To get the higher .edu allowance, sign in with Google using your @umass.edu address. If you don't have one, create a Google account with <em>Use your existing email</em> and enter your @umass.edu email.</p>
         <p>Sign-in is only needed for AI features like Auto-Apply and tailored resumes.</p>
+        <!-- Paid plans went live 2026-09-19 (worker/wrangler.toml: PAYMENTS_ENABLED=1, SUPPORTER_PRICE_TEXT
+             $5/month, PRO_PRICE_TEXT $12/month). This page already told students about a monthly AI
+             allowance; leaving out what happens when it runs out, and what it costs, is the kind of
+             surprise that gets an extension one-starred. Stated here, at the step where the account is
+             created, rather than at the top where it would read as a paywall on a product that has none. -->
+        <p>Every account gets a free AI allowance each month. If you use it up, <strong>Supporter</strong>
+           ($5/month) or <strong>Pro</strong> ($12/month) raises it; both are optional, and Stripe handles
+           the payment and the cancelling. Searching, ranking and the <a href="index.html">dashboard</a>
+           stay free and need no account at all.</p>
       </li>
     </ol>
 
@@ -137,11 +221,68 @@
       <li><strong>Sign-in fails:</strong> try the other provider, or check that pop-ups aren't blocked. If you expected the larger school allowance, sign in with the account that has your .edu email. If it still fails, <a href="https://github.com/bpmcginley/InternshipFinder/issues">open an issue</a>.</li>
       <li><strong>Remove it:</strong> go to <code>chrome://extensions</code> and click <em>Remove</em>. Chrome deletes everything the extension saved. See <a href="privacy.html#delete">how to delete your data</a>.</li>
     </ul>
+
+    <!-- The same share control the phone banner uses, kept where a desktop reader ends up: the person
+         who just installed it is the likeliest person to pass it to a roommate. One handler serves both
+         buttons, so there is nothing to keep in sync. -->
+    <h2>Send this page on</h2>
+    <p>Pass the link to a friend, or to your own laptop if you're reading on a phone.</p>
+    <div class="share-row">
+      <button class="btn" type="button" data-share>Share this page</button>
+      <span class="share-note" role="status" aria-live="polite"></span>
+    </div>
   </main>
 
   <footer>
     <a href="index.html">Back to InternScout</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · Not affiliated with UMass Amherst.
   </footer>
 </div>
+<script>
+// Share control for the phone banner and the "Send this page on" row. No library and no build step:
+// this page carried no script at all until now, and two buttons don't justify starting one.
+(function () {
+  var buttons = document.querySelectorAll("[data-share]");
+  if (!buttons.length) return;
+  // Drop any #fragment so the link that arrives opens at the top of the steps, not mid-page.
+  var url = location.href.split("#")[0];
+
+  function note(btn, msg, keep) {
+    var el = btn.parentNode.querySelector(".share-note");
+    if (!el) return;
+    el.textContent = msg;
+    if (btn._clear) { clearTimeout(btn._clear); btn._clear = null; }
+    // An address printed on screen is there to be copied by hand, so it stays; "Copied" is just an ack.
+    if (!keep) btn._clear = setTimeout(function () { el.textContent = ""; }, 3000);
+  }
+
+  function showUrl(btn) { note(btn, url, true); }
+
+  function copy(btn) {
+    // navigator.clipboard is absent in older browsers and on any page served over plain http, so the
+    // last resort is printing the address rather than assuming the API is there.
+    if (!navigator.clipboard || !navigator.clipboard.writeText) { showUrl(btn); return; }
+    navigator.clipboard.writeText(url).then(function () { note(btn, "Copied"); }, function () { showUrl(btn); });
+  }
+
+  function share(btn) {
+    if (!navigator.share) { copy(btn); return; }
+    var p;
+    try { p = navigator.share({ title: "InternScout", text: "InternScout: internship search for UMass students, free to search.", url: url }); }
+    catch (e) { copy(btn); return; }
+    if (!p || !p.then) return;
+    p.then(function () { note(btn, "Sent"); }, function (err) {
+      // Closing the share sheet rejects with AbortError. That is the student saying no, not a failure,
+      // so it must not read as an error or reach the console. Any other rejection means the sheet never
+      // worked, and copying the link is the honest second choice.
+      if (err && err.name === "AbortError") return;
+      copy(btn);
+    });
+  }
+
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener("click", function () { share(this); });
+  }
+})();
+</script>
 </body>
 </html>

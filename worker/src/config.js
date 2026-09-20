@@ -80,12 +80,29 @@ export const PLANS = {
 };
 
 // What one account may cost in a month, in cents, whatever tasks it is spent on. A full free .edu
-// allowance costs about $1.50 and a Deep Dive a few cents more, so these sit well clear of honest use;
+// was: // allowance costs about $1.50 and a Deep Dive a few cents more, so these sit well clear of honest use;
+// allowance is about $1.34 of Gemini and a Deep Dive a few cents more, so the free row now clears
+// was: // honest use by a sixth rather than by double (the 2026-09-19 note below says why);
+// honest use by 16c, about an eighth, rather than by double (the 2026-09-19 note below says why);
 // the paid rows stay under what the plan brings in after Stripe's cut ($4.56 and $11.35). A "general"
 // free account gets GENERAL_ALLOWANCE_PCT of the free row, like its allowances. This is what bounds a
 // task with no unit cap (the Deep Dive): without it one modified client could spend the whole
 // MONTHLY_BUDGET_CENTS and pause AI for everyone.
-export const USER_BUDGET_CENTS = { free: 300, supporter: 450, pro: 1100 };
+//
+// The free row halved for launch (2026-09-19). At 300 one student could take 4% of the month's $75,
+// so roughly 25 heavy free accounts drained the whole budget; 150 doubles how many students the same
+// $75 reaches. It still sits above what the 20-autofill allowance costs (~120c at ~$0.06 an autofill),
+// was: // so for ordinary use the unit allowance is what a student meets first and this ceiling stays the
+// was: // backstop against a modified client rather than something honest use runs into. Supporter and Pro are
+// so for ordinary use the unit allowance is what a student meets first -- but only just, and no
+// longer only for a modified client: against the ~134c a full free .edu allowance costs there are
+// 16c left, which is roughly eight Deep Dives at ~2c, and the Deep Dive is deliberately uncapped
+// (TASKS above). A student who spends a full allowance and then runs eight of them meets this
+// ceiling through entirely honest use, so this is the row to revisit first once real per-student
+// spend is in D1. Supporter and Pro are
+// priced against what their own plan brings in, not against the shared budget, so they are unchanged.
+// was: export const USER_BUDGET_CENTS = { free: 300, supporter: 450, pro: 1100 };
+export const USER_BUDGET_CENTS = { free: 150, supporter: 450, pro: 1100 };
 
 // The paid plans, cheapest first. Order is what the dashboard shows.
 export const PAID_PLANS = ["supporter", "pro"];
@@ -107,6 +124,16 @@ export const CONFIG = {
   // read your own number, keeping some headroom.
   RATE: { ...FREE_RATE, globalPerMinute: 120 },
   MONTHLY_BUDGET_CENTS: 7500,   // default; the MONTHLY_BUDGET_CENTS var wins
+  // The month's stop is cumulative, so with nothing else the whole $75 can go on launch day and every
+  // student who arrives after that meets a dead product until the 1st. null means "a thirtieth of
+  // MONTHLY_BUDGET_CENTS", 250c a day at $75, so raising the month raises the day with it; set a
+  // number here, or the DAILY_BUDGET_CENTS var, to pick the day's share by hand. A day that runs out
+  // was: // pauses AI until midnight UTC, not until next month, and search is untouched either way.
+  // pauses AI until midnight UTC, not until next month, and search is untouched either way. It is
+  // the FREE tier's share: src/limits.js charges and checks it for free plans only, because a
+  // Supporter or Pro student has paid for their AI and is bounded by their own USER_BUDGET_CENTS
+  // row above, so a ceiling free accounts drained must not answer them "paused until tomorrow".
+  DAILY_BUDGET_CENTS: null,
   DEMAND_WINDOW_DAYS: 90,
   MAX_BODY_BYTES: 4_000_000,
   SCOPES: ["openid", "email", "profile"],
