@@ -17618,9 +17618,10 @@
   "nike|wd1|nke": {
    "name": "Nike",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "hospitality_sports"
+   "sector": "hospitality_sports",
+   "last_fail": "2026-09-20"
   },
   "nio|wd3|NIO_Careers": {
    "name": "Nio",
@@ -19746,10 +19747,9 @@
   "uasys|wd5|uasys": {
    "name": "University of Arkansas",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "education_research",
-   "last_fail": "2026-09-20"
+   "sector": "education_research"
   },
   "ubc|wd10|ubcstaffjobs": {
    "name": "University of British Columbia",
