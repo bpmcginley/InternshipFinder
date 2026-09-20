@@ -9914,9 +9914,8 @@
   "emit.fa.ca3.oraclecloud.com|CX_2001": {
    "name": "WSP",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-20"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "emje.fa.us6.oraclecloud.com|CX_1001": {
    "name": "Southern Company",
@@ -10048,9 +10047,8 @@
   "fa-etgw-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "TriNet",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-20"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-etqo-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "HEXAWARE",
@@ -13379,9 +13377,8 @@
   "basspro|wd1|careers": {
    "name": "Bass Pro Shops",
    "quant": false,
-   "fails": 3,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-20"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "baxter|wd1|baxter": {
    "name": "Baxter International",
@@ -15289,9 +15286,8 @@
   "fhlbtopeka|wd1|FHLBT": {
    "name": "FHLBank Topeka",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-20"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "fifththird|wd5|53careers": {
    "name": "Fifth Third Bank",
