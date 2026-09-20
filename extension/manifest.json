@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "InternScout Auto-Apply",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Fills internship applications from your saved profile and stops at the submit button. It never submits an application for you.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0b8sFYgpG2ZcPkKjaSg4tNtFqOd1x7gBnHpoGDarAw6xBQhHQa6cHvuenLG5327cEMoF9XNN+TOM7ChVohVIZxJ4smuOI3JqjKy3B5LEM3qLVevdkQGuW8CIn088n7WuhI95eCm0iJ56Licu5uh4AwBf6kRVPA7w+Jl9yz+ErZldVmUyVweS7LhPuYMrBvvZ967NVy/7kEz7OV8VuYdr3lCuSwojmHhL5zAGQzHjjjMqugU/iu0+LN/f7bhU/JU2j82MlmAGV3nxgql6UomYAGo0caMw1CgSDLcP7y+vlWYM7t2NZQqQvJjTfjVkraBY8LhNdeGsky2w3e0/NnunGwIDAQAB",
   "permissions": [

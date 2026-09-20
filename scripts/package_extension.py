@@ -19,7 +19,9 @@ EXT = ROOT / "extension"
 DIST = ROOT / "dist"
 
 SKIP_DIRS = {"test", "tests", "fixtures", "__pycache__", "node_modules", ".git"}
-SKIP_FILES = ["*.test.*", ".DS_Store", "Thumbs.db", "desktop.ini", "*.pem", "*.crx", "*.zip"]
+# was: SKIP_FILES = ["*.test.*", ".DS_Store", "Thumbs.db", "desktop.ini", "*.pem", "*.crx", "*.zip"]
+# README.md is developer notes; it shipped inside both zips and inside the store package.
+SKIP_FILES = ["*.test.*", ".DS_Store", "Thumbs.db", "desktop.ini", "*.pem", "*.crx", "*.zip", "README.md"]
 
 
 LOCAL_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])[:/]")

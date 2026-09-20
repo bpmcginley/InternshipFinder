@@ -20,6 +20,17 @@ database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
 # and for the optional paid plans: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
 # (Supporter) and STRIPE_PRICE_ID_PRO (Pro). A plan whose price id is unset is simply not offered.
+#
+# This block is the COMPLETE set of plain vars after every deploy. `wrangler deploy` defaults to
+# --keep-vars=false, so anything typed into the Cloudflare dashboard Variables panel and not repeated
+# here is deleted on the next deploy, without warning and without appearing in the diff. Write down
+# what that panel holds before deploying. Secrets are not affected: they live in a separate store and
+# survive a deploy either way.
+#
+# One var the code reads is deliberately absent: DAILY_BUDGET_CENTS (src/limits.js
+# dailyBudgetCents). Left unset it is a thirtieth of MONTHLY_BUDGET_CENTS, so raising the month
+# raises the day with it and the two cannot drift. Pinning it here would break that link. Set it only
+# to override the day's share by hand, and then remember it is the free tier's share alone.
 [vars]
 # Anyone with a Google or Microsoft account can sign in; a provider is off while its client ID is empty.
 GOOGLE_CLIENT_ID = "393696929617-g2ck4v93fdl54gioop0utk9c46p4thut.apps.googleusercontent.com"

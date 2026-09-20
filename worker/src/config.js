@@ -73,7 +73,13 @@ const PRO_RATE = { perMinute: 25, perDay: 2000 };
 // `priceEnv` names the wrangler secret holding that plan's Stripe Price id. A plan whose secret is
 // unset is simply not offered, so one tier can go live before the other.
 export const PLANS = {
-  // free has no `rate` of its own: it uses CONFIG.RATE below, which the RATE var can override.
+  // was: // free has no `rate` of its own: it uses CONFIG.RATE below, which the RATE var can override.
+  // There is no RATE var. Nothing in src/ reads `env.RATE`; the only rate figure a var can move is
+  // the deployment-wide one, through GLOBAL_RPM (src/limits.js globalPerMinute). Setting RATE in the
+  // Cloudflare dashboard does nothing, silently, and the per-student 10/min and 300/day below stay
+  // whatever this file says -- which matters because a launch-day surge is the moment someone would
+  // reach for that var and believe it worked.
+  // free has no `rate` of its own: it uses CONFIG.RATE below. To change it, edit FREE_RATE here.
   free: { multiplier: 1 },
   supporter: { multiplier: 2.5, priceText: "$5/month", priceEnv: "STRIPE_PRICE_ID", textEnv: "SUPPORTER_PRICE_TEXT", label: "Supporter", rate: PAID_RATE },
   pro: { multiplier: 6, priceText: "$12/month", priceEnv: "STRIPE_PRICE_ID_PRO", textEnv: "PRO_PRICE_TEXT", label: "Pro", rate: PRO_RATE },

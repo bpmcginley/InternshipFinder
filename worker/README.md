@@ -61,6 +61,25 @@ Claude never handles keys. Run these yourself:
    deploys. Always deploy this way rather than with `wrangler deploy` on its own: a commit that adds a
    table and code that reads it would otherwise ship without the table, and every request that
    touches it would answer 500. That is exactly what happened to `/me` when the billing tables landed.
+
+   <!-- "safe to repeat" is true and incomplete, and the gap only bites on a database that is already
+        live -- which is now the case. `CREATE TABLE IF NOT EXISTS` skips a table that exists; it never
+        adds a missing COLUMN to one. So a `plans` table created under an older shape survives this step
+        untouched, the deploy reports success, and every checkout then fails on the live site with "no
+        such column". Nothing in the deploy output says so. Added here because the read-only check costs
+        two seconds and the failure it prevents is a student's declined card. -->
+   **Before the first deploy after a schema change, read the live shapes and compare them to
+   `schema.sql` by eye.** `CREATE TABLE IF NOT EXISTS` adds a missing table but never a missing column,
+   so a table that already exists in an older shape is left as it was and the deploy still reports
+   success:
+
+   ```
+   npx wrangler d1 execute internscout --remote --command "SELECT name, sql FROM sqlite_master WHERE type='table'"
+   ```
+
+   A table that is missing entirely will be created by step 5. A table that is present but short a
+   column has to be migrated by hand with `ALTER TABLE ... ADD COLUMN`, because nothing in this
+   repository will do it for you.
 6. Put that URL in `extension/lib/config.js` (`WORKER_URL`) and in the dashboard's `CONFIG.workerUrl`.
 7. GitHub repo secrets for the ingest workflow: `INTERNSCOUT_DEMAND_URL` (the Worker URL plus `/demand`)
    and `INTERNSCOUT_DEMAND_TOKEN` (the same value as `DEMAND_TOKEN`).

@@ -14,6 +14,9 @@ body{width:300px}
 .note{padding:14px 16px 0;color:var(--ink2);font-size:12.5px}
 .actions{padding:14px 16px 16px;display:grid;gap:8px}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* Sign-in stacks instead of pairing: the honest labels ("Google (any account)", "Microsoft (personal)")
+   run about 146px at 13px and .btn never wraps, so they do not fit the 130px half of a 300px popup. */
+#acct-out .pair{grid-template-columns:1fr}
 .acct{padding:14px 16px 0;display:grid;gap:8px;font-size:12.5px}
 .who{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--ink2)}
 .who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -32,7 +35,8 @@ body{width:300px}
 <div class="acct" id="acct" hidden>
   <div id="acct-out" hidden>
     <div style="margin-bottom:8px;color:var(--ink2)">Sign in to use the free AI features. Any Google account or personal Microsoft account works.</div>
-    <div class="pair"><button class="btn" data-signin="google" title="Sign in with Google using your @umass.edu address">Google (UMass)</button><button class="btn" data-signin="microsoft">Microsoft</button></div>
+    <!-- was:     <div class="pair"><button class="btn" data-signin="google" title="Sign in with Google using your @umass.edu address">Google (UMass)</button><button class="btn" data-signin="microsoft">Microsoft</button></div> -->
+    <div class="pair"><button class="btn" data-signin="google" title="Any Google account works. A .edu address doubles the monthly allowance.">Google (any account)</button><button class="btn" data-signin="microsoft" title="Personal Microsoft accounts only for now. A work or school login such as @umass.edu may be refused.">Microsoft (personal)</button></div>
   </div>
   <div class="who" id="acct-in" hidden><span id="acct-email"></span><button class="link" id="signout">Sign out</button></div>
   <ul class="allow" id="allow" hidden></ul>
