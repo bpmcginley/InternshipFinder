@@ -65,6 +65,7 @@
 "26 crossing blvd|NY":null,
 "2626 delaware ave|NY":null,
 "2701 castor ave|PA":null,
+"2780 monroe ave suite 201|NY":null,
 "288 mt nebo pointe dr|PA":null,
 "29 flatbush avenue|NY":null,
 "29 vervalen st|NJ":null,
@@ -109,6 +110,7 @@
 "50 route 17k|NY":null,
 "50 spring valley market pl|NY":null,
 "500 skyview centre pkwy|NY":null,
+"501 route 73 south|NJ":null,
 "51 d richmond hill rd.|NY":null,
 "5622 amanda ln|NY":null,
 "578 aviation rd|NY":null,
@@ -312,6 +314,7 @@
 40.2398,
 -76.92
 ],
+"can79: clifton|NJ":null,
 "canandaigua|NY":[
 42.8507,
 -77.3191
@@ -968,6 +971,10 @@
 42.9712,
 -73.7929
 ],
+"manalapan|NJ":[
+40.2853,
+-74.3335
+],
 "manhasset|NY":[
 40.7957,
 -73.6989
@@ -1024,6 +1031,10 @@
 "midland park|NJ":[
 40.9893,
 -74.1401
+],
+"millburn|NJ":[
+40.7244,
+-74.3069
 ],
 "millersburg|PA":[
 40.5417,
@@ -1114,6 +1125,10 @@
 "new hope|PA":[
 40.3643,
 -74.9513
+],
+"new hyde park|NY":[
+40.7352,
+-73.6883
 ],
 "new jersey (remote|NJ":null,
 "new jersey (usa|NJ":null,
