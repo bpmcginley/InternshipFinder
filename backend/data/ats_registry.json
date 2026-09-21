@@ -356,6 +356,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "collinear-ai": {
+   "name": "Collinear AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-21"
+  },
   "colonist": {
    "name": "Colonist",
    "quant": false,
@@ -7782,6 +7788,12 @@
    "added": "2026-09-18",
    "sector": "retail_consumer"
   },
+  "firstcitizens.jibeapply.com": {
+   "name": "First Citizens BancShares",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-21"
+  },
   "githubinc.jibeapply.com": {
    "name": "GitHub",
    "quant": false,
@@ -12480,16 +12492,14 @@
   "accenture|wd103|AccentureCareers": {
    "name": "Accenture",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-21"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "accenture|wd103|AvanadeCareers": {
    "name": "Avanade",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-09-21"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "acciona|wd3|acciona_employment_channel": {
    "name": "ACCIONA",
@@ -18015,9 +18025,8 @@
   "pennant|wd1|PennantServicesCareerSite": {
    "name": "Pennant Group",
    "quant": false,
-   "fails": 3,
-   "added": "2026-09-19",
-   "last_fail": "2026-09-21"
+   "fails": 0,
+   "added": "2026-09-19"
   },
   "pentair|wd5|pentair_careers": {
    "name": "Pentair",
@@ -19883,6 +19892,18 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "education_research"
+  },
+  "upbound|wd501|Acima": {
+   "name": "Acima",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-21"
+  },
+  "upbound|wd501|Upbound": {
+   "name": "Upbound Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-21"
   },
   "upenn|wd1.myworkdaysite.com|Wharton": {
    "name": "The Wharton School",

@@ -69,6 +69,7 @@
 "29 flatbush avenue|NY":null,
 "29 vervalen st|NJ":null,
 "300 creekview ave|NJ":null,
+"300 main street exton|PA":null,
 "3001 archer dr|PA":null,
 "3015 third avenue|NY":null,
 "3031 route 50|NY":null,
@@ -127,6 +128,7 @@
 "7414 niagara falls blvd|NY":null,
 "7500 commons blvd|NY":null,
 "76-22 roosevelt ave.|NY":null,
+"797 east lancaster ave suite 100 villanova|PA":null,
 "800 rock hill dr|PA":null,
 "8001 flatlands ave|NY":null,
 "8290 transit rd|NY":null,
@@ -201,6 +203,10 @@
 "baldwinsville|NY":[
 43.1587,
 -76.3327
+],
+"baldwin|NY":[
+40.6508,
+-73.6124
 ],
 "ballston lake|NY":[
 42.9089,
@@ -395,6 +401,10 @@
 "clarion|PA":[
 41.2149,
 -79.3857
+],
+"clarks summit|PA":[
+41.4941,
+-75.7034
 ],
 "clark|NJ":[
 40.6234,
@@ -644,6 +654,10 @@
 40.1378,
 -75.2118
 ],
+"fountain hill|PA":[
+40.6015,
+-75.3954
+],
 "franklin lakes|NJ":[
 41.0168,
 -74.2057
@@ -719,6 +733,7 @@
 39.6427,
 -74.3339
 ],
+"hacc financial center|PA":null,
 "hamilton township|NJ":[
 40.2113,
 -74.6858
@@ -802,6 +817,10 @@
 "hub - san francisco|NY":null,
 "hub - seattle|NY":null,
 "hudson rbt|NY":null,
+"hudson valley|NY":[
+41.3161,
+-74.1262
+],
 "hudson|NY":[
 42.2529,
 -73.791
@@ -1217,6 +1236,10 @@
 ],
 "no campus location|NY":null,
 "norristown pa|PA":null,
+"north brunswick|NJ":[
+40.4539,
+-74.4765
+],
 "north jersey|NJ":null,
 "north tonawanda|NY":[
 43.0408,
@@ -1884,6 +1907,10 @@
 -80.0795
 ],
 "warren|NJ":null,
+"warrington|PA":[
+40.2493,
+-75.1341
+],
 "washington|PA":[
 40.171,
 -80.2455
@@ -1937,6 +1964,7 @@
 40.0155,
 -74.8281
 ],
+"westchester county|NY":null,
 "whitehouse station|NJ":[
 40.6154,
 -74.7704
