@@ -33,7 +33,13 @@ select **Read and write permissions** → Save.
 ### 3. Turn on Pages
 Repo → **Settings → Pages** → Source: **Deploy from a branch** →
 Branch: **main**, folder: **/docs** → Save.
-Your site appears at `https://<your-username>.github.io/<repo-name>/` (for this repo, `https://bpmcginley.github.io/InternshipFinder/`) within a minute.
+Your site appears at `https://<your-username>.github.io/<repo-name>/` within a minute.
+
+This repo serves from its own domain, `https://internscout.org/`. `docs/CNAME` names it, and GitHub
+Pages redirects the old `https://bpmcginley.github.io/InternshipFinder/` address there. The domain's
+DNS (at Cloudflare) needs the four GitHub Pages `A` records on `internscout.org` and a `CNAME` from
+`www` to `bpmcginley.github.io`, set to **DNS only** (grey cloud) so GitHub can issue the HTTPS
+certificate. Then tick **Enforce HTTPS** under Settings → Pages.
 
 ### 4. Get the first batch of data
 Repo → **Actions → "Ingest internships" → Run workflow**.
@@ -61,7 +67,7 @@ Optional: add a `SERPAPI_KEY` secret (Settings → Secrets and variables → Act
 
 ## Auto-Apply
 Install the extension (see `extension/README.md`), then reload the Pages site. The
-extension works on `https://bpmcginley.github.io/InternshipFinder/*`. If your Pages URL is
+extension works on `https://internscout.org/*` (and the old github.io address). If your Pages URL is
 different, add it to `content_scripts.matches` in `extension/manifest.json`.
 
 ## Notes

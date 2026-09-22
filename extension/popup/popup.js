@@ -2,7 +2,7 @@ import { loadStore, hasKey, isWorker } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 
-const DASHBOARD = "https://bpmcginley.github.io/InternshipFinder/";
+const DASHBOARD = "https://internscout.org/";
 const $ = (id) => document.getElementById(id);
 $("ver").textContent = "v" + chrome.runtime.getManifest().version;
 

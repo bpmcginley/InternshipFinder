@@ -93,7 +93,7 @@ async function savePlan(db, user, { plan, status, customer, subscription, period
 }
 
 const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
-const siteUrl = (env) => (env.SITE_URL || "https://bpmcginley.github.io/InternshipFinder").replace(/\/+$/, "");
+const siteUrl = (env) => (env.SITE_URL || "https://internscout.org").replace(/\/+$/, "");
 
 // Checkout for a paid tier. client_reference_id carries the hash back on the webhook, so a
 // payment can be matched to an account without Stripe ever learning who the student is.

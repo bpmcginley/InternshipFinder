@@ -90,14 +90,17 @@ Check it: `GET <worker-url>/config` should list both providers and `"paused": fa
 
 Both client IDs are public and live in `wrangler.toml`. A provider is hidden while its ID is empty.
 
-- **Google:** a *Web application* OAuth client. JavaScript origins are the Pages origin and
-  `http://localhost:8000`.
+- **Google:** a *Web application* OAuth client. JavaScript origins are `https://internscout.org`, the
+  old Pages origin and `http://localhost:8000`.
 - **Microsoft:** the Entra app "InternScout" (any tenant + personal accounts). ID tokens are on,
   with the optional claims `email` and `xms_edov`. For now it targets personal accounts, because an
   unverified publisher can't get consent in most school tenants.
 
 Both need these redirect URIs:
-- `https://bpmcginley.github.io/InternshipFinder/`
+- `https://internscout.org/`: the dashboard. It sends `location.origin + location.pathname`, so the
+  trailing slash matters; `https://internscout.org` without it does not match.
+- `https://bpmcginley.github.io/InternshipFinder/`: the dashboard's address before the domain. GitHub
+  Pages now redirects it to `internscout.org`, so this one can be removed once nothing uses it.
 - `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`: every Load unpacked copy. The `"key"` in
   `extension/manifest.json` fixes this ID.
 - `https://hpnbbpmalfjijnmpoihhjgjolhabjpgi.chromiumapp.org/`: the Chrome Web Store copy. The store zip

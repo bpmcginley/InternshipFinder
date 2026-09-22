@@ -80,7 +80,7 @@ async function renderQueue() {
   const s = await loadStore();
   let h = "";
   if (!s.settings.onboarded || !hasKey(s)) h += `<div class="card needs_you"><div class="msg">Finish the Deep Dive before using Auto-Apply.</div><div class="row"><button class="b primary" id="dive">Start Deep Dive</button></div></div>`;
-  if (!jobs.length) h += `<div class="empty">No applications queued.<br>Pick internships on the dashboard and press <b>Auto-Apply</b>.<br><br><a href="https://bpmcginley.github.io/InternshipFinder/" target="_blank" style="color:var(--blue)">Open dashboard ↗</a></div>`;
+  if (!jobs.length) h += `<div class="empty">No applications queued.<br>Pick internships on the dashboard and press <b>Auto-Apply</b>.<br><br><a href="https://internscout.org/" target="_blank" style="color:var(--blue)">Open dashboard ↗</a></div>`;
   for (const [name, sts] of GROUPS) {
     const list = jobs.filter((j) => sts.includes(j.status));
     if (list.length) h += `<div class="group">${name}<span class="n">${list.length}</span></div>` + list.map(jobCard).join("");

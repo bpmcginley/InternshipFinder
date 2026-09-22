@@ -98,7 +98,7 @@ inside the description as sites the extension works on is fine, with the non-aff
 > Works best on the big application systems — Workday, Greenhouse, Lever, Ashby, SmartRecruiters, iCIMS and similar. Employer-run career sites may need more help from you.
 >
 > Made by a UMass Amherst student. Not affiliated with UMass Amherst, or with any of the application systems or employers named above; those names are used only to say where the extension works.
-> Privacy: https://bpmcginley.github.io/InternshipFinder/privacy.html
+> Privacy: https://internscout.org/privacy.html
 
 **Screenshots to take (1280×800):** dashboard with listings ticked; Deep Dive files step; side panel
 queue with "Ready to submit"; a filled form paused at Submit with the overlay.
@@ -136,7 +136,7 @@ mark and plain text.
 | `identity` | Signs the student in with their Google or Microsoft account (`chrome.identity.launchWebAuthFlow`). The sign-in token lets our server work out which monthly AI allowance applies — free, the doubled .edu one, or a paid plan — and how much of it is left. We never receive passwords. |
 | Host permissions: 19 applicant-tracking domains | The systems employers run their application forms on (`*.myworkdayjobs.com`, `*.greenhouse.io`, `*.lever.co`, `*.ashbyhq.com`, `*.icims.com`, `*.taleo.net` and 13 more, listed in `manifest.json`). These carry about 81% of the postings we index. The extension injects the form-filling agent and the submit guard into the application page the student queued, on a tab it opened for that application. |
 | Optional host permission `<all_urls>` | Many employers run their application form on their own site instead (`careers.tesla.com`, `amazon.jobs`, `cityjobs.nyc.gov`, and a long tail that grows with every employer added), and a student can paste any application link. These can't be listed in advance, so the extension asks for one specific site at the moment it's needed: when a queued application is on a site it can't reach, the run pauses and the side panel shows an "Allow amazon.jobs" button. The student grants that one domain, or declines and the application stays paused. Nothing is granted at install. |
-| Content script on `bpmcginley.github.io/InternshipFinder/*` | Lets the InternScout dashboard send listings the student picked to the extension, and show which ones were applied to. This is the only site the extension talks to that isn't an application form. |
+| Content script on `internscout.org/*` (and the old `bpmcginley.github.io/InternshipFinder/*` address, which now redirects there) | Lets the InternScout dashboard send listings the student picked to the extension, and show which ones were applied to. This is the only site the extension talks to that isn't an application form. |
 
 <!-- ROW HISTORY for the table above. These notes sit below the table rather than above the rows they
      describe, and that placement is the point: GitHub Flavored Markdown ends a table body at the first
@@ -207,7 +207,7 @@ mark and plain text.
      else is read on the device (mammoth for DOCX) and sent as text, sliced at 60,000 characters.
      was: ...and — for a Deep Dive or a tailored resume — the saved resume or other file itself, sent whole. -->
 
-**Privacy policy URL:** https://bpmcginley.github.io/InternshipFinder/privacy.html
+**Privacy policy URL:** https://internscout.org/privacy.html
 
 <!-- was: Chrome counts data as "collected" when it leaves the device. Profile data stays local except for the text an AI task needs. That text passes through our Cloudflare Worker to Google's paid Gemini API and is not stored. Tick these categories: -->
 <!-- "the text an AI task needs" undercounted what is sent, and this sentence introduces the table that a

@@ -6,14 +6,14 @@ always stops at the submit button, so you check everything and submit yourself.
 
 Free. Made by a UMass student. Not affiliated with UMass Amherst.
 
-**Open the dashboard: https://bpmcginley.github.io/InternshipFinder/**
+**Open the dashboard: https://internscout.org/**
 
 ---
 
 ## Get started
 
 ### 1. Open the dashboard
-Go to **https://bpmcginley.github.io/InternshipFinder/**. No account needed. Listings refresh
+Go to **https://internscout.org/**. No account needed. Listings refresh
 several times a day from public job boards, employer career sites and government programs.
 
 ### 2. Set up your profile
@@ -28,7 +28,7 @@ under **My profile**.
 ### 3. Install the extension (optional)
 You only need it for Auto-Apply and the Deep Dive profile. It isn't in the Chrome Web Store yet,
 so install it by hand:
-**[Install guide](https://bpmcginley.github.io/InternshipFinder/install.html)**. In short:
+**[Install guide](https://internscout.org/install.html)**. In short:
 download the zip from [Releases](https://github.com/bpmcginley/InternshipFinder/releases/latest),
 unzip it, go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and pin it.
 
@@ -84,8 +84,8 @@ Hit your cap? Under **Advanced** in the extension you can use your own Gemini or
 - We keep only a scrambled sign-in ID, your monthly usage counts and the states you picked.
 - Delete it all any time with **Delete my data**, then clear site data or remove the extension.
 
-Full details: **[Privacy policy](https://bpmcginley.github.io/InternshipFinder/privacy.html)** ·
-**[Terms](https://bpmcginley.github.io/InternshipFinder/terms.html)**
+Full details: **[Privacy policy](https://internscout.org/privacy.html)** ·
+**[Terms](https://internscout.org/terms.html)**
 
 ---
 

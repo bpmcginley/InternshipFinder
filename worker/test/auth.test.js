@@ -156,6 +156,8 @@ test("CORS: allowed origins and extensions only", async () => {
   const w = await setup();
   const origin = (o) => w.api("GET", "/config", { headers: { Origin: o } })
     .then((r) => r.headers.get("Access-Control-Allow-Origin"));
+  assert.equal(await origin("https://internscout.org"), "https://internscout.org");
+  // Kept through the domain switch, for tabs opened on the old address before it.
   assert.equal(await origin("https://bpmcginley.github.io"), "https://bpmcginley.github.io");
   assert.equal(await origin("chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag"), "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag");
   // The Web Store copy has its own ID; without it, every AI call from a store install fails CORS.
@@ -171,6 +173,8 @@ test("CORS: allowed origins and extensions only", async () => {
   for (const id of ["jmjjgnckddhjbohfpbekodkpbpbmfjag", "hpnbbpmalfjijnmpoihhjgjolhabjpgi"]) {
     assert.equal(await fallback("chrome-extension://" + id), "chrome-extension://" + id);
   }
+  // ...and the site's own domain, or the dashboard's sign-in and upgrade calls would all fail.
+  assert.equal(await fallback("https://internscout.org"), "https://internscout.org");
   const pre = await w.api("OPTIONS", "/ai", { headers: { Origin: "http://localhost:8000" } });
   assert.equal(pre.status, 204);
   assert.match(pre.headers.get("Access-Control-Allow-Headers"), /Authorization/);
