@@ -158,9 +158,19 @@ test("CORS: allowed origins and extensions only", async () => {
     .then((r) => r.headers.get("Access-Control-Allow-Origin"));
   assert.equal(await origin("https://bpmcginley.github.io"), "https://bpmcginley.github.io");
   assert.equal(await origin("chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag"), "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag");
+  // The Web Store copy has its own ID; without it, every AI call from a store install fails CORS.
+  assert.equal(await origin("chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi"), "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi");
   // Only InternScout's own ID: any other extension could otherwise call the API from a student's browser
   assert.equal(await origin("chrome-extension://abcdefg"), null);
   assert.equal(await origin("https://evil.example"), null);
+  // wrangler.toml sets ALLOWED_ORIGINS, but a deploy that loses the var falls back to the built-in list,
+  // which must carry both extension IDs as well.
+  const bare = await setup({ env: { ALLOWED_ORIGINS: undefined } });
+  const fallback = (o) => bare.api("GET", "/config", { headers: { Origin: o } })
+    .then((r) => r.headers.get("Access-Control-Allow-Origin"));
+  for (const id of ["jmjjgnckddhjbohfpbekodkpbpbmfjag", "hpnbbpmalfjijnmpoihhjgjolhabjpgi"]) {
+    assert.equal(await fallback("chrome-extension://" + id), "chrome-extension://" + id);
+  }
   const pre = await w.api("OPTIONS", "/ai", { headers: { Origin: "http://localhost:8000" } });
   assert.equal(pre.status, 204);
   assert.match(pre.headers.get("Access-Control-Allow-Headers"), /Authorization/);

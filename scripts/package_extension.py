@@ -35,8 +35,9 @@ def included(rel: Path) -> bool:
 
 def build(webstore: bool = False) -> Path:
     """webstore=True drops manifest "key". The key pins the extension ID for "Load unpacked" installs
-    (so sign-in redirects and the Worker's CORS pin match the store ID); the store assigns that ID
-    itself and may refuse a manifest that carries one."""
+    (jmjj...); the store may refuse a manifest that carries one and assigns its own ID. That ID is not
+    the unpacked one: the store item was created as hpnbb... on 2026-09-22, so sign-in redirects and
+    the Worker's CORS list carry both IDs (worker/wrangler.toml ALLOWED_ORIGINS)."""
     manifest = json.loads((EXT / "manifest.json").read_text(encoding="utf-8"))
     version = manifest["version"]
     # The dashboard bridge also matches localhost so the dashboard can be developed against the

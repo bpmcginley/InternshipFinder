@@ -282,8 +282,12 @@ Chrome counts data as "collected" when it leaves the device. Profile data stays 
 - `identity` must be in `manifest.json` `permissions` (the sign-in build adds it). Remove its row above if it isn't.
 - Build the zips with `python scripts/package_extension.py` and upload `dist/internscout-extension-<version>-webstore.zip`
   (the same build without manifest `"key"`; the plain zip keeps it for GitHub Releases).
-- Store ID: `jmjjgnckddhjbohfpbekodkpbpbmfjag`. `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/` must be a
-  redirect URI with both sign-in providers.
+<!-- was: - Store ID: `jmjjgnckddhjbohfpbekodkpbpbmfjag`. ... must be a redirect URI with both sign-in providers.
+     That assumed the store would reuse the ID the manifest "key" gives Load unpacked. It did not: the store
+     zip has no "key", and on 2026-09-22 the new item was created as hpnbb... -->
+- Store ID: `hpnbbpmalfjijnmpoihhjgjolhabjpgi` (Load unpacked stays `jmjjgnckddhjbohfpbekodkpbpbmfjag`). Each needs
+  its `https://<id>.chromiumapp.org/` redirect URI with both sign-in providers, and its `chrome-extension://<id>`
+  origin in the Worker's `ALLOWED_ORIGINS`. All four redirect entries were added on 2026-09-22.
 <!-- was: - Test account for reviewers: none needed. Reviewers can sign in with any Google or Microsoft account (they get the smaller general allowance). Note in the reviewer notes that search and the Deep Dive also work without sign-in. -->
 <!-- "the Deep Dive also works without sign-in" was wrong, and wrong in the worst direction: it is an
      instruction to the reviewer that fails when followed. Checked against the Worker on 2026-09-19 —
