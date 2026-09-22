@@ -815,7 +815,12 @@
 
     const majorsText = p ? (p.majors.length ? p.majors.join(", ") : p.fields.length ? p.fields.map(IS.fieldLabel).join(", ") : "All fields") : "";
     const whereText = p ? [p.states.length ? (p.states.length <= 5 ? p.states.join(", ") : `${p.states.length} states`) : IS.BASELINE.join(", "), p.remote ? "remote" : ""].filter(Boolean).join(" + ") : "";
-    const sortTh = (key, label) => h("th", { className: cx("sort", f.sort === key && "on"), onClick: () => upd("sort", key) }, label);
+    // A real button inside the header, so the column sorts from the keyboard and a screen reader
+    // hears which column the list is sorted by. Each sort here is a fixed order, so "descending"
+    // is only an approximation for company (A-Z), but aria-sort has no "custom" value.
+    const sortTh = (key, label) => h("th", { className: cx("sort", f.sort === key && "on"), scope: "col",
+      "aria-sort": f.sort === key ? (key === "company" ? "ascending" : "descending") : undefined },
+      h("button", { type: "button", onClick: () => upd("sort", key) }, label));
     const feedbackUrl = C.formUrl ? C.formUrl.split("{id}").join("") : C.issuesUrl;
     // Optional paid plans. The Worker only advertises the tiers whose Stripe price it actually has,
     // so a tier that isn't set up yet never appears as a button the student can press.
@@ -867,7 +872,7 @@
 
       h("section", { className: "figures" },
         h("div", { className: "fig" }, h("div", { className: "n" }, figures.open), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
-        h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh), h("div", { className: "l" }, "New this scan")),
+        h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh), h("div", { className: "l" }, "New this week")),
         h("div", { className: "fig" }, h("div", { className: "n" }, figures.applied), h("div", { className: "l" }, "You applied")),
         nationwide != null && h("div", { className: "fig" }, h("div", { className: "n" }, nationwide), h("div", { className: "l" }, "Open nationwide")),
         h("div", { className: "fig states" },

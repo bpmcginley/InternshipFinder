@@ -46,7 +46,7 @@ python -m http.server 8000     # http://localhost:8000/docs/
 Coverage report (field clusters with fewer than 15 open listings in the baseline states):
 
 ```bash
-python -m internscout.coverage ../docs/data/listings.json --min 15
+python -m internscout.coverage ../docs/data/listings --min 15
 ```
 
 In CI, this prints to the job summary.
@@ -134,12 +134,12 @@ Never commit keys.
    `.github/workflows/release.yml` runs the extension tests, builds the zip and attaches it to a
    GitHub Release. The tag must match the manifest version.
 
-Web Store listing text and permission justifications: [docs/webstore.md](docs/webstore.md).
+Web Store listing text and permission justifications: [store/webstore.md](store/webstore.md).
 
 ## Pushing
 
-**Never use `push-to-github.ps1` or `push-to-github.sh`.** They delete `.git` and re-initialize
-the repo. Push through a normal clone: copy changes in, commit, `git push origin main`.
+Push through a normal clone: commit, then `git push origin main`. Never delete or re-initialize
+`.git`; that wipes history and the data commits Actions made.
 
 ## Rules
 

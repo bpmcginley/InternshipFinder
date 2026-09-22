@@ -97,6 +97,19 @@ describe("checkout", () => {
     assert.equal(res.status, 502);
     assert.ok(!(await res.text()).includes("acct_123"));
   });
+
+  // Two tabs, or a double click: both must land on the one session Stripe can only take payment for once.
+  it("gives a repeat checkout the same idempotency key, and a new one per plan", async () => {
+    const { api, token, fetch } = await setup({ env: BOTH });
+    for (const plan of ["supporter", "supporter", "pro"]) {
+      assert.equal((await api("POST", "/billing/checkout", { token: await token(), body: { plan } })).status, 200);
+    }
+    const keys = fetch.calls.filter((c) => c.url.includes("checkout/sessions")).map((c) => c.init.headers["Idempotency-Key"]);
+    assert.equal(keys.length, 3);
+    assert.ok(keys[0] && keys[0].length <= 255);
+    assert.equal(keys[0], keys[1]);
+    assert.notEqual(keys[0], keys[2]);
+  });
 });
 
 describe("webhook", () => {
@@ -109,6 +122,19 @@ describe("webhook", () => {
     const old = new Date(NOW.getTime() - 20 * 60_000);
     assert.equal((await post(api, completed(user), { at: old })).status, 400);
     assert.equal((await db.dump()).plans.length, 0);
+  });
+
+  // While a secret is rolled Stripe signs with both, one v1 per secret, and ours may not be last.
+  it("accepts an event when any one of several signatures matches", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    const event = completed(user);
+    const ours = (await sign(JSON.stringify(event))).split(",")[1];
+    const theirs = (await sign(JSON.stringify(event), "whsec_old")).split(",")[1];
+    const t = Math.floor(NOW.getTime() / 1000);
+    assert.equal((await post(api, event, { header: `t=${t},${ours},${theirs}` })).status, 200);
+    assert.equal((await db.dump()).plans.length, 1);
+    assert.equal((await post(api, { ...event, id: "evt_2" }, { header: `t=${t},${theirs},v1=00` })).status, 400);
   });
 
   it("upgrades on payment and raises the allowance", async () => {

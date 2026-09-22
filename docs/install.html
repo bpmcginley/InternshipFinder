@@ -207,6 +207,19 @@
       <p>Chrome may show this warning for extensions installed by hand. It's normal. Close it to keep using InternScout. It goes away once the extension is in the Web Store.</p>
     </div>
 
+    <!-- The hand-installed copy and the Web Store copy share one extension ID (the manifest "key"),
+         so Chrome won't hold both, and removing this one deletes what it saved. There is no export
+         yet, so the student has to keep their own copies before they switch. -->
+    <div class="box warn">
+      <h3>Switching to the Web Store version later</h3>
+      <p>When InternScout is in the Web Store, you'll need to remove this copy before you add that one. Removing it deletes your profile, your uploaded files and any passwords it made for employer sites. Before you switch:</p>
+      <ul>
+        <li>Keep your own copy of your resume and any files you uploaded.</li>
+        <li>Save the passwords for employer accounts it created in your password manager. They're under <strong>Accounts</strong> in the side panel, with a Copy button.</li>
+      </ul>
+      <p>After you add the Web Store version, redo the Deep Dive. Your dashboard profile and application statuses are kept, because the dashboard saves them in your browser, separately from the extension.</p>
+    </div>
+
     <h2>Updating</h2>
     <ol>
       <li>Download the new zip from the <a href="https://github.com/bpmcginley/InternshipFinder/releases/latest">latest release</a>.</li>
