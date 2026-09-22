@@ -14,9 +14,8 @@ so they persist per-device without a backend.
 ## One-time setup
 
 ### 1. Push to your repo (`bpmcginley/InternshipFinder`)
-The remote already exists. Use a normal clone and push. **Do not use `push-to-github.ps1` or
-`push-to-github.sh`**: they delete `.git`, which wipes history and the data commits Actions made.
-See `CONTRIBUTING.md` for the full workflow.
+The remote already exists. Use a normal clone and push. Never delete or re-initialize `.git`:
+that wipes history and the data commits Actions made. See `CONTRIBUTING.md` for the full workflow.
 
 ```bash
 git clone https://github.com/bpmcginley/InternshipFinder.git
@@ -34,7 +33,7 @@ select **Read and write permissions** → Save.
 ### 3. Turn on Pages
 Repo → **Settings → Pages** → Source: **Deploy from a branch** →
 Branch: **main**, folder: **/docs** → Save.
-Your site appears at `https://<your-username>.github.io/internscout/` within a minute.
+Your site appears at `https://<your-username>.github.io/<repo-name>/` (for this repo, `https://bpmcginley.github.io/InternshipFinder/`) within a minute.
 
 ### 4. Get the first batch of data
 Repo → **Actions → "Ingest internships" → Run workflow**.

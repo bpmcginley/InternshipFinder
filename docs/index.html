@@ -186,6 +186,8 @@
   thead th{background:var(--panel);text-align:left;font:500 12px var(--sans);color:var(--ink3);padding:12px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
   thead th.sort{cursor:pointer;user-select:none}
   thead th.sort:hover,thead th.on{color:var(--ink)}
+  thead th.sort button{all:inherit;cursor:pointer;display:inline}
+  thead th.sort button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
   thead th.on::after{content:" \2193"}
   tbody td{padding:13px 14px;border-bottom:1px solid var(--rule2);vertical-align:top}
   tbody tr:last-child td{border-bottom:0}

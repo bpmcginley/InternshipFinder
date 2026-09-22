@@ -183,8 +183,11 @@ Stripe customer for this user. We build no billing screens.
 ### `POST /billing/webhook` (Stripe only, no sign-in)
 Needs a valid `Stripe-Signature` header; an unverified body never changes a plan. A signature more than
 5 minutes old is refused, and a repeated event id returns `{ "ok": true, "repeat": true }` without
-applying twice. Handled types: `checkout.session.completed`, `customer.subscription.updated`,
-`customer.subscription.deleted`. Anything else is ignored.
+applying twice. A signature header may carry several `v1=` values (Stripe sends one per live secret
+while a secret is being rolled); any one that matches is enough. Handled types:
+`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`,
+`charge.refunded` (only a full refund) and `charge.dispute.created`, which both cancel the
+subscription and put the student back on free. Anything else is ignored.
 
 The tier comes from the subscription's price id rather than its metadata, because a student who
 switches tier inside Stripe's portal keeps the metadata the original checkout wrote. Metadata is only

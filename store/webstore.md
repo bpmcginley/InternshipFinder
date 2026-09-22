@@ -108,6 +108,9 @@ with a system's name. The screenshot that carries the whole message is the one p
 it "InternScout stops here. You press Submit." Keep the item icon and any promo tile to the InternScout
 mark and plain text.
 
+**Small promo tile (440×280):** `store/promo-tile-440x280.png`, built by `python scripts/make_promo_tile.py`
+(needs Pillow). This folder sits outside `docs/`, so GitHub Pages does not publish these notes.
+
 ## Single purpose
 
 > InternScout Auto-Apply helps a student fill out internship application forms from the profile they saved in the extension, and stops before submitting so the student reviews and submits each application.

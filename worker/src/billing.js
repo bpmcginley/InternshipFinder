@@ -11,6 +11,8 @@ const STRIPE_API_VERSION = "2026-08-26.dahlia";
 const ACTIVE = new Set(["active", "trialing"]);
 // Stripe rejects a signature this far from its timestamp; the same window stops a replayed webhook.
 const SIG_TOLERANCE_S = 300;
+// Checkouts for the same student and plan inside this window share one Stripe session.
+const CHECKOUT_WINDOW_MS = 10 * 60_000;
 
 // A paid plan is on offer only when its own Stripe Price id is set, so one tier can go live first.
 export const priceIdOf = (env, config, plan) => {
@@ -130,7 +132,12 @@ export async function checkout(db, env, config, user, plan, now, fetchImpl) {
   // activates it at dashboard.stripe.com/settings/managed-payments, or Stripe rejects the session.
   if (managedPayments(env)) form["managed_payments[enabled]"] = "true";
   if (existing.customer) form.customer = existing.customer;
-  const session = await stripe(env, "checkout/sessions", form, fetchImpl);
+  // Two tabs (or a double click) each used to get their own session, and paying both left two
+  // subscriptions with only the second on file. The same student, plan and customer within one
+  // ten-minute window now get Stripe's same session back, which can only be paid once.
+  const windowId = Math.floor(now.getTime() / CHECKOUT_WINDOW_MS);
+  const key = ["checkout", user, plan, existing.customer || "new", windowId].join(":");
+  const session = await stripe(env, "checkout/sessions", form, fetchImpl, key);
   return { url: session.url };
 }
 
@@ -161,14 +168,19 @@ const sameHex = (a, b) => {
 
 // Stripe-Signature: "t=<unix>,v1=<hmac of "t.body">". Anyone could POST to the webhook URL, so an
 // unverified body is never allowed to change a plan.
+// was: Object.fromEntries over the pairs, which kept only the last v1. While a webhook secret is
+// being rolled Stripe sends one v1 per live secret, so a valid event signed with ours could be
+// refused for the whole overlap. Any one matching v1 is enough.
 export async function verifyWebhook(secret, header, body, now) {
-  const parts = Object.fromEntries(String(header || "").split(",").map((p) => p.split("=", 2)));
-  const t = Number(parts.t);
-  if (!Number.isFinite(t) || !parts.v1) throw new HttpError(400, "bad_signature", "Bad webhook signature");
+  const pairs = String(header || "").split(",").map((p) => p.trim().split("=", 2));
+  const t = Number((pairs.find(([k]) => k === "t") || [])[1]);
+  const sigs = pairs.filter(([k, v]) => k === "v1" && v).map(([, v]) => v);
+  if (!Number.isFinite(t) || !sigs.length) throw new HttpError(400, "bad_signature", "Bad webhook signature");
   if (Math.abs(Math.floor(now.getTime() / 1000) - t) > SIG_TOLERANCE_S) {
     throw new HttpError(400, "bad_signature", "Webhook timestamp is out of range");
   }
-  if (!sameHex(await hmacHex(secret, t + "." + body), parts.v1)) {
+  const want = await hmacHex(secret, t + "." + body);
+  if (!sigs.some((s) => sameHex(want, s))) {
     throw new HttpError(400, "bad_signature", "Bad webhook signature");
   }
   try {
@@ -271,6 +283,32 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
       customer: sub.customer || o.customer,
       subscription: o.id,
       periodEnd: endOf(sub),
+    }, now);
+    return { ok: true };
+  }
+
+  // Money taken back. Stripe cancels nothing on a refund or a dispute, so without this a student
+  // who charged back or was refunded kept the bigger allowance until the subscription lapsed on its
+  // own, and Managed Payments (where Stripe fights the dispute for us) is no different: the plan row
+  // is ours either way. A part refund is left alone - that is a goodwill credit, not an undoing -
+  // and so is a dispute that Stripe later decides in our favour, which arrives as its own event and
+  // does not restore the plan; the student can subscribe again.
+  if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+    const charge = event.type === "charge.dispute.created" ? { customer: o.customer } : o;
+    if (event.type === "charge.refunded" && !(o.refunded || (o.amount_refunded && o.amount_refunded >= o.amount))) {
+      return { ok: true, ignored: true };
+    }
+    const row = charge.customer
+      ? await db.prepare("SELECT user_hash, subscription FROM plans WHERE customer = ?").bind(charge.customer).first()
+      : null;
+    if (!row || !row.user_hash) return { ok: true, ignored: true };
+    // Ends it now rather than at the period end: they have their money back already.
+    if (row.subscription) {
+      await stripe(env, "subscriptions/" + encodeURIComponent(row.subscription), {}, fetchImpl, null, "DELETE")
+        .catch(() => null);
+    }
+    await savePlan(db, row.user_hash, {
+      plan: "free", status: "canceled", customer: charge.customer, subscription: row.subscription, periodEnd: null,
     }, now);
     return { ok: true };
   }

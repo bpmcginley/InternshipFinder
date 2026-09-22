@@ -97,6 +97,19 @@ describe("checkout", () => {
     assert.equal(res.status, 502);
     assert.ok(!(await res.text()).includes("acct_123"));
   });
+
+  // Two tabs, or a double click: both must land on the one session Stripe can only take payment for once.
+  it("gives a repeat checkout the same idempotency key, and a new one per plan", async () => {
+    const { api, token, fetch } = await setup({ env: BOTH });
+    for (const plan of ["supporter", "supporter", "pro"]) {
+      assert.equal((await api("POST", "/billing/checkout", { token: await token(), body: { plan } })).status, 200);
+    }
+    const keys = fetch.calls.filter((c) => c.url.includes("checkout/sessions")).map((c) => c.init.headers["Idempotency-Key"]);
+    assert.equal(keys.length, 3);
+    assert.ok(keys[0] && keys[0].length <= 255);
+    assert.equal(keys[0], keys[1]);
+    assert.notEqual(keys[0], keys[2]);
+  });
 });
 
 describe("webhook", () => {
@@ -109,6 +122,19 @@ describe("webhook", () => {
     const old = new Date(NOW.getTime() - 20 * 60_000);
     assert.equal((await post(api, completed(user), { at: old })).status, 400);
     assert.equal((await db.dump()).plans.length, 0);
+  });
+
+  // While a secret is rolled Stripe signs with both, one v1 per secret, and ours may not be last.
+  it("accepts an event when any one of several signatures matches", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    const event = completed(user);
+    const ours = (await sign(JSON.stringify(event))).split(",")[1];
+    const theirs = (await sign(JSON.stringify(event), "whsec_old")).split(",")[1];
+    const t = Math.floor(NOW.getTime() / 1000);
+    assert.equal((await post(api, event, { header: `t=${t},${ours},${theirs}` })).status, 200);
+    assert.equal((await db.dump()).plans.length, 1);
+    assert.equal((await post(api, { ...event, id: "evt_2" }, { header: `t=${t},${theirs},v1=00` })).status, 400);
   });
 
   it("upgrades on payment and raises the allowance", async () => {
@@ -193,6 +219,38 @@ describe("webhook", () => {
     const me = await (await api("GET", "/me", { token: await token() })).json();
     assert.equal(me.plan, "free");
     assert.equal(me.can_upgrade, true);
+  });
+
+  // Money taken back ends the plan: Stripe cancels nothing by itself on a refund or a chargeback.
+  it("drops the plan on a full refund or a dispute, and cancels the subscription", async () => {
+    for (const event of [
+      { id: "evt_r", type: "charge.refunded", data: { object: { customer: "cus_1", amount: 500, amount_refunded: 500, refunded: true } } },
+      { id: "evt_d", type: "charge.dispute.created", data: { object: { customer: "cus_1", amount: 500 } } },
+    ]) {
+      const { api, db, token, fetch } = await setup({ env: PAID });
+      const user = await whoami(api, token, db);
+      await post(api, completed(user));
+      assert.equal((await post(api, event)).status, 200, event.type);
+
+      const me = await (await api("GET", "/me", { token: await token() })).json();
+      assert.equal(me.plan, "free", event.type);
+      assert.equal(me.can_upgrade, true, event.type);
+      const cancel = fetch.calls.find((c) => c.url.includes("subscriptions/sub_1") && c.init.method === "DELETE");
+      assert.ok(cancel, event.type + " should cancel the subscription");
+    }
+  });
+
+  // A goodwill credit for one month is not an undoing of the subscription.
+  it("leaves the plan alone on a part refund", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    await post(api, completed(user));
+    const res = await post(api, {
+      id: "evt_r2", type: "charge.refunded",
+      data: { object: { customer: "cus_1", amount: 500, amount_refunded: 200, refunded: false } },
+    });
+    assert.equal((await res.json()).ignored, true);
+    assert.equal((await (await api("GET", "/me", { token: await token() })).json()).plan, "supporter");
   });
 
   // The event id is recorded before the plan row is written. If that write fails, Stripe retries,
