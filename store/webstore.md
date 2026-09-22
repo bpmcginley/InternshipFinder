@@ -13,8 +13,10 @@ long description and the manifest description all say it outright. Keep them say
 
 No other company's name goes in the item name, the icon or the promotional images — not Workday, not
 Greenhouse, not LinkedIn, not a university. Using someone's trademark in the title or artwork implies
-an affiliation InternScout does not have, and it is a common rejection reason. Naming those systems
-inside the description as sites the extension works on is fine, with the non-affiliation line below.
+an affiliation InternScout does not have, and it is a common rejection reason. Don't list them in the
+description either: the 2026-09-22 submission was rejected as keyword spam for naming six application
+systems in one sentence. Describe what the extension works on in general words instead.
+<!-- was: Naming those systems inside the description as sites the extension works on is fine, with the non-affiliation line below. -->
 
 **Short description** (max 132 characters):
 > Fills internship applications from your saved profile and stops at the submit button. It never submits an application for you.
@@ -95,9 +97,15 @@ inside the description as sites the extension works on is fine, with the non-aff
 > • Or use your own AI key instead of a plan: the extension's Deep Dive setup accepts an Anthropic (Claude) or Google (Gemini) API key, and then you pay that provider directly and our monthly allowance no longer applies.
 > • We don't store your resume, prompts or AI replies.
 >
-> Works best on the big application systems — Workday, Greenhouse, Lever, Ashby, SmartRecruiters, iCIMS and similar. Employer-run career sites may need more help from you.
+<!-- was: > Works best on the big application systems — Workday, Greenhouse, Lever, Ashby, SmartRecruiters, iCIMS and similar. Employer-run career sites may need more help from you. -->
+<!-- was: > Made by a UMass Amherst student. Not affiliated with UMass Amherst, or with any of the application systems or employers named above; those names are used only to say where the extension works. -->
+<!-- Rejected 2026-09-22 as keyword spam ("Yellow Argon"), quoting exactly the six system names. A list
+     of other companies' product names reads to the store's check as keywords, whatever the sentence
+     around it says. Say what the extension works on without naming anyone; the disclaimer then has no
+     named list to point back at. -->
+> Works best on the large application systems many employers use for student hiring. Employer-run career sites may need more help from you.
 >
-> Made by a UMass Amherst student. Not affiliated with UMass Amherst, or with any of the application systems or employers named above; those names are used only to say where the extension works.
+> Made by a UMass Amherst student. Not affiliated with UMass Amherst, or with any employer or application system.
 > Privacy: https://internscout.org/privacy.html
 
 **Screenshots to take (1280×800):** dashboard with listings ticked; Deep Dive files step; side panel
