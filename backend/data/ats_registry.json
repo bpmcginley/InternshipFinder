@@ -19258,8 +19258,9 @@
   "stryker|wd1|StrykerCareers": {
    "name": "Stryker",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-09-22"
   },
   "suncor|wd1|Suncor_External": {
    "name": "Suncor",
