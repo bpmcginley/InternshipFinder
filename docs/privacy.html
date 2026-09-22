@@ -136,7 +136,12 @@
       <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong></li>
       <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
       <li>GitHub hosts the page and may keep normal web server logs under its own policy. The dashboard also loads fonts and code libraries from public servers (such as Google Fonts).</li>
-      <li>We don't use analytics, ad trackers or cookies of our own.</li>
+      <!-- was: <li>We don't use analytics, ad trackers or cookies of our own.</li>
+           Cloudflare Web Analytics was added 2026-09-22 (the beacon before </body> on every page), so
+           "no analytics" stopped being true. What it collects is what Cloudflare documents for the
+           beacon: it sets no cookies and no local storage and does not fingerprint, so this names the
+           tool and says what it does rather than keeping the old absolute. -->
+      <li>We count page visits with <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a>. It uses no cookies and doesn't identify you: it sees which page was loaded, the referring site, your browser type, a rough country and how fast the page loaded. We don't use ad trackers, and we set no cookies of our own.</li>
     </ul>
 
     <h2>Your profile and files</h2>
@@ -345,5 +350,8 @@
     <a href="index.html">Back to InternScout</a> · <a href="terms.html">Terms</a> · Not affiliated with UMass Amherst.
   </footer>
 </div>
+<!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
+     and nothing that identifies a visitor; see privacy.html. The token is public by design. -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>
 </body>
 </html>
