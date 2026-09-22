@@ -106,7 +106,7 @@ systems in one sentence. Describe what the extension works on in general words i
 > Works best on the large application systems many employers use for student hiring. Employer-run career sites may need more help from you.
 >
 > Made by a UMass Amherst student. Not affiliated with UMass Amherst, or with any employer or application system.
-> Privacy: https://internscout.org/privacy.html
+> Privacy: https://internscout.org/privacy
 
 **Screenshots to take (1280×800):** dashboard with listings ticked; Deep Dive files step; side panel
 queue with "Ready to submit"; a filled form paused at Submit with the overlay.
@@ -215,7 +215,8 @@ mark and plain text.
      else is read on the device (mammoth for DOCX) and sent as text, sliced at 60,000 characters.
      was: ...and — for a Deep Dive or a tailored resume — the saved resume or other file itself, sent whole. -->
 
-**Privacy policy URL:** https://internscout.org/privacy.html
+**Privacy policy URL:** https://internscout.org/privacy (GitHub Pages serves `privacy.html` at this
+extensionless path; the old github.io address redirects here too)
 
 <!-- was: Chrome counts data as "collected" when it leaves the device. Profile data stays local except for the text an AI task needs. That text passes through our Cloudflare Worker to Google's paid Gemini API and is not stored. Tick these categories: -->
 <!-- "the text an AI task needs" undercounted what is sent, and this sentence introduces the table that a
