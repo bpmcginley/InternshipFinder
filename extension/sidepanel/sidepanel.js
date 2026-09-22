@@ -25,7 +25,8 @@ document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click
 }));
 
 function jobCard(j) {
-  let h = `<div class="card ${j.status}" data-id="${j.id}"><div class="top"><span class="dot"></span><span class="co">${esc(j.company)}</span><span class="st">${LABEL[j.status] || j.status}${j.cost_usd ? " · " + money(j.cost_usd) : ""}</span></div><div class="title">${esc(j.title)}${j.location ? " · " + esc(j.location) : ""}</div>`;
+  // Status is a small pill; the AI cost sits beside it in grey rather than inside it.
+  let h = `<div class="card ${j.status}" data-id="${j.id}"><div class="top"><span class="dot"></span><span class="co">${esc(j.company)}</span><span class="st">${LABEL[j.status] || j.status}</span>${j.cost_usd ? `<span class="cost">${money(j.cost_usd)}</span>` : ""}</div><div class="title">${esc(j.title)}${j.location ? " · " + esc(j.location) : ""}</div>`;
   const btns = [];
   if (j.status === "working") {
     h += `<div class="msg small">${esc(j.activity || "Working…")} (step ${j.steps || 0})</div>`;
@@ -62,7 +63,7 @@ function jobCard(j) {
     btns.push(["focus", "Review & submit", "primary"], ["submitted", "I submitted it"], ["resume", "Keep going"]);
   } else if (j.status === "failed") {
     h += `<div class="msg">${esc(j.reason)}</div>`;
-    btns.push(["retry", "Retry"], ["focus", "Open"]);
+    btns.push(["retry", "Retry"], ["focus", "Show tab"]);
   } else if (j.status === "queued") {
     h += `<div class="msg small">Waiting for a free tab…</div>`;
   }
@@ -82,7 +83,7 @@ async function renderQueue() {
   if (!jobs.length) h += `<div class="empty">No applications queued.<br>Pick internships on the dashboard and press <b>Auto-Apply</b>.<br><br><a href="https://bpmcginley.github.io/InternshipFinder/" target="_blank" style="color:var(--blue)">Open dashboard ↗</a></div>`;
   for (const [name, sts] of GROUPS) {
     const list = jobs.filter((j) => sts.includes(j.status));
-    if (list.length) h += `<div class="group">${name} (${list.length})</div>` + list.map(jobCard).join("");
+    if (list.length) h += `<div class="group">${name}<span class="n">${list.length}</span></div>` + list.map(jobCard).join("");
   }
   h += `<div class="group">Apply to any posting</div><form id="addurl" class="row" style="margin-top:0;flex-wrap:nowrap"><input id="url" type="url" required placeholder="https://… application link"><button class="b">Queue</button></form><div class="small" id="addmsg"></div>`;
   const sp = await spend(), avg = perApplication(jobs);

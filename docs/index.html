@@ -58,7 +58,9 @@
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
-    --ink:#17191c; --ink2:#4b5058; --ink3:#868b92;
+    /* ink3 is the small grey text: column headers, dates, counts. It was #868b92, which is 3.2:1
+       on this paper and fails WCAG AA for text under 18px; #646a73 is 5.0:1. */
+    --ink:#17191c; --ink2:#454a52; --ink3:#646a73;
     --rule:#e2ded4; --rule2:#ece9e1;
     --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8;
     --blue:#2b5aa0; --amber:#9a6412; --amber-soft:#f6ecd9; --green:#1f7a4d; --red:#a8362c;
@@ -69,22 +71,26 @@
   }
   @media (prefers-color-scheme:dark){:root{
     --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
-    --ink:#ecebe6; --ink2:#b3b1aa; --ink3:#7d7c77;
+    --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e;
     --rule:#2c2d31; --rule2:#232427;
     --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24;
     --blue:#8fb2e8; --amber:#e0b25e; --amber-soft:#2e2717; --green:#7cc3a1; --red:#e48a80;
     color-scheme:dark;
   }}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
   a{color:inherit}
   button,input,select{font-family:var(--sans)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .wrap{max-width:1320px;margin:0 auto;padding:0 28px}
 
-  header.top{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap;padding:30px 0 16px;border-bottom:1px solid var(--ink)}
-  .mark{font:600 32px/1 var(--serif);letter-spacing:-.6px;margin:0}
-  .sub{color:var(--ink2);margin-top:8px;font-size:13.5px}
+  header.top{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap;padding:26px 0 14px;border-bottom:1px solid var(--ink)}
+  .mark{font:600 30px/1 var(--serif);letter-spacing:-.6px;margin:0}
+  .sub{color:var(--ink2);margin-top:8px;font-size:14px}
+  .sub a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
+  .sub a:hover{text-decoration-color:var(--ink)}
+  .sub button{all:unset;cursor:pointer;color:var(--accent);font-weight:500}
+  .sub button:hover{text-decoration:underline;text-underline-offset:3px}
   .top-r{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .signed{display:inline-flex;align-items:center;gap:2px;color:var(--green);font-size:13px;padding-left:6px}
 
@@ -103,17 +109,16 @@
   .count.ok{background:var(--accent-soft);color:var(--green)}
   .busy{color:var(--ink3);font:12px var(--mono);margin-right:4px}
 
-  /* landing */
-  .landing-mini{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding:10px 0;color:var(--ink3);font-size:12.5px;border-bottom:1px solid var(--rule)}
-  .landing{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:20px 44px;padding:26px 0;border-bottom:1px solid var(--rule)}
-  .landing h2{font:600 26px/1.2 var(--serif);letter-spacing:-.4px;margin:0 0 10px}
-  .landing h3{font:600 13px var(--sans);margin:0 0 6px}
-  .landing p{color:var(--ink2);margin:0 0 8px;font-size:14.5px}
-  .landing .fine{color:var(--ink3);font-size:12.5px}
-  .landing ul,.landing ol{margin:0;padding-left:20px;color:var(--ink2)}
-  .landing li{margin:4px 0}
-  .landing-cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-  .landing-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  /* landing: one hero column and one "how it works" column. The old third column repeated the
+     three setup steps that the setup card itself shows. */
+  .landing{display:grid;grid-template-columns:minmax(280px,1.3fr) minmax(280px,1fr);gap:20px 56px;padding:28px 0 26px;border-bottom:1px solid var(--rule)}
+  .landing h2{font:600 28px/1.2 var(--serif);letter-spacing:-.4px;margin:0 0 12px;max-width:22ch}
+  .landing h3{font:600 14px var(--sans);margin:0 0 8px}
+  .landing p{color:var(--ink2);margin:0 0 10px;font-size:15px;max-width:58ch}
+  .landing .fine{color:var(--ink3);font-size:13px}
+  .landing ul{margin:0;padding-left:18px;color:var(--ink2)}
+  .landing li{margin:5px 0}
+  .landing-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 
   /* profile setup */
   .setup{margin:18px 0 0;padding:20px 24px 18px}
@@ -146,10 +151,14 @@
   .setup-danger{display:flex;gap:8px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px}
   .setup-danger .meta{margin:0}
 
-  .figures{display:flex;gap:44px;flex-wrap:wrap;padding:22px 0;border-bottom:1px solid var(--rule)}
-  .fig .n{font:600 36px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
-  .fig .l{color:var(--ink3);font-size:12.5px;margin-top:7px}
-  .fig.states{margin-left:auto;align-self:flex-end;color:var(--ink2);font-size:12.5px;max-width:480px;text-align:right;line-height:1.7}
+  /* figures: the numbers in one row, and one plain sentence under them saying which states they
+     cover and when the scan ran. That sentence used to float right of the numbers and wrapped
+     under them on anything narrower than about 1100px, leaving a hole. */
+  .figures{padding:20px 0 18px;border-bottom:1px solid var(--rule)}
+  .figrow{display:flex;gap:40px;flex-wrap:wrap}
+  .fig .n{font:600 34px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
+  .fig .l{color:var(--ink3);font-size:13px;margin-top:6px}
+  .coverage{color:var(--ink2);font-size:13.5px;margin-top:14px;line-height:1.6}
   .updated{color:var(--ink3)}
 
   .notice{margin:16px 0 0;padding:12px 16px;background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:4px;color:var(--ink2)}
@@ -157,16 +166,29 @@
   .notice a{color:var(--accent);font-weight:500}
   .notice.quietnote{border-left-color:var(--rule);font-size:13px}
 
-  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:18px 0 14px}
-  .field{position:relative;display:flex;align-items:center;min-height:34px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
+  /* filters: search, field, state and sort on the first row, everything else behind "More filters".
+     Thirteen equal-looking dropdowns in one wrapping row was the single hardest thing to read on
+     the page. */
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:18px 0 0}
+  .filters.extra{padding:10px 14px 12px;margin-top:10px;background:var(--sunk);border-radius:8px;gap:8px}
+  .filters.extra .field{background:var(--panel)}
+  .filterbar-foot{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;padding:10px 0 14px;font-size:13px;color:var(--ink2)}
+  .filterbar-foot .btn.quiet{padding:0 6px;height:28px;font-size:13px}
+  .field{position:relative;display:flex;align-items:center;min-height:36px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
   .field:focus-within{border-color:var(--ink3)}
-  .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:13px;height:32px;padding:0 10px;outline:none}
+  .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:14px;height:34px;padding:0 10px;outline:none}
   .field select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer}
   .field select option{background:var(--panel);color:var(--ink)}
-  .field.sel::after{content:"";position:absolute;right:12px;top:12px;width:5px;height:5px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg);pointer-events:none}
-  .field.search{flex:1 1 240px;min-width:200px}
+  .field.sel::after{content:"";position:absolute;right:12px;top:13px;width:5px;height:5px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg);pointer-events:none}
+  .field.search{flex:1 1 260px;min-width:220px}
   .field.search input{width:100%}
-  .field.toggle{gap:7px;padding:0 12px;cursor:pointer;color:var(--ink2);font-size:13px}
+  .field.search::before{content:"";width:14px;height:14px;margin-left:10px;flex:none;border:1.6px solid var(--ink3);border-radius:50%;box-shadow:5px 5px 0 -3.5px var(--ink3);transform:scale(.85)}
+  .field.search input{padding-left:6px}
+  /* on/off filters look like switches, not like another dropdown */
+  .field.toggle{gap:8px;padding:0 12px 0 10px;cursor:pointer;color:var(--ink2);font-size:13.5px;border-radius:18px}
+  .field.toggle:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+  .morebtn{height:36px;border-radius:6px;gap:6px}
+  .morebtn .count{margin-left:2px}
   .spacer{flex:1}
 
   .ms{min-width:160px}
@@ -183,24 +205,29 @@
   .sheet{background:var(--panel);border:1px solid var(--rule);border-radius:8px}
   .tablewrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse}
-  thead th{background:var(--panel);text-align:left;font:500 12px var(--sans);color:var(--ink3);padding:12px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
+  thead th{background:var(--panel);text-align:left;font:500 12.5px var(--sans);color:var(--ink3);padding:11px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
   thead th.sort{cursor:pointer;user-select:none}
   thead th.sort:hover,thead th.on{color:var(--ink)}
   thead th.sort button{all:inherit;cursor:pointer;display:inline}
   thead th.sort button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
   thead th.on::after{content:" \2193"}
-  tbody td{padding:13px 14px;border-bottom:1px solid var(--rule2);vertical-align:top}
+  tbody td{padding:12px 12px;border-bottom:1px solid var(--rule2);vertical-align:top}
+  tbody td:first-child,thead th:first-child{padding-left:16px}
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover td{background:color-mix(in srgb,var(--sunk) 50%,transparent)}
   tbody tr.sel td{background:var(--accent-soft)}
   tbody tr.dim td{opacity:.62}
   input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:15px;height:15px;margin:2px 0 0;cursor:pointer}
   .c-chk{width:34px}
-  .c-co{min-width:250px}
+  .c-co{min-width:240px;width:32%}
+  .c-field{min-width:120px}
+  .c-loc{min-width:140px}
+  /* A pay string can run to "$60,000 - $80,000 / year"; let it wrap rather than widen the table. */
+  .c-pay{max-width:150px}
   .c-links{white-space:nowrap}
   .co{font-weight:600}
   .role{color:var(--ink2);margin-top:1px}
-  .meta{color:var(--ink3);font-size:12px;margin-top:3px}
+  .meta{color:var(--ink3);font-size:12.5px;margin-top:3px}
   .new{color:var(--accent);font:600 11.5px var(--sans);margin-left:8px}
   .closed{color:var(--red)}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px}
@@ -240,11 +267,12 @@
   .flag{font-size:12.5px;margin:3px 0;color:var(--ink2)}
   .flag.bad{color:var(--red)} .flag.warn{color:var(--amber)} .flag.good{color:var(--green)}
   .more{display:flex;justify-content:center;padding:14px;border-top:1px solid var(--rule2)}
-  footer{color:var(--ink3);font-size:12.5px;padding:14px 0 48px}
+  footer{color:var(--ink3);font-size:13px;padding:14px 0 48px;max-width:78ch}
   footer .links{display:flex;gap:4px 16px;flex-wrap:wrap;align-items:center;margin-top:8px}
   footer .links a{color:var(--ink2);text-decoration:none}
   footer .links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   noscript p{max-width:640px;margin:40px auto;padding:0 20px;color:var(--ink2)}
   @media (max-width:900px){
     .whyg{grid-template-columns:1fr;gap:18px}
@@ -252,21 +280,37 @@
   }
   @media (max-width:760px){
     .wrap{padding:0 16px}
-    .figures{gap:26px}
+    .figrow{gap:22px 28px}
     .fig .n{font-size:28px}
-    .fig.states{margin-left:0;text-align:left}
     .top-r{margin-left:0}
-    .landing-cols,.row2{grid-template-columns:1fr}
+    .row2{grid-template-columns:1fr}
     .setup{padding:16px}
-    /* listings as cards */
+    .filters.extra{padding:10px 12px}
+    .filters.extra .field.sel,.filters.extra .field.toggle{flex:1 1 44%}
+    .filters .field.ms{flex:1 1 44%}
+    .filters .field.sel{flex:1 1 40%}
+    /* Listings as cards. The old card stacked every column as "label / value" pairs, so one
+       listing ran the full height of a phone screen. Now: title block, one line of facts,
+       one line of controls. */
     table.list thead{display:none}
-    table.list,table.list tbody,table.list tr,table.list td{display:block;width:100%}
-    table.list tr{padding:10px 0;border-bottom:1px solid var(--rule)}
-    table.list tbody td{border:0;padding:4px 14px}
-    table.list td[data-label]::before{content:attr(data-label);display:block;font-size:11px;color:var(--ink3)}
-    table.list .c-chk{float:right;width:auto}
-    table.list .c-co{min-width:0}
+    table.list,table.list tbody{display:block;width:100%}
+    table.list tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--rule)}
+    table.list tr.why{display:block;padding:0}
+    table.list tbody td{display:block;border:0;padding:0;width:auto;min-width:0}
+    table.list .c-co{flex:1 1 100%;order:0}
+    table.list .c-chk{order:1;margin-left:auto;width:auto}
+    table.list .c-field,table.list .c-loc,table.list .c-pay{order:2;font-size:13.5px;color:var(--ink2)}
+    table.list .c-field .meta,table.list .c-loc .meta,table.list .c-loc > div{display:inline;margin:0}
+    table.list .c-loc .meta::before,table.list .c-field .meta::before{content:" · "}
+    table.list .c-pay .muted{display:none}
+    table.list .c-match{order:3;flex:1 1 100%;margin-top:4px}
+    table.list .c-mine{order:4}
+    table.list .c-links{order:5;display:flex;gap:14px;align-items:baseline}
+    table.list .c-links > div{margin:0}
+    table.list .rowbtn,table.list .report{margin-top:0}
+    table.list .c-links .report{display:none}
     tbody tr.why td{padding:14px}
+    .whyg{gap:16px}
   }
 </style>
 <script>

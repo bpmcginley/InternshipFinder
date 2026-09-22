@@ -6,7 +6,7 @@
   const IS = window.IS, C = IS.C;
   const ADMIN = new URLSearchParams(location.search).get("admin") === "1";
 
-  const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1";
+  const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
   const STATE_LABEL = { none: "Not started", interested: "Interested", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
   const JOB_LABEL = { queued: "Queued", working: "Agent working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
@@ -212,7 +212,10 @@
     const tags = r.field_tags || [];
     const stages = (r.stage || []).filter(s => s !== "internship").map(s => IS.STAGE_LABEL[s] || s);
     const term = IS.termText(r.term);
-    const cols = canAuto ? 9 : 8;
+    // Term now sits under the location, so the row has one column fewer.
+    const cols = canAuto ? 8 : 7;
+    // Two field tags is what a row can show without wrapping onto three lines; the rest are a count.
+    const fieldText = tags.slice(0, 2).map(IS.fieldLabel).join(", ") + (tags.length > 2 ? ` +${tags.length - 2}` : "");
     return h(F, null,
       h("tr", { className: cx(checked && "sel", open && "opened", sc.mismatch && "dim") },
         canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": "Select " + r.company_name, checked,
@@ -228,14 +231,14 @@
           (meta || r.status === "closed") && h("div", { className: "meta" }, meta, r.status === "closed" && h("span", { className: "closed" }, (meta ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
-        h("td", { "data-label": "Field" }, tags.length ? tags.slice(0, 4).map(IS.fieldLabel).join(", ") : h("span", { className: "muted" }, "—"),
+        h("td", { className: "c-field", title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, tags.length ? fieldText : h("span", { className: "muted" }, "—"),
           (stages.length > 0 || r.sector) && h("div", { className: "meta" }, [...stages, r.sector && IS.sectorLabel(r.sector)].filter(Boolean).join(" · "))),
-        h("td", { "data-label": "Location" }, h(Loc, { r, keys })),
-        h("td", { "data-label": "Term" }, term || h("span", { className: "muted" }, "—"), r.duration && h("div", { className: "meta" }, r.duration)),
-        h("td", { "data-label": "Pay" }, r.salary ? h("span", { className: "num" }, r.salary) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "—")),
-        h("td", { "data-label": "Match" }, h("button", { type: "button", className: "score whybtn " + cls, "aria-expanded": !!open, onClick: () => onWhy(r.id), title: `Match score ${sc.score} of 100. Click for why.` },
-          h("span", { className: "num" }, sc.score), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide" : "Why"))),
-        h("td", { "data-label": "Your status" },
+        h("td", { className: "c-loc" }, h(Loc, { r, keys }),
+          (term || r.duration) && h("div", { className: "meta" }, [term, r.duration].filter(Boolean).join(" · "))),
+        h("td", { className: "c-pay" }, r.salary ? h("span", { className: "num" }, r.salary) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "—")),
+        h("td", { className: "c-match" }, h("button", { type: "button", className: "score whybtn " + cls, "aria-expanded": !!open, onClick: () => onWhy(r.id), title: `Match score ${sc.score} of 100. Click for why.` },
+          h("span", { className: "num" }, sc.score), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))),
+        h("td", { className: "c-mine" },
           h("select", { className: "mine", "aria-label": "Your status", value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status))),
         h("td", { className: "c-links" },
@@ -264,13 +267,10 @@
   // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide }) {
   // `plans` is the Worker's /config payments.plans, so the prices shown here are the ones Stripe is
   // actually configured with rather than a second copy that can drift.
+  // When closed it renders nothing: the "About InternScout" link lives in the header tagline, so
+  // the page no longer carries a second strip of small print under the header just to hold it.
   function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans }) {
-    if (!open) return h("div", { className: "landing-mini" },
-      // was: h("span", null, "Free internship, co-op and research search for UMass students. Not affiliated with UMass Amherst."),
-      // Search really is free, so "free … search" stands; it is scoped now so it can't be read as a
-      // claim about the paid AI plans that went live on 2026-09-19.
-      h("span", null, "Free internship, co-op and research search for UMass students, no sign-in needed. Not affiliated with UMass Amherst."),
-      h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(true) }, "About InternScout"));
+    if (!open) return null;
     return h("section", { className: "landing", "aria-label": "About InternScout" },
       h("div", { className: "landing-main" },
         h("h2", null, "Internships, co-ops and research for your major, anywhere in the US"),
@@ -300,20 +300,17 @@
         // a Dive finishes ("the next Deep Dive is a new run") and this same file offers an onboarded
         // student the button again, so it is a habit, not a limit.
           ". The Deep Dive has no monthly run allowance of its own, though a per-account AI budget still applies, and it runs on the same free account. Made by a UMass student, not affiliated with UMass Amherst.")),
-      h("div", { className: "landing-cols" },
-        h("div", null, h("h3", null, "How it works"),
-          h("ul", null,
-            h("li", null, "A scanner checks career sites and job boards every day and keeps only student roles."),
-            h("li", null, "Your profile stays in this browser. Ranking happens on this page; nothing about you is uploaded."),
-            h("li", null, "Signing in with Google or Microsoft is optional. It lets your chosen states count toward where we scan in more detail."))),
-        h("div", null, h("h3", null, "Start in 3 steps"),
-          h("ol", null,
-            h("li", null, h("b", null, "About you: "), "your major(s) and class year."),
-            h("li", null, h("b", null, "What you want: "), "internships, co-ops, research; which terms."),
-            h("li", null, h("b", null, "Where: "), "the states you'd work in, plus remote.")),
-          h("div", { className: "landing-actions" },
-            h("button", { type: "button", className: "btn primary", onClick: onSetup }, hasProfile ? "Edit my profile" : "Set up in 3 steps"),
-            h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(false) }, "Hide")))));
+      // The "Start in 3 steps" list that used to sit here repeated the setup card's own three
+      // steps one screen higher. One copy, on the card, is enough.
+      h("div", null, h("h3", null, "How it works"),
+        h("ul", null,
+          h("li", null, "A scanner checks employer career sites and public job boards several times a day and keeps only student roles."),
+          h("li", null, "Your profile stays in this browser. Ranking happens on this page; nothing about you is uploaded."),
+          h("li", null, "The optional extension fills in applications for you and always stops before Submit."),
+          h("li", null, "Signing in with Google or Microsoft is optional. It lets your chosen states count toward where we scan in more detail.")),
+        h("div", { className: "landing-actions" },
+          h("button", { type: "button", className: "btn primary", onClick: onSetup }, hasProfile ? "Edit my profile" : "Set up your profile"),
+          h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(false) }, "Hide this"))));
   }
 
   // ---------- setup (3 steps) ----------
@@ -662,6 +659,16 @@
 
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
+    // "More filters" remembers whether it was open; the count is how many of the controls inside it
+    // are set to something other than their default, so a hidden filter is never a silent one.
+    const [moreOpen, setMoreOpenRaw] = useState(() => !!IS.ls.get(MORE_KEY, false));
+    const setMoreOpen = fn => setMoreOpenRaw(o => { const n = typeof fn === "function" ? fn(o) : fn; IS.ls.set(MORE_KEY, n); return n; });
+    const defaults = initF(p);
+    const moreCount = ["stage", "year", "sector", "app_state"].filter(k => f[k]).length
+      + (f.paid !== (defaults.paid || "") ? 1 : 0) + (f.where ? 1 : 0) + (f.status !== "open" ? 1 : 0)
+      + (f.hide_citizen !== defaults.hide_citizen ? 1 : 0) + (f.new_only ? 1 : 0) + (f.eligible ? 1 : 0);
+    const anyFilter = moreCount > 0 || !!f.q.trim() || f.fields.length > 0 || f.states.length > 0;
+    const clearFilters = () => { setF(s => ({ ...s, q: "", fields: [], states: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...defaults })); setLimit(PAGE); };
     const st = id => appStates[id] || "none";
     const keepSaved = list => { setSaved(list); IS.ls.set(SAVED_KEY, list); };
     function onSaved(v) {
@@ -842,17 +849,20 @@
       // to be .edu at all. A .edu only doubles the allowance, which the tooltip now says.
       h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
 
+    const aboutBtn = !landingOpen && h("button", { type: "button", onClick: () => setLandingOpen(true) }, "About InternScout");
     return h("div", { className: "wrap" },
       h("header", { className: "top" },
         h("div", null,
           h("h1", { className: "mark" }, "InternScout"),
-          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for UMass students, anywhere in the US")),
+          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for UMass students, anywhere in the US.",
+            aboutBtn && " · ", aboutBtn)),
         h("div", { className: "top-r" },
           busy && h("span", { className: "busy" }, busy),
           info.spend && info.spend.calls > 0 && h("span", { className: "busy", title: "Estimated AI cost of Auto-Apply and the Deep Dive this month" }, `AI $${info.spend.month_usd.toFixed(2)} this month${info.spend.budget ? ` of $${info.spend.budget}` : ""}`),
           ADMIN && h("button", { type: "button", className: "btn quiet", onClick: rescan, disabled: !!busy, title: "Run the scanner on GitHub now" }, "Rescan"),
           ADMIN && ghToken && h("button", { type: "button", className: "btn quiet", onClick: () => { localStorage.removeItem("internscout.gh_token"); setGhToken(""); setBusy("Token cleared"); } }, "Forget token"),
-          h("button", { type: "button", className: "btn", onClick: () => { setSetupOpen(true); } }, p ? "My profile" : "Set up profile"),
+          // Hidden while the setup card is already open under it, so a first visit shows one way in.
+          !setupOpen && h("button", { type: "button", className: "btn", onClick: () => { setSetupOpen(true); } }, p ? "My profile" : "Set up profile"),
           signInBtn,
           auth.token && h("span", { className: "signed", title: who && who.email ? `Signed in as ${who.email}` : "Signed in" }, "Signed in",
             auth.source === "page" && h("button", { type: "button", className: "btn quiet", onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); } }, "Sign out")),
@@ -870,14 +880,17 @@
       // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
       setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
 
+      // Numbers get thousands separators, "You applied" appears once there is something to count,
+      // and the state list is one sentence under the numbers instead of a block floated to the right.
       h("section", { className: "figures" },
-        h("div", { className: "fig" }, h("div", { className: "n" }, figures.open), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
-        h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh), h("div", { className: "l" }, "New this week")),
-        h("div", { className: "fig" }, h("div", { className: "n" }, figures.applied), h("div", { className: "l" }, "You applied")),
-        nationwide != null && h("div", { className: "fig" }, h("div", { className: "n" }, nationwide), h("div", { className: "l" }, "Open nationwide")),
-        h("div", { className: "fig states" },
-          h("div", null, loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` +${keys.length - 8} more` : ""),
-          h("div", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : ""))),
+        h("div", { className: "figrow" },
+          h("div", { className: "fig" }, h("div", { className: "n" }, figures.open.toLocaleString()), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
+          h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh.toLocaleString()), h("div", { className: "l" }, "New this week")),
+          nationwide != null && h("div", { className: "fig" }, h("div", { className: "n" }, nationwide.toLocaleString()), h("div", { className: "l" }, "Open nationwide")),
+          figures.applied > 0 && h("div", { className: "fig" }, h("div", { className: "n" }, figures.applied.toLocaleString()), h("div", { className: "l" }, "You applied"))),
+        h("div", { className: "coverage" },
+          loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` and ${keys.length - 8} more` : "", ". ",
+          h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", "."))),
 
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
@@ -895,12 +908,19 @@
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
 
-      h("div", { className: "filters" },
+      // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
+      // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows
+      // how many of them are set so nothing is hidden by surprise.
+      h("div", { className: "filters", role: "search" },
         h("div", { className: "field search" }, h(SearchBox, { value: f.q, onChange: v => upd("q", v) })),
-        h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
-          saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`)))),
         h(MultiSelect, { placeholder: "Field", options: opts.fields, selected: f.fields, onChange: v => upd("fields", v) }),
         h(MultiSelect, { placeholder: p ? "State (your areas)" : "State", options: opts.states, selected: f.states, onChange: v => upd("states", v) }),
+        h(Sel, { label: "Sort", value: f.sort, onChange: v => upd("sort", v) }, opt("score", "Sort: best match"), opt("new", "Sort: newest"), opt("company", "Sort: company A–Z"), opt("comp", "Sort: pay listed")),
+        h("button", { type: "button", className: cx("btn morebtn", moreOpen && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
+          moreOpen ? "Fewer filters" : "More filters", moreCount > 0 && h("span", { className: "count ok" }, moreCount)),
+        h("span", { className: "spacer" }),
+        canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
+      moreOpen && h("div", { className: "filters extra" },
         h(Sel, { label: "Stage", value: f.stage, onChange: v => upd("stage", v) }, opt("", "Any stage"), IS.STAGES.map(([k, l]) => opt(k, (IS.STAGE_LABEL[k] || l)))),
         h(Sel, { label: "Eligible year", value: f.year, onChange: v => upd("year", v) }, opt("", "Any year"), IS.YEARS.map(([k, l]) => opt(k, "Open to " + l.toLowerCase().replace("master's", "master's").replace("phd", "PhD")))),
         opts.sectors.length > 0 && h(Sel, { label: "Sector", value: f.sector, onChange: v => upd("sector", v) }, opt("", "Any sector"), opts.sectors.map(([k, n]) => opt(k, `${IS.sectorLabel(k)} (${n})`))),
@@ -909,13 +929,15 @@
         h(Sel, { label: "Posting status", value: f.status, onChange: v => upd("status", v) }, opt("", "Open or closed"), opt("open", "Open"), opt("closed", "Closed")),
         h(Sel, { label: "Your progress", value: f.app_state, onChange: v => upd("app_state", v) }, opt("", "Any progress"), APP_STATES.map(s => opt(s, STATE_LABEL[s])), opt("auto", "In Auto-Apply queue")),
         h("label", { className: "field toggle", title: "Hide roles limited to U.S. citizens (or citizens and permanent residents) that your work authorization rules out" },
-          h("input", { type: "checkbox", checked: f.hide_citizen, onChange: e => upd("hide_citizen", e.target.checked) }), " Hide citizen-only"),
-        h("label", { className: "field toggle" }, h("input", { type: "checkbox", checked: f.new_only, onChange: e => upd("new_only", e.target.checked) }), " New only"),
+          h("input", { type: "checkbox", checked: f.hide_citizen, onChange: e => upd("hide_citizen", e.target.checked) }), "Hide citizen-only"),
+        h("label", { className: "field toggle" }, h("input", { type: "checkbox", checked: f.new_only, onChange: e => upd("new_only", e.target.checked) }), "New only"),
         elig && h("label", { className: "field toggle", title: "Hide postings whose description rules you out (class year, grad year, citizenship, degree, sponsorship, passed deadline)" },
-          h("input", { type: "checkbox", checked: f.eligible, onChange: e => upd("eligible", e.target.checked) }), " Hide not eligible"),
-        h(Sel, { label: "Sort", value: f.sort, onChange: v => upd("sort", v) }, opt("score", "Best match"), opt("new", "Newest"), opt("company", "Company A–Z"), opt("comp", "Pay listed")),
-        h("span", { className: "spacer" }),
-        canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
+          h("input", { type: "checkbox", checked: f.eligible, onChange: e => upd("eligible", e.target.checked) }), "Hide not eligible"),
+        h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
+          saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`))))),
+      h("div", { className: "filterbar-foot" },
+        h("span", null, loading && !all.length ? "Loading…" : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}`),
+        anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
 
       searching && !wantDesc && h("div", { className: "notice" }, `Searching titles, companies and fields in ${keys.length} states. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)"),
@@ -928,19 +950,18 @@
               h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select all shown", checked: allChecked, disabled: !selectable.length,
                   onChange: e => { const on = e.target.checked; setSel(s => { const n = new Set(s); selectable.slice(0, 100).forEach(r => on ? n.add(r.id) : n.delete(r.id)); return n; }); } })),
-                sortTh("company", "Company and role"), h("th", null, "Field"), h("th", null, "Location"), h("th", null, "Term"),
-                sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", null, "Your status"), h("th", null))),
+                sortTh("company", "Company and role"), h("th", { scope: "col" }, "Field"), h("th", { scope: "col" }, "Location and term"),
+                sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", { scope: "col" }, "Your status"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")))),
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
 
       h("footer", null,
-        h("div", null, `${shown.length} of ${rows.length} shown. Your profile and progress are saved in this browser.`, canAuto ? " Auto-Apply never presses Submit; you do." : "",
-          // was: " InternScout is free, made by a UMass student, and not affiliated with UMass Amherst."),
-          // Same correction as the landing copy: paid plans are live, so the footer can't say the
-          // product is simply free. Prices come from /config; with no /config yet we name no figure.
-          " Search and this dashboard are free with no sign-in; the AI extras have a free monthly allowance"
-          + (payPlans.length ? `, and ${payPlans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" or ")} raise it` : ", and optional paid plans raise it")
+        // Same facts as before, in two short sentences instead of one long one. The plan prices
+        // still come from /config so they cannot drift from Stripe.
+        h("div", null, `${shown.length.toLocaleString()} of ${rows.length.toLocaleString()} shown. Your profile and progress stay in this browser.`, canAuto ? " Auto-Apply never presses Submit; you do." : ""),
+        h("div", { style: { marginTop: 6 } }, "Search is free with no sign-in. The AI extras have a free monthly allowance"
+          + (payPlans.length ? `; ${payPlans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" or ")} raises it` : "; optional paid plans raise it")
           + ". Made by a UMass student, not affiliated with UMass Amherst."),
         h("nav", { className: "links", "aria-label": "Footer" },
           h("a", { href: "privacy.html" }, "Privacy"),

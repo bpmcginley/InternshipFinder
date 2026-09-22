@@ -9,16 +9,20 @@ nav button:hover{color:var(--ink)}
 nav button.on{color:var(--ink);border-bottom-color:var(--ink)}
 main{padding:12px 14px 28px}
 .card{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:11px 12px;margin-bottom:8px}
-.card.needs_you{box-shadow:inset 3px 0 var(--amber)}
+/* A card waiting on the student is the one thing in this panel that must be seen first, so it is
+   tinted as well as edged. Done and in-progress cards stay plain. */
+.card.needs_you{box-shadow:inset 3px 0 var(--amber);background:color-mix(in srgb,var(--amber-soft) 45%,var(--panel))}
 .card.ready_to_submit{box-shadow:inset 3px 0 var(--green)}
 .card.failed{box-shadow:inset 3px 0 var(--red)}
 .top{display:flex;align-items:center;gap:7px}
 .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ink3)}
 .working .dot{background:var(--blue)}.needs_you .dot{background:var(--amber)}.ready_to_submit .dot,.submitted .dot{background:var(--green)}.failed .dot{background:var(--red)}
 .co{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.st{margin-left:auto;font-size:11.5px;color:var(--ink3);white-space:nowrap}
-.needs_you .st{color:var(--amber)} .ready_to_submit .st{color:var(--green)} .failed .st{color:var(--red)}
-.title{color:var(--ink2);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{margin-left:auto;font-size:11.5px;font-weight:500;color:var(--ink2);white-space:nowrap;background:var(--sunk);padding:2px 8px;border-radius:10px}
+.needs_you .st{color:var(--amber);background:var(--amber-soft)} .ready_to_submit .st{color:var(--green);background:var(--accent-soft)} .failed .st{color:var(--red)}
+.cost{color:var(--ink3);font-size:11.5px;white-space:nowrap}
+/* Two lines of title rather than one cut short: the location used to be what got cut. */
+.title{color:var(--ink2);font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
 .msg{margin-top:7px;white-space:pre-wrap}
 ul{margin:6px 0 0 18px;padding:0;color:var(--ink2)}
 li{margin:2px 0}
@@ -35,7 +39,8 @@ details{margin-top:8px;color:var(--ink3);font-size:12px}
 summary{cursor:pointer}
 details div{padding:3px 0;border-top:1px solid var(--rule2)}
 .empty{color:var(--ink2);text-align:center;padding:36px 12px;line-height:1.7}
-.group{font:600 12px var(--sans);color:var(--ink2);margin:18px 0 8px}
+.group{font:600 13px var(--sans);color:var(--ink);margin:18px 0 8px}
+.group .n{color:var(--ink3);font-weight:500;margin-left:4px}
 main>.group:first-child{margin-top:4px}
 .kv{display:grid;grid-template-columns:1fr auto;gap:4px;align-items:center}
 code{font:12px var(--mono)}
