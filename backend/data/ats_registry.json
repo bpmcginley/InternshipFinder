@@ -7348,9 +7348,8 @@
   "careers-wipfli": {
    "name": "Wipfli",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-09-22"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-wseinc": {
    "name": "Weston & Sampson",
@@ -7545,9 +7544,8 @@
   "uscareers-waters": {
    "name": "Waters Corporation",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-09-22"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "uscareers-willkie": {
    "name": "Willkie Farr & Gallagher",
@@ -19258,9 +19256,8 @@
   "stryker|wd1|StrykerCareers": {
    "name": "Stryker",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-22"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "suncor|wd1|Suncor_External": {
    "name": "Suncor",
