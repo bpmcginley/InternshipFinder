@@ -43,5 +43,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" "$ZIP" \
               --title "InternScout extension ${GITHUB_REF_NAME#ext-v}" \
-              --notes "Download the zip below, then follow the install guide: https://bpmcginley.github.io/InternshipFinder/install.html"
+              --notes "Download the zip below, then follow the install guide: https://internscout.org/install.html"
           fi

@@ -42,7 +42,9 @@ GENERAL_ALLOWANCE_PCT = "50"
 # Two extension origins. jmjj... is the ID the manifest "key" fixes for every Load unpacked copy;
 # hpnbb... is the ID the Chrome Web Store assigned when the item was created (the store zip has no
 # "key", so the store did not reuse jmjj...). Both have to be here or that copy's AI calls fail CORS.
-ALLOWED_ORIGINS = "https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag,chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi"
+# internscout.org is the site's own domain; bpmcginley.github.io stays so a tab opened before the
+# switch keeps working until it is reloaded (GitHub Pages then redirects it to internscout.org).
+ALLOWED_ORIGINS = "https://internscout.org,https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag,chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi"
 MONTHLY_BUDGET_CENTS = "7500"
 # AI calls per minute across everyone, so a busy hour cannot spend the whole Gemini per-minute quota
 # and leave every student with upstream 429s. Your account's real number is at
@@ -61,4 +63,5 @@ STRIPE_MANAGED_PAYMENTS = "1"
 SUPPORTER_PRICE_TEXT = "$5/month"
 PRO_PRICE_TEXT = "$12/month"
 # Where Stripe sends students back to after checkout
-SITE_URL = "https://bpmcginley.github.io/InternshipFinder"
+# was: SITE_URL = "https://bpmcginley.github.io/InternshipFinder"
+SITE_URL = "https://internscout.org"

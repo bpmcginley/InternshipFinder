@@ -561,7 +561,7 @@ function review() {
     S.settings.deep_dive_run = null;   // the next Deep Dive is a new run
     await save(true);
     render();
-    $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://bpmcginley.github.io/InternshipFinder/" target="_blank">Open the internship dashboard ↗</a>`;
+    $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>`;
   });
 }
 

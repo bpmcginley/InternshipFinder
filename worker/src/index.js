@@ -15,7 +15,9 @@ const EXTENSION_ORIGINS = [
   "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag",   // Load unpacked (fixed by the manifest "key")
   "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi",   // Chrome Web Store
 ];
-const DEFAULT_ORIGINS = ["https://bpmcginley.github.io", "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
+// internscout.org is the site's own domain. The github.io origin stays for tabs opened before the
+// switch; GitHub Pages redirects every new visit to internscout.org.
+const DEFAULT_ORIGINS = ["https://internscout.org", "https://bpmcginley.github.io", "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");

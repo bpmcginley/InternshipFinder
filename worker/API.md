@@ -7,7 +7,7 @@ dashboard (`docs/index.html`). Change it here first, then in all three.
 - Base URL: `CONFIG.workerUrl` in the dashboard, `WORKER_URL` in `extension/lib/config.js`.
   Live: `https://internscout-api.bpmcginley.workers.dev`.
 - CORS: origins from the `ALLOWED_ORIGINS` var (comma list; default
-  `https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag,chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi`).
+  `https://internscout.org,https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag,chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi`).
   Only InternScout's own two extension IDs: `jmjj…` is Load unpacked (fixed by the manifest `"key"`), and
   `hpnbb…` is the Chrome Web Store copy, whose ID the store assigned.
   Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`.
@@ -34,7 +34,8 @@ dashboard (`docs/index.html`). Change it here first, then in all three.
 - Identity: `user_hash = hex(sha256(iss_provider + "|" + sub + "|" + HASH_SALT))`, where `iss_provider` is `google` or
   `microsoft`, so a Microsoft user keeps one hash across tenants. No email, name or token is stored.
 - Redirect URIs Bruce registers with the provider:
-  - Dashboard: `https://bpmcginley.github.io/InternshipFinder/`
+  - Dashboard: `https://internscout.org/` (and the old `https://bpmcginley.github.io/InternshipFinder/`,
+    which GitHub Pages now redirects to it)
   - Extension, Load unpacked: `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`
   - Extension, Chrome Web Store: `https://hpnbbpmalfjijnmpoihhjgjolhabjpgi.chromiumapp.org/`
 - Clients use the implicit flow (`response_type=id_token`, a random `nonce`, `scope=openid email profile`).
