@@ -221,6 +221,38 @@ describe("webhook", () => {
     assert.equal(me.can_upgrade, true);
   });
 
+  // Money taken back ends the plan: Stripe cancels nothing by itself on a refund or a chargeback.
+  it("drops the plan on a full refund or a dispute, and cancels the subscription", async () => {
+    for (const event of [
+      { id: "evt_r", type: "charge.refunded", data: { object: { customer: "cus_1", amount: 500, amount_refunded: 500, refunded: true } } },
+      { id: "evt_d", type: "charge.dispute.created", data: { object: { customer: "cus_1", amount: 500 } } },
+    ]) {
+      const { api, db, token, fetch } = await setup({ env: PAID });
+      const user = await whoami(api, token, db);
+      await post(api, completed(user));
+      assert.equal((await post(api, event)).status, 200, event.type);
+
+      const me = await (await api("GET", "/me", { token: await token() })).json();
+      assert.equal(me.plan, "free", event.type);
+      assert.equal(me.can_upgrade, true, event.type);
+      const cancel = fetch.calls.find((c) => c.url.includes("subscriptions/sub_1") && c.init.method === "DELETE");
+      assert.ok(cancel, event.type + " should cancel the subscription");
+    }
+  });
+
+  // A goodwill credit for one month is not an undoing of the subscription.
+  it("leaves the plan alone on a part refund", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    await post(api, completed(user));
+    const res = await post(api, {
+      id: "evt_r2", type: "charge.refunded",
+      data: { object: { customer: "cus_1", amount: 500, amount_refunded: 200, refunded: false } },
+    });
+    assert.equal((await res.json()).ignored, true);
+    assert.equal((await (await api("GET", "/me", { token: await token() })).json()).plan, "supporter");
+  });
+
   // The event id is recorded before the plan row is written. If that write fails, Stripe retries,
   // and the retry must not be waved through as a repeat or the student paid for nothing.
   it("applies the retry of an event whose first attempt failed", async () => {

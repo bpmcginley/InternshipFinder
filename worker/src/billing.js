@@ -287,6 +287,32 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
     return { ok: true };
   }
 
+  // Money taken back. Stripe cancels nothing on a refund or a dispute, so without this a student
+  // who charged back or was refunded kept the bigger allowance until the subscription lapsed on its
+  // own, and Managed Payments (where Stripe fights the dispute for us) is no different: the plan row
+  // is ours either way. A part refund is left alone - that is a goodwill credit, not an undoing -
+  // and so is a dispute that Stripe later decides in our favour, which arrives as its own event and
+  // does not restore the plan; the student can subscribe again.
+  if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+    const charge = event.type === "charge.dispute.created" ? { customer: o.customer } : o;
+    if (event.type === "charge.refunded" && !(o.refunded || (o.amount_refunded && o.amount_refunded >= o.amount))) {
+      return { ok: true, ignored: true };
+    }
+    const row = charge.customer
+      ? await db.prepare("SELECT user_hash, subscription FROM plans WHERE customer = ?").bind(charge.customer).first()
+      : null;
+    if (!row || !row.user_hash) return { ok: true, ignored: true };
+    // Ends it now rather than at the period end: they have their money back already.
+    if (row.subscription) {
+      await stripe(env, "subscriptions/" + encodeURIComponent(row.subscription), {}, fetchImpl, null, "DELETE")
+        .catch(() => null);
+    }
+    await savePlan(db, row.user_hash, {
+      plan: "free", status: "canceled", customer: charge.customer, subscription: row.subscription, periodEnd: null,
+    }, now);
+    return { ok: true };
+  }
+
   return { ok: true, ignored: true };
 }
 

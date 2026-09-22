@@ -162,8 +162,10 @@ Pro later without touching code.
    - `npx wrangler secret put STRIPE_PRICE_ID` (Supporter)
    - `npx wrangler secret put STRIPE_PRICE_ID_PRO` (Pro; skip it to launch with one tier)
 4. Add the webhook in Stripe → Developers → Webhooks: URL `<worker-url>/billing/webhook`, events
-   `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
-   Copy the signing secret and run `npx wrangler secret put STRIPE_WEBHOOK_SECRET`.
+   `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`,
+   `charge.refunded`, `charge.dispute.created`. The last two put a student back on free and cancel
+   the subscription when the money goes back; leave them out and a refunded plan keeps its
+   allowance. Copy the signing secret and run `npx wrangler secret put STRIPE_WEBHOOK_SECRET`.
 5. Set `PAYMENTS_ENABLED = "1"` and a correct `SITE_URL` in `wrangler.toml`, then `npm run deploy`.
 6. Check it with a test card (`4242 4242 4242 4242`): `GET /me` should flip to `"plan": "supporter"`
    (or `"pro"`) with a larger allowance, switching tier in Stripe's portal should move it across, and
