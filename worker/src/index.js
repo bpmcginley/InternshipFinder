@@ -8,10 +8,14 @@ import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./de
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
-// The extension's ID is fixed by the "key" in its manifest (same ID from the store and from Load unpacked),
-// so it is named here instead of trusting every chrome-extension:// origin.
-const EXTENSION_ORIGIN = "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag";
-const DEFAULT_ORIGINS = `https://bpmcginley.github.io,http://localhost:8000,${EXTENSION_ORIGIN}`;
+// InternScout's own extension IDs, named here instead of trusting every chrome-extension:// origin.
+// was: one ID, on the belief that the manifest "key" gave the store the same ID as Load unpacked. It
+// does not: the store zip drops "key", and the store assigned its own ID when the item was created.
+const EXTENSION_ORIGINS = [
+  "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag",   // Load unpacked (fixed by the manifest "key")
+  "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi",   // Chrome Web Store
+];
+const DEFAULT_ORIGINS = ["https://bpmcginley.github.io", "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");

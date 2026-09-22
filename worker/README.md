@@ -98,8 +98,11 @@ Both client IDs are public and live in `wrangler.toml`. A provider is hidden whi
 
 Both need these redirect URIs:
 - `https://bpmcginley.github.io/InternshipFinder/`
-- `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`. The `"key"` in `extension/manifest.json`
-  gives the store install and every Load unpacked copy this same ID, so one redirect covers both.
+- `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`: every Load unpacked copy. The `"key"` in
+  `extension/manifest.json` fixes this ID.
+- `https://hpnbbpmalfjijnmpoihhjgjolhabjpgi.chromiumapp.org/`: the Chrome Web Store copy. The store zip
+  drops `"key"`, so the store assigned its own ID when the item was created; the key does not carry over.
+  Both IDs are also in `ALLOWED_ORIGINS` (`wrangler.toml`).
 
 <!-- was: ## Paid plans (Bruce, only when AI spend needs covering) -->
 ## Paid plans (live)
