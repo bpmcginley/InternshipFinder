@@ -33,6 +33,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           INTERNSCOUT_DEMAND_URL: ${{ secrets.INTERNSCOUT_DEMAND_URL }}
           INTERNSCOUT_DEMAND_TOKEN: ${{ secrets.INTERNSCOUT_DEMAND_TOKEN }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
         run: python growth/report.py docs > report.md
 
       - name: Post it

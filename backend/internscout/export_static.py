@@ -17,6 +17,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from .db import SessionLocal, init_db
 from .models import Listing, Application
+from .seo_pages import baseline_day
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, stage_of, years_of
@@ -303,7 +304,14 @@ def carry_first_seen(listings: list[dict], out_dir: str, today=None, prev=None) 
         if seen:
             x["first_seen"] = seen
             carried += 1
-        x["is_new"] = _seen_within(x.get("first_seen"), today, NEW_DAYS)
+    # New means what the landing pages mean by it (seo_pages.fresh): found in the last week, not an
+    # old posting a scan only just reached, and not one already open on the day first_seen began
+    # (2026-09-18), which marked every listing on the site as new.
+    baseline = baseline_day(listings)
+    for x in listings:
+        x["is_new"] = (_seen_within(x.get("first_seen"), today, NEW_DAYS)
+                       and not (baseline and str(x.get("first_seen") or "")[:10] <= baseline)
+                       and (not x.get("posted_at") or _seen_within(x["posted_at"], today, 2 * NEW_DAYS)))
     return carried
 
 

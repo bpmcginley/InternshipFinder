@@ -33,12 +33,13 @@ def _rfc822(stamp, fallback: datetime) -> str:
     return format_datetime(sp._when(stamp) or fallback)
 
 
-def rss(path: str, h1: str, items: list[dict], now: datetime, state: str | None = None) -> str:
+def rss(path: str, h1: str, items: list[dict], now: datetime, state: str | None = None,
+        limit: int | None = ITEMS) -> str:
     url = sp.SITE + path
     rows = []
     # Newest to InternScout, not newest posting: a reader or bot only wants what it has not seen yet.
     found = sorted(items, key=lambda x: x.get("first_seen") or "", reverse=True)
-    for x in found[:ITEMS]:
+    for x in found[:limit]:
         bits = [sp.place(x, state)]
         if x.get("term"):
             bits.append(str(x["term"]))
@@ -76,6 +77,6 @@ def write_all(site_dir: str, pages: list[dict]) -> int:
             continue
         folder = os.path.join(site_dir, p["path"].strip("/").replace("/", os.sep))
         with open(os.path.join(folder, "feed.xml"), "w", encoding="utf-8", newline="\n") as f:
-            f.write(rss(p["path"], p["h1"], p["items"], now, p.get("state")))
+            f.write(rss(p["path"], p["h1"], p["items"], now, p.get("state"), p.get("feed_limit", ITEMS)))
         n += 1
     return n
