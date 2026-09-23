@@ -35,6 +35,9 @@
 <meta property="og:description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in needed; paid plans only add AI."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://internscout.org/"/>
+<!-- The landing pages under internships/ link here with ?field= and ?state= so the list opens on what the
+     student was reading. Those are the same page to a search engine; this keeps them one result. -->
+<link rel="canonical" href="https://internscout.org/"/>
 <!-- was: <meta property="og:image" content="icon128.png"/> -->
 <meta property="og:image" content="https://internscout.org/og-preview.png"/>
 <!-- was: <meta name="twitter:card" content="summary"/> -->
@@ -354,7 +357,7 @@
 </head>
 <body>
 <div id="root"></div>
-<noscript><p>InternScout needs JavaScript to search and rank listings. The raw data is public at <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/docs/data">github.com/bpmcginley/InternshipFinder</a>.</p></noscript>
+<noscript><p>InternScout needs JavaScript to search and rank listings. Without it, <a href="internships/">browse open internships by field, state or major</a>. The raw data is public at <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/docs/data">github.com/bpmcginley/InternshipFinder</a>.</p></noscript>
 <!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
      and nothing that identifies a visitor; see privacy.html. The token is public by design. -->
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>

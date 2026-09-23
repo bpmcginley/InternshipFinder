@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 import os
 from datetime import datetime, timezone
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from .db import SessionLocal, init_db
 from .models import Listing, Application
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
@@ -148,7 +149,14 @@ def _listing_dict(row: Listing) -> dict:
         "insights": ins,
         "is_new": row.is_new,
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
+        **({"via_search": True} if _search_only(row) else {}),
     }
+
+
+def _search_only(row: Listing) -> bool:
+    """Found only by the paid Google Jobs searches, which run once a day (see carry_search_finds)."""
+    sources = {s.source for s in row.source_links}
+    return sources == {"google_jobs"}
 
 
 def merged_stages(stored: list[str] | None, title: str) -> list[str]:
@@ -359,12 +367,46 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
     return held
 
 
+def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
+    """Keep what the Google Jobs searches found until they have had a chance to find it again.
+
+    Those searches cost money and run once a day, on the first run after midnight UTC; the three
+    runs after it do not search. The database does not outlive a run, so a listing only a search
+    found was published by the daily export and deleted by the next one, six hours later: the
+    2026-09-23 02:48 export held the searches' finds and the 10:49 one had none of them. That also
+    blinded focus.py, which reads the last export to see which fields are still thin, to
+    everything its own searches turned up.
+
+    So such a listing is carried from the last export for CARRY_DAYS after a search last saw it,
+    the same bound a board that failed to answer gets.
+    """
+    prev = previous_export(out_dir) if prev is None else prev
+    today = today or datetime.now(timezone.utc).date()
+    have = {x["apply_url"] for x in listings if x.get("apply_url")}
+    held = 0
+    for it in prev:
+        url = it.get("apply_url")
+        if not it.get("via_search") or it.get("status") != "open" or not url or url in have:
+            continue
+        if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
+            continue
+        stage = merged_stages(it.get("stage"), it.get("title") or "")
+        if not stage:
+            continue
+        listings.append({**it, "stage": stage, "carried": True})
+        have.add(url)
+        held += 1
+    return held
+
+
 def export(out_dir: str) -> dict:
     init_db()
     os.makedirs(out_dir, exist_ok=True)
     with SessionLocal() as db:
         rows = db.scalars(
-            select(Listing).order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
+            # source_links in one query: _listing_dict reads them for every row (via_search).
+            select(Listing).options(selectinload(Listing.source_links))
+            .order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
         listings = still_student_opportunities([_listing_dict(r) for r in rows])
         generated_at = datetime.now(timezone.utc).isoformat()
@@ -375,6 +417,7 @@ def export(out_dir: str) -> dict:
         prev = previous_export(out_dir)
         carried = carry_first_seen(listings, out_dir, prev=prev)
         held = carry_open_boards(listings, out_dir, prev=prev)
+        held += carry_search_finds(listings, out_dir, prev=prev)
         stats = {
             "total": len(listings),
             "open": sum(1 for x in listings if x["status"] == "open"),

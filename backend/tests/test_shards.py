@@ -363,3 +363,21 @@ def test_the_coverage_report_reads_a_folder_with_sidecars(tmp_path):
     from internscout.coverage import load
     write_shards([dict(_listing("a1", ["Boston, MA"]), description="x")], str(tmp_path), "now")
     assert [x["id"] for x in load(str(tmp_path / "listings"))] == ["a1"]
+
+
+def test_what_the_daily_search_found_outlives_the_runs_that_do_not_search(tmp_path):
+    # Google Jobs runs once a day and the database is rebuilt every run, so its finds were
+    # published at 02:48 and gone at 10:49.
+    from datetime import date
+    from internscout.export_static import carry_search_finds
+    found = _prev(id="g", apply_url="https://www.linkedin.com/jobs/view/1", ats="other", via_search=True,
+                  last_seen="2026-09-23T02:48:00+00:00")
+    board = _prev(id="b", apply_url="https://x/b")          # a board listing this run did not return
+    stale = _prev(id="s", apply_url="https://x/s", via_search=True, last_seen="2026-09-19T02:48:00+00:00")
+    _write_prev(tmp_path, [found, board, stale])
+    listings = []
+    assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 23)) == 1
+    assert [x["id"] for x in listings] == ["g"] and listings[0]["carried"]
+    # found again by today's search: not added twice
+    listings = [dict(found, last_seen="2026-09-24T02:48:00+00:00")]
+    assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 24)) == 0

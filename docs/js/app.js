@@ -501,7 +501,13 @@
     const [setupOpen, setSetupOpen] = useState(() => !IS.loadProfile() && !IS.ls.get(SKIP_KEY, false));
     const [landingOpen, setLandingOpen] = useState(() => !IS.ls.get(LANDING_KEY, false));
     const initF = prof => ({ sort: prof ? "score" : "new", hide_citizen: !!(prof && prof.work_auth && prof.work_auth !== "citizen"), paid: prof && prof.paid_only ? "no_unpaid" : "" });
-    const [f, setF] = useState(() => ({ q: "", fields: [], states: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()) }));
+    // The landing pages under internships/ link here with ?field=a,b&state=MA, so the list opens on what the
+    // student was reading. Only well-formed tags and state keys are taken; an unknown one matches nothing.
+    const fromLink = () => {
+      const q = new URLSearchParams(location.search), list = (k, ok) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, 6);
+      return { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/) };
+    };
+    const [f, setF] = useState(() => ({ q: "", fields: [], states: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...fromLink() }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
     const [saved, setSaved] = useState(() => IS.ls.get(SAVED_KEY, []) || []);
     const [openId, setOpenId] = useState(null);
@@ -514,6 +520,14 @@
     const { info, queue, profile: extProfile } = useExtension();
 
     useEffect(() => { IS.ls.set(LANDING_KEY, true); }, []);
+    // Taken into the filters above, so drop them from the address: a reload after changing filters
+    // should not bring the landing page's back.
+    useEffect(() => {
+      const q = new URLSearchParams(location.search);
+      if (!q.has("field") && !q.has("state")) return;
+      q.delete("field"); q.delete("state");
+      history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
+    }, []);
 
     // data
     const reload = useCallback(async fromRaw => {
@@ -964,6 +978,8 @@
           + (payPlans.length ? `; ${payPlans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" or ")} raises it` : "; optional paid plans raise it")
           + ". Made by a UMass student, not affiliated with UMass Amherst."),
         h("nav", { className: "links", "aria-label": "Footer" },
+          // The crawlable pages built by backend/internscout/seo_pages.py at deploy time.
+          h("a", { href: "internships/" }, "Browse by field, state or major"),
           h("a", { href: "privacy.html" }, "Privacy"),
           h("a", { href: "terms.html" }, "Terms"),
           h("a", { href: feedbackUrl, target: "_blank", rel: "noopener" }, "Feedback"),
