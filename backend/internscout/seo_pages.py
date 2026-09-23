@@ -41,6 +41,7 @@ def keep_at(need: int) -> int:
     topic hovering at the line does not vanish and come back between deploys (a search engine that
     finds a URL gone drops it, and takes weeks to trust it again)."""
     return need * 2 // 3
+MIN_EMPLOYER = 10       # open roles an employer needs before it gets a page of its own
 PER_PAGE = 40           # listings shown on one page; the dashboard has the rest
 NEW_DAYS = 7
 RELATED = 12            # related-page links per section
@@ -138,8 +139,23 @@ def load(site_dir: str) -> dict:
                     continue
                 keep = by_id.setdefault(x["id"], dict(x, keys=set()))
                 keep["keys"].add(key)
-    return {"generated_at": index.get("generated_at"), "listings": list(by_id.values()),
-            "majors": majors.get("majors", [])}
+    listings = list(by_id.values())
+    return {"generated_at": index.get("generated_at"), "listings": listings,
+            "majors": majors.get("majors", []), "baseline": baseline_day(listings)}
+
+
+def baseline_day(listings: list[dict]) -> str | None:
+    """The day first_seen began to be kept, if it still dominates the data.
+
+    first_seen only survives from one export to the next since 2026-09-18, so everything already
+    open that day carries that date: 11,146 of 12,792 listings on 2026-09-23. Counted as "found this
+    week", that made half the site new, and a post said 110 new data science roles when 31 were.
+    A day holding more than a third of all listings is that start, not a week's finds."""
+    days = Counter(str(x.get("first_seen") or "")[:10] for x in listings if x.get("first_seen"))
+    if not days:
+        return None
+    day, n = min(days.items())
+    return day if n * 3 > len(listings) else None
 
 
 def _when(stamp) -> datetime | None:
@@ -180,6 +196,16 @@ def place(x: dict, state: str | None = None) -> str:
 # UMass Amherst students are the audience: roles within reach of western Massachusetts, and remote
 # ones, are the ones they can take. Pages that span the country list those first.
 HOME_STATES = {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "remote"}
+
+
+def fresh(x: dict, now: datetime, baseline: str | None = None) -> bool:
+    """Found in the last NEW_DAYS, and not an old posting a scan has only just reached, nor one that
+    was already open on the day first_seen began (baseline_day)."""
+    seen, posted = _when(x.get("first_seen")), _when(x.get("posted_at"))
+    if baseline and str(x.get("first_seen") or "")[:10] <= baseline:
+        return False
+    return bool(seen and now - seen <= timedelta(days=NEW_DAYS)
+                and (posted is None or now - posted <= timedelta(days=2 * NEW_DAYS)))
 
 
 def near_home_first(items: list[dict]) -> list[dict]:
@@ -227,12 +253,14 @@ def summary(items: list[dict], what: str, where: str) -> str:
     return " ".join(esc(p) for p in parts)
 
 
-def listing_rows(items: list[dict], now: datetime, state: str | None = None) -> str:
+EMPLOYERS: dict[str, str] = {}   # company name -> its employer page, set by build()
+
+
+def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None) -> str:
     rows = []
     ordered = newest_first(items) if state else near_home_first(items)
     for x in ordered[:PER_PAGE]:
-        seen = _when(x.get("first_seen"))
-        new = seen and now - seen <= timedelta(days=NEW_DAYS)
+        new = fresh(x, now, BASELINE)
         stage = ", ".join(s.replace("_", "-") for s in (x.get("stage") or []) if s != "internship")
         meta = [esc(place(x, state))]
         if x.get("term"):
@@ -245,12 +273,18 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None) -> 
         href = esc(safe_url(x["apply_url"]))
         rows.append(
             '<li class="job">'
-            f'<div class="co">{esc(x.get("company_name") or "")}{new_tag}</div>'
+            f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)}{pay_tag}</div>'
             f'<a class="go" href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>'
             "</li>")
     return "\n".join(rows)
+
+
+def company_link(name: str, here: str | None = None) -> str:
+    """The company's name, linked to its employer page when it has one (and it is not this page)."""
+    path = EMPLOYERS.get(name)
+    return f'<a href="{esc(path)}">{esc(name)}</a>' if path and name != here else esc(name)
 
 
 def link_list(title: str, links: list[tuple[str, str, int]]) -> str:
@@ -303,6 +337,7 @@ def beacon_from(site_dir: str) -> str:
 
 
 BEACON = ""   # set by build() from the site's own index.html
+BASELINE: str | None = None   # set by build(): see baseline_day
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
@@ -354,12 +389,14 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 """
 
 
-def dash_link(fields=(), state: str | None = None) -> str:
-    """The dashboard, opened on this page's fields and state (docs/js/app.js reads ?field= and
-    ?state=; the dashboard's canonical link keeps these one page to search engines)."""
+def dash_link(fields=(), state: str | None = None, search: str | None = None) -> str:
+    """The dashboard, opened on this page's fields, state or search (docs/js/app.js reads ?field=,
+    ?state= and ?q=; the dashboard's canonical link keeps these one page to search engines)."""
     q = [f"field={quote(','.join(fields), safe=',')}"] if fields else []
     if state:
         q.append(f"state={quote(state)}")
+    if search:
+        q.append(f"q={quote(search)}")
     return "/?" + "&amp;".join(q) if q else "/"
 
 
@@ -369,12 +406,13 @@ def fits_line(majors: list[str]) -> str:
 
 
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
-                 state: str | None = None, dash: str = "/", fits: list[str] | None = None) -> str:
+                 state: str | None = None, dash: str = "/", fits: list[str] | None = None,
+                 here: str | None = None) -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
     return (f"<p class=\"lede\">{summary(items, what, where)}</p>" + fits_line(fits or []) +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
-            f"<ul class=\"jobs\">{listing_rows(items, now, state)}</ul>"
+            f"<ul class=\"jobs\">{listing_rows(items, now, state, here)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
             + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
@@ -386,9 +424,10 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
 
 def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[dict]:
     """live: the paths the site is serving now (from its sitemap), which get the lower keep_at bar."""
-    global BEACON
+    global BEACON, BASELINE
     BEACON = beacon_from(site_dir)
     d = load(site_dir)
+    BASELINE = d["baseline"]
     listings = d["listings"]
     now = _when(d["generated_at"]) or datetime.now(timezone.utc)
     updated = f"{now:%B} {now.day}, {now.year}"
@@ -435,6 +474,22 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
         path = owner.setdefault(ids, f"/internships/for/{slugify(name)}-majors/")
         major_rows.append((m, tags, items, path))
         fits.setdefault(path, []).append(name)
+
+    # Employers with enough open roles get a page ("Amgen internships" is a common search). Two
+    # names that slug alike keep only the larger, so one URL never means two companies.
+    global EMPLOYERS
+    by_company: dict[str, list] = {}
+    for x in listings:
+        by_company.setdefault(x.get("company_name") or "", []).append(x)
+    EMPLOYERS = {}
+    taken: set[str] = set()
+    for name, items in sorted(by_company.items(), key=lambda kv: -len(kv[1])):
+        slug = slugify(name)
+        path = f"/internships/at/{slug}/"
+        if not slug or slug in taken or not enough(len(items), path, MIN_EMPLOYER):
+            continue
+        taken.add(slug)
+        EMPLOYERS[name] = path
 
     def add(path, title, desc, h1, crumbs, body, items=None, state=None):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
@@ -505,7 +560,39 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
                          fits=[n for n in fits[path] if n != name]), items)
 
+    for name, path in sorted(EMPLOYERS.items()):
+        items = by_company[name]
+        top = [t for t, _ in Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS).most_common(3)]
+        mostly = join_words([lower_name(field_title(t)) for t in top])
+        note = (f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are its open roles "
+                "from public job boards; always apply on the employer's own site.</p>")
+        related = note + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
+                                                     for t in top if t in fields])
+        add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
+            f"{len(items):,} open internships and co-ops at {name} for college students"
+            + (f", mostly in {mostly}" if mostly else "") + f". Updated {updated}. Free search, no sign-up.",
+            f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
+            listing_body(items, f"at {name}", "", now, related, dash=dash_link(search=name), here=name), items)
+
+    new = [x for x in listings if fresh(x, now, d["baseline"])]
+    if len(new) >= MIN_OPEN:
+        add("/internships/new/", f"New Internships This Week – {len(new):,} Found | InternScout",
+            f"{len(new):,} internships, co-ops and research roles for college students found in the last week, "
+            f"Northeast and remote first. Updated {updated}. Free, no sign-up.",
+            "New internships this week", [root, ("/internships/new/", "New this week")],
+            listing_body(new, "found in the last week", "", now,
+                         "<p class=\"more\">One feed for a whole club: this page's RSS feed carries every new "
+                         "role, so a Discord or Slack channel can follow just this one.</p>"), new)
+
     # Hubs last, so they only link to pages that exist.
+    add("/internships/at/", f"Internships by Employer – {len(EMPLOYERS):,} Employers | InternScout",
+        f"Open internships and co-ops at {len(EMPLOYERS):,} employers hiring college students now, from each "
+        "employer's public job board. Free, no sign-up.",
+        "Internships by employer", [root, ("/internships/at/", "By employer")],
+        f"<p class=\"lede\">Every employer with at least {MIN_EMPLOYER} open student roles. InternScout is not "
+        "affiliated with any of them.</p>"
+        + link_list("Employers", sorted(((p, n, len(by_company[n])) for n, p in EMPLOYERS.items()),
+                                        key=lambda e: e[1].lower())))
     add("/internships/for/", f"Internships by Major – {len(majors_made)} Majors | InternScout",
         "Open internships, co-ops and research roles for every UMass Amherst major, from nursing and "
         "sport management to engineering and finance. Free, no sign-up.",
@@ -523,8 +610,10 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
                                           for t, v in fields.items()), key=lambda p: p[1]))
            + link_list("By state", sorted(((f"/internships/{state_slug(k)}/", US_STATES[k], len(v))
                                           for k, v in states.items()), key=lambda p: p[1]))
-           + "<section class=\"rel\"><h2>By major</h2><ul><li><a href=\"/internships/for/\">"
-             f"All {len(majors_made)} majors</a></li></ul></section>")
+           + "<section class=\"rel\"><h2>More ways to browse</h2><ul><li><a href=\"/internships/for/\">"
+             f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(EMPLOYERS):,} employers"
+             "</a></li>" + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
+                            if len(new) >= MIN_OPEN else "") + "</ul></section>")
     add("/internships/", f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout",
         f"{len(listings):,} open internships, co-ops and research roles for college students, updated "
         f"{updated}. Browse by field, state or major. Free, no sign-up.",

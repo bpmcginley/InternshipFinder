@@ -22,22 +22,17 @@ import os
 import sys
 import urllib.request
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 from internscout import seo_pages as sp  # noqa: E402
 
 LIMIT = 300          # Bluesky's limit, in characters; Mastodon's is 500 and Discord's 2,000
-FRESH_DAYS = 7
 MIN_NEW = 5          # a field needs this many new nearby roles to be worth a post
 
 
-def fresh(x: dict, now: datetime) -> bool:
-    """Found this week, and not an old posting a scan only just reached."""
-    seen, posted = sp._when(x.get("first_seen")), sp._when(x.get("posted_at"))
-    return bool(seen and now - seen <= timedelta(days=FRESH_DAYS)
-                and (posted is None or now - posted <= timedelta(days=2 * FRESH_DAYS)))
+fresh = sp.fresh      # found this week, and not an old posting a scan only just reached
 
 
 def candidates(site_dir: str) -> tuple[list[tuple[str, list[dict]]], datetime]:
@@ -45,7 +40,7 @@ def candidates(site_dir: str) -> tuple[list[tuple[str, list[dict]]], datetime]:
     now = sp._when(d["generated_at"]) or datetime.now(timezone.utc)
     by_field: dict[str, list[dict]] = {}
     for x in d["listings"]:
-        if x["keys"] & sp.HOME_STATES and fresh(x, now):
+        if x["keys"] & sp.HOME_STATES and fresh(x, now, d["baseline"]):
             for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS:
                 by_field.setdefault(t, []).append(x)
     ranked = sorted(((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW), key=lambda tv: (-len(tv[1]), tv[0]))
@@ -73,7 +68,10 @@ def pick(ranked: list[tuple[str, list[dict]]], now: datetime) -> tuple[str, list
 
 def _post_json(url: str, body: dict, headers: dict | None = None) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", **(headers or {})})
+                                 headers={"Content-Type": "application/json",
+                                          # Cloudflare-fronted APIs (Discord among them) refuse Python's default agent.
+                                          "User-Agent": "InternScout-brand-posts/1.0 (+https://internscout.org)",
+                                          **(headers or {})})
     with urllib.request.urlopen(req, timeout=30) as r:
         raw = r.read()
     return json.loads(raw) if raw else {}

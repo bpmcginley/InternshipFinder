@@ -505,7 +505,8 @@
     // student was reading. Only well-formed tags and state keys are taken; an unknown one matches nothing.
     const fromLink = () => {
       const q = new URLSearchParams(location.search), list = (k, ok) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, 6);
-      return { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/) };
+      // ?q= is a search, from an employer's page: plain text, so it only ever fills the search box.
+      return { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/), q: (q.get("q") || "").slice(0, 80) };
     };
     const [f, setF] = useState(() => ({ q: "", fields: [], states: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...fromLink() }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
@@ -524,8 +525,8 @@
     // should not bring the landing page's back.
     useEffect(() => {
       const q = new URLSearchParams(location.search);
-      if (!q.has("field") && !q.has("state")) return;
-      q.delete("field"); q.delete("state");
+      if (!q.has("field") && !q.has("state") && !q.has("q")) return;
+      q.delete("field"); q.delete("state"); q.delete("q");
       history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     }, []);
 
