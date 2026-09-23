@@ -28,6 +28,19 @@ from urllib.parse import quote
 
 SITE = "https://internscout.org"
 MIN_OPEN = 5            # no page for fewer open listings than this
+# A field in one state needs more: at 5, 900 near-identical pages would be most of the site, the shape
+# search engines treat as doorway pages. At 15 about 400 remain, each a list worth reading.
+MIN_COMBO = 15
+# ...counting only postings filed in fewer states than this. One employer posting the same role in
+# 30 states would otherwise make 30 pages that differ only in the state's name.
+SPREAD = 10
+
+
+def keep_at(need: int) -> int:
+    """A page that is already live stays until it falls to two thirds of what a new page needs, so a
+    topic hovering at the line does not vanish and come back between deploys (a search engine that
+    finds a URL gone drops it, and takes weeks to trust it again)."""
+    return need * 2 // 3
 PER_PAGE = 40           # listings shown on one page; the dashboard has the rest
 NEW_DAYS = 7
 RELATED = 12            # related-page links per section
@@ -45,6 +58,7 @@ US_STATES = {
     "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin",
     "WY": "Wyoming", "PR": "Puerto Rico", "remote": "Remote (US)",
 }
+PLACES = set(US_STATES) - {"remote"}      # the states a posting can be filed in
 
 # How a field tag reads in a heading and in a URL. Tags not listed read as their own words.
 FIELD_TITLES = {
@@ -137,7 +151,10 @@ def _when(stamp) -> datetime | None:
 
 
 def newest_first(items: list[dict]) -> list[dict]:
-    return sorted(items, key=lambda x: (x.get("first_seen") or "", x.get("posted_at") or ""), reverse=True)
+    """The dashboard's order (docs/js/app.js, "newer"): dated postings first, newest posting first,
+    then by when a scan found it. first_seen alone would put a 2024 posting found this week on top."""
+    return sorted(items, key=lambda x: (bool(x.get("posted_at")), x.get("posted_at") or "", x.get("first_seen") or ""),
+                  reverse=True)
 
 
 def is_paid(x: dict) -> bool:
@@ -174,6 +191,11 @@ def plural(n: int, one: str, many: str | None = None) -> str:
     return f"{n:,} {one if n == 1 else (many or one + 's')}"
 
 
+def lower_name(name: str) -> str:
+    """A field title as it reads mid-sentence: "machine learning and AI", not "... and ai"."""
+    return " ".join(w if len(w) > 1 and w.isupper() else w.lower() for w in name.split())
+
+
 def join_words(words: list[str]) -> str:
     words = [w for w in words if w]
     return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1] if words else ""
@@ -194,7 +216,8 @@ def summary(items: list[dict], what: str, where: str) -> str:
     paid = sum(1 for x in items if is_paid(x))
     if paid:
         parts.append(f"{paid * 100 // n}% list pay or say they are paid.")
-    terms = Counter(x["term"] for x in items if x.get("term"))
+    # A bare season ("Summer") is a board that gave no year; beside "Summer 2027" it reads as a repeat.
+    terms = Counter(x["term"] for x in items if x.get("term") and re.search(r"\d{4}|round", str(x["term"])))
     if terms:
         top = [t for t, _ in terms.most_common(2)]
         parts.append(f"The most common start {'term is' if len(top) == 1 else 'terms are'} {join_words(top)}.")
@@ -283,7 +306,7 @@ BEACON = ""   # set by build() from the site's own index.html
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
-         body: str, updated: str) -> str:
+         body: str, updated: str, index: bool = True) -> str:
     url = SITE + path
     crumb_html = " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1]) + \
                  (f" › {esc(crumbs[-1][1])}" if crumbs else "")
@@ -292,6 +315,8 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
                               for i, (h, t) in enumerate(crumbs)]}
     # "</" inside a script block would end it early; JSON allows the escaped form.
     ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
+    # A breadcrumb trail of one is not a trail (Google reports it as invalid), so the hub has none.
+    ld_tag = f'<script type="application/ld+json">{ld_json}</script>' if len(crumbs) > 1 else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -299,7 +324,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(description)}"/>
-<link rel="canonical" href="{esc(url)}"/>
+{f'<link rel="canonical" href="{esc(url)}"/>' if index else '<meta name="robots" content="noindex"/>'}
 <meta property="og:title" content="{esc(title)}"/>
 <meta property="og:description" content="{esc(description)}"/>
 <meta property="og:type" content="website"/>
@@ -309,7 +334,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 <link rel="icon" type="image/png" sizes="48x48" href="/icon48.png"/>
 <link rel="apple-touch-icon" href="/icon128.png"/>
 <style>{CSS}</style>
-<script type="application/ld+json">{ld_json}</script>
+{ld_tag}
 </head>
 <body>
 <div class="wrap">
@@ -337,11 +362,16 @@ def dash_link(fields=(), state: str | None = None) -> str:
     return "/?" + "&amp;".join(q) if q else "/"
 
 
+def fits_line(majors: list[str]) -> str:
+    return (f"<p class=\"fits\">The page for {esc(join_words(sorted(majors)))} "
+            f"{'majors' if len(majors) > 1 else 'majors too'}.</p>") if majors else ""
+
+
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
-                 state: str | None = None, dash: str = "/") -> str:
+                 state: str | None = None, dash: str = "/", fits: list[str] | None = None) -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
-    return (f"<p class=\"lede\">{summary(items, what, where)}</p>"
+    return (f"<p class=\"lede\">{summary(items, what, where)}</p>" + fits_line(fits or []) +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
             f"<ul class=\"jobs\">{listing_rows(items, now, state)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
@@ -351,7 +381,8 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
 
 # ---------------------------------------------------------------- build
 
-def build(site_dir: str) -> list[dict]:
+def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[dict]:
+    """live: the paths the site is serving now (from its sitemap), which get the lower keep_at bar."""
     global BEACON
     BEACON = beacon_from(site_dir)
     d = load(site_dir)
@@ -368,8 +399,11 @@ def build(site_dir: str) -> list[dict]:
         for k in x["keys"]:
             if k in US_STATES:
                 by_state.setdefault(k, []).append(x)
-    fields = {t: v for t, v in by_field.items() if len(v) >= MIN_OPEN}
-    states = {k: v for k, v in by_state.items() if len(v) >= MIN_OPEN}
+    def enough(n: int, path: str, need: int = MIN_OPEN) -> bool:
+        return n >= need or (path in live and n >= keep_at(need))
+
+    fields = {t: v for t, v in by_field.items() if enough(len(v), f"/internships/{field_slug(t)}/")}
+    states = {k: v for k, v in by_state.items() if enough(len(v), f"/internships/{state_slug(k)}/")}
     # A field slug and a state slug must never name the same folder.
     state_slugs = {state_slug(k) for k in states}
     fields = {t: v for t, v in fields.items() if field_slug(t) not in state_slugs}
@@ -378,11 +412,33 @@ def build(site_dir: str) -> list[dict]:
     for t, items in fields.items():
         for k in states:
             hit = [x for x in items if k in x["keys"]]
-            if len(hit) >= MIN_OPEN:
+            local = [x for x in hit if len(x["keys"] & PLACES) < SPREAD]
+            if enough(len(local), f"/internships/{field_slug(t)}/{state_slug(k)}/", MIN_COMBO):
                 combos[(t, k)] = hit
 
-    def add(path, title, desc, h1, crumbs, body):
-        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated)})
+    # A major whose listings are exactly a field page's, or an earlier major's, would be a second URL
+    # for the same list. It gets no page of its own: the majors hub links it to that page, and that
+    # page names it.
+    owner = {frozenset(x["id"] for x in v): f"/internships/{field_slug(t)}/" for t, v in fields.items()}
+    major_rows, fits = [], {}
+    for m in d["majors"]:
+        tags = [t for t in m.get("tags") or [] if t not in SKIP_FIELDS]
+        items = [x for x in listings if set(x.get("field_tags") or []) & set(tags)]
+        if (m.get("level") not in (None, "undergrad")
+                or not enough(len(items), f"/internships/for/{slugify(m['name'])}-majors/")):
+            continue
+        name = m["name"]
+        ids = frozenset(x["id"] for x in items)
+        path = owner.setdefault(ids, f"/internships/for/{slugify(name)}-majors/")
+        major_rows.append((m, tags, items, path))
+        fits.setdefault(path, []).append(name)
+
+    def add(path, title, desc, h1, crumbs, body, items=None):
+        # lastmod is the day the page's newest listing was found: it moves when the page gains a
+        # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
+        found = [str(x.get("first_seen") or "")[:10] for x in (listings if items is None else items)]
+        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated),
+                      "items": items, "h1": h1, "lastmod": max((f for f in found if f), default=None)})
 
     root = ("/internships/", "Internships")
 
@@ -391,13 +447,13 @@ def build(site_dir: str) -> list[dict]:
         path = f"/internships/{field_slug(t)}/"
         top_states = sorted(((k, len(v)) for (tt, k), v in combos.items() if tt == t), key=lambda kv: -kv[1])
         related = link_list(f"{name} internships by state",
-                            [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states[:RELATED]])
+                            [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states])
         emp = join_words([c for c, _ in Counter(x["company_name"] for x in items).most_common(3)])
         add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
-            f"{len(items):,} open {name.lower()} internships and co-ops for college students, updated "
+            f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
             f"{name} internships", [root, (path, name)],
-            listing_body(items, f"in {name.lower()}", "", now, related, dash=dash_link([t])))
+            listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path)), items)
 
     for k, items in sorted(states.items()):
         where = US_STATES[k]
@@ -405,13 +461,13 @@ def build(site_dir: str) -> list[dict]:
         top_fields = sorted(((t, len(v)) for (t, kk), v in combos.items() if kk == k), key=lambda tv: -tv[1])
         related = link_list(f"Internships in {where} by field",
                             [(f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
-                             for t, n in top_fields[:RELATED]])
+                             for t, n in top_fields])
         loc = "remote" if k == "remote" else f"in {where}"
         add(path, f"Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout",
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", [root, (path, where)],
-            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k)))
+            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k)), items)
 
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
@@ -422,20 +478,18 @@ def build(site_dir: str) -> list[dict]:
                              for kk, n in others[:RELATED]])
         loc = "remote" if k == "remote" else f"in {where}"
         add(path, f"{name} Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout",
-            f"{len(items):,} open {name.lower()} internships and co-ops {loc}, updated {updated}. "
+            f"{len(items):,} open {lower_name(name)} internships and co-ops {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
-            listing_body(items, f"in {name.lower()}", f" {loc}", now, related, state=k, dash=dash_link([t], k)))
+            listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k)), items)
 
     majors_made = []
-    for m in d["majors"]:
-        tags = [t for t in m.get("tags") or [] if t not in SKIP_FIELDS]
-        items = [x for x in listings if set(x.get("field_tags") or []) & set(tags)]
-        if len(items) < MIN_OPEN or m.get("level") not in (None, "undergrad"):
-            continue
+    for m, tags, items, path in major_rows:
         name = m["name"]
-        path = f"/internships/for/{slugify(name)}-majors/"
+        majors_made.append((path, name, len(items)))
+        if path != f"/internships/for/{slugify(name)}-majors/":
+            continue                 # folded into the field or major page with the same listings
         rel_tags = [t for t in (m.get("related") or []) if t in fields]
         related = link_list(f"Related fields for {name} majors",
                             [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t])) for t in rel_tags[:RELATED]])
@@ -444,8 +498,8 @@ def build(site_dir: str) -> list[dict]:
             f"{updated}. Built for UMass Amherst students; free, no sign-up.",
             f"Internships for {name} majors",
             [root, ("/internships/for/", "By major"), (path, name)],
-            listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags)))
-        majors_made.append((path, name, len(items)))
+            listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
+                         fits=[n for n in fits[path] if n != name]), items)
 
     # Hubs last, so they only link to pages that exist.
     add("/internships/for/", f"Internships by Major – {len(majors_made)} Majors | InternScout",
@@ -471,29 +525,57 @@ def build(site_dir: str) -> list[dict]:
     return pages
 
 
+def not_found(updated: str) -> str:
+    """GitHub Pages serves 404.html for any missing path, including a landing page whose listings
+    closed. Without it a visitor from an old search result gets GitHub's own page, with no way back."""
+    body = ("<p class=\"lede\">This page isn't here. If it listed internships, they may have closed "
+            "since it was made.</p>"
+            "<p><a class=\"cta\" href=\"/internships/\">Browse open internships</a></p>"
+            "<p>Or <a href=\"/\">open the dashboard</a> to search every listing.</p>")
+    return page("/404.html", "Page not found | InternScout", "This page is not on InternScout.",
+                "Page not found", [], body, updated, index=False)
+
+
 def write(site_dir: str, pages: list[dict]) -> None:
     for p in pages:
         folder = os.path.join(site_dir, p["path"].strip("/").replace("/", os.sep))
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, "index.html"), "w", encoding="utf-8", newline="\n") as f:
             f.write(p["html"])
-    today = datetime.now(timezone.utc).date().isoformat()
-    static = ["/", "/install.html", "/privacy", "/terms"]
-    urls = static + [p["path"] for p in pages]
+    now = datetime.now(timezone.utc)
+    with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(not_found(f"{now:%B} {now.day}, {now.year}"))
+    # The dashboard changes with every data refresh; the other static pages carry no lastmod rather
+    # than a made-up one.
+    hub = next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None)
+    urls = [("/", hub), ("/install.html", None), ("/privacy", None), ("/terms", None)] + \
+           [(p["path"], p.get("lastmod")) for p in pages]
     with open(os.path.join(site_dir, "sitemap.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
-        for u in urls:
-            f.write(f"  <url><loc>{esc(SITE + u)}</loc><lastmod>{today}</lastmod></url>\n")
+        for u, mod in urls:
+            f.write(f"  <url><loc>{esc(SITE + u)}</loc>" + (f"<lastmod>{mod}</lastmod>" if mod else "") + "</url>\n")
         f.write("</urlset>\n")
     with open(os.path.join(site_dir, "robots.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("User-agent: *\nAllow: /\n# Raw listing data; the pages under /internships/ are the readable form.\n"
                 f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
 
 
+def live_paths(sitemap: str) -> set[str]:
+    """The paths in the sitemap the site was serving before this build; empty if there was none."""
+    try:
+        with open(sitemap, encoding="utf-8") as f:
+            return {SITE_PATH.sub("", u) for u in re.findall(r"<loc>([^<]+)</loc>", f.read())}
+    except OSError:
+        return set()
+
+
+SITE_PATH = re.compile("^" + re.escape(SITE))
+
+
 def main(argv: list[str]) -> None:
     site_dir = argv[1] if len(argv) > 1 else "docs"
-    pages = build(site_dir)
+    pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else set())
     write(site_dir, pages)
     print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
 

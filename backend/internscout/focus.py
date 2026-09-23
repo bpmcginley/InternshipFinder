@@ -15,31 +15,35 @@ from __future__ import annotations
 import os
 from collections import Counter
 
+# Google Jobs results are tagged from their titles alone (normalize.py: classify(title)), so a query
+# only helps its field if the titles it brings back classify into that field and read as a student
+# role. tests/test_focus.py checks each query's typical title ("fine arts internship" -> "Fine Arts
+# Intern") against classify() and stage_of().
 SEARCHES: dict[str, list[str]] = {
     "psychology": ["psychology research assistant internship", "psychology internship undergraduate",
                    "behavioral health internship college student", "mental health internship undergraduate"],
     "nursing": ["nursing student internship", "student nurse extern summer 2027",
                 "nurse extern program", "patient care technician student"],
     "health": ["hospital internship undergraduate", "healthcare internship college student",
-               "health administration internship", "clinical internship undergraduate"],
+               "healthcare administration internship", "clinical internship undergraduate"],
     "public_health": ["public health internship undergraduate", "community health internship",
                       "health policy internship", "epidemiology internship undergraduate"],
     "clinical_research": ["clinical research assistant internship", "clinical research intern undergraduate"],
-    "arts": ["arts administration internship", "arts nonprofit internship", "gallery internship",
-             "creative internship college student"],
+    "arts": ["arts administration internship", "fine arts internship", "gallery internship",
+             "art museum internship"],
     "museums": ["museum internship", "museum education internship", "curatorial internship", "archives internship"],
-    "music": ["music industry internship", "orchestra internship", "music nonprofit internship", "record label internship"],
-    "theater": ["theater internship", "performing arts internship", "stage management internship", "arts center internship"],
+    "music": ["music industry internship", "music business internship", "music nonprofit internship", "record label internship"],
+    "theater": ["theater internship", "performing arts internship", "stage management internship", "theatre production internship"],
     "film": ["film production internship", "video production internship college student"],
     "languages": ["translation internship", "bilingual internship college student",
-                  "international education internship", "language assistant internship"],
-    "social_science": ["social science research assistant", "sociology research internship",
+                  "interpreter internship", "localization internship"],
+    "social_science": ["sociology internship", "sociology research internship",
                        "survey research internship", "anthropology internship"],
     "education": ["education internship college student", "teaching assistant internship undergraduate",
-                  "tutoring internship", "youth program internship"],
-    "social_work": ["social work internship undergraduate", "human services internship", "community services internship"],
+                  "tutoring internship", "classroom teaching internship"],
+    "social_work": ["social work internship undergraduate", "human services internship", "case management internship"],
     "publishing": ["publishing internship", "editorial internship", "book publishing internship"],
-    "journalism": ["journalism internship 2027", "newsroom internship", "reporting internship"],
+    "journalism": ["journalism internship 2027", "newsroom internship", "news reporter internship"],
     "library": ["library internship", "archives internship college student"],
     "physics": ["physics research internship undergraduate", "astronomy internship undergraduate"],
     "chemistry": ["chemistry internship undergraduate", "chemistry lab internship"],

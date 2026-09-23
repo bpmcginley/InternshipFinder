@@ -1,5 +1,8 @@
 """The daily focus searches follow whichever fields UMass majors are worst served in."""
+import re
+
 from internscout import focus
+from internscout.classify import classify, stage_of
 
 
 def _x(tags, key="MA"):
@@ -50,3 +53,19 @@ def test_bad_export_falls_back(tmp_path):
     (tmp_path / "data" / "listings").mkdir(parents=True)
     (tmp_path / "data" / "listings" / "index.json").write_text("not json", encoding="utf-8")
     assert focus.choose(str(tmp_path / "data"), ["x"]) == ["x"]
+
+
+def _typical_title(query: str) -> str:
+    """The title a query usually brings back: "fine arts internship" -> "Fine Arts Intern"."""
+    if re.search(r"\bintern(ship)?s?\b", query, re.I):
+        core = re.sub(r"\b(internships?|interns?|undergraduate|college student|summer \d{4}|\d{4})\b", "", query, flags=re.I)
+        return re.sub(r"\s+", " ", core).strip().title() + " Intern"
+    return query.title()
+
+
+def test_every_search_can_add_to_its_own_field():
+    for tag, queries in focus.SEARCHES.items():
+        for q in queries:
+            title = _typical_title(q)
+            assert tag in classify(title), (tag, q, title, classify(title))
+            assert stage_of(title), (q, title)

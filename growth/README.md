@@ -27,12 +27,12 @@ Recompute this table with `python growth/audience.py` (it reads `docs/data`).
 
 | Loop | Status | How it adapts |
 |---|---|---|
-| **Landing pages** (`backend/internscout/seo_pages.py`) | Built | Rebuilt on every deploy from the live data (about 1,100 pages today: every field, state, field in a state, and UMass major). A page appears when its topic reaches 5 open listings and disappears when it drops below, so the site's search footprint follows the job market with no one editing it. |
-| **Sitemap and robots.txt** | Built | Regenerated with the pages, so search engines are told about new pages the same day. |
+| **Landing pages** (`backend/internscout/seo_pages.py`) | Built | Rebuilt on every deploy from the live data (about 500 pages today: every field and state with 5+ open roles, every field in a state with 15+ roles posted in fewer than 10 states, and every UMass major whose list is not identical to another page's). A page that is already live stays until it falls to two thirds of that bar, so pages near the line do not flicker; a page that does go gets a 404 page that links back to the listings. The site's search footprint follows the job market with no one editing it. |
+| **Sitemap and robots.txt** | Built | Regenerated with the pages. Each page's `lastmod` is the day its newest listing was found, so search engines learn which pages really changed. |
 | **Where to scan** | Already running | The ingest adds any state students pick to its detailed scan (`Worker /demand`), so coverage grows where the audience is. |
-| **What to search for** (`backend/internscout/focus.py`) | Built | Every ingest reads the last export, finds the fields UMass majors are worst served in (open roles nearby, per major that depends on the field), and spends the daily focus searches there. Today that is languages, arts and social science. When a field fills up it drops out on its own. |
+| **What to search for** (`backend/internscout/focus.py`) | Built | Every ingest reads the last export, finds the fields UMass majors are worst served in (open roles nearby, per major that depends on the field), and spends the daily focus searches there. Today that is languages, arts and social science. What the searches find is kept for two days after they last see it (it used to vanish at the next run), so a field that fills up drops out on its own. A test checks that every search's typical result is tagged with the field it is meant to fill. |
 | **Visit counting** | Running | Cloudflare Web Analytics on every page, cookieless. |
-| **Weekly growth report** (`growth/report.py`) | Built | Every Monday a GitHub issue labelled `growth-report`: visits, top landing pages and referrers (once the Cloudflare token is added), the states students picked, which majors are served and which are thin, where the focus searches are going, and the landing-page count. Last week's issue closes itself. Run it any time with `python growth/report.py`. |
+| **Weekly growth report** (`growth/report.py`) | Built | Every Monday a GitHub issue labelled `growth-report`: visits without bots, top landing pages and referrers, the share of visits that came in through any landing page (once the Cloudflare token is added), the states students picked (in order, with no counts, because the issue is public), which majors are served and which are thin, where the focus searches are going, and the landing-page count. Last week's issue closes itself. Run it any time with `python growth/report.py`. |
 
 ## Channels, and the rules each follows
 
@@ -72,7 +72,7 @@ returning users who ask for one.
 
 | Step | Why |
 |---|---|
-| Settings → Pages → Source: **GitHub Actions** (done with the landing-pages PR) | The landing pages are built at deploy time |
+| Settings → Pages → Source: **GitHub Actions**, just before the landing-pages PR merges | The landing pages are built at deploy time; the deploy refuses to run until this is set |
 | Verify internscout.org in Google Search Console | See which searches find the pages; unlocks the store's Official URL |
 | A Cloudflare API token with Analytics read, saved as a repo secret | Lets the weekly report read visits |
 | Ad accounts and monthly caps, when ready | Paid reach in recruiting season |

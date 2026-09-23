@@ -28,19 +28,32 @@ import audience  # noqa: E402
 ACCOUNT = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "d4a5640a67faee275d9df91204c4ec59")
 SITE_TAG = os.environ.get("CLOUDFLARE_SITE_TAG", "54f99780d57f4ae2a55182b44b082e0a")
 
+# bot: 0 is the dashboard's "Exclude bots": crawlers that run JavaScript, Googlebot's renderer among
+# them, load the landing pages too, and on a young site they would be a real share of the count.
 QUERY = """
 query($account: string!, $site: string!, $start: Time!, $end: Time!, $prevStart: Time!) {
   viewer { accounts(filter: {accountTag: $account}) {
     week: rumPageloadEventsAdaptiveGroups(limit: 1,
-      filter: {siteTag: $site, datetime_geq: $start, datetime_lt: $end}) { count sum { visits } }
+      filter: {siteTag: $site, bot: 0, datetime_geq: $start, datetime_lt: $end}) { count sum { visits } }
     prev: rumPageloadEventsAdaptiveGroups(limit: 1,
-      filter: {siteTag: $site, datetime_geq: $prevStart, datetime_lt: $start}) { count sum { visits } }
+      filter: {siteTag: $site, bot: 0, datetime_geq: $prevStart, datetime_lt: $start}) { count sum { visits } }
     pages: rumPageloadEventsAdaptiveGroups(limit: 15, orderBy: [sum_visits_DESC],
-      filter: {siteTag: $site, datetime_geq: $start, datetime_lt: $end}) { sum { visits } dimensions { requestPath } }
+      filter: {siteTag: $site, bot: 0, datetime_geq: $start, datetime_lt: $end}) { sum { visits } dimensions { requestPath } }
     refs: rumPageloadEventsAdaptiveGroups(limit: 10, orderBy: [sum_visits_DESC],
-      filter: {siteTag: $site, datetime_geq: $start, datetime_lt: $end}) { sum { visits } dimensions { refererHost } }
+      filter: {siteTag: $site, bot: 0, datetime_geq: $start, datetime_lt: $end}) { sum { visits } dimensions { refererHost } }
     countries: rumPageloadEventsAdaptiveGroups(limit: 6, orderBy: [sum_visits_DESC],
-      filter: {siteTag: $site, datetime_geq: $start, datetime_lt: $end}) { sum { visits } dimensions { countryName } }
+      filter: {siteTag: $site, bot: 0, datetime_geq: $start, datetime_lt: $end}) { sum { visits } dimensions { countryName } }
+  } }
+}
+"""
+
+
+# Asked on its own, so a schema change here cannot take the rest of the Visits section with it.
+LANDING_QUERY = """
+query($account: string!, $site: string!, $start: Time!, $end: Time!) {
+  viewer { accounts(filter: {accountTag: $account}) {
+    landing: rumPageloadEventsAdaptiveGroups(limit: 1,
+      filter: {siteTag: $site, bot: 0, datetime_geq: $start, datetime_lt: $end, requestPath_like: "/internships/%"}) { sum { visits } }
   } }
 }
 """
@@ -66,7 +79,14 @@ def visits_section(now: datetime) -> list[str]:
         r = _post("https://api.cloudflare.com/client/v4/graphql",
                   {"query": QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG, "start": iso(start),
                                                  "end": iso(end), "prevStart": iso(prev)}}, token)
-        acct = r["data"]["viewer"]["accounts"][0]
+        # A wrong token, account or site tag comes back as HTTP 200 with "errors" and no data; say
+        # what Cloudflare said rather than failing on the missing data.
+        if r.get("errors"):
+            return out + [f"Cloudflare answered: {r['errors'][0].get('message', 'unknown error')}", ""]
+        accounts = (r.get("data") or {}).get("viewer", {}).get("accounts") or []
+        if not accounts:
+            return out + [f"Cloudflare returned no account {ACCOUNT}; check CLOUDFLARE_ACCOUNT_ID and the token's scope.", ""]
+        acct = accounts[0]
     except Exception as e:                       # the rest of the report still has value
         return out + [f"Could not read Cloudflare ({type(e).__name__}).", ""]
     total = lambda rows: (rows[0]["sum"]["visits"] if rows else 0)  # noqa: E731
@@ -78,8 +98,18 @@ def visits_section(now: datetime) -> list[str]:
     out += [f"| {r['dimensions']['refererHost'] or '(direct or unknown)'} | {r['sum']['visits']:,} |" for r in acct["refs"]]
     out += ["", "Countries: " + ", ".join(f"{c['dimensions']['countryName']} {c['sum']['visits']:,}"
                                           for c in acct["countries"]), ""]
-    landing = sum(p["sum"]["visits"] for p in acct["pages"] if p["dimensions"]["requestPath"].startswith("/internships/"))
-    out += [f"Landing pages brought {landing:,} of the visits above.", ""]
+    # Counted over every landing page, not just the ones in the top-15 table: most search traffic
+    # arrives spread thin across hundreds of them.
+    try:
+        r = _post("https://api.cloudflare.com/client/v4/graphql",
+                  {"query": LANDING_QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG,
+                                                         "start": iso(start), "end": iso(end)}}, token)
+        landing, floor = total(r["data"]["viewer"]["accounts"][0]["landing"]), ""
+    except Exception:
+        landing = sum(p["sum"]["visits"] for p in acct["pages"] if p["dimensions"]["requestPath"].startswith("/internships/"))
+        floor = "at least "
+    share = f" ({landing * 100 // week}%)" if week else ""
+    out += [f"Landing pages under /internships/ brought {floor}{landing:,} of the {week:,} visits{share}.", ""]
     return out
 
 
@@ -96,8 +126,11 @@ def demand_section() -> list[str]:
         return out + [f"Could not read demand ({type(e).__name__}).", ""]
     if not states:
         return out + ["No student has picked states yet.", ""]
-    top = sorted(states.items(), key=lambda kv: -kv[1])[:15]
-    return out + [", ".join(f"{k} {v}" for k, v in top), ""]
+    # The issue is public, and while there are few students a count is close to a person (and the top
+    # one is a floor on the number of users). So: the states, most picked first, and no numbers. The
+    # ingest log already lists the same codes.
+    top = [k for k, _ in sorted(states.items(), key=lambda kv: -kv[1])]
+    return out + ["Most picked first: " + ", ".join(top), ""]
 
 
 def audience_section(site_dir: str) -> list[str]:
