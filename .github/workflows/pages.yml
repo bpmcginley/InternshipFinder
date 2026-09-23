@@ -62,13 +62,23 @@ jobs:
         run: |
           cp -r docs _site
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
-          cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml
+          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)
+          # For the notify job: what was live before this deploy, and what this deploy publishes.
+          mkdir -p sitemaps
+          cp _site/sitemap.xml sitemaps/new.xml
+          if [ -f live-sitemap.xml ]; then cp live-sitemap.xml sitemaps/old.xml; fi
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sitemaps
+          path: sitemaps
+          retention-days: 1
 
   deploy:
     needs: build
@@ -80,3 +90,20 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Bing, and the engines that share its index (DuckDuckGo, Yahoo, ChatGPT search), recrawl the pages
+  # this deploy added, removed or changed within hours (growth/indexnow.py). Google reads the sitemap.
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: growth
+      - uses: actions/download-artifact@v4
+        with:
+          name: sitemaps
+          path: sitemaps
+      - name: Tell IndexNow what changed
+        run: python3 growth/indexnow.py sitemaps/old.xml sitemaps/new.xml --submit

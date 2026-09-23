@@ -29,6 +29,9 @@ Recompute this table with `python growth/audience.py` (it reads `docs/data`).
 |---|---|---|
 | **Landing pages** (`backend/internscout/seo_pages.py`) | Built | Rebuilt on every deploy from the live data (about 500 pages today: every field and state with 5+ open roles, every field in a state with 15+ roles posted in fewer than 10 states, and every UMass major whose list is not identical to another page's). A page that is already live stays until it falls to two thirds of that bar, so pages near the line do not flicker; a page that does go gets a 404 page that links back to the listings. The site's search footprint follows the job market with no one editing it. |
 | **Sitemap and robots.txt** | Built | Regenerated with the pages. Each page's `lastmod` is the day its newest listing was found, so search engines learn which pages really changed. |
+| **Instant indexing** (`growth/indexnow.py`) | Built | After each deploy, the pages it added, removed or changed are sent to IndexNow, so Bing and the engines that use its index (DuckDuckGo, Yahoo, ChatGPT search) recrawl them within hours. Google reads the sitemap. |
+| **RSS feeds** (`backend/internscout/feeds.py`) | Built | Every landing page has a `feed.xml` of its newest roles. A club that points a Discord bot (MonitoRSS) or Slack's `/feed` at, say, the computer science in Massachusetts feed gets new roles in its channel as they are found: promotion the club chose, that keeps working with no one posting. |
+| **Brand posts** (`growth/social.py`) | Built, waiting for accounts | Tuesdays and Thursdays it writes a post from the data (one field's new roles nearby this week, linking its page) and sends it to InternScout's Bluesky, Mastodon or Discord, whichever has secrets set. Until then the weekly report carries the post as a draft. |
 | **Where to scan** | Already running | The ingest adds any state students pick to its detailed scan (`Worker /demand`), so coverage grows where the audience is. |
 | **What to search for** (`backend/internscout/focus.py`) | Built | Every ingest reads the last export, finds the fields UMass majors are worst served in (open roles nearby, per major that depends on the field), and spends the daily focus searches there. Today that is languages, arts and social science. What the searches find is kept for two days after they last see it (it used to vanish at the next run), so a field that fills up drops out on its own. A test checks that every search's typical result is tagged with the field it is meant to fill. |
 | **Visit counting** | Running | Cloudflare Web Analytics on every page, cookieless. |
@@ -43,14 +46,14 @@ is, or breaks the law.
    nothing is written to fill space. Measure it with Google Search Console once it is verified
    (a DNS record in Cloudflare), which also unlocks the store's verified Official URL.
 2. **Communities (Reddit, Discord, class group chats).** Posts are made openly as InternScout, or by
-   Bruce saying he built it. **Never by accounts posing as students who happen to like it**: that
+   the founder saying they built it. **Never by accounts posing as students who happen to like it**: that
    breaks every platform's rules and the FTC's endorsement rules. Drafts can be written ahead; a
    person posts them.
 3. **Email.** Only to people who ask for it (a "send me new listings for my major" option on the
    dashboard), with an unsubscribe link and a postal address (a PO box keeps a home address off it).
    **No scraped or bought lists**, and no mass mail to university addresses.
 4. **Paid ads.** Reddit, Google and Instagram ads aimed at UMass and the primary majors, in recruiting
-   season. Always under a monthly cap Bruce sets in each ad account. Ad platforms show the verified
+   season. Always under a monthly cap the owner sets in each ad account. Ad platforms show the verified
    advertiser's legal name publicly, so ads are the one channel that is not anonymous.
 5. **Partners.** UMass career center (Career Connect), department advisors, and student clubs
    (consulting, finance, tech, engineering). Personal emails, sent by a person.
@@ -63,12 +66,12 @@ law requires for a paid product.
 ## Should there be an app?
 
 Not a native one yet. Auto-Apply needs a desktop browser, and the search already works on a phone's
-browser. The cheap version of an app is a **Progressive Web App**: "Add to Home Screen" on the
-dashboard, plus an optional notification when new listings match the student's major. That is a
-week of work on the existing site, not a second product. Revisit a store app once there are
-returning users who ask for one.
+browser. The dashboard is now installable as a web app (a manifest and home-screen icons drawn by
+`scripts/make_app_icons.py`): Chrome and Android offer "Install", and iOS "Add to Home Screen" gets a
+proper icon. Next would be an optional notification when new listings match the student's major.
+Revisit a store app once there are returning users who ask for one.
 
-## What needs Bruce
+## What needs the owner
 
 | Step | Why |
 |---|---|
@@ -77,3 +80,4 @@ returning users who ask for one.
 | A Cloudflare API token with Analytics read, saved as a repo secret | Lets the weekly report read visits |
 | Ad accounts and monthly caps, when ready | Paid reach in recruiting season |
 | A PO box, before any email goes out | Required on every marketing email |
+| Brand accounts (Bluesky, Mastodon, a Discord server), with their secrets in the repo, when ready | Lets the brand posts go out on their own; see growth/social.py for the secret names |

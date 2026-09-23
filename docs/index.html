@@ -54,7 +54,14 @@
      floor, so og:image above points at og-preview.png instead. -->
 <link rel="icon" type="image/png" sizes="48x48" href="icon48.png"/>
 <link rel="icon" type="image/png" sizes="128x128" href="icon128.png"/>
-<link rel="apple-touch-icon" href="icon128.png"/>
+<!-- was: <link rel="apple-touch-icon" href="icon128.png"/> -->
+<!-- Installable as an app: the manifest lists the 192px and 512px icons Chrome requires before it
+     offers "Install", and iOS gets a 180px square with no transparent corners (it rounds them itself,
+     and paints transparency black). scripts/make_app_icons.py draws all of them. -->
+<link rel="apple-touch-icon" href="icon180.png"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#131416" media="(prefers-color-scheme: dark)"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet"/>
