@@ -1,0 +1,36 @@
+name: Brand posts
+
+# Twice a week, growth/social.py writes a short post from the data (one field's new listings in the
+# Northeast and remote, linking its landing page) and sends it to InternScout's own accounts. Each
+# account is used only if its secrets are set; with none set this run just prints the post.
+on:
+  schedule:
+    - cron: "0 15 * * 2,4"    # Tuesdays and Thursdays, 11am US Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brand-posts
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Post
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          MASTODON_URL: ${{ secrets.MASTODON_URL }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python growth/social.py docs --send

@@ -53,7 +53,10 @@ def build() -> Path:
            font=_font("segoeui.ttf", 36), fill=SOFT)
 
     # was: y=520, which sat 50px below the band's centre line once the band moved up.
-    d.text((84, 486), "Search free. Apply faster.", font=_font("segoeuisl.ttf", 56), fill=ACCENT)
+    # was: "Search free. Apply faster." The slogan the owner chose on 2026-09-23 for every ad surface,
+    # and a link preview is the one every share carries. At 56px it ends at x=1113, a right margin
+    # to match the 84px left one.
+    d.text((84, 486), "Built by one student, made for all students.", font=_font("segoeuisl.ttf", 56), fill=ACCENT)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     img.save(OUT, "PNG", optimize=True)

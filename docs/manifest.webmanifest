@@ -1,0 +1,16 @@
+{
+  "name": "InternScout",
+  "short_name": "InternScout",
+  "description": "Internships, co-ops and research for UMass students, ranked for your major, class year and the states you pick.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#131416",
+  "theme_color": "#131416",
+  "icons": [
+    { "src": "icon192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

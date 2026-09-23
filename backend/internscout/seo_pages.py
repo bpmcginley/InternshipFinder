@@ -283,7 +283,7 @@ ul.jobs{list-style:none;padding:0;margin:24px 0;border-top:1px solid var(--rule)
 .co{font-weight:600}.role{grid-column:1}.meta{grid-column:1;color:var(--ink3);font-size:14px}
 .pay{color:var(--ink2)}.new{font-size:12px;color:var(--accent);font-weight:600;margin-left:6px}
 .go{grid-column:2;grid-row:1/span 3;align-self:center;font-size:14px;white-space:nowrap}
-.more{color:var(--ink2)}section.rel h2{font:600 20px/1.3 "Source Serif 4",Georgia,serif;margin:36px 0 8px}
+.more,.follow{color:var(--ink2)}section.rel h2{font:600 20px/1.3 "Source Serif 4",Georgia,serif;margin:36px 0 8px}
 section.rel ul{list-style:none;padding:0;margin:0;columns:2;column-gap:28px}
 section.rel li{padding:3px 0;break-inside:avoid}.n{color:var(--ink3);font-size:13px}
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
@@ -306,7 +306,7 @@ BEACON = ""   # set by build() from the site's own index.html
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
-         body: str, updated: str, index: bool = True) -> str:
+         body: str, updated: str, index: bool = True, feed: bool = False) -> str:
     url = SITE + path
     crumb_html = " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1]) + \
                  (f" › {esc(crumbs[-1][1])}" if crumbs else "")
@@ -331,6 +331,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 <meta property="og:url" content="{esc(url)}"/>
 <meta property="og:image" content="{SITE}/og-preview.png"/>
 <meta name="twitter:card" content="summary_large_image"/>
+{f'<link rel="alternate" type="application/rss+xml" title="{esc(h1)} | InternScout" href="feed.xml"/>' if feed else ""}
 <link rel="icon" type="image/png" sizes="48x48" href="/icon48.png"/>
 <link rel="apple-touch-icon" href="/icon128.png"/>
 <style>{CSS}</style>
@@ -345,7 +346,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer>InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>Built by one student, made for all students.</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
 </body>
@@ -376,6 +377,8 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
             f"<ul class=\"jobs\">{listing_rows(items, now, state)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
+            + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
+              "<a href=\"feed.xml\">RSS feed</a></p>"
             + related)
 
 
@@ -433,12 +436,13 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
         major_rows.append((m, tags, items, path))
         fits.setdefault(path, []).append(name)
 
-    def add(path, title, desc, h1, crumbs, body, items=None):
+    def add(path, title, desc, h1, crumbs, body, items=None, state=None):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
         found = [str(x.get("first_seen") or "")[:10] for x in (listings if items is None else items)]
-        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated),
-                      "items": items, "h1": h1, "lastmod": max((f for f in found if f), default=None)})
+        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, feed=items is not None),
+                      "items": items, "h1": h1, "state": state,
+                      "lastmod": max((f for f in found if f), default=None)})
 
     root = ("/internships/", "Internships")
 
@@ -467,7 +471,7 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", [root, (path, where)],
-            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k)), items)
+            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k)), items, k)
 
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
@@ -482,7 +486,7 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
             "Free search for college students, no sign-up.",
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
-            listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k)), items)
+            listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k)), items, k)
 
     majors_made = []
     for m, tags, items, path in major_rows:
@@ -511,6 +515,9 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
     hub = (f"<p class=\"lede\">{len(listings):,} open internships, co-ops, research positions and "
            "fellowships for college students, collected from employer job boards and public programs. "
            "Browse by field, by state or by major, or open the dashboard to rank them for you.</p>"
+           "<p>Every page below has an RSS feed of its new listings (the link at the bottom of the page). "
+           "Paste it into a Discord feed bot such as MonitoRSS, or Slack's <code>/feed subscribe</code>, "
+           "and new roles appear in your club's channel as they are found.</p>"
            "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
            + link_list("By field", sorted(((f"/internships/{field_slug(t)}/", field_title(t), len(v))
                                           for t, v in fields.items()), key=lambda p: p[1]))
@@ -577,6 +584,8 @@ def main(argv: list[str]) -> None:
     site_dir = argv[1] if len(argv) > 1 else "docs"
     pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else set())
     write(site_dir, pages)
+    from . import feeds            # feeds imports this module, so not at the top
+    feeds.write_all(site_dir, pages)
     print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
 
 
