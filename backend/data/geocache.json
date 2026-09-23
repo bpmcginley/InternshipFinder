@@ -713,6 +713,10 @@
 40.8837,
 -74.3069
 ],
+"fairport|NY":[
+43.0993,
+-77.443
+],
 "far rockaway|NY":[
 40.6054,
 -73.7551
@@ -1995,6 +1999,7 @@
 "usa ny new york city 3 times square|NY":null,
 "usa ny new york city 66 hudson blvd e|NY":null,
 "usa ny uniondale 1500 rxr plaza|NY":null,
+"usa pa clarks summit|PA":null,
 "usa pa lancaster|PA":null,
 "usa pa lehigh valley|PA":null,
 "usa pa new castle|PA":null,
@@ -2129,6 +2134,7 @@
 40.6154,
 -74.7704
 ],
+"wilkes barre pa|PA":null,
 "wilkes barre|PA":[
 41.2465,
 -75.8817
