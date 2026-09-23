@@ -9,6 +9,7 @@
 "10 union square east|NY":null,
 "100 upland square dr|PA":null,
 "100 willow park ctr|NY":null,
+"10047 - new jersey cvs pharmacy|NJ":null,
 "1008 flatbush ave|NY":null,
 "101 grand ave|NJ":null,
 "101 shore rd|NY":null,
@@ -587,6 +588,10 @@
 "croydon|PA":[
 40.0873,
 -74.9035
+],
+"crum lynne|PA":[
+39.8723,
+-75.328
 ],
 "danville|PA":[
 40.9665,
@@ -1311,6 +1316,7 @@
 -73.8929
 ],
 "nj - bayonne|NJ":null,
+"nj - burlington township|NJ":null,
 "nj - closter|NJ":null,
 "nj - cresskill|NJ":null,
 "nj - dumont|NJ":null,
@@ -1349,6 +1355,7 @@
 40.8997,
 -74.2474
 ],
+"nj - west caldwell|NJ":null,
 "nj - west orange|NJ":null,
 "nj - westwood|NJ":null,
 "nj - woodbridge|NJ":null,
@@ -1385,9 +1392,11 @@
 "ny - buffalo|NY":null,
 "ny - delmar|NY":null,
 "ny - farmingdale|NY":null,
+"ny - fishkill|NY":null,
 "ny - forest hills|NY":null,
 "ny - glendale|NY":null,
 "ny - goshen|NY":null,
+"ny - hempstead|NY":null,
 "ny - howard beach|NY":null,
 "ny - huntington|NY":null,
 "ny - hybrid|NY":null,
@@ -1409,6 +1418,7 @@
 "ny - ozone park|NY":null,
 "ny - ridgewood|NY":null,
 "ny - riverhead|NY":null,
+"ny - seaford|NY":null,
 "ny - staten island|NY":null,
 "ny - sunnyside|NY":null,
 "ny - wantagh|NY":null,
@@ -1470,6 +1480,7 @@
 -76.5094
 ],
 "pa - allentown|PA":null,
+"pa - allison park|PA":null,
 "pa - bensalem|PA":null,
 "pa - bethlehem|PA":null,
 "pa - blue bell|PA":null,
@@ -1494,6 +1505,7 @@
 "pa - lancaster|PA":null,
 "pa - lansdale|PA":null,
 "pa - lansdowne|PA":null,
+"pa - macungie|PA":null,
 "pa - mechanicsburg|PA":null,
 "pa - media|PA":null,
 "pa - middletown|PA":null,
@@ -1583,6 +1595,10 @@
 "pittsford|NY":[
 43.091,
 -77.5153
+],
+"plainsboro township|NJ":[
+40.3334,
+-74.6004
 ],
 "plainview|NY":[
 40.7765,
@@ -1901,6 +1917,7 @@
 "united states - wayne|PA":null,
 "united states of america|NJ":null,
 "united states of america|NY":null,
+"united states-new york-ronkonkoma|NY":null,
 "united states|NY":null,
 "united states|PA":[
 40.0775,
@@ -2014,6 +2031,10 @@
 40.603,
 -74.6874
 ],
+"usa|NY":[
+43.0691,
+-76.1724
+],
 "us|NY":null,
 "utica-rome ny hybrid|NY":null,
 "utica|NY":[
@@ -2023,6 +2044,10 @@
 "valatie|NY":[
 42.4134,
 -73.6732
+],
+"victor|NY":[
+42.9826,
+-77.4089
 ],
 "villanova|PA":[
 40.0412,
