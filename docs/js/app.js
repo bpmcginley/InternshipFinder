@@ -964,6 +964,8 @@
           + (payPlans.length ? `; ${payPlans.map(pl => pl.label + (pl.price ? " " + pl.price : "")).join(" or ")} raises it` : "; optional paid plans raise it")
           + ". Made by a UMass student, not affiliated with UMass Amherst."),
         h("nav", { className: "links", "aria-label": "Footer" },
+          // The crawlable pages built by backend/internscout/seo_pages.py at deploy time.
+          h("a", { href: "internships/" }, "Browse by field, state or major"),
           h("a", { href: "privacy.html" }, "Privacy"),
           h("a", { href: "terms.html" }, "Terms"),
           h("a", { href: feedbackUrl, target: "_blank", rel: "noopener" }, "Feedback"),

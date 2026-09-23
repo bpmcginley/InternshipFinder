@@ -1,0 +1,47 @@
+name: Growth report
+
+# Once a week, growth/report.py writes what brought students in and where the next gains are, and
+# this posts it as a GitHub issue labelled growth-report. Last week's issue is closed so exactly one
+# report is open at a time.
+on:
+  schedule:
+    - cron: "0 13 * * 1"      # Mondays, 9am US Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: growth-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Write the report
+        env:
+          # Optional: Cloudflare token with Account Analytics: Read. Without it the Visits section says so.
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          INTERNSCOUT_DEMAND_URL: ${{ secrets.INTERNSCOUT_DEMAND_URL }}
+          INTERNSCOUT_DEMAND_TOKEN: ${{ secrets.INTERNSCOUT_DEMAND_TOKEN }}
+        run: python growth/report.py docs > report.md
+
+      - name: Post it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create growth-report --color 1d5c46 --description "Weekly growth report" --force
+          for n in $(gh issue list --label growth-report --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Superseded by this week's report."
+          done
+          gh issue create --title "Growth report: week ending $(date -u +'%B %-d, %Y')" \
+            --label growth-report --body-file report.md

@@ -1,0 +1,120 @@
+"""The crawlable landing pages: made only where there is enough to show, safe against whatever a job
+board puts in a title, and pointing only at real web links."""
+import json
+import os
+import re
+
+from internscout import seo_pages
+
+
+def _row(i, state="MA", tags=("mechanical",), **over):
+    row = {
+        "id": f"id{i}", "company_name": f"Company {i}", "title": f"Mechanical Intern {i}",
+        "field_tags": list(tags), "stage": ["internship"], "term": "Summer 2027", "salary": None,
+        "posted_at": "2026-09-20T00:00:00", "first_seen": f"2026-09-2{i % 3}T00:00:00",
+        "regions": [{"loc": f"Town {i}, {state}", "kind": "x", "state": state}],
+        "apply_url": f"https://jobs.example.com/{i}", "status": "open", "is_remote": False,
+        "insights": None,
+    }
+    row.update(over)
+    return row
+
+
+def _site(tmp_path, files, majors=None):
+    data = tmp_path / "data" / "listings"
+    data.mkdir(parents=True)
+    index = {"generated_at": "2026-09-23T10:00:00+00:00", "files": {}}
+    for key, rows in files.items():
+        (data / f"{key}.json").write_text(json.dumps(rows), encoding="utf-8")
+        index["files"][key] = {"file": f"listings/{key}.json"}
+    (data / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    (tmp_path / "data" / "majors.json").write_text(json.dumps({"majors": majors or []}), encoding="utf-8")
+    return str(tmp_path)
+
+
+def _paths(pages):
+    return {p["path"] for p in pages}
+
+
+def test_pages_only_where_there_are_enough_open_listings(tmp_path):
+    ma = [_row(i) for i in range(6)]                                  # 6 mechanical in MA
+    ct = [_row(10 + i, state="CT") for i in range(3)]                 # only 3 in CT
+    site = _site(tmp_path, {"MA": ma, "CT": ct})
+    paths = _paths(seo_pages.build(site))
+    assert "/internships/mechanical-engineering/" in paths           # 9 nationwide
+    assert "/internships/massachusetts/" in paths
+    assert "/internships/mechanical-engineering/massachusetts/" in paths
+    assert "/internships/connecticut/" not in paths                  # 3 < MIN_OPEN
+    assert "/internships/mechanical-engineering/connecticut/" not in paths
+    assert "/internships/" in paths
+
+
+def test_closed_and_non_web_links_are_left_out(tmp_path):
+    rows = [_row(i) for i in range(4)]
+    rows.append(_row(4, status="closed"))
+    rows.append(_row(5, apply_url="javascript:alert(1)"))
+    site = _site(tmp_path, {"MA": rows})
+    # Only 4 usable listings, so nothing but the hubs is built.
+    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/"}
+
+
+def test_job_board_text_is_escaped(tmp_path):
+    rows = [_row(i) for i in range(5)]
+    rows[0]["title"] = '<script>alert("x")</script>Intern'
+    rows[1]["company_name"] = 'Evil & Co "</title>'
+    site = _site(tmp_path, {"MA": rows})
+    for p in seo_pages.build(site):
+        assert "<script>alert" not in p["html"]
+        assert '"</title>' not in p["html"]
+    page = next(p for p in seo_pages.build(site) if p["path"] == "/internships/massachusetts/")
+    assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;Intern" in page["html"]
+
+
+def test_state_page_shows_the_location_in_that_state(tmp_path):
+    rows = [_row(i) for i in range(5)]
+    rows[0]["regions"] = [{"loc": "New York, NY", "kind": "x", "state": "NY"},
+                          {"loc": "Boston, MA", "kind": "x", "state": "MA"}]
+    site = _site(tmp_path, {"MA": rows, "NY": [rows[0]]})
+    page = next(p for p in seo_pages.build(site) if p["path"] == "/internships/massachusetts/")
+    assert "Boston, MA +1" in page["html"]
+    assert "New York, NY +1" not in page["html"]
+
+
+def test_major_pages_put_the_northeast_first(tmp_path):
+    far = [_row(i, state="TX", tags=("sports",)) for i in range(5)]
+    near = [_row(20, state="MA", tags=("sports",), first_seen="2026-01-01T00:00:00")]
+    site = _site(tmp_path, {"TX": far, "MA": near},
+                 majors=[{"name": "Sport Management", "tags": ["sports"], "related": [], "level": "undergrad"}])
+    page = next(p for p in seo_pages.build(site) if p["path"] == "/internships/for/sport-management-majors/")
+    # The Massachusetts role is the oldest, and still listed before every Texas one. (Only the list
+    # itself is compared: the opening paragraph names top employers in its own order.)
+    jobs = page["html"][page["html"].index('<ul class="jobs">'):]
+    order = re.findall(r'"co">Company (\d+)', jobs)
+    assert order[0] == "20" and sorted(order[1:]) == ["0", "1", "2", "3", "4"]
+
+
+def test_sitemap_and_robots(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
+    seo_pages.write(site, seo_pages.build(site))
+    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    assert "<loc>https://internscout.org/internships/massachusetts/</loc>" in sitemap
+    assert "<loc>https://internscout.org/privacy</loc>" in sitemap
+    robots = open(os.path.join(site, "robots.txt"), encoding="utf-8").read()
+    assert "Sitemap: https://internscout.org/sitemap.xml" in robots
+    assert "Disallow: /data/" in robots
+    assert os.path.exists(os.path.join(site, "internships", "massachusetts", "index.html"))
+
+
+def test_analytics_snippet_comes_from_the_dashboard(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
+    snippet = "<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{}'></script>"
+    (tmp_path / "index.html").write_text(f"<html><body>{snippet}</body></html>", encoding="utf-8")
+    assert all(snippet in p["html"] for p in seo_pages.build(site))
+    (tmp_path / "index.html").write_text("<html></html>", encoding="utf-8")
+    assert all("cloudflareinsights" not in p["html"] for p in seo_pages.build(site))
+
+
+def test_field_and_state_slugs_never_collide():
+    states = {seo_pages.state_slug(k) for k in seo_pages.US_STATES}
+    assert not states & {seo_pages.field_slug(t) for t in seo_pages.FIELD_TITLES}
+    assert "for" not in states

@@ -1,0 +1,64 @@
+name: Deploy site
+
+# Publishes docs/ to GitHub Pages together with the crawlable landing pages under /internships/,
+# which backend/internscout/seo_pages.py builds from docs/data on every deploy. They are built here
+# rather than committed: 1,000+ pages rewritten four times a day would bloat the repo, and a page
+# built at deploy time is always exactly as fresh as the data it is deployed with.
+#
+# Requires Settings -> Pages -> Source: "GitHub Actions". While the source is still "Deploy from a
+# branch", GitHub's own build keeps publishing docs/ as it is, and the deploy job below fails.
+on:
+  push:
+    branches: [main]
+  # The ingest job pushes its data commit with GITHUB_TOKEN, and a push made that way starts no
+  # other workflow. Following the ingest run is how fresh data gets deployed.
+  workflow_run:
+    workflows: ["Ingest internships"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true      # a newer deploy already includes everything an older one would
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main             # after an ingest run: the commit that run just pushed
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the site and its landing pages
+        # seo_pages uses only the standard library, so nothing is installed.
+        run: |
+          cp -r docs _site
+          rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
+          cd backend && python -m internscout.seo_pages ../_site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

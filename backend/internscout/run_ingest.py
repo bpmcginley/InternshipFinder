@@ -173,8 +173,12 @@ def main():
             found += discover(reg, items)
             raw += items
         if args.google or do_all:
+            # The fields UMass majors are worst served in, read from the export this run is about
+            # to replace; GOOGLE_JOBS_FOCUS_QUERIES is only the fallback now.
+            from .focus import choose as choose_focus
+            focus_queries = choose_focus(args.export, GOOGLE_JOBS_FOCUS_QUERIES)
             items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, google_jobs_locations(), max_searches=GOOGLE_JOBS_MAX_SEARCHES,
-                                      focus_queries=GOOGLE_JOBS_FOCUS_QUERIES,
+                                      focus_queries=focus_queries,
                                       focus_searches=GOOGLE_JOBS_FOCUS_SEARCHES)
             found += discover(reg, items)
             raw += items
