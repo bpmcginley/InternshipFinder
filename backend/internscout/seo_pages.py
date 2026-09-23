@@ -24,6 +24,7 @@ import re
 import sys
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 SITE = "https://internscout.org"
 MIN_OPEN = 5            # no page for fewer open listings than this
@@ -327,15 +328,24 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 """
 
 
+def dash_link(fields=(), state: str | None = None) -> str:
+    """The dashboard, opened on this page's fields and state (docs/js/app.js reads ?field= and
+    ?state=; the dashboard's canonical link keeps these one page to search engines)."""
+    q = [f"field={quote(','.join(fields), safe=',')}"] if fields else []
+    if state:
+        q.append(f"state={quote(state)}")
+    return "/?" + "&amp;".join(q) if q else "/"
+
+
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
-                 state: str | None = None) -> str:
+                 state: str | None = None, dash: str = "/") -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
     return (f"<p class=\"lede\">{summary(items, what, where)}</p>"
-            "<a class=\"cta\" href=\"/\">Rank these for your major and year</a>"
+            f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
             f"<ul class=\"jobs\">{listing_rows(items, now, state)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
-               "<a href=\"/\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
+               f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
             + related)
 
 
@@ -387,7 +397,7 @@ def build(site_dir: str) -> list[dict]:
             f"{len(items):,} open {name.lower()} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
             f"{name} internships", [root, (path, name)],
-            listing_body(items, f"in {name.lower()}", "", now, related))
+            listing_body(items, f"in {name.lower()}", "", now, related, dash=dash_link([t])))
 
     for k, items in sorted(states.items()):
         where = US_STATES[k]
@@ -401,7 +411,7 @@ def build(site_dir: str) -> list[dict]:
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", [root, (path, where)],
-            listing_body(items, "", f" {loc}", now, related, state=k))
+            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k)))
 
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
@@ -416,7 +426,7 @@ def build(site_dir: str) -> list[dict]:
             "Free search for college students, no sign-up.",
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
-            listing_body(items, f"in {name.lower()}", f" {loc}", now, related, state=k))
+            listing_body(items, f"in {name.lower()}", f" {loc}", now, related, state=k, dash=dash_link([t], k)))
 
     majors_made = []
     for m in d["majors"]:
@@ -434,7 +444,7 @@ def build(site_dir: str) -> list[dict]:
             f"{updated}. Built for UMass Amherst students; free, no sign-up.",
             f"Internships for {name} majors",
             [root, ("/internships/for/", "By major"), (path, name)],
-            listing_body(items, f"that fit {name} majors", "", now, related))
+            listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags)))
         majors_made.append((path, name, len(items)))
 
     # Hubs last, so they only link to pages that exist.

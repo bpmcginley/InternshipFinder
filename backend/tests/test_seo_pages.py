@@ -118,3 +118,16 @@ def test_field_and_state_slugs_never_collide():
     states = {seo_pages.state_slug(k) for k in seo_pages.US_STATES}
     assert not states & {seo_pages.field_slug(t) for t in seo_pages.FIELD_TITLES}
     assert "for" not in states
+
+
+def test_dashboard_links_open_on_the_page_topic(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]},
+                 majors=[{"name": "Mechanical Engineering", "tags": ["mechanical", "other"], "level": "undergrad"}])
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    assert 'href="/?field=mechanical"' in pages["/internships/mechanical-engineering/"]
+    assert 'href="/?state=MA"' in pages["/internships/massachusetts/"]
+    assert 'href="/?field=mechanical&amp;state=MA"' in pages["/internships/mechanical-engineering/massachusetts/"]
+    assert 'href="/?field=mechanical"' in pages["/internships/for/mechanical-engineering-majors/"]
+    # docs/js/app.js takes only values shaped like these; anything else would open an empty list.
+    assert all(re.fullmatch(r"[a-z_]{2,32}", t) for t in seo_pages.FIELD_TITLES)
+    assert all(re.fullmatch(r"[A-Z]{2}|remote", k) for k in seo_pages.US_STATES)
