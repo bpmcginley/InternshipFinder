@@ -172,8 +172,9 @@ def test_live_paths_reads_the_previous_sitemap(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
     seo_pages.write(site, seo_pages.build(site))
     live = seo_pages.live_paths(os.path.join(site, "sitemap.xml"))
-    assert {"/", "/internships/", "/internships/massachusetts/"} <= live
-    assert seo_pages.live_paths(os.path.join(site, "missing.xml")) == set()
+    assert {"/", "/internships/", "/internships/massachusetts/"} <= set(live)
+    assert live["/internships/massachusetts/"] == "2026-09-22" and live["/install.html"] == ""
+    assert seo_pages.live_paths(os.path.join(site, "missing.xml")) == {}
 
 
 def test_lastmod_follows_the_listings_and_hubs_carry_no_one_item_breadcrumb(tmp_path):
@@ -229,7 +230,7 @@ def test_employers_with_enough_roles_get_a_page_and_their_name_links_to_it(tmp_p
     assert "/internships/at/big-co/" in pages and "/internships/at/small-co/" not in pages
     own = pages["/internships/at/big-co/"]
     assert "InternScout is not affiliated with Big Co." in own
-    assert 'href="/?q=Big%20Co"' in own
+    assert 'href="/?state=MA&amp;company=Big%20Co"' in own
     assert '<a href="/internships/at/big-co/">Big Co</a>' not in own          # no link to itself
     ma = pages["/internships/massachusetts/"]
     assert '<a href="/internships/at/big-co/">Big Co</a>' in ma
@@ -255,3 +256,46 @@ def test_the_day_first_seen_began_is_not_this_weeks_news(tmp_path):
     pages = {p["path"]: p for p in seo_pages.build(site)}
     assert {x["id"] for x in pages["/internships/new/"]["items"]} == {f"id{20 + i}" for i in range(5)}
     assert pages["/internships/massachusetts/"]["html"].count('class="new"') == 5
+
+
+def test_spellings_of_one_employer_share_a_page_and_a_role_counts_once(tmp_path):
+    a = [_row(i, company_name="Boeing") for i in range(8)]
+    b = [_row(20 + i, company_name="The Boeing Company") for i in range(4)]
+    dup = [_row(40, company_name="The Boeing Company", title=a[0]["title"], regions=a[0]["regions"])]  # second board
+    site = _site(tmp_path, {"MA": a + b + dup})
+    pages = {p["path"]: p for p in seo_pages.build(site)}
+    assert "/internships/at/the-boeing-company/" not in pages
+    boeing = pages["/internships/at/boeing/"]
+    assert len(boeing["items"]) == 12 and "Boeing Internships – 12 Open Now" in boeing["html"]
+    assert "company=Boeing&amp;company=The%20Boeing%20Company" in boeing["html"]
+    assert '<a href="/internships/at/boeing/">The Boeing Company</a>' in pages["/internships/massachusetts/"]["html"]
+    assert seo_pages.employer_key("Magna International") == seo_pages.employer_key("Magna")
+    assert seo_pages.employer_key("Booz Allen Hamilton") == seo_pages.employer_key("Booz Allen")
+    assert seo_pages.employer_key("Bank of America") == "bank of america"
+
+
+def test_a_work_study_board_gets_no_employer_page(tmp_path):
+    rows = [_row(i, company_name="Some University", stage=["part_time"], title=f"Library Assistant (FWS) {i}")
+            for i in range(12)]
+    site = _site(tmp_path, {"MA": rows})
+    assert "/internships/at/some-university/" not in _paths(seo_pages.build(site))
+
+
+def test_new_page_links_to_new_only_and_feeds_every_new_role(tmp_path):
+    rows = [_row(i, first_seen="2026-09-22T00:00:00") for i in range(40)]
+    rows += [_row(100 + i, first_seen="2026-09-18T00:00:00") for i in range(41)]   # the baseline day
+    site = _site(tmp_path, {"MA": rows})
+    pages = seo_pages.build(site)
+    new = next(p for p in pages if p["path"] == "/internships/new/")
+    assert 'href="/?new=1"' in new["html"] and new["feed_limit"] is None
+    from internscout import feeds
+    seo_pages.write(site, pages)
+    feeds.write_all(site, pages)
+    xml = open(os.path.join(site, "internships", "new", "feed.xml"), encoding="utf-8").read()
+    assert xml.count("<item>") == 40
+
+
+def test_lastmod_never_goes_back(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
+    pages = seo_pages.build(site, {"/internships/massachusetts/": "2026-09-30"})
+    assert next(p for p in pages if p["path"] == "/internships/massachusetts/")["lastmod"] == "2026-09-30"

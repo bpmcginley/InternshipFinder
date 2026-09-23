@@ -505,10 +505,14 @@
     // student was reading. Only well-formed tags and state keys are taken; an unknown one matches nothing.
     const fromLink = () => {
       const q = new URLSearchParams(location.search), list = (k, ok) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, 6);
-      // ?q= is a search, from an employer's page: plain text, so it only ever fills the search box.
-      return { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/), q: (q.get("q") || "").slice(0, 80) };
+      // ?company= comes from an employer's page (every spelling its listings use) and matches names
+      // exactly; ?new=1 from the New this week page. Both are plain values, never markup.
+      const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/),
+        company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
+      if (q.get("new") === "1") link.new_only = true;
+      return link;
     };
-    const [f, setF] = useState(() => ({ q: "", fields: [], states: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...fromLink() }));
+    const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...fromLink() }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
     const [saved, setSaved] = useState(() => IS.ls.get(SAVED_KEY, []) || []);
     const [openId, setOpenId] = useState(null);
@@ -525,8 +529,8 @@
     // should not bring the landing page's back.
     useEffect(() => {
       const q = new URLSearchParams(location.search);
-      if (!q.has("field") && !q.has("state") && !q.has("q")) return;
-      q.delete("field"); q.delete("state"); q.delete("q");
+      if (!["field", "state", "company", "new"].some(k => q.has(k))) return;
+      ["field", "state", "company", "new"].forEach(k => q.delete(k));
       history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     }, []);
 
@@ -682,8 +686,8 @@
     const moreCount = ["stage", "year", "sector", "app_state"].filter(k => f[k]).length
       + (f.paid !== (defaults.paid || "") ? 1 : 0) + (f.where ? 1 : 0) + (f.status !== "open" ? 1 : 0)
       + (f.hide_citizen !== defaults.hide_citizen ? 1 : 0) + (f.new_only ? 1 : 0) + (f.eligible ? 1 : 0);
-    const anyFilter = moreCount > 0 || !!f.q.trim() || f.fields.length > 0 || f.states.length > 0;
-    const clearFilters = () => { setF(s => ({ ...s, q: "", fields: [], states: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...defaults })); setLimit(PAGE); };
+    const anyFilter = moreCount > 0 || !!f.q.trim() || f.fields.length > 0 || f.states.length > 0 || f.company.length > 0;
+    const clearFilters = () => { setF(s => ({ ...s, q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...defaults })); setLimit(PAGE); };
     const st = id => appStates[id] || "none";
     const keepSaved = list => { setSaved(list); IS.ls.set(SAVED_KEY, list); };
     function onSaved(v) {
@@ -740,6 +744,7 @@
         r = r.filter(x => places.every(pl => IS.regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state)) !== pl.neg) &&
           terms.every(({ t, neg }) => (words.has(t) ? placeHay(x) : hay(x)).includes(t) !== neg));
       }
+      if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
       if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
       if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
       else if (f.where === "remote") r = r.filter(x => IS.regs(x).some(g => g.kind === "remote") || x.is_remote);
@@ -928,6 +933,8 @@
       // how many of them are set so nothing is hidden by surprise.
       h("div", { className: "filters", role: "search" },
         h("div", { className: "field search" }, h(SearchBox, { value: f.q, onChange: v => upd("q", v) })),
+        f.company.length > 0 && h("button", { type: "button", className: "btn", title: "Show every employer", onClick: () => upd("company", []) },
+          "Employer: " + f.company[0] + " \u00d7"),
         h(MultiSelect, { placeholder: "Field", options: opts.fields, selected: f.fields, onChange: v => upd("fields", v) }),
         h(MultiSelect, { placeholder: p ? "State (your areas)" : "State", options: opts.states, selected: f.states, onChange: v => upd("states", v) }),
         h(Sel, { label: "Sort", value: f.sort, onChange: v => upd("sort", v) }, opt("score", "Sort: best match"), opt("new", "Sort: newest"), opt("company", "Sort: company A–Z"), opt("comp", "Sort: pay listed")),

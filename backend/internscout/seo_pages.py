@@ -144,18 +144,15 @@ def load(site_dir: str) -> dict:
             "majors": majors.get("majors", []), "baseline": baseline_day(listings)}
 
 
-def baseline_day(listings: list[dict]) -> str | None:
-    """The day first_seen began to be kept, if it still dominates the data.
+# first_seen has survived from one export to the next only since this day, so everything already
+# open then carries it: 11,146 of 12,792 listings on 2026-09-23. Counted as "found this week", that
+# made half the site new, and a brand post said 110 new data science roles when 31 were.
+FIRST_SEEN_SINCE = "2026-09-18"
 
-    first_seen only survives from one export to the next since 2026-09-18, so everything already
-    open that day carries that date: 11,146 of 12,792 listings on 2026-09-23. Counted as "found this
-    week", that made half the site new, and a post said 110 new data science roles when 31 were.
-    A day holding more than a third of all listings is that start, not a week's finds."""
-    days = Counter(str(x.get("first_seen") or "")[:10] for x in listings if x.get("first_seen"))
-    if not days:
-        return None
-    day, n = min(days.items())
-    return day if n * 3 > len(listings) else None
+
+def baseline_day(listings: list[dict]) -> str | None:
+    """The day before which "first seen" means only "already open when we started keeping dates"."""
+    return FIRST_SEEN_SINCE
 
 
 def _when(stamp) -> datetime | None:
@@ -253,7 +250,37 @@ def summary(items: list[dict], what: str, where: str) -> str:
     return " ".join(esc(p) for p in parts)
 
 
-EMPLOYERS: dict[str, str] = {}   # company name -> its employer page, set by build()
+EMPLOYERS: dict[str, str] = {}   # every spelling of a company's name -> its employer page, set by build()
+
+# Trailing words that name the same employer differently: "Magna International" is Magna, "The Boeing
+# Company" is Boeing. Only whole trailing words go, so "Bank of America" keeps its name.
+_SUFFIX = re.compile(r"\s+(inc|incorporated|llc|ltd|co|company|corp|corporation|international|group|holdings|plc|lp)$")
+EMPLOYER_ALIASES = {"booz allen hamilton": "booz allen"}
+STUDENT_STAGES = {"internship", "co_op", "research", "fellowship"}
+
+
+def employer_key(name: str) -> str:
+    k = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9& ]+", " ", name.lower())).strip()
+    k = re.sub(r"^the ", "", k)
+    while _SUFFIX.search(k):
+        k = _SUFFIX.sub("", k).strip()
+    return EMPLOYER_ALIASES.get(k, k) or name.lower()
+
+
+def dedupe_roles(items: list[dict]) -> list[dict]:
+    """One row per role: a company that posts a requisition on two of its boards (Boeing's
+    JR2026520392 and JR2026520392-1) would otherwise count it twice in "N Open Now"."""
+    seen, out = set(), []
+    for x in newest_first(items):
+        key = (re.sub(r"\W+", " ", (x.get("title") or "").lower()).strip(), place(x))
+        if key not in seen:
+            seen.add(key)
+            out.append(x)
+    return out
+
+
+def student_share(items: list[dict]) -> float:
+    return sum(1 for x in items if set(x.get("stage") or []) & STUDENT_STAGES) / len(items) if items else 0.0
 
 
 def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None) -> str:
@@ -282,9 +309,9 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
 
 
 def company_link(name: str, here: str | None = None) -> str:
-    """The company's name, linked to its employer page when it has one (and it is not this page)."""
+    """The company's name, linked to its employer page when it has one (here: this page's path)."""
     path = EMPLOYERS.get(name)
-    return f'<a href="{esc(path)}">{esc(name)}</a>' if path and name != here else esc(name)
+    return f'<a href="{esc(path)}">{esc(name)}</a>' if path and path != here else esc(name)
 
 
 def link_list(title: str, links: list[tuple[str, str, int]]) -> str:
@@ -389,14 +416,17 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 """
 
 
-def dash_link(fields=(), state: str | None = None, search: str | None = None) -> str:
-    """The dashboard, opened on this page's fields, state or search (docs/js/app.js reads ?field=,
-    ?state= and ?q=; the dashboard's canonical link keeps these one page to search engines)."""
+def dash_link(fields=(), state: str | None = None, companies=(), new: bool = False) -> str:
+    """The dashboard, opened on this page's fields, states, employer or new roles (docs/js/app.js
+    reads ?field=, ?state=a,b, ?company= and ?new=1; its canonical link keeps these one page to search
+    engines). An employer goes as an exact name, not a search: searching "Intel" also finds
+    "intelligence", and "Texas Instruments" reads as a place."""
     q = [f"field={quote(','.join(fields), safe=',')}"] if fields else []
     if state:
-        q.append(f"state={quote(state)}")
-    if search:
-        q.append(f"q={quote(search)}")
+        q.append(f"state={quote(state, safe=',')}")
+    q += [f"company={quote(c)}" for c in companies]
+    if new:
+        q.append("new=1")
     return "/?" + "&amp;".join(q) if q else "/"
 
 
@@ -422,8 +452,9 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
 
 # ---------------------------------------------------------------- build
 
-def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[dict]:
-    """live: the paths the site is serving now (from its sitemap), which get the lower keep_at bar."""
+def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset()) -> list[dict]:
+    """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
+    whose lastmod the new one never goes below."""
     global BEACON, BASELINE
     BEACON = beacon_from(site_dir)
     d = load(site_dir)
@@ -475,26 +506,36 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
         major_rows.append((m, tags, items, path))
         fits.setdefault(path, []).append(name)
 
-    # Employers with enough open roles get a page ("Amgen internships" is a common search). Two
-    # names that slug alike keep only the larger, so one URL never means two companies.
+    # Employers with enough open roles get a page ("Amgen internships" is a common search). Spellings
+    # of one employer share a page (employer_key), a role posted on two boards counts once, and only
+    # employers whose roles are mostly internships, co-ops, research or fellowships qualify: a
+    # university's work-study board is jobs for its own students, not internships for everyone.
     global EMPLOYERS
-    by_company: dict[str, list] = {}
+    groups: dict[str, list] = {}
     for x in listings:
-        by_company.setdefault(x.get("company_name") or "", []).append(x)
+        if x.get("company_name"):
+            groups.setdefault(employer_key(x["company_name"]), []).append(x)
     EMPLOYERS = {}
-    taken: set[str] = set()
-    for name, items in sorted(by_company.items(), key=lambda kv: -len(kv[1])):
-        slug = slugify(name)
-        path = f"/internships/at/{slug}/"
-        if not slug or slug in taken or not enough(len(items), path, MIN_EMPLOYER):
+    by_company: dict[str, list] = {}      # display name -> its roles, one row each
+    spellings: dict[str, list] = {}       # display name -> every name its listings use
+    for key, items in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        names = Counter(x["company_name"] for x in items)
+        name = min(names, key=lambda n: (-names[n], len(n)))
+        items = dedupe_roles(items)
+        path = f"/internships/at/{slugify(name)}/"
+        if (not slugify(name) or path in EMPLOYERS.values() or student_share(items) < 0.5
+                or not enough(len(items), path, MIN_EMPLOYER)):
             continue
-        taken.add(slug)
-        EMPLOYERS[name] = path
+        by_company[name], spellings[name] = items, sorted(names)
+        EMPLOYERS.update({n: path for n in names})
 
     def add(path, title, desc, h1, crumbs, body, items=None, state=None):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
         found = [str(x.get("first_seen") or "")[:10] for x in (listings if items is None else items)]
+        # The live sitemap's lastmod is a floor: when the newest role on a page closes, the newest left
+        # is older, and a lastmod that goes backwards is one a search engine stops trusting.
+        found.append(live.get(path) or "" if isinstance(live, dict) else "")
         pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, feed=items is not None),
                       "items": items, "h1": h1, "state": state,
                       "lastmod": max((f for f in found if f), default=None)})
@@ -560,19 +601,25 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
                          fits=[n for n in fits[path] if n != name]), items)
 
-    for name, path in sorted(EMPLOYERS.items()):
-        items = by_company[name]
+    for name, items in sorted(by_company.items()):
+        path = EMPLOYERS[name]
         top = [t for t, _ in Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS).most_common(3)]
-        mostly = join_words([lower_name(field_title(t)) for t in top])
-        note = (f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are its open roles "
-                "from public job boards; always apply on the employer's own site.</p>")
+        covered = sum(1 for x in items if set(x.get("field_tags") or []) & set(top))
+        fields_words = join_words([lower_name(field_title(t)) for t in top])
+        # "Mostly" only when it is true; otherwise the fields are some of what the employer hires for.
+        about = (f", mostly in {fields_words}" if covered * 2 > len(items) else
+                 f", including roles in {fields_words}") if top else ""
+        note = (f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
+                f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>")
         related = note + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
                                                      for t in top if t in fields])
+        where = ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
         add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
-            f"{len(items):,} open internships and co-ops at {name} for college students"
-            + (f", mostly in {mostly}" if mostly else "") + f". Updated {updated}. Free search, no sign-up.",
+            f"{len(items):,} open internships and co-ops at {name} for college students{about}. "
+            f"Updated {updated}. Free search, no sign-up.",
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
-            listing_body(items, f"at {name}", "", now, related, dash=dash_link(search=name), here=name), items)
+            listing_body(items, f"at {name}", "", now, related,
+                         dash=dash_link(state=where, companies=spellings[name]), here=path), items)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
     if len(new) >= MIN_OPEN:
@@ -581,17 +628,19 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
             f"Northeast and remote first. Updated {updated}. Free, no sign-up.",
             "New internships this week", [root, ("/internships/new/", "New this week")],
             listing_body(new, "found in the last week", "", now,
-                         "<p class=\"more\">One feed for a whole club: this page's RSS feed carries every new "
-                         "role, so a Discord or Slack channel can follow just this one.</p>"), new)
+                         "<p class=\"more\">One feed for a whole club: this page's RSS feed carries every role "
+                         "found in the last week, so a Discord or Slack channel can follow just this one.</p>",
+                         dash=dash_link(new=True)), new)
+        pages[-1]["feed_limit"] = None            # every new role, not the usual newest 25
 
     # Hubs last, so they only link to pages that exist.
-    add("/internships/at/", f"Internships by Employer – {len(EMPLOYERS):,} Employers | InternScout",
-        f"Open internships and co-ops at {len(EMPLOYERS):,} employers hiring college students now, from each "
+    add("/internships/at/", f"Internships by Employer – {len(by_company):,} Employers | InternScout",
+        f"Open internships and co-ops at {len(by_company):,} employers hiring college students now, from each "
         "employer's public job board. Free, no sign-up.",
         "Internships by employer", [root, ("/internships/at/", "By employer")],
-        f"<p class=\"lede\">Every employer with at least {MIN_EMPLOYER} open student roles. InternScout is not "
-        "affiliated with any of them.</p>"
-        + link_list("Employers", sorted(((p, n, len(by_company[n])) for n, p in EMPLOYERS.items()),
+        f"<p class=\"lede\">Employers with about {MIN_EMPLOYER} or more open student roles, most of them "
+        "internships, co-ops or research. InternScout is not affiliated with any of them.</p>"
+        + link_list("Employers", sorted(((EMPLOYERS[n], n, len(v)) for n, v in by_company.items()),
                                         key=lambda e: e[1].lower())))
     add("/internships/for/", f"Internships by Major – {len(majors_made)} Majors | InternScout",
         "Open internships, co-ops and research roles for every UMass Amherst major, from nursing and "
@@ -611,7 +660,7 @@ def build(site_dir: str, live: set[str] | frozenset[str] = frozenset()) -> list[
            + link_list("By state", sorted(((f"/internships/{state_slug(k)}/", US_STATES[k], len(v))
                                           for k, v in states.items()), key=lambda p: p[1]))
            + "<section class=\"rel\"><h2>More ways to browse</h2><ul><li><a href=\"/internships/for/\">"
-             f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(EMPLOYERS):,} employers"
+             f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(by_company):,} employers"
              "</a></li>" + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
                             if len(new) >= MIN_OPEN else "") + "</ul></section>")
     add("/internships/", f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout",
@@ -657,13 +706,16 @@ def write(site_dir: str, pages: list[dict]) -> None:
                 f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
 
 
-def live_paths(sitemap: str) -> set[str]:
-    """The paths in the sitemap the site was serving before this build; empty if there was none."""
+def live_paths(sitemap: str) -> dict[str, str]:
+    """path -> lastmod ("" if none) for every page in the sitemap the site was serving before this
+    build; empty if there was none."""
     try:
         with open(sitemap, encoding="utf-8") as f:
-            return {SITE_PATH.sub("", u) for u in re.findall(r"<loc>([^<]+)</loc>", f.read())}
+            text = f.read()
     except OSError:
-        return set()
+        return {}
+    return {SITE_PATH.sub("", loc): mod for loc, mod in
+            re.findall(r"<loc>([^<]+)</loc>(?:<lastmod>([^<]*)</lastmod>)?", text)}
 
 
 SITE_PATH = re.compile("^" + re.escape(SITE))
@@ -671,7 +723,7 @@ SITE_PATH = re.compile("^" + re.escape(SITE))
 
 def main(argv: list[str]) -> None:
     site_dir = argv[1] if len(argv) > 1 else "docs"
-    pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else set())
+    pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
     write(site_dir, pages)
     from . import feeds            # feeds imports this module, so not at the top
     feeds.write_all(site_dir, pages)

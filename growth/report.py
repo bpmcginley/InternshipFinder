@@ -166,14 +166,16 @@ def targeting_section(site_dir: str) -> list[str]:
 
 def pages_section(site_dir: str) -> list[str]:
     pages = seo_pages.build(site_dir)
-    kinds = {"field or state": 0, "field in a state": 0, "major": 0}
+    kinds = {"field or state": 0, "field in a state": 0, "major": 0, "employer": 0}
     for p in pages:
         parts = p["path"].strip("/").split("/")
         if len(parts) == 3 and parts[1] == "for":
             kinds["major"] += 1
+        elif len(parts) == 3 and parts[1] == "at":
+            kinds["employer"] += 1
         elif len(parts) == 3:
             kinds["field in a state"] += 1
-        elif len(parts) == 2 and parts[1] != "for":
+        elif len(parts) == 2 and parts[1] not in ("for", "at", "new"):
             kinds["field or state"] += 1
     return ["## Landing pages",
             f"{len(pages):,} pages from the current data: "
