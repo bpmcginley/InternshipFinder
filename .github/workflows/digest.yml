@@ -1,13 +1,28 @@
-name: Email digest preview
+# was: name: Email digest preview
+# It can send now, once the owner turns sending on, so "preview" no longer describes it.
+name: Email digest
 
 # growth/digest.py writes this week's new-internships email from docs/data: the fields that gained
-# the most new roles, Northeast and remote first. This run uploads the HTML, text and JSON as an
-# artifact to read. It sends nothing and uses no secrets. Sending waits for an email provider and a
-# PO box, because every marketing email must carry a postal address. Until then it runs only by hand.
+# the most new roles, Northeast and remote first. Every run uploads the HTML, text and JSON as an
+# artifact to read.
+#
+# Sending stays off until the repository variable DIGEST_ENABLED is 1. Then growth/digest_send.py
+# sends the email through Buttondown with the secrets BUTTONDOWN_API_KEY and DIGEST_POSTAL_ADDRESS,
+# and refuses, naming what is missing, if either is empty. A run started by hand sends only a test
+# copy to the address in the DIGEST_TEST_TO variable, unless "Send to every subscriber" is ticked.
+# growth/README.md lists the setup steps in order.
 on:
   workflow_dispatch:
+    inputs:
+      everyone:
+        description: "Send to every subscriber. Unticked, only a test copy goes to DIGEST_TEST_TO. Nothing is sent unless DIGEST_ENABLED is 1."
+        type: boolean
+        default: false
+  # To send every Monday, uncomment the two schedule lines below, once a test copy has been checked
+  # (growth/README.md). A scheduled run sends to every subscriber when DIGEST_ENABLED is 1, and only
+  # writes the preview when it isn't.
   # schedule:
-  #   - cron: "0 12 * * 1"    # Mondays, 8am US Eastern, once there is something to send it with
+  #   - cron: "0 12 * * 1"    # Mondays, 8am US Eastern
 
 permissions:
   contents: read
@@ -41,3 +56,19 @@ jobs:
           name: digest-preview
           path: digest-preview
           retention-days: 14
+
+      - name: Send the digest
+        # digest_send.py uses only the standard library too. The input and variables reach the script
+        # through env, never pasted into the command, so no value can change what the shell runs.
+        if: vars.DIGEST_ENABLED == '1'
+        env:
+          BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
+          DIGEST_POSTAL_ADDRESS: ${{ secrets.DIGEST_POSTAL_ADDRESS }}
+          DIGEST_TEST_TO: ${{ vars.DIGEST_TEST_TO }}
+          EVERYONE: ${{ github.event_name == 'schedule' || inputs.everyone }}
+        run: |
+          if [ "$EVERYONE" = "true" ]; then
+            python growth/digest_send.py docs --send
+          else
+            python growth/digest_send.py docs --send --test-to "$DIGEST_TEST_TO"
+          fi

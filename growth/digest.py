@@ -10,6 +10,7 @@ Nothing here sends mail or opens a network connection. Sending needs an email pr
 address first. A sender would take the HTML and text from render_html and render_text, replace
 {{ unsubscribe_url }} with the provider's own unsubscribe link, and pass in the postal address. The
 subscriber list would live with that provider. InternScout's own servers never store an email address.
+growth/digest_send.py is that sender, through Buttondown; this file stays unable to send.
 
 Run from the repo root:  python growth/digest.py [docs] [--out DIR]
     writes digest.html, digest.txt and digest.json into DIR (default ./digest-preview).
