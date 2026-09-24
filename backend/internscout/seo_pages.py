@@ -447,6 +447,12 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
             + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
               "<a href=\"feed.xml\">RSS feed</a></p>"
+            # The extension has been in the Chrome Web Store since 2026-09-22. This links the install
+            # page rather than the store: it's ours, so the link stays inside the site, and it tells a
+            # phone reader to send it to a laptop instead of dropping them on a store page that can't
+            # install anything.
+            + "<p class=\"follow\">Applying to a few? The free <a href=\"/install.html\">Auto-Apply extension</a> "
+              "fills in the application for you and stops at the submit button.</p>"
             + related)
 
 

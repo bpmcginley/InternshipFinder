@@ -43,5 +43,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" "$ZIP" \
               --title "InternScout extension ${GITHUB_REF_NAME#ext-v}" \
-              --notes "Download the zip below, then follow the install guide: https://internscout.org/install.html"
+              --notes "Most people should add the extension from the Chrome Web Store instead, which updates itself: https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=github-release. To load this zip by hand: https://internscout.org/install.html#by-hand"
           fi

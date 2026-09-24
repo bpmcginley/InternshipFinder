@@ -26,3 +26,11 @@ def test_listings_come_from_the_exported_stats(tmp_path):
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "stats.json").write_text(json.dumps({"open": 12823, "new": 1422, "generated_at": "x"}))
     assert metrics.listings(str(tmp_path)) == {"open": 12823, "new_7d": 1422, "generated_at": "x"}
+
+
+def test_store_listing_numbers_read_from_the_page_and_absent_until_shown():
+    page = ('<a href="/category/extensions/productivity">Tools</a>1,234 users</div>'
+            '<span aria-label="4.5 out of 5 stars" title="4.5 out of 5 stars"></span>')
+    unrated = '<span aria-label="0 out of 5 stars"></span>'
+    assert metrics.store_stats(page) == {"users": 1234, "rating": 4.5}
+    assert metrics.store_stats("<div>Add to Chrome</div>" + unrated) == {"users": None, "rating": None}

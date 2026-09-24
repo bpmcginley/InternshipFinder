@@ -4,7 +4,8 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Install the extension · InternScout</title>
-<meta name="description" content="How to install the InternScout Auto-Apply extension by hand, until it's in the Chrome Web Store."/>
+<!-- was: <meta name="description" content="How to install the InternScout Auto-Apply extension by hand, until it's in the Chrome Web Store."/> -->
+<meta name="description" content="Add the free InternScout Auto-Apply extension from the Chrome Web Store. It fills internship applications from your profile and stops at the submit button."/>
 
 <!-- Link previews, same reasoning as index.html: this page is the one students actually forward, and
      until today it forwarded as a bare grey URL. The description here is written for the preview rather
@@ -19,7 +20,8 @@
      was: "og:image is document-relative because the site lives under the /InternshipFinder/ project
      path on github.io; scrapers resolve it against og:url." -->
 <meta property="og:title" content="Install InternScout Auto-Apply"/>
-<meta property="og:description" content="Load the InternScout Auto-Apply extension by hand in about three minutes. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/>
+<!-- was: <meta property="og:description" content="Load the InternScout Auto-Apply extension by hand in about three minutes. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/> -->
+<meta property="og:description" content="Add InternScout Auto-Apply from the Chrome Web Store in about a minute. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/>
 <meta property="og:type" content="article"/>
 <meta property="og:url" content="https://internscout.org/install.html"/>
 <!-- was: <meta property="og:image" content="icon128.png"/> -->
@@ -86,10 +88,12 @@
   button.btn{border:0;font:600 16px var(--sans);cursor:pointer}
   .share-row{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin:6px 0 4px}
   .share-note{color:var(--ink3);font-size:14px;overflow-wrap:anywhere}
-  /* Chrome, Edge and Brave on a phone or tablet have no chrome://extensions Developer mode, so they
-     cannot load an extension from a folder, which is what step 5 below asks for. A student who opens
-     this page on a phone is reading seven steps they cannot perform. Show them that first, and give
-     them the one useful action: send the link to the laptop they will install from.
+  /* was: "...so they cannot load an extension from a folder, which is what step 5 below asks for. A
+     student who opens this page on a phone is reading seven steps they cannot perform."
+     Chrome, Edge and Brave on a phone or tablet can't add extensions from the Chrome Web Store (and
+     have no Developer mode for the by-hand route either). A student who opens this page on a phone is
+     reading steps they cannot perform. Show them that first, and give them the one useful action:
+     send the link to the laptop they will install from.
      The query now tests the hardware only, because the copy in .phonebar is about the hardware. It
      also used to fire at (max-width:640px), which is a window size and not a device: an ordinary
      desktop browser in a side-by-side window matches it, and so does a 1280px window at 200% browser
@@ -124,7 +128,8 @@
 
   <main>
     <h1>Install the extension</h1>
-    <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop</p>
+    <!-- was: <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop</p> -->
+    <p class="meta">About a minute · Chrome, Edge or Brave on a laptop or desktop</p>
 
     <!-- Phone-only banner. Hidden on desktop by CSS, not by script, so it is right even before the
          page's JavaScript runs. See the .phonebar rules for why the media query is written as it is. -->
@@ -137,40 +142,29 @@
            small fixed list of extensions you can turn on. What is true of all three browsers on all
            phones and tablets is that none of them expose the chrome://extensions Developer mode this
            page needs, so none can load an extension from a folder - which is step 5 below. -->
-      <p>Chrome, Edge and Brave on phones and tablets can't load an extension from a folder, so the steps
-         below won't work here. Send yourself the link and open it on your laptop. Searching still works on
-         this phone: the <a href="index.html">dashboard</a> needs no extension and no account.</p>
+      <!-- was: <p>Chrome, Edge and Brave on phones and tablets can't load an extension from a folder, so the steps
+         below won't work here. ...</p> -->
+      <p>Chrome, Edge and Brave on phones and tablets can't add extensions from the Chrome Web Store, so
+         the steps below won't work here. Send yourself the link and open it on your laptop. Searching still
+         works on this phone: the <a href="index.html">dashboard</a> needs no extension and no account.</p>
       <div class="share-row">
         <button class="btn" type="button" data-share>Send this to my laptop</button>
         <span class="share-note" role="status" aria-live="polite"></span>
       </div>
     </aside>
 
-    <p class="lede">The InternScout Auto-Apply extension isn't in the Chrome Web Store yet. Until it is, you install it by hand. These steps show you how.</p>
+    <!-- was: <p class="lede">The InternScout Auto-Apply extension isn't in the Chrome Web Store yet. Until it is, you install it by hand. These steps show you how.</p>
+         The store approved it on 2026-09-22, so the by-hand steps moved down to "Install by hand instead"
+         for the few people who still need them, and the store button is step 1. -->
+    <p class="lede">InternScout Auto-Apply is in the Chrome Web Store. Add it in a click, and it keeps itself up to date.</p>
     <p>You don't need the extension to search. The <a href="index.html">dashboard</a> works on its own. The extension adds your Deep Dive profile and Auto-Apply, which fills out applications and stops at the submit button.</p>
 
     <ol class="steps">
       <li>
-        <h3>Download the zip</h3>
-        <p>Open the latest release on GitHub. Under <strong>Assets</strong>, download <code>internscout-extension-<em>version</em>.zip</code>. Don't pick "Source code".</p>
-        <a class="btn" href="https://github.com/bpmcginley/InternshipFinder/releases/latest">Open the latest release</a>
-      </li>
-      <li>
-        <h3>Unzip it into a folder you'll keep</h3>
-        <p><strong>Windows:</strong> right-click the zip, then <em>Extract All</em>. <strong>Mac:</strong> double-click the zip.</p>
-        <p>Move the new folder somewhere it can stay, like Documents. Chrome runs the extension from this folder. If you delete or move it, the extension stops working.</p>
-      </li>
-      <li>
-        <h3>Open the extensions page</h3>
-        <p>Type <code>chrome://extensions</code> in the address bar and press Enter. In Edge, use <code>edge://extensions</code>. (Browsers don't let you click these links, so type it.)</p>
-      </li>
-      <li>
-        <h3>Turn on Developer mode</h3>
-        <p>Flip the <strong>Developer mode</strong> switch. In Chrome it's at the top right. In Edge it's in the left sidebar.</p>
-      </li>
-      <li>
-        <h3>Click Load unpacked</h3>
-        <p>Pick the folder you unzipped: the one with <code>manifest.json</code> directly inside. An <strong>InternScout Auto-Apply</strong> card appears, and the Deep Dive setup opens in a new tab.</p>
+        <h3>Add it from the Chrome Web Store</h3>
+        <p>Open the listing, click <strong>Add to Chrome</strong>, then <strong>Add extension</strong>. The Deep Dive setup opens in a new tab.</p>
+        <p><strong>Edge:</strong> click <strong>Allow extensions from other stores</strong> in the bar at the top of the listing first, then add it the same way. <strong>Brave</strong> works like Chrome.</p>
+        <a class="btn" href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Open it in the Chrome Web Store</a>
       </li>
       <li>
         <h3>Pin it to your toolbar</h3>
@@ -199,42 +193,51 @@
         <li>Finish the <strong>Deep Dive</strong>: your resume, facts and a few short questions. Everything stays on your device.</li>
         <li>Open the <a href="index.html">dashboard</a>, tick some listings and press <strong>Auto-Apply</strong>.</li>
         <li>Most applications run on a system the extension already has access to. When one is on an employer's own careers site, the job pauses and the side panel shows an <strong>Allow <em>that site</em></strong> button. Chrome then asks about that one site. Nothing else is granted, and you can say no.</li>
+        <li>If it helps you, a rating on the <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Web Store listing</a> helps other students find it.</li>
       </ul>
     </div>
 
+    <!-- was: "Switching to the Web Store version later", written to the by-hand installer before the store
+         listing existed. Same facts, now addressed to someone who already has the by-hand copy: the store
+         assigned its own ID (hpnbb...) and the hand-installed copy keeps jmjj... from the manifest "key",
+         so Chrome can hold both, but nothing moves between them, and both would answer the dashboard. -->
     <div class="box warn">
-      <h3>"Disable developer mode extensions" warning</h3>
-      <p>Chrome may show this warning for extensions installed by hand. It's normal. Close it to keep using InternScout. It goes away once the extension is in the Web Store.</p>
-    </div>
-
-    <!-- was: "you'll need to remove this copy before you add that one", written when the two copies were
-         thought to share one extension ID. They don't: the store assigned its own ID (hpnbb...) and the
-         hand-installed copy keeps jmjj... from the manifest "key". So Chrome can hold both, but nothing
-         moves between them, and both would answer the dashboard, so the advice is: move, then remove. -->
-    <div class="box warn">
-      <h3>Switching to the Web Store version later</h3>
-      <p>The Web Store version is a separate extension from this one, so nothing you saved here carries over to it. Before you switch:</p>
+      <h3>Installed it by hand before?</h3>
+      <p>The Web Store version is a separate extension from the one you loaded by hand, so nothing you saved in the old copy carries over. Before you switch:</p>
       <ul>
         <li>Keep your own copy of your resume and any files you uploaded.</li>
         <li>Save the passwords for employer accounts it created in your password manager. They're under <strong>Accounts</strong> in the side panel, with a Copy button.</li>
       </ul>
-      <p>Then add the Web Store version, sign in and redo the Deep Dive. Once it works, remove this copy at <code>chrome://extensions</code>, so the two don't both try to fill the same application. Your dashboard profile and application statuses are kept, because the dashboard saves them in your browser, separately from the extension.</p>
+      <p>Then add the Web Store version, sign in and redo the Deep Dive. Once it works, remove the old copy at <code>chrome://extensions</code> (it's the InternScout card with a reload arrow), so the two don't both try to fill the same application. Your dashboard profile and application statuses are kept, because the dashboard saves them in your browser, separately from the extension.</p>
     </div>
 
+    <!-- was: a three-step "Updating" section (download the new zip, replace the folder's files, reload).
+         That's only true of the by-hand copy now, so it moved into the section below. -->
     <h2>Updating</h2>
-    <ol>
-      <li>Download the new zip from the <a href="https://github.com/bpmcginley/InternshipFinder/releases/latest">latest release</a>.</li>
-      <li>Unzip it and replace the files in your <strong>existing</strong> folder. Keep the folder in the same place.</li>
-      <li>Go to <code>chrome://extensions</code> and click the reload arrow on the InternScout card.</li>
-    </ol>
-    <p>Your profile and files are saved in Chrome, not in the folder, so they carry over. If you load the extension from a different folder location, Chrome treats it as a new extension and your saved profile won't show up.</p>
+    <p>Nothing to do. Chrome updates Web Store extensions on its own, usually within a few hours of a new version.</p>
 
     <h2>Troubleshooting</h2>
     <ul>
-      <li><strong>"Manifest file is missing or unreadable":</strong> you picked the outer folder. Open it and pick the folder that has <code>manifest.json</code> inside.</li>
+      <li><strong>No "Add to Chrome" button:</strong> the store only offers it in desktop Chrome, Edge and Brave. On a school- or work-managed computer your IT department may block extensions; use your own laptop instead.</li>
       <li><strong>Sign-in fails:</strong> try the other provider, or check that pop-ups aren't blocked. If you expected the larger school allowance, sign in with the account that has your .edu email. If it still fails, <a href="https://github.com/bpmcginley/InternshipFinder/issues">open an issue</a>.</li>
       <li><strong>Remove it:</strong> go to <code>chrome://extensions</code> and click <em>Remove</em>. Chrome deletes everything the extension saved. See <a href="privacy.html#delete">how to delete your data</a>.</li>
     </ul>
+
+    <!-- The steps this page used to lead with, kept for anyone the store route doesn't suit (a browser
+         that can't reach the store, or trying a GitHub release before the store has reviewed it). Same
+         wording as before; only the step numbers and the pointer to the sign-in step are new. -->
+    <h2 id="by-hand">Install by hand instead</h2>
+    <p>Only if the Web Store route doesn't work for you. The by-hand copy doesn't update itself.</p>
+    <ol>
+      <li>Open the <a href="https://github.com/bpmcginley/InternshipFinder/releases/latest">latest release</a> on GitHub. Under <strong>Assets</strong>, download <code>internscout-extension-<em>version</em>.zip</code>. Don't pick "Source code".</li>
+      <li>Unzip it into a folder you'll keep, like Documents. <strong>Windows:</strong> right-click the zip, then <em>Extract All</em>. <strong>Mac:</strong> double-click the zip. Chrome runs the extension from this folder, so if you delete or move it, the extension stops working.</li>
+      <li>Type <code>chrome://extensions</code> in the address bar and press Enter. In Edge, use <code>edge://extensions</code>. (Browsers don't let you click these links, so type it.)</li>
+      <li>Flip the <strong>Developer mode</strong> switch. In Chrome it's at the top right. In Edge it's in the left sidebar.</li>
+      <li>Click <strong>Load unpacked</strong> and pick the folder you unzipped: the one with <code>manifest.json</code> directly inside. If Chrome says <em>"Manifest file is missing or unreadable"</em>, you picked the outer folder.</li>
+      <li>Pin it and sign in, as in steps 2 and 3 above.</li>
+    </ol>
+    <p><strong>Updating a by-hand copy:</strong> download the new zip, replace the files in your <strong>existing</strong> folder (keep it in the same place), then click the reload arrow on the InternScout card at <code>chrome://extensions</code>. Your profile and files are saved in Chrome, not in the folder, so they carry over.</p>
+    <p>Chrome may show a <strong>"Disable developer mode extensions"</strong> warning for extensions installed by hand. It's normal; close it to keep using InternScout.</p>
 
     <!-- The same share control the phone banner uses, kept where a desktop reader ends up: the person
          who just installed it is the likeliest person to pass it to a roommate. One handler serves both

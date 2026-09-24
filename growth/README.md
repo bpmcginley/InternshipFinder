@@ -36,7 +36,8 @@ Recompute this table with `python growth/audience.py` (it reads `docs/data`).
 | **Brand posts** (`growth/social.py`) | Built, waiting for accounts | Tuesdays and Thursdays it writes a post from the data (one field's new roles nearby this week, linking its page) and sends it to InternScout's Bluesky, Mastodon or Discord, whichever has secrets set. Until then the weekly report carries the post as a draft. |
 | **Where to scan** | Already running | The ingest adds any state students pick to its detailed scan (`Worker /demand`), so coverage grows where the audience is. |
 | **What to search for** (`backend/internscout/focus.py`) | Built | Every ingest reads the last export, finds the fields UMass majors are worst served in (open roles nearby, per major that depends on the field), and spends the daily focus searches there. Today that is languages, arts and social science. What the searches find is kept for two days after they last see it (it used to vanish at the next run), so a field that fills up drops out on its own. A test checks that every search's typical result is tagged with the field it is meant to fill. |
-| **Analytics dashboard** (`growth/metrics.py`) | Built | Every morning the day's visits (by source and landing page), top pages, referrers, countries, Bluesky and listing numbers are copied into the app's D1 database. A private Claude page reads them, and the live sign-in, AI and Stripe numbers, through the owner's own Cloudflare and Stripe connectors. Totals only. |
+| **Chrome Web Store listing** | Live since 2026-09-22 | The extension installs in one click from [its listing](https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi) and updates itself. The install page leads with it, the dashboard links straight to it on a computer, and every landing page links the install page. Each link carries a `utm_source` naming the place it sits, so the store's own install analytics say which ones work. |
+| **Analytics dashboard** (`growth/metrics.py`) | Built | Every morning the day's visits (by source and landing page), top pages, referrers, countries, Bluesky and listing numbers, and the store listing's users and rating, are copied into the app's D1 database. A private Claude page reads them, and the live sign-in, AI and Stripe numbers, through the owner's own Cloudflare and Stripe connectors. Totals only. |
 | **Visit counting** | Running | Cloudflare Web Analytics on every page, cookieless. |
 | **Weekly growth report** (`growth/report.py`) | Built | Every Monday a GitHub issue labelled `growth-report`: visits without bots, top landing pages and referrers, the share of visits that came in through any landing page (once the Cloudflare token is added), the states students picked (in order, with no counts, because the issue is public), which majors are served and which are thin, where the focus searches are going, and the landing-page count. Last week's issue closes itself. Run it any time with `python growth/report.py`. |
 
@@ -79,8 +80,9 @@ Revisit a store app once there are returning users who ask for one.
 | Step | Why |
 |---|---|
 | Settings → Pages → Source: **GitHub Actions**, just before the landing-pages PR merges | The landing pages are built at deploy time; the deploy refuses to run until this is set |
-| Verify internscout.org in Google Search Console | See which searches find the pages; unlocks the store's Official URL |
-| A Cloudflare API token with Analytics read, saved as a repo secret | Lets the weekly report read visits |
+| ~~Verify internscout.org in Google Search Console~~ (done 2026-09-23) | See which searches find the pages; unlocks the store's Official URL |
+| In the Chrome Web Store developer dashboard, Store listing → **Official URL**: internscout.org | The listing then shows the site as verified, which store visitors trust |
+| A Cloudflare API token with Analytics read and D1 edit, saved as a repo secret | Lets the weekly report read visits and the daily metrics copy write them |
 | Ad accounts and monthly caps, when ready | Paid reach in recruiting season |
 | A PO box, before any email goes out | Required on every marketing email |
 | Brand accounts (Bluesky, Mastodon, a Discord server), with their secrets in the repo, when ready | Lets the brand posts go out on their own; see growth/social.py for the secret names |

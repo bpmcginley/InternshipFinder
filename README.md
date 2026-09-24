@@ -26,13 +26,13 @@ Listings are then ranked for you. Your profile is saved in your browser only. Ch
 under **My profile**.
 
 ### 3. Install the extension (optional)
-You only need it for Auto-Apply and the Deep Dive profile. It isn't in the Chrome Web Store yet,
-so install it by hand:
-**[Install guide](https://internscout.org/install.html)**. In short:
-download the zip from [Releases](https://github.com/bpmcginley/InternshipFinder/releases/latest),
-unzip it, go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and pin it.
+You only need it for Auto-Apply and the Deep Dive profile.
+**[Add it from the Chrome Web Store](https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=github-readme)**,
+then pin it. It updates itself.
 
-Works in Chrome, Edge and Brave on a computer.
+Works in Chrome, Edge and Brave on a computer. To load a build from
+[Releases](https://github.com/bpmcginley/InternshipFinder/releases/latest) by hand instead, see the
+[install guide](https://internscout.org/install.html#by-hand).
 
 ### 4. Sign in (for AI features)
 Click **Sign in with Google** or **Sign in with Microsoft** in the extension or on the dashboard.

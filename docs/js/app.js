@@ -26,6 +26,13 @@
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const cx = (...a) => a.filter(Boolean).join(" ");
   const prevent = fn => e => { e.preventDefault(); fn(e); };
+  // Where "install the extension" goes: the Chrome Web Store listing on a laptop or desktop, and the
+  // install page on a phone or tablet, which can't add extensions (same media query as install.html's
+  // phone banner). `from` is the listing's utm_source, so the store counts installs per link.
+  const touchOnly = () => !!(window.matchMedia && matchMedia("(pointer:coarse) and (hover:none)").matches);
+  const installUrl = from => C.extensionStoreUrl && !touchOnly()
+    ? C.extensionStoreUrl + "?utm_source=" + encodeURIComponent(from)
+    : C.extensionInstallUrl || "install.html";
 
   // ---------- search ----------
   // Every word must appear; -word excludes; "quoted phrase" matches exactly. Place words (city or state
@@ -924,7 +931,9 @@
       // POST /ai and serves the counts from GET /me. This notice sits under copy that promises
       // search is free with no sign-in, so the account has to be named here or it reads as carried
       // over. The account is free, which is why that word stays.
-      info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // "Install guide" pointed at the by-hand steps; since 2026-09-22 it's one click in the Web Store.
+      info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
 
@@ -992,7 +1001,8 @@
           h("a", { href: "terms.html" }, "Terms"),
           h("a", { href: feedbackUrl, target: "_blank", rel: "noopener" }, "Feedback"),
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
-          h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
+          // was: h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
+          h("a", { href: installUrl("dashboard-footer"), target: "_blank", rel: "noopener" }, "Install extension"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
           C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs"),

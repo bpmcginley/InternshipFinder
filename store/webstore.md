@@ -1,5 +1,9 @@
 # Chrome Web Store listing: InternScout Auto-Apply
 
+**Live:** https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi
+(version 0.4.3, "Published - public", confirmed 2026-09-24). Links from our own pages add
+`?utm_source=<place>` so the store's install analytics split installs by where they came from.
+
 Copy these into the Developer Dashboard. Bruce pays the $5 developer fee and submits.
 Keep this file in step with `extension/manifest.json` and `docs/privacy.html`.
 

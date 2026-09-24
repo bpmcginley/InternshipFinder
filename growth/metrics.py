@@ -6,7 +6,8 @@ Cloudflare Web Analytics has no connector a dashboard page can call, so once a d
   metrics_daily     one row per day for the last 30 days: visits, and how many came in through a
                     landing page, from a search engine, from social sites, or directly
   metrics_snapshot  one row per run: the week's top pages, referrers and countries, Bluesky
-                    followers and engagement, open and new listings, and the page count
+                    followers and engagement, open and new listings, the page count, and the
+                    extension's Chrome Web Store users and rating
 
 Only totals: no visitor, student or account is ever stored. The dashboard reads these rows, and the
 live sign-in, AI and Stripe numbers, through the viewer's own Cloudflare and Stripe connectors.
@@ -30,6 +31,7 @@ SITE_TAG = os.environ.get("CLOUDFLARE_SITE_TAG", "54f99780d57f4ae2a55182b44b082e
 D1_DATABASE = os.environ.get("INTERNSCOUT_D1_ID", "ef477808-f94c-4dce-a0b3-1198f00e5c39")
 BLUESKY = os.environ.get("BLUESKY_HANDLE") or "internscout.org"
 SITE = "https://internscout.org"
+STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"
 DAYS = 30
 # Cloudflare turns away Python's default user agent with a 403, so every request names itself.
 UA = {"User-Agent": "InternScout-metrics/1.0 (+https://internscout.org)"}
@@ -130,6 +132,24 @@ def listings(site_dir: str) -> dict:
     return {"open": s.get("open"), "new_7d": s.get("new"), "generated_at": s.get("generated_at")}
 
 
+def store_stats(html: str) -> dict:
+    """The user count and average rating on a Chrome Web Store listing page. Each is None until the
+    store shows it: a new listing has no user count, and an unrated one shows "0 out of 5 stars"
+    (a real rating is never under 1)."""
+    users = re.search(r">([\d,]+)\+? users?<", html)
+    rating = re.search(r'aria-label="([\d.]+) out of 5 stars"', html)
+    return {"users": int(users.group(1).replace(",", "")) if users else None,
+            "rating": (float(rating.group(1)) or None) if rating else None}
+
+
+def store() -> dict:
+    """The extension's public store listing. The store has no API for these numbers, so this reads the
+    page itself, once a day (robots.txt allows /detail/ pages without a query string)."""
+    req = urllib.request.Request(STORE_URL, headers=UA)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return store_stats(r.read().decode("utf-8", "replace"))
+
+
 def page_count() -> int:
     req = urllib.request.Request(f"{SITE}/sitemap.xml", headers=UA)
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -159,7 +179,8 @@ def main(argv: list[str]) -> int:
             problems.append(f"visits: {e}")
     else:
         problems.append("visits: no CLOUDFLARE_API_TOKEN")
-    for key, fn in (("bluesky", lambda: bluesky(now)), ("listings", lambda: listings(site_dir)), ("pages", page_count)):
+    for key, fn in (("bluesky", lambda: bluesky(now)), ("listings", lambda: listings(site_dir)), ("pages", page_count),
+                    ("store", store)):
         try:
             snap[key] = fn()
         except (OSError, urllib.error.URLError, ValueError, KeyError) as e:
