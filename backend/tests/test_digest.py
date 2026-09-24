@@ -244,3 +244,9 @@ def test_the_command_writes_a_preview_and_sends_nothing(tmp_path, capsys):
     source = open(os.path.join(ROOT, "growth", "digest.py"), encoding="utf-8").read()
     for module in ("smtplib", "urllib.request", "http.client", "socket", "requests"):
         assert f"import {module}" not in source and f"from {module}" not in source
+
+
+def test_one_employer_fills_at_most_two_places_in_a_field():
+    rows = [{"company_name": "Big Co", "id": f"b{i}"} for i in range(6)] + [{"company_name": "Small Co", "id": "s1"}]
+    picked = digest.varied(rows)
+    assert [x["id"] for x in picked] == ["b0", "b1", "s1", "b2", "b3"]   # 2 + the other employer, then topped up

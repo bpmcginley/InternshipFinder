@@ -289,7 +289,7 @@ def test_the_send_itself_is_never_repeated(site, ready, api, capsys):
     api.answers = [{"id": "em_3", "status": "draft"}, urllib.error.URLError("timed out")]
     assert digest_send.main(["digest_send.py", site, "--send"]) == digest_send.EXIT_PROVIDER
     assert len(api.requests) == 2
-    assert "Draft em_3 was made but not sent" in capsys.readouterr().out
+    assert "may or may not be sending" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("answer", [{}, {"id": ""}, {"id": "em_1/../../newsletters"},
@@ -304,3 +304,20 @@ def test_standard_library_only():
     source = open(os.path.join(ROOT, "growth", "digest_send.py"), encoding="utf-8").read()
     for module in ("requests", "httpx", "urllib3", "aiohttp"):
         assert f"import {module}" not in source and f"from {module}" not in source
+
+
+def test_a_job_title_with_the_unsubscribe_token_stays_text():
+    page = ('<html><body><p>Intern {{ unsubscribe_url }} role</p>'
+            '<a href="{{ unsubscribe_url }}">Unsubscribe</a></body></html>')
+    body = digest_send.body_html(page)
+    assert body.count(digest_send.UNSUBSCRIBE) == 1                  # only the footer's link is live
+    assert "Intern &#123;&#123; unsubscribe_url &#125;&#125; role" in body
+    with pytest.raises(ValueError):                                  # a title can't stand in for the link
+        digest_send.body_html("<html><body><p>{{ unsubscribe_url }}</p></body></html>")
+
+
+def test_no_answer_to_the_send_says_the_result_is_unknown(site, ready, api, capsys):
+    api.answers = [{"id": "em_4", "status": "draft"}, urllib.error.URLError("reset")]
+    assert digest_send.main(["digest_send.py", site, "--send"]) == digest_send.EXIT_PROVIDER
+    out = capsys.readouterr().out
+    assert "may or may not be sending" in out and "was made but not sent" not in out

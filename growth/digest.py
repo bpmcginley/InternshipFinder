@@ -34,6 +34,7 @@ from internscout import seo_pages as sp  # noqa: E402
 MIN_NEW = 3            # new roles a field needs this week to get a section
 MAX_SECTIONS = 8       # eight fields of five roles is already a long email
 PER_SECTION = 5        # roles shown per field; the field's page has the rest
+PER_EMPLOYER = 2       # ...and at most this many from one employer, so one big poster can't fill a field
 
 UTM = "utm_source=digest&utm_medium=email"
 HOME_URL = f"{sp.SITE}/?{UTM}"
@@ -98,7 +99,21 @@ def role(x: dict) -> dict:
 def section(tag: str, items: list[dict], open_count: int) -> dict:
     return {"tag": tag, "title": sp.field_title(tag), "new": len(items), "open": open_count,
             "url": field_url(tag, open_count),
-            "roles": [role(x) for x in sp.near_home_first(items)[:PER_SECTION]]}
+            "roles": [role(x) for x in varied(sp.near_home_first(items))]}
+
+
+def varied(ordered: list[dict]) -> list[dict]:
+    """The first PER_SECTION roles in order, at most PER_EMPLOYER from any one employer. When too few
+    employers are left to fill the section, the rest are filled in order after all."""
+    seen: Counter = Counter()
+    picked = []
+    for x in ordered:
+        if seen[x.get("company_name")] < PER_EMPLOYER:
+            seen[x.get("company_name")] += 1
+            picked.append(x)
+        if len(picked) == PER_SECTION:
+            return picked
+    return picked + [x for x in ordered if x not in picked][:PER_SECTION - len(picked)]
 
 
 def preheader(sections: list[dict]) -> str:

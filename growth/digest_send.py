@@ -64,6 +64,11 @@ class ProviderError(Exception):
     """Buttondown refused a request or could not be reached. The message says which and why."""
 
 
+class NoAnswer(ProviderError):
+    """No answer at all: the request may or may not have reached Buttondown. For the final send that
+    means the email may already be going out, which is not the same as "not sent"."""
+
+
 # ---------------------------------------------------------------- the email
 
 def subject(d: dict) -> str:
@@ -83,11 +88,15 @@ def body_html(page: str) -> str:
     m = re.search(r"<body[^>]*>(.*)</body>", page, re.S)
     if not m:
         raise ValueError("digest.render_html returned a page with no <body>")
-    parts = m.group(1).split(digest.UNSUBSCRIBE)
-    if len(parts) < 2:
-        raise ValueError(f"the digest has no {digest.UNSUBSCRIBE} placeholder for the unsubscribe link")
+    # was: parts = m.group(1).split(digest.UNSUBSCRIBE), which also kept a job title that happened to
+    # contain the token as a live tag, and let such a title stand in for a missing footer link. Only the
+    # footer's own href is kept: job-board text is HTML-escaped, so it can never contain href="...".
+    link = f'href="{digest.UNSUBSCRIBE}"'
+    parts = m.group(1).split(link)
+    if len(parts) != 2:
+        raise ValueError(f"the digest needs exactly one unsubscribe link ({link}); found {len(parts) - 1}")
     safe = [p.replace("{", "&#123;").replace("}", "&#125;") for p in parts]
-    return FANCY + UNSUBSCRIBE.join(safe).strip()
+    return FANCY + f'href="{UNSUBSCRIBE}"'.join(safe).strip()
 
 
 def payload(d: dict, postal_address: str | None, public_archive: bool = False) -> dict:
@@ -137,7 +146,7 @@ def call(method: str, path: str, key: str, body: dict | None = None, headers: di
         except ValueError:
             raise ProviderError(f"Buttondown answered {method} {path} with something that isn't JSON: "
                                 f"{raw[:200]!r}") from None
-    raise ProviderError(problem)
+    raise NoAnswer(problem)
 
 
 def create_draft(key: str, body: dict) -> str:
@@ -244,6 +253,12 @@ def main(argv: list[str]) -> int:
             call("PATCH", f"/emails/{email_id}", key, {"status": "about_to_send"})
             print(f"[digest] {email_id} is on its way to every subscriber. Buttondown sends it within a few "
                   "minutes; until then, setting it back to a draft in the dashboard stops it.")
+    except NoAnswer as e:
+        # The request may have reached Buttondown before the connection dropped, so the email may be on
+        # its way. Saying "not sent" here is how a second run sends everyone a second copy.
+        print(f"[digest] No answer to the last step for draft {email_id}, so it may or may not be sending. {e}")
+        print("[digest] Check that email's status in Buttondown's dashboard before running this again.")
+        return EXIT_PROVIDER
     except ProviderError as e:
         print(f"[digest] Draft {email_id} was made but not sent. {e}")
         print("[digest] Send or delete that draft in Buttondown's dashboard before running this again.")
