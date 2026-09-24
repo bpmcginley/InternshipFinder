@@ -122,7 +122,7 @@
         <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li>
         <!-- Added with the weekly email sign-up (docs/js/app.js Digest). It is the one place a student
              hands over an email address on purpose, so the short version says who ends up holding it. -->
-        <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. <a href="#digest">Details below</a>.</li>
+        <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. Buttondown also records the IP address you sign up from. <a href="#digest">Details below</a>.</li>
         <li>We never see your password.</li>
         <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
       </ul>
@@ -325,10 +325,16 @@
     <h2 id="digest">If you sign up for the weekly email</h2>
     <p>The weekly email is optional. Search, your profile and everything else on InternScout work without it. You sign up with the form under the listings on the dashboard.</p>
     <ul>
-      <li><strong>What it contains:</strong> internships InternScout found in the past week, picked for the fields you ticked, with links to the postings. If you ticked none, it covers every field.</li>
+      <!-- was: <li><strong>What it contains:</strong> internships InternScout found in the past week, picked for the fields you ticked, with links to the postings. If you ticked none, it covers every field.</li>
+           growth/digest_send.py sends one email to every subscriber, built from the fields with the most new
+           roles that week, so "picked for the fields you ticked" promised a matching the sender doesn't do. -->
+      <li><strong>What it contains:</strong> the internships InternScout found in the past week, grouped by field: the fields with the most new roles that week, each with a few postings and a link to the rest. For now everyone gets the same email. The fields you tick are saved with your subscription so it can be matched to them later.</li>
       <li><strong>How often:</strong> once a week. Buttondown first sends one confirmation email, and nothing else arrives until you click its link.</li>
       <li><strong>Buttondown holds your address, not us.</strong> The form sends your email address, and the fields you ticked, straight from your browser to Buttondown, the service that sends the email. They never pass through or get stored on InternScout's servers, which is why the <em>What we store</em> table above has no row for them. Buttondown keeps them under <a href="https://buttondown.com/legal/privacy" target="_blank" rel="noopener">its own privacy policy</a>.</li>
-      <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked and whether you have confirmed. That is what it takes to send the email. The list is used only to send this email, is never sold or shared, and is not copied anywhere else.</li>
+      <!-- was: <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked and whether you have confirmed. ...</li>
+           That read as the whole record. Buttondown also keeps the IP address a subscriber signed up from, a
+           rough location from it, and the page the form was on, and shows them on the subscriber's record. -->
+      <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked, whether you have confirmed, and what Buttondown records when you sign up: the IP address you signed up from, a rough location worked out from it, and the page the form was on. Open and click tracking is switched off for this email. The list is used only to send this email, is never sold or shared, and is not copied anywhere else.</li>
       <li>Signing up again with other fields adds them to the ones you had; it doesn't remove any. To drop a field, write to us, or unsubscribe and sign up again.</li>
       <li><strong>Unsubscribing:</strong> every email has an unsubscribe link at the bottom, and it stops the emails. To have your address deleted from Buttondown's list as well, write to us at the address under <em>Contact</em> below.</li>
     </ul>

@@ -342,11 +342,14 @@
       h("a", { href: "privacy.html#digest" }, "Details"),
       // The key remounts the boxes when the profile's fields change, so each new field starts ticked.
       fields.length > 0
-        ? h("fieldset", { key: fields.join(","), id: "digest-fields" }, h("legend", null, "Fields from your profile"),
+        // was: h("legend", null, "Fields from your profile")
+        ? h("fieldset", { key: fields.join(","), id: "digest-fields" }, h("legend", null, "Fields from your profile, saved with your subscription so the email can be matched to them later"),
           h("div", { className: "checks" }, fields.map(t => h("label", { key: t, className: "check" },
             h("input", { type: "checkbox", id: "digest-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
-        : h("div", { style: { marginTop: 8 } }, "With no fields picked, the email covers every field. ",
-          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " to narrow it."),
+        // was: "With no fields picked, the email covers every field. ... to narrow it." For now every
+        // subscriber gets the same email (growth/digest_send.py), so ticked fields only get saved.
+        : h("div", { style: { marginTop: 8 } }, "Everyone gets the same email for now. ",
+          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " and they'll be saved with your subscription, so it can be matched to them later."),
       h("div", { className: "digest-row" },
         h("label", { htmlFor: "digest-email" }, "Email"),
         h("input", { id: "digest-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
@@ -1053,7 +1056,9 @@
       outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
         `They come back on ${resetDay}. `,
         !invite && h("a", { href: "#", onClick: prevent(openInvite) }, "Invite a classmate"),
-        `${invite ? "Share your invite link below" : ` for ${inviteWords} each`}${upgrades.length ? ", or pick a plan above" : ""}.`),
+        // was: ` for ${inviteWords} each`. An inviter is rewarded for their first REFERRAL.maxRewards
+        // classmates only (worker/src/referral.js), so "each" was false for the heaviest users.
+        `${invite ? "Share your invite link below" : `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates`}${upgrades.length ? ". Or pick a plan above" : ""}.`),
       auth.token && invite && h("div", { className: "notice invite" },
         h("b", null, "Invite classmates. "),
         `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
