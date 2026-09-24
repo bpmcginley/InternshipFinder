@@ -83,7 +83,8 @@
     <!-- was: <p class="meta">Last updated September 17, 2026</p> -->
     <!-- was: <p class="meta">Last updated September 19, 2026</p>  (operator named, an email address,
          who may subscribe, and governing law added 2026-09-22) -->
-    <p class="meta">Last updated September 22, 2026</p>
+    <!-- was: <p class="meta">Last updated September 22, 2026</p>  (invite runs added 2026-09-24) -->
+    <p class="meta">Last updated September 24, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so "a free
          tool" flat out is no longer accurate. Search genuinely is free and always has been. -->
     <!-- was: <p class="lede">InternScout is a free tool made by a UMass Amherst student. By using the dashboard or the extension, you agree to these terms.</p> -->
@@ -136,6 +137,23 @@
       <li><strong>Caps, limits and features may change at any time.</strong></li>
       <!-- was: <li>Optional paid plans raise the allowance for students who want more. They are optional, and search stays free. See below.</li> -->
       <li>Optional paid plans raise the allowance for students who want more: Supporter at $5/month, Pro at $12/month. They are optional, and search stays free. See below.</li>
+    </ul>
+
+    <!-- Invites went live on 2026-09-24. The numbers are REFERRAL in worker/src/config.js (3 Auto-Apply
+         runs each, 10 rewarded invites, a 7-day window) and the rules are claim() in
+         worker/src/referral.js (.edu tier only, one claim per account). limits.js admit() spends the
+         extra runs only after the month's allowance, and they still meet the per-account and budget
+         stops. Extra runs are something of value we hand out, so the terms say what they aren't worth
+         and what happens to runs gained by gaming the program. -->
+    <h2>Invite runs</h2>
+    <p>You can share your own invite link from <strong>Invite classmates</strong> on the dashboard.</p>
+    <ul>
+      <li>When a classmate signs in through your link with a school (.edu) account in that account's first week on InternScout, they get 3 extra Auto-Apply runs, and so do you. You can earn them for up to 10 invites.</li>
+      <li>Each account can join through an invite only once, ever.</li>
+      <li>Extra runs are used only after your monthly allowance runs out. They don't expire, but they still count toward your account's AI limits.</li>
+      <li>They have no cash value and can't be sold or transferred.</li>
+      <li>We may change or end the invite program at any time. Runs you've already been given stay usable.</li>
+      <li>Runs gained through abuse, such as fake or duplicate accounts or inviting yourself, may be removed.</li>
     </ul>
 
     <h2>Paid plans (optional)</h2>

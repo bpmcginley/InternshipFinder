@@ -180,6 +180,13 @@
   /* The invite panel: the student's link, selectable, beside a Share or Copy button. */
   .invite-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
   .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
+  /* The weekly email sign-up under the list: the profile's fields as checkboxes, then one row of
+     label, email box and button. Quiet on purpose, so it never competes with the listings. */
+  .digest fieldset{margin:10px 0 0}
+  .digest legend{font-weight:500;font-size:13px;color:var(--ink)}
+  .digest-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .digest-row label{font-weight:500;color:var(--ink)}
+  .digest-row input[type=email]{flex:1 1 220px;min-width:0;max-width:340px;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font-size:14px}
 
   /* filters: search, field, state and sort on the first row, everything else behind "More filters".
      Thirteen equal-looking dropdowns in one wrapping row was the single hardest thing to read on
@@ -365,6 +372,15 @@
     // install analytics, so each place that links here says which one it is.
     extensionStoreUrl: "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi",
     baselineStates: ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"],
+    // The weekly email ("Email me new internships each week", under the list in js/app.js). The form
+    // posts straight from the student's browser to Buttondown, which keeps the address and the ticked
+    // fields and sends the confirmation email, so InternScout's own servers never see either.
+    // The form stays hidden while formAction is empty. Once the Buttondown account exists, paste
+    // "https://buttondown.com/api/emails/embed-subscribe/YOUR-BUTTONDOWN-USERNAME" here, with the
+    // account's username in place of the capitals. Before pasting it, put the PO box in the
+    // newsletter's footer setting in Buttondown: CAN-SPAM wants a postal address in every email,
+    // and Buttondown does not add one itself.
+    digest: { provider: "Buttondown", formAction: "" },
   };
 </script>
 <script crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>

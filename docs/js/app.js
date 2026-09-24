@@ -320,6 +320,45 @@
           h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(false) }, "Hide this"))));
   }
 
+  // ---------- weekly email ----------
+  // A plain HTML form that posts straight to the email provider (window.CONFIG.digest). Buttondown's
+  // docs say not to send it with fetch: the subscriber may have to pass a CAPTCHA or fix a typo on
+  // Buttondown's own page, so the browser has to follow the response. target="_blank" puts that page
+  // in a new tab and leaves the student's search where it was. Nothing here touches the Worker, so
+  // the address never reaches InternScout's servers.
+  // `fields` are the profile's field tags (majors' tags plus hand-picked fields, as in scoring). Each
+  // ticked box is one `tag` value. The value is the tag key ("swe"), not its label, because the key is
+  // what listings carry in field_tags and it never changes wording. Buttondown adds tags on a repeat
+  // sign-up rather than replacing them, so unticking a box later cannot remove a tag.
+  function Digest({ cfg, fields, hasProfile, onSetup }) {
+    const [sent, setSent] = useState(false);
+    const prov = cfg.provider || "Buttondown";
+    // Only the form's status line changes on submit. The form and its inputs stay mounted, because
+    // React can re-render before the browser has read the fields it is about to send.
+    return h("form", { id: "digest-form", className: "notice quietnote digest", action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
+      "aria-labelledby": "digest-title", onSubmit: () => setSent(true) },
+      h("b", { id: "digest-title" }, "Email me new internships each week. "),
+      `One email a week; unsubscribe any time. You'll get a confirmation email first, and nothing else arrives until you click its link. Your address${fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email, not to InternScout's servers. `,
+      h("a", { href: "privacy.html#digest" }, "Details"),
+      // The key remounts the boxes when the profile's fields change, so each new field starts ticked.
+      fields.length > 0
+        // was: h("legend", null, "Fields from your profile")
+        ? h("fieldset", { key: fields.join(","), id: "digest-fields" }, h("legend", null, "Fields from your profile, saved with your subscription so the email can be matched to them later"),
+          h("div", { className: "checks" }, fields.map(t => h("label", { key: t, className: "check" },
+            h("input", { type: "checkbox", id: "digest-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
+        // was: "With no fields picked, the email covers every field. ... to narrow it." For now every
+        // subscriber gets the same email (growth/digest_send.py), so ticked fields only get saved.
+        : h("div", { style: { marginTop: 8 } }, "Everyone gets the same email for now. ",
+          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " and they'll be saved with your subscription, so it can be matched to them later."),
+      h("div", { className: "digest-row" },
+        h("label", { htmlFor: "digest-email" }, "Email"),
+        h("input", { id: "digest-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
+        h("button", { id: "digest-submit", type: "submit", className: "btn primary" }, "Subscribe"),
+        sent && h("span", { className: "muted", role: "status" }, `${prov} opened in a new tab. Finish there if it asks, then look for the confirmation email.`)),
+      // In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
+      h("input", { type: "hidden", name: "embed", value: "1" }));
+  }
+
   // ---------- setup (3 steps) ----------
   const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
   const GRAD_YEARS = Array.from({ length: 9 }, (_, i) => 2026 + i);
@@ -656,9 +695,17 @@
     const inviteWords = inviteOffer ? Object.entries(inviteOffer.bonus || {}).map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k] || k)}`).join(" and ") : "";
     useEffect(() => {
       if (!auth.token || !invited || !inviteOffer) return;
+      // This account was already told "use a school account" this session, and the Worker's answer
+      // can't change while it stays signed in. A different account (another sub) still tries.
+      const sub = (IS.decodeJwt(auth.token) || {}).sub || "";
+      if (sub && IS.ss.get(IS.INVITE_EDU_KEY) === sub) return;
       IS.claimInvite(auth.token, invited).then(r => {
         if (!r) return;
-        if (r.error === "edu_only") { setNote(r.message); return; }
+        // was: if (r.error === "edu_only") { setNote(r.message); return; }
+        // The code is kept for a later school-account sign-in, so the same personal account was asked
+        // again and shown the same refusal on every page load. Remembering its sub for the session
+        // shows the message once; the code still waits for a .edu sign-in.
+        if (r.error === "edu_only") { if (sub) IS.ss.set(IS.INVITE_EDU_KEY, sub); setNote(r.message); return; }
         IS.ls.del(IS.INVITE_KEY); setInvited(null);
         if (r.ok) {
           setNote(`Invite accepted: you ${r.inviter_rewarded ? "and your classmate each got" : "got"} ${inviteWords}. They're used after your monthly allowance and don't expire.`);
@@ -904,6 +951,12 @@
       "aria-sort": f.sort === key ? (key === "company" ? "ascending" : "descending") : undefined },
       h("button", { type: "button", onClick: () => upd("sort", key) }, label));
     const feedbackUrl = C.formUrl ? C.formUrl.split("{id}").join("") : C.issuesUrl;
+    // The weekly email form shows only once window.CONFIG.digest.formAction is filled in, and only
+    // for an https address, so a mistyped one can't send a student's email in the clear.
+    const digestOn = !!(C.digest && C.digest.formAction && /^https:\/\//.test(C.digest.formAction));
+    // The same field tags the ranking treats as the student's own, less "other", and only well-formed
+    // keys: an unknown tag name creates a new tag at Buttondown.
+    const digestFields = [...ctx.direct].filter(t => t !== "other" && /^[a-z_]{2,32}$/.test(t));
     // Optional paid plans. The Worker only advertises the tiers whose Stripe price it actually has,
     // so a tier that isn't set up yet never appears as a button the student can press.
     const payPlans = auth.cfg && auth.cfg.payments && auth.cfg.payments.enabled ? auth.cfg.payments.plans || [] : [];
@@ -912,6 +965,16 @@
     const upgrades = me && me.can_upgrade ? payPlans.filter(pl => pl.multiplier > myMult) : [];
     const upgradeTitle = pl => `Optional. Covers the AI bill and gives you ${pl.multiplier}× your monthly `
       + "AI allowance. Stripe takes the payment; we never see your card. Cancel any time.";
+    // Out of Auto-Apply runs: say when they come back and how to get more now. Only for a real
+    // allowance (limit > 0): a limit of 0 is Auto-Apply switched off, and limits.js won't spend
+    // invite runs on a switched-off task, so "used up" and "invite a classmate" would both be wrong.
+    const autoAllow = me && me.allowance && me.allowance.autofill;
+    const outOfRuns = !!(auth.token && me && !me.paused && inviteOffer && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // me.month is the Worker's UTC month ("2026-09"); the allowance resets on the 1st of the next one.
+    const monthMatch = /^(\d{4})-(\d{2})$/.exec((me && me.month) || "");
+    const resetDay = monthMatch
+      ? new Date(Date.UTC(+monthMatch[1], +monthMatch[2], 1)).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })
+      : "the 1st of next month";
     // was: const signInTitle = "Optional. Search works without it. Any Google or Microsoft account works; a school .edu email gets more AI use. Signing in also lets your chosen states count toward where we scan in more detail.";
     // The old wording left "more AI use" vague and the button beside it said "(UMass email)", which
     // together read as a school requirement. worker/src/auth.js only asks for a verified address on a
@@ -989,6 +1052,13 @@
       // Arrived through a classmate's link, not signed in yet: say what signing in gets them.
       invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
         `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
+      // The invite link hides while the invite panel below is already open; the plan buttons are in the header.
+      outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
+        `They come back on ${resetDay}. `,
+        !invite && h("a", { href: "#", onClick: prevent(openInvite) }, "Invite a classmate"),
+        // was: ` for ${inviteWords} each`. An inviter is rewarded for their first REFERRAL.maxRewards
+        // classmates only (worker/src/referral.js), so "each" was false for the heaviest users.
+        `${invite ? "Share your invite link below" : `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates`}${upgrades.length ? ". Or pick a plan above" : ""}.`),
       auth.token && invite && h("div", { className: "notice invite" },
         h("b", null, "Invite classmates. "),
         `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
@@ -1047,6 +1117,9 @@
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
+
+      // Below the list and above the footer links, so it never pushes a listing down.
+      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: () => setSetupOpen(true) }),
 
       h("footer", null,
         // Same facts as before, in two short sentences instead of one long one. The plan prices

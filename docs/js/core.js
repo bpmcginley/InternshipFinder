@@ -479,6 +479,9 @@
   // Referral credits (worker/src/referral.js). A classmate's invite code rides in on ?ref= and waits
   // here until the student signs in; GET /invite is the student's own link, POST /invite/claim uses one.
   const INVITE_KEY = "internscout.invite.v1";
+  // sessionStorage: the sign-in sub of the account the Worker last answered "edu_only" for, so the
+  // dashboard asks for that account once per session instead of on every page load.
+  const INVITE_EDU_KEY = "internscout.invite.edu_only";
   const INVITE_CODE = /^[a-hj-km-np-z2-9]{8}$/;
   async function fetchInvite(token) {
     if (!workerOn() || !token) return null;
@@ -555,7 +558,9 @@
       } catch (e) { server = false; }
     }
     ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.set(DELETED_KEY, true);
-    ss.del(TOKEN_KEY);
+    // was: ss.del(TOKEN_KEY);
+    // The invite check now keeps the account's sub for the session; it comes from the token and goes with it.
+    ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY);
     return { server };
   }
 
@@ -578,7 +583,7 @@
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
-    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
+    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();
