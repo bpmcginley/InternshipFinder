@@ -9,6 +9,9 @@ extension.pem
 # Built extension zips (scripts/package_extension.py)
 dist/
 
+# Email digest previews (growth/digest.py): rebuilt from the data on every run
+digest-preview/
+
 # Worker: local secrets and build state - never commit
 worker/node_modules/
 worker/.wrangler/

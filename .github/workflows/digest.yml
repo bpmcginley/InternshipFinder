@@ -1,0 +1,43 @@
+name: Email digest preview
+
+# growth/digest.py writes this week's new-internships email from docs/data: the fields that gained
+# the most new roles, Northeast and remote first. This run uploads the HTML, text and JSON as an
+# artifact to read. It sends nothing and uses no secrets. Sending waits for an email provider and a
+# PO box, because every marketing email must carry a postal address. Until then it runs only by hand.
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 12 * * 1"    # Mondays, 8am US Eastern, once there is something to send it with
+
+permissions:
+  contents: read
+
+concurrency:
+  group: email-digest
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            growth
+            backend
+            docs/data
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Write the digest
+        # digest.py and seo_pages use only the standard library, so nothing is installed.
+        run: python growth/digest.py docs --out digest-preview
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-preview
+          path: digest-preview
+          retention-days: 14
