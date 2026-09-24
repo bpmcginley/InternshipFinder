@@ -28,9 +28,10 @@ concurrency:
   group: pages
   cancel-in-progress: true      # a newer deploy already includes everything an older one would
 
+# Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check that Pages deploys from this workflow
@@ -43,11 +44,11 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main             # after an ingest run: the commit that run just pushed
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -68,13 +69,13 @@ jobs:
           cp _site/sitemap.xml sitemaps/new.xml
           if [ -f live-sitemap.xml ]; then cp live-sitemap.xml sitemaps/old.xml; fi
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sitemaps
           path: sitemaps
@@ -82,26 +83,26 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # Bing, and the engines that share its index (DuckDuckGo, Yahoo, ChatGPT search), recrawl the pages
   # this deploy added, removed or changed within hours (growth/indexnow.py). Google reads the sitemap.
   notify:
     needs: deploy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: growth
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: sitemaps
           path: sitemaps

@@ -14,19 +14,20 @@ concurrency:
   group: dashboard-metrics
   cancel-in-progress: false
 
+# Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   metrics:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             growth
             docs/data/stats.json
           sparse-checkout-cone-mode: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 

@@ -10,12 +10,13 @@ on:
 permissions:
   contents: write               # create the release and upload the zip
 
+# Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check tag matches manifest version
         run: |
