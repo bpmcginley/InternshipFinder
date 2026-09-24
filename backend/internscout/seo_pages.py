@@ -42,9 +42,11 @@ def keep_at(need: int) -> int:
     finds a URL gone drops it, and takes weeks to trust it again)."""
     return need * 2 // 3
 MIN_EMPLOYER = 10       # open roles an employer needs before it gets a page of its own
+MIN_KIND = 25           # ...and a start term, paid, co-op, research or class-year page (see kinds())
 PER_PAGE = 40           # listings shown on one page; the dashboard has the rest
 NEW_DAYS = 7
 RELATED = 12            # related-page links per section
+TAIL = ", from internships to co-ops and research"     # how a page's opening sentence usually ends
 
 US_STATES = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
@@ -226,22 +228,25 @@ def join_words(words: list[str]) -> str:
 
 # ---------------------------------------------------------------- page pieces
 
-def summary(items: list[dict], what: str, where: str) -> str:
-    """The page's opening paragraph, every clause computed from its own listings."""
+def summary(items: list[dict], what: str, where: str, tail: str = TAIL, about: frozenset = frozenset()) -> str:
+    """The page's opening paragraph, every clause computed from its own listings. tail is "" where
+    "from internships to co-ops and research" would contradict the page (the co-op page)."""
     n = len(items)
-    parts = [f"{plural(n, 'open student role')} {what}{where}, from internships to co-ops and research."]
+    parts = [f"{plural(n, 'open student role')} {what}{where}{tail}."]
     stages = Counter(s for x in items for s in x.get("stage") or [])
+    # `about` names what the page is picked by (the co-op page is all co-ops, the paid page all paid):
+    # counting that again would only repeat the heading.
     extra = [plural(stages[s], label) for s, label in
              (("co_op", "co-op"), ("research", "research position"), ("fellowship", "fellowship"),
-              ("part_time", "part-time role")) if stages.get(s)]
+              ("part_time", "part-time role")) if stages.get(s) and s not in about]
     if extra:
         parts.append(f"That includes {join_words(extra)}.")
     paid = sum(1 for x in items if is_paid(x))
-    if paid:
+    if paid and "paid" not in about:
         parts.append(f"{paid * 100 // n}% list pay or say they are paid.")
     # A bare season ("Summer") is a board that gave no year; beside "Summer 2027" it reads as a repeat.
     terms = Counter(x["term"] for x in items if x.get("term") and re.search(r"\d{4}|round", str(x["term"])))
-    if terms:
+    if terms and "term" not in about:
         top = [t for t, _ in terms.most_common(2)]
         parts.append(f"The most common start {'term is' if len(top) == 1 else 'terms are'} {join_words(top)}.")
     employers = [c for c, _ in Counter(x["company_name"] for x in items).most_common(5)]
@@ -281,6 +286,64 @@ def dedupe_roles(items: list[dict]) -> list[dict]:
 
 def student_share(items: list[dict]) -> float:
     return sum(1 for x in items if set(x.get("stage") or []) & STUDENT_STAGES) / len(items) if items else 0.0
+
+
+TERM = re.compile(r"^(Winter|Spring|Summer|Fall) (\d{4})$")
+SEASONS = {"Winter": 0, "Spring": 1, "Summer": 2, "Fall": 3}
+
+
+def kinds(listings: list[dict]) -> list[dict]:
+    """The other ways students search, beside field, state, major and employer, each a volume Semrush
+    measured on 2026-09-24 (US, monthly): a start term ("summer 2027 internships" 590, "summer
+    internships" 5,400), "paid internships" 3,600, "co op jobs" 720, "research internships for
+    undergraduates" 390 and "reu programs" 1,300, "freshman internships" and "sophomore internships"
+    390 each. Every page is picked by the listings' own fields, so it lists only what its title says:
+    a term page is the roles whose posting names that term, and a class-year page is the roles whose
+    posting says it takes that year (most say nothing, and those stay off it)."""
+    out = []
+    for t in sorted({str(x.get("term")) for x in listings if TERM.match(str(x.get("term") or ""))},
+                    key=lambda t: (TERM.match(t)[2], SEASONS[TERM.match(t)[1]])):
+        out.append({"slug": slugify(t), "h1": f"{t} internships", "crumb": t, "what": f"starting {t}",
+                    "title": f"{t} Internships – {{n}} Open Now",
+                    "desc": f"{{n}} open {t} internships, co-ops and research roles for college students, "
+                            "updated {updated}. Northeast and remote first. Free search, no sign-up.",
+                    "pick": lambda x, t=t: x.get("term") == t, "dash": {}, "about": frozenset({"term"})})
+    stage = lambda s: lambda x: s in (x.get("stage") or [])          # noqa: E731
+    year = lambda y: lambda x: y in (x.get("years") or [])           # noqa: E731
+    years_note = ("<p class=\"more\">Most postings don't say which class years they take, so this page is "
+                  "only the ones that do. The dashboard's “Eligible year” filter keeps the rest as well.</p>")
+    out += [
+        {"slug": "paid", "h1": "Paid internships", "crumb": "Paid", "what": "that list pay or say they are paid",
+         "title": "Paid Internships – {n} Open with Pay Listed",
+         "desc": "{n} open internships, co-ops and research roles that list pay or say they are paid, updated "
+                 "{updated}. Free search for college students, no sign-up.",
+         "pick": is_paid, "dash": {"paid": True}, "about": frozenset({"paid"})},
+        {"slug": "co-op", "h1": "Co-op jobs and internships", "crumb": "Co-ops", "what": "that are co-ops",
+         "tail": "", "title": "Co-op Jobs and Internships – {n} Open",
+         "desc": "{n} open co-ops for college students, updated {updated}. Northeast and remote first. "
+                 "Free search, no sign-up.",
+         "pick": stage("co_op"), "dash": {"stage": "co_op"}, "about": frozenset({"co_op"})},
+        {"slug": "research", "h1": "Research internships for undergraduates", "crumb": "Research",
+         "what": "in research", "tail": "", "title": "Research Internships for Undergraduates – {n} Open",
+         "desc": "{n} open research positions for undergraduates, updated {updated}. Free search, no sign-up.",
+         "note": "<p class=\"more\">Paid summer research programs (REUs) funded by the National Science "
+                 "Foundation are listed on the <a href=\"https://www.nsf.gov/funding/initiatives/reu\">NSF's "
+                 "REU page</a>; many apply through their own sites.</p>",
+         "pick": stage("research"), "dash": {"stage": "research"}, "about": frozenset({"research"})},
+        {"slug": "for-freshmen", "h1": "Internships for freshmen", "crumb": "Open to first-years",
+         "what": "whose postings say they take first-year students",
+         "title": "Internships for Freshmen – {n} Open to First-Years",
+         "desc": "{n} open internships and programs whose postings say they take first-year college "
+                 "students, updated {updated}. Free search, no sign-up.",
+         "note": years_note, "pick": year("first_year"), "dash": {"year": "first_year"}},
+        {"slug": "for-sophomores", "h1": "Internships for sophomores", "crumb": "Open to sophomores",
+         "what": "whose postings say they take sophomores",
+         "title": "Internships for Sophomores – {n} Open",
+         "desc": "{n} open internships and programs whose postings say they take sophomores, updated "
+                 "{updated}. Free search, no sign-up.",
+         "note": years_note, "pick": year("sophomore"), "dash": {"year": "sophomore"}},
+    ]
+    return out
 
 
 def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None) -> str:
@@ -416,17 +479,22 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 """
 
 
-def dash_link(fields=(), state: str | None = None, companies=(), new: bool = False) -> str:
-    """The dashboard, opened on this page's fields, states, employer or new roles (docs/js/app.js
-    reads ?field=, ?state=a,b, ?company= and ?new=1; its canonical link keeps these one page to search
-    engines). An employer goes as an exact name, not a search: searching "Intel" also finds
-    "intelligence", and "Texas Instruments" reads as a place."""
+def dash_link(fields=(), state: str | None = None, companies=(), new: bool = False,
+              stage: str | None = None, year: str | None = None, paid: bool = False) -> str:
+    """The dashboard, opened on this page's fields, states, employer, new roles, stage, class year or
+    paid roles (docs/js/app.js reads ?field=, ?state=a,b, ?company=, ?new=1, ?stage=, ?year= and
+    ?paid=1; its canonical link keeps these one page to search engines). An employer goes as an exact
+    name, not a search: searching "Intel" also finds "intelligence", and "Texas Instruments" reads as
+    a place."""
     q = [f"field={quote(','.join(fields), safe=',')}"] if fields else []
     if state:
         q.append(f"state={quote(state, safe=',')}")
     q += [f"company={quote(c)}" for c in companies]
     if new:
         q.append("new=1")
+    q += [f"{k}={quote(v)}" for k, v in (("stage", stage), ("year", year)) if v]
+    if paid:
+        q.append("paid=1")
     return "/?" + "&amp;".join(q) if q else "/"
 
 
@@ -437,10 +505,10 @@ def fits_line(majors: list[str]) -> str:
 
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
-                 here: str | None = None) -> str:
+                 here: str | None = None, tail: str = TAIL, about: frozenset = frozenset()) -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
-    return (f"<p class=\"lede\">{summary(items, what, where)}</p>" + fits_line(fits or []) +
+    return (f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>" + fits_line(fits or []) +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
             f"<ul class=\"jobs\">{listing_rows(items, now, state, here)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
@@ -628,6 +696,29 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             listing_body(items, f"at {name}", "", now, related,
                          dash=dash_link(state=where, companies=spellings[name]), here=path), items)
 
+    # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
+    # already uses is skipped, like a field slug that names a state.
+    taken = {p["path"] for p in pages}
+    kind_made = []
+    for k in kinds(listings):
+        path = f"/internships/{k['slug']}/"
+        items = [x for x in listings if k["pick"](x)]
+        if path not in taken and enough(len(items), path, MIN_KIND):
+            kind_made.append((path, k, items))
+    for path, k, items in kind_made:
+        top = Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS if t in fields)
+        related = (k.get("note", "")
+                   + link_list(f"{k['h1'][0].upper()}{k['h1'][1:]} by field",
+                               [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
+                                for t, _ in top.most_common(RELATED)])
+                   + link_list("More ways to browse", [(p, kk["h1"][0].upper() + kk["h1"][1:], len(v))
+                                                       for p, kk, v in kind_made if p != path]))
+        n = f"{len(items):,}"
+        add(path, k["title"].format(n=n) + " | InternScout", k["desc"].format(n=n, updated=updated),
+            k["h1"], [root, (path, k["crumb"])],
+            listing_body(items, k["what"], "", now, related, dash=dash_link(**k["dash"]),
+                         tail=k.get("tail", TAIL), about=k.get("about", frozenset())), items)
+
     new = [x for x in listings if fresh(x, now, d["baseline"])]
     if len(new) >= MIN_OPEN:
         add("/internships/new/", f"New Internships This Week – {len(new):,} Found | InternScout",
@@ -669,7 +760,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
            + "<section class=\"rel\"><h2>More ways to browse</h2><ul><li><a href=\"/internships/for/\">"
              f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(by_company):,} employers"
              "</a></li>" + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
-                            if len(new) >= MIN_OPEN else "") + "</ul></section>")
+                            if len(new) >= MIN_OPEN else "")
+           + "".join(f"<li><a href=\"{p}\">{esc(k['h1'][0].upper() + k['h1'][1:])}</a> "
+                     f"<span class=\"n\">{len(v):,}</span></li>" for p, k, v in kind_made)
+           + "</ul></section>")
     add("/internships/", f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout",
         f"{len(listings):,} open internships, co-ops and research roles for college students, updated "
         f"{updated}. Browse by field, state or major. Free, no sign-up.",

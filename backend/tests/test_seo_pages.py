@@ -301,3 +301,27 @@ def test_lastmod_never_goes_back(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
     pages = seo_pages.build(site, {"/internships/massachusetts/": "2026-09-30"})
     assert next(p for p in pages if p["path"] == "/internships/massachusetts/")["lastmod"] == "2026-09-30"
+
+
+def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp_path):
+    rows = ([_row(i, salary="$25/hr") for i in range(30)]                               # Summer 2027, paid
+            + [_row(100 + i, term="Spring 2027", stage=["co_op"]) for i in range(26)]    # co-ops
+            + [_row(200 + i, term=None, years=["first_year", "sophomore"]) for i in range(26)]
+            + [_row(300 + i, term="Fall 2027", stage=["research"]) for i in range(24)])  # below MIN_KIND
+    pages = {p["path"]: p for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    for path in ("/internships/summer-2027/", "/internships/spring-2027/", "/internships/paid/",
+                 "/internships/co-op/", "/internships/for-freshmen/", "/internships/for-sophomores/"):
+        assert path in pages, path
+    assert "/internships/fall-2027/" not in pages and "/internships/research/" not in pages
+    assert len(pages["/internships/summer-2027/"]["items"]) == 30
+    assert all(x["stage"] == ["co_op"] for x in pages["/internships/co-op/"]["items"])
+    assert len(pages["/internships/for-freshmen/"]["items"]) == 26          # only postings that say so
+    assert "<title>Summer 2027 Internships – 30 Open Now | InternScout</title>" in pages["/internships/summer-2027/"]["html"]
+    # The co-op page's opening doesn't claim "from internships to co-ops and research".
+    assert "26 open student roles that are co-ops." in pages["/internships/co-op/"]["html"]
+    # Each opens the dashboard on the matching filter, and the hub links every one.
+    assert 'href="/?stage=co_op"' in pages["/internships/co-op/"]["html"]
+    assert 'href="/?year=first_year"' in pages["/internships/for-freshmen/"]["html"]
+    assert 'href="/?paid=1"' in pages["/internships/paid/"]["html"]
+    assert all(f'href="{p}"' in pages["/internships/"]["html"]
+               for p in ("/internships/summer-2027/", "/internships/paid/", "/internships/for-sophomores/"))

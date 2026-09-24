@@ -517,6 +517,12 @@
       const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/),
         company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
       if (q.get("new") === "1") link.new_only = true;
+      // ?stage=, ?year= and ?paid=1 come from the co-op, research, class-year and paid pages, and
+      // set the same Stage, Eligible year and Pay filters a student can pick by hand.
+      const stage = q.get("stage"), year = q.get("year");
+      if (stage && IS.STAGES.some(([k]) => k === stage)) link.stage = stage;
+      if (year && IS.YEARS.some(([k]) => k === year)) link.year = year;
+      if (q.get("paid") === "1") link.paid = "paid";
       return link;
     };
     const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...fromLink() }));
@@ -536,8 +542,9 @@
     // should not bring the landing page's back.
     useEffect(() => {
       const q = new URLSearchParams(location.search);
-      if (!["field", "state", "company", "new"].some(k => q.has(k))) return;
-      ["field", "state", "company", "new"].forEach(k => q.delete(k));
+      const LINK_KEYS = ["field", "state", "company", "new", "stage", "year", "paid"];
+      if (!LINK_KEYS.some(k => q.has(k))) return;
+      LINK_KEYS.forEach(k => q.delete(k));
       history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     }, []);
 
