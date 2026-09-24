@@ -131,6 +131,8 @@ def test_dashboard_links_open_on_the_page_topic(tmp_path):
     assert 'href="/?state=MA"' in pages["/internships/massachusetts/"]
     assert 'href="/?field=mechanical&amp;state=MA"' in pages["/internships/mechanical-engineering/massachusetts/"]
     assert 'href="/?field=mechanical,aerospace"' in pages["/internships/for/mechanical-engineering-majors/"]
+    # Every listing page offers the extension through the site's own install page.
+    assert 'The free <a href="/install.html?from=landing-page">Auto-Apply extension</a>' in pages["/internships/massachusetts/"]
     # docs/js/app.js takes only values shaped like these; anything else would open an empty list.
     assert all(re.fullmatch(r"[a-z_]{2,32}", t) for t in seo_pages.FIELD_TITLES)
     assert all(re.fullmatch(r"[A-Z]{2}|remote", k) for k in seo_pages.US_STATES)

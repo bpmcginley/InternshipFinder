@@ -4,6 +4,11 @@ Queue internships from the InternScout dashboard. For each one, the agent opens 
 walks every step of the application (sign-up, uploads, questions, EEO), fills it all from
 your Deep Dive profile, and **stops at the submit button**. You review and press Submit.
 
+## Install
+Students: add it from the
+[Chrome Web Store](https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi).
+The steps below load this folder by hand, for development.
+
 ## Install (unpacked)
 1. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
 2. Click **Load unpacked** and pick this `extension/` folder.
