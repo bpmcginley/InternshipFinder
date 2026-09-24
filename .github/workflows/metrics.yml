@@ -1,0 +1,38 @@
+name: Dashboard metrics
+
+# Once a day, growth/metrics.py copies the numbers the private analytics dashboard shows (visits by
+# day and source, top pages, Bluesky, listings) into the app's D1 database. Totals only.
+on:
+  schedule:
+    - cron: "30 11 * * *"     # 7:30am US Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-metrics
+  cancel-in-progress: false
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            growth
+            docs/data/stats.json
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Write the day's numbers
+        env:
+          # Needs Account Analytics: Read and D1: Edit.
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+        run: python growth/metrics.py docs --write
