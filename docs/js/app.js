@@ -532,6 +532,10 @@
     const [limit, setLimit] = useState(PAGE);
     const [sel, setSel] = useState(() => new Set());
     const [note, setNote] = useState("");
+    // A classmate's invite code waiting for sign-in, and the student's own invite panel (worker/src/referral.js).
+    const [invited, setInvited] = useState(() => IS.ls.get(IS.INVITE_KEY, null));
+    const [invite, setInvite] = useState(null);
+    const [inviteNote, setInviteNote] = useState("");
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
@@ -542,8 +546,12 @@
     // should not bring the landing page's back.
     useEffect(() => {
       const q = new URLSearchParams(location.search);
-      const LINK_KEYS = ["field", "state", "company", "new", "stage", "year", "paid"];
+      const LINK_KEYS = ["field", "state", "company", "new", "stage", "year", "paid", "ref"];
       if (!LINK_KEYS.some(k => q.has(k))) return;
+      // A classmate's invite (?ref=) waits in this browser until the student signs in (see the claim
+      // effect below). Only a code shaped like the Worker's is kept.
+      const ref = q.get("ref");
+      if (ref && IS.INVITE_CODE.test(ref)) { IS.ls.set(IS.INVITE_KEY, ref); setInvited(ref); }
       LINK_KEYS.forEach(k => q.delete(k));
       history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     }, []);
@@ -640,6 +648,39 @@
       });
       if (auth.token) check(4);
     }, [auth.token]);
+
+    // Claim a waiting invite once the student is signed in and the Worker offers invites (its /config
+    // says what one is worth). Refusals are final, so the code is dropped, except "use a school
+    // account": signing in again with one can still claim it. Unreachable: try again next load.
+    const inviteOffer = auth.cfg && auth.cfg.invite;
+    const inviteWords = inviteOffer ? Object.entries(inviteOffer.bonus || {}).map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k] || k)}`).join(" and ") : "";
+    useEffect(() => {
+      if (!auth.token || !invited || !inviteOffer) return;
+      IS.claimInvite(auth.token, invited).then(r => {
+        if (!r) return;
+        if (r.error === "edu_only") { setNote(r.message); return; }
+        IS.ls.del(IS.INVITE_KEY); setInvited(null);
+        if (r.ok) {
+          setNote(`Invite accepted: you ${r.inviter_rewarded ? "and your classmate each got" : "got"} ${inviteWords}. They're used after your monthly allowance and don't expire.`);
+          IS.fetchMe(auth.token).then(m => { if (m) setMe(m); });
+        } else if (r.error && r.error !== "already_claimed" && r.message) setNote(r.message);
+      });
+    }, [auth.token, invited, !!inviteOffer]);
+    async function openInvite() {
+      if (invite) { setInvite(null); return; }
+      setInviteNote("");
+      const r = await IS.fetchInvite(auth.token);
+      if (r) setInvite(r); else setNote("Couldn't load your invite link. Try again in a minute.");
+    }
+    async function shareInvite() {
+      const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
+      if (navigator.share) {
+        try { await navigator.share({ title: "InternScout", text, url: invite.link }); setInviteNote("Sent"); return; }
+        catch (e) { if (e && e.name === "AbortError") return; }
+      }
+      try { await navigator.clipboard.writeText(invite.link); setInviteNote("Link copied"); }
+      catch (e) { setInviteNote("Select the link above and copy it"); }
+    }
 
     async function billing(kind, plan) {
       setBusy(kind === "checkout" ? "Opening Stripe…" : "Opening your billing page…");
@@ -902,6 +943,8 @@
             auth.source === "page" && h("button", { type: "button", className: "btn quiet", onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); } }, "Sign out")),
           auth.token && me && me.allowance && h("span", { className: "busy", title: IS.allowanceText(me) },
             me.paused ? "AI paused this month" : `${IS.leftOf(me, "autofill")} Auto-Apply · ${IS.leftOf(me, "resume_tailor")} resumes left${me.plan && me.plan !== "free" ? ` (${(IS.PLAN_LABELS[me.plan] || me.plan).toLowerCase()})` : me.tier === "edu" ? " (.edu)" : ""}`),
+          auth.token && inviteOffer && h("button", { type: "button", className: "btn quiet", onClick: openInvite, "aria-expanded": !!invite,
+            title: `Share your link. Each classmate who signs in through it with a school Google account gets you both ${inviteWords}.` }, "Invite classmates"),
           auth.token && upgrades.map(pl => h("button", { key: pl.plan, type: "button", className: "btn quiet", onClick: () => billing("checkout", pl.plan), disabled: !!busy, title: upgradeTitle(pl) }, `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`)),
           auth.token && me && me.can_manage && h("button", { type: "button", className: "btn quiet", onClick: () => billing("portal"), disabled: !!busy, title: "Change your card or cancel, on Stripe's own page." }, "Manage plan"),
           info.installed && h("button", { type: "button", className: "btn quiet", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
@@ -943,6 +986,17 @@
       info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
+      // Arrived through a classmate's link, not signed in yet: say what signing in gets them.
+      invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
+        `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
+      auth.token && invite && h("div", { className: "notice invite" },
+        h("b", null, "Invite classmates. "),
+        `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
+          + ` (for up to ${invite.max} classmates; ${invite.rewarded} so far).`,
+        h("div", { className: "invite-row" },
+          h("input", { id: "invite-link", type: "text", readOnly: true, value: invite.link, "aria-label": "Your invite link", onFocus: e => e.target.select() }),
+          h("button", { type: "button", className: "btn primary", onClick: shareInvite }, navigator.share ? "Share link" : "Copy link"),
+          inviteNote && h("span", { className: "muted", role: "status" }, inviteNote))),
 
       // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
       // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows

@@ -1,6 +1,7 @@
 // Allowance, per-run, rate and budget checks over D1. Counters only, never request content.
 import { HttpError } from "./http.js";
 import { canUpgrade } from "./billing.js";
+import { forgetStatements } from "./referral.js";
 
 export const monthOf = (d) => d.toISOString().slice(0, 7);
 
@@ -231,12 +232,28 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     .bind(...runKey).run();
   const isNew = ins.meta.changes > 0;
   let used;
+  let bonusTook = false;
   if (isNew) {
     // A new run costs a unit. The WHERE makes "is there one left" and "take it" the same statement.
-    const row = limit != null && !(limit > 0) ? null : await db.prepare(
+    let row = limit != null && !(limit > 0) ? null : await db.prepare(
       "INSERT INTO usage (user_hash, month, task, units) VALUES (?, ?, ?, 1) " +
       "ON CONFLICT(user_hash, month, task) DO UPDATE SET units = units + 1 WHERE units < ? RETURNING units",
     ).bind(user, month, task, limit == null ? Number.MAX_SAFE_INTEGER : limit).first();
+    // The month's units are gone: an invite's extra units (referral.js) come next, taken the same way,
+    // one statement that checks and spends. Only where the task has a real allowance: a limit of 0 is
+    // the task switched off, which extra units must not switch back on. The unit still goes on the
+    // month's usage row, so /me can say how many were used this month.
+    if (!row && limit > 0) {
+      const extra = await db.prepare("UPDATE bonus SET used = used + 1 WHERE user_hash = ? AND task = ? AND used < granted RETURNING used")
+        .bind(user, task).first();
+      if (extra) {
+        bonusTook = true;
+        row = await db.prepare(
+          "INSERT INTO usage (user_hash, month, task, units) VALUES (?, ?, ?, 1) " +
+          "ON CONFLICT(user_hash, month, task) DO UPDATE SET units = units + 1 RETURNING units",
+        ).bind(user, month, task).first();
+      }
+    }
     if (!row) {
       await db.prepare("DELETE FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?").bind(...runKey).run();
       throw cap(`Monthly ${task} allowance is used up`);
@@ -258,7 +275,13 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   // same record; reading the clock again there would put the correction on the wrong day at midnight.
   // It starts null and is set only where the day's row is actually charged, below, so "the day was
   // charged" and "the day gets corrected" are one fact rather than two conditions kept in step.
-  const admitted = { month, day: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
+  // was: const admitted = { month, day: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
+  // `bonusTook` says this run spent an invite unit, so release() gives that back rather than a month's
+  // unit; `bonusLeft` is how many invite units remain, for the X-InternScout-Remaining header.
+  const extraRow = limit > 0 ? await db.prepare("SELECT granted - used AS left FROM bonus WHERE user_hash = ? AND task = ?")
+    .bind(user, task).first() : null;
+  const admitted = { month, day: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false,
+                     bonusTook, bonusLeft: extraRow ? Math.max(0, extraRow.left) : 0 };
   // The account's own ceiling. Without it the only thing between one modified client and the whole
   // month's budget is the daily rate limit: a task with no unit cap, a fresh run_id per call and a
   // large body would pause AI for everyone. It is set well above what a full allowance costs, so a
@@ -318,21 +341,30 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   return admitted;
 }
 
-// Units left for the task this month, for the X-InternScout-Remaining header.
+// Units left for the task this month, for the X-InternScout-Remaining header: the month's own, plus
+// any invite units, which are spent after them.
 export function remainingOf(admitted) {
   if (admitted.limit == null) return "unlimited";
-  return Math.max(0, admitted.limit - admitted.used);
+  // was: return Math.max(0, admitted.limit - admitted.used);
+  return Math.max(0, admitted.limit - admitted.used) + (admitted.bonusLeft || 0);
 }
+
+// What /me reports as a task's limit, so that limit - used (the sum the dashboard and the extension
+// already do) is what the student can still run: the month's allowance, or what they have used if
+// invite units took them past it, plus the invite units left. An older client needs no change.
+export const shownLimit = (limit, used, bonusLeft) => (limit == null ? null : Math.max(limit, used) + (bonusLeft || 0));
 
 // Gemini refused or could not be reached: give back the unit, the call and the estimate. The rate
 // buckets keep their count, since the call was made.
 export async function release(db, user, task, runId, admitted) {
   // was: const { month, isNew, estimate, metered } = admitted;
-  const { month, day, isNew, estimate, metered } = admitted;
+  const { month, day, isNew, estimate, metered, bonusTook } = admitted;
   const stmts = [];
   if (isNew) {
     stmts.push(db.prepare("DELETE FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?").bind(user, month, task, runId));
     stmts.push(db.prepare("UPDATE usage SET units = units - 1 WHERE user_hash = ? AND month = ? AND task = ? AND units > 0").bind(user, month, task));
+    // The run was paid for with an invite unit (admit), so that is the one that comes back.
+    if (bonusTook) stmts.push(db.prepare("UPDATE bonus SET used = used - 1 WHERE user_hash = ? AND task = ? AND used > 0").bind(user, task));
   } else {
     stmts.push(db.prepare("UPDATE runs SET calls = calls - 1 WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ? AND calls > 0")
       .bind(user, month, task, runId));
@@ -414,6 +446,7 @@ export async function deleteUser(db, user, now = new Date()) {
     db.prepare("DELETE FROM spend WHERE user_hash = ? AND month < ?").bind(user, month),
     db.prepare("INSERT INTO forget (user_hash, month) VALUES (?, ?) ON CONFLICT(user_hash) DO UPDATE SET month = excluded.month")
       .bind(user, month),
+    ...forgetStatements(db, user),
   ]);
 }
 

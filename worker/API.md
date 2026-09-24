@@ -72,8 +72,12 @@ Every error is JSON `{ "error": code, "message": text }`:
     "supporter": { "resume_tailor": 25, "autofill": 50,  "deep_dive": null, "field_match": 650,  "short_answer": 200 },
     "pro":       { "resume_tailor": 60, "autofill": 120, "deep_dive": null, "field_match": 1560, "short_answer": 480 } },
   "payments": { "enabled": false, "plans": [] },
-  "paused": false }
+  "paused": false,
+  "invite": { "bonus": { "autofill": 3 }, "max": 10 } }
 ```
+`invite` is what an invite is worth (`REFERRAL` in config.js; see `GET /invite`). The dashboard shows
+invite features only when it is present.
+
 The `general` allowance is `floor(edu × GENERAL_ALLOWANCE_PCT / 100)`, with a minimum of 1 per task. Only providers
 with a client ID set are listed.
 
@@ -101,9 +105,35 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
 - **`can_upgrade`** is true when payments are on and a larger tier than the current one is offered, so
   it stays true for a Supporter while Pro exists and goes false on the top tier.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
+- **Invite units** (see `GET /invite`) are already in `limit`: it is the month's allowance, or what was
+  used if invite units took the student past it, plus the invite units left. So `limit - used` is always
+  what they can still run, and an older client needs no change. A task with invite units left also
+  carries `"bonus": 3`.
+
+### `GET /invite` (auth)
+The student's own invite link, made on first ask:
+```json
+{ "code": "k7m2qpxa", "link": "https://internscout.org/?ref=k7m2qpxa", "rewarded": 1, "max": 10,
+  "bonus": { "autofill": 3 }, "left": { "autofill": 3 } }
+```
+`rewarded` is how many classmates have earned them credit (at most `max`); `left` is their unused
+invite units. The code is random and says nothing about the student.
+
+### `POST /invite/claim` (auth)
+Body `{ "code": "k7m2qpxa" }`, sent by the dashboard once a student who arrived on `?ref=` signs in.
+Returns `{ "ok": true, "bonus": { "autofill": 3 }, "inviter_rewarded": true }`: both accounts get
+`REFERRAL.bonus` (config.js), the inviter only while under `REFERRAL.maxRewards`. Invite units never
+expire and are spent only after the month's allowance for that task (`admit()` in limits.js), still
+under the account's spend ceiling and both budget stops. Refusals: `400 bad_invite` / `404 bad_invite`
+(not a code), `400 own_invite`, `403 edu_only` (the claimer isn't a school .edu account),
+`409 not_new` (the account was first seen more than `REFERRAL.windowDays` ago), `409 already_claimed`
+(one invite per account, ever).
 
 ### `DELETE /me` (auth)
-Deletes this user's demand and plan rows and every usage, run and spend row from earlier months. Returns `{ "ok": true }`.
+Deletes this user's demand and plan rows, every usage, run and spend row from earlier months, and
+their invite code, invite units and first-seen date. Their name comes off every invite record; their
+own record of joining through an invite stays, without the inviter, so they can't claim a second one.
+Returns `{ "ok": true }`.
 
 This month's usage, run, spend and rate rows stay until the month ends: they are a hashed ID and
 numbers, and deleting them on request would let an account at its cap reset it by deleting and

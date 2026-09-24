@@ -177,6 +177,9 @@
   .notice b{color:var(--ink)}
   .notice a{color:var(--accent);font-weight:500}
   .notice.quietnote{border-left-color:var(--rule);font-size:13px}
+  /* The invite panel: the student's link, selectable, beside a Share or Copy button. */
+  .invite-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
 
   /* filters: search, field, state and sort on the first row, everything else behind "More filters".
      Thirteen equal-looking dropdowns in one wrapping row was the single hardest thing to read on
