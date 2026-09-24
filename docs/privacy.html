@@ -120,6 +120,9 @@
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage counts, the states you picked, and — only if you subscribe — which plan you are on. Nothing else.</li> -->
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li> -->
         <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li>
+        <!-- Added with the weekly email sign-up (docs/js/app.js Digest). It is the one place a student
+             hands over an email address on purpose, so the short version says who ends up holding it. -->
+        <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. <a href="#digest">Details below</a>.</li>
         <li>We never see your password.</li>
         <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
       </ul>
@@ -291,6 +294,10 @@
     <!-- was: ...one for the month, and one for the current day, so a single busy day can't empty the month's budget. These are service-wide figures. -->
     <p>Separately from the table, we keep running totals of what AI costs the whole service: one for the month across the whole service, and one for the day's free-allowance share, so a single busy day can't empty the month's budget. Neither is tied to a person. Neither is linked to any account, and neither says anything about who used what.</p>
     <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+    <!-- The weekly email adds nothing to the table above: the form posts from the browser straight to
+         Buttondown and never touches the Worker. This line is here so "we don't store emails" isn't
+         read as "no one keeps the address you gave for the email". -->
+    <p>If you sign up for the weekly email, Buttondown keeps your address, not our server. See <a href="#digest">If you sign up for the weekly email</a>.</p>
 
     <!-- Given an id so the "What we store" paragraph above can link here instead of asking the
          reader to go hunting for the section that completes that table. -->
@@ -309,11 +316,30 @@
       <li>While a subscription is live, <strong>Delete my data</strong> is refused with a message asking you to cancel first, so nothing keeps billing a card for an account that no longer exists here. Cancel on Stripe's billing page, then delete.</li>
     </ul>
 
+    <!-- Facts from the sign-up form in docs/js/app.js (Digest) and Buttondown's docs:
+         docs.buttondown.com/building-your-subscriber-base (the form posts email, tag and embed),
+         /tags (a repeat sign-up adds tags, never removes them) and /double-opt-in (a confirmation
+         email first; nothing is sent until its link is clicked). Not stated here yet: open and click
+         tracking. Whether Buttondown records opens and clicks depends on the newsletter's settings,
+         which were not checked; if it is on, add a line saying so. -->
+    <h2 id="digest">If you sign up for the weekly email</h2>
+    <p>The weekly email is optional. Search, your profile and everything else on InternScout work without it. You sign up with the form under the listings on the dashboard.</p>
+    <ul>
+      <li><strong>What it contains:</strong> internships InternScout found in the past week, picked for the fields you ticked, with links to the postings. If you ticked none, it covers every field.</li>
+      <li><strong>How often:</strong> once a week. Buttondown first sends one confirmation email, and nothing else arrives until you click its link.</li>
+      <li><strong>Buttondown holds your address, not us.</strong> The form sends your email address, and the fields you ticked, straight from your browser to Buttondown, the service that sends the email. They never pass through or get stored on InternScout's servers, which is why the <em>What we store</em> table above has no row for them. Buttondown keeps them under <a href="https://buttondown.com/legal/privacy" target="_blank" rel="noopener">its own privacy policy</a>.</li>
+      <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked and whether you have confirmed. That is what it takes to send the email. The list is used only to send this email, is never sold or shared, and is not copied anywhere else.</li>
+      <li>Signing up again with other fields adds them to the ones you had; it doesn't remove any. To drop a field, write to us, or unsubscribe and sign up again.</li>
+      <li><strong>Unsubscribing:</strong> every email has an unsubscribe link at the bottom, and it stops the emails. To have your address deleted from Buttondown's list as well, write to us at the address under <em>Contact</em> below.</li>
+    </ul>
+
     <h2 id="delete">Delete your data</h2>
     <ol>
       <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
       <li><strong>In your browser:</strong> clear site data for <code>internscout.org</code> (and for <code>bpmcginley.github.io</code>, the address InternScout used before September 2026, if you visited it then). In Chrome, click the icon left of the address bar, then <em>Site settings</em>, then <em>Delete data</em>. This removes your dashboard profile and saved statuses.</li>
       <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li>
+      <!-- Delete my data only reaches the Worker, and the weekly email's list lives at Buttondown. -->
+      <li><strong>The weekly email:</strong> use the unsubscribe link in any of the emails. <strong>Delete my data</strong> can't reach it, because the address is kept by Buttondown, not by our server. To have it deleted from Buttondown's list as well, write to us at the address below.</li>
     </ol>
     <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use.</p>
 

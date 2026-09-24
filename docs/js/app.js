@@ -320,6 +320,42 @@
           h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(false) }, "Hide this"))));
   }
 
+  // ---------- weekly email ----------
+  // A plain HTML form that posts straight to the email provider (window.CONFIG.digest). Buttondown's
+  // docs say not to send it with fetch: the subscriber may have to pass a CAPTCHA or fix a typo on
+  // Buttondown's own page, so the browser has to follow the response. target="_blank" puts that page
+  // in a new tab and leaves the student's search where it was. Nothing here touches the Worker, so
+  // the address never reaches InternScout's servers.
+  // `fields` are the profile's field tags (majors' tags plus hand-picked fields, as in scoring). Each
+  // ticked box is one `tag` value. The value is the tag key ("swe"), not its label, because the key is
+  // what listings carry in field_tags and it never changes wording. Buttondown adds tags on a repeat
+  // sign-up rather than replacing them, so unticking a box later cannot remove a tag.
+  function Digest({ cfg, fields, hasProfile, onSetup }) {
+    const [sent, setSent] = useState(false);
+    const prov = cfg.provider || "Buttondown";
+    // Only the form's status line changes on submit. The form and its inputs stay mounted, because
+    // React can re-render before the browser has read the fields it is about to send.
+    return h("form", { id: "digest-form", className: "notice quietnote digest", action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
+      "aria-labelledby": "digest-title", onSubmit: () => setSent(true) },
+      h("b", { id: "digest-title" }, "Email me new internships each week. "),
+      `One email a week; unsubscribe any time. You'll get a confirmation email first, and nothing else arrives until you click its link. Your address${fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email, not to InternScout's servers. `,
+      h("a", { href: "privacy.html#digest" }, "Details"),
+      // The key remounts the boxes when the profile's fields change, so each new field starts ticked.
+      fields.length > 0
+        ? h("fieldset", { key: fields.join(","), id: "digest-fields" }, h("legend", null, "Fields from your profile"),
+          h("div", { className: "checks" }, fields.map(t => h("label", { key: t, className: "check" },
+            h("input", { type: "checkbox", id: "digest-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
+        : h("div", { style: { marginTop: 8 } }, "With no fields picked, the email covers every field. ",
+          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " to narrow it."),
+      h("div", { className: "digest-row" },
+        h("label", { htmlFor: "digest-email" }, "Email"),
+        h("input", { id: "digest-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
+        h("button", { id: "digest-submit", type: "submit", className: "btn primary" }, "Subscribe"),
+        sent && h("span", { className: "muted", role: "status" }, `${prov} opened in a new tab. Finish there if it asks, then look for the confirmation email.`)),
+      // In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
+      h("input", { type: "hidden", name: "embed", value: "1" }));
+  }
+
   // ---------- setup (3 steps) ----------
   const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
   const GRAD_YEARS = Array.from({ length: 9 }, (_, i) => 2026 + i);
@@ -912,6 +948,12 @@
       "aria-sort": f.sort === key ? (key === "company" ? "ascending" : "descending") : undefined },
       h("button", { type: "button", onClick: () => upd("sort", key) }, label));
     const feedbackUrl = C.formUrl ? C.formUrl.split("{id}").join("") : C.issuesUrl;
+    // The weekly email form shows only once window.CONFIG.digest.formAction is filled in, and only
+    // for an https address, so a mistyped one can't send a student's email in the clear.
+    const digestOn = !!(C.digest && C.digest.formAction && /^https:\/\//.test(C.digest.formAction));
+    // The same field tags the ranking treats as the student's own, less "other", and only well-formed
+    // keys: an unknown tag name creates a new tag at Buttondown.
+    const digestFields = [...ctx.direct].filter(t => t !== "other" && /^[a-z_]{2,32}$/.test(t));
     // Optional paid plans. The Worker only advertises the tiers whose Stripe price it actually has,
     // so a tier that isn't set up yet never appears as a button the student can press.
     const payPlans = auth.cfg && auth.cfg.payments && auth.cfg.payments.enabled ? auth.cfg.payments.plans || [] : [];
@@ -1070,6 +1112,9 @@
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
+
+      // Below the list and above the footer links, so it never pushes a listing down.
+      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: () => setSetupOpen(true) }),
 
       h("footer", null,
         // Same facts as before, in two short sentences instead of one long one. The plan prices
