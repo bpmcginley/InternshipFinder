@@ -450,8 +450,9 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
             # The extension has been in the Chrome Web Store since 2026-09-22. This links the install
             # page rather than the store: it's ours, so the link stays inside the site, and it tells a
             # phone reader to send it to a laptop instead of dropping them on a store page that can't
-            # install anything.
-            + "<p class=\"follow\">Applying to a few? The free <a href=\"/install.html\">Auto-Apply extension</a> "
+            # install anything. ?from= becomes the store link's utm_source there (install.html's
+            # canonical link keeps it one page to search engines).
+            + "<p class=\"follow\">Applying to a few? The free <a href=\"/install.html?from=landing-page\">Auto-Apply extension</a> "
               "fills in the application for you and stops at the submit button.</p>"
             + related)
 

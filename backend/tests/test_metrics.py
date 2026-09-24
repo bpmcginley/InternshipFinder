@@ -3,6 +3,8 @@ import importlib.util
 import json
 import os
 
+import pytest
+
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 _spec = importlib.util.spec_from_file_location("metrics", os.path.join(ROOT, "growth", "metrics.py"))
 metrics = importlib.util.module_from_spec(_spec)
@@ -34,3 +36,6 @@ def test_store_listing_numbers_read_from_the_page_and_absent_until_shown():
     unrated = '<span aria-label="0 out of 5 stars"></span>'
     assert metrics.store_stats(page) == {"users": 1234, "rating": 4.5}
     assert metrics.store_stats("<div>Add to Chrome</div>" + unrated) == {"users": None, "rating": None}
+    # A page that isn't a listing (a consent page, new markup) is a problem to report, not "no users".
+    with pytest.raises(ValueError):
+        metrics.store_stats("<html>Before you continue to Google</html>")

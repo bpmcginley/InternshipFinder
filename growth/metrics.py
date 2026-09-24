@@ -135,9 +135,12 @@ def listings(site_dir: str) -> dict:
 def store_stats(html: str) -> dict:
     """The user count and average rating on a Chrome Web Store listing page. Each is None until the
     store shows it: a new listing has no user count, and an unrated one shows "0 out of 5 stars"
-    (a real rating is never under 1)."""
+    (a real rating is never under 1). Every listing shows that rating element, so a page without it
+    isn't one the parser understands, and it says so rather than report "no users yet"."""
     users = re.search(r">([\d,]+)\+? users?<", html)
     rating = re.search(r'aria-label="([\d.]+) out of 5 stars"', html)
+    if not rating:
+        raise ValueError("store listing not recognised")
     return {"users": int(users.group(1).replace(",", "")) if users else None,
             "rating": (float(rating.group(1)) or None) if rating else None}
 

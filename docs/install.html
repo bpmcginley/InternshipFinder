@@ -24,6 +24,9 @@
 <meta property="og:description" content="Add InternScout Auto-Apply from the Chrome Web Store in about a minute. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/>
 <meta property="og:type" content="article"/>
 <meta property="og:url" content="https://internscout.org/install.html"/>
+<!-- Landing pages link here as install.html?from=landing-page (see the script at the bottom); this
+     keeps every such address one page to search engines. -->
+<link rel="canonical" href="https://internscout.org/install.html"/>
 <!-- was: <meta property="og:image" content="icon128.png"/> -->
 <meta property="og:image" content="https://internscout.org/og-preview.png"/>
 <!-- was: <meta name="twitter:card" content="summary"/> -->
@@ -255,13 +258,26 @@
   </footer>
 </div>
 <script>
+// Our own links to this page say where they sit (install.html?from=landing-page). Pass that on as
+// the store links' utm_source, so the store's install analytics tell a landing-page reader from one
+// who came straight here. Only a short lowercase tag is taken; anything else keeps "install-page".
+(function () {
+  var m = /[?&]from=([a-z-]{1,32})(?:&|$)/.exec(location.search);
+  if (!m) return;
+  var links = document.querySelectorAll('a[href*="utm_source=install-page"]');
+  for (var i = 0; i < links.length; i++) links[i].href = links[i].href.replace("utm_source=install-page", "utm_source=" + m[1]);
+})();
+</script>
+<script>
 // Share control for the phone banner and the "Send this page on" row. No library and no build step:
 // this page carried no script at all until now, and two buttons don't justify starting one.
 (function () {
   var buttons = document.querySelectorAll("[data-share]");
   if (!buttons.length) return;
-  // Drop any #fragment so the link that arrives opens at the top of the steps, not mid-page.
-  var url = location.href.split("#")[0];
+  // was: var url = location.href.split("#")[0];  ("Drop any #fragment so the link that arrives opens
+  // at the top of the steps, not mid-page.") The query goes too now: ?from= says which of our own
+  // links brought this reader, and a friend they send it to didn't come from there.
+  var url = location.origin + location.pathname;
 
   function note(btn, msg, keep) {
     var el = btn.parentNode.querySelector(".share-note");
