@@ -656,9 +656,17 @@
     const inviteWords = inviteOffer ? Object.entries(inviteOffer.bonus || {}).map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k] || k)}`).join(" and ") : "";
     useEffect(() => {
       if (!auth.token || !invited || !inviteOffer) return;
+      // This account was already told "use a school account" this session, and the Worker's answer
+      // can't change while it stays signed in. A different account (another sub) still tries.
+      const sub = (IS.decodeJwt(auth.token) || {}).sub || "";
+      if (sub && IS.ss.get(IS.INVITE_EDU_KEY) === sub) return;
       IS.claimInvite(auth.token, invited).then(r => {
         if (!r) return;
-        if (r.error === "edu_only") { setNote(r.message); return; }
+        // was: if (r.error === "edu_only") { setNote(r.message); return; }
+        // The code is kept for a later school-account sign-in, so the same personal account was asked
+        // again and shown the same refusal on every page load. Remembering its sub for the session
+        // shows the message once; the code still waits for a .edu sign-in.
+        if (r.error === "edu_only") { if (sub) IS.ss.set(IS.INVITE_EDU_KEY, sub); setNote(r.message); return; }
         IS.ls.del(IS.INVITE_KEY); setInvited(null);
         if (r.ok) {
           setNote(`Invite accepted: you ${r.inviter_rewarded ? "and your classmate each got" : "got"} ${inviteWords}. They're used after your monthly allowance and don't expire.`);
@@ -912,6 +920,16 @@
     const upgrades = me && me.can_upgrade ? payPlans.filter(pl => pl.multiplier > myMult) : [];
     const upgradeTitle = pl => `Optional. Covers the AI bill and gives you ${pl.multiplier}× your monthly `
       + "AI allowance. Stripe takes the payment; we never see your card. Cancel any time.";
+    // Out of Auto-Apply runs: say when they come back and how to get more now. Only for a real
+    // allowance (limit > 0): a limit of 0 is Auto-Apply switched off, and limits.js won't spend
+    // invite runs on a switched-off task, so "used up" and "invite a classmate" would both be wrong.
+    const autoAllow = me && me.allowance && me.allowance.autofill;
+    const outOfRuns = !!(auth.token && me && !me.paused && inviteOffer && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // me.month is the Worker's UTC month ("2026-09"); the allowance resets on the 1st of the next one.
+    const monthMatch = /^(\d{4})-(\d{2})$/.exec((me && me.month) || "");
+    const resetDay = monthMatch
+      ? new Date(Date.UTC(+monthMatch[1], +monthMatch[2], 1)).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })
+      : "the 1st of next month";
     // was: const signInTitle = "Optional. Search works without it. Any Google or Microsoft account works; a school .edu email gets more AI use. Signing in also lets your chosen states count toward where we scan in more detail.";
     // The old wording left "more AI use" vague and the button beside it said "(UMass email)", which
     // together read as a school requirement. worker/src/auth.js only asks for a verified address on a
@@ -989,6 +1007,11 @@
       // Arrived through a classmate's link, not signed in yet: say what signing in gets them.
       invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
         `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
+      // The invite link hides while the invite panel below is already open; the plan buttons are in the header.
+      outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
+        `They come back on ${resetDay}. `,
+        !invite && h("a", { href: "#", onClick: prevent(openInvite) }, "Invite a classmate"),
+        `${invite ? "Share your invite link below" : ` for ${inviteWords} each`}${upgrades.length ? ", or pick a plan above" : ""}.`),
       auth.token && invite && h("div", { className: "notice invite" },
         h("b", null, "Invite classmates. "),
         `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
