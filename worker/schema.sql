@@ -89,3 +89,39 @@ CREATE TABLE IF NOT EXISTS stripe_events (
 
 CREATE INDEX IF NOT EXISTS plans_subscription ON plans (subscription);
 CREATE INDEX IF NOT EXISTS stripe_events_seen ON stripe_events (seen);
+
+-- Referral credits (src/referral.js, REFERRAL in src/config.js). Hashed ids and counts only, like the
+-- rest of this file. A student's own invite code: random, so it says nothing about who owns it.
+CREATE TABLE IF NOT EXISTS invite_codes (
+  code TEXT PRIMARY KEY,
+  user_hash TEXT NOT NULL UNIQUE,
+  created TEXT NOT NULL
+);
+
+-- One row per account that joined through an invite, naming the inviter by the same hashed id, and
+-- whether the inviter was rewarded (they stop being rewarded after REFERRAL.maxRewards). "Delete my
+-- data" empties `referrer` but keeps the row, so one account can only ever claim one invite.
+CREATE TABLE IF NOT EXISTS referrals (
+  invitee TEXT PRIMARY KEY,
+  referrer TEXT NOT NULL,
+  rewarded INTEGER NOT NULL DEFAULT 0,
+  claimed TEXT NOT NULL
+);
+
+-- Extra units per task from invites. They don't reset monthly: src/limits.js admit() spends one only
+-- after the month's allowance for that task is used up.
+CREATE TABLE IF NOT EXISTS bonus (
+  user_hash TEXT NOT NULL,
+  task TEXT NOT NULL,
+  granted INTEGER NOT NULL DEFAULT 0,
+  used INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_hash, task)
+);
+
+-- When the Worker first saw an account, so only an account in its first week can claim an invite.
+CREATE TABLE IF NOT EXISTS accounts (
+  user_hash TEXT PRIMARY KEY,
+  first TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals (referrer);

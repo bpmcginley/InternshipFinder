@@ -10,8 +10,12 @@ the states students pick. The request/response contract is in [API.md](API.md).
      and a status, and `stripe_events` holds event ids. Those are third-party account identifiers, not
      hashed IDs or counters, and a Web Store reviewer reads this file. schema.sql:73 already says as
      much beside the table; this sentence now matches it. -->
-It stores hashed IDs, usage counters, chosen states, spend totals monthly and daily, and -- for a paid
-plan -- the Stripe customer and subscription ids and the plan's status (`schema.sql`). Never prompts,
+<!-- was: It stores hashed IDs, usage counters, chosen states, spend totals monthly and daily, and -- for a paid
+plan -- the Stripe customer and subscription ids and the plan's status (`schema.sql`). -->
+It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
+monthly and daily, invite records (a random code, who joined through whose invite as hashed IDs, and
+extra units), and -- for a paid plan -- the Stripe customer and subscription ids and the plan's status
+(`schema.sql`). Never prompts,
 replies, emails or tokens. Workers Logs stay off for the same reason.
 
 ## Files
@@ -25,6 +29,7 @@ replies, emails or tokens. Workers Logs stay off for the same reason.
 | `src/gemini.js` | Builds the Gemini request, clamps tokens and thinking, prices usage |
 | `src/demand.js` | `POST /demand` and CI-only `GET /demand` |
 | `src/billing.js` | Optional paid plans: Stripe Checkout, the billing portal, webhook checks |
+| `src/referral.js` | Referral credits: invite codes, `GET /invite`, `POST /invite/claim`, extra units |
 | `src/config.js` | Models, per-task allowances, prices, rate limits. Edit here, then deploy |
 | `wrangler.toml` | Public vars (client IDs, origins, budget) and the D1 binding |
 

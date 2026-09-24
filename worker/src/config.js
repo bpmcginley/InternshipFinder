@@ -113,6 +113,15 @@ export const USER_BUDGET_CENTS = { free: 150, supporter: 450, pro: 1100 };
 // The paid plans, cheapest first. Order is what the dashboard shows.
 export const PAID_PLANS = ["supporter", "pro"];
 
+// Referral credits (Bruce, 2026-09-24). A student who signs in through a classmate's invite link with
+// a school (.edu) account, within `windowDays` of the Worker first seeing that account, gets `bonus`
+// extra units, and so does the classmate, for up to `maxRewards` invites each. The extra units never
+// expire and are only spent once the month's allowance is gone (limits.js admit), and they still count
+// against USER_BUDGET_CENTS and both budget stops. At ~$0.06 an Auto-Apply run, 3 runs is at most ~18c
+// per student; the Paid Lanes prospectus puts this at ~33c per signed-in student, the one lane that
+// pays back. `.edu` only, because a school address is the one thing a student can't mint dozens of.
+export const REFERRAL = { bonus: { autofill: 3 }, maxRewards: 10, windowDays: 7 };
+
 export const CONFIG = {
   TASKS,
   ALLOWANCE_CHANGES,
@@ -144,4 +153,5 @@ export const CONFIG = {
   MAX_BODY_BYTES: 4_000_000,
   SCOPES: ["openid", "email", "profile"],
   PAID_PLANS,
+  REFERRAL,
 };

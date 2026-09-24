@@ -476,7 +476,31 @@
       return r.ok ? await r.json() : null;
     } catch (e) { return null; }
   }
+  // Referral credits (worker/src/referral.js). A classmate's invite code rides in on ?ref= and waits
+  // here until the student signs in; GET /invite is the student's own link, POST /invite/claim uses one.
+  const INVITE_KEY = "internscout.invite.v1";
+  const INVITE_CODE = /^[a-hj-km-np-z2-9]{8}$/;
+  async function fetchInvite(token) {
+    if (!workerOn() || !token) return null;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/invite", { headers: { Authorization: "Bearer " + token } });
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  }
+  // { ok, bonus } or { error, message } from the Worker; null when it couldn't be reached (try later).
+  async function claimInvite(token, code) {
+    if (!workerOn() || !token) return null;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/invite/claim", {
+        method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ code }),
+      });
+      if (r.status >= 500) return null;
+      return await r.json().catch(() => null);
+    } catch (e) { return null; }
+  }
   const ALLOWANCE_LABELS = { autofill: "Auto-Apply runs", resume_tailor: "Tailored resumes", deep_dive: "Deep Dives" };
+  // A label as it reads mid-sentence: "tailored resumes", but Auto-Apply and the Deep Dive keep their capitals.
+  const midSentence = l => /^(Auto-Apply|Deep Dive)/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1);
   // Fallback names for the paid tiers. /config carries the real labels; this is for when it hasn't
   // loaded yet, or an older page meets a tier it doesn't know.
   const PLAN_LABELS = { supporter: "Supporter", pro: "Pro" };
@@ -492,6 +516,10 @@
     // worker/src/auth.js grants the "edu" tier on a verified .edu address from Microsoft as well as
     // Google, so naming only Google told half the students here that they couldn't qualify.
     lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google or Microsoft account with a verified .edu email gets twice as much.");
+    // The Worker already counts invite units in `limit`; say where they came from.
+    const extra = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k] && me.allowance[k].bonus > 0)
+      .map(k => `${me.allowance[k].bonus} ${midSentence(ALLOWANCE_LABELS[k])}`);
+    if (extra.length) lines.push(`Includes ${extra.join(" and ")} from invites. They don't expire.`);
     if (me.plan && me.plan !== "free") lines.push((PLAN_LABELS[me.plan] || me.plan) + " plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
     if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");
     return lines.join("\n");
@@ -526,7 +554,7 @@
         if (r.status === 409) return { server: false, blocked: true };
       } catch (e) { server = false; }
     }
-    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.set(DELETED_KEY, true);
+    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.set(DELETED_KEY, true);
     ss.del(TOKEN_KEY);
     return { server };
   }
@@ -550,7 +578,7 @@
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
-    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS,
+    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

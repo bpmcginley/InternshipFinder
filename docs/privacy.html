@@ -90,7 +90,8 @@
     <!-- was: <p class="meta">Last updated September 17, 2026</p> -->
     <!-- was: <p class="meta">Last updated September 19, 2026</p>  (operator named, an email address,
          and under-18 consent for paid plans added 2026-09-22) -->
-    <p class="meta">Last updated September 22, 2026</p>
+    <!-- was: <p class="meta">Last updated September 22, 2026</p>  (invites added 2026-09-24) -->
+    <p class="meta">Last updated September 24, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
          the whole product "free" without qualification is no longer true. Search still is. -->
     <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
@@ -117,7 +118,8 @@
              itself disproves is worse than none, so this one points at the full list instead of
              closing the subject off. -->
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage counts, the states you picked, and — only if you subscribe — which plan you are on. Nothing else.</li> -->
-        <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li>
+        <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li> -->
+        <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li>
         <li>We never see your password.</li>
         <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
       </ul>
@@ -270,6 +272,12 @@
                you deleted in) inside the same batch as the deletions, and cleanup() uses it to sweep
                the counts that had to be kept, then deletes the row itself once the month is past. -->
           <tr><td>If you press Delete my data: your hashed ID and the month you did it in</td><td>So the counts that have to survive until the month ends are swept automatically once it does. This marker is deleted with them.</td></tr>
+          <!-- Invites (worker/src/referral.js, schema.sql: accounts, invite_codes, referrals, bonus),
+               added 2026-09-24. The table is introduced as the complete list, so each new row is here. -->
+          <tr><td>The date our server first saw your account</td><td>Only accounts in their first week can accept an invite.</td></tr>
+          <tr><td>If you open Invite classmates: a random invite code</td><td>It makes your invite link. The code says nothing about who you are.</td></tr>
+          <tr><td>If you join through an invite: that you did, when, and the inviter's hashed ID</td><td>So an account can accept only one invite, and an inviter is credited for at most 10.</td></tr>
+          <tr><td>Extra AI runs from invites: how many you were given and how many you have used</td><td>They are used after your monthly allowance and don't expire.</td></tr>
         </tbody>
       </table>
     </div>
@@ -303,7 +311,7 @@
 
     <h2 id="delete">Delete your data</h2>
     <ol>
-      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record and everything from earlier months are removed right away. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
+      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
       <li><strong>In your browser:</strong> clear site data for <code>internscout.org</code> (and for <code>bpmcginley.github.io</code>, the address InternScout used before September 2026, if you visited it then). In Chrome, click the icon left of the address bar, then <em>Site settings</em>, then <em>Delete data</em>. This removes your dashboard profile and saved statuses.</li>
       <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li>
     </ol>

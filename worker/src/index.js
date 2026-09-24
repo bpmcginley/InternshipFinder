@@ -3,7 +3,8 @@ import { CONFIG } from "./config.js";
 import { HttpError, json } from "./http.js";
 import { authenticateUser, providers } from "./auth.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
-import { admit, allowanceFor, cleanup, deleteUser, isPaused, monthOf, release, remainingOf, settle, usageFor } from "./limits.js";
+import { admit, allowanceFor, cleanup, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
@@ -97,15 +98,18 @@ async function route(request, env, ctx, d) {
         },
         payments: paymentsInfo(env, d.config),
         paused: await isPaused(db, env, d.config, now),
+        // What an invite is worth (REFERRAL in config.js), so the dashboard can offer it before sign-in.
+        invite: { bonus: d.config.REFERRAL.bonus, max: d.config.REFERRAL.maxRewards },
       });
     }
 
     case "GET /me": {
       const user = await signIn();
-      later(ctx, touchSeen(db, user, now));
+      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
       const month = monthOf(now);
       const used = await usageFor(db, user, month);
       const mine = await planOf(db, user);
+      const extra = await bonusFor(db, user);
       return json({
         month,
         plan: mine.plan,
@@ -119,7 +123,15 @@ async function route(request, env, ctx, d) {
         // them. /config keeps the default, which is the honest answer before anyone has signed in.
         // was: paused: await isPaused(db, env, d.config, now),
         paused: await isPaused(db, env, d.config, now, mine.plan),
-        allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan, now) })),
+        // was: allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan, now) })),
+        // `limit` takes in invite units (shownLimit), so limit - used stays what the student can run;
+        // `bonus`, only when there are any, is the invite units left, for a client that wants to say
+        // where the extra came from.
+        allowance: allowanceTable(d.config, (task) => {
+          const limit = allowanceFor(d.config, env, task, who.tier, mine.plan, now);
+          const out = { used: used[task] || 0, limit: shownLimit(limit, used[task] || 0, extra[task]) };
+          return limit != null && extra[task] ? { ...out, bonus: extra[task] } : out;
+        }),
       });
     }
 
@@ -186,7 +198,7 @@ async function route(request, env, ctx, d) {
         await release(db, user, task, runId, admitted);
         throw e;
       }
-      later(ctx, touchSeen(db, user, now));
+      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
 
       const headers = { "X-InternScout-Model": model, "X-InternScout-Remaining": String(remainingOf(admitted)) };
       const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
@@ -206,6 +218,18 @@ async function route(request, env, ctx, d) {
       } catch {}
       later(ctx, settle(db, user, admitted, price(usage), usage));
       return new Response(text, { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
+    }
+
+    // Referral credits (referral.js). The link a student shares, and a new classmate claiming it.
+    case "GET /invite": {
+      const user = await signIn();
+      return json(await inviteInfo(db, env, d.config, user, now));
+    }
+
+    case "POST /invite/claim": {
+      const user = await signIn();
+      const { body } = await readJson(request, 1_000);
+      return json(await claim(db, d.config, user, who.tier, body.code, now));
     }
 
     case "POST /demand": {
