@@ -519,6 +519,10 @@
 40.8584,
 -74.1638
 ],
+"clinton|NY":[
+40.7653,
+-73.9939
+],
 "clinton|PA":[
 40.4891,
 -80.295
@@ -1869,6 +1873,12 @@
 40.7945,
 -77.8616
 ],
+"state of new jersey|NJ":null,
+"state of new york|NY":[
+42.8934,
+-78.8674
+],
+"state of pennsylvania|PA":null,
 "stevens|PA":[
 40.2162,
 -76.1552
@@ -1986,6 +1996,7 @@
 "us malta|NY":null,
 "us new jersey|NJ":null,
 "us new york|NY":null,
+"us nj remote|NJ":null,
 "us ny niskayuna|NY":null,
 "us ny pearl river|NY":null,
 "us ny waterford|NY":null,
