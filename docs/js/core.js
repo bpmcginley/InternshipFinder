@@ -482,6 +482,11 @@
   // sessionStorage: the sign-in sub of the account the Worker last answered "edu_only" for, so the
   // dashboard asks for that account once per session instead of on every page load.
   const INVITE_EDU_KEY = "internscout.invite.edu_only";
+  // sessionStorage: "sub|iat|code" of the sign-in whose claim last failed for a passing reason (the
+  // Worker unreachable, a 5xx, 429, or a 401 while Google rotates its keys). The code stays in
+  // localStorage, and the dashboard tries again on the next sign-in or the next session instead of
+  // on every page load with the same token.
+  const INVITE_TRIED_KEY = "internscout.invite.tried";
   const INVITE_CODE = /^[a-hj-km-np-z2-9]{8}$/;
   async function fetchInvite(token) {
     if (!workerOn() || !token) return null;
@@ -490,14 +495,18 @@
       return r.ok ? await r.json() : null;
     } catch (e) { return null; }
   }
-  // { ok, bonus } or { error, message } from the Worker; null when it couldn't be reached (try later).
+  // was: // { ok, bonus } or { error, message } from the Worker; null when it couldn't be reached (try later).
+  // { ok, bonus } or { error, message } from the Worker; null when the answer says nothing about the
+  // invite itself (try later): unreachable, 5xx, 429, or 401. A 401 ("Sign in first", "Unknown
+  // signing key; sign in again") is about the token, e.g. mid Google key rotation, not the code.
   async function claimInvite(token, code) {
     if (!workerOn() || !token) return null;
     try {
       const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/invite/claim", {
         method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ code }),
       });
-      if (r.status >= 500) return null;
+      // was: if (r.status >= 500) return null;
+      if (r.status >= 500 || r.status === 401 || r.status === 429) return null;
       return await r.json().catch(() => null);
     } catch (e) { return null; }
   }
@@ -560,7 +569,8 @@
     ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.set(DELETED_KEY, true);
     // was: ss.del(TOKEN_KEY);
     // The invite check now keeps the account's sub for the session; it comes from the token and goes with it.
-    ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY);
+    // was: ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY);
+    ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY); ss.del(INVITE_TRIED_KEY);
     return { server };
   }
 
@@ -583,7 +593,7 @@
     createStore, loadMajors, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
-    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
+    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

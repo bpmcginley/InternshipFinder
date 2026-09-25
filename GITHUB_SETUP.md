@@ -31,12 +31,24 @@ Repo → **Settings → Actions → General → Workflow permissions** →
 select **Read and write permissions** → Save.
 
 ### 3. Turn on Pages
-Repo → **Settings → Pages** → Source: **Deploy from a branch** →
+<!-- was: Repo → **Settings → Pages** → Source: **Deploy from a branch** →
 Branch: **main**, folder: **/docs** → Save.
-Your site appears at `https://<your-username>.github.io/<repo-name>/` within a minute.
+Your site appears at `https://<your-username>.github.io/<repo-name>/` within a minute. -->
+<!-- A branch deploy publishes docs/ as it is, without the /internships/ landing pages and
+sitemap.xml that .github/workflows/pages.yml builds at deploy time, so those would 404. -->
+Repo → **Settings → Pages** → Source: **GitHub Actions**. Set this before the first deploy: the
+**Deploy site** workflow (`.github/workflows/pages.yml`) refuses to run while the source is still
+"Deploy from a branch". It copies `docs/` into an artifact, builds the `/internships/` pages with
+`backend/internscout/seo_pages.py`, and deploys it on every push to `main` and after every ingest
+run. Run it once by hand (**Actions → Deploy site → Run workflow**); your site appears at
+`https://<your-username>.github.io/<repo-name>/` when it finishes.
 
-This repo serves from its own domain, `https://internscout.org/`. `docs/CNAME` names it, and GitHub
-Pages redirects the old `https://bpmcginley.github.io/InternshipFinder/` address there. The domain's
+<!-- was: This repo serves from its own domain, `https://internscout.org/`. `docs/CNAME` names it, and GitHub
+Pages redirects the old `https://bpmcginley.github.io/InternshipFinder/` address there. The domain's -->
+This repo serves from its own domain, `https://internscout.org/`. An Actions deploy ignores
+`docs/CNAME` (the workflow drops it from the artifact), so enter the domain under **Settings → Pages →
+Custom domain**; GitHub Pages then redirects the old `https://bpmcginley.github.io/InternshipFinder/`
+address there. The domain's
 DNS (at Cloudflare) needs the four GitHub Pages `A` records on `internscout.org` and a `CNAME` from
 `www` to `bpmcginley.github.io`, set to **DNS only** (grey cloud) so GitHub can issue the HTTPS
 certificate. Then tick **Enforce HTTPS** under Settings → Pages.
