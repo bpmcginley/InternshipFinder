@@ -7042,8 +7042,9 @@
   "careers-jkmoving": {
    "name": "JK Moving Services",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-09-25"
   },
   "careers-jointcommission": {
    "name": "Joint Commission International",
@@ -9833,9 +9834,8 @@
   "eeho.fa.us2.oraclecloud.com|CX_45001": {
    "name": "Oracle",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-09-25"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "eeik.fa.us2.oraclecloud.com|CX_1": {
    "name": "University of Wyoming",
