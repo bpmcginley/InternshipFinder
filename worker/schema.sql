@@ -118,10 +118,55 @@ CREATE TABLE IF NOT EXISTS bonus (
   PRIMARY KEY (user_hash, task)
 );
 
+-- was: -- When the Worker first saw an account, so only an account in its first week can claim an invite.
 -- When the Worker first saw an account, so only an account in its first week can claim an invite.
+-- "Delete my data" keeps this row (a hashed id and a date): removing it let an old account delete,
+-- sign in again and count as new.
 CREATE TABLE IF NOT EXISTS accounts (
   user_hash TEXT PRIMARY KEY,
   first TEXT NOT NULL
 );
 
+-- How many invites have earned this inviter credit, ever. claim() checks REFERRAL.maxRewards against
+-- this, not against a COUNT over `referrals`: "Delete my data" blanks `referrer` on those rows, so the
+-- count fell whenever the inviter or a rewarded classmate deleted, and the inviter could earn past the
+-- cap. "Delete my data" keeps this row (a hashed id and a number). A new table rather than a column,
+-- because CREATE TABLE IF NOT EXISTS never adds a column to a table that is already live.
+CREATE TABLE IF NOT EXISTS inviters (
+  user_hash TEXT PRIMARY KEY,
+  rewarded INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals (referrer);
+
+-- Backfills. `npm run deploy` runs this file before every `wrangler deploy`, so both are written to be
+-- repeated: each only ever adds a missing row or moves a value the safe way (a first-seen date
+-- earlier, a count higher), and a second run changes nothing. Each reads only small tables once.
+--
+-- `accounts` appeared with invites (2026-09-24). An account from before then had no row, and claim()
+-- or /me gave it first-seen = that day, so every existing .edu student could claim as "new". This dates
+-- each account from its earliest trace in the tables that were already there: its oldest usage month
+-- (taken as the 1st of that month, the earliest it could have been), when it last set its states, its
+-- plan record and its invite code. An account with no row gets the earliest of those. An account that
+-- already has one is moved earlier only on proof: a usage month that ended before its first-seen (upto
+-- is the 1st of the month after), or a timestamp before it. A usage month that merely matches the
+-- first-seen month proves nothing, so a genuinely new student's date is never pulled back to the 1st.
+-- (`WHERE` before `ON CONFLICT` also keeps SQLite from reading the upsert as a join.)
+INSERT INTO accounts (user_hash, first)
+SELECT e.user_hash, MIN(e.t) FROM (
+  SELECT user_hash, month || '-01T00:00:00.000Z' AS t, date(month || '-01', '+1 month') AS upto FROM usage
+  UNION ALL SELECT user_hash, updated, updated FROM demand
+  UNION ALL SELECT user_hash, updated, updated FROM plans
+  UNION ALL SELECT user_hash, created, created FROM invite_codes
+) AS e LEFT JOIN accounts AS a ON a.user_hash = e.user_hash
+WHERE a.user_hash IS NULL OR e.upto <= a.first
+GROUP BY e.user_hash
+ON CONFLICT(user_hash) DO UPDATE SET first = excluded.first WHERE excluded.first < accounts.first;
+
+-- `inviters` is new with the fix above. Seed it from the referral rows that still name their inviter;
+-- rows already blanked by a deletion can't be attributed and are lost to the count. Once seeded, the
+-- count only grows (claim() adds to it, nothing takes away), so it is never below this and the
+-- `WHERE` keeps a repeat run from touching it.
+INSERT INTO inviters (user_hash, rewarded)
+SELECT referrer, COUNT(*) FROM referrals WHERE referrer != '' AND rewarded = 1 GROUP BY referrer
+ON CONFLICT(user_hash) DO UPDATE SET rewarded = excluded.rewarded WHERE excluded.rewarded > inviters.rewarded;

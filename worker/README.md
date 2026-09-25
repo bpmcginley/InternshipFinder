@@ -12,10 +12,17 @@ the states students pick. The request/response contract is in [API.md](API.md).
      much beside the table; this sentence now matches it. -->
 <!-- was: It stores hashed IDs, usage counters, chosen states, spend totals monthly and daily, and -- for a paid
 plan -- the Stripe customer and subscription ids and the plan's status (`schema.sql`). -->
-It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
+<!-- was: It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
 monthly and daily, invite records (a random code, who joined through whose invite as hashed IDs, and
 extra units), and -- for a paid plan -- the Stripe customer and subscription ids and the plan's status
-(`schema.sql`). Never prompts,
+(`schema.sql`). Never prompts, -->
+<!-- The `inviters` table (each inviter's lifetime count of rewarded invites) was added 2026-09-25 so
+     "Delete my data" can't reset the 10-invite cap; it is a hashed ID and a number, listed here like
+     the rest. -->
+It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
+monthly and daily, invite records (a random code, who joined through whose invite as hashed IDs, each
+inviter's lifetime count of rewarded invites, and extra units), and -- for a paid plan -- the Stripe
+customer and subscription ids and the plan's status (`schema.sql`). Never prompts,
 replies, emails or tokens. Workers Logs stay off for the same reason.
 
 ## Files

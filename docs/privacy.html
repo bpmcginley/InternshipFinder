@@ -91,7 +91,9 @@
     <!-- was: <p class="meta">Last updated September 19, 2026</p>  (operator named, an email address,
          and under-18 consent for paid plans added 2026-09-22) -->
     <!-- was: <p class="meta">Last updated September 22, 2026</p>  (invites added 2026-09-24) -->
-    <p class="meta">Last updated September 24, 2026</p>
+    <!-- was: <p class="meta">Last updated September 24, 2026</p>  (what Delete my data keeps for invites,
+         and the pending invite code in local storage, added 2026-09-25) -->
+    <p class="meta">Last updated September 25, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
          the whole product "free" without qualification is no longer true. Search still is. -->
     <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
@@ -124,7 +126,10 @@
              hands over an email address on purpose, so the short version says who ends up holding it. -->
         <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. Buttondown also records the IP address you sign up from. <a href="#digest">Details below</a>.</li>
         <li>We never see your password.</li>
-        <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
+        <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
+             The invite records Delete my data keeps (see #delete) are part of what "it" covers, so the
+             short version names them too. -->
+        <li>You can delete it at any time. The current month's counts stay until the month ends, and a few invite records (your hashed ID with a date or a count) stay after that, so deleting can't be used to reset a limit. <a href="#delete">Details below</a>.</li>
       </ul>
     </div>
 
@@ -138,7 +143,12 @@
            not a USPS code or REMOTE, so no listing id, status or filter could travel that route even by
            accident. The statuses themselves really never leave, which is why this is split in two. -->
       <!-- was: <li>Your saved statuses (like Interested or Applied), filters and profile are saved in your browser's local storage. They are not sent to us.</li> -->
-      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong></li>
+      <!-- docs/js/core.js INVITE_KEY ("internscout.invite.v1"): app.js stores the ?ref= code from an
+           invite link there and sends it to POST /invite/claim only once the student signs in, then
+           drops it; core.js's Delete my data removes it too. It is a classmate's random code, not
+           anything about this student, but the list says what the dashboard keeps, so it is here. -->
+      <!-- was: <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong></li> -->
+      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it.</li>
       <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
       <li>GitHub hosts the page and may keep normal web server logs under its own policy. The dashboard also loads fonts and code libraries from public servers (such as Google Fonts).</li>
       <!-- was: <li>We don't use analytics, ad trackers or cookies of our own.</li>
@@ -277,9 +287,18 @@
           <tr><td>If you press Delete my data: your hashed ID and the month you did it in</td><td>So the counts that have to survive until the month ends are swept automatically once it does. This marker is deleted with them.</td></tr>
           <!-- Invites (worker/src/referral.js, schema.sql: accounts, invite_codes, referrals, bonus),
                added 2026-09-24. The table is introduced as the complete list, so each new row is here. -->
-          <tr><td>The date our server first saw your account</td><td>Only accounts in their first week can accept an invite.</td></tr>
+          <!-- 2026-09-25: Delete my data used to remove the first-seen date and so reopened the first
+               week, and the 10-invite limit was a count of rows that deletion blanks, so deleting
+               reset it. referral.js forgetStatements() now keeps the `accounts` row and the new
+               `inviters` row (schema.sql), and these rows say so, next to the invitee row that was
+               already kept for the same reason. For accounts from before invites, schema.sql dates
+               the first-seen row from the account's earliest usage month, states or plan. -->
+          <!-- was: <tr><td>The date our server first saw your account</td><td>Only accounts in their first week can accept an invite.</td></tr> -->
+          <tr><td>The date our server first saw your account (for accounts from before invites started, the earliest month we have usage counts for, or when you first picked states or a plan)</td><td>Only accounts in their first week can accept an invite. <strong>Kept after Delete my data</strong>, so deleting and signing in again can't make an account new again.</td></tr>
           <tr><td>If you open Invite classmates: a random invite code</td><td>It makes your invite link. The code says nothing about who you are.</td></tr>
-          <tr><td>If you join through an invite: that you did, when, and the inviter's hashed ID</td><td>So an account can accept only one invite, and an inviter is credited for at most 10.</td></tr>
+          <!-- was: <tr><td>If you join through an invite: that you did, when, and the inviter's hashed ID</td><td>So an account can accept only one invite, and an inviter is credited for at most 10.</td></tr> -->
+          <tr><td>If you join through an invite: that you did, when, and the inviter's hashed ID</td><td>So an account can accept only one invite. <strong>Kept after Delete my data</strong>, without the inviter's ID, so deleting and signing in again can't accept a second one.</td></tr>
+          <tr><td>If your invites earn you extra runs: how many invites have, in total</td><td>An inviter is credited for at most 10 invites, ever. <strong>Kept after Delete my data</strong> (just your hashed ID and that number), so deleting and signing in again can't start the count over.</td></tr>
           <tr><td>Extra AI runs from invites: how many you were given and how many you have used</td><td>They are used after your monthly allowance and don't expire.</td></tr>
         </tbody>
       </table>
@@ -341,7 +360,10 @@
 
     <h2 id="delete">Delete your data</h2>
     <ol>
-      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
+      <!-- was: <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
+           The first-seen date and the inviter's lifetime count are now kept too (referral.js
+           forgetStatements(), 2026-09-25), so this list names all three kept invite records. -->
+      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. Three invite records stay, each just your hashed ID with a date or a number, because without them deleting and signing in again would get around the invite rules: the date we first saw your account (so it can't count as new again); if you joined through an invite, the record that you did, without the inviter's ID (so you can't accept a second one); and if your invites earned you extra runs, how many did (so the limit of 10 can't start over). This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
       <li><strong>In your browser:</strong> clear site data for <code>internscout.org</code> (and for <code>bpmcginley.github.io</code>, the address InternScout used before September 2026, if you visited it then). In Chrome, click the icon left of the address bar, then <em>Site settings</em>, then <em>Delete data</em>. This removes your dashboard profile and saved statuses.</li>
       <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li>
       <!-- Delete my data only reaches the Worker, and the weekly email's list lives at Buttondown. -->

@@ -116,8 +116,11 @@ The student's own invite link, made on first ask:
 { "code": "k7m2qpxa", "link": "https://internscout.org/?ref=k7m2qpxa", "rewarded": 1, "max": 10,
   "bonus": { "autofill": 3 }, "left": { "autofill": 3 } }
 ```
-`rewarded` is how many classmates have earned them credit (at most `max`); `left` is their unused
-invite units. The code is random and says nothing about the student.
+<!-- was: `rewarded` is how many classmates have earned them credit (at most `max`); `left` is their unused
+invite units. The code is random and says nothing about the student. -->
+`rewarded` is how many classmates have earned them credit, ever (at most `max`; the `inviters` count,
+which `DELETE /me` keeps, so deleting and signing in again shows the same number and a new code);
+`left` is their unused invite units. The code is random and says nothing about the student.
 
 ### `POST /invite/claim` (auth)
 Body `{ "code": "k7m2qpxa" }`, sent by the dashboard once a student who arrived on `?ref=` signs in.
@@ -128,11 +131,22 @@ under the account's spend ceiling and both budget stops. Refusals: `400 bad_invi
 (not a code), `400 own_invite`, `403 edu_only` (the claimer isn't a school .edu account),
 `409 not_new` (the account was first seen more than `REFERRAL.windowDays` ago), `409 already_claimed`
 (one invite per account, ever).
+<!-- Added 2026-09-25: the claim and the grants used to be two separate writes. -->
+The claim and both grants are one D1 batch (one transaction), so a failure part-way leaves nothing
+recorded and the claim can simply be sent again. An account that existed before invites did (2026-09-24)
+is dated by `schema.sql`'s backfill from its earliest usage month, states or plan, so it is not `new`.
 
 ### `DELETE /me` (auth)
-Deletes this user's demand and plan rows, every usage, run and spend row from earlier months, and
+<!-- was: Deletes this user's demand and plan rows, every usage, run and spend row from earlier months, and
 their invite code, invite units and first-seen date. Their name comes off every invite record; their
 own record of joining through an invite stays, without the inviter, so they can't claim a second one.
+Returns `{ "ok": true }`. -->
+Deletes this user's demand and plan rows, every usage, run and spend row from earlier months, and
+their invite code and invite units. Their name comes off every invite record. Three invite rows stay,
+each a hashed ID with a date or a number, because each is what stops deleting and signing in again
+from resetting a rule: their own record of joining through an invite (without the inviter), so they
+can't claim a second one; their first-seen date (`accounts`), so an old account can't claim as new;
+and their lifetime count of rewarded invites (`inviters`), so an inviter at `max` can't earn 10 more.
 Returns `{ "ok": true }`.
 
 This month's usage, run, spend and rate rows stay until the month ends: they are a hashed ID and
