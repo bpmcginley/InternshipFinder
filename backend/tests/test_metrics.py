@@ -67,3 +67,28 @@ def test_store_listing_numbers_read_from_the_page_and_absent_until_shown():
     # A page that isn't a listing (a consent page, new markup) is a problem to report, not "no users".
     with pytest.raises(ValueError):
         metrics.store_stats("<html>Before you continue to Google</html>")
+
+
+def test_hourly_snapshots_thin_to_one_a_day_and_expire():
+    """Run hourly, the snapshot table keeps every run from the last two days, the day's last run
+    before that, and nothing past 120 days (it used to keep only the newest 120 rows)."""
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+    now = datetime(2026, 9, 25, 15, 23, tzinfo=timezone.utc)
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE metrics_snapshot (taken TEXT PRIMARY KEY, data TEXT NOT NULL)")
+    t = now - timedelta(days=130)
+    while t <= now:
+        db.execute("INSERT INTO metrics_snapshot VALUES (?, '{}')", [t.strftime("%Y-%m-%dT%H:%M:%SZ")])
+        t += timedelta(hours=1)
+    for sql, params in metrics.prune_sql(now):
+        db.execute(sql, params)
+    taken = [r[0] for r in db.execute("SELECT taken FROM metrics_snapshot ORDER BY taken")]
+    cut = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    recent = [x for x in taken if x >= cut]
+    older = [x for x in taken if x < cut]
+    assert len(recent) == 49                                   # every hourly run of the last 48 hours
+    assert len({x[:10] for x in older}) == len(older)          # at most one per day before that
+    assert all(x.endswith("T23:23:00Z") for x in older[:-1])   # and it is the day's last run
+    assert older[0] >= (now - timedelta(days=120)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert taken[-1] == now.strftime("%Y-%m-%dT%H:%M:%SZ")     # the newest, which the dashboard reads

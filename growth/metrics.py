@@ -1,7 +1,9 @@
-"""Daily numbers for the private analytics dashboard, stored in the app's own database (D1).
+"""Numbers for the private analytics dashboard, stored in the app's own database (D1).
 
-Cloudflare Web Analytics has no connector a dashboard page can call, so once a day this reads it
+Cloudflare Web Analytics has no connector a dashboard page can call, so every hour this reads it
 (and Bluesky and the listings data) and writes two tables in the internscout D1 database:
+(was: "once a day". Each run rewrites the last 30 days through the current hour, today's partial
+day included, so running hourly keeps the dashboard within the hour at no extra cost.)
 
   metrics_daily     one row per day for the last 30 days: visits, and how many came in through a
                     landing page, from a search engine, from social sites, or directly
@@ -186,6 +188,23 @@ def d1(token: str, sql: str, params: list | None = None) -> None:
         raise RuntimeError("D1: " + json.dumps(r.get("errors"))[:300])
 
 
+# Every snapshot from the last KEEP_ALL_DAYS, then the day's last one for KEEP_DAYS, then nothing.
+KEEP_ALL_DAYS = 2
+KEEP_DAYS = 120
+
+
+def prune_sql(now: datetime) -> list[tuple[str, list]]:
+    """The statements that thin metrics_snapshot after a run. `taken` is an ISO timestamp, so a
+    string comparison orders it and its first 10 characters are the UTC day."""
+    iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
+    return [
+        ("DELETE FROM metrics_snapshot WHERE taken < ? AND taken NOT IN "
+         "(SELECT MAX(taken) FROM metrics_snapshot GROUP BY substr(taken, 1, 10))",
+         [iso(now - timedelta(days=KEEP_ALL_DAYS))]),
+        ("DELETE FROM metrics_snapshot WHERE taken < ?", [iso(now - timedelta(days=KEEP_DAYS))]),
+    ]
+
+
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     site_dir = args[0] if args else "docs"
@@ -221,9 +240,11 @@ def main(argv: list[str]) -> int:
                       "VALUES (?, ?, ?, ?, ?, ?, ?)",
                [row["day"], row["visits"], row["landing"], row["search"], row["social"], row["direct"], snap["taken"]])
         d1(token, "INSERT OR REPLACE INTO metrics_snapshot (taken, data) VALUES (?, ?)", [snap["taken"], json.dumps(snap)])
-        # One snapshot a day is plenty; keep the last 120.
-        d1(token, "DELETE FROM metrics_snapshot WHERE taken NOT IN "
-                  "(SELECT taken FROM metrics_snapshot ORDER BY taken DESC LIMIT 120)")
+        # was: keep the last 120 snapshots, which was 120 days at one run a day but only five days at
+        # one an hour. The dashboard reads the newest snapshot only; the older ones are the history
+        # (store users, Bluesky followers, listings over time), so thin them rather than drop them.
+        for sql, params in prune_sql(now):
+            d1(token, sql, params)
     except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as e:
         detail = e.read().decode("utf-8", "replace")[:300] if isinstance(e, urllib.error.HTTPError) else str(e)
         print(f"[metrics] write failed: {detail}")
