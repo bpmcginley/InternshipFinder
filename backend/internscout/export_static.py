@@ -17,7 +17,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from .db import SessionLocal, init_db
 from .models import Listing, Application
-from .seo_pages import baseline_day
+from .seo_pages import baseline_day, placeholder_pay
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, stage_of, years_of
@@ -120,7 +120,10 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
 def _listing_dict(row: Listing) -> dict:
     regions = _regions(row)
     ins = extract(row.description) if row.status == "open" else None
-    if ins is not None and "pay" not in ins and row.salary:
+    # A placeholder salary ("$0.00 /Yr", "$0.00 - $999.99 Hour") is a board with no pay to show, not
+    # a paid role (seo_pages.placeholder_pay); the dashboard's pay badge reads this flag.
+    if ins is not None and "pay" not in ins and row.salary and not placeholder_pay(row.salary):
+        # was: if ins is not None and "pay" not in ins and row.salary:
         ins["pay"] = "paid"
     return {
         # Not row.id: the database is rebuilt every run, so that was the insert order.
@@ -304,15 +307,27 @@ def carry_first_seen(listings: list[dict], out_dir: str, today=None, prev=None) 
         if seen:
             x["first_seen"] = seen
             carried += 1
-    # New means what the landing pages mean by it (seo_pages.fresh): found in the last week, not an
-    # old posting a scan only just reached, and not one already open on the day first_seen began
-    # (2026-09-18), which marked every listing on the site as new.
+    mark_new(listings, today)
+    return carried
+
+
+def mark_new(listings: list[dict], today=None) -> None:
+    """Set is_new on every listing.
+
+    New means what the landing pages mean by it (seo_pages.fresh): found in the last week, not an
+    old posting a scan only just reached, and not one already open on the day first_seen began
+    (2026-09-18), which marked every listing on the site as new.
+
+    export() calls this again after carry_open_boards and carry_search_finds: the rows they carry
+    over come from the last export with the is_new that export gave them, so a role new a week ago
+    kept its New badge for as long as its board kept failing to answer.
+    """
+    today = today or datetime.now(timezone.utc).date()
     baseline = baseline_day(listings)
     for x in listings:
         x["is_new"] = (_seen_within(x.get("first_seen"), today, NEW_DAYS)
                        and not (baseline and str(x.get("first_seen") or "")[:10] <= baseline)
                        and (not x.get("posted_at") or _seen_within(x["posted_at"], today, 2 * NEW_DAYS)))
-    return carried
 
 
 def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
@@ -426,6 +441,9 @@ def export(out_dir: str) -> dict:
         carried = carry_first_seen(listings, out_dir, prev=prev)
         held = carry_open_boards(listings, out_dir, prev=prev)
         held += carry_search_finds(listings, out_dir, prev=prev)
+        # Again, now the carried rows are in: they came with the is_new the last export gave them.
+        # Dated from generated_at, the "today" seo_pages.fresh uses for /internships/new/.
+        mark_new(listings, datetime.fromisoformat(generated_at).date())
         stats = {
             "total": len(listings),
             "open": sum(1 for x in listings if x["status"] == "open"),

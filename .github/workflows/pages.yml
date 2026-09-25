@@ -26,13 +26,18 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true      # a newer deploy already includes everything an older one would
+  # Queued, not cancelled (was: true): a newer deploy does include everything an older one would, but
+  # cancelling a run that is inside deploy-pages can leave the Pages deployment half-made, and
+  # GitHub's own Pages starter workflow sets false for that reason. A queued run waits a few minutes.
+  cancel-in-progress: false
 
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      pages: ${{ steps.pages.outcome }}     # success or failure: whether the landing pages were built
     steps:
       - name: Check that Pages deploys from this workflow
         env:
@@ -59,7 +64,17 @@ jobs:
         run: curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
 
       - name: Build the site and its landing pages
+        id: pages
         # seo_pages uses only the standard library, so nothing is installed.
+        # This workflow is the site's only deploy path, so a build that fails here must not also stop
+        # the dashboard from deploying: the next step deploys docs/ as it is, and the
+        # pages-build-failed job at the end leaves the run red so the failure is still seen. (The
+        # build itself skips and counts a malformed listing rather than failing on it.)
+        continue-on-error: true
+        env:
+          # A backstop: seo_pages breaks every tie itself so two builds of the same data are the same
+          # bytes, and a fixed hash seed keeps any tie it missed from moving between deploys.
+          PYTHONHASHSEED: "0"
         run: |
           cp -r docs _site
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
@@ -69,6 +84,17 @@ jobs:
           cp _site/sitemap.xml sitemaps/new.xml
           if [ -f live-sitemap.xml ]; then cp live-sitemap.xml sitemaps/old.xml; fi
 
+      - name: Fall back to the dashboard alone
+        # Whatever the failed build left in _site is thrown away, so nothing half-written is published.
+        # There is no sitemap.xml or robots.txt in docs/, so none is deployed; the next good deploy
+        # judges every page as new (see "Save the sitemap"), which costs only the keep_at grace.
+        if: steps.pages.outcome == 'failure'
+        run: |
+          rm -rf _site sitemaps
+          cp -r docs _site
+          rm -f _site/CNAME
+          echo "::error::The landing pages did not build; deploying docs/ without them. See the step above."
+
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
@@ -76,6 +102,7 @@ jobs:
           path: _site
 
       - uses: actions/upload-artifact@v7
+        if: steps.pages.outcome == 'success'   # no pages, no sitemap: notify is skipped
         with:
           name: sitemaps
           path: sitemaps
@@ -94,8 +121,11 @@ jobs:
 
   # Bing, and the engines that share its index (DuckDuckGo, Yahoo, ChatGPT search), recrawl the pages
   # this deploy added, removed or changed within hours (growth/indexnow.py). Google reads the sitemap.
+  # Not after a fallback deploy: its "new" sitemap would be none at all, and IndexNow would be told
+  # every landing page was removed.
   notify:
-    needs: deploy
+    needs: [build, deploy]      # was: needs: deploy
+    if: needs.build.outputs.pages == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -108,3 +138,15 @@ jobs:
           path: sitemaps
       - name: Tell IndexNow what changed
         run: python3 growth/indexnow.py sitemaps/old.xml sitemaps/new.xml --submit
+
+  # The fallback above deploys and then would let the run finish green. This job is what keeps a
+  # failed landing-page build from going unnoticed: the site is up, and the run still says it broke.
+  pages-build-failed:
+    needs: [build, deploy]
+    if: ${{ !cancelled() && needs.build.outputs.pages == 'failure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - run: |
+          echo "::error::The landing pages under /internships/ failed to build, so this deploy published the dashboard without them. See the build job's 'Build the site and its landing pages' step."
+          exit 1

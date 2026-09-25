@@ -384,3 +384,36 @@ def test_what_the_daily_search_found_outlives_the_runs_that_do_not_search(tmp_pa
     # found again by today's search: not added twice
     listings = [dict(found, last_seen="2026-09-24T02:48:00+00:00")]
     assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 24)) == 0
+
+
+def test_rows_carried_from_the_last_export_are_judged_new_again(tmp_path, monkeypatch):
+    # carry_first_seen set is_new before carry_open_boards and carry_search_finds added their rows, so
+    # a carried row kept the flag the last export gave it: a role new a week ago stayed "New" for as
+    # long as its board kept failing to answer.
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from internscout import export_static
+
+    class NoRows:                     # this run fetched nothing from the board: it collapsed
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def scalars(self, query):
+            return SimpleNamespace(all=lambda: [])
+
+    monkeypatch.setattr(export_static, "SessionLocal", NoRows)
+    monkeypatch.setattr(export_static, "init_db", lambda: None)
+    now = datetime.now(timezone.utc)
+    stamp = lambda days: (now - timedelta(days=days)).isoformat()      # noqa: E731
+    prev = [_prev(id=str(i), apply_url=f"https://x/{i}", is_new=True, field_tags=["mechanical"],
+                  first_seen=stamp(10 if i else 2), last_seen=stamp(0), posted_at=None) for i in range(4)]
+    _write_prev(tmp_path, prev)
+    stats = export_static.export(str(tmp_path))
+    assert stats["held"] == 4
+    rows = {x["id"]: x for x in json.loads((tmp_path / "listings" / "MA.json").read_text(encoding="utf-8"))}
+    assert rows["0"]["is_new"] is True                       # found two days ago: still new
+    assert [rows[str(i)]["is_new"] for i in (1, 2, 3)] == [False] * 3
+    assert stats["new"] == 1
