@@ -104,7 +104,8 @@ def test_sitemap_and_robots(tmp_path):
     assert "<loc>https://internscout.org/privacy</loc>" in sitemap
     robots = open(os.path.join(site, "robots.txt"), encoding="utf-8").read()
     assert "Sitemap: https://internscout.org/sitemap.xml" in robots
-    assert "Disallow: /data/" in robots
+    # The dashboard at / reads ./data/ in the browser; a crawler barred from it sees an empty shell.
+    assert "Disallow" not in robots          # was: assert "Disallow: /data/" in robots
     assert os.path.exists(os.path.join(site, "internships", "massachusetts", "index.html"))
 
 
@@ -124,7 +125,9 @@ def test_field_and_state_slugs_never_collide():
 
 
 def test_dashboard_links_open_on_the_page_topic(tmp_path):
-    site = _site(tmp_path, {"MA": [_row(i) for i in range(15)] + [_row(15, tags=("aerospace",))]},
+    # Three aerospace roles, so the major's page shows enough the mechanical page does not to be a
+    # page of its own (seo_pages.same_list); with one it would be folded into the field page.
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(15)] + [_row(15 + i, tags=("aerospace",)) for i in range(3)]},
                  majors=[{"name": "Mechanical Engineering", "tags": ["mechanical", "aerospace", "other"], "level": "undergrad"}])
     pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
     assert 'href="/?field=mechanical"' in pages["/internships/mechanical-engineering/"]
@@ -289,7 +292,7 @@ def test_new_page_links_to_new_only_and_feeds_every_new_role(tmp_path):
     site = _site(tmp_path, {"MA": rows})
     pages = seo_pages.build(site)
     new = next(p for p in pages if p["path"] == "/internships/new/")
-    assert 'href="/?new=1"' in new["html"] and new["feed_limit"] is None
+    assert 'href="/?new=1"' in new["html"] and new["feed_limit"] == seo_pages.NEW_FEED   # was: is None
     from internscout import feeds
     seo_pages.write(site, pages)
     feeds.write_all(site, pages)
@@ -325,3 +328,129 @@ def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp
     assert 'href="/?paid=1"' in pages["/internships/paid/"]["html"]
     assert all(f'href="{p}"' in pages["/internships/"]["html"]
                for p in ("/internships/summer-2027/", "/internships/paid/", "/internships/for-sophomores/"))
+
+
+def _build_in_new_python(site: str, seed: int) -> dict[str, bytes]:
+    """Build the site in a fresh interpreter with the given hash seed; every file it holds, as bytes."""
+    import subprocess
+    import sys
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    subprocess.run([sys.executable, "-m", "internscout.seo_pages", site], cwd=backend, check=True,
+                   capture_output=True, env=dict(os.environ, PYTHONHASHSEED=str(seed)))
+    out = {}
+    for folder, _, names in os.walk(site):
+        for n in names:
+            path = os.path.join(folder, n)
+            with open(path, "rb") as f:
+                out[os.path.relpath(path, site)] = f.read()
+    return out
+
+
+def test_two_builds_are_identical(tmp_path):
+    # Two deploys of the same data wrote ~150 different index.html and every feed.xml: counts over
+    # sets tied in hash order (which Python changes per run), ties in sorts kept arrival order, and
+    # feeds and the 404 page were dated by the clock. Every tie here is deliberate: one employer's
+    # roles spread evenly over four fields and three states, all posted and found at the same moment.
+    import shutil
+    tags = ("mechanical", "civil", "electrical", "aerospace")
+    rows = [_row(i, tags=tags, company_name="Tie Co" if i < 12 else f"Co {i % 7}",
+                 posted_at="2026-09-20T00:00:00", first_seen="2026-09-21T00:00:00") for i in range(60)]
+    base = _site(tmp_path / "base", {"MA": rows, "NY": rows[:30], "CT": rows[:30], "remote": rows[30:]},
+                 majors=[{"name": "Engineering", "tags": list(tags), "level": "undergrad"}])
+    builds = []
+    for seed in (1, 2, 3):
+        site = str(tmp_path / f"b{seed}")
+        shutil.copytree(base, site)
+        builds.append(_build_in_new_python(site, seed))
+    assert any(p.endswith("feed.xml") for p in builds[0]) and len(builds[0]) > 20
+    # Builds a second apart would differ by a clock date; three quick ones may not, so check the
+    # dates themselves: every one is the data's generated_at (_site: 2026-09-23 10:00 UTC).
+    feed = builds[0][os.path.join("internships", "massachusetts", "feed.xml")].decode()
+    assert "<lastBuildDate>Wed, 23 Sep 2026 10:00:00 +0000</lastBuildDate>" in feed
+    assert b"Updated September 23, 2026." in builds[0]["404.html"]
+    for other in builds[1:]:
+        assert other.keys() == builds[0].keys()
+        assert [p for p in builds[0] if other[p] != builds[0][p]] == []
+
+
+def test_a_major_showing_what_a_field_page_shows_is_folded_into_it(tmp_path):
+    # /internships/health/, /for/nursing-majors/ and /for/nutrition-majors/ showed the same 40 postings
+    # as three canonical pages: the majors pulled in a few older roles that never made the first 40,
+    # so their full lists differed and the exact-match fold never fired.
+    health = [_row(i, tags=("health",)) for i in range(45)]
+    older = [_row(100 + i, tags=("nutrition_x",), posted_at="2025-01-01T00:00:00") for i in range(3)]
+    newer = [_row(200 + i, tags=("classics_x",), posted_at="2026-09-24T00:00:00") for i in range(4)]
+    sport = [_row(300 + i, tags=("sport_x",), posted_at="2026-09-24T00:00:00") for i in range(5)]
+    site = _site(tmp_path, {"MA": health + older + newer + sport}, majors=[
+        {"name": "Nutrition", "tags": ["health", "nutrition_x"], "level": "undergrad"},   # same 40 shown
+        {"name": "Classics", "tags": ["health", "classics_x"], "level": "undergrad"},     # 36 of 40 (90%)
+        {"name": "Sport", "tags": ["health", "sport_x"], "level": "undergrad"}])          # 35 of 40
+    pages = seo_pages.build(site)
+    by_path = {p["path"]: p["html"] for p in pages}
+    assert "/internships/for/nutrition-majors/" not in by_path
+    assert "/internships/for/classics-majors/" not in by_path
+    assert "/internships/for/sport-majors/" in by_path
+    # The merged majors link to the page that shows their roles, and that page names them.
+    assert "The page for Classics and Nutrition majors." in by_path["/internships/health/"]
+    hub = by_path["/internships/for/"]
+    assert hub.count('href="/internships/health/"') == 2 and 'href="/internships/for/sport-majors/"' in hub
+    seo_pages.write(site, pages)
+    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    assert "nutrition-majors" not in sitemap and "classics-majors" not in sitemap and "sport-majors" in sitemap
+    # A page is never folded into a smaller one: the sport_x field page shows 5 of Sport's 40.
+    assert seo_pages.same_list(frozenset("abcde"), frozenset("abcdefghij")) is False
+    assert seo_pages.same_list(frozenset("abcdefghij"), frozenset("abcdefghi")) is True
+
+
+def test_json_ld_cannot_be_broken_out_of(tmp_path):
+    # Only "</" was escaped, and "<!--<script>" in an employer's name leaves the HTML parser in a state
+    # where the real </script> no longer closes the block.
+    evil = 'Evil <!--<script>alert(1)</script> & "Co"'
+    rows = [_row(i, company_name=evil) for i in range(12)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    html = next(h for p, h in pages.items() if p.startswith("/internships/at/") and p != "/internships/at/")
+    start = html.index('<script type="application/ld+json">') + len('<script type="application/ld+json">')
+    block = html[start:html.index("</script>", start)]
+    assert not set("<>&") & set(block)
+    assert json.loads(block)["itemListElement"][-1]["name"] == evil
+
+
+def test_a_placeholder_salary_is_not_pay(tmp_path):
+    # 22 open listings said "$0.00 - $999.99 Hour" or "$0.00 /Yr" and were counted, and shown, as paid.
+    for salary in ("$0.00 /Yr", "$0.00 - $999.99 Hour", "0", "$0 - $0"):
+        x = {"salary": salary, "insights": {"pay": "paid"}}
+        assert not seo_pages.is_paid(x) and seo_pages.pay_text(x) == "", salary
+    for salary in ("$25/hr", "$20.00 - $30.00 Hour", "$85,000 /Yr"):
+        assert seo_pages.is_paid({"salary": salary}) and seo_pages.pay_text({"salary": salary}) == salary
+    assert seo_pages.pay_text({"salary": None, "insights": {"pay": "paid"}}) == "Paid"
+    rows = [_row(i, salary="$0.00 - $999.99 Hour") for i in range(5)]
+    page = next(p for p in seo_pages.build(_site(tmp_path, {"MA": rows})) if p["path"] == "/internships/massachusetts/")
+    assert "999.99" not in page["html"] and "list pay" not in page["html"]
+
+
+def test_a_malformed_listing_is_skipped_not_fatal(tmp_path, capsys):
+    # pages.yml deploys only through this build, so one bad row stopped the whole site from deploying.
+    good = [_row(i) for i in range(5)] + [_row(5, regions=[{"state": "MA", "kind": "x"}])]   # no "loc": fine
+    bad = [_row(10, regions=[{"kind": "x"}]),        # a region naming nothing
+           _row(11, company_name=42),
+           _row(12, field_tags="mechanical"),
+           "not a listing"]
+    long_a, long_b = "A" * 150 + " One", "A" * 150 + " Two"                          # past any sane folder name
+    rows = good + bad + [_row(20 + i, company_name=long_a) for i in range(10)] + [_row(40 + i, company_name=long_b) for i in range(10)]
+    site = _site(tmp_path, {"MA": rows})
+    pages = seo_pages.build(site)
+    assert "skipped 4 malformed" in capsys.readouterr().err
+    ma = next(p for p in pages if p["path"] == "/internships/massachusetts/")
+    assert len(ma["items"]) == 26 and "Town 5" not in ma["html"]
+    employer = sorted(p["path"] for p in pages if p["path"].startswith("/internships/at/") and p["path"] != "/internships/at/")
+    assert len(employer) == 2 and all(len(p.split("/")[3]) <= seo_pages.SLUG_MAX for p in employer)
+    seo_pages.write(site, pages)                    # no OSError from a 300-character folder name
+    assert seo_pages.slugify("x" * 200) == seo_pages.slugify("x" * 200) != seo_pages.slugify("x" * 201)
+
+
+def test_new_means_the_same_calendar_week_the_dashboard_counts():
+    # fresh() used a rolling 7 x 24 hours and is_new calendar days, so the two counts differed.
+    from datetime import datetime, timezone
+    now = datetime(2026, 9, 28, 11, tzinfo=timezone.utc)
+    assert not seo_pages.fresh({"first_seen": "2026-09-21T20:00:00+00:00"}, now, "2026-09-18")   # 7 days back
+    assert seo_pages.fresh({"first_seen": "2026-09-22T01:00:00+00:00"}, now, "2026-09-18")       # 6 days back

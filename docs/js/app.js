@@ -688,25 +688,41 @@
       if (auth.token) check(4);
     }, [auth.token]);
 
+    // was: // Claim a waiting invite once the student is signed in and the Worker offers invites (its /config
+    // was: // says what one is worth). Refusals are final, so the code is dropped, except "use a school
+    // was: // account": signing in again with one can still claim it. Unreachable: try again next load.
     // Claim a waiting invite once the student is signed in and the Worker offers invites (its /config
-    // says what one is worth). Refusals are final, so the code is dropped, except "use a school
-    // account": signing in again with one can still claim it. Unreachable: try again next load.
+    // says what one is worth). Only answers about the invite itself are final and drop the code:
+    // success, bad_invite, own_invite, not_new, already_claimed. "Use a school account" keeps it for
+    // a later .edu sign-in. Anything else (unreachable, 5xx, 429, a 401 while Google rotates its
+    // keys, an error this page doesn't know) keeps it and tries once more per sign-in or session.
+    const INVITE_FINAL = ["bad_invite", "own_invite", "not_new", "already_claimed"];
     const inviteOffer = auth.cfg && auth.cfg.invite;
     const inviteWords = inviteOffer ? Object.entries(inviteOffer.bonus || {}).map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k] || k)}`).join(" and ") : "";
     useEffect(() => {
       if (!auth.token || !invited || !inviteOffer) return;
       // This account was already told "use a school account" this session, and the Worker's answer
       // can't change while it stays signed in. A different account (another sub) still tries.
-      const sub = (IS.decodeJwt(auth.token) || {}).sub || "";
+      // was: const sub = (IS.decodeJwt(auth.token) || {}).sub || "";
+      const claims = IS.decodeJwt(auth.token) || {}, sub = claims.sub || "";
       if (sub && IS.ss.get(IS.INVITE_EDU_KEY) === sub) return;
+      // A passing failure already happened for this very sign-in (same sub and issue time) and code
+      // this session: page reloads reuse the token, so asking again would only repeat it. A new
+      // sign-in (new iat, e.g. after the 401) or a new session gets one more try.
+      const attempt = `${sub}|${claims.iat || ""}|${invited}`;
+      if (IS.ss.get(IS.INVITE_TRIED_KEY) === attempt) return;
       IS.claimInvite(auth.token, invited).then(r => {
-        if (!r) return;
+        // was: if (!r) return;
         // was: if (r.error === "edu_only") { setNote(r.message); return; }
         // The code is kept for a later school-account sign-in, so the same personal account was asked
         // again and shown the same refusal on every page load. Remembering its sub for the session
         // shows the message once; the code still waits for a .edu sign-in.
-        if (r.error === "edu_only") { if (sub) IS.ss.set(IS.INVITE_EDU_KEY, sub); setNote(r.message); return; }
-        IS.ls.del(IS.INVITE_KEY); setInvited(null);
+        if (r && r.error === "edu_only") { if (sub) IS.ss.set(IS.INVITE_EDU_KEY, sub); setNote(r.message); return; }
+        // was: IS.ls.del(IS.INVITE_KEY); setInvited(null);
+        // Every non-edu error used to drop the code, so a 401 during a Google key rotation (claimInvite
+        // passed any status < 500 through) lost the invite for good. Only final answers drop it now.
+        if (!r || !(r.ok || INVITE_FINAL.includes(r.error))) { IS.ss.set(IS.INVITE_TRIED_KEY, attempt); return; }
+        IS.ss.del(IS.INVITE_TRIED_KEY); IS.ls.del(IS.INVITE_KEY); setInvited(null);
         if (r.ok) {
           setNote(`Invite accepted: you ${r.inviter_rewarded ? "and your classmate each got" : "got"} ${inviteWords}. They're used after your monthly allowance and don't expire.`);
           IS.fetchMe(auth.token).then(m => { if (m) setMe(m); });
@@ -720,7 +736,11 @@
       if (r) setInvite(r); else setNote("Couldn't load your invite link. Try again in a minute.");
     }
     async function shareInvite() {
-      const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
+      // was: const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
+      // The Worker gives the .edu tier to any verified school email (Google, or a school Microsoft
+      // account whose domain is verified), so eligibility is worded by email, not provider. Google is
+      // still the recommended button: many school Microsoft tenants block unverified publishers.
+      const text = `InternScout finds internships for your major. Sign in through my link with your school (.edu) email and we both get ${inviteWords}.`;
       if (navigator.share) {
         try { await navigator.share({ title: "InternScout", text, url: invite.link }); setInviteNote("Sent"); return; }
         catch (e) { if (e && e.name === "AbortError") return; }
@@ -1007,7 +1027,8 @@
           auth.token && me && me.allowance && h("span", { className: "busy", title: IS.allowanceText(me) },
             me.paused ? "AI paused this month" : `${IS.leftOf(me, "autofill")} Auto-Apply · ${IS.leftOf(me, "resume_tailor")} resumes left${me.plan && me.plan !== "free" ? ` (${(IS.PLAN_LABELS[me.plan] || me.plan).toLowerCase()})` : me.tier === "edu" ? " (.edu)" : ""}`),
           auth.token && inviteOffer && h("button", { type: "button", className: "btn quiet", onClick: openInvite, "aria-expanded": !!invite,
-            title: `Share your link. Each classmate who signs in through it with a school Google account gets you both ${inviteWords}.` }, "Invite classmates"),
+            // was: title: `Share your link. Each classmate who signs in through it with a school Google account gets you both ${inviteWords}.` }, "Invite classmates"),
+            title: `Share your link. Each classmate who signs in through it with a school (.edu) email gets you both ${inviteWords}.` }, "Invite classmates"),
           auth.token && upgrades.map(pl => h("button", { key: pl.plan, type: "button", className: "btn quiet", onClick: () => billing("checkout", pl.plan), disabled: !!busy, title: upgradeTitle(pl) }, `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`)),
           auth.token && me && me.can_manage && h("button", { type: "button", className: "btn quiet", onClick: () => billing("portal"), disabled: !!busy, title: "Change your card or cancel, on Stripe's own page." }, "Manage plan"),
           info.installed && h("button", { type: "button", className: "btn quiet", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
@@ -1051,7 +1072,8 @@
       note && h("div", { className: "notice", role: "status" }, note),
       // Arrived through a classmate's link, not signed in yet: say what signing in gets them.
       invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
-        `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
+        // was: `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
+        `Sign in with your school (.edu) email (Google works for most schools) and you'll both get ${inviteWords}. Searching needs no account.`),
       // The invite link hides while the invite panel below is already open; the plan buttons are in the header.
       outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
         `They come back on ${resetDay}. `,
@@ -1061,7 +1083,8 @@
         `${invite ? "Share your invite link below" : `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates`}${upgrades.length ? ". Or pick a plan above" : ""}.`),
       auth.token && invite && h("div", { className: "notice invite" },
         h("b", null, "Invite classmates. "),
-        `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
+        // was: `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
+        `Each classmate who signs in through your link with a school (.edu) email in their first week gets ${inviteWords}, and so do you`
           + ` (for up to ${invite.max} classmates; ${invite.rewarded} so far).`,
         h("div", { className: "invite-row" },
           h("input", { id: "invite-link", type: "text", readOnly: true, value: invite.link, "aria-label": "Your invite link", onFocus: e => e.target.select() }),

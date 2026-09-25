@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -66,6 +68,30 @@ query($account: string!, $site: string!, $start: Time!, $end: Time!) {
 """
 
 
+# A referrer host needs this many visits in the week to be named. The analytics beacon's token is in
+# every page, so anyone can send pageloads with a made-up referrer (or path); a handful of fake ones
+# should not be enough to put a name in the report.
+MIN_REF_VISITS = 3
+MAX_SHOWN = 120     # characters of one path or host
+
+
+def inert(value, empty: str = "(none)") -> str:
+    """A value from the analytics (a page path, a referrer host) as inline code that GitHub renders as
+    plain text: no link, no @mention, no #issue reference, no HTML, no table cell break.
+
+    The report is a public issue, and both values come from visitors' browsers, so they are whatever
+    a sender makes them. Inside a code span Markdown turns nothing into a link or a mention; the only
+    ways out of one are a backtick, a line break, or (in a table) a pipe, and all of those are removed
+    first, with backslashes and every other control or formatting character (bidi overrides among
+    them). Nothing from the analytics is ever written as a link."""
+    text = "".join(ch for ch in str(value or "")
+                   if ch not in "`|\\" and unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp"))
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > MAX_SHOWN:
+        text = text[:MAX_SHOWN - 3] + "..."
+    return f"`{text}`" if text else empty
+
+
 def _post(url: str, body: dict, token: str) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
                                  headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", **UA})
@@ -100,9 +126,18 @@ def visits_section(now: datetime) -> list[str]:
     week, before = total(acct["week"]), total(acct["prev"])
     change = f" ({'+' if week >= before else ''}{week - before} on the week before)" if before else ""
     out += [f"**{week:,} visits**{change}.", "", "| Page | Visits |", "|---|---|"]
-    out += [f"| `{p['dimensions']['requestPath']}` | {p['sum']['visits']:,} |" for p in acct["pages"]]
+    # was: f"| `{p['dimensions']['requestPath']}` | ...": a path with a backtick or pipe in it broke out
+    # of the code span and the table. And the referrer went in as bare text, so a spoofed one could put
+    # a link or an @mention in a public issue. Both are now inert() code spans.
+    out += [f"| {inert(p['dimensions']['requestPath'])} | {p['sum']['visits']:,} |" for p in acct["pages"]]
     out += ["", "| Came from | Visits |", "|---|---|"]
-    out += [f"| {r['dimensions']['refererHost'] or '(direct or unknown)'} | {r['sum']['visits']:,} |" for r in acct["refs"]]
+    # was: every referrer, whatever its count. A host with fewer than MIN_REF_VISITS is left out, but
+    # direct visits (no referrer) are ours to label and always shown.
+    refs = [r for r in acct["refs"] if not r["dimensions"]["refererHost"] or r["sum"]["visits"] >= MIN_REF_VISITS]
+    out += [f"| {inert(r['dimensions']['refererHost']) if r['dimensions']['refererHost'] else '(direct or unknown)'} "
+            f"| {r['sum']['visits']:,} |" for r in refs]
+    if len(refs) < len(acct["refs"]):
+        out += ["", f"Referrers with fewer than {MIN_REF_VISITS} visits are left out."]
     out += ["", "Countries: " + ", ".join(f"{c['dimensions']['countryName']} {c['sum']['visits']:,}"
                                           for c in acct["countries"]), ""]
     # Counted over every landing page, not just the ones in the top-15 table: most search traffic

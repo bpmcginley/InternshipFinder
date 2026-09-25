@@ -231,6 +231,10 @@
          wording as before; only the step numbers and the pointer to the sign-in step are new. -->
     <h2 id="by-hand">Install by hand instead</h2>
     <p>Only if the Web Store route doesn't work for you. The by-hand copy doesn't update itself.</p>
+    <!-- By-hand copies 0.4.2 and older only talk to bpmcginley.github.io, which now redirects to
+         internscout.org, so their dashboard link stopped working without any error. The dashboard's
+         profile and statuses live in the browser per address, so the old ones stay behind. -->
+    <p><strong>Installed by hand before September 22, 2026?</strong> That copy (0.4.2 or older) only works with the old bpmcginley.github.io address, so it no longer connects to the dashboard. Remove it at <code>chrome://extensions</code> and <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">add InternScout from the Chrome Web Store</a> (or load 0.4.3 or newer by hand). Your dashboard profile and saved statuses from the old address don't carry over to internscout.org, so set your profile up again there.</p>
     <ol>
       <li>Open the <a href="https://github.com/bpmcginley/InternshipFinder/releases/latest">latest release</a> on GitHub. Under <strong>Assets</strong>, download <code>internscout-extension-<em>version</em>.zip</code>. Don't pick "Source code".</li>
       <li>Unzip it into a folder you'll keep, like Documents. <strong>Windows:</strong> right-click the zip, then <em>Extract All</em>. <strong>Mac:</strong> double-click the zip. Chrome runs the extension from this folder, so if you delete or move it, the extension stops working.</li>

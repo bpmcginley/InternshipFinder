@@ -38,12 +38,14 @@ def rss(path: str, h1: str, items: list[dict], now: datetime, state: str | None 
     url = sp.SITE + path
     rows = []
     # Newest to InternScout, not newest posting: a reader or bot only wants what it has not seen yet.
-    found = sorted(items, key=lambda x: x.get("first_seen") or "", reverse=True)
+    # Roles found in the same second stay in id order, so the same data makes the same feed.
+    found = sorted(sorted(items, key=lambda x: str(x.get("id"))), key=lambda x: x.get("first_seen") or "", reverse=True)
+    # was: found = sorted(items, key=lambda x: x.get("first_seen") or "", reverse=True)
     for x in found[:limit]:
         bits = [sp.place(x, state)]
         if x.get("term"):
             bits.append(str(x["term"]))
-        pay = str(x["salary"]) if x.get("salary") else ("Paid" if sp.is_paid(x) else "")
+        pay = sp.pay_text(x)      # was: str(x["salary"]) if x.get("salary") else ("Paid" if sp.is_paid(x) else "")
         if pay:
             bits.append(pay)
         rows.append(
@@ -68,9 +70,12 @@ def rss(path: str, h1: str, items: list[dict], now: datetime, state: str | None 
             + "\n</channel>\n</rss>\n")
 
 
-def write_all(site_dir: str, pages: list[dict]) -> int:
-    """feed.xml beside every landing page that lists roles (the hubs have none)."""
-    now = datetime.now(timezone.utc)
+def write_all(site_dir: str, pages: list[dict], now: datetime | None = None) -> int:
+    """feed.xml beside every landing page that lists roles (the hubs have none).
+
+    Dated from the data (seo_pages.GENERATED, set by build), not the clock: lastBuildDate is when a
+    feed's content last changed, and a clock date made every feed a new file on every deploy."""
+    now = now or sp.GENERATED or datetime.now(timezone.utc)     # was: now = datetime.now(timezone.utc)
     n = 0
     for p in pages:
         if p.get("items") is None:

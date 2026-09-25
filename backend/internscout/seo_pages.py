@@ -17,13 +17,14 @@ Run:  python -m internscout.seo_pages <site_dir>
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import os
 import re
 import sys
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 SITE = "https://internscout.org"
@@ -46,6 +47,7 @@ MIN_KIND = 25           # ...and a start term, paid, co-op, research or class-ye
 PER_PAGE = 40           # listings shown on one page; the dashboard has the rest
 NEW_DAYS = 7
 RELATED = 12            # related-page links per section
+NEW_FEED = 100          # items in /internships/new/feed.xml (the other feeds carry feeds.ITEMS)
 TAIL = ", from internships to co-ops and research"     # how a page's opening sentence usually ends
 
 US_STATES = {
@@ -105,8 +107,19 @@ def field_title(tag: str) -> str:
     return FIELD_TITLES.get(tag, (tag.replace("_", " ").title(), None))[0]
 
 
+SLUG_MAX = 80           # longest slug a URL folder gets (see slugify)
+
+
 def slugify(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    """URL-safe words. A job board's company name can run to hundreds of characters, and a folder
+    name past the filesystem's 255 bytes is an OSError that stopped the whole deploy. A long slug is
+    cut to SLUG_MAX and ends in a hash of the whole one, so two long names that share their first 70
+    characters still get two folders, and the same name gets the same folder on every build."""
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    # was: return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    if len(slug) <= SLUG_MAX:
+        return slug
+    return slug[:SLUG_MAX - 9].rstrip("-") + "-" + hashlib.sha1(slug.encode()).hexdigest()[:8]
 
 
 def field_slug(tag: str) -> str:
@@ -127,6 +140,30 @@ def safe_url(url) -> str | None:
 
 # ---------------------------------------------------------------- data
 
+_TEXT = (str, type(None))
+_LIST_FIELDS = ("field_tags", "stage", "years")
+
+
+def well_formed(x) -> bool:
+    """Whether a listing has the shape every page builder reads without checking. pages.yml deploys
+    through this build and nothing else, so one row a job board mangled (a region with no "loc", a
+    company name that is a number, a tag list that is a string) used to stop the whole site from
+    deploying. Such a row is left out and counted instead (load)."""
+    if not isinstance(x, dict) or isinstance(x.get("id"), bool) or not isinstance(x.get("id"), (str, int)):
+        return False
+    if not all(isinstance(x.get(k), _TEXT) for k in ("company_name", "title", "first_seen", "posted_at")):
+        return False
+    if not isinstance(x.get("term"), _TEXT) or not isinstance(x.get("insights"), (dict, type(None))):
+        return False
+    if not all(isinstance(x.get(k) or [], list) and all(isinstance(v, str) for v in x.get(k) or [])
+               for k in _LIST_FIELDS):
+        return False
+    regions = x.get("regions") or []
+    return isinstance(regions, list) and all(
+        isinstance(g, dict) and isinstance(g.get("loc"), _TEXT) and isinstance(g.get("state"), _TEXT)
+        and bool(g.get("loc") or g.get("state")) for g in regions)
+
+
 def load(site_dir: str) -> dict:
     data = os.path.join(site_dir, "data")
     with open(os.path.join(data, "listings", "index.json"), encoding="utf-8") as f:
@@ -134,13 +171,21 @@ def load(site_dir: str) -> dict:
     with open(os.path.join(data, "majors.json"), encoding="utf-8") as f:
         majors = json.load(f)
     by_id: dict[str, dict] = {}
+    bad = 0
     for key, meta in index["files"].items():
         with open(os.path.join(data, meta["file"]), encoding="utf-8") as f:
-            for x in json.load(f):
-                if x.get("status") != "open" or not safe_url(x.get("apply_url")):
-                    continue
-                keep = by_id.setdefault(x["id"], dict(x, keys=set()))
-                keep["keys"].add(key)
+            rows = json.load(f)
+        for x in rows if isinstance(rows, list) else []:
+            if not well_formed(x):
+                bad += 1
+                continue
+            if x.get("status") != "open" or not safe_url(x.get("apply_url")):
+                continue
+            keep = by_id.setdefault(str(x["id"]), dict(x, id=str(x["id"]), keys=set()))
+            # was: keep = by_id.setdefault(x["id"], dict(x, keys=set()))
+            keep["keys"].add(key)
+    if bad:
+        print(f"[seo] warning: skipped {bad} malformed listing rows (see well_formed)", file=sys.stderr)
     listings = list(by_id.values())
     return {"generated_at": index.get("generated_at"), "listings": listings,
             "majors": majors.get("majors", []), "baseline": baseline_day(listings)}
@@ -167,13 +212,51 @@ def _when(stamp) -> datetime | None:
 
 def newest_first(items: list[dict]) -> list[dict]:
     """The dashboard's order (docs/js/app.js, "newer"): dated postings first, newest posting first,
-    then by when a scan found it. first_seen alone would put a 2024 posting found this week on top."""
-    return sorted(items, key=lambda x: (bool(x.get("posted_at")), x.get("posted_at") or "", x.get("first_seen") or ""),
-                  reverse=True)
+    then by when a scan found it. first_seen alone would put a 2024 posting found this week on top.
+    Postings that tie on all three stay in id order, not in whatever order they arrived: which 40 a
+    page shows must be the same on every build of the same data (test_two_builds_are_identical)."""
+    return sorted(sorted(items, key=lambda x: str(x.get("id"))),
+                  key=lambda x: (bool(x.get("posted_at")), x.get("posted_at") or "", x.get("first_seen") or ""),
+                  reverse=True)      # sorted() stays stable under reverse=True, so ties keep id order
+    # was: return sorted(items, key=lambda x: (...), reverse=True)   (ties in arrival order)
+
+
+def top(counts: Counter, n: int | None = None) -> list:
+    """Counter.most_common, but ties broken by the key itself. most_common breaks them by insertion
+    order, and counting over a set inserts in hash order, which Python changes on every run: one
+    employer page said "mostly in nonprofit, marketing and communications" on one build and
+    "... communications and marketing" on the next."""
+    return [k for k, _ in sorted(counts.items(), key=lambda kv: (-kv[1], str(kv[0])))[:n]]
+
+
+# A board with no pay to show still fills the field: "$0.00 /Yr", "$0.00 - $999.99 Hour" (22 open
+# listings on 2026-09-25). A figure that is all zeros, or a range that starts at zero, says nothing.
+_AMOUNT = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def placeholder_pay(salary) -> bool:
+    nums = [float(n.replace(",", "")) for n in _AMOUNT.findall(str(salary or ""))]
+    return bool(nums) and (nums[0] == 0 or not any(nums))
+
+
+def real_salary(x: dict) -> str | None:
+    """The listing's salary text, unless it is a placeholder (placeholder_pay)."""
+    s = x.get("salary")
+    return str(s) if s and not placeholder_pay(s) else None
 
 
 def is_paid(x: dict) -> bool:
+    # A placeholder salary is not pay. export_static used to turn one into insights.pay "paid" as
+    # well, and an export made before that fix still carries it, so a placeholder settles it.
+    if x.get("salary") and placeholder_pay(x["salary"]):
+        return False
     return bool(x.get("salary")) or ((x.get("insights") or {}).get("pay") == "paid")
+    # was: return bool(x.get("salary")) or ((x.get("insights") or {}).get("pay") == "paid")
+
+
+def pay_text(x: dict) -> str:
+    """What a listing row says about pay: the real salary, else "Paid" when the posting says so."""
+    return real_salary(x) or ("Paid" if is_paid(x) else "")
 
 
 def place(x: dict, state: str | None = None) -> str:
@@ -188,7 +271,8 @@ def place(x: dict, state: str | None = None) -> str:
         lead = next((g for g in regions if g.get("state") == state), regions[0])
     else:
         lead = regions[0]
-    shown = "Remote" if lead.get("state") == "Remote" else lead["loc"]
+    shown = "Remote" if lead.get("state") == "Remote" else (lead.get("loc") or lead.get("state") or "United States")
+    # was: shown = "Remote" if lead.get("state") == "Remote" else lead["loc"]
     return shown + (f" +{len(regions) - 1}" if len(regions) > 1 else "")
 
 
@@ -199,12 +283,22 @@ HOME_STATES = {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "remote"}
 
 def fresh(x: dict, now: datetime, baseline: str | None = None) -> bool:
     """Found in the last NEW_DAYS, and not an old posting a scan has only just reached, nor one that
-    was already open on the day first_seen began (baseline_day)."""
+    was already open on the day first_seen began (baseline_day).
+
+    Counted in calendar days (today is the data's UTC date, a stamp's day the day it names), the
+    rule export_static.mark_new gives is_new, so the dashboard's "New" filter and /internships/new/
+    agree. A rolling 7 x 24 hours made them differ by the roles
+    found seven days ago later in the day than the run (1,834 here against 1,832 there). One
+    difference is left: a listing with no first_seen is not new here and is there, but every
+    exported row has one."""
     seen, posted = _when(x.get("first_seen")), _when(x.get("posted_at"))
     if baseline and str(x.get("first_seen") or "")[:10] <= baseline:
         return False
-    return bool(seen and now - seen <= timedelta(days=NEW_DAYS)
-                and (posted is None or now - posted <= timedelta(days=2 * NEW_DAYS)))
+    today = now.astimezone(timezone.utc).date()
+    return bool(seen and (today - seen.date()).days < NEW_DAYS
+                and (posted is None or (today - posted.date()).days < 2 * NEW_DAYS))
+    # was: seen and now - seen <= timedelta(days=NEW_DAYS)
+    #      and (posted is None or now - posted <= timedelta(days=2 * NEW_DAYS))
 
 
 def near_home_first(items: list[dict]) -> list[dict]:
@@ -247,9 +341,10 @@ def summary(items: list[dict], what: str, where: str, tail: str = TAIL, about: f
     # A bare season ("Summer") is a board that gave no year; beside "Summer 2027" it reads as a repeat.
     terms = Counter(x["term"] for x in items if x.get("term") and re.search(r"\d{4}|round", str(x["term"])))
     if terms and "term" not in about:
-        top = [t for t, _ in terms.most_common(2)]
-        parts.append(f"The most common start {'term is' if len(top) == 1 else 'terms are'} {join_words(top)}.")
-    employers = [c for c, _ in Counter(x["company_name"] for x in items).most_common(5)]
+        common = top(terms, 2)       # was: [t for t, _ in terms.most_common(2)]
+        parts.append(f"The most common start {'term is' if len(common) == 1 else 'terms are'} {join_words(common)}.")
+    employers = top(Counter(x["company_name"] for x in items if x.get("company_name")), 5)
+    # was: employers = [c for c, _ in Counter(x["company_name"] for x in items).most_common(5)]
     if len(employers) >= 3:
         parts.append(f"Employers with the most openings: {join_words(employers)}.")
     return " ".join(esc(p) for p in parts)
@@ -346,10 +441,36 @@ def kinds(listings: list[dict]) -> list[dict]:
     return out
 
 
+def shown(items: list[dict], state: str | None = None) -> list[dict]:
+    """The PER_PAGE listings a page actually shows, in its order: what a reader, and a search engine,
+    sees of it. Two pages that show the same ones are the same page to both (see same_list)."""
+    return (newest_first(items) if state else near_home_first(items))[:PER_PAGE]
+
+
+def shown_ids(items: list[dict]) -> frozenset:
+    return frozenset(x["id"] for x in shown(items))
+
+
+SAME_SHARE = 0.9    # a page that already shows this much of another's list is that page (same_list)
+
+
+def same_list(owner: frozenset, mine: frozenset) -> bool:
+    """Whether a page that would show `mine` is the page that already shows `owner`: the same
+    listings, or at least SAME_SHARE of mine among them. A search engine picks one of two such pages
+    and treats the other as a duplicate either way; folding it here decides which, and keeps one
+    page's signals from being split across two URLs.
+
+    The share is of the page being folded, which is the smaller one whenever the two differ in
+    size. Folding a page into a smaller one would drop the listings only it shows (a major showing 40
+    roles, 6 of them all a small field's page has), so a smaller owner never takes a bigger page."""
+    return owner == mine or len(owner & mine) * 10 >= SAME_SHARE * 10 * len(mine)
+
+
 def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None) -> str:
     rows = []
-    ordered = newest_first(items) if state else near_home_first(items)
-    for x in ordered[:PER_PAGE]:
+    for x in shown(items, state):
+        # was: ordered = newest_first(items) if state else near_home_first(items)
+        #      for x in ordered[:PER_PAGE]:
         new = fresh(x, now, BASELINE)
         stage = ", ".join(s.replace("_", "-") for s in (x.get("stage") or []) if s != "internship")
         meta = [esc(place(x, state))]
@@ -357,7 +478,7 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
             meta.append(esc(str(x["term"])))
         if stage:
             meta.append(esc(stage))
-        pay = esc(str(x["salary"])) if x.get("salary") else ("Paid" if is_paid(x) else "")
+        pay = esc(pay_text(x))       # was: esc(str(x["salary"])) if x.get("salary") else ("Paid" if is_paid(x) else "")
         new_tag = ' <span class="new">New</span>' if new else ""
         pay_tag = f' · <span class="pay">{pay}</span>' if pay else ""
         href = esc(safe_url(x["apply_url"]))
@@ -428,6 +549,10 @@ def beacon_from(site_dir: str) -> str:
 
 BEACON = ""   # set by build() from the site's own index.html
 BASELINE: str | None = None   # set by build(): see baseline_day
+# set by build(): when the data was exported. Everything a build writes is dated from it, never from
+# the clock, so two builds of the same data are the same bytes (the 404 page and every feed's
+# lastBuildDate differed on each deploy).
+GENERATED: datetime | None = None
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
@@ -438,8 +563,14 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
     ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
           "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": t, "item": SITE + h}
                               for i, (h, t) in enumerate(crumbs)]}
-    # "</" inside a script block would end it early; JSON allows the escaped form.
-    ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
+    # "</" inside a script block would end it early, and so can "<!--" followed by "<script": an
+    # employer named "<!--<script>" puts the parser in a state where the real </script> no longer
+    # closes the block, and the page after it becomes script. So no "<", ">" or "&" appears in the
+    # block at all: JSON reads <, > and & as the same characters, and they only ever
+    # occur inside strings (they are not JSON punctuation), so replacing them is always safe.
+    ld_json = (json.dumps(ld, ensure_ascii=False)
+               .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+    # was: ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
     # A breadcrumb trail of one is not a trail (Google reports it as invalid), so the hub has none.
     ld_tag = f'<script type="application/ld+json">{ld_json}</script>' if len(crumbs) > 1 else ""
     return f"""<!DOCTYPE html>
@@ -530,21 +661,25 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
 def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset()) -> list[dict]:
     """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
     whose lastmod the new one never goes below."""
-    global BEACON, BASELINE
+    global BEACON, BASELINE, GENERATED
     BEACON = beacon_from(site_dir)
     d = load(site_dir)
     BASELINE = d["baseline"]
     listings = d["listings"]
     now = _when(d["generated_at"]) or datetime.now(timezone.utc)
+    GENERATED = now
     updated = f"{now:%B} {now.day}, {now.year}"
     pages: list[dict] = []
 
     by_field: dict[str, list] = {}
     by_state: dict[str, list] = {}
+    # Sets are walked in sorted order everywhere below: a set of strings iterates in hash order, which
+    # changes from one Python run to the next, and 170 of the pages came out different on two builds
+    # of the same data (test_two_builds_are_identical).
     for x in listings:
-        for t in set(x.get("field_tags") or []) - SKIP_FIELDS:
+        for t in sorted(set(x.get("field_tags") or []) - SKIP_FIELDS):   # was: in set(...) - SKIP_FIELDS
             by_field.setdefault(t, []).append(x)
-        for k in x["keys"]:
+        for k in sorted(x["keys"]):                                      # was: for k in x["keys"]:
             if k in US_STATES:
                 by_state.setdefault(k, []).append(x)
     def enough(n: int, path: str, need: int = MIN_OPEN) -> bool:
@@ -557,17 +692,21 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     fields = {t: v for t, v in fields.items() if field_slug(t) not in state_slugs}
 
     combos: dict[tuple[str, str], list] = {}
-    for t, items in fields.items():
-        for k in states:
+    for t, items in sorted(fields.items()):         # was: for t, items in fields.items():
+        for k in sorted(states):                      # was: for k in states:
             hit = [x for x in items if k in x["keys"]]
             local = [x for x in hit if len(x["keys"] & PLACES) < SPREAD]
             if enough(len(local), f"/internships/{field_slug(t)}/{state_slug(k)}/", MIN_COMBO):
                 combos[(t, k)] = hit
 
-    # A major whose listings are exactly a field page's, or an earlier major's, would be a second URL
-    # for the same list. It gets no page of its own: the majors hub links it to that page, and that
-    # page names it.
-    owner = {frozenset(x["id"] for x in v): f"/internships/{field_slug(t)}/" for t, v in fields.items()}
+    # A major whose page would show what a field page, or an earlier major's page, already shows would
+    # be a second URL for the same list. It gets no page of its own: the majors hub links it to that
+    # page, and that page names it. "Shows" is the PER_PAGE listings on the page (shown), not every
+    # listing behind it: matching only identical full lists let /internships/health/,
+    # /for/nursing-majors/ and /for/nutrition-majors/ all show the same 40 postings, each its own
+    # canonical page, because the majors pulled in a few more roles that never made the first 40.
+    owners = [(shown_ids(v), f"/internships/{field_slug(t)}/") for t, v in sorted(fields.items())]
+    # was: owner = {frozenset(x["id"] for x in v): f"/internships/{field_slug(t)}/" for t, v in fields.items()}
     major_rows, fits = [], {}
     for m in d["majors"]:
         tags = [t for t in m.get("tags") or [] if t not in SKIP_FIELDS]
@@ -576,8 +715,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                 or not enough(len(items), f"/internships/for/{slugify(m['name'])}-majors/")):
             continue
         name = m["name"]
-        ids = frozenset(x["id"] for x in items)
-        path = owner.setdefault(ids, f"/internships/for/{slugify(name)}-majors/")
+        mine = shown_ids(items)
+        path = next((p for ids, p in owners if same_list(ids, mine)), None)
+        if path is None:
+            path = f"/internships/for/{slugify(name)}-majors/"
+            owners.append((mine, path))
+        # was: ids = frozenset(x["id"] for x in items)
+        #      path = owner.setdefault(ids, f"/internships/for/{slugify(name)}-majors/")
         major_rows.append((m, tags, items, path))
         fits.setdefault(path, []).append(name)
 
@@ -593,9 +737,11 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     EMPLOYERS = {}
     by_company: dict[str, list] = {}      # display name -> its roles, one row each
     spellings: dict[str, list] = {}       # display name -> every name its listings use
-    for key, items in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+    # Ties go to the key and to the name itself, so which spelling names the page, and which of two
+    # employers whose names slug alike gets the folder, is the same on every build.
+    for key, items in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0])):   # was: key=lambda kv: -len(kv[1])
         names = Counter(x["company_name"] for x in items)
-        name = min(names, key=lambda n: (-names[n], len(n)))
+        name = min(names, key=lambda n: (-names[n], len(n), n))                       # was: (-names[n], len(n))
         items = dedupe_roles(items)
         path = f"/internships/at/{slugify(name)}/"
         if (not slugify(name) or path in EMPLOYERS.values() or student_share(items) < 0.5
@@ -620,10 +766,12 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     for t, items in sorted(fields.items()):
         name = field_title(t)
         path = f"/internships/{field_slug(t)}/"
-        top_states = sorted(((k, len(v)) for (tt, k), v in combos.items() if tt == t), key=lambda kv: -kv[1])
+        top_states = sorted(((k, len(v)) for (tt, k), v in combos.items() if tt == t), key=lambda kv: (-kv[1], kv[0]))
+        # was: key=lambda kv: -kv[1]  (and so on below: every count that can tie is broken by name)
         related = link_list(f"{name} internships by state",
                             [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states])
-        emp = join_words([c for c, _ in Counter(x["company_name"] for x in items).most_common(3)])
+        emp = join_words(top(Counter(x["company_name"] for x in items if x.get("company_name")), 3))
+        # was: emp = join_words([c for c, _ in Counter(x["company_name"] for x in items).most_common(3)])
         add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
             f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
@@ -633,7 +781,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     for k, items in sorted(states.items()):
         where = US_STATES[k]
         path = f"/internships/{state_slug(k)}/"
-        top_fields = sorted(((t, len(v)) for (t, kk), v in combos.items() if kk == k), key=lambda tv: -tv[1])
+        top_fields = sorted(((t, len(v)) for (t, kk), v in combos.items() if kk == k), key=lambda tv: (-tv[1], tv[0]))
         related = link_list(f"Internships in {where} by field",
                             [(f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
                              for t, n in top_fields])
@@ -647,7 +795,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
         path = f"/internships/{field_slug(t)}/{state_slug(k)}/"
-        others = sorted(((kk, len(v)) for (tt, kk), v in combos.items() if tt == t and kk != k), key=lambda kv: -kv[1])
+        others = sorted(((kk, len(v)) for (tt, kk), v in combos.items() if tt == t and kk != k), key=lambda kv: (-kv[1], kv[0]))
         related = link_list(f"{name} internships in other states",
                             [(f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
                              for kk, n in others[:RELATED]])
@@ -678,17 +826,19 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
 
     for name, items in sorted(by_company.items()):
         path = EMPLOYERS[name]
-        top = [t for t, _ in Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS).most_common(3)]
-        covered = sum(1 for x in items if set(x.get("field_tags") or []) & set(top))
-        fields_words = join_words([lower_name(field_title(t)) for t in top])
+        main = top(Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
+        # was: top = [t for t, _ in Counter(t for x in items for t in set(...) - SKIP_FIELDS).most_common(3)]
+        covered = sum(1 for x in items if set(x.get("field_tags") or []) & set(main))
+        fields_words = join_words([lower_name(field_title(t)) for t in main])
         # "Mostly" only when it is true; otherwise the fields are some of what the employer hires for.
         about = (f", mostly in {fields_words}" if covered * 2 > len(items) else
-                 f", including roles in {fields_words}") if top else ""
+                 f", including roles in {fields_words}") if main else ""
         note = (f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
                 f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>")
         related = note + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                                                     for t in top if t in fields])
-        where = ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
+                                                     for t in main if t in fields])
+        where = ",".join(top(Counter(k for x in items for k in x["keys"] if k in US_STATES), 6))
+        # was: ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
         add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
             f"{len(items):,} open internships and co-ops at {name} for college students{about}. "
             f"Updated {updated}. Free search, no sign-up.",
@@ -706,11 +856,11 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         if path not in taken and enough(len(items), path, MIN_KIND):
             kind_made.append((path, k, items))
     for path, k, items in kind_made:
-        top = Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS if t in fields)
+        by_tag = Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS if t in fields)
         related = (k.get("note", "")
                    + link_list(f"{k['h1'][0].upper()}{k['h1'][1:]} by field",
                                [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                                for t, _ in top.most_common(RELATED)])
+                                for t in top(by_tag, RELATED)])     # was: for t, _ in top.most_common(RELATED)
                    + link_list("More ways to browse", [(p, kk["h1"][0].upper() + kk["h1"][1:], len(v))
                                                        for p, kk, v in kind_made if p != path]))
         n = f"{len(items):,}"
@@ -726,10 +876,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"Northeast and remote first. Updated {updated}. Free, no sign-up.",
             "New internships this week", [root, ("/internships/new/", "New this week")],
             listing_body(new, "found in the last week", "", now,
-                         "<p class=\"more\">One feed for a whole club: this page's RSS feed carries every role "
-                         "found in the last week, so a Discord or Slack channel can follow just this one.</p>",
+                         "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
+                         f"{NEW_FEED} newest roles found this week, so a Discord or Slack channel can follow "
+                         "just this one.</p>",
                          dash=dash_link(new=True)), new)
-        pages[-1]["feed_limit"] = None            # every new role, not the usual newest 25
+        # More than the usual newest 25, since this one feed may be a club's only one, but not every
+        # new role: that was 1,800 items and 800 KB, fetched every few hours by every subscriber.
+        pages[-1]["feed_limit"] = NEW_FEED        # was: None (every new role)
 
     # Hubs last, so they only link to pages that exist.
     add("/internships/at/", f"Internships by Employer – {len(by_company):,} Employers | InternScout",
@@ -739,13 +892,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         f"<p class=\"lede\">Employers with about {MIN_EMPLOYER} or more open student roles, most of them "
         "internships, co-ops or research. InternScout is not affiliated with any of them.</p>"
         + link_list("Employers", sorted(((EMPLOYERS[n], n, len(v)) for n, v in by_company.items()),
-                                        key=lambda e: e[1].lower())))
+                                        key=lambda e: (e[1].lower(), e[1]))))   # was: key=lambda e: e[1].lower()
     add("/internships/for/", f"Internships by Major – {len(majors_made)} Majors | InternScout",
         "Open internships, co-ops and research roles for every UMass Amherst major, from nursing and "
         "sport management to engineering and finance. Free, no sign-up.",
         "Internships by major", [root, ("/internships/for/", "By major")],
         "<p class=\"lede\">Pick your major to see open roles that fit it. Each page counts only what is "
-        "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: p[1])))
+        "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: (p[1], p[0]))))
     hub = (f"<p class=\"lede\">{len(listings):,} open internships, co-ops, research positions and "
            "fellowships for college students, collected from employer job boards and public programs. "
            "Browse by field, by state or by major, or open the dashboard to rank them for you.</p>"
@@ -788,7 +941,7 @@ def write(site_dir: str, pages: list[dict]) -> None:
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, "index.html"), "w", encoding="utf-8", newline="\n") as f:
             f.write(p["html"])
-    now = datetime.now(timezone.utc)
+    now = GENERATED or datetime.now(timezone.utc)     # was: now = datetime.now(timezone.utc)
     with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(not_found(f"{now:%B} {now.day}, {now.year}"))
     # The dashboard changes with every data refresh; the other static pages carry no lastmod rather
@@ -803,8 +956,12 @@ def write(site_dir: str, pages: list[dict]) -> None:
             f.write(f"  <url><loc>{esc(SITE + u)}</loc>" + (f"<lastmod>{mod}</lastmod>" if mod else "") + "</url>\n")
         f.write("</urlset>\n")
     with open(os.path.join(site_dir, "robots.txt"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("User-agent: *\nAllow: /\n# Raw listing data; the pages under /internships/ are the readable form.\n"
-                f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
+        # No "Disallow: /data/": the dashboard at / (canonical, and in the sitemap) fetches its listings
+        # from ./data/ in the browser, and a crawler barred from them renders it as an empty shell. The
+        # files there are JSON, which search engines do not list as pages anyway.
+        f.write(f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
+        # was: f.write("User-agent: *\nAllow: /\n# Raw listing data; the pages under /internships/ are the readable form.\n"
+        #              f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
 
 
 def live_paths(sitemap: str) -> dict[str, str]:
@@ -827,7 +984,10 @@ def main(argv: list[str]) -> None:
     pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
     write(site_dir, pages)
     from . import feeds            # feeds imports this module, so not at the top
-    feeds.write_all(site_dir, pages)
+    # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
+    # `python -m internscout.seo_pages` this module is __main__, and the internscout.seo_pages that
+    # feeds imports is a second copy whose build() never ran, so its GENERATED is None.
+    feeds.write_all(site_dir, pages, GENERATED)     # was: feeds.write_all(site_dir, pages)
     print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
 
 

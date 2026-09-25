@@ -127,9 +127,29 @@ def bluesky(now: datetime) -> dict:
 
 
 def listings(site_dir: str) -> dict:
+    """Open and new listings. new_7d is counted as the weekly digest and the brand posts count it
+    (digest.new_roles: found this week by the /internships/new/ rule, one row per role within each
+    employer), so the dashboard, the email and the posts agree. That needs the listings and
+    backend/internscout (the Dashboard metrics workflow checks out both); where either is missing, it
+    falls back to stats.json's own "new", which counts before deduplication and runs a little higher.
+    new_7d_basis says which one a snapshot holds."""
     with open(os.path.join(site_dir, "data", "stats.json"), encoding="utf-8") as f:
         s = json.load(f)
-    return {"open": s.get("open"), "new_7d": s.get("new"), "generated_at": s.get("generated_at")}
+    # was: return {"open": s.get("open"), "new_7d": s.get("new"), "generated_at": s.get("generated_at")}
+    out = {"open": s.get("open"), "new_7d": s.get("new"), "new_7d_basis": "stats.json",
+           "generated_at": s.get("generated_at")}
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        for p in (os.path.join(here, "..", "backend"), here):
+            if p not in sys.path:
+                sys.path.insert(0, p)
+        import digest                                   # imported here: it needs backend/internscout
+        d = digest.sp.load(site_dir)
+        now = digest.sp._when(d["generated_at"]) or datetime.now(timezone.utc)
+        out.update(new_7d=len(digest.new_roles(d, now)), new_7d_basis="digest")
+    except (ImportError, OSError, ValueError, KeyError):
+        pass
+    return out
 
 
 def store_stats(html: str) -> dict:

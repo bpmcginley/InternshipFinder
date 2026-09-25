@@ -43,3 +43,13 @@ def test_a_feed_is_written_beside_each_listing_page_and_not_the_hubs(tmp_path):
     assert feeds.write_all(str(tmp_path), pages) == 1
     assert (tmp_path / "internships" / "x" / "feed.xml").exists()
     assert not (tmp_path / "internships" / "feed.xml").exists()
+
+
+def test_a_feed_is_dated_by_its_data_not_the_clock(tmp_path, monkeypatch):
+    # lastBuildDate came from the clock, so every deploy rewrote every feed even when nothing changed.
+    from internscout import seo_pages
+    monkeypatch.setattr(seo_pages, "GENERATED", datetime(2026, 9, 23, 10, tzinfo=timezone.utc))
+    (tmp_path / "internships" / "x").mkdir(parents=True)
+    feeds.write_all(str(tmp_path), [{"path": "/internships/x/", "h1": "X", "items": [_row(1)], "state": None}])
+    xml = (tmp_path / "internships" / "x" / "feed.xml").read_text(encoding="utf-8")
+    assert "<lastBuildDate>Wed, 23 Sep 2026 10:00:00 +0000</lastBuildDate>" in xml
