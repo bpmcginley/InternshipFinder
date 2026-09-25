@@ -1,10 +1,13 @@
 name: Dashboard metrics
 
-# Once a day, growth/metrics.py copies the numbers the private analytics dashboard shows (visits by
+# Every hour, growth/metrics.py copies the numbers the private analytics dashboard shows (visits by
 # day and source, top pages, Bluesky, listings) into the app's D1 database. Totals only.
 on:
   schedule:
-    - cron: "30 11 * * *"     # 7:30am US Eastern
+    # was: "30 11 * * *" (once a day, 7:30am US Eastern). Each run rewrites the last 30 days through
+    # the current hour, so hourly keeps the dashboard current; minute 23 stays clear of the top of the
+    # hour, when GitHub's scheduler is busiest and delays runs. Free for a public repository.
+    - cron: "23 * * * *"
   workflow_dispatch:
 
 permissions:
