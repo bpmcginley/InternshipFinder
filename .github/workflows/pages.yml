@@ -36,8 +36,6 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    outputs:
-      pages: ${{ steps.pages.outcome }}     # success or failure: whether the landing pages were built
     steps:
       - name: Check that Pages deploys from this workflow
         env:
@@ -66,11 +64,13 @@ jobs:
       - name: Build the site and its landing pages
         id: pages
         # seo_pages uses only the standard library, so nothing is installed.
-        # This workflow is the site's only deploy path, so a build that fails here must not also stop
-        # the dashboard from deploying: the next step deploys docs/ as it is, and the
-        # pages-build-failed job at the end leaves the run red so the failure is still seen. (The
-        # build itself skips and counts a malformed listing rather than failing on it.)
-        continue-on-error: true
+        # A malformed listing is skipped and counted inside the build, so bad data no longer stops a
+        # deploy. Anything else that breaks here fails the run and deploys nothing, which leaves the
+        # last good site live, landing pages and all.
+        # was: continue-on-error: true, then a fallback step that deployed docs/ without the landing
+        # pages. That kept the dashboard's data current, but a Pages deploy replaces the whole site, so
+        # every page under /internships/ (about 880, all in the submitted sitemap) would have answered
+        # 404 until the next good build. A few hours of older listings costs far less than that.
         env:
           # A backstop: seo_pages breaks every tie itself so two builds of the same data are the same
           # bytes, and a fixed hash seed keeps any tie it missed from moving between deploys.
@@ -84,17 +84,6 @@ jobs:
           cp _site/sitemap.xml sitemaps/new.xml
           if [ -f live-sitemap.xml ]; then cp live-sitemap.xml sitemaps/old.xml; fi
 
-      - name: Fall back to the dashboard alone
-        # Whatever the failed build left in _site is thrown away, so nothing half-written is published.
-        # There is no sitemap.xml or robots.txt in docs/, so none is deployed; the next good deploy
-        # judges every page as new (see "Save the sitemap"), which costs only the keep_at grace.
-        if: steps.pages.outcome == 'failure'
-        run: |
-          rm -rf _site sitemaps
-          cp -r docs _site
-          rm -f _site/CNAME
-          echo "::error::The landing pages did not build; deploying docs/ without them. See the step above."
-
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
@@ -102,7 +91,6 @@ jobs:
           path: _site
 
       - uses: actions/upload-artifact@v7
-        if: steps.pages.outcome == 'success'   # no pages, no sitemap: notify is skipped
         with:
           name: sitemaps
           path: sitemaps
@@ -121,11 +109,8 @@ jobs:
 
   # Bing, and the engines that share its index (DuckDuckGo, Yahoo, ChatGPT search), recrawl the pages
   # this deploy added, removed or changed within hours (growth/indexnow.py). Google reads the sitemap.
-  # Not after a fallback deploy: its "new" sitemap would be none at all, and IndexNow would be told
-  # every landing page was removed.
   notify:
-    needs: [build, deploy]      # was: needs: deploy
-    if: needs.build.outputs.pages == 'success'
+    needs: deploy
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -138,15 +123,3 @@ jobs:
           path: sitemaps
       - name: Tell IndexNow what changed
         run: python3 growth/indexnow.py sitemaps/old.xml sitemaps/new.xml --submit
-
-  # The fallback above deploys and then would let the run finish green. This job is what keeps a
-  # failed landing-page build from going unnoticed: the site is up, and the run still says it broke.
-  pages-build-failed:
-    needs: [build, deploy]
-    if: ${{ !cancelled() && needs.build.outputs.pages == 'failure' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    steps:
-      - run: |
-          echo "::error::The landing pages under /internships/ failed to build, so this deploy published the dashboard without them. See the build job's 'Build the site and its landing pages' step."
-          exit 1

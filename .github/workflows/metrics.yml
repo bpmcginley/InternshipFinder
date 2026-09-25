@@ -22,9 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # was: growth + docs/data/stats.json only. growth/metrics.py counts "new this week" the way the
+          # digest and the brand posts do (digest.new_roles), which needs the listings and
+          # backend/internscout (standard library only, so no pip install); with just stats.json it fell
+          # back to the pre-dedupe count, so the dashboard disagreed with the email and the posts.
           sparse-checkout: |
             growth
-            docs/data/stats.json
+            backend/internscout
+            docs/data
           sparse-checkout-cone-mode: false
 
       - uses: actions/setup-python@v7

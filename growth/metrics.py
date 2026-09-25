@@ -130,9 +130,9 @@ def listings(site_dir: str) -> dict:
     """Open and new listings. new_7d is counted as the weekly digest and the brand posts count it
     (digest.new_roles: found this week by the /internships/new/ rule, one row per role within each
     employer), so the dashboard, the email and the posts agree. That needs the listings and
-    backend/internscout; where either is missing (the Dashboard metrics workflow checks out only
-    stats.json), it falls back to stats.json's own "new", which counts before deduplication and runs
-    a little higher. new_7d_basis says which one a snapshot holds."""
+    backend/internscout (the Dashboard metrics workflow checks out both); where either is missing, it
+    falls back to stats.json's own "new", which counts before deduplication and runs a little higher.
+    new_7d_basis says which one a snapshot holds."""
     with open(os.path.join(site_dir, "data", "stats.json"), encoding="utf-8") as f:
         s = json.load(f)
     # was: return {"open": s.get("open"), "new_7d": s.get("new"), "generated_at": s.get("generated_at")}
