@@ -61,6 +61,9 @@ jobs:
       - name: Send the digest
         # digest_send.py uses only the standard library too. The input and variables reach the script
         # through env, never pasted into the command, so no value can change what the shell runs.
+        # A send to everyone refuses (exit 2) when Buttondown already has an email sent or scheduled in
+        # the last six days, so a rerun can't send subscribers a second copy; the override,
+        # --allow-same-week, is left for a person to run by hand after checking the dashboard.
         if: vars.DIGEST_ENABLED == '1'
         env:
           BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}

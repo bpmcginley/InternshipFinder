@@ -10,7 +10,8 @@ A send is two calls, as Buttondown's API documents them (API version 2026-04-01,
   2. PATCH /v1/emails/<id> to status "about_to_send". Buttondown sends it within a few minutes, and
      until then it can be stopped by setting it back to a draft in the dashboard.
 With --test-to, step 2 is POST /v1/emails/<id>/send-draft instead. That sends one copy to that
-address and leaves the draft unsent.
+address and leaves the draft unsent. Before a send to every subscriber, GET /v1/emails checks that
+none has gone out or been scheduled this week.
 
 Without --send this is a dry run: it prints what it would send and sends nothing. A real send needs
 all three of:
@@ -19,10 +20,17 @@ all three of:
   DIGEST_POSTAL_ADDRESS    the postal address (a PO box) CAN-SPAM requires in every email; it may
                            have several lines
 With --send and either variable missing or blank, it names what is missing and exits 2 without
-calling Buttondown. It also exits 2, sending nothing, in a week with no field to list. When Buttondown
-refuses a request or can't be reached, it exits 1.
+calling Buttondown. It also exits 2, sending nothing, in a week with no field to list, and when
+Buttondown already has an email sent or scheduled this week (same_week, below; --allow-same-week
+skips that check). When Buttondown refuses a request or can't be reached, it exits 1.
 
-Run from the repo root:  python growth/digest_send.py [docs] [--send] [--test-to ADDRESS] [--public-archive]
+If the last step (the send itself) gets no answer, or a 5xx answer from Buttondown or a gateway in
+front of it, whether the email is going out is UNKNOWN: the request may have been queued before the
+error. The script says so and tells the operator to look at Buttondown's sent and scheduled emails
+first. It never suggests sending again, which is how subscribers would get two copies.
+
+Run from the repo root:
+  python growth/digest_send.py [docs] [--send] [--test-to ADDRESS] [--public-archive] [--allow-same-week]
 """
 from __future__ import annotations
 
@@ -32,8 +40,10 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
+from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -59,9 +69,22 @@ EMAIL_ID = re.compile(r"[A-Za-z0-9_-]+")
 
 EXIT_PROVIDER, EXIT_REFUSED = 1, 2
 
+# The statuses of an email that has gone, or will go, to subscribers with nobody doing anything more.
+# A draft is not one: every test copy leaves an unsent draft behind (README, Email digest 7).
+GONE = ("about_to_send", "scheduled", "in_flight", "sent")
+# Two digests this close together are one sent twice. Six days, not seven, so a run a week after the
+# last one (the Monday schedule, give or take the minutes a send takes) is never blocked by it.
+SAME_WEEK = timedelta(days=6)
+MAX_PAGES = 20      # of Buttondown's email list; a weekly newsletter needs years to fill that many
+
 
 class ProviderError(Exception):
-    """Buttondown refused a request or could not be reached. The message says which and why."""
+    """Buttondown refused a request or could not be reached. The message says which and why, and
+    status is the HTTP status Buttondown (or a gateway in front of it) answered with, if any."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 class NoAnswer(ProviderError):
@@ -137,7 +160,7 @@ def call(method: str, path: str, key: str, body: dict | None = None, headers: di
             with urllib.request.urlopen(req, timeout=30) as r:
                 raw = r.read()
         except urllib.error.HTTPError as e:
-            raise ProviderError(_explain(method, path, e.code, e.read() or b"")) from None
+            raise ProviderError(_explain(method, path, e.code, e.read() or b""), e.code) from None
         except OSError as e:          # URLError, a timeout or a dropped connection
             problem = f"No answer from Buttondown to {method} {path}: {e}"
             continue
@@ -163,6 +186,51 @@ def create_draft(key: str, body: dict) -> str:
     return email_id
 
 
+def _when(stamp) -> datetime | None:
+    try:
+        d = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def same_week(key: str, subject_line: str, now: datetime | None = None) -> dict | None:
+    """An email Buttondown has already sent or scheduled that this send would repeat, or None: one
+    with the same subject, or any sent or scheduled email dated within SAME_WEEK of now. The subject
+    alone would miss a rerun on a later day, since the count and the date in it follow the data.
+
+    GET /v1/emails, filtered to the GONE statuses and read page by page. Each email is checked here
+    too, so the check still holds if Buttondown ever ignored the filter. A failure to read the list
+    raises ProviderError, and main then sends nothing: not knowing is not the same as "none"."""
+    now = now or datetime.now(timezone.utc)
+    path = "/emails?" + urllib.parse.urlencode([("status", s) for s in GONE])
+    for _ in range(MAX_PAGES):
+        page = call("GET", path, key, tries=2)          # a read, so safe to repeat
+        for e in page.get("results") or []:
+            if not isinstance(e, dict) or e.get("status") not in GONE:
+                continue
+            if e.get("subject") == subject_line:
+                return e
+            when = _when(e.get("publish_date") or e.get("creation_date"))
+            if when and abs(now - when) <= SAME_WEEK:
+                return e
+        nxt = page.get("next")
+        if not nxt:
+            return None
+        # Follow only Buttondown's own next-page links, so the key is never sent anywhere else.
+        if not str(nxt).startswith(f"{API}/emails?"):
+            raise ProviderError(f"Buttondown's email list gave a next page that isn't its own: {str(nxt)[:200]}")
+        path = str(nxt)[len(API):]
+    raise ProviderError(f"Buttondown's email list runs past {MAX_PAGES} pages, so this week's could not all "
+                        "be checked.")
+
+
+def unknown(e: ProviderError) -> bool:
+    """Whether a failed request may still have been carried out: no answer at all, or a 5xx from
+    Buttondown or a gateway in front of it (a 502 or 504 can come after Buttondown took the request)."""
+    return isinstance(e, NoAnswer) or (e.status or 0) >= 500
+
+
 # ---------------------------------------------------------------- command line
 
 def _plan(test_to: str | None) -> list[str]:
@@ -172,7 +240,9 @@ def _plan(test_to: str | None) -> list[str]:
                   + "  (one test copy; the draft stays unsent)")
     else:
         second = f"PATCH {API}/emails/<new id>  " + json.dumps({"status": "about_to_send"}) + "  (every subscriber)"
-    return [f"POST {API}/emails  (a draft, with X-API-Version {API_VERSION})", second]
+    # was: return [f"POST {API}/emails  (a draft, with X-API-Version {API_VERSION})", second]
+    first = [] if test_to else [f"GET {API}/emails?status=...  (stops if one was sent or scheduled this week)"]
+    return first + [f"POST {API}/emails  (a draft, with X-API-Version {API_VERSION})", second]
 
 
 def main(argv: list[str]) -> int:
@@ -186,6 +256,9 @@ def main(argv: list[str]) -> int:
                     help="send one test copy to this address instead of to every subscriber")
     ap.add_argument("--public-archive", action="store_true",
                     help="also post the email on Buttondown's public web archive (off by default)")
+    ap.add_argument("--allow-same-week", action="store_true",
+                    help="send to every subscriber even though Buttondown already has an email sent or "
+                         "scheduled this week (only after checking it in the dashboard)")
     args = ap.parse_args(argv[1:])
 
     key = (os.environ.get(KEY_ENV) or "").strip()
@@ -238,6 +311,20 @@ def main(argv: list[str]) -> int:
         print(f"[digest] Not sent: {ADDRESS_ENV} has no printable lines, so the email has no postal address.")
         return EXIT_REFUSED
 
+    if not test_to and not args.allow_same_week:
+        # A test copy goes to one address, so only a send to every subscriber is checked.
+        try:
+            earlier = same_week(key, email["subject"])
+        except ProviderError as e:
+            print(f"[digest] Not sent: could not check Buttondown for an email already sent this week. {e}")
+            return EXIT_PROVIDER
+        if earlier:
+            when = earlier.get("publish_date") or earlier.get("creation_date") or "no date"
+            print(f"[digest] Not sent: Buttondown already has {earlier.get('id')} ({earlier.get('status')}, "
+                  f"{when}): {earlier.get('subject')!r}. Subscribers get one digest a week. If that email "
+                  "really did not go out, check it in the dashboard, then run this again with --allow-same-week.")
+            return EXIT_REFUSED
+
     try:
         email_id = create_draft(key, email)
     except ProviderError as e:
@@ -253,13 +340,21 @@ def main(argv: list[str]) -> int:
             call("PATCH", f"/emails/{email_id}", key, {"status": "about_to_send"})
             print(f"[digest] {email_id} is on its way to every subscriber. Buttondown sends it within a few "
                   "minutes; until then, setting it back to a draft in the dashboard stops it.")
-    except NoAnswer as e:
-        # The request may have reached Buttondown before the connection dropped, so the email may be on
-        # its way. Saying "not sent" here is how a second run sends everyone a second copy.
-        print(f"[digest] No answer to the last step for draft {email_id}, so it may or may not be sending. {e}")
-        print("[digest] Check that email's status in Buttondown's dashboard before running this again.")
-        return EXIT_PROVIDER
+    # was: except NoAnswer as e: ... "Check that email's status in Buttondown's dashboard before running
+    # this again." A 5xx fell through to the branch below, which said "made but not sent" and "Send or
+    # delete that draft": but a gateway's 502 or 504 can come after Buttondown queued the send, and
+    # following that advice sends everyone a second copy. Both now say UNKNOWN and never suggest a resend.
     except ProviderError as e:
+        if unknown(e):
+            # The request may have reached Buttondown before the error, so the email may be on its way.
+            # Saying "not sent" here is how a second run sends everyone a second copy.
+            print(f"[digest] Status UNKNOWN for {email_id}: the last step failed in a way that can come after "
+                  f"Buttondown took it, so it may or may not be sending. {e}")
+            print(f"[digest] Before doing anything else, look for {email_id} in Buttondown's sent and scheduled "
+                  "emails. If it is there, it is sending: leave it. Do not send that draft or run this again "
+                  "until you have checked; a run this week refuses by itself once it shows there.")
+            return EXIT_PROVIDER
+        # A 4xx: Buttondown answered, and refused.
         print(f"[digest] Draft {email_id} was made but not sent. {e}")
         print("[digest] Send or delete that draft in Buttondown's dashboard before running this again.")
         return EXIT_PROVIDER

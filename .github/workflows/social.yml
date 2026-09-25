@@ -3,6 +3,13 @@ name: Brand posts
 # Twice a week, growth/social.py writes a short post from the data (one field's new listings in the
 # Northeast and remote, linking its landing page) and sends it to InternScout's own accounts. Each
 # account is used only if its secrets are set; with none set this run just prints the post.
+# It posts nothing when the data export is over two days old (a stalled ingest), and the run fails
+# when any account with secrets could not post, so a revoked password shows up as a red run.
+#
+# Kill switch: set the repository variable SOCIAL_ENABLED to 0 (Settings -> Secrets and variables ->
+# Actions -> Variables) and every run, scheduled or by hand, is skipped without posting. Unset or any
+# other value, it runs as before. Unlike the digest's DIGEST_ENABLED, this one is on by default,
+# because the accounts only post once their secrets are added.
 on:
   schedule:
     - cron: "0 15 * * 2,4"    # Tuesdays and Thursdays, 11am US Eastern
@@ -18,6 +25,8 @@ concurrency:
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   post:
+    # The variable reaches only this condition, never a command line.
+    if: vars.SOCIAL_ENABLED != '0'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

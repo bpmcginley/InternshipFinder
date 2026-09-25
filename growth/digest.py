@@ -80,12 +80,28 @@ def unique_roles(items: list[dict]) -> list[dict]:
     return [x for group in by_employer.values() for x in sp.dedupe_roles(group)]
 
 
+def new_roles(d: dict, now: datetime) -> list[dict]:
+    """This week's new roles, as every growth output counts them: found this week by sp.fresh (the
+    rule /internships/new/ uses), then one row per role within each employer (unique_roles). The
+    digest's subject, the brand posts' counts and the dashboard metrics all use this one number.
+    stats.json's "new" (export_static's is_new) counts every listing a scan first saw in the last
+    week, before either step, so it runs a little higher; it is the dashboard's own badge count."""
+    return unique_roles([x for x in d["listings"] if sp.fresh(x, now, d["baseline"])])
+
+
+def has_page(tag: str, open_count: int) -> bool:
+    """Whether seo_pages.build makes a landing page for this field: it needs MIN_OPEN open roles, and a
+    field whose slug names a state gets none (the state's page has that path)."""
+    return open_count >= sp.MIN_OPEN and sp.field_slug(tag) not in STATE_SLUGS
+
+
 def field_url(tag: str, open_count: int) -> str:
     """The field's landing page. When the field has no page, the dashboard filtered to that field
     instead. A page needs MIN_OPEN open roles, and a field whose slug names a state gets none."""
-    slug = sp.field_slug(tag)
-    if open_count >= sp.MIN_OPEN and slug not in STATE_SLUGS:
-        return f"{sp.SITE}/internships/{slug}/?{UTM}"
+    # was: slug = sp.field_slug(tag); if open_count >= sp.MIN_OPEN and slug not in STATE_SLUGS:
+    # The test moved into has_page so growth/social.py links only to pages that exist by the same rule.
+    if has_page(tag, open_count):
+        return f"{sp.SITE}/internships/{sp.field_slug(tag)}/?{UTM}"
     return f"{sp.SITE}/?field={quote(tag)}&{UTM}"
 
 
@@ -129,7 +145,8 @@ def build(site_dir: str, now: datetime | None = None) -> dict:
     d = sp.load(site_dir)
     now = now or sp._when(d["generated_at"]) or datetime.now(timezone.utc)
     listings = d["listings"]
-    new = unique_roles([x for x in listings if sp.fresh(x, now, d["baseline"])])
+    # was: new = unique_roles([x for x in listings if sp.fresh(x, now, d["baseline"])])
+    new = new_roles(d, now)
     # Open roles per field, counted as the field's landing page counts them, so "See all N" matches it.
     open_by_field = Counter(t for x in listings for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS)
     by_field: dict[str, list[dict]] = {}
