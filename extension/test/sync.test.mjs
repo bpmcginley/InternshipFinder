@@ -273,3 +273,29 @@ test("new settings defaults reach an existing store through the normal merge", a
   assert.equal(s.settings.profile_updated_at, null);
   assert.equal(s.settings.profile_synced_hash, null);
 });
+
+
+test("learned answers to self-identification questions stay on the device, and survive a restore", async () => {
+  const { syncedSubset, applyServer, withoutDemographicAnswers } = await import("../lib/sync.js");
+  const { emptyStore } = await import("../lib/store.js");
+  const s = emptyStore();
+  s.profile.extra = {
+    "What is your gender identity?": "Woman",
+    "Are you Hispanic or Latino?": "No",
+    "Please select your veteran status": "Not a veteran",
+    "Do you have a disability?": "No",
+    "Voluntary self-identification of race": "Asian",
+    "Why do you want to work here?": "The mission",
+    "Desired start date": "June 2027",
+  };
+  const up = syncedSubset(s).profile.extra;
+  assert.deepEqual(up, { "Why do you want to work here?": "The mission", "Desired start date": "June 2027" });
+  assert.deepEqual(withoutDemographicAnswers(undefined), {});
+  // The account's copy (no demographic answers) is restored over this device: ours are kept.
+  applyServer(s, { extra: { "Why do you want to work here?": "Growth", "Leaked: gender": "x" } }, "2026-09-26T12:00:00.000Z");
+  assert.equal(s.profile.extra["Why do you want to work here?"], "Growth");
+  assert.equal(s.profile.extra["What is your gender identity?"], "Woman");
+  assert.equal(s.profile.extra["Do you have a disability?"], "No");
+  assert.ok(!("Leaked: gender" in s.profile.extra), "a demographic entry from the server is not taken");
+  assert.ok(!("Desired start date" in s.profile.extra), "non-demographic entries come from the account's copy");
+});

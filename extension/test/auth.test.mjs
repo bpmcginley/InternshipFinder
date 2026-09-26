@@ -158,3 +158,17 @@ test("sign out deletes the session on the Worker (best effort) and every local k
   assert.deepEqual(SESSION, {});
   assert.equal(await A.getToken(), null);
 });
+
+
+test("only internscout.org, or a local copy on an unpacked build, may take the sign-in over the bridge", async () => {
+  const { trustedDashboard } = await import("../lib/auth.js");
+  assert.equal(trustedDashboard({ origin: "https://internscout.org" }, false), true);
+  assert.equal(trustedDashboard({ url: "https://internscout.org/internships/finance/" }, false), true);
+  assert.equal(trustedDashboard({ origin: "http://localhost:8765" }, false), false, "store build: no local pages");
+  assert.equal(trustedDashboard({ origin: "http://localhost:8765" }, true), true);
+  assert.equal(trustedDashboard({ origin: "http://127.0.0.1" }, true), true);
+  assert.equal(trustedDashboard({ origin: "https://bpmcginley.github.io" }, true), false);
+  assert.equal(trustedDashboard({ origin: "https://internscout.org.evil.com" }, true), false);
+  assert.equal(trustedDashboard({ origin: "http://localhost.evil.com" }, true), false);
+  assert.equal(trustedDashboard({}, true), false);
+});

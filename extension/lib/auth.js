@@ -39,6 +39,15 @@ export function pickProvider(cfg, id) {
   return list.find((p) => p.id === id) || null;
 }
 
+// May the page a bridge request came from have the student's sign-in (auth:token)? internscout.org
+// always; a local copy of the site only on an unpacked (developer) build, where `unpacked` is true.
+export function trustedDashboard(sender, unpacked) {
+  let origin = sender && sender.origin;
+  try { origin = origin || new URL(sender.url).origin; } catch (e) { return false; }
+  if (origin === "https://internscout.org") return true;
+  return !!unpacked && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || "");
+}
+
 export const PROVIDER_LABELS = { google: "Google", microsoft: "Microsoft" };
 
 export function buildAuthUrl(provider, { redirectUri, nonce, loginHint, silent }) {

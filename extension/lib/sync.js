@@ -22,6 +22,11 @@ import { ensureToken, workerFetch } from "./auth.js";
 
 // Keys in profile.facts that never leave the device (the Worker also strips them, as a second line).
 export const DEMOGRAPHIC_KEYS = ["gender", "race", "hispanic", "veteran", "disability", "lgbtq"];
+// profile.extra holds answers the agent learned on application forms ({question text: answer}). An
+// employer's own voluntary self-identification question lands there too, so any entry whose question
+// reads like one of the six stays on the device with them. Erring wide is fine: a dropped entry is only
+// asked again on the next device.
+export const DEMOGRAPHIC_QUESTION = /\b(gender|sex|race|racial|ethnic|ethnicity|hispanic|latin[oax]|veteran|military status|protected veteran|disabilit|handicap|lgbt|sexual orientation|transgender|self-identif)/i;
 // Settings only the background writes. A page saving its own copy of the store keeps the stored values
 // of these, or it would undo a sync that happened while it was open.
 export const BACKGROUND_SETTINGS = ["cloud_sync", "profile_updated_at", "profile_synced_hash"];
@@ -36,11 +41,16 @@ export function withoutDemographics(facts) {
   return out;
 }
 
+export function withoutDemographicAnswers(extra) {
+  return Object.fromEntries(Object.entries(extra || {}).filter(([q]) => !DEMOGRAPHIC_QUESTION.test(q)));
+}
+
 export function syncedSubset(s) {
   const p = (s && s.profile) || {};
   const st = (s && s.settings) || {};
   return {
-    profile: { ...p, facts: withoutDemographics(p.facts) },
+    // was: profile: { ...p, facts: withoutDemographics(p.facts) },
+    profile: { ...p, facts: withoutDemographics(p.facts), extra: withoutDemographicAnswers(p.extra) },
     settings: { onboarded: !!st.onboarded, deep_dive_at: st.deep_dive_at ?? null },
     dashboard_profile: (s && s.dashboard_profile) ?? null,
   };
@@ -79,9 +89,14 @@ export function toServer(sub) {
 export function applyServer(s, serverProfile, updated) {
   const { settings = {}, dashboard_profile = null, ...profile } = serverProfile || {};
   const mine = (s.profile && s.profile.facts) || {};
+  const myExtra = (s.profile && s.profile.extra) || {};
   s.profile = deepMerge(emptyStore().profile, profile);
   // Whatever the account's copy says about these (it should say nothing), this device's answers stand.
   for (const k of DEMOGRAPHIC_KEYS) s.profile.facts[k] = k in mine ? mine[k] : EMPTY_FACTS[k];
+  // The same for learned self-identification answers: the account's copy never has them, so keep ours.
+  const extra = withoutDemographicAnswers(s.profile.extra);
+  for (const [q, a] of Object.entries(myExtra)) if (DEMOGRAPHIC_QUESTION.test(q)) extra[q] = a;
+  s.profile.extra = extra;
   s.dashboard_profile = dashboard_profile || null;
   if (settings.onboarded) s.settings.onboarded = true;
   if (settings.deep_dive_at != null) s.settings.deep_dive_at = settings.deep_dive_at;

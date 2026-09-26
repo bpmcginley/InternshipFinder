@@ -2,7 +2,7 @@
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile } from "./queue.js";
 import { runJob, resumeJob, isRunning, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
-import { getToken, authStatus, authBridge, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
+import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
 
@@ -200,6 +200,10 @@ async function handle(m, sender, fromPage) {
     }
     case "auth:token":
       // was: { token: await getToken() }. A session also says whose it is and until when (lib/auth.js bridgeReply).
+      // A session lasts a year, where the ID token this used to hand out lasted an hour, so only the
+      // real dashboard gets it: internscout.org, or a local copy of the site on an unpacked (developer)
+      // build. The bridge also runs on localhost for development, and any local page could ask there.
+      if (fromPage && !trustedDashboard(sender, !chrome.runtime.getManifest().update_url)) return { token: null };
       return authBridge();
     case "auth:signin": {
       // Runs here, not in the popup: the popup closes when the sign-in window takes focus.
