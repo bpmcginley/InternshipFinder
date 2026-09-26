@@ -26,6 +26,8 @@
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const cx = (...a) => a.filter(Boolean).join(" ");
   const prevent = fn => e => { e.preventDefault(); fn(e); };
+  // Smooth scrolling is motion too, so it follows the same prefers-reduced-motion switch as the CSS.
+  const scrollBehavior = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
   // Where "install the extension" goes: the Chrome Web Store listing on a laptop or desktop, and the
   // install page on a phone or tablet, which can't add extensions (same media query as install.html's
   // phone banner). `from` is the listing's utm_source, so the store counts installs per link.
@@ -162,7 +164,8 @@
 
   function Loc({ r, keys }) {
     const all = IS.regs(r), g = all.find(x => keys.has(x.state) || (x.kind === "remote" && keys.has("remote"))) || all[0];
-    const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || "—");
+    // was: || "—". A muted word says what is missing; a bare dash only says something is.
+    const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || h("span", { className: "muted" }, "Not listed"));
     const sub = g && g.kind === "remote" ? "Remote" : g && g.state && !first.includes(g.state) ? g.state : null;
     const more = Math.max(0, all.length - 1);
     return h(F, null,
@@ -238,18 +241,18 @@
           (meta || r.status === "closed") && h("div", { className: "meta" }, meta, r.status === "closed" && h("span", { className: "closed" }, (meta ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
-        h("td", { className: "c-field", title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, tags.length ? fieldText : h("span", { className: "muted" }, "—"),
+        h("td", { className: "c-field", title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, tags.length ? fieldText : h("span", { className: "muted" }, "Not tagged"),
           (stages.length > 0 || r.sector) && h("div", { className: "meta" }, [...stages, r.sector && IS.sectorLabel(r.sector)].filter(Boolean).join(" · "))),
         h("td", { className: "c-loc" }, h(Loc, { r, keys }),
           (term || r.duration) && h("div", { className: "meta" }, [term, r.duration].filter(Boolean).join(" · "))),
-        h("td", { className: "c-pay" }, r.salary ? h("span", { className: "num" }, r.salary) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "—")),
+        h("td", { className: "c-pay" }, r.salary ? h("span", { className: "num" }, r.salary) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "Not listed")),
         h("td", { className: "c-match" }, h("button", { type: "button", className: "score whybtn " + cls, "aria-expanded": !!open, onClick: () => onWhy(r.id), title: `Match score ${sc.score} of 100. Click for why.` },
           h("span", { className: "num" }, sc.score), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))),
         h("td", { className: "c-mine" },
           h("select", { className: "mine", "aria-label": "Your status", value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status))),
         h("td", { className: "c-links" },
-          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener" }, "Open posting") : h("span", { className: "muted" }, "—"),
+          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener" }, "Open posting") : h("span", { className: "muted" }, "No link"),
           !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", onClick: () => onAuto([r]) }, "Auto-Apply")),
           h("div", null, h("a", { className: "report", href: IS.reportUrl(r), target: "_blank", rel: "noopener", title: "Wrong tag, dead link or not a student role? Tell us." }, "Report")))),
       open && h("tr", { className: "why" }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns }))));
@@ -366,12 +369,19 @@
   // was: function Setup({ initial, majors, index, stats, firstTime, onSave, onClose, onDelete, signedIn }) {
   // statsReady says the stats.json fetch has settled. stats === null alone cannot tell "still
   // downloading" from "failed", and coverage() below words those two cases differently.
-  function Setup({ initial, majors, index, stats, statsReady, firstTime, onSave, onClose, onDelete, signedIn }) {
+  // was: function Setup({ initial, majors, index, stats, statsReady, firstTime, onSave, onClose, onDelete, signedIn }) {
+  // majorsReady does for majors.json what statsReady does for stats.json: majors === null alone is
+  // both "still downloading" and "failed", and step 1 used to say "didn't load" for the first.
+  function Setup({ initial, majors, majorsReady, index, stats, statsReady, firstTime, onSave, onClose, onDelete, signedIn }) {
     const [d, setD] = useState(() => ({ ...IS.emptyProfile(), ...(initial || {}) }));
-    const [step, setStep] = useState(1);
+    const [step, setStepRaw] = useState(1);
+    // "fwd" or "back" once the student has moved between steps; "" on first open, so the card doesn't
+    // slide in on page load. The step body is keyed by step, so each change replays the CSS animation.
+    const [dir, setDir] = useState("");
+    const setStep = n => { setDir(n > step ? "fwd" : "back"); setStepRaw(n); };
     const [stagesTouched, setStagesTouched] = useState(!!(initial && initial.stages && initial.stages.length));
     const ref = useRef();
-    useEffect(() => { if (ref.current) ref.current.scrollIntoView({ block: "start", behavior: "smooth" }); }, [step]);
+    useEffect(() => { if (ref.current) ref.current.scrollIntoView({ block: "start", behavior: scrollBehavior() }); }, [step]);
     const set = (k, v) => setD(s => ({ ...s, [k]: v }));
     const toggle = (k, v) => setD(s => ({ ...s, [k]: s[k].includes(v) ? s[k].filter(x => x !== v) : [...s[k], v] }));
 
@@ -474,7 +484,8 @@
     let body;
     if (step === 1) body = h(F, null,
       h("h3", null, "About you"),
-      !majors && h("div", { className: "meta" }, "The major list didn't load. Pick the fields you're interested in below instead."),
+      // was: !majors && h("div", { className: "meta" }, "The major list didn't load. Pick the fields you're interested in below instead."),
+      !majors && h("div", { className: "meta", role: "status" }, IS.majorsNote(majors, majorsReady)),
       majors && h("div", { className: "lbl" }, "Major(s)", h(MultiSelect, { wide: true, label: "Majors", placeholder: "Start typing, e.g. Nursing", options: majorOpts, selected: d.majors, onChange: v => set("majors", v) })),
       majors && h("div", { className: "lbl" }, "Minor(s) ", h("span", { className: "muted" }, "optional"), h(MultiSelect, { wide: true, label: "Minors", placeholder: "Start typing", options: minorOpts, selected: d.minors, onChange: v => set("minors", v) })),
       h("div", { className: "lbl" }, undeclared ? "Fields you're interested in" : h(F, null, "Other fields you're interested in ", h("span", { className: "muted" }, "optional")),
@@ -516,7 +527,7 @@
 
     return h("section", { className: "setup sheet", ref, "aria-label": "My profile" },
       h("div", { className: "setup-head" }, h("h2", null, firstTime ? "Set up InternScout" : "My profile"), dots),
-      body,
+      h("div", { key: step, className: cx("step-body", dir) }, body),
       h("div", { className: "setup-foot" },
         step > 1 && h("button", { type: "button", className: "btn", onClick: () => setStep(step - 1) }, "Back"),
         step < 3 && h("button", { type: "button", className: "btn primary", onClick: () => setStep(step + 1) }, "Next"),
@@ -534,6 +545,8 @@
     const store = useRef(null); if (!store.current) store.current = IS.createStore();
     const [p, setP] = useState(IS.loadProfile);
     const [majors, setMajors] = useState(null);
+    // Set when IS.loadMajors() settles, either way (see majorsReady in Setup).
+    const [majorsReady, setMajorsReady] = useState(false);
     const [stats, setStats] = useState(null);
     // Separate from stats because IS.loadStats() resolves with null on failure (core.js), so the
     // value alone cannot say whether the fetch is still in flight.
@@ -605,7 +618,8 @@
     }, []);
     useEffect(() => {
       reload(false);
-      IS.loadMajors().then(setMajors);
+      // was: IS.loadMajors().then(setMajors);
+      IS.loadMajors().catch(() => null).then(m => { setMajors(m); setMajorsReady(true); });
       // was: IS.loadStats().then(setStats);
       // loadStats never rejects (core.js catches every base and returns null), so this .then is the
       // one place that knows the fetch has settled, whichever way it went.
@@ -779,7 +793,7 @@
       setF(x => ({ ...x, states: [], ...initF(s) }));
       setNote(`Profile saved. Ranking for ${s.majors.length ? s.majors.join(", ") : s.fields.length ? s.fields.map(IS.fieldLabel).join(", ") : "all fields"}.`);
       setTimeout(() => setNote(""), 6000);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
     function closeSetup() { if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); }
     async function deleteData() {
@@ -1039,7 +1053,8 @@
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
       h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
       // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
-      setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
+      // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
+      setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
 
       // Numbers get thousands separators, "You applied" appears once there is something to count,
       // and the state list is one sentence under the numbers instead of a block floated to the right.

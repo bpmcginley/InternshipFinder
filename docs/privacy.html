@@ -25,7 +25,9 @@
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
-    --ink:#17191c; --ink2:#4b5058; --ink3:#868b92; --rule:#e2ded4;
+    --ink:#17191c; --ink2:#454a52; --ink3:#646a73; --rule:#e2ded4;
+    /* ink2/ink3 were #4b5058/#868b92 here and #b3b1aa/#7d7c77 in dark: ink3 was 3.1:1 on this paper
+       (4.4:1 in dark), under AA for body-size text. Same values as the dashboard now. */
     --accent:#1d5c46; --accent-soft:#e3eee8; --amber:#9a6412;
     --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -34,7 +36,7 @@
   }
   @media (prefers-color-scheme:dark){:root{
     --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
-    --ink:#ecebe6; --ink2:#b3b1aa; --ink3:#7d7c77; --rule:#2c2d31;
+    --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e; --rule:#2c2d31;
     --accent:#7cc3a1; --accent-soft:#1c2a24; --amber:#e0b25e;
     color-scheme:dark;
   }}
@@ -45,6 +47,7 @@
   .mark{font:600 22px/1 var(--serif);letter-spacing:-.3px;color:var(--ink);text-decoration:none}
   nav{display:flex;gap:4px 16px;flex-wrap:wrap}
   nav a{color:var(--ink2);font-size:14px;text-decoration:none}
+  nav a{transition:color 140ms ease-out}
   nav a:hover{color:var(--ink)}
   nav a[aria-current=page]{color:var(--accent);font-weight:600}
   h1{font:600 34px/1.15 var(--serif);letter-spacing:-.5px;margin:36px 0 4px}
@@ -58,8 +61,9 @@
   ul,ol{padding-left:22px}
   li{margin:5px 0}
   code,kbd{font:14px var(--mono);background:var(--sunk);padding:1px 6px;border-radius:4px;overflow-wrap:anywhere}
-  .box{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:4px;padding:6px 18px;margin:22px 0}
-  .box.warn{border-left-color:var(--amber)}
+  /* was: a 3px accent (or amber) bar down the left edge. One even border now, tinted for a warning. */
+  .box{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:6px 18px;margin:22px 0}
+  .box.warn{border-color:color-mix(in srgb,var(--amber) 45%,var(--rule))}
   .box h3{margin-top:12px}
   .table{overflow-x:auto;margin:12px 0}
   table{border-collapse:collapse;width:100%;font-size:15px}
@@ -69,6 +73,7 @@
   footer a{color:var(--ink2)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (max-width:480px){h1{font-size:28px}.lede{font-size:17px}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -121,7 +126,7 @@
              closing the subject off. -->
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage counts, the states you picked, and — only if you subscribe — which plan you are on. Nothing else.</li> -->
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li> -->
-        <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li>
+        <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and, only if you subscribe, your plan and your Stripe IDs. The full list is below.</li>
         <!-- Added with the weekly email sign-up (docs/js/app.js Digest). It is the one place a student
              hands over an email address on purpose, so the short version says who ends up holding it. -->
         <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. Buttondown also records the IP address you sign up from. <a href="#digest">Details below</a>.</li>
@@ -166,10 +171,10 @@
            listings above); leaving it here is what made the two sections contradict each other. -->
       <!-- was: <li>Your majors, class year, chosen states, work authorization, resume, transcript, cover letter, writing samples and saved answers stay on your device. They live in browser storage (dashboard) or Chrome extension storage.</li> -->
       <li>Your majors, class year, work authorization, resume, transcript, cover letter, writing samples and saved answers are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of any of it, and nothing here is uploaded for safekeeping or backup.</li>
-      <li><strong>Some of these files are sent to the AI when you run a feature that reads them.</strong> They go inside the request, through our Worker to Google's Gemini API, and are not stored at either end — see <a href="#ai">AI features</a>. Which file goes depends on the feature and on the file's format:
+      <li><strong>Some of these files are sent to the AI when you run a feature that reads them.</strong> They go inside the request, through our Worker to Google's Gemini API, and are not stored at either end (see <a href="#ai">AI features</a>). Which file goes depends on the feature and on the file's format:
         <ul>
           <li><strong>The Deep Dive</strong> reads your resume and CV to fill in your profile, and your cover letter and writing samples to learn your writing voice. A PDF is sent as the file itself. A Word or plain-text file is read on your device first and only the text it contains is sent, up to 60,000 characters.</li>
-          <li><strong>Tailoring your resume</strong> sends your resume when it is a PDF: the whole PDF goes, so the AI can transcribe its layout and the tailored copy can keep it. That reading is cached on your device and reused, so the file is sent once per resume, not once per application. If your resume is a Word file, the extension opens it locally and sends only the bullet text — <em>that file never leaves your device</em>.</li>
+          <li><strong>Tailoring your resume</strong> sends your resume when it is a PDF: the whole PDF goes, so the AI can transcribe its layout and the tailored copy can keep it. That reading is cached on your device and reused, so the file is sent once per resume, not once per application. If your resume is a Word file, the extension opens it locally and sends only the bullet text; <em>that file never leaves your device</em>.</li>
           <li><strong>Your transcript is never sent to the AI.</strong> It is only ever attached to an employer's own form when their site asks for one.</li>
         </ul>
       </li>
@@ -179,7 +184,7 @@
            fill_secret tool (agent.js line 720) fills it from local storage and the value never enters
            the conversation, which is why the tool description tells the model it will not see it. -->
       <!-- was: <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. They are never sent to us or to the AI.</li> -->
-      <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. <strong>The passwords are never sent to us or to the AI</strong> — the extension types them into the page itself, and the AI is only told to ask for one, never given it. The sign-up email address <em>is</em> included in each Auto-Apply request, because the AI has to know which address to register or sign in with.</li>
+      <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. <strong>The passwords are never sent to us or to the AI</strong>: the extension types them into the page itself, and the AI is only told to ask for one, never given it. The sign-up email address <em>is</em> included in each Auto-Apply request, because the AI has to know which address to register or sign in with.</li>
       <li>Chrome does not encrypt extension storage. Anyone who can use your computer account could read it.</li>
       <li>We have no copy of any of this. If you clear it, it's gone.</li>
     </ul>
@@ -209,7 +214,7 @@
       <!-- was: <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, so here it is in full. Every AI task sends your profile: your name, contact details, education, experience, the stories from your Deep Dive and your writing voice. On top of that: -->
       <!-- Second pass, 2026-09-19: "Only two ... Everything else sends much less" was an overclaim that the tailoring bullet below disproves in its own last clause - the no-resume path sends experience and education, two of the five items that sentence used to define "your profile". The count and the reassurance both go; the per-feature bullets carry it. -->
       <!-- was: ...so here is what each one sends. Only two of them send your profile - your name, contact details, education, experience and the stories from your Deep Dive. Those two are Auto-Apply, which sends all of it including your writing voice, and the Deep Dive's interview step, which sends all of it except your voice and your saved answers. Everything else sends much less: -->
-      <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, and it is not the same for every feature, so here is what each one sends. Two of them send your whole stored profile — your name, contact details, education, experience and the stories from your Deep Dive: Auto-Apply, which adds your writing voice, and the Deep Dive's interview step, which leaves out your voice and your saved answers. The rest each send only what their own bullet names below, which for one tailoring path is still most of your experience and education:
+      <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, and it is not the same for every feature, so here is what each one sends. Two of them send your whole stored profile (your name, contact details, education, experience and the stories from your Deep Dive): Auto-Apply, which adds your writing voice, and the Deep Dive's interview step, which leaves out your voice and your saved answers. The rest each send only what their own bullet names below, which for one tailoring path is still most of your experience and education:
         <ul>
           <!-- Three things the old bullet left out, all of which a reader would want counted as
                "sent": extension/background/agent.js formatSnapshot() also writes each field's
@@ -217,7 +222,7 @@
                line listing what the extension already typed; and agent.js jobIntro() sends the
                posting itself on the first turn, capped at 5,000 characters of description. -->
           <!-- was: <li><strong>Auto-Apply</strong> sends a snapshot of the application page on each step: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options and its own error. It also sends the buttons on the page, and your sign-up email for that site. When a page has fewer than four fields — a sign-in wall, an interstitial, a page that failed to load — it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li> -->
-          <li><strong>Auto-Apply</strong> sends your whole profile on every turn, and the sign-up email it uses for that site. On the first turn it also sends the posting: company, title, location, apply link and the first 5,000 characters of the description. Then, on each step, a snapshot of the application page: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options, whether it is required, its placeholder text, its length limit and its own error. It also sends the buttons on the page and a list of anything the extension has already filled in for you. When a page has fewer than four fields — a sign-in wall, an interstitial, a page that failed to load — it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li>
+          <li><strong>Auto-Apply</strong> sends your whole profile on every turn, and the sign-up email it uses for that site. On the first turn it also sends the posting: company, title, location, apply link and the first 5,000 characters of the description. Then, on each step, a snapshot of the application page: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options, whether it is required, its placeholder text, its length limit and its own error. It also sends the buttons on the page and a list of anything the extension has already filled in for you. When a page has fewer than four fields (a sign-in wall, an interstitial, a page that failed to load), it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li>
           <!-- "your profile" was true of one of the three tailoring paths only. In
                extension/background/tailor.js, tailorDocx() and tailorPdf() both build their prompt as
                jobText(job) + voiceOf(store) + the resume, and line 104 defines voiceOf() as exactly
@@ -228,7 +233,7 @@
           <!-- was: <li><strong>Tailored resumes</strong> send the job posting's title, company and description, your profile, and your resume — the whole PDF if it is a PDF, or just its bullet text if it is a Word file.</li> -->
           <!-- Second pass, 2026-09-19: the previous sentence promised the name, contact details and education are not sent here, which is false for a PDF resume. extension/background/tailor.js layoutOf() sends {type:"document", media_type:"application/pdf", data: orig.b64} - the whole file, with everything printed on it. The stored profile really is withheld; the file is not, and the two are different claims. -->
           <!-- was: ...or just its bullet text if it is a Word file. Your name, contact details and education are not sent on this path. If you have no resume on file... -->
-          <li><strong>Tailored resumes</strong> send the job posting's title, company and the first 6,000 characters of its description, your career goal and your writing voice, and your resume — the whole PDF file if it is a PDF, or just its bullet text if it is a Word file. Your stored profile is not sent on this path, but the resume file is: a PDF goes whole, so whatever is printed on it — your name, your contact details, your education — goes with it, and a Word file is read here on your device and only its bullet text is sent. If you have no resume on file, the fixed template is built instead from your experience, projects, skills, education, career goal and voice; your name and contact details are printed onto it here on your device and never leave it.</li>
+          <li><strong>Tailored resumes</strong> send the job posting's title, company and the first 6,000 characters of its description, your career goal and your writing voice, and your resume: the whole PDF file if it is a PDF, or just its bullet text if it is a Word file. Your stored profile is not sent on this path, but the resume file is: a PDF goes whole, so whatever is printed on it (your name, your contact details, your education) goes with it, and a Word file is read here on your device and only its bullet text is sent. If you have no resume on file, the fixed template is built instead from your experience, projects, skills, education, career goal and voice; your name and contact details are printed onto it here on your device and never leave it.</li>
           <!-- The Deep Dive is four separate calls that send four different things, and rolling them
                into one sentence was how "the files listed above" came to stand for all of them. Read
                off extension/onboarding/onboarding.js: extract() sends only the resume and CV document
@@ -237,7 +242,7 @@
                up to 20,000 characters of the student's own chat replies, and distill() sends the
                transcript plus the existing stories and goals. -->
           <!-- was: <li><strong>The Deep Dive</strong> sends the files listed above and your answers from the interview step.</li> -->
-          <li><strong>The Deep Dive</strong> sends something different at each step. <em>Read my resume</em> sends your resume and CV files and nothing else — on a first run there is no profile yet, because that call is what fills it in. <em>The interview</em> sends your profile (all of it except your writing voice and your saved answers) along with the conversation so far. <em>Analyze my writing</em> sends your writing samples, your cover letter and up to 20,000 characters of your own interview replies. <em>Finish &amp; save stories</em> sends the interview transcript plus the stories and goals you already have.</li>
+          <li><strong>The Deep Dive</strong> sends something different at each step. <em>Read my resume</em> sends your resume and CV files and nothing else; on a first run there is no profile yet, because that call is what fills it in. <em>The interview</em> sends your profile (all of it except your writing voice and your saved answers) along with the conversation so far. <em>Analyze my writing</em> sends your writing samples, your cover letter and up to 20,000 characters of your own interview replies. <em>Finish &amp; save stories</em> sends the interview transcript plus the stories and goals you already have.</li>
         </ul>
       </li>
       <li>The Worker checks your sign-in and your monthly allowance.</li>

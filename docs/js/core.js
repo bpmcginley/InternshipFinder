@@ -352,6 +352,13 @@
     }
     return null;
   }
+  // What step 1 of the setup card says in place of the major pickers. loadMajors() resolves with null
+  // only once every source has failed, but before it resolves the page holds null too, so null alone
+  // cannot mean "failed": on a slow first load the card said the list "didn't load" while majors.json
+  // was still downloading. `settled` is set when loadMajors() resolves, whichever way it went.
+  const majorsNote = (majors, settled) => majors && majors.majors ? null
+    : settled ? "The major list didn't load. Pick the fields you're interested in below instead."
+      : "Loading the list of majors…";
   async function loadStats() {
     for (const b of [C.dataUrl || "./data/", C.rawDataFallback].filter(Boolean)) {
       try { return await getJSON(b + "stats.json"); } catch (e) { }
@@ -590,7 +597,7 @@
     // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the
     // student's own tag, not the biggest one in the Set profileFields returns.
     WEIGHTS, PART_LABEL, profileFields, primaryField, score,
-    createStore, loadMajors, loadStats,
+    createStore, loadMajors, majorsNote, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
