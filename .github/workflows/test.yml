@@ -1,7 +1,8 @@
 name: Tests
 
-# The three suites that guard the parts a student actually touches: the ingest and tagging rules,
-# the Worker that holds the AI key and the caps, and the extension that fills their applications.
+# The suites that guard the parts a student actually touches: the ingest and tagging rules, the
+# Worker that holds the AI key and the caps, the extension that fills their applications, and the
+# dashboard's own logic in docs/js/core.js.
 # They ran nowhere automatically before this: the extension's only ran on a release tag, by which
 # point a break is already tagged, and the backend's and the Worker's ran only on a laptop.
 on:
@@ -60,3 +61,16 @@ jobs:
           node-version: "22"
       - name: Run tests
         run: node --test extension/test/*.test.mjs
+
+  # The dashboard's own logic (docs/js/core.js), loaded the way the page loads it. The tests live
+  # outside docs/ so they aren't published with the site.
+  site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Run tests
+        run: node --test tests/site/*.test.mjs

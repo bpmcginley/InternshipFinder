@@ -75,17 +75,28 @@
     --ink:#17191c; --ink2:#454a52; --ink3:#646a73;
     --rule:#e2ded4; --rule2:#ece9e1;
     --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8;
-    --blue:#2b5aa0; --amber:#9a6412; --amber-soft:#f6ecd9; --green:#1f7a4d; --red:#a8362c;
+    /* accent-hover is the primary button's hover: a real colour step instead of filter:brightness().
+       amber was #9a6412 and green #1f7a4d: 4.26:1 and 4.47:1 on their own tinted badges (.count, the
+       11px Queue counters) and amber 4.23:1 on --sunk (the Why panel's "!" flags), under AA's 4.5:1.
+       These are 5.0:1 and 4.78:1 at the worst pairing. */
+    --accent-hover:#164a38;
+    --blue:#2b5aa0; --amber:#8c5a0f; --amber-soft:#f6ecd9; --green:#1d7549; --red:#a8362c;
     --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    /* One spacing scale for the page's sections, gaps and paddings (was: 14, 18, 20, 26, 28, 30 and
+       40px side by side). Small in-control paddings stay as they were. */
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+    /* Motion only says that something changed state; every use is switched off under
+       prefers-reduced-motion at the bottom of this sheet. */
+    --ease-out:cubic-bezier(.2,.7,.3,1); --t-fast:140ms; --t-move:200ms;
     color-scheme:light;
   }
   @media (prefers-color-scheme:dark){:root{
     --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
     --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e;
     --rule:#2c2d31; --rule2:#232427;
-    --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24;
+    --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24; --accent-hover:#95d2b3;
     --blue:#8fb2e8; --amber:#e0b25e; --amber-soft:#2e2717; --green:#7cc3a1; --red:#e48a80;
     color-scheme:dark;
   }}
@@ -96,7 +107,7 @@
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .wrap{max-width:1320px;margin:0 auto;padding:0 28px}
 
-  header.top{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap;padding:26px 0 14px;border-bottom:1px solid var(--ink)}
+  header.top{display:flex;align-items:flex-end;gap:var(--s5);flex-wrap:wrap;padding:var(--s5) 0 var(--s4);border-bottom:1px solid var(--ink)}
   .mark{font:600 30px/1 var(--serif);letter-spacing:-.6px;margin:0}
   .sub{color:var(--ink2);margin-top:8px;font-size:14px}
   .sub a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
@@ -106,11 +117,14 @@
   .top-r{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .signed{display:inline-flex;align-items:center;gap:2px;color:var(--green);font-size:13px;padding-left:6px}
 
-  .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
+  .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;
+    transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}
   .btn:hover:not(:disabled){border-color:var(--ink3)}
+  /* Press feedback: the button moves a pixel down while held. */
+  .btn:active:not(:disabled){transform:translateY(1px)}
   .btn:disabled{opacity:.45;cursor:default}
   .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-  .btn.primary:hover:not(:disabled){filter:brightness(1.1)}
+  .btn.primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
   .btn.quiet{border-color:transparent;background:transparent;color:var(--ink2);padding:0 8px}
   .btn.quiet:hover:not(:disabled){color:var(--ink);border-color:transparent}
   .btn.small{height:28px;padding:0 10px;font-size:12.5px}
@@ -123,20 +137,23 @@
 
   /* landing: one hero column and one "how it works" column. The old third column repeated the
      three setup steps that the setup card itself shows. */
-  .landing{display:grid;grid-template-columns:minmax(280px,1.3fr) minmax(280px,1fr);gap:20px 56px;padding:28px 0 26px;border-bottom:1px solid var(--rule)}
+  .landing{display:grid;grid-template-columns:minmax(280px,1.3fr) minmax(280px,1fr);gap:var(--s5) var(--s7);padding:var(--s6) 0 var(--s5);border-bottom:1px solid var(--rule)}
   .landing h2{font:600 28px/1.2 var(--serif);letter-spacing:-.4px;margin:0 0 12px;max-width:22ch}
   .landing h3{font:600 14px var(--sans);margin:0 0 8px}
   .landing p{color:var(--ink2);margin:0 0 10px;font-size:15px;max-width:58ch}
   .landing .fine{color:var(--ink3);font-size:13px}
   .landing ul{margin:0;padding-left:18px;color:var(--ink2)}
   .landing li{margin:5px 0}
-  .landing-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+  .landing-actions{display:flex;gap:var(--s2);flex-wrap:wrap;margin-top:var(--s4)}
 
   /* profile setup */
-  .setup{margin:18px 0 0;padding:20px 24px 18px}
+  .setup{margin:var(--s4) 0 0;padding:var(--s5)}
   .setup-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
   .setup-head h2{font:600 22px/1.2 var(--serif);margin:0}
   .setup h3{font:600 15px var(--sans);margin:10px 0 12px}
+  /* A note between two fields (the coverage count, "No states picked") sat flush against the label
+     under it; it gets the same space a field has. */
+  .step-body > .meta{margin-bottom:var(--s4)}
   .steps{display:flex;gap:6px}
   .dot{width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font:500 11.5px var(--mono);border:1px solid var(--rule);color:var(--ink3)}
   .dot.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -159,24 +176,25 @@
   .stategrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 12px;margin-bottom:10px;max-height:340px;overflow:auto;padding:6px 8px;border:1px solid var(--rule2);border-radius:6px}
   .stategrid .check{padding:3px 2px}
   .stategrid .check.on{color:var(--ink)}
-  .setup-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--rule2)}
+  .setup-foot{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;margin-top:var(--s4);padding-top:var(--s4);border-top:1px solid var(--rule2)}
   .setup-danger{display:flex;gap:8px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px}
   .setup-danger .meta{margin:0}
 
   /* figures: the numbers in one row, and one plain sentence under them saying which states they
      cover and when the scan ran. That sentence used to float right of the numbers and wrapped
      under them on anything narrower than about 1100px, leaving a hole. */
-  .figures{padding:20px 0 18px;border-bottom:1px solid var(--rule)}
-  .figrow{display:flex;gap:40px;flex-wrap:wrap}
+  .figures{padding:var(--s5) 0;border-bottom:1px solid var(--rule)}
+  .figrow{display:flex;gap:var(--s4) var(--s6);flex-wrap:wrap}
   .fig .n{font:600 34px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
   .fig .l{color:var(--ink3);font-size:13px;margin-top:6px}
-  .coverage{color:var(--ink2);font-size:13.5px;margin-top:14px;line-height:1.6}
+  .coverage{color:var(--ink2);font-size:13.5px;margin-top:var(--s3);line-height:1.6}
   .updated{color:var(--ink3)}
 
-  .notice{margin:16px 0 0;padding:12px 16px;background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:4px;color:var(--ink2)}
+  /* was: a 3px accent bar down the left edge. Now one even border, tinted toward the accent. */
+  .notice{margin:var(--s4) 0 0;padding:var(--s3) var(--s4);background:var(--panel);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--rule));border-radius:6px;color:var(--ink2)}
   .notice b{color:var(--ink)}
   .notice a{color:var(--accent);font-weight:500}
-  .notice.quietnote{border-left-color:var(--rule);font-size:13px}
+  .notice.quietnote{border-color:var(--rule);font-size:13px}
   /* The invite panel: the student's link, selectable, beside a Share or Copy button. */
   .invite-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
   .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
@@ -191,13 +209,17 @@
   /* filters: search, field, state and sort on the first row, everything else behind "More filters".
      Thirteen equal-looking dropdowns in one wrapping row was the single hardest thing to read on
      the page. */
-  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:18px 0 0}
-  .filters.extra{padding:10px 14px 12px;margin-top:10px;background:var(--sunk);border-radius:8px;gap:8px}
+  .filters{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;padding:var(--s4) 0 0}
+  .filters.extra{padding:var(--s3) var(--s4);margin-top:var(--s3);background:var(--sunk);border-radius:8px;gap:var(--s2)}
   .filters.extra .field{background:var(--panel)}
-  .filterbar-foot{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;padding:10px 0 14px;font-size:13px;color:var(--ink2)}
+  .filterbar-foot{display:flex;gap:var(--s2) var(--s4);flex-wrap:wrap;align-items:center;padding:var(--s3) 0 var(--s4);font-size:13px;color:var(--ink2)}
   .filterbar-foot .btn.quiet{padding:0 6px;height:28px;font-size:13px}
-  .field{position:relative;display:flex;align-items:center;min-height:36px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
-  .field:focus-within{border-color:var(--ink3)}
+  .field{position:relative;display:flex;align-items:center;min-height:36px;background:var(--panel);border:1px solid var(--rule);border-radius:6px;
+    transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}
+  .field:hover{border-color:var(--ink3)}
+  /* The inputs inside a .field drop their own outline, so the box itself shows focus, in the same
+     accent as the :focus-visible ring everywhere else. */
+  .field:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
   .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:14px;height:34px;padding:0 10px;outline:none}
   .field select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer}
   .field select option{background:var(--panel);color:var(--ink)}
@@ -227,10 +249,12 @@
   .sheet{background:var(--panel);border:1px solid var(--rule);border-radius:8px}
   .tablewrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse}
-  thead th{background:var(--panel);text-align:left;font:500 12.5px var(--sans);color:var(--ink3);padding:11px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
+  thead th{background:var(--panel);text-align:left;font:500 12.5px var(--sans);color:var(--ink3);padding:var(--s3);border-bottom:1px solid var(--rule);white-space:nowrap}
   thead th.sort{cursor:pointer;user-select:none}
   thead th.sort:hover,thead th.on{color:var(--ink)}
-  thead th.sort button{all:inherit;cursor:pointer;display:inline}
+  /* all:inherit also copied the th's own padding and bottom border onto the button, so the sortable
+     headings sat a second padding's width right of their column, over a stray underline. */
+  thead th.sort button{all:inherit;padding:0;border:0;cursor:pointer;display:inline}
   thead th.sort button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
   thead th.on::after{content:" \2193"}
   tbody td{padding:12px 12px;border-bottom:1px solid var(--rule2);vertical-align:top}
@@ -238,7 +262,9 @@
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover td{background:color-mix(in srgb,var(--sunk) 50%,transparent)}
   tbody tr.sel td{background:var(--accent-soft)}
-  tbody tr.dim td{opacity:.62}
+  /* was: opacity:.62, which took the grey meta text to 2.5:1 (light) and 3.0:1 (dark). Rows that aren't
+     for the student's year are still links a student may follow, so they dim by colour and stay at AA. */
+  tbody tr.dim td,tbody tr.dim .role{color:var(--ink3)}
   input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:15px;height:15px;margin:2px 0 0;cursor:pointer}
   .c-chk{width:34px}
   .c-co{min-width:240px;width:32%}
@@ -275,8 +301,8 @@
   .whybtn .why-l{font-size:11.5px;color:var(--ink3)}
   .whybtn:hover .why-l{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
   tbody tr.opened td{border-bottom-color:transparent}
-  tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:16px 18px 18px;opacity:1}
-  .whyg{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.5fr) minmax(220px,1fr);gap:30px}
+  tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:var(--s4) var(--s4) var(--s5)}
+  .whyg{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.5fr) minmax(220px,1fr);gap:var(--s6)}
   .whyg h4{margin:0 0 9px;font:600 12.5px var(--sans);color:var(--ink)}
   .whyg a{color:var(--accent)}
   .part{display:grid;grid-template-columns:118px 1fr 42px;gap:8px;align-items:center;font-size:12.5px;color:var(--ink2);margin:4px 0}
@@ -288,21 +314,37 @@
   .tag.miss{border-color:color-mix(in srgb,var(--red) 40%,transparent);color:var(--red)}
   .flag{font-size:12.5px;margin:3px 0;color:var(--ink2)}
   .flag.bad{color:var(--red)} .flag.warn{color:var(--amber)} .flag.good{color:var(--green)}
-  .more{display:flex;justify-content:center;padding:14px;border-top:1px solid var(--rule2)}
-  footer{color:var(--ink3);font-size:13px;padding:14px 0 48px;max-width:78ch}
+  .more{display:flex;justify-content:center;padding:var(--s4);border-top:1px solid var(--rule2)}
+  footer{color:var(--ink3);font-size:13px;padding:var(--s4) 0 var(--s7);max-width:78ch}
   footer .links{display:flex;gap:4px 16px;flex-wrap:wrap;align-items:center;margin-top:8px}
   footer .links a{color:var(--ink2);text-decoration:none}
   footer .links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   noscript p{max-width:640px;margin:40px auto;padding:0 20px;color:var(--ink2)}
+  /* Motion, each tied to a change of state and never to scrolling. Content is visible at rest: these
+     run once, when the thing they describe appears. */
+  @keyframes is-step-fwd{from{opacity:0;transform:translateX(12px)}}
+  @keyframes is-step-back{from{opacity:0;transform:translateX(-12px)}}
+  @keyframes is-reveal{from{opacity:0;transform:translateY(-4px)}}
+  @keyframes is-rows-in{from{opacity:0;transform:translateY(6px)}}
+  .step-body.fwd{animation:is-step-fwd var(--t-move) var(--ease-out)}
+  .step-body.back{animation:is-step-back var(--t-move) var(--ease-out)}
+  tbody tr.why .whyg{animation:is-reveal 180ms var(--ease-out)}
+  .notice[role=status],.notice[role=alert]{animation:is-reveal 180ms var(--ease-out)}
+  /* The list replacing "Loading listings": the table body is new at that moment and only then. */
+  table.list tbody{animation:is-rows-in 220ms var(--ease-out)}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+    .btn:active:not(:disabled){transform:none}
+  }
   @media (max-width:900px){
-    .whyg{grid-template-columns:1fr;gap:18px}
+    .whyg{grid-template-columns:1fr;gap:var(--s4)}
     .landing{grid-template-columns:1fr}
   }
   @media (max-width:760px){
     .wrap{padding:0 16px}
-    .figrow{gap:22px 28px}
+    .figrow{gap:var(--s4) var(--s5)}
     .fig .n{font-size:28px}
     .top-r{margin-left:0}
     .row2{grid-template-columns:1fr}
@@ -316,7 +358,7 @@
        one line of controls. */
     table.list thead{display:none}
     table.list,table.list tbody{display:block;width:100%}
-    table.list tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--rule)}
+    table.list tr{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s1) var(--s3);padding:var(--s3) var(--s4);border-bottom:1px solid var(--rule)}
     table.list tr.why{display:block;padding:0}
     table.list tbody td{display:block;border:0;padding:0;width:auto;min-width:0}
     table.list .c-co{flex:1 1 100%;order:0}
@@ -331,8 +373,8 @@
     table.list .c-links > div{margin:0}
     table.list .rowbtn,table.list .report{margin-top:0}
     table.list .c-links .report{display:none}
-    tbody tr.why td{padding:14px}
-    .whyg{gap:16px}
+    tbody tr.why td{padding:var(--s4)}
+    .whyg{gap:var(--s4)}
   }
 </style>
 <script>

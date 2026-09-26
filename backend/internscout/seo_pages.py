@@ -506,23 +506,29 @@ def link_list(title: str, links: list[tuple[str, str, int]]) -> str:
     return f"<section class=\"rel\"><h2>{esc(title)}</h2><ul>{lis}</ul></section>"
 
 
+# The dashboard's tokens (docs/index.html). accent-hover is the call-to-action's hover, a real colour
+# step rather than a fade. nav spacing is a flex gap (was: margin-left on each link, which also pushed
+# the first one off the header's edge when the header wrapped on a phone).
 CSS = """
 :root{--paper:#f6f4ef;--panel:#fffefb;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;
---accent:#1d5c46;--accent-soft:#e3eee8;color-scheme:light}
+--accent:#1d5c46;--accent-soft:#e3eee8;--accent-hover:#164a38;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--paper:#131416;--panel:#1a1b1e;--ink:#ecebe6;--ink2:#b8b6af;
---ink3:#95948e;--rule:#2c2d31;--accent:#7cc3a1;--accent-soft:#1c2a24;color-scheme:dark}}
+--ink3:#95948e;--rule:#2c2d31;--accent:#7cc3a1;--accent-soft:#1c2a24;--accent-hover:#95d2b3;color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);
 font:16px/1.6 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:860px;margin:0 auto;padding:0 20px 64px}a{color:var(--accent)}
 header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 20px;flex-wrap:wrap;
 padding:22px 0 14px;border-bottom:1px solid var(--ink)}
 .mark{font:600 22px/1 "Source Serif 4",Georgia,serif;color:var(--ink);text-decoration:none}
-nav a{color:var(--ink2);font-size:14px;text-decoration:none;margin-left:14px}
+nav{display:flex;gap:4px 14px;flex-wrap:wrap}
+nav a{color:var(--ink2);font-size:14px;text-decoration:none;transition:color 140ms ease-out}nav a:hover{color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .crumbs{font-size:14px;color:var(--ink3);margin:22px 0 0}.crumbs a{color:var(--ink3)}
 h1{font:600 32px/1.2 "Source Serif 4",Georgia,serif;margin:10px 0 8px}
 .lede{color:var(--ink2);font-size:17px;margin:0 0 6px}.updated{color:var(--ink3);font-size:14px;margin:0}
 .cta{display:inline-block;margin:18px 0 8px;padding:10px 16px;border-radius:6px;background:var(--accent);
-color:var(--paper);font-weight:600;text-decoration:none}
+color:var(--paper);font-weight:600;text-decoration:none;transition:background-color 140ms ease-out}
+.cta:hover{background:var(--accent-hover)}.cta:active{transform:translateY(1px)}
 ul.jobs{list-style:none;padding:0;margin:24px 0;border-top:1px solid var(--rule)}
 .job{display:grid;grid-template-columns:1fr auto;gap:2px 16px;padding:14px 0;border-bottom:1px solid var(--rule)}
 .co{font-weight:600}.role{grid-column:1}.meta{grid-column:1;color:var(--ink3);font-size:14px}
@@ -534,6 +540,7 @@ section.rel li{padding:3px 0;break-inside:avoid}.n{color:var(--ink3);font-size:1
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
 footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:26px}section.rel ul{columns:1}
 .job{grid-template-columns:1fr}.go{grid-column:1;grid-row:auto;margin-top:4px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
 """
 
 def beacon_from(site_dir: str) -> str:
