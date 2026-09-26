@@ -10,7 +10,9 @@ dashboard (`docs/index.html`). Change it here first, then in all three.
   `https://internscout.org,https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag,chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi`).
   Only InternScout's own two extension IDs: `jmjj…` is Load unpacked (fixed by the manifest `"key"`), and
   `hpnbb…` is the Chrome Web Store copy, whose ID the store assigned.
-  Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`.
+  <!-- was: Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`. -->
+  Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
+  A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
 
 ## Sign-in
 - Anyone with a Google or Microsoft account can sign in (personal, school or work). Search never needs sign-in.
@@ -39,9 +41,31 @@ dashboard (`docs/index.html`). Change it here first, then in all three.
   - Extension, Load unpacked: `https://jmjjgnckddhjbohfpbekodkpbpbmfjag.chromiumapp.org/`
   - Extension, Chrome Web Store: `https://hpnbbpmalfjijnmpoihhjgjolhabjpgi.chromiumapp.org/`
 - Clients use the implicit flow (`response_type=id_token`, a random `nonce`, `scope=openid email profile`).
+  <!-- was:
   - Dashboard: keeps the token in `sessionStorage["internscout.idtoken"]`.
   - Extension: uses `chrome.identity.launchWebAuthFlow` and keeps the token in `chrome.storage.session`.
-  - Both check `exp` and sign in again when it's expired.
+  - Both check `exp` and sign in again when it's expired. -->
+  - Then both trade the ID token for a session (`POST /session`, below) and keep the session record:
+    the dashboard in `localStorage["internscout.session"]`, the extension (which gets the ID token from
+    `chrome.identity.launchWebAuthFlow`) in `chrome.storage.local["internscout.session"]`. The student
+    stays signed in on that device until they sign out or leave it unused for a year.
+  - A Worker without `/session` (404, a network error or a 5xx) falls back to the old way: the raw ID
+    token (dashboard `sessionStorage["internscout.idtoken"]`, extension `chrome.storage.session`),
+    checked against `exp` and signed in again when it's expired.
+
+## Sessions ("stay signed in")
+- A session token is opaque: `"iss_" + base64url(32 random bytes)` (no padding, 47 characters). Every
+  authenticated route accepts it as `Authorization: Bearer iss_…` in place of an ID token; ID tokens keep
+  working exactly as above.
+- A session gives the same `{ user, tier }` as the ID token it was made from. The tier is fixed when the
+  session is made (signing in again makes a new one with the current tier).
+- The Worker stores only `sha256(token)` (hex) with the `user_hash`, tier, provider and three dates
+  (`sessions` in `schema.sql`). Never the token, never the email.
+- Sliding expiry: a year (365 days) from the last use. A use moves `last_used` and `expires` forward at
+  most once per UTC day, after the response (`ctx.waitUntil`). The daily cron deletes expired rows.
+- At most 20 sessions per account: making the 21st deletes the least recently used.
+- An unknown, deleted or expired session answers `401 auth` with the message
+  `Sign-in expired; sign in again`. The extension then drops its session so the UI shows "Sign in".
 
 ## Errors
 Every error is JSON `{ "error": code, "message": text }`:
@@ -49,11 +73,14 @@ Every error is JSON `{ "error": code, "message": text }`:
 | Status | code | When |
 |---|---|---|
 | 400 | `bad_request` / `bad_task` | invalid body or unknown task |
-| 401 | `auth` | missing, expired or invalid token |
+| 401 | `auth` | missing, expired or invalid token, or an unknown or expired session |
+| 409 | `stale` | `PUT /profile` older than the saved copy; includes `profile` and `updated` (the saved copy) |
+| 409 | `subscribed` | `DELETE /me` while a paid plan is live |
 | 429 | `cap` | monthly allowance for the task is used up; includes `task`, `resets` (ISO date) |
 | 429 | `rate` | this caller's per-minute or per-day call limit; includes `retry_after` (s) |
 | 503 | `busy` | everyone's calls together hit `GLOBAL_RPM` for this minute; nothing to do with this caller's own limits, so retry after `retry_after` (s) |
 | 503 | `paused` | global monthly budget reached; search still works |
+| 503 | `sync_off` | `/profile` while the `PROFILE_KEY` secret is unset |
 | 502 | `upstream` | Gemini failed |
 
 ## Endpoints
@@ -73,8 +100,13 @@ Every error is JSON `{ "error": code, "message": text }`:
     "pro":       { "resume_tailor": 60, "autofill": 120, "deep_dive": null, "field_match": 1560, "short_answer": 480 } },
   "payments": { "enabled": false, "plans": [] },
   "paused": false,
-  "invite": { "bonus": { "autofill": 3 }, "max": 10 } }
+  "invite": { "bonus": { "autofill": 3 }, "max": 10 },
+  "sessions": true,
+  "sync": true }
 ```
+`sessions: true` says this Worker has `POST /session` (an older one lacks both flags). `sync` is whether
+saving the Deep Dive to the account is on, which is whether the `PROFILE_KEY` secret is set.
+
 `invite` is what an invite is worth (`REFERRAL` in config.js; see `GET /invite`). The dashboard shows
 invite features only when it is present.
 
@@ -136,6 +168,56 @@ The claim and both grants are one D1 batch (one transaction), so a failure part-
 recorded and the claim can simply be sent again. An account that existed before invites did (2026-09-24)
 is dated by `schema.sql`'s backfill from its earliest usage month, states or plan, so it is not `new`.
 
+### `POST /session` (ID token only)
+`Authorization: Bearer <provider ID token>`. A session token here is `401 auth`: only a fresh sign-in
+with Google or Microsoft can start a session. Returns
+```json
+{ "session": "iss_…", "account": "3f2a9c0d1e5b7a64", "email": "student@umass.edu",
+  "provider": "google", "tier": "edu", "expires": "2027-09-26T14:03:11.000Z" }
+```
+- **`account`** is the first 16 hex characters of the `user_hash`: a stable, non-identifying id for the
+  client (it stands in for the token's `sub`, e.g. in dedupe keys).
+- **`email`** is the token's `email` claim (for a Microsoft token without one, `preferred_username`), for
+  the client to show "Signed in as …". It is echoed, not stored.
+- **`expires`** is a year from now; it slides forward with use (see "Sessions").
+
+An invalid ID token is `401 auth`, as on every route.
+
+### `DELETE /session`
+`Authorization: Bearer iss_…` deletes that session (signs that device out). Always `200 { "ok": true }`:
+an ID token, an unknown or already deleted session, or no header at all is already signed out.
+
+### `GET /profile` (auth)
+The Deep Dive saved to the account: `{ "profile": { … } | null, "updated": "<ISO>" | null }`.
+`null`s mean nothing is saved.
+
+### `PUT /profile` (auth)
+Body `{ "profile": { … }, "updated": "<ISO>" }`, at most 256 KB (`400 bad_request` over it, or when
+`profile` isn't an object or `updated` isn't a date). `updated` is the client's time for its latest
+edit; it is stored as `toISOString()`, and a time later than the Worker's own clock is stored as the
+Worker's time (a device whose clock runs fast would otherwise make every other device's save stale). The
+reply's `updated` is the time actually stored; clients keep that one.
+- The client sends only the synced subset (see the extension's `lib/sync.js`): never files, saved
+  logins, API keys, or the six demographic answers. The Worker deletes those six keys
+  (`gender, race, hispanic, veteran, disability, lgbtq`) from `profile.facts` again before storing.
+- If the saved copy's `updated` is later than the body's: `409 { "error": "stale", "message": …,
+  "profile": <saved>, "updated": "<saved ISO>" }`, and nothing is written; the client merges the saved
+  copy in. An equal time overwrites (a retried save succeeds). The write is conditional on the same
+  rule, so two devices saving at once can't leave the older copy on top.
+- Otherwise `200 { "ok": true, "updated": "<ISO stored>" }`.
+- **Encrypted at rest:** AES-GCM-256 with a fresh 12-byte IV per write; the row holds
+  `base64(iv || ciphertext)` and the plaintext size. The key is HKDF-SHA256 with ikm = the
+  base64-decoded `PROFILE_KEY` secret (32 bytes), salt `"internscout-profile-v1"`, info = the
+  `user_hash`, so every account has its own key. A row that no longer decrypts (the secret was
+  replaced) reads as nothing saved, and the next `PUT` replaces it whatever its time.
+
+### `DELETE /profile` (auth)
+Deletes the saved copy (the student unticked "Save my Deep Dive to my account"). `200 { "ok": true }`,
+also when there was none.
+
+All three `/profile` routes answer `503 { "error": "sync_off", "message": "Saving profiles isn't turned on yet." }`
+while `PROFILE_KEY` is unset (`GET /config` then says `"sync": false`), before looking at the sign-in.
+
 ### `DELETE /me` (auth)
 <!-- was: Deletes this user's demand and plan rows, every usage, run and spend row from earlier months, and
 their invite code, invite units and first-seen date. Their name comes off every invite record; their
@@ -147,7 +229,8 @@ each a hashed ID with a date or a number, because each is what stops deleting an
 from resetting a rule: their own record of joining through an invite (without the inviter), so they
 can't claim a second one; their first-seen date (`accounts`), so an old account can't claim as new;
 and their lifetime count of rewarded invites (`inviters`), so an inviter at `max` can't earn 10 more.
-Returns `{ "ok": true }`.
+The saved Deep Dive (`profiles`) and **every** session of the account (`sessions`) go too, in the same
+batch, so the account is signed out on every device. Returns `{ "ok": true }`.
 
 This month's usage, run, spend and rate rows stay until the month ends: they are a hashed ID and
 numbers, and deleting them on request would let an account at its cap reset it by deleting and
@@ -247,6 +330,9 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   - `GEMINI_API_KEY`
   - `HASH_SALT`
   - `DEMAND_TOKEN`
+  - `PROFILE_KEY`: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts saved Deep Dives.
+    Unset, the `/profile` routes answer `503 sync_off`. Replacing it makes every saved copy unreadable
+    (each is replaced on that student's next save), so set it once and keep it.
   - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (Supporter), `STRIPE_PRICE_ID_PRO` (Pro),
     `STRIPE_WEBHOOK_SECRET` — only for the paid plans
 - **Vars:**
@@ -257,7 +343,9 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   - `GLOBAL_RPM` (AI calls per minute across everyone, default 120; `"0"` turns AI off)
   - `PAYMENTS_ENABLED` (`"0"` by default), `SUPPORTER_PRICE_TEXT` and `PRO_PRICE_TEXT` (display only),
     `SITE_URL` (where Stripe returns to)
-- **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `plans`, `stripe_events`.
+<!-- was: - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `plans`, `stripe_events`. -->
+- **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `spend`, `tokens`, `forget`,
+  `plans`, `stripe_events`, `invite_codes`, `referrals`, `bonus`, `accounts`, `inviters`, `sessions`, `profiles`.
   The schema is in `worker/schema.sql`.
 
 ## Dashboard ↔ extension bridge
@@ -265,4 +353,7 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
 - **New message types:**
   - `{type:"profile:set", profile:{majors, minors, class_year, grad_term, stages, terms, states, work_auth}}` returns `{ok:true}`. The extension stores `majors`, `class_year` and `grad_term` in `profile.facts`.
   - `{type:"profile:get"}` returns `{profile}`.
-  - `{type:"auth:token"}` returns `{token}` or `{token:null}`. The dashboard can reuse the extension's sign-in.
+  <!-- was: - `{type:"auth:token"}` returns `{token}` or `{token:null}`. The dashboard can reuse the extension's sign-in. -->
+  - `{type:"auth:token"}` returns `{token, email, account, expires}` (`expires` in ms since the epoch)
+    when the extension holds a session, `{token}` for a legacy ID token, or `{token:null}`. The dashboard
+    can reuse the extension's sign-in, and accepts both shapes.

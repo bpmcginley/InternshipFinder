@@ -2,7 +2,8 @@
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile } from "./queue.js";
 import { runJob, resumeJob, isRunning, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
-import { getToken, authStatus, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
+import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
+import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
 
 const ONBOARDING = "onboarding/onboarding.html";
@@ -198,21 +199,35 @@ async function handle(m, sender, fromPage) {
       return { profile: { ...(d || {}), majors, class_year: f.class_year, grad_term: f.grad_term } };
     }
     case "auth:token":
-      return { token: await getToken() };
-    case "auth:signin":
+      // was: { token: await getToken() }. A session also says whose it is and until when (lib/auth.js bridgeReply).
+      // A session lasts a year, where the ID token this used to hand out lasted an hour, so only the
+      // real dashboard gets it: internscout.org, or a local copy of the site on an unpacked (developer)
+      // build. The bridge also runs on localhost for development, and any local page could ask there.
+      if (fromPage && !trustedDashboard(sender, !chrome.runtime.getManifest().update_url)) return { token: null };
+      return authBridge();
+    case "auth:signin": {
       // Runs here, not in the popup: the popup closes when the sign-in window takes focus.
       // No provider given (the side panel's "Sign in & resume"): signIn reuses the last one, else Google.
       await signIn({ interactive: true, provider: ["google", "microsoft"].includes(m.provider) ? m.provider : undefined });
-      return authStatus();
+      // Then fetch the Deep Dive saved to the account, so a new device skips straight past it.
+      const sync = await syncNow().catch(() => null);
+      return { ...(await authStatus()), restored: !!(sync && sync.state === "restored") };
+    }
     case "auth:signout":
       await signOut();
+      await forgetSynced();
       return { ok: true };
     case "auth:delete": {
-      // DELETE /me on the Worker, then sign out. A refusal (a live subscription) is passed back as it is.
+      // DELETE /me on the Worker (which also deletes the saved Deep Dive and every sign-in), then sign out.
+      // Saving to the account is switched off too, so signing in again doesn't quietly upload it all again.
+      // A refusal (a live subscription) is passed back as it is.
       const r = await deleteServerData();
-      if (r.ok) await signOut();
+      if (r.ok) { await signOut(); await forgetSynced({ stop: true }); }
       return r;
     }
+    case "sync:set":
+      // The Deep Dive's "Save my Deep Dive to my account" switch.
+      return setCloudSync(!!m.on);
     case "auth:status":
       return authStatus();
     case "auth:me": {
@@ -317,6 +332,15 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const s = await loadStore(); // also migrates v0.1 storage
   if (reason === "install" || !s.settings.onboarded) openDeepDive();
+  syncNow().catch(() => {});   // an update: fetch or send the Deep Dive saved to the account (lib/sync.js)
+});
+
+// Browser startup: the account may hold a Deep Dive edited on another device since this one last ran.
+chrome.runtime.onStartup.addListener(() => { syncNow().catch(() => {}); });
+
+// An edit to the part of the store that is saved to the account (lib/sync.js): send it after a short pause.
+chrome.storage.onChanged.addListener((ch, area) => {
+  if (area === "local" && ch.store && isLocalEdit(ch.store.oldValue, ch.store.newValue)) noteEdit().catch(() => {});
 });
 
 // An uninstall is the only thing a student does that the extension can never report: the profile is
@@ -338,4 +362,6 @@ if (chrome.runtime.setUninstallURL) chrome.runtime.setUninstallURL(FEEDBACK_FORM
     if (j.status === "working" && !isRunning(j.id)) await updateJob(j.id, { status: "queued" });
   }
   schedule();
+  // An edit noted just before Chrome stopped the worker last time is sent now.
+  flushPending().catch(() => {});
 })();

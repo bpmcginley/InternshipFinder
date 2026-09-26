@@ -2,6 +2,8 @@
 import { HttpError } from "./http.js";
 import { canUpgrade } from "./billing.js";
 import { forgetStatements } from "./referral.js";
+import { forgetSessions } from "./session.js";
+import { forgetProfile } from "./profile.js";
 
 export const monthOf = (d) => d.toISOString().slice(0, 7);
 
@@ -436,7 +438,8 @@ export async function settle(db, user, admitted, cents, usage) {
 // "Delete my data". Chosen states, earlier months and the plan row go at once. This month's counters
 // stay until the month ends: they are a hashed id and numbers, and deleting them on request would let
 // anyone at a limit reset it by deleting and signing in again. The `forget` row has the daily cron
-// remove them as soon as the month is over.
+// remove them as soon as the month is over. The saved Deep Dive and every sign-in (sessions) go at once
+// too, in the same batch, so the account is signed out on every device.
 export async function deleteUser(db, user, now = new Date()) {
   const month = monthOf(now);
   await db.batch([
@@ -447,6 +450,8 @@ export async function deleteUser(db, user, now = new Date()) {
     db.prepare("INSERT INTO forget (user_hash, month) VALUES (?, ?) ON CONFLICT(user_hash) DO UPDATE SET month = excluded.month")
       .bind(user, month),
     ...forgetStatements(db, user),
+    forgetProfile(db, user),
+    forgetSessions(db, user),
   ]);
 }
 

@@ -16,7 +16,13 @@ The steps below load this folder by hand, for development.
    panel or the dashboard.
 
 ## Deep Dive
-Six steps. Everything stays in `chrome.storage.local`.
+<!-- was: "Six steps. Everything stays in `chrome.storage.local`." Since 0.5.0 the Deep Dive is also saved
+     to your account when you are signed in (on by default). -->
+Six steps, kept in `chrome.storage.local`. Signed in, the Deep Dive is also saved to your account
+(encrypted on InternScout's server), so it is there when you sign in on another computer. Your resume
+and other files, your demographic answers and your saved logins stay on this device. To stop, untick
+"Save my Deep Dive to my account" under Setup; that deletes the saved copy. You stay signed in until
+you sign out.
 <!-- was: "1. **Setup:** AI provider (Anthropic Claude or Google Gemini 3.8 Flash) and its API key, model, ..."
      Corrected in the September 2026 audit: the default needs no key. This file ships inside the zips. -->
 1. **Setup:** sign in (the default: InternScout's own AI, free, with a monthly allowance and no key to

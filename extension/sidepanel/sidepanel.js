@@ -188,8 +188,12 @@ function render() {
   ({ queue: renderQueue, answers: renderAnswers, accounts: renderAccounts })[tab]();
 }
 
+// The queue tab also redraws when the Deep Dive becomes finished or unfinished, which a restore from the
+// student's account does (lib/sync.js), so "Finish the Deep Dive" doesn't linger after one.
+const doneOf = (v) => !!(v && v.settings && v.settings.onboarded);
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== "local") return;
-  if ((tab === "queue" && (ch.queue || ch.usage)) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }
+  const flipped = ch.store && doneOf(ch.store.oldValue) !== doneOf(ch.store.newValue);
+  if ((tab === "queue" && (ch.queue || ch.usage || flipped)) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }
 });
 render();

@@ -624,7 +624,15 @@
     const [inviteNote, setInviteNote] = useState("");
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
-    const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
+    // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
+    // auth.token is the bearer sent to the Worker (a session code or an ID token); auth.who is
+    // IS.authInfo() of the sign-in it came from ({ email, sub, exp, signin, session }), because a
+    // session code can't be decoded the way an ID token could.
+    const [auth, setAuth] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
+    const signedIn = (x, source) => { const who = IS.authInfo(x); return who ? { token: who.token, who, source } : { token: null, who: null }; };
+    // was (twice): IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.tokenOk(r.token)) setAuth(a => ({ ...a, token: r.token, source: "extension" })); });
+    // The extension answers { token, email, account, expires } for a session and { token } for an ID token.
+    const askExtension = () => IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.authOk(r)) setAuth(a => ({ ...a, ...signedIn(r, "extension") })); });
     const { info, queue, profile: extProfile } = useExtension();
 
     useEffect(() => { IS.ls.set(LANDING_KEY, true); }, []);
@@ -689,32 +697,45 @@
 
     // sign-in
     useEffect(() => {
-      const r = IS.handleRedirect();
-      if (r && r.token) setAuth(a => ({ ...a, token: r.token, source: "page" }));
-      if (r && r.error) setNote("Sign-in didn't work: " + r.error);
+      // was: const r = IS.handleRedirect(); (synchronous, before the trade for a session)
+      IS.handleRedirect().then(r => {
+        if (r && r.token) setAuth(a => ({ ...a, ...signedIn(r.session || r.token, "page") }));
+        if (r && r.error) setNote("Sign-in didn't work: " + r.error);
+      });
       IS.fetchWorkerConfig().then(cfg => setAuth(a => ({ ...a, cfg })));
     }, []);
     useEffect(() => {
       if (!info.installed || auth.token) return;
-      IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.tokenOk(r.token)) setAuth(a => ({ ...a, token: r.token, source: "extension" })); });
+      askExtension();
     }, [info.installed]);
     useEffect(() => { if (auth.token && p) IS.postDemand(auth.token, p); }, [auth.token, p]);
-    const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
+    // was: const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
+    const who = auth.token ? auth.who : null;
     const [me, setMe] = useState(null);
-    // A token lasts about an hour. When it runs out, stop showing "Signed in": take a fresh one from
-    // the extension if it has one, otherwise show the sign-in buttons again.
+    // An ID token lasts about an hour, a session until sign-out or a year unused. When either runs out
+    // (or the Worker refuses it), stop showing "Signed in": take a fresh one from the extension if it
+    // has one, otherwise show the sign-in buttons again.
     const dropToken = useCallback(() => {
-      IS.signOut(); setAuth(a => ({ ...a, token: null }));
-      if (info.installed) IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.tokenOk(r.token)) setAuth(a => ({ ...a, token: r.token, source: "extension" })); });
+      // was: IS.signOut(); setAuth(a => ({ ...a, token: null }));
+      IS.signOut(); setAuth(a => ({ ...a, token: null, who: null }));
+      if (info.installed) askExtension();
     }, [info.installed]);
     useEffect(() => {
       setMe(null);
       if (!auth.token) return;
       let live = true, last = Date.now();
-      const load = () => IS.fetchMe(auth.token).then(m => { if (!live) return; if (m) setMe(m); else if (!IS.tokenOk(auth.token)) dropToken(); });
+      // was: ... else if (!IS.tokenOk(auth.token)) dropToken(); });
+      // authOk is also false once the Worker has answered 401 for this token (a session it ended).
+      const load = () => IS.fetchMe(auth.token).then(m => { if (!live) return; if (m) setMe(m); else if (!IS.authOk(auth.who)) dropToken(); });
       load();
-      const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
-      const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
+      // was: const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
+      // was: const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
+      // An ID token ends within the hour. A session ends up to a year out, past the longest delay
+      // setTimeout can hold (about 24.8 days), and the old cap would have signed it out at that
+      // point. So a session only gets the timer once its end is within reach; before that the
+      // Worker's 401 is what ends it.
+      const ms = ((auth.who && auth.who.exp) || 0) - Date.now() - 60000;
+      const timer = ms <= 2 ** 31 - 1 ? setTimeout(dropToken, Math.max(0, ms)) : 0;
       // Coming back to the tab after an Auto-Apply run: the "left this month" text should be current.
       const onVis = () => { if (document.visibilityState === "visible" && Date.now() - last > 60000) { last = Date.now(); load(); } };
       document.addEventListener("visibilitychange", onVis);
@@ -752,12 +773,15 @@
       // This account was already told "use a school account" this session, and the Worker's answer
       // can't change while it stays signed in. A different account (another sub) still tries.
       // was: const sub = (IS.decodeJwt(auth.token) || {}).sub || "";
-      const claims = IS.decodeJwt(auth.token) || {}, sub = claims.sub || "";
+      // was: const claims = IS.decodeJwt(auth.token) || {}, sub = claims.sub || "";
+      // For a session the account stands in for the sub, and `signin` for the ID token's iat.
+      const claims = auth.who || {}, sub = claims.sub || "";
       if (sub && IS.ss.get(IS.INVITE_EDU_KEY) === sub) return;
       // A passing failure already happened for this very sign-in (same sub and issue time) and code
       // this session: page reloads reuse the token, so asking again would only repeat it. A new
       // sign-in (new iat, e.g. after the 401) or a new session gets one more try.
-      const attempt = `${sub}|${claims.iat || ""}|${invited}`;
+      // was: const attempt = `${sub}|${claims.iat || ""}|${invited}`;
+      const attempt = `${sub}|${claims.signin || ""}|${invited}`;
       if (IS.ss.get(IS.INVITE_TRIED_KEY) === attempt) return;
       IS.claimInvite(auth.token, invited).then(r => {
         // was: if (!r) return;
@@ -831,7 +855,9 @@
     }
     function closeSetup() { if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); }
     async function deleteData() {
-      const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
+      // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
+      // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
+      const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and, from our server, your chosen states, past usage and the Deep Dive saved to your account, and sign you out everywhere (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       if (!window.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
@@ -840,7 +866,8 @@
         setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
         try { localStorage.removeItem("internscout.gh_token"); } catch (e) { } setGhToken("");
       }
-      setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
+      // was: setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
+      setP(null); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
       setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : (r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.")
         + (info.installed ? " The extension keeps its own copy of your profile and files: removing it at chrome://extensions deletes that copy." : ""));
@@ -1088,7 +1115,9 @@
                 disabled: !!busy, title: upgradeTitle(pl), desc: `${pl.multiplier}× your monthly AI allowance. Cancel any time.` })) : []),
               auth.token && me && me.can_manage && { key: "manage", group: "plan", label: "Manage plan", onClick: () => billing("portal"), disabled: !!busy,
                 desc: "Change your card or cancel, on Stripe's own page." },
-              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); } },
+              // was: onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); }
+              // signOut(true) also ends the session on the Worker, so the code can't be used again.
+              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } },
             ].filter(Boolean),
             admin: ADMIN ? [
               { key: "rescan", label: "Rescan", desc: "Run the scanner on GitHub now", onClick: rescan, disabled: !!busy },

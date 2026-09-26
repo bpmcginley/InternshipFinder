@@ -1,8 +1,12 @@
 # InternScout Worker
 
-The product's only server: a Cloudflare Worker with a D1 database. It checks Google or Microsoft
+<!-- was: The product's only server: a Cloudflare Worker with a D1 database. It checks Google or Microsoft
 sign-in, calls Gemini with the project's key, enforces monthly caps and the global budget, and counts
-the states students pick. The request/response contract is in [API.md](API.md).
+the states students pick. -->
+The product's only server: a Cloudflare Worker with a D1 database. It checks Google or Microsoft
+sign-in and keeps students signed in with sessions, calls Gemini with the project's key, enforces
+monthly caps and the global budget, counts the states students pick, and keeps an encrypted copy of a
+student's Deep Dive when they save it to their account. The request/response contract is in [API.md](API.md).
 
 <!-- was: It stores only hashed IDs, usage counters, chosen states and monthly spend (`schema.sql`). Never -->
 <!-- was: It stores only hashed IDs, usage counters, chosen states and spend totals, monthly and daily (`schema.sql`). -->
@@ -19,18 +23,30 @@ extra units), and -- for a paid plan -- the Stripe customer and subscription ids
 <!-- The `inviters` table (each inviter's lifetime count of rewarded invites) was added 2026-09-25 so
      "Delete my data" can't reset the 10-invite cap; it is a hashed ID and a number, listed here like
      the rest. -->
-It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
+<!-- was: It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
 monthly and daily, invite records (a random code, who joined through whose invite as hashed IDs, each
 inviter's lifetime count of rewarded invites, and extra units), and -- for a paid plan -- the Stripe
 customer and subscription ids and the plan's status (`schema.sql`). Never prompts,
-replies, emails or tokens. Workers Logs stay off for the same reason.
+replies, emails or tokens. Workers Logs stay off for the same reason. -->
+<!-- Sessions and saved profiles were added 2026-09-26 ("stay signed in" and "save the Deep Dive to your
+     account"). -->
+It stores hashed IDs and the day each was first seen, usage counters, chosen states, spend totals
+monthly and daily, invite records (a random code, who joined through whose invite as hashed IDs, each
+inviter's lifetime count of rewarded invites, and extra units), one row per signed-in device (a
+sha256 fingerprint of its session token, the tier, the provider and dates), the Deep Dive of each
+student who saves it to their account (AES-GCM encrypted under the `PROFILE_KEY` secret, without
+files, saved logins, API keys or demographic answers), and -- for a paid plan -- the Stripe customer
+and subscription ids and the plan's status (`schema.sql`). Never prompts, replies, emails or tokens.
+Workers Logs stay off for the same reason.
 
 ## Files
 
 | File | What it does |
 |---|---|
 | `src/index.js` | Routes, CORS, daily cleanup cron |
-| `src/auth.js` | ID token checks (JWKS, `iss`, `aud`, `exp`), `edu`/`general` tier, user hash |
+| `src/auth.js` | ID token checks (JWKS, `iss`, `aud`, `exp`), `edu`/`general` tier, user hash; hands `iss_` bearers to `session.js` |
+| `src/session.js` | "Stay signed in": `POST`/`DELETE /session`, session bearers, the sliding year, 20 per account |
+| `src/profile.js` | The saved Deep Dive: `GET`/`PUT`/`DELETE /profile`, AES-GCM at rest, the stale rule |
 <!-- was: | `src/limits.js` | Monthly allowance, per-minute/day rate limits, budget | -->
 | `src/limits.js` | Monthly allowance, per-minute/day rate limits, monthly and daily budget |
 | `src/gemini.js` | Builds the Gemini request, clamps tokens and thinking, prices usage |
@@ -68,6 +84,12 @@ Claude never handles keys. Run these yourself:
    - `npx wrangler secret put GEMINI_API_KEY` (a paid-tier key, so Google doesn't train on prompts)
    - `npx wrangler secret put HASH_SALT` (any long random string; changing it resets everyone's usage)
    - `npx wrangler secret put DEMAND_TOKEN` (any long random string; CI uses it to read state counts)
+   - `npx wrangler secret put PROFILE_KEY` (exactly 32 random bytes, base64: paste the output of
+     `openssl rand -base64 32`, or of
+     `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). It encrypts the
+     Deep Dives students save to their account. Until it is set, saving is off (`/config` says
+     `"sync": false`) and nothing breaks. Set it once and keep it: a new value makes every saved copy
+     unreadable until that student saves again.
 5. `npm run deploy`. Note the `*.workers.dev` URL it prints. This applies `schema.sql` to the live
    database first (every statement is `CREATE TABLE IF NOT EXISTS`, so it is safe to repeat) and then
    deploys. Always deploy this way rather than with `wrangler deploy` on its own: a commit that adds a

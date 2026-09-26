@@ -1,6 +1,7 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
 import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS } from "../lib/store.js";
 import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/auth.js";
+import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
 
@@ -11,19 +12,28 @@ const STEPS = [
   ["interview", "Interview"], ["voice", "Voice"], ["review", "Review"],
 ];
 let S = await loadStore();
-const rerun = !!S.settings.onboarded;
+let rerun = !!S.settings.onboarded;   // was: const. A restore from the account (below) makes this a rerun.
 let step = new URLSearchParams(location.search).get("step") || (rerun ? "review" : "setup");
+let seenRestore = await restoredAt();   // the last restore this page has loaded
+let restoredNote = "";                  // shown above the current step until the student moves on
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (sel) => main.querySelector(sel);
 
 // ---------- persistence ----------
 // The service worker also writes the store (accounts, answers, learned answers), so merge instead of overwrite.
+// It also restores the Deep Dive from the student's account (lib/sync.js): when that happened after this
+// page loaded, this page's copy is out of date and must not be written over it; the page reloads instead.
 let saveTimer = null;
 function save(now) {
   clearTimeout(saveTimer);
-  const run = () => updateStore((fresh) => {
+  const run = () => updateStore(async (fresh) => {
+    if ((await restoredAt()) !== seenRestore) return;
     fresh.profile = { ...S.profile, extra: { ...fresh.profile.extra, ...S.profile.extra } };
-    fresh.files = S.files; fresh.ai = S.ai; fresh.settings = S.settings;
+    fresh.files = S.files; fresh.ai = S.ai;
+    // was: fresh.settings = S.settings. The sync bookkeeping and the account switch belong to the background.
+    const keep = Object.fromEntries(BACKGROUND_SETTINGS.map((k) => [k, fresh.settings[k]]));
+    fresh.settings = { ...S.settings, ...keep };
+    Object.assign(S.settings, keep);
   });
   if (now) return run();
   saveTimer = setTimeout(run, 300);
@@ -82,7 +92,7 @@ function doneFor(id) {
     review: !!S.settings.onboarded,
   }[id];
 }
-function go(id) { save(true); step = id; render(); scrollTo(0, 0); }
+function go(id) { save(true); step = id; restoredNote = ""; render(); scrollTo(0, 0); }
 function navButtons(prev, next, nextLabel = "Next") {
   return `<div class="nav"><div>${prev ? `<button class="btn" data-go="${prev}">← Back</button>` : ""}</div><div>${next ? `<button class="btn blue" data-go="${next}">${nextLabel} →</button>` : ""}</div></div>`;
 }
@@ -93,8 +103,30 @@ function render() {
   stepsEl.innerHTML = STEPS.map(([id, t]) => `<button data-step="${id}" class="${id === step ? "on" : ""} ${doneFor(id) ? "done" : ""}">${t}</button>`).join("");
   stepsEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.step)));
   ({ setup, files, facts, interview, voice, review })[step]();
+  if (restoredNote) main.insertAdjacentHTML("afterbegin", `<div class="banner">${esc(restoredNote)}</div>`);
   wireNav();
 }
+
+// The background restored the Deep Dive from the student's account (after they signed in here or in the
+// popup, or at startup). Reload it, so a student on a new computer isn't sent through the Deep Dive again.
+async function showRestore() {
+  const r = await takeRestored();
+  seenRestore = await restoredAt();
+  if (!r) return false;
+  restoredNote = restoredMessage(r) + (S.files.resume ? "" : " Your files stay on each device, so add your resume under Files.");
+  return true;
+}
+chrome.storage.onChanged.addListener(async (ch, area) => {
+  const r = area === "local" && ch[RESTORED_KEY] && ch[RESTORED_KEY].newValue;
+  if (!r || r.at === seenRestore) return;
+  clearTimeout(saveTimer);
+  S = await loadStore();
+  rerun = !!S.settings.onboarded;
+  if (!(await showRestore())) return;
+  if (rerun) step = "review";
+  render();
+  scrollTo(0, 0);
+});
 
 // ---------- 1. setup ----------
 function setup() {
@@ -197,10 +229,37 @@ async function fillAccount(msg) {
     return;
   }
   const lines = allowanceLines(a.me, MAIN_TASKS);
+  const synced = (await loadStore()).settings.cloud_sync !== false;   // the background's copy, not this page's
+  if (!$("#acct")) return;
   box.innerHTML = `
     <p class="small" style="margin:0 0 8px">Signed in${a.provider ? ` with ${esc(PROVIDER_LABELS[a.provider] || a.provider)}` : ""}${a.email ? ` as <b>${esc(a.email)}</b>` : ""}. <a href="#" id="signout">Sign out</a> &middot; <a href="#" id="deldata">Delete my data</a></p>
     ${lines.length ? `<ul class="small" style="margin:0 0 6px;padding-left:18px">${lines.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
-    <p class="small ${!a.me || a.me.error ? "err" : "muted"}" style="margin:0">${esc(tierNote(a.me))}</p>${note}`;
+    <p class="small ${!a.me || a.me.error ? "err" : "muted"}" style="margin:0">${esc(tierNote(a.me))}</p>
+    <label class="check small" style="margin:12px 0 0"><input type="checkbox" id="cloudsync" ${synced ? "checked" : ""}><span>Save my Deep Dive to my account, so it's there on my other devices</span></label>
+    <p class="small muted" style="margin:4px 0 0 21px">Your resume and other files, your demographic answers and your saved logins stay on this device.</p>
+    <p class="small" id="syncmsg" style="margin:4px 0 0 21px" hidden></p>${note}`;
+  // Off: asks first, then the background deletes the account's copy (DELETE /profile) and stops saving.
+  // On again: the background sends this device's Deep Dive (or takes a newer one from the account).
+  $("#cloudsync").addEventListener("change", async (e) => {
+    const cb = e.target, on = cb.checked, out = $("#syncmsg");
+    if (!on && !confirm("Stop saving your Deep Dive to your account? The copy saved there will be deleted. Everything on this device stays as it is.")) { cb.checked = true; return; }
+    cb.disabled = true;
+    out.hidden = false; out.className = "small muted"; busy(out, on ? "Saving your Deep Dive to your account…" : "Deleting the copy in your account…");
+    const r = await chrome.runtime.sendMessage({ type: "sync:set", on }).catch((err) => ({ error: err.message }));
+    cb.disabled = false;
+    if (!r || !r.ok) {
+      cb.checked = !on;
+      out.className = "small err";
+      out.textContent = on ? "Couldn't turn this on right now. Try again in a moment."
+        : "Couldn't delete the copy in your account, so saving is still on. Check your connection or sign in again, then try again.";
+      return;
+    }
+    S.settings.cloud_sync = on;
+    out.className = "small ok";
+    out.textContent = on
+      ? (r.state === "pushed" || r.state === "same" || r.state === "restored" ? "Turned on. Your Deep Dive is saved to your account." : "Turned on. It will be saved to your account when InternScout can take it.")
+      : "Turned off. The copy in your account was deleted.";
+  });
   $("#signout").addEventListener("click", async (e) => {
     e.preventDefault();
     await chrome.runtime.sendMessage({ type: "auth:signout" });
@@ -212,7 +271,9 @@ async function fillAccount(msg) {
   // - profile, files, saved logins - is the student's own copy and goes when the extension is removed.
   $("#deldata").addEventListener("click", async (e) => {
     e.preventDefault();
-    if (!confirm("Delete what InternScout's server holds about you (your chosen states, plan record and past months' counts)? This month's counts stay until the month ends. Your profile and files in this browser are not touched.")) return;
+    // was: "(your chosen states, plan record and past months' counts)". The server now also keeps the saved
+    // Deep Dive and the sign-ins, and DELETE /me removes both.
+    if (!confirm("Delete what InternScout's server holds about you (your saved Deep Dive, your sign-ins, your chosen states, plan record and past months' counts)? This month's counts stay until the month ends. Your profile and files in this browser are not touched.")) return;
     const r = await chrome.runtime.sendMessage({ type: "auth:delete" });
     if (r && r.ok) { alert("Deleted. You have been signed out."); fillAccount(); }
     // An expired sign-in came back as {error: "auth"} with no message, and was reported as a
@@ -565,4 +626,7 @@ function review() {
   });
 }
 
+// A restore that happened before this page opened (signed in from the popup on a new computer).
+await showRestore();
+if (restoredNote && S.settings.onboarded && !new URLSearchParams(location.search).get("step")) step = "review";
 render();

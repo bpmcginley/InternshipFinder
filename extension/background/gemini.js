@@ -227,7 +227,7 @@ export async function readSSE(res) {
 const isSSE = (res) => /event-stream/i.test((res.headers && res.headers.get && res.headers.get("content-type")) || "");
 
 // Sends the same Gemini body to WORKER_URL/ai and parses the reply with the Gemini parser.
-// refreshToken(): called once after a 401; returns a new token or null.
+// refreshToken(rejected): called once after a 401 with the token the Worker refused; returns a new token or null.
 //
 // The call asks for a streamed reply (?stream=1). Chrome ends an extension service worker whose
 // fetch has had no response for 30 seconds, and a tailored resume or a Deep Dive step can take longer
@@ -274,7 +274,7 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
     const err = workerError(res.status, data);
     if (err.code === "auth" && !refreshed && refreshToken) {
       refreshed = true;
-      token = await refreshToken().catch(() => null);
+      token = await refreshToken(token).catch(() => null);   // gets the rejected token, so a dead session can be dropped
       if (!token) throw err;
       attempt--;
       continue;
