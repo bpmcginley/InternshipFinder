@@ -33,7 +33,12 @@ concurrency:
 jobs:
   post:
     # The variable reaches only this condition, never a command line.
-    if: vars.SOCIAL_ENABLED != '0'
+    # was: if: vars.SOCIAL_ENABLED != '0'. An unset variable is null, and an expression comparing null
+    # with a string turns both into numbers: null -> 0 and '0' -> 0, so "!= '0'" was false and every
+    # run was skipped whenever the variable did not exist, the default it was meant to leave on.
+    # Now: run when the variable is unset or empty (!vars.X; '' and null are falsy), or set to
+    # anything but '0' (both sides strings, compared as strings). Only SOCIAL_ENABLED = 0 skips.
+    if: ${{ !vars.SOCIAL_ENABLED || vars.SOCIAL_ENABLED != '0' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10       # was: 5; Instagram fetches the card before it publishes
     steps:
