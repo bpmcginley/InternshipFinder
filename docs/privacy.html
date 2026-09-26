@@ -98,7 +98,9 @@
     <!-- was: <p class="meta">Last updated September 22, 2026</p>  (invites added 2026-09-24) -->
     <!-- was: <p class="meta">Last updated September 24, 2026</p>  (what Delete my data keeps for invites,
          and the pending invite code in local storage, added 2026-09-25) -->
-    <p class="meta">Last updated September 25, 2026</p>
+    <!-- was: <p class="meta">Last updated September 25, 2026</p>  (staying signed in and the Deep Dive
+         saved to your account added 2026-09-26) -->
+    <p class="meta">Last updated September 26, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
          the whole product "free" without qualification is no longer true. Search still is. -->
     <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
@@ -113,7 +115,14 @@
              the AI whole, as base64. Storage and transmission are two different promises; only the
              storage one was ever true. -->
         <!-- was: <li>Your profile, resume and files stay in your browser and the extension.</li> -->
-        <li>Your profile, resume and files are stored only in your browser and the extension. We never keep a copy.</li>
+        <!-- "We never keep a copy" stopped being true on 2026-09-26: the extension now saves the Deep Dive
+             profile to the student's account by default (extension/lib/sync.js, PUT /profile). Files
+             still never leave for storage, and the six demographic answers, saved logins and API keys
+             are left out of the saved copy, so those promises are kept and named. -->
+        <!-- was: <li>Your profile, resume and files are stored only in your browser and the extension. We never keep a copy.</li> -->
+        <li>Your resume and other files are stored only in your browser and the extension. We never keep a copy of them.</li>
+        <li>The profile your Deep Dive builds is saved to your InternScout account by default, encrypted, so it's there on your other devices. You can turn that off in the extension, which deletes our copy. Your demographic answers, saved logins and API keys are never saved to your account. <a href="#saved">Details below</a>.</li>
+        <li>You stay signed in on a device until you sign out. Your browser keeps a random sign-in code; our server keeps only a fingerprint of it.</li>
         <li>Stored is not the same as never sent. The Deep Dive and resume tailoring do send your resume and some other files to the AI, in the request itself. Details below.</li>
         <li>AI requests pass through our server to Google's paid Gemini API. We don't store them, and they aren't used to train AI.</li>
         <!-- "only" stopped being true once paid plans went live: a subscriber also has a plan row. -->
@@ -126,7 +135,9 @@
              closing the subject off. -->
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage counts, the states you picked, and — only if you subscribe — which plan you are on. Nothing else.</li> -->
         <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li> -->
-        <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and, only if you subscribe, your plan and your Stripe IDs. The full list is below.</li>
+        <!-- was: <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and, only if you subscribe, your plan and your Stripe IDs. The full list is below.</li>
+             Sessions and the saved Deep Dive (2026-09-26) are two more things the server keeps. -->
+        <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, a fingerprint of each sign-in, your saved Deep Dive (encrypted, unless you turn saving off), your invite code and extra runs if you use invites, and, only if you subscribe, your plan and your Stripe IDs. The full list is below.</li>
         <!-- Added with the weekly email sign-up (docs/js/app.js Digest). It is the one place a student
              hands over an email address on purpose, so the short version says who ends up holding it. -->
         <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. Buttondown also records the IP address you sign up from. <a href="#digest">Details below</a>.</li>
@@ -134,7 +145,8 @@
         <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
              The invite records Delete my data keeps (see #delete) are part of what "it" covers, so the
              short version names them too. -->
-        <li>You can delete it at any time. The current month's counts stay until the month ends, and a few invite records (your hashed ID with a date or a count) stay after that, so deleting can't be used to reset a limit. <a href="#delete">Details below</a>.</li>
+        <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, and a few invite records (your hashed ID with a date or a count) stay after that, so deleting can't be used to reset a limit. <a href="#delete">Details below</a>.</li> -->
+        <li>You can delete it at any time. Delete my data also removes your saved Deep Dive and signs you out everywhere. The current month's counts stay until the month ends, and a few invite records (your hashed ID with a date or a count) stay after that, so deleting can't be used to reset a limit. <a href="#delete">Details below</a>.</li>
       </ul>
     </div>
 
@@ -153,7 +165,13 @@
            drops it; core.js's Delete my data removes it too. It is a classmate's random code, not
            anything about this student, but the list says what the dashboard keeps, so it is here. -->
       <!-- was: <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong></li> -->
-      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it.</li>
+      <!-- 2026-09-26: the dashboard now keeps a sign-in there too (docs/js/core.js SESSION_KEY,
+           "internscout.session": the session code, a short account ID, the email, provider, tier and
+           expiry), and the dashboard profile it hands the extension is part of what the extension
+           saves to the account (dashboard_profile in the synced subset). -->
+      <!-- was: <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it.</li> -->
+      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it. If the extension is installed, the dashboard also hands it your profile, and the extension saves that with your Deep Dive (see <a href="#saved">below</a>).</li>
+      <li>When you sign in, the dashboard keeps your sign-in in local storage too: a random sign-in code, a short account ID, and your email address, only so it can show which account is signed in. It stays until you sign out, press Delete my data, or the sign-in ends.</li>
       <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
       <li>GitHub hosts the page and may keep normal web server logs under its own policy. The dashboard also loads fonts and code libraries from public servers (such as Google Fonts).</li>
       <!-- was: <li>We don't use analytics, ad trackers or cookies of our own.</li>
@@ -170,7 +188,12 @@
            "chosen states" is dropped from this list because those do go to the server (see Searching
            listings above); leaving it here is what made the two sections contradict each other. -->
       <!-- was: <li>Your majors, class year, chosen states, work authorization, resume, transcript, cover letter, writing samples and saved answers stay on your device. They live in browser storage (dashboard) or Chrome extension storage.</li> -->
-      <li>Your majors, class year, work authorization, resume, transcript, cover letter, writing samples and saved answers are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of any of it, and nothing here is uploaded for safekeeping or backup.</li>
+      <!-- Third pass, 2026-09-26: the profile half of this sentence is no longer true by default. The
+           extension saves the Deep Dive profile to the account (extension/lib/sync.js, PUT /profile);
+           the files half still is, so the files keep the promise and the profile gets its own section. -->
+      <!-- was: <li>Your majors, class year, work authorization, resume, transcript, cover letter, writing samples and saved answers are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of any of it, and nothing here is uploaded for safekeeping or backup.</li> -->
+      <li>Your resume, CV, transcript, cover letter and writing samples are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of them, and they are never uploaded for safekeeping or backup.</li>
+      <li>Your profile (majors, class year, work authorization, the facts and stories from your Deep Dive and your saved answers) is kept on your device too, and by default the extension also saves a copy to your InternScout account. What is saved and what never is: <a href="#saved">Your Deep Dive, saved to your account</a>.</li>
       <li><strong>Some of these files are sent to the AI when you run a feature that reads them.</strong> They go inside the request, through our Worker to Google's Gemini API, and are not stored at either end (see <a href="#ai">AI features</a>). Which file goes depends on the feature and on the file's format:
         <ul>
           <li><strong>The Deep Dive</strong> reads your resume and CV to fill in your profile, and your cover letter and writing samples to learn your writing voice. A PDF is sent as the file itself. A Word or plain-text file is read on your device first and only the text it contains is sent, up to 60,000 characters.</li>
@@ -186,7 +209,28 @@
       <!-- was: <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. They are never sent to us or to the AI.</li> -->
       <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. <strong>The passwords are never sent to us or to the AI</strong>: the extension types them into the page itself, and the AI is only told to ask for one, never given it. The sign-up email address <em>is</em> included in each Auto-Apply request, because the AI has to know which address to register or sign in with.</li>
       <li>Chrome does not encrypt extension storage. Anyone who can use your computer account could read it.</li>
-      <li>We have no copy of any of this. If you clear it, it's gone.</li>
+      <!-- was: <li>We have no copy of any of this. If you clear it, it's gone.</li> -->
+      <li>We have no copy of your files, your demographic answers or your saved logins. If you clear them, they're gone. Your profile can be restored from your account if you left saving on.</li>
+    </ul>
+
+    <!-- Added 2026-09-26 with profile sync (extension/lib/sync.js; worker GET/PUT/DELETE /profile).
+         What is saved is the synced subset: `profile` (facts, education, experience, projects,
+         skills, links, stories, goals, voice, extra) minus the six demographic keys in profile.facts
+         (gender, race, hispanic, veteran, disability, lgbtq), plus settings.onboarded,
+         settings.deep_dive_at and dashboard_profile (majors, minors, class year, graduation term,
+         stages, terms, states, work authorization). Never uploaded: files, `accounts`, ai.apiKey,
+         ai.geminiKey, settings.master_password, settings.signup_email, the `answers` log and the job
+         queue. The Worker also strips the demographic keys before storing, and encrypts each profile
+         with AES-GCM-256 under a key derived per account from a server secret. -->
+    <h2 id="saved">Your Deep Dive, saved to your account</h2>
+    <p>When you are signed in, the extension saves the profile your Deep Dive builds to your InternScout account, so it's there when you sign in on another computer or reinstall the extension. This is on by default.</p>
+    <ul>
+      <li><strong>What is saved:</strong> the profile the Deep Dive builds. That is the facts it collects about you (such as your name, contact details, address, work authorization and the other standard application questions), your education, experience, projects, skills and links, your stories and goals, your writing voice, and your answers to its questions. It also includes the profile you set on the dashboard (your majors, class year, graduation term, the kinds of roles, terms and states you picked, and your work authorization), and whether and when you finished the Deep Dive.</li>
+      <li><strong>What is never saved to your account:</strong> your resume, CV, transcript, cover letter, writing samples and any other file; your answers to the six demographic questions (gender, race, Hispanic or Latino, veteran status, disability and LGBTQ+); the logins and passwords the extension saved for employer sites; your own API keys; and your list of past application answers and jobs. These stay on your device. Our server also removes the demographic answers from anything it is sent, as a second check.</li>
+      <li><strong>Encrypted at rest.</strong> The saved profile is encrypted on our server with a key made for your account alone. It is stored against your scrambled sign-in ID, with the time it was last changed and its size. It is decrypted only to send it back to your own extension while you are signed in.</li>
+      <li>It is not used for anything else: not for the AI (the extension sends the AI what each feature needs from the copy on your device, as described under <a href="#ai">AI features</a>), not for ads, and not shared or sold.</li>
+      <li><strong>Turning it off:</strong> untick <em>Save my Deep Dive to my account</em> in the extension. It asks you to confirm, then deletes the copy on our server right away and stops saving. Your profile on the device is untouched.</li>
+      <li><strong>Delete my data</strong> (in the extension or on the dashboard) deletes the saved profile too, along with every sign-in, so every device is signed out.</li>
     </ul>
 
     <!-- id added so the files section above can link straight here. -->
@@ -262,10 +306,21 @@
 
     <h2>Sign-in</h2>
     <ul>
-      <li>You sign in only to use AI features and to save your chosen states. Search never needs it.</li>
+      <!-- was: <li>You sign in only to use AI features and to save your chosen states. Search never needs it.</li> -->
+      <li>You sign in only to use AI features, to save your chosen states and to save your Deep Dive to your account. Search never needs it.</li>
       <li>You sign in with any Google or Microsoft account. You type your password on the provider's own page. <strong>We never see or receive your password.</strong></li>
-      <li>The provider gives back a short-lived token. The Worker checks it on each request and does not save it. It reads the email in the token only to see whether it is a verified school (.edu) address, which gets a larger AI allowance. The email is never stored.</li>
-      <li>Your browser keeps the token only for the current session. It's gone when you close the browser or when it expires.</li>
+      <!-- 2026-09-26: the provider's token is now traded once for a session (worker POST /session,
+           schema.sql `sessions`) so a student stays signed in. The session code is
+           "iss_" + 32 random bytes; the Worker stores only its SHA-256, the hashed account ID, the
+           tier, the provider and created / last used / expires dates, with a 365-day sliding expiry
+           and at most 20 per account. The old wording (token kept only for the browser session) is
+           what the dashboard still falls back to when the Worker can't make a session. -->
+      <!-- was: <li>The provider gives back a short-lived token. The Worker checks it on each request and does not save it. It reads the email in the token only to see whether it is a verified school (.edu) address, which gets a larger AI allowance. The email is never stored.</li> -->
+      <li>The provider gives back a short-lived token. The Worker checks it and does not save it. It reads the email in the token only to see whether it is a verified school (.edu) address, which gets a larger AI allowance. The email is never stored on our server.</li>
+      <!-- was: <li>Your browser keeps the token only for the current session. It's gone when you close the browser or when it expires.</li> -->
+      <li><strong>Staying signed in.</strong> The Worker then gives your browser or extension a random sign-in code, and that code is what signs you in from then on, so you stay signed in on that device until you sign out. Your device keeps the code, with your email address so it can show which account is signed in. Our server keeps only a fingerprint of the code (a one-way hash it can't be turned back into), your scrambled sign-in ID, your allowance tier, whether you used Google or Microsoft, and when the sign-in was made, last used and ends.</li>
+      <li>A sign-in ends when you sign out, when you press Delete my data (which ends all of them), or after a year without being used. Each device or browser has its own, and we keep at most 20 per account, dropping the oldest.</li>
+      <li>If our server can't start a sign-in like this, the dashboard falls back to keeping the provider's token for the current browser session only. It's gone when you close the browser or when it expires, about an hour later.</li>
       <li>From the token, the Worker makes a one-way hash: a scrambled code that can't be turned back into your name or email. We don't store your name or email.</li>
     </ul>
 
@@ -281,6 +336,10 @@
         <thead><tr><th scope="col">Data</th><th scope="col">Why</th></tr></thead>
         <tbody>
           <tr><td>Hashed sign-in ID</td><td>To tie your usage counts together without knowing who you are.</td></tr>
+          <!-- Added 2026-09-26: worker/schema.sql `sessions` and `profiles`. The table is the complete
+               list, so both new tables get a row. -->
+          <tr><td>For each device you are signed in on: a fingerprint of its sign-in code (never the code itself), your hashed sign-in ID, your allowance tier, whether you used Google or Microsoft, and when the sign-in was made, last used and ends</td><td>So you stay signed in on that device. Deleted when you sign out there, after a year without use, or when you press Delete my data. At most 20 per account.</td></tr>
+          <tr><td>Unless you turn saving off: your Deep Dive profile, encrypted, with when it last changed and its size (what is in it and what is left out: <a href="#saved">see above</a>)</td><td>So your Deep Dive is there on your other devices. Deleted when you turn saving off or press Delete my data.</td></tr>
           <tr><td>Monthly usage counts per AI task (for example, "3 tailored resumes in September"), with a random ID for each run</td><td>To enforce the monthly allowance.</td></tr>
           <tr><td>One number per month: roughly what your AI use has cost us, in cents</td><td>So a single account can't use up the budget that pays for everyone's AI. It is removed when the month ends.</td></tr>
           <tr><td>Short-term call counters (per minute and per day)</td><td>To stop abuse.</td></tr>
@@ -317,7 +376,10 @@
     <!-- Second pass, 2026-09-19: the day total is not service-wide. worker/src/limits.js charges it inside `if (plan === "free")`, and the comment above that line says a paid call neither reads nor writes the row, so it measures the free tier's share of the month. -->
     <!-- was: ...one for the month, and one for the current day, so a single busy day can't empty the month's budget. These are service-wide figures. -->
     <p>Separately from the table, we keep running totals of what AI costs the whole service: one for the month across the whole service, and one for the day's free-allowance share, so a single busy day can't empty the month's budget. Neither is tied to a person. Neither is linked to any account, and neither says anything about who used what.</p>
-    <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+    <!-- was: <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+         The saved Deep Dive (2026-09-26) has the student's name and contact email in it, so the flat
+         "names, emails" no longer holds without naming that one exception. -->
+    <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
     <!-- The weekly email adds nothing to the table above: the form posts from the browser straight to
          Buttondown and never touches the Worker. This line is here so "we don't store emails" isn't
          read as "no one keeps the address you gave for the email". -->
@@ -368,19 +430,25 @@
       <!-- was: <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
            The first-seen date and the inviter's lifetime count are now kept too (referral.js
            forgetStatements(), 2026-09-25), so this list names all three kept invite records. -->
-      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. Three invite records stay, each just your hashed ID with a date or a number, because without them deleting and signing in again would get around the invite rules: the date we first saw your account (so it can't count as new again); if you joined through an invite, the record that you did, without the inviter's ID (so you can't accept a second one); and if your invites earned you extra runs, how many did (so the limit of 10 can't start over). This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
+      <!-- was: <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. Three invite records stay ...
+           DELETE /me also removes the saved profile and every session (2026-09-26). -->
+      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your saved Deep Dive, every sign-in (so every device is signed out), your plan record, your invite code and extra runs, and everything from earlier months are removed right away. Three invite records stay, each just your hashed ID with a date or a number, because without them deleting and signing in again would get around the invite rules: the date we first saw your account (so it can't count as new again); if you joined through an invite, the record that you did, without the inviter's ID (so you can't accept a second one); and if your invites earned you extra runs, how many did (so the limit of 10 can't start over). This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
       <li><strong>In your browser:</strong> clear site data for <code>internscout.org</code> (and for <code>bpmcginley.github.io</code>, the address InternScout used before September 2026, if you visited it then). In Chrome, click the icon left of the address bar, then <em>Site settings</em>, then <em>Delete data</em>. This removes your dashboard profile and saved statuses.</li>
-      <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li>
+      <!-- was: <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li> -->
+      <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords. That doesn't reach the copy of your Deep Dive saved to your account: turn saving off or press Delete my data first.</li>
       <!-- Delete my data only reaches the Worker, and the weekly email's list lives at Buttondown. -->
       <li><strong>The weekly email:</strong> use the unsubscribe link in any of the emails. <strong>Delete my data</strong> can't reach it, because the address is kept by Buttondown, not by our server. To have it deleted from Buttondown's list as well, write to us at the address below.</li>
     </ol>
-    <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use.</p>
+    <!-- was: <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use.</p>
+         A saved profile has no automatic expiry (worker/schema.sql `profiles`), so this says so. -->
+    <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use and your sign-ins end after a year. A saved Deep Dive can only be reached through a sign-in to the same account, so delete it (or turn saving off) while you still can.</p>
 
     <h2>Chrome Web Store: limited use</h2>
     <p>The extension's use of data follows the <a href="https://developer.chrome.com/docs/webstore/program-policies/user-data-faq">Chrome Web Store User Data Policy</a>, including the Limited Use requirements. In plain words:</p>
     <ul>
       <li>Data is used only for the extension's single purpose: helping you fill out internship applications, plus the AI help that goes with it.</li>
-      <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker), or where the law requires.</li>
+      <!-- was: <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker), or where the law requires.</li> -->
+      <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker, and your Deep Dive profile to your own InternScout account unless you turn that off), or where the law requires.</li>
       <li>Data is never sold.</li>
       <li>Data is never used for ads, including personalized ads.</li>
       <li>Data is never used to decide credit, lending or anything like it.</li>

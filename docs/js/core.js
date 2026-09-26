@@ -396,8 +396,15 @@
   };
 
   // ---------- Google / Microsoft sign-in (implicit id_token flow, see worker/API.md) ----------
+  // The provider's ID token lasts about an hour, and sessionStorage goes when the tab closes, so the
+  // dashboard used to sign out that often. After the redirect the ID token is now traded once for a
+  // Worker session (POST /session): an opaque "iss_..." code kept in localStorage until sign-out, or
+  // until the Worker forgets it after a year unused. The ID token stays the fallback for a Worker
+  // that doesn't know /session yet (404), is down (5xx) or can't be reached.
   const TOKEN_KEY = "internscout.idtoken";
+  const SESSION_KEY = "internscout.session";
   const workerOn = () => !!C.workerUrl && !/\.example\.|example\.workers\.dev/.test(C.workerUrl);
+  const workerBase = () => C.workerUrl.replace(/\/$/, "");
   function decodeJwt(t) {
     try {
       let s = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -405,13 +412,97 @@
       return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0))));
     } catch (e) { return null; }
   }
-  const tokenOk = t => { const p = t && decodeJwt(t); return !!(p && p.exp && p.exp * 1000 > Date.now() + 60000); };
-  const storedToken = () => { const t = ss.get(TOKEN_KEY); if (t && tokenOk(t)) return t; if (t) ss.del(TOKEN_KEY); return null; };
+  const isSession = t => typeof t === "string" && t.startsWith("iss_");
+  const storedSession = () => { const r = ls.get(SESSION_KEY, null); return r && typeof r === "object" && isSession(r.token) ? r : null; };
+  // Tokens the Worker answered 401 for on this page. The page's own copies are dropped at once
+  // (forget), and this lets a token the page didn't store (the extension's) read as signed out too.
+  const rejected = new Set();
+  // The one place that reads who a sign-in belongs to and when it ends, for either kind:
+  //   a session record, as stored here { token, account, email, provider, tier, expires: ISO } or as
+  //   the extension's bridge sends it { token, email, account, expires: ms };
+  //   a legacy ID token (a JWT string, or { token: JWT } from an older extension);
+  //   a bare "iss_..." string, looked up in this page's stored record;
+  //   or this function's own result.
+  // Returns { token, email, sub, exp (ms), signin, session } or null. `sub` is the provider's sub for
+  // an ID token and the session's `account` for a session (both are stable per account, which is all
+  // the dedupe keys need). `signin` changes with each new sign-in: the ID token's iat, or the tail of
+  // the session code.
+  // was: callers ran decodeJwt(token).email / .sub / .exp and tokenOk(token) themselves, which a
+  // session code can't answer.
+  function authInfo(x) {
+    if (!x) return null;
+    if (typeof x === "string") {
+      if (isSession(x)) { const r = storedSession(); return r && r.token === x ? authInfo(r) : null; }
+      const p = decodeJwt(x);
+      return p ? { token: x, email: p.email || "", sub: p.sub || "", exp: (Number(p.exp) || 0) * 1000, signin: String(p.iat || ""), session: false } : null;
+    }
+    if (typeof x !== "object" || typeof x.token !== "string") return null;
+    if (!isSession(x.token)) {
+      const i = authInfo(x.token);
+      return i && x.email && !i.email ? { ...i, email: x.email } : i;
+    }
+    const exp = typeof x.exp === "number" ? x.exp : typeof x.expires === "number" ? x.expires : Date.parse(x.expires || "") || 0;
+    return { token: x.token, email: x.email || "", sub: x.sub || x.account || "", exp, signin: x.signin || x.token.slice(-8), session: true };
+  }
+  // Signed in and good for at least another minute, and not refused by the Worker on this page.
+  const authOk = x => { const i = authInfo(x); return !!(i && i.exp > Date.now() + 60000 && !rejected.has(i.token)); };
+  // was: const tokenOk = t => { const p = t && decodeJwt(t); return !!(p && p.exp && p.exp * 1000 > Date.now() + 60000); };
+  // Kept under its old name for anything still calling it; it understands sessions now.
+  const tokenOk = authOk;
+  // was: const storedToken = () => { const t = ss.get(TOKEN_KEY); if (t && tokenOk(t)) return t; if (t) ss.del(TOKEN_KEY); return null; };
+  // The session first (it outlives the tab), then this tab's ID token. Expired ones are removed.
+  const storedToken = () => {
+    const r = storedSession();
+    if (r && authOk(r)) return r.token;
+    if (ls.get(SESSION_KEY, null) != null) ls.del(SESSION_KEY);
+    const t = ss.get(TOKEN_KEY); if (t && authOk(t)) return t; if (t) ss.del(TOKEN_KEY); return null;
+  };
+  // Drop this page's copy of a token the Worker refused (401). Only that token: a 401 for the
+  // extension's token mustn't sign out the page's own session, or the other way round.
+  function forget(token) {
+    if (!token) return;
+    rejected.add(token);
+    const r = storedSession(); if (r && r.token === token) ls.del(SESSION_KEY);
+    if (ss.get(TOKEN_KEY) === token) ss.del(TOKEN_KEY);
+  }
+  // The Worker slides a session's expiry to a year from its last use. The record here keeps the
+  // expiry it was created with, so after a successful call move it forward the same way (a day
+  // short, since the Worker refreshes at most once a day); otherwise a student who uses InternScout
+  // every day would still be signed out here a year after signing in.
+  function touchSession(token) {
+    const r = storedSession();
+    if (!r || r.token !== token) return;
+    const next = Date.now() + 364 * DAY;
+    if ((Date.parse(r.expires) || 0) < next - DAY) ls.set(SESSION_KEY, { ...r, expires: new Date(next).toISOString() });
+  }
   const randomHex = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
   const redirectUri = () => C.redirectUri || (location.origin + location.pathname.replace(/index\.html$/, ""));
 
-  // Reads the #id_token=... hash the provider sends back. Returns null, {token}, or {error}.
-  function handleRedirect() {
+  // Trade a checked ID token for a session. Returns the stored record, { error } for a 401 (the
+  // Worker refused the ID token itself), or null when sessions aren't available (404, 5xx, network,
+  // or any other answer without a session in it) and the caller keeps the ID token instead.
+  async function startSession(idToken) {
+    if (!workerOn()) return null;
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const r = await fetch(workerBase() + "/session", { method: "POST", headers: { Authorization: "Bearer " + idToken }, signal: ctl.signal });
+      if (r.status === 401) { const b = await r.json().catch(() => ({})); return { error: (b && b.message) || "Sign-in check failed. Try again." }; }
+      if (!r.ok) return null;
+      const b = await r.json().catch(() => null);
+      if (!b || !isSession(b.session) || !(Date.parse(b.expires) > Date.now())) return null;
+      const rec = { token: b.session, account: b.account || "", email: b.email || "", provider: b.provider || "", tier: b.tier || "", expires: b.expires };
+      ls.set(SESSION_KEY, rec);
+      return rec;
+    } catch (e) { return null; } finally { clearTimeout(timer); }
+  }
+
+  // was: // Reads the #id_token=... hash the provider sends back. Returns null, {token}, or {error}.
+  // was: function handleRedirect() { ... ss.set(TOKEN_KEY, t); return { token: t }; }
+  // Reads the #id_token=... hash the provider sends back and, when the Worker has sessions, trades the
+  // token for one. Resolves to null (no sign-in in the address), { token, session } (session: the
+  // stored record, or null when the ID token was kept instead), or { error }. Async now, because the
+  // trade is a network call; the hash is still read and cleared before the first await.
+  async function handleRedirect() {
     const h = location.hash || "";
     if (!/[#&](id_token|error)=/.test(h)) return null;
     const q = new URLSearchParams(h.slice(1));
@@ -423,9 +514,16 @@
     if (!state || q.get("state") !== state) return { error: "Sign-in state didn't match. Try again." };
     const p = decodeJwt(t);
     if (!p || p.nonce !== nonce) return { error: "Sign-in check failed. Try again." };
-    if (!tokenOk(t)) return { error: "Sign-in expired. Try again." };
+    // was: if (!tokenOk(t)) return { error: "Sign-in expired. Try again." };
+    if (!authOk(t)) return { error: "Sign-in expired. Try again." };
+    // A new sign-in replaces whatever this browser held before.
+    ls.del(SESSION_KEY); ss.del(TOKEN_KEY);
+    const s = await startSession(t);
+    if (s && s.error) return { error: s.error };
+    if (s) return { token: s.token, session: s };
+    // was: ss.set(TOKEN_KEY, t); return { token: t };
     ss.set(TOKEN_KEY, t);
-    return { token: t };
+    return { token: t, session: null };
   }
 
   async function fetchWorkerConfig() {
@@ -454,13 +552,25 @@
     });
     location.assign(p.authorize_url + (p.authorize_url.includes("?") ? "&" : "?") + q.toString());
   }
-  const signOut = () => ss.del(TOKEN_KEY);
+  // was: const signOut = () => ss.del(TOKEN_KEY);
+  // Removes this page's sign-in. With `everywhere` (the Sign out button) it also ends the session on
+  // the Worker: DELETE /session, best effort, since a failure still signs out here and an unused
+  // session lapses by itself after a year. Without it (an expiry) there is nothing to end.
+  function signOut(everywhere) {
+    const r = storedSession();
+    ls.del(SESSION_KEY); ss.del(TOKEN_KEY);
+    if (everywhere && r && workerOn()) {
+      try { fetch(workerBase() + "/session", { method: "DELETE", headers: { Authorization: "Bearer " + r.token }, keepalive: true }).catch(() => { }); } catch (e) { }
+    }
+  }
 
   async function postDemand(token, p) {
     if (!workerOn() || !token || !p) return false;
     const states = demandStates(p);
     if (!states.length) return false;
-    const sub = (decodeJwt(token) || {}).sub || "";
+    // was: const sub = (decodeJwt(token) || {}).sub || "";
+    // A session's account stands in for the sub, so the first send after the switch repeats once.
+    const sub = (authInfo(token) || {}).sub || "";
     const key = sub + "|" + states.slice().sort().join(",");
     if (ls.get("internscout.demand.sent", "") === key) return true;
     try {
@@ -469,7 +579,8 @@
         body: JSON.stringify({ states }),
       });
       if (r.ok) { ls.set("internscout.demand.sent", key); return true; }
-      if (r.status === 401) signOut();
+      // was: if (r.status === 401) signOut();
+      if (r.status === 401) forget(token);
     } catch (e) { }
     return false;
   }
@@ -479,7 +590,9 @@
     if (!workerOn() || !token) return null;
     try {
       const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/me", { headers: { Authorization: "Bearer " + token } });
-      if (r.status === 401) { signOut(); return null; }
+      // was: if (r.status === 401) { signOut(); return null; }
+      if (r.status === 401) { forget(token); return null; }
+      if (r.ok) touchSession(token);
       return r.ok ? await r.json() : null;
     } catch (e) { return null; }
   }
@@ -554,7 +667,8 @@
         headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
         body: JSON.stringify(plan ? { plan } : {}),
       });
-      if (r.status === 401) { signOut(); return { error: "Sign in again." }; }
+      // was: if (r.status === 401) { signOut(); return { error: "Sign in again." }; }
+      if (r.status === 401) { forget(token); return { error: "Sign in again." }; }
       const b = await r.json().catch(() => ({}));
       if (r.ok && b.url) return { url: b.url };
       return { error: b.message || "That didn't work. Try again later." };
@@ -577,7 +691,9 @@
     // was: ss.del(TOKEN_KEY);
     // The invite check now keeps the account's sub for the session; it comes from the token and goes with it.
     // was: ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY);
-    ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY); ss.del(INVITE_TRIED_KEY);
+    // was: ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY); ss.del(INVITE_TRIED_KEY);
+    // DELETE /me also ends every session of the account on the Worker, so the record here goes too.
+    ss.del(TOKEN_KEY); ls.del(SESSION_KEY); ss.del(INVITE_EDU_KEY); ss.del(INVITE_TRIED_KEY);
     return { server };
   }
 
@@ -599,7 +715,8 @@
     WEIGHTS, PART_LABEL, profileFields, primaryField, score,
     createStore, loadMajors, majorsNote, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
-    workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
+    // was: workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, ...
+    workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };

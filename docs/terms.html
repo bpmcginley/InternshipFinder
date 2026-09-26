@@ -91,7 +91,9 @@
     <!-- was: <p class="meta">Last updated September 22, 2026</p>  (invite runs added 2026-09-24) -->
     <!-- was: <p class="meta">Last updated September 24, 2026</p>  (the 10-invite limit and the first week
          made explicit across Delete my data, 2026-09-25) -->
-    <p class="meta">Last updated September 25, 2026</p>
+    <!-- was: <p class="meta">Last updated September 25, 2026</p>  (staying signed in and the Deep Dive
+         saved to your account added 2026-09-26) -->
+    <p class="meta">Last updated September 26, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so "a free
          tool" flat out is no longer accurate. Search genuinely is free and always has been. -->
     <!-- was: <p class="lede">InternScout is a free tool made by a UMass Amherst student. By using the dashboard or the extension, you agree to these terms.</p> -->
@@ -111,6 +113,10 @@
         <!-- was: <li>AI use has fair-use monthly caps, and they may change.</li> -->
         <li>Search is free. AI use has fair-use monthly caps, and they may change.</li>
         <li>Optional Supporter ($5/month) and Pro ($12/month) plans raise the AI allowance. Stripe takes the payment.</li>
+        <!-- Added 2026-09-26: sign-ins now last until sign-out (worker POST /session) and the Deep Dive
+             is saved to the account by default (extension/lib/sync.js). Both change what a student
+             should know before using a shared computer, so the short version says it. -->
+        <li>You stay signed in on a device until you sign out, and your Deep Dive is saved to your account unless you turn that off. Sign out on shared computers.</li>
         <li>Don't misuse it.</li>
         <li>It isn't run by UMass Amherst, and it may change or shut down.</li>
       </ul>
@@ -211,7 +217,16 @@
     </ul>
 
     <h2>Your data</h2>
+    <!-- was: <p>The <a href="privacy.html">privacy policy</a> explains what we store and how to delete it.</p>
+         Kept, with the two new facts a user agrees to by using the service: a sign-in that lasts until
+         sign-out, and the Deep Dive saved to the account by default. The details stay in the privacy
+         policy, so the two pages can't drift apart on them. -->
     <p>The <a href="privacy.html">privacy policy</a> explains what we store and how to delete it.</p>
+    <ul>
+      <li><strong>Staying signed in.</strong> Once you sign in, that browser or extension stays signed in until you sign out, you press Delete my data, or it goes a year unused. Anyone using that device can use your sign-in and your AI allowance, so sign out on a shared or public computer.</li>
+      <li><strong>Your Deep Dive is saved to your account by default</strong>, encrypted, so it's there on your other devices. Your files, your demographic answers, your saved employer-site logins and your API keys are never saved to it. You can turn saving off in the extension, which deletes our copy, and Delete my data deletes it too.</li>
+      <li>The saved copy is a convenience, not a guaranteed backup. Keep your own copy of anything you can't afford to lose, such as your resume.</li>
+    </ul>
 
     <h2>Provided as-is</h2>
     <p>InternScout is provided "as is" and "as available", with no warranties of any kind. As far as the law allows, we are not responsible for any loss or harm from using it. That includes missed deadlines, wrong or missing listings, rejected or incomplete applications, AI mistakes, downtime or lost data.</p>
@@ -220,7 +235,9 @@
     <ul>
       <li>We may change, pause or shut down any part of InternScout at any time, with or without notice.</li>
       <li>We may update these terms. The date at the top shows the latest version. If you keep using InternScout after a change, you accept the new terms.</li>
-      <li>If InternScout shuts down, the data kept in your browser and extension stays on your device until you delete it.</li>
+      <!-- was: <li>If InternScout shuts down, the data kept in your browser and extension stays on your device until you delete it.</li>
+           Still true of the device copy; the saved Deep Dive is on the server, so it gets its own clause. -->
+      <li>If InternScout shuts down, the data kept in your browser and extension stays on your device until you delete it. A Deep Dive saved to your account may stop being available when the server does, so keep the copy on your device.</li>
     </ul>
 
     <!-- A consumer contract with no governing law leaves the forum to be argued about. Massachusetts
