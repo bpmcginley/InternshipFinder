@@ -1225,6 +1225,10 @@
 40.4284,
 -79.6975
 ],
+"n amityville|NY":[
+40.6976,
+-73.4251
+],
 "nassau|NY":[
 42.5159,
 -73.6101
@@ -2069,6 +2073,7 @@
 "usa-new jersey-perth amboy|NJ":null,
 "usa-new jersey-piscataway township|NJ":null,
 "usa-new jersey|NJ":null,
+"usa-new york-ny-1166 avenue of americas|NY":null,
 "usa|NJ":[
 40.603,
 -74.6874
@@ -2167,6 +2172,10 @@
 -74.8281
 ],
 "westchester county|NY":null,
+"westwood|NJ":[
+40.9912,
+-74.0326
+],
 "wheatland|PA":[
 41.2009,
 -80.4977
@@ -2199,6 +2208,10 @@
 "williston park|NY":[
 40.7565,
 -73.6449
+],
+"woodbridge township|NJ":[
+40.5537,
+-74.2824
 ],
 "woodbury|NY":[
 40.8257,
