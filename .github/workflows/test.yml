@@ -32,7 +32,8 @@ jobs:
         working-directory: backend
         run: |
           pip install -r requirements.txt
-          pip install pytest
+          # pillow: growth/cards.py's tests draw a real card (DejaVu is on the runner image).
+          pip install pytest pillow
       - name: Run tests
         working-directory: backend
         run: python -m pytest tests/ -q

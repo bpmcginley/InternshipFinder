@@ -6,6 +6,11 @@ name: Brand posts
 # It posts nothing when the data export is over two days old (a stalled ingest), and the run fails
 # when any account with secrets could not post, so a revoked password shows up as a red run.
 #
+# The same pick also becomes a picture card (growth/cards.py). The card is pushed to the
+# social-cards branch, where raw.githubusercontent.com serves it, and growth/instagram.py posts it to
+# Instagram when INSTAGRAM_TOKEN is set. A LinkedIn draft of the same post is saved to D1 for the
+# private analytics page, since LinkedIn gives a page this size no posting API.
+#
 # Kill switch: set the repository variable SOCIAL_ENABLED to 0 (Settings -> Secrets and variables ->
 # Actions -> Variables) and every run, scheduled or by hand, is skipped without posting. Unset or any
 # other value, it runs as before. Unlike the digest's DIGEST_ENABLED, this one is on by default,
@@ -15,8 +20,10 @@ on:
     - cron: "0 15 * * 2,4"    # Tuesdays and Thursdays, 11am US Eastern
   workflow_dispatch:
 
+# was: contents: read. Write is for pushing the card to the social-cards branch; nothing here
+# touches main (and a push made with this token starts no other workflow).
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: brand-posts
@@ -28,7 +35,7 @@ jobs:
     # The variable reaches only this condition, never a command line.
     if: vars.SOCIAL_ENABLED != '0'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10       # was: 5; Instagram fetches the card before it publishes
     steps:
       - uses: actions/checkout@v7
 
@@ -36,11 +43,54 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Card fonts and Pillow
+        # IBM Plex is the site's typeface (growth/cards.py falls back to DejaVu without it).
+        run: |
+          sudo apt-get install -y -qq fonts-ibm-plex >/dev/null
+          python -m pip install -q pillow
+
       - name: Post
+        id: post
         env:
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           MASTODON_URL: ${{ secrets.MASTODON_URL }}
           MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python growth/social.py docs --send
+          # For the LinkedIn draft in D1 (the analytics copy's token: D1 Edit).
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        # was: run: python growth/social.py docs --send
+        run: python growth/social.py docs --out=out --send
+
+      # The steps below run even when a text account failed above (a failed step still leaves the run
+      # red), so one revoked password doesn't also stop the picture posts.
+      - name: Put the card where Instagram can fetch it
+        if: ${{ !cancelled() && hashFiles('out/card.jpg') != '' }}
+        run: |
+          name=$(python -c "import json; print(json.load(open('out/post.json'))['card_name'])")
+          case "$name" in *[!A-Za-z0-9._-]*|'') echo "unexpected card name"; exit 1;; esac
+          git config --global user.name "InternScout"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin social-cards >/dev/null; then
+            git fetch -q --depth 1 origin social-cards
+            git worktree add -q --detach cards FETCH_HEAD
+          else
+            git worktree add -q --detach cards
+            (cd cards && git switch -q --orphan social-cards)
+          fi
+          cp out/card.jpg "cards/$name"
+          cd cards
+          git add "$name"
+          git diff --cached --quiet || git commit -q -m "Card: $name"
+          git push -q origin HEAD:refs/heads/social-cards
+          echo "Card served at https://raw.githubusercontent.com/${{ github.repository }}/social-cards/$name"
+
+      - name: Instagram
+        # Runs in a week with nothing to post too: it keeps the 60-day token refreshed.
+        if: ${{ !cancelled() }}
+        env:
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -f out/post.json ]; then python growth/instagram.py out/post.json --send
+          else python growth/instagram.py --send; fi

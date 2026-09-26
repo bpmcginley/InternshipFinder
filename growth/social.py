@@ -10,6 +10,12 @@ sends it to whichever brand accounts have credentials in the environment:
 
 With none set it only prints the post, and the weekly growth report carries it as a draft.
 
+With --out=DIR it also writes what the picture channels need, from the same pick: DIR/post.json (the
+card's numbers, an Instagram caption and a LinkedIn draft) and DIR/card.jpg (growth/cards.py). The
+Brand posts workflow then puts the card where Instagram can fetch it and runs growth/instagram.py.
+LinkedIn has no posting API open to a page this size, so its text is saved as a draft for a person
+to post (save_drafts), and the private analytics page shows it ready to copy.
+
 It posts nothing when the data export is more than STALE old: "this week" and the field it picks both
 come from the export's time, so a stalled ingest would post the same stale text run after run. When a
 configured account fails, the others are still tried, and then the run exits 1 so the Actions run
@@ -20,7 +26,7 @@ variable SOCIAL_ENABLED is 0.
 These are posts by InternScout, on InternScout's accounts, saying what the data says. Nothing here
 posts as a person, replies to anyone or posts into other people's spaces.
 
-Run from the repo root:  python growth/social.py [docs] [--send]
+Run from the repo root:  python growth/social.py [docs] [--out=DIR] [--send]
 """
 from __future__ import annotations
 
@@ -146,6 +152,92 @@ def draft(site_dir: str) -> tuple[str, str] | None:
     return compose(chosen[0], chosen[1], open_by_field[chosen[0]]) if chosen else None
 
 
+# Where growth/cards.py's JPEGs are served from: a branch of their own, so a card every few days never
+# lands in main's history, and raw.githubusercontent.com serves each one as image/jpeg as soon as it
+# is pushed (Instagram fetches a post's image from a public URL; it takes no upload).
+CARD_BRANCH = "social-cards"
+CARD_BASE = f"https://raw.githubusercontent.com/bpmcginley/InternshipFinder/{CARD_BRANCH}/"
+IG_CAPTION_MAX = 2200     # Instagram's caption limit, in characters
+LINKEDIN_MAX = 3000       # a LinkedIn post's limit
+SLOGAN = "Built by one student, made for all students."
+DISCLAIMER = "Not affiliated with UMass Amherst."
+
+
+def hashtag(field_title: str) -> str:
+    """A field's name as one hashtag from its first two words: 'Data science and analytics' -> #DataScience."""
+    words = [w for w in "".join(c if c.isalnum() else " " for c in field_title).split()
+             if w.lower() not in ("and", "of", "the", "or")]
+    return "#" + "".join(w[:1].upper() + w[1:] for w in words[:2]) if words else ""
+
+
+def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
+    """Everything the picture channels need for this run's pick, or None when there is nothing to post.
+    The same field, count and employers as the text post, so every channel says the same thing."""
+    ranked, now, open_by_field = candidates(site_dir)
+    chosen = pick(ranked, now)
+    if not chosen:
+        return None
+    field, items = chosen
+    text, url = compose(field, items, open_by_field[field])
+    title = sp.field_title(field)
+    name = sp.lower_name(title)
+    employers = [c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c]
+    today = today or datetime.now(timezone.utc)
+    slug = sp.field_slug(field)
+    tags = " ".join(t for t in (hashtag(title), "#internships", "#summerinternship", "#collegestudents",
+                                "#studentjobs", "#careers") if t)
+    named = ", ".join(employers[:4])
+    # Instagram doesn't make a caption's address a link, so it points at the one in the profile.
+    ig = (f"{len(items)} new {name} internships in the Northeast and remote this week"
+          + (f", from {named} and more" if named else "") + ".\n\n"
+          "Search every one free at internscout.org (link in bio), filtered to your major and the states you pick.\n\n"
+          f"{SLOGAN} {DISCLAIMER}\n\n{tags}")
+    li = (f"{len(items)} new {name} internships opened in the Northeast and remote this week."
+          + (f"\n\nEmployers hiring include {named}." if named else "") + "\n\n"
+          "InternScout lists internships, co-ops and research programs for every major, refreshed several "
+          "times a day. Searching is free and needs no account.\n\n"
+          f"{url}\n\n{SLOGAN} {DISCLAIMER}\n\n{tags}")
+    card_name = f"{today:%Y-%m-%d}-{slug}.jpg"
+    return {
+        "field": field, "slug": slug, "url": url, "text": text, "count": len(items),
+        "eyebrow": f"New this week · {now:%b} {now.day}",
+        "headline": f"new {name} internships",
+        "where": "in the Northeast and remote",
+        "employers": employers[:5],
+        "card_name": card_name,
+        "card_url": CARD_BASE + card_name,
+        "instagram_caption": ig[:IG_CAPTION_MAX],
+        "linkedin_text": li[:LINKEDIN_MAX],
+    }
+
+
+def write_out(site_dir: str, out_dir: str) -> dict | None:
+    """post.json and card.jpg into out_dir, for the workflow's picture steps."""
+    data = card_data(site_dir)
+    if not data:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "post.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    import cards      # imported here: only the card needs Pillow, the text posts don't
+    cards.render(data, os.path.join(out_dir, "card.jpg"))
+    return data
+
+
+def save_drafts(data: dict, token: str) -> None:
+    """The LinkedIn draft, into the app's D1 (table social_drafts), where the private analytics page
+    shows it ready to copy. Brand text only, like everything else growth/ writes there."""
+    import metrics    # the same D1 helper and database the analytics copy uses
+    metrics.d1(token, "CREATE TABLE IF NOT EXISTS social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
+                      "text TEXT NOT NULL, image_url TEXT, url TEXT, PRIMARY KEY (taken, channel))")
+    taken = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    metrics.d1(token, "INSERT OR REPLACE INTO social_drafts (taken, channel, text, image_url, url) VALUES (?, ?, ?, ?, ?)",
+               [taken, "linkedin", data["linkedin_text"], data["card_url"], data["url"]])
+    # A draft is only worth posting for a week or two; keep the last 20.
+    metrics.d1(token, "DELETE FROM social_drafts WHERE taken NOT IN "
+                      "(SELECT taken FROM social_drafts ORDER BY taken DESC LIMIT 20)")
+
+
 def stale(site_dir: str, now: datetime | None = None) -> str | None:
     """Why the export is too old to post from, or None. An export with no readable time counts as
     stale: candidates would fall back to the clock, and the post would claim a week it can't see."""
@@ -174,9 +266,31 @@ def main(argv: list[str]) -> int:
         return 0
     text, url = post
     print(text)
+    out_dir = next((a.split("=", 1)[1] for a in argv if a.startswith("--out=")), None)
+    data, failed = None, []
+    if out_dir:
+        # A card that can't be drawn (no Pillow, no font) must not stop the text posts below.
+        try:
+            data = write_out(site_dir, out_dir)
+            if data:
+                print(f"[social] card and captions written to {out_dir}")
+        except Exception as e:
+            print(f"[social] card failed: {type(e).__name__}: {e}")
+            failed.append("card")
+            for leftover in ("card.jpg", "post.json"):     # half a card must not reach Instagram
+                try:
+                    os.remove(os.path.join(out_dir, leftover))
+                except OSError:
+                    pass
     if "--send" not in argv:
-        return 0
-    failed = []
+        return 1 if failed else 0
+    if data and os.environ.get("CLOUDFLARE_API_TOKEN"):
+        try:
+            save_drafts(data, os.environ["CLOUDFLARE_API_TOKEN"])
+            print("[social] LinkedIn draft saved for the analytics page")
+        except Exception as e:
+            print(f"[social] LinkedIn draft failed: {type(e).__name__}")
+            failed.append("LinkedIn draft")
     for name, needs, send in CHANNELS:
         if not all(os.environ.get(k) for k in needs):
             continue
