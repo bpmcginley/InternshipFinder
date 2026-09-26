@@ -158,6 +158,40 @@
           h("span", null, o.label || o.value), o.count != null ? h("span", { className: "c" }, o.count) : o.hint ? h("span", { className: "c" }, o.hint) : null))));
   }
 
+  // Everything about the signed-in account in one place, behind one button: who is signed in, this
+  // month's allowance, invites, plans and sign-out. It used to sit in the header as a dozen buttons and
+  // labels in one row that wrapped into a long second line. A disclosure (a button that shows a panel),
+  // closed by Escape, a click outside, or choosing an item.
+  function AccountMenu({ email, planLabel, allowLines, resetDay, spendText, items, admin }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(), btn = useRef();
+    useEffect(() => {
+      if (!open) return;
+      const down = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+      const key = e => { if (e.key === "Escape") { setOpen(false); btn.current && btn.current.focus(); } };
+      document.addEventListener("mousedown", down); document.addEventListener("keydown", key);
+      return () => { document.removeEventListener("mousedown", down); document.removeEventListener("keydown", key); };
+    }, [open]);
+    const pick = fn => () => { setOpen(false); fn(); };
+    const item = it => h("button", { key: it.key, type: "button", className: cx("acct-item", it.danger && "danger"), onClick: pick(it.onClick), disabled: it.disabled, title: it.title },
+      h("span", { className: "t" }, it.label), it.desc && h("span", { className: "d" }, it.desc));
+    const groups = [items.filter(i => i.group === "share"), items.filter(i => i.group === "plan"), items.filter(i => i.group === "session"), admin || []].filter(g => g.length);
+    return h("div", { className: "acct", ref },
+      h("button", { type: "button", className: "btn acct-btn", ref: btn, "aria-expanded": open, "aria-controls": "acct-panel", onClick: () => setOpen(o => !o) },
+        "Account", h("span", { className: "chev", "aria-hidden": true })),
+      open && h("div", { className: "acct-panel", id: "acct-panel" },
+        h("div", { className: "acct-sec" },
+          h("div", { className: "acct-k" }, email ? "Signed in as" : "Signed in"),
+          email && h("div", { className: "acct-email" }, email),
+          h("div", { className: "acct-plan" }, planLabel)),
+        (allowLines.length > 0 || spendText) && h("div", { className: "acct-sec" },
+          h("div", { className: "acct-k" }, "This month"),
+          allowLines.map((l, i) => h("div", { key: i, className: "acct-line" }, l)),
+          spendText && h("div", { className: "acct-line muted" }, spendText),
+          resetDay && h("div", { className: "acct-line muted" }, `Resets ${resetDay}.`)),
+        groups.map((g, i) => h("div", { key: i, className: "acct-sec acct-list" }, g.map(item)))));
+  }
+
   const Sel = ({ label, value, onChange, children }) => h("div", { className: "field sel" },
     h("select", { "aria-label": label, value, onChange: e => onChange(e.target.value) }, children));
   const opt = (v, l) => h("option", { key: v, value: v }, l);
@@ -1055,29 +1089,41 @@
           h("h1", { className: "mark" }, "InternScout"),
           h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for UMass students, anywhere in the US.",
             aboutBtn && " · ", aboutBtn)),
+        // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
+        // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
+        // header keeps the everyday actions and the account details live in the Account menu.
         h("div", { className: "top-r" },
-          busy && h("span", { className: "busy" }, busy),
-          info.spend && info.spend.calls > 0 && h("span", { className: "busy", title: "Estimated AI cost of Auto-Apply and the Deep Dive this month" }, `AI $${info.spend.month_usd.toFixed(2)} this month${info.spend.budget ? ` of $${info.spend.budget}` : ""}`),
-          ADMIN && h("button", { type: "button", className: "btn quiet", onClick: rescan, disabled: !!busy, title: "Run the scanner on GitHub now" }, "Rescan"),
-          ADMIN && ghToken && h("button", { type: "button", className: "btn quiet", onClick: () => { localStorage.removeItem("internscout.gh_token"); setGhToken(""); setBusy("Token cleared"); } }, "Forget token"),
+          busy && h("span", { className: "busy", role: "status" }, busy),
+          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_panel" }) }, "Queue",
+            jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,
+            jobCounts.ready_to_submit ? h("span", { className: "count ok" }, `${jobCounts.ready_to_submit} ready`) : null),
+          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
           // Hidden while the setup card is already open under it, so a first visit shows one way in.
           !setupOpen && h("button", { type: "button", className: "btn", onClick: () => { setSetupOpen(true); } }, p ? "My profile" : "Set up profile"),
           signInBtn,
-          auth.token && h("span", { className: "signed", title: who && who.email ? `Signed in as ${who.email}` : "Signed in" }, "Signed in",
-            // was: onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); }
-            // signOut(true) also ends the session on the Worker, so the code can't be used again.
-            auth.source === "page" && h("button", { type: "button", className: "btn quiet", onClick: () => { IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } }, "Sign out")),
-          auth.token && me && me.allowance && h("span", { className: "busy", title: IS.allowanceText(me) },
-            me.paused ? "AI paused this month" : `${IS.leftOf(me, "autofill")} Auto-Apply · ${IS.leftOf(me, "resume_tailor")} resumes left${me.plan && me.plan !== "free" ? ` (${(IS.PLAN_LABELS[me.plan] || me.plan).toLowerCase()})` : me.tier === "edu" ? " (.edu)" : ""}`),
-          auth.token && inviteOffer && h("button", { type: "button", className: "btn quiet", onClick: openInvite, "aria-expanded": !!invite,
-            // was: title: `Share your link. Each classmate who signs in through it with a school Google account gets you both ${inviteWords}.` }, "Invite classmates"),
-            title: `Share your link. Each classmate who signs in through it with a school (.edu) email gets you both ${inviteWords}.` }, "Invite classmates"),
-          auth.token && upgrades.map(pl => h("button", { key: pl.plan, type: "button", className: "btn quiet", onClick: () => billing("checkout", pl.plan), disabled: !!busy, title: upgradeTitle(pl) }, `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`)),
-          auth.token && me && me.can_manage && h("button", { type: "button", className: "btn quiet", onClick: () => billing("portal"), disabled: !!busy, title: "Change your card or cancel, on Stripe's own page." }, "Manage plan"),
-          info.installed && h("button", { type: "button", className: "btn quiet", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
-          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_panel" }) }, "Queue",
-            jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,
-            jobCounts.ready_to_submit ? h("span", { className: "count ok" }, `${jobCounts.ready_to_submit} ready`) : null))),
+          (auth.token || ADMIN) && h(AccountMenu, {
+            email: who && who.email,
+            planLabel: auth.token ? (me && me.plan && me.plan !== "free" ? `${IS.PLAN_LABELS[me.plan] || me.plan} plan` : me && me.tier === "edu" ? "Free plan, school (.edu) allowance" : "Free plan") : "Not signed in",
+            // The same lines the allowance tooltip used to hold, now visible.
+            allowLines: auth.token && me && me.allowance ? IS.allowanceText(me).split("\n") : [],
+            resetDay: auth.token && me && me.allowance ? resetDay : null,
+            spendText: info.spend && info.spend.calls > 0 ? `Estimated AI cost: $${info.spend.month_usd.toFixed(2)}${info.spend.budget ? ` of $${info.spend.budget}` : ""}` : null,
+            items: [
+              auth.token && inviteOffer && { key: "invite", group: "share", label: invite ? "Hide your invite link" : "Invite classmates", onClick: openInvite,
+                desc: `You and each classmate who joins with a .edu email get ${inviteWords}.` },
+              ...(auth.token ? upgrades.map(pl => ({ key: pl.plan, group: "plan", label: `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`, onClick: () => billing("checkout", pl.plan),
+                disabled: !!busy, title: upgradeTitle(pl), desc: `${pl.multiplier}× your monthly AI allowance. Cancel any time.` })) : []),
+              auth.token && me && me.can_manage && { key: "manage", group: "plan", label: "Manage plan", onClick: () => billing("portal"), disabled: !!busy,
+                desc: "Change your card or cancel, on Stripe's own page." },
+              // was: onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); }
+              // signOut(true) also ends the session on the Worker, so the code can't be used again.
+              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } },
+            ].filter(Boolean),
+            admin: ADMIN ? [
+              { key: "rescan", label: "Rescan", desc: "Run the scanner on GitHub now", onClick: rescan, disabled: !!busy },
+              ghToken && { key: "forget", label: "Forget token", onClick: () => { localStorage.removeItem("internscout.gh_token"); setGhToken(""); setBusy("Token cleared"); } },
+            ].filter(Boolean) : null,
+          }))),
 
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
       h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),

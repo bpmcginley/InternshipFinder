@@ -107,15 +107,45 @@
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .wrap{max-width:1320px;margin:0 auto;padding:0 28px}
 
-  header.top{display:flex;align-items:flex-end;gap:var(--s5);flex-wrap:wrap;padding:var(--s5) 0 var(--s4);border-bottom:1px solid var(--ink)}
+  /* was: align-items:flex-end, with every control in .top-r. The header now holds the everyday
+     actions only; account details are in the Account menu (.acct below). */
+  header.top{position:relative;display:flex;align-items:center;gap:var(--s4) var(--s5);flex-wrap:wrap;padding:var(--s5) 0 var(--s4);border-bottom:1px solid var(--ink)}
   .mark{font:600 30px/1 var(--serif);letter-spacing:-.6px;margin:0}
   .sub{color:var(--ink2);margin-top:8px;font-size:14px}
   .sub a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
   .sub a:hover{text-decoration-color:var(--ink)}
   .sub button{all:unset;cursor:pointer;color:var(--accent);font-weight:500}
   .sub button:hover{text-decoration:underline;text-underline-offset:3px}
-  .top-r{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  .signed{display:inline-flex;align-items:center;gap:2px;color:var(--green);font-size:13px;padding-left:6px}
+  .top-r{margin-left:auto;display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;justify-content:flex-end}
+
+  /* Account menu */
+  .acct{position:relative}
+  .acct-btn .chev{width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform var(--t-fast) var(--ease-out)}
+  .acct-btn[aria-expanded="true"]{border-color:var(--ink3);background:var(--sunk)}
+  .acct-btn[aria-expanded="true"] .chev{transform:translateY(1px) rotate(225deg)}
+  .acct-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:min(340px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--rule);border-radius:8px;
+    box-shadow:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent);padding:4px;animation:acct-in var(--t-fast) var(--ease-out)}
+  @keyframes acct-in{from{opacity:.4;transform:translateY(-4px)}}
+  .acct-sec{display:grid;gap:4px;padding:10px 12px}
+  .acct-sec + .acct-sec{border-top:1px solid var(--rule)}
+  .acct-sec.acct-list{padding:4px 0;gap:0}
+  .acct-k{font:500 11px/1.2 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .acct-email{font-weight:500;overflow-wrap:anywhere}
+  .acct-plan{color:var(--green);font-size:13px}
+  .acct-line{font-size:13.5px;color:var(--ink)}
+  .acct-line.muted{color:var(--ink2);font-size:13px}
+  .acct-item{appearance:none;border:0;background:none;font:inherit;text-align:left;color:var(--ink);cursor:pointer;display:grid;gap:2px;padding:8px 12px;border-radius:6px;
+    transition:background-color var(--t-fast) ease-out}
+  .acct-item .t{font-weight:500;font-size:14px}
+  .acct-item .d{color:var(--ink2);font-size:12.5px;line-height:1.4}
+  .acct-item:hover:not(:disabled),.acct-item:focus-visible{background:var(--sunk)}
+  .acct-item:disabled{color:var(--ink3);cursor:default}
+  @media (max-width:640px){
+    .top-r{margin-left:0;width:100%;justify-content:flex-start}
+    /* On a phone the panel spans the header instead of hanging off the button. */
+    .acct{position:static}
+    .acct-panel{left:0;right:0;width:auto}
+  }
 
   .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;
     transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}

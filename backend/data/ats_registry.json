@@ -13621,8 +13621,9 @@
   "basspro|wd1|careers": {
    "name": "Bass Pro Shops",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-26"
+   "fails": 1,
+   "added": "2026-09-26",
+   "last_fail": "2026-09-26"
   },
   "baxter|wd1|baxter": {
    "name": "Baxter International",
@@ -15242,9 +15243,10 @@
   "elevancehealth|wd1|ELV-ET": {
    "name": "Elevance Health",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-24",
-   "sector": "health"
+   "sector": "health",
+   "last_fail": "2026-09-26"
   },
   "elkay|wd1|Elkay_External": {
    "name": "Zurn Elkay Water Solutions",
