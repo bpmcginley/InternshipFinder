@@ -168,3 +168,67 @@ def test_automation_reports_each_jobs_last_run(monkeypatch):
     assert [j["job"] for j in got] == [name for _, name in metrics.JOBS]
     assert all("branch=main" in u for u in seen)
     assert next(j for j in got if j["file"] == "growth-report.yml")["conclusion"] is None
+
+
+GSC_ROWS = {
+    "date": [{"keys": ["2026-09-27"], "clicks": 2, "impressions": 100, "position": 10.0},
+             {"keys": ["2026-09-10"], "clicks": 1, "impressions": 300, "position": 30.0}],
+    "query": [{"keys": ["finance internships boston"], "clicks": 2, "impressions": 40, "position": 8.25}],
+    "page": [{"keys": ["https://internscout.org/internships/finance/"], "clicks": 2, "impressions": 90, "position": 9.0}],
+}
+
+
+def test_search_console_needs_a_key_file(monkeypatch):
+    monkeypatch.delenv("GSC_SERVICE_ACCOUNT", raising=False)
+    with pytest.raises(ValueError):
+        metrics.search_console(NOW)
+    monkeypatch.setenv("GSC_SERVICE_ACCOUNT", "not json")
+    with pytest.raises(ValueError, match="key file"):
+        metrics.search_console(NOW)
+
+
+def test_search_console_reads_days_queries_and_pages(monkeypatch):
+    monkeypatch.setenv("GSC_SERVICE_ACCOUNT", json.dumps({"client_email": "bot@x.iam.gserviceaccount.com",
+                                                          "private_key": "k"}))
+    monkeypatch.setattr(metrics, "_gsc_token", lambda info: "tok")
+    bodies = []
+
+    def fake_json(url, body=None, token=None, timeout=30):
+        assert token == "tok" and "sc-domain%3Ainternscout.org" in url
+        bodies.append(body)
+        return {"rows": GSC_ROWS[body["dimensions"][0]]}
+    monkeypatch.setattr(metrics, "_json", fake_json)
+    got = metrics.search_console(NOW)
+    assert bodies[0]["startDate"] == "2026-09-02" and bodies[0]["endDate"] == "2026-09-29"
+    assert [d["day"] for d in got["days"]] == ["2026-09-10", "2026-09-27"]
+    # Position is averaged by impressions, as Search Console does: (10*100 + 30*300) / 400.
+    assert got["totals_28d"] == {"clicks": 3, "impressions": 400, "ctr": 0.0075, "position": 25.0}
+    assert got["totals_7d"]["clicks"] == 2 and got["totals_7d"]["position"] == 10.0
+    assert got["queries"][0] == {"query": "finance internships boston", "clicks": 2, "impressions": 40, "position": 8.2}
+    assert got["pages"][0]["path"] == "/internships/finance/"
+
+
+def test_search_queries_stay_out_of_the_public_run_log():
+    snap = {"search_console": {"queries": [{"query": "jane doe internship"}], "pages": []}, "pages": 9}
+    shown = metrics.printable(snap)
+    assert "jane" not in json.dumps(shown) and shown["search_console"]["queries"] == "1 queries"
+    assert snap["search_console"]["queries"][0]["query"] == "jane doe internship"     # the copy is untouched
+
+
+def test_the_sign_in_assertion_is_a_valid_rs256_jwt():
+    pytest.importorskip("cryptography")             # CI installs it; skipped where it won't build
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                            serialization.NoEncryption()).decode()
+    token = metrics._jwt({"client_email": "bot@x", "private_key": pem, "private_key_id": "k1"}, 1000)
+    head, claims, sig = token.split(".")
+    pad = lambda s: s + "=" * (-len(s) % 4)  # noqa: E731
+    body = json.loads(base64.urlsafe_b64decode(pad(claims)))
+    assert body == {"iss": "bot@x", "scope": metrics.GSC_SCOPE, "iat": 1000, "exp": 4600,
+                    "aud": "https://oauth2.googleapis.com/token"}
+    assert json.loads(base64.urlsafe_b64decode(pad(head)))["alg"] == "RS256"
+    key.public_key().verify(base64.urlsafe_b64decode(pad(sig)), f"{head}.{claims}".encode(),
+                            padding.PKCS1v15(), hashes.SHA256())                          # raises if wrong

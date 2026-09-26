@@ -10,15 +10,18 @@ day included, so running hourly keeps the dashboard within the hour at no extra 
                     landing page, from a search engine, from social sites, or directly
   metrics_snapshot  one row per run: the week's top pages, referrers and countries; followers and
                     each recent post's engagement on Bluesky, Instagram and Mastodon; the last run
-                    of each GitHub Actions job; open and new listings, the page count, and the
-                    extension's Chrome Web Store users and rating
+                    of each GitHub Actions job; Google searches (clicks, impressions, position by
+                    day, top queries and pages, from Search Console); open and new listings, the
+                    page count, and the extension's Chrome Web Store users and rating
 
 Only totals: no visitor, student or account is ever stored. The dashboard reads these rows, and the
 live sign-in, AI and Stripe numbers, through the viewer's own Cloudflare and Stripe connectors.
 
 Needs CLOUDFLARE_API_TOKEN with Account Analytics: Read and D1: Edit. Optional: INSTAGRAM_TOKEN (the
 same secret Brand posts uses; the working token it descends from is read from D1 and never refreshed
-here) and GITHUB_TOKEN (without it, the public API's hourly allowance still covers a run).
+here), GITHUB_TOKEN (without it, the public API's hourly allowance still covers a run) and
+GSC_SERVICE_ACCOUNT (a Google service account's JSON key, added to the Search Console property as a
+Restricted user; needs the cryptography package to sign in).
 Run from the repo root:  python growth/metrics.py [docs] [--write]
 """
 from __future__ import annotations
@@ -43,6 +46,9 @@ REPO = os.environ.get("GITHUB_REPOSITORY") or "bpmcginley/InternshipFinder"
 JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metrics.yml", "Dashboard copy"),
         ("social.yml", "Brand posts"), ("growth-report.yml", "Growth report"), ("test.yml", "Tests")]
 RECENT = 8                                  # recent posts kept per account
+GSC_SITE = os.environ.get("GSC_SITE") or "sc-domain:internscout.org"
+GSC_DAYS = 28
+GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
 SITE = "https://internscout.org"
 STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"
 DAYS = 30
@@ -214,6 +220,97 @@ def automation() -> list[dict]:
     return out
 
 
+def _jwt(info: dict, now: int) -> str:
+    """The signed assertion Google trades for an access token (RS256 over the service account's key,
+    signed with the cryptography package). The key never leaves this process."""
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization     # imported here: only this source
+    from cryptography.hazmat.primitives.asymmetric import padding       # needs a package outside stdlib
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=")  # noqa: E731
+    head = b64(json.dumps({"alg": "RS256", "typ": "JWT", "kid": info.get("private_key_id")}).encode())
+    claims = b64(json.dumps({"iss": info["client_email"], "scope": GSC_SCOPE, "iat": now, "exp": now + 3600,
+                             "aud": info.get("token_uri") or "https://oauth2.googleapis.com/token"}).encode())
+    key = serialization.load_pem_private_key(info["private_key"].encode(), password=None)
+    return (head + b"." + claims + b"." + b64(key.sign(head + b"." + claims, padding.PKCS1v15(), hashes.SHA256()))).decode()
+
+
+def _gsc_token(info: dict) -> str:
+    import time
+    uri = info.get("token_uri") or "https://oauth2.googleapis.com/token"
+    body = urllib.parse.urlencode({"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                                   "assertion": _jwt(info, int(time.time()))})
+    req = urllib.request.Request(uri, data=body.encode(), method="POST",
+                                 headers={"Content-Type": "application/x-www-form-urlencoded", **UA})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.load(r)["access_token"]
+    except urllib.error.HTTPError as e:
+        raise RuntimeError("Google sign-in: " + _google_error(e)) from None
+
+
+def _google_error(e: urllib.error.HTTPError) -> str:
+    try:
+        err = json.loads(e.read()).get("error")
+        return (err.get("message") if isinstance(err, dict) else str(err)) or f"HTTP {e.code}"
+    except (ValueError, AttributeError):
+        return f"HTTP {e.code}"
+
+
+def _gsc_rows(token: str, body: dict) -> list[dict]:
+    url = ("https://searchconsole.googleapis.com/webmasters/v3/sites/"
+           f"{urllib.parse.quote(GSC_SITE, safe='')}/searchAnalytics/query")
+    try:
+        return _json(url, body, token).get("rows") or []
+    except urllib.error.HTTPError as e:
+        # 403 here usually means the service account's email isn't a user on the property yet.
+        raise RuntimeError("Search Console: " + _google_error(e)) from None
+
+
+def _gsc_totals(rows: list[dict]) -> dict:
+    clicks = sum(r["clicks"] for r in rows)
+    impressions = sum(r["impressions"] for r in rows)
+    # Google's average position weights each day by its impressions.
+    position = sum(r["position"] * r["impressions"] for r in rows) / impressions if impressions else None
+    return {"clicks": clicks, "impressions": impressions, "ctr": round(clicks / impressions, 4) if impressions else None,
+            "position": round(position, 1) if position is not None else None}
+
+
+def search_console(now: datetime) -> dict:
+    """The last 28 days of Google searches for the site: clicks, impressions and average position by
+    day, and the top queries and pages. dataState "all" includes the last two days, which Google
+    finalises later, so the newest days can still move a little."""
+    key = os.environ.get("GSC_SERVICE_ACCOUNT")
+    if not key:
+        raise ValueError("no GSC_SERVICE_ACCOUNT")
+    try:
+        info = json.loads(key)
+        info["client_email"], info["private_key"]           # noqa: B018  (both must be present)
+    except (ValueError, KeyError, TypeError):
+        raise ValueError("GSC_SERVICE_ACCOUNT is not a service account key file's JSON") from None
+    token = _gsc_token(info)
+    end = now.date()
+    base = {"startDate": (end - timedelta(days=GSC_DAYS - 1)).isoformat(), "endDate": end.isoformat(), "dataState": "all"}
+    cell = lambda r: {"clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),  # noqa: E731
+                      "position": round(r.get("position", 0), 1)}
+    days = [{"day": r["keys"][0], **cell(r)} for r in _gsc_rows(token, {**base, "dimensions": ["date"], "rowLimit": 100})]
+    queries = [{"query": r["keys"][0], **cell(r)}
+               for r in _gsc_rows(token, {**base, "dimensions": ["query"], "rowLimit": 15})]
+    pages = [{"path": urllib.parse.urlparse(r["keys"][0]).path or "/", **cell(r)}
+             for r in _gsc_rows(token, {**base, "dimensions": ["page"], "rowLimit": 10})]
+    since7 = (end - timedelta(days=6)).isoformat()
+    return {"site": GSC_SITE, "days": sorted(days, key=lambda d: d["day"]), "totals_28d": _gsc_totals(days),
+            "totals_7d": _gsc_totals([d for d in days if d["day"] >= since7]), "queries": queries, "pages": pages}
+
+
+def printable(snap: dict) -> dict:
+    """The snapshot as the run log shows it. The repository is public, so its Actions logs are too:
+    search queries are counted there, never listed (they go only to the private database)."""
+    out = dict(snap)
+    if isinstance(out.get("search_console"), dict):
+        out["search_console"] = {**out["search_console"], "queries": f"{len(out['search_console']['queries'])} queries"}
+    return out
+
+
 def listings(site_dir: str) -> dict:
     """Open and new listings. new_7d is counted as the weekly digest and the brand posts count it
     (digest.new_roles: found this week by the /internships/new/ rule, one row per role within each
@@ -309,14 +406,16 @@ def main(argv: list[str]) -> int:
         problems.append("visits: no CLOUDFLARE_API_TOKEN")
     for key, fn in (("bluesky", lambda: bluesky(now)), ("instagram", lambda: instagram(token, now)),
                     ("mastodon", lambda: mastodon(now)), ("automation", automation),
+                    ("search_console", lambda: search_console(now)),
                     ("listings", lambda: listings(site_dir)), ("pages", page_count), ("store", store)):
         try:
             snap[key] = fn()
         # RuntimeError includes instagram.InstagramError, which carries Meta's message, never the token.
-        except (OSError, urllib.error.URLError, ValueError, KeyError, RuntimeError) as e:
+        # ImportError: the cryptography package isn't installed (Search Console only).
+        except (OSError, urllib.error.URLError, ValueError, KeyError, RuntimeError, ImportError) as e:
             problems.append(f"{key}: {e}")
     snap["problems"] = problems
-    print(json.dumps({"days": days[-7:], **snap}, indent=1))
+    print(json.dumps({"days": days[-7:], **printable(snap)}, indent=1))
     if not write:
         return 0
     if not token:
