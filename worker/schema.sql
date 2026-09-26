@@ -1,5 +1,8 @@
 -- InternScout Worker D1 schema.
--- Only hashed ids, months, tasks, run ids, counters, states and spend. Never prompts, replies, emails or tokens.
+-- was: -- Only hashed ids, months, tasks, run ids, counters, states and spend. Never prompts, replies, emails or tokens.
+-- Hashed ids, months, tasks, run ids, counters, states and spend; a fingerprint (sha256) of each sign-in
+-- session token; and, for a student who saves their Deep Dive to their account, that profile encrypted.
+-- Never prompts, replies, emails or tokens themselves.
 
 CREATE TABLE IF NOT EXISTS usage (
   user_hash TEXT NOT NULL,
@@ -138,6 +141,36 @@ CREATE TABLE IF NOT EXISTS inviters (
 );
 
 CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals (referrer);
+
+-- "Stay signed in" (src/session.js). One row per signed-in device. `id` is sha256 hex of the session token
+-- the device keeps, so a copy of this table can't be used to sign in. `tier` is fixed when the session is
+-- made from a provider ID token. `expires` is a year after `last_used`, and both move forward at most once
+-- per UTC day of use. At most 20 per account (the least recently used goes). Sign-out deletes the row;
+-- "Delete my data" deletes all of an account's rows; the daily cron deletes expired ones. No email.
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_hash TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  created TEXT NOT NULL,
+  last_used TEXT NOT NULL,
+  expires TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_hash);
+
+-- The Deep Dive saved to the student's account (src/profile.js), on by default and switched off by the
+-- student. `data` is base64(iv(12) || AES-GCM-256 ciphertext) of the profile JSON, under a key derived
+-- from the PROFILE_KEY secret and this row's user_hash, so neither the database alone nor a row moved to
+-- another account reads as anything. The six demographic answers, files, saved logins and API keys are
+-- never in it. `updated` is the client's time for its latest edit (ISO); `bytes` the plaintext size.
+-- Turning the switch off and "Delete my data" both delete the row.
+CREATE TABLE IF NOT EXISTS profiles (
+  user_hash TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated TEXT NOT NULL,
+  bytes INTEGER NOT NULL
+);
 
 -- Backfills. `npm run deploy` runs this file before every `wrangler deploy`, so both are written to be
 -- repeated: each only ever adds a missing row or moves a value the safe way (a first-seen date

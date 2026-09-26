@@ -1,7 +1,10 @@
-// InternScout API Worker: sign-in check, the Gemini proxy with caps, and area demand. Contract: API.md.
+// InternScout API Worker: sign-in check and sessions, the Gemini proxy with caps, area demand and the
+// saved Deep Dive. Contract: API.md.
 import { CONFIG } from "./config.js";
 import { HttpError, json } from "./http.js";
-import { authenticateUser, providers } from "./auth.js";
+import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "./auth.js";
+import { createSession, dropExpiredSessions, endSession, isSessionToken } from "./session.js";
+import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
 import { admit, allowanceFor, cleanup, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
@@ -27,7 +30,9 @@ function corsHeaders(request, env) {
   if (!allowed.includes(origin)) return {};
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    // was: "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    // PUT is for PUT /profile; without it the browser's preflight refuses the save.
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Expose-Headers": "X-InternScout-Model, X-InternScout-Remaining",
     "Access-Control-Max-Age": "86400",
@@ -82,7 +87,10 @@ async function route(request, env, ctx, d) {
   const db = env.DB;
   const now = d.now();
   let who = { user: null, tier: "general" };   // set by signIn()
-  const signIn = async () => (who = await authenticateUser(request, env, { fetch: d.fetch, now: now.getTime() })).user;
+  // was: const signIn = async () => (who = await authenticateUser(request, env, { fetch: d.fetch, now: now.getTime() })).user;
+  // `later` carries a session's once-a-day refresh past the response (session.js sessionUser).
+  const signIn = async () => (who = await authenticateUser(request, env,
+    { fetch: d.fetch, now: now.getTime(), later: (p) => later(ctx, p) })).user;
   const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan, now));
 
   switch (`${request.method} ${path}`) {
@@ -100,6 +108,9 @@ async function route(request, env, ctx, d) {
         paused: await isPaused(db, env, d.config, now),
         // What an invite is worth (REFERRAL in config.js), so the dashboard can offer it before sign-in.
         invite: { bonus: d.config.REFERRAL.bonus, max: d.config.REFERRAL.maxRewards },
+        // "Stay signed in" (POST /session) is always on; saving the Deep Dive needs the PROFILE_KEY secret.
+        sessions: true,
+        sync: syncOn(env),
       });
     }
 
@@ -133,6 +144,45 @@ async function route(request, env, ctx, d) {
           return limit != null && extra[task] ? { ...out, bonus: extra[task] } : out;
         }),
       });
+    }
+
+    // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
+    // Only an ID token can start a session, so a stolen session token cannot make more of itself.
+    case "POST /session": {
+      const token = bearerOf(request);
+      if (!token || isSessionToken(token)) throw new HttpError(401, "auth", "Sign in with Google or Microsoft first");
+      const { provider, claims, tier } = await verifyIdToken(token, env, { fetch: d.fetch, now: now.getTime() });
+      const user = await userHash(provider, claims, env);
+      const { token: session, expires } = await createSession(db, { user, tier, provider }, now);
+      // The email is echoed for the client to show ("Signed in as ..."); it is not stored.
+      const email = claims.email || claims.preferred_username || null;
+      return json({ session, account: user.slice(0, 16), email, provider, tier, expires });
+    }
+
+    case "DELETE /session": {
+      await endSession(db, bearerOf(request));
+      return json({ ok: true });
+    }
+
+    // The saved Deep Dive (profile.js). All three answer 503 sync_off until PROFILE_KEY is set.
+    case "GET /profile": {
+      requireSync(env);
+      const user = await signIn();
+      return json(await getProfile(db, env, user));
+    }
+
+    case "PUT /profile": {
+      requireSync(env);
+      const user = await signIn();
+      const { body } = await readJson(request, MAX_PROFILE_BYTES);
+      return json(await putProfile(db, env, user, body));
+    }
+
+    case "DELETE /profile": {
+      requireSync(env);
+      const user = await signIn();
+      await deleteProfile(db, user);
+      return json({ ok: true });
     }
 
     case "DELETE /me": {
@@ -272,6 +322,7 @@ export default {
   fetch: (request, env, ctx) => handle(request, env, ctx),
   scheduled(event, env, ctx) {
     const now = new Date();
-    ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
+    // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
+    ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
   },
 };

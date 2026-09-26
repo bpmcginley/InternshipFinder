@@ -7,3 +7,5 @@ import "./gemini.test.js";
 import "./limits.test.js";
 // referral.test.js was missing here, so `node --test test/` (npm test) never ran the referral tests.
 import "./referral.test.js";
+import "./session.test.js";
+import "./profile.test.js";

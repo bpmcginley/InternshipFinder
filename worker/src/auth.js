@@ -1,6 +1,7 @@
 // Sign-in check: verifies a Google or Microsoft OIDC ID token with WebCrypto and turns it into a user_hash
 // plus a tier ("edu" or "general"). Nothing from the token (email, name, the token itself) is kept or logged.
 import { HttpError } from "./http.js";
+import { isSessionToken, sessionUser } from "./session.js";
 
 const LEEWAY_S = 60;
 const JWKS_TTL_MS = 3600_000;
@@ -131,10 +132,20 @@ export async function userHash(provider, claims, env) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// { user, tier } for a request's bearer token.
-export async function authenticateUser(request, env, deps = {}) {
+// The bearer token from the Authorization header, or null.
+export function bearerOf(request) {
   const m = /^Bearer\s+(\S+)$/i.exec(request.headers.get("Authorization") || "");
-  if (!m) throw authError("Sign in first");
-  const { provider, claims, tier } = await verifyIdToken(m[1], env, deps);
+  return m ? m[1] : null;
+}
+
+// was: // { user, tier } for a request's bearer token.
+// { user, tier } for a request's bearer token: a provider ID token (checked as before) or an "iss_"
+// session (session.js), which carries the user and tier fixed when it was made from an ID token.
+// deps.later(promise) runs the session's once-a-day refresh after the response (index.js later()).
+export async function authenticateUser(request, env, deps = {}) {
+  const token = bearerOf(request);
+  if (!token) throw authError("Sign in first");
+  if (isSessionToken(token)) return sessionUser(env.DB, token, deps);
+  const { provider, claims, tier } = await verifyIdToken(token, env, deps);
   return { user: await userHash(provider, claims, env), tier };
 }

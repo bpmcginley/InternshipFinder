@@ -17,7 +17,9 @@ binding = "DB"
 database_name = "internscout"
 database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 
+# was: # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
 # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
+# PROFILE_KEY (32 random bytes, base64; encrypts saved Deep Dives, and saving is off while it is unset),
 # and for the optional paid plans: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
 # (Supporter) and STRIPE_PRICE_ID_PRO (Pro). A plan whose price id is unset is simply not offered.
 #
