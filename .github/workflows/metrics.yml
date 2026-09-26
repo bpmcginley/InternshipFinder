@@ -1,7 +1,8 @@
 name: Dashboard metrics
 
 # Every hour, growth/metrics.py copies the numbers the private analytics dashboard shows (visits by
-# day and source, top pages, Bluesky, listings) into the app's D1 database. Totals only.
+# day and source, top pages, the brand accounts on Bluesky, Instagram and Mastodon, the last run of
+# each job below, listings) into the app's D1 database. Totals only.
 on:
   schedule:
     # was: "30 11 * * *" (once a day, 7:30am US Eastern). Each run rewrites the last 30 days through
@@ -10,8 +11,10 @@ on:
     - cron: "23 * * * *"
   workflow_dispatch:
 
+# actions: read lets GITHUB_TOKEN see the other workflows' last runs (the dashboard's job health).
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: dashboard-metrics
@@ -44,4 +47,8 @@ jobs:
           # Needs Account Analytics: Read and D1: Edit.
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          MASTODON_URL: ${{ secrets.MASTODON_URL }}
+          # Only to find the working token Brand posts keeps in D1; this job never refreshes it.
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: python growth/metrics.py docs --write

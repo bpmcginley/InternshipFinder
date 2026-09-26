@@ -2,6 +2,8 @@
 import importlib.util
 import json
 import os
+import sys
+from datetime import datetime, timezone
 
 import pytest
 
@@ -92,3 +94,77 @@ def test_hourly_snapshots_thin_to_one_a_day_and_expire():
     assert all(x.endswith("T23:23:00Z") for x in older[:-1])   # and it is the day's last run
     assert older[0] >= (now - timedelta(days=120)).strftime("%Y-%m-%dT%H:%M:%SZ")
     assert taken[-1] == now.strftime("%Y-%m-%dT%H:%M:%SZ")     # the newest, which the dashboard reads
+
+
+NOW = datetime(2026, 9, 29, 15, 0, tzinfo=timezone.utc)
+sys.path.insert(0, os.path.join(ROOT, "growth"))           # metrics.instagram imports growth/instagram.py
+
+
+def test_bluesky_keeps_our_recent_posts_and_sums_the_week(monkeypatch):
+    def post(rkey, when, likes, text="x"):
+        return {"post": {"uri": f"at://did:plc:a/app.bsky.feed.post/{rkey}", "likeCount": likes, "repostCount": 1,
+                         "replyCount": 0, "author": {"handle": "internscout.org"},
+                         "record": {"createdAt": when, "text": text}}}
+    feed = [post("a", "2026-09-28T18:00:00.000Z", 4, "word " * 40),
+            {**post("b", "2026-09-27T18:00:00.000Z", 50), "reason": {"$type": "repost"}},   # someone else's
+            post("c", "2026-09-10T18:00:00.000Z", 9)]                                         # last month
+    answers = {"getProfile": {"followersCount": 7, "postsCount": 3}, "getAuthorFeed": {"feed": feed}}
+    monkeypatch.setattr(metrics, "_json", lambda url, *a, **k: next(v for key, v in answers.items() if key in url))
+    got = metrics.bluesky(NOW)
+    assert got["followers"] == 7 and got["posts_7d"] == 1 and got["likes_7d"] == 4 and got["reposts_7d"] == 1
+    assert [p["url"].rsplit("/", 1)[-1] for p in got["recent"]] == ["a", "c"]
+    assert len(got["recent"][0]["text"]) <= 110 and got["recent"][0]["text"].endswith("…")
+
+
+def test_mastodon_reads_the_public_account_and_strips_markup(monkeypatch):
+    answers = {"lookup": {"id": "1", "acct": "internscout", "followers_count": 3, "statuses_count": 1},
+               "statuses": [{"created_at": "2026-09-28T12:00:00.000Z", "content": "<p>New <a href='x'>roles</a></p>",
+                             "favourites_count": 2, "reblogs_count": 1, "replies_count": 0, "url": "https://m/1"}]}
+    monkeypatch.setattr(metrics, "_json", lambda url, *a, **k: next(v for key, v in answers.items() if key in url))
+    got = metrics.mastodon(NOW)
+    assert got["handle"] == "@internscout@mastodon.social" and got["followers"] == 3
+    assert got["recent"][0]["text"] == "New roles" and got["likes_7d"] == 2
+
+
+def test_instagram_needs_the_secret_and_reads_counts_without_refreshing(monkeypatch):
+    monkeypatch.delenv("INSTAGRAM_TOKEN", raising=False)
+    with pytest.raises(ValueError):
+        metrics.instagram("cf", NOW)
+    import instagram as ig                                  # the module metrics.instagram imports
+    monkeypatch.setenv("INSTAGRAM_TOKEN", "secret")
+    monkeypatch.setattr(ig, "working_token", lambda secret, cf: ("kept-token", None))
+    monkeypatch.setattr(ig, "_d1_rows", lambda cf, sql, params=None: [{"expires": "2026-11-24T18:00:00Z"}])
+    calls = []
+
+    def fake(method, path, params):
+        calls.append((method, path, params["access_token"]))
+        if path == "me":
+            return {"username": "internscout", "followers_count": 12, "follows_count": 0, "media_count": 2}
+        return {"data": [{"caption": "Hi", "timestamp": "2026-09-28T15:00:00+0000", "like_count": 5,
+                          "comments_count": 1, "permalink": "https://www.instagram.com/p/x/"}]}
+    monkeypatch.setattr(ig, "_request", fake)
+    got = metrics.instagram("cf", NOW)
+    assert got["followers"] == 12 and got["likes_7d"] == 5 and got["comments_7d"] == 1
+    assert got["token_expires"] == "2026-11-24T18:00:00Z"
+    assert all(m == "GET" and tok == "kept-token" for m, _, tok in calls)     # never refresh_access_token
+    assert "refresh_access_token" not in [p for _, p, _ in calls]
+
+
+def test_automation_reports_each_jobs_last_run(monkeypatch):
+    class Resp:
+        def __init__(self, body): self.body = body
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return json.dumps(self.body).encode()
+    seen = []
+
+    def fake_open(req, timeout=30):
+        seen.append(req.full_url)
+        run = [] if "growth-report" in req.full_url else [{"conclusion": "success", "updated_at": "t",
+                                                           "event": "schedule", "html_url": "u"}]
+        return Resp({"workflow_runs": run})
+    monkeypatch.setattr(metrics.urllib.request, "urlopen", fake_open)
+    got = metrics.automation()
+    assert [j["job"] for j in got] == [name for _, name in metrics.JOBS]
+    assert all("branch=main" in u for u in seen)
+    assert next(j for j in got if j["file"] == "growth-report.yml")["conclusion"] is None

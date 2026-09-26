@@ -1,20 +1,24 @@
 """Numbers for the private analytics dashboard, stored in the app's own database (D1).
 
 Cloudflare Web Analytics has no connector a dashboard page can call, so every hour this reads it
-(and Bluesky and the listings data) and writes two tables in the internscout D1 database:
+(and the brand accounts, the automated jobs and the listings data) and writes two tables in the
+internscout D1 database:
 (was: "once a day". Each run rewrites the last 30 days through the current hour, today's partial
 day included, so running hourly keeps the dashboard within the hour at no extra cost.)
 
   metrics_daily     one row per day for the last 30 days: visits, and how many came in through a
                     landing page, from a search engine, from social sites, or directly
-  metrics_snapshot  one row per run: the week's top pages, referrers and countries, Bluesky
-                    followers and engagement, open and new listings, the page count, and the
+  metrics_snapshot  one row per run: the week's top pages, referrers and countries; followers and
+                    each recent post's engagement on Bluesky, Instagram and Mastodon; the last run
+                    of each GitHub Actions job; open and new listings, the page count, and the
                     extension's Chrome Web Store users and rating
 
 Only totals: no visitor, student or account is ever stored. The dashboard reads these rows, and the
 live sign-in, AI and Stripe numbers, through the viewer's own Cloudflare and Stripe connectors.
 
-Needs CLOUDFLARE_API_TOKEN with Account Analytics: Read and D1: Edit.
+Needs CLOUDFLARE_API_TOKEN with Account Analytics: Read and D1: Edit. Optional: INSTAGRAM_TOKEN (the
+same secret Brand posts uses; the working token it descends from is read from D1 and never refreshed
+here) and GITHUB_TOKEN (without it, the public API's hourly allowance still covers a run).
 Run from the repo root:  python growth/metrics.py [docs] [--write]
 """
 from __future__ import annotations
@@ -32,6 +36,13 @@ ACCOUNT = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "d4a5640a67faee275d9df91204c4e
 SITE_TAG = os.environ.get("CLOUDFLARE_SITE_TAG", "54f99780d57f4ae2a55182b44b082e0a")
 D1_DATABASE = os.environ.get("INTERNSCOUT_D1_ID", "ef477808-f94c-4dce-a0b3-1198f00e5c39")
 BLUESKY = os.environ.get("BLUESKY_HANDLE") or "internscout.org"
+MASTODON = os.environ.get("MASTODON_URL") or "https://mastodon.social"
+MASTODON_ACCT = os.environ.get("MASTODON_ACCT") or "internscout"
+REPO = os.environ.get("GITHUB_REPOSITORY") or "bpmcginley/InternshipFinder"
+# The jobs the dashboard watches, by workflow file: a failed or overdue one is something to look at.
+JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metrics.yml", "Dashboard copy"),
+        ("social.yml", "Brand posts"), ("growth-report.yml", "Growth report"), ("test.yml", "Tests")]
+RECENT = 8                                  # recent posts kept per account
 SITE = "https://internscout.org"
 STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"
 DAYS = 30
@@ -116,16 +127,91 @@ def visits(token: str, now: datetime) -> tuple[list[dict], dict]:
     return sorted(rows.values(), key=lambda x: x["day"]), week
 
 
+def _clip(text: str | None, n: int = 110) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= n else text[:n - 1].rstrip() + "\u2026"
+
+
+def _week(posts: list[dict], now: datetime, *keys: str) -> dict:
+    """posts_7d, and each key summed over the posts made in the last 7 days."""
+    since = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M")
+    week = [p for p in posts if (p.get("when") or "") >= since]
+    return {"posts_7d": len(week), **{f"{k}_7d": sum(p.get(k) or 0 for p in week) for k in keys}}
+
+
 def bluesky(now: datetime) -> dict:
     base = "https://public.api.bsky.app/xrpc/"
     who = urllib.parse.quote(BLUESKY)
     prof = _json(f"{base}app.bsky.actor.getProfile?actor={who}")
     feed = _json(f"{base}app.bsky.feed.getAuthorFeed?limit=30&filter=posts_no_replies&actor={who}").get("feed") or []
-    since = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M")
-    week = [f["post"] for f in feed if f["post"]["record"].get("createdAt", "") >= since]
+    # was: every feed item counted, reposts of other accounts included. Now our own posts only.
+    posts = [{"when": f["post"]["record"].get("createdAt", "")[:19] + "Z",
+              "text": _clip(f["post"]["record"].get("text")),
+              "likes": f["post"].get("likeCount", 0), "reposts": f["post"].get("repostCount", 0),
+              "replies": f["post"].get("replyCount", 0),
+              "url": f"https://bsky.app/profile/{BLUESKY}/post/{f['post']['uri'].rsplit('/', 1)[-1]}"}
+             for f in feed if not f.get("reason")]
     return {"handle": BLUESKY, "followers": prof.get("followersCount", 0), "posts": prof.get("postsCount", 0),
-            "posts_7d": len(week), "likes_7d": sum(p.get("likeCount", 0) for p in week),
-            "reposts_7d": sum(p.get("repostCount", 0) for p in week)}
+            **_week(posts, now, "likes", "reposts", "replies"), "recent": posts[:RECENT]}
+
+
+def mastodon(now: datetime) -> dict:
+    """The brand's Mastodon account, from the server's public API (reading needs no token)."""
+    acct = _json(f"{MASTODON}/api/v1/accounts/lookup?acct={urllib.parse.quote(MASTODON_ACCT)}")
+    statuses = _json(f"{MASTODON}/api/v1/accounts/{acct['id']}/statuses?limit=20&exclude_replies=true"
+                     "&exclude_reblogs=true")
+    tag = re.compile(r"<[^>]+>")
+    posts = [{"when": st["created_at"][:19] + "Z", "text": _clip(tag.sub(" ", st.get("content") or "")),
+              "likes": st.get("favourites_count", 0), "reposts": st.get("reblogs_count", 0),
+              "replies": st.get("replies_count", 0), "url": st.get("url")} for st in statuses]
+    return {"handle": f"@{acct['acct']}@{urllib.parse.urlparse(MASTODON).netloc}",
+            "followers": acct.get("followers_count", 0), "posts": acct.get("statuses_count", 0),
+            **_week(posts, now, "likes", "reposts", "replies"), "recent": posts[:RECENT]}
+
+
+def instagram(cf_token: str | None, now: datetime) -> dict:
+    """@internscout's followers and each recent post's likes and comments (instagram_business_basic;
+    reach and views would need the insights permission, which the app doesn't ask for). The token is
+    the one Brand posts keeps refreshed in D1; this only reads it, so the two jobs never both refresh.
+    token_expires is when that token lapses if Brand posts stops running."""
+    secret = os.environ.get("INSTAGRAM_TOKEN")
+    if not secret:
+        raise ValueError("no INSTAGRAM_TOKEN")
+    import instagram as ig                              # imported here: it imports this module
+    token = ig.working_token(secret, cf_token)[0]
+    expires = None
+    if cf_token:
+        rows = ig._d1_rows(cf_token, "SELECT expires FROM social_tokens WHERE name = 'instagram' AND seed = ?",
+                           [ig._seed(secret)])
+        expires = rows[0]["expires"] if rows else None
+    me = ig._request("GET", "me", {"fields": "username,followers_count,follows_count,media_count",
+                                   "access_token": token})
+    media = ig._request("GET", "me/media", {"fields": "caption,timestamp,like_count,comments_count,permalink",
+                                            "limit": 20, "access_token": token}).get("data") or []
+    posts = [{"when": (m.get("timestamp") or "")[:19] + "Z", "text": _clip(m.get("caption")),
+              "likes": m.get("like_count", 0), "comments": m.get("comments_count", 0), "url": m.get("permalink")}
+             for m in media]
+    return {"handle": "@" + (me.get("username") or "internscout"), "followers": me.get("followers_count"),
+            "following": me.get("follows_count"), "posts": me.get("media_count"), "token_expires": expires,
+            **_week(posts, now, "likes", "comments"), "recent": posts[:RECENT]}
+
+
+def automation() -> list[dict]:
+    """The last finished run on main of each job the dashboard watches."""
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {"Accept": "application/vnd.github+json", **UA}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    out = []
+    for file, name in JOBS:
+        req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/actions/workflows/{file}/runs"
+                                     "?branch=main&status=completed&per_page=1", headers=headers)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            runs = json.load(r).get("workflow_runs") or []
+        run = runs[0] if runs else {}
+        out.append({"job": name, "file": file, "conclusion": run.get("conclusion"), "at": run.get("updated_at"),
+                    "event": run.get("event"), "url": run.get("html_url")})
+    return out
 
 
 def listings(site_dir: str) -> dict:
@@ -221,11 +307,13 @@ def main(argv: list[str]) -> int:
             problems.append(f"visits: {e}")
     else:
         problems.append("visits: no CLOUDFLARE_API_TOKEN")
-    for key, fn in (("bluesky", lambda: bluesky(now)), ("listings", lambda: listings(site_dir)), ("pages", page_count),
-                    ("store", store)):
+    for key, fn in (("bluesky", lambda: bluesky(now)), ("instagram", lambda: instagram(token, now)),
+                    ("mastodon", lambda: mastodon(now)), ("automation", automation),
+                    ("listings", lambda: listings(site_dir)), ("pages", page_count), ("store", store)):
         try:
             snap[key] = fn()
-        except (OSError, urllib.error.URLError, ValueError, KeyError) as e:
+        # RuntimeError includes instagram.InstagramError, which carries Meta's message, never the token.
+        except (OSError, urllib.error.URLError, ValueError, KeyError, RuntimeError) as e:
             problems.append(f"{key}: {e}")
     snap["problems"] = problems
     print(json.dumps({"days": days[-7:], **snap}, indent=1))
