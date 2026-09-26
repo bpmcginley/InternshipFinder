@@ -33,7 +33,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           # pillow: growth/cards.py's tests draw a real card (DejaVu is on the runner image).
-          pip install pytest pillow
+          # cryptography: growth/metrics.py signs the Search Console sign-in with it.
+          pip install pytest pillow cryptography
       - name: Run tests
         working-directory: backend
         run: python -m pytest tests/ -q
