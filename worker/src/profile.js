@@ -85,14 +85,17 @@ export async function getProfile(db, env, user) {
 // wins: the client gets 409 stale with that copy, to merge in. Equal times overwrite, so a retry of the
 // same save succeeds. The write itself is conditional on the same rule, so two devices saving at once
 // can't both pass the check and leave the older copy on top.
-export async function putProfile(db, env, user, body) {
+// A client clock that runs ahead would stamp a future time, and every other device's save would then
+// lose (409) until the real time caught up, so a time later than the server's own is taken as now.
+export async function putProfile(db, env, user, body, now = Date.now()) {
   const profile = body.profile;
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     throw new HttpError(400, "bad_request", "profile must be an object");
   }
   const t = typeof body.updated === "string" ? Date.parse(body.updated) : NaN;
   if (!Number.isFinite(t)) throw new HttpError(400, "bad_request", "updated must be an ISO date");
-  const updated = new Date(t).toISOString();
+  // was: const updated = new Date(t).toISOString();
+  const updated = new Date(Math.min(t, now)).toISOString();
   if (profile.facts && typeof profile.facts === "object") {
     for (const k of DEMOGRAPHICS) delete profile.facts[k];
   }

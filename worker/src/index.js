@@ -175,7 +175,7 @@ async function route(request, env, ctx, d) {
       requireSync(env);
       const user = await signIn();
       const { body } = await readJson(request, MAX_PROFILE_BYTES);
-      return json(await putProfile(db, env, user, body));
+      return json(await putProfile(db, env, user, body, now.getTime()));
     }
 
     case "DELETE /profile": {

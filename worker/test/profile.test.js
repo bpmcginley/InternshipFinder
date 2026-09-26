@@ -69,18 +69,30 @@ test("the stored row is AES-GCM ciphertext with a fresh IV, and only this accoun
 test("an older save than the stored copy is 409 stale with the stored copy; equal or newer saves win", async () => {
   const w = await sync();
   const token = await w.token();
-  assert.equal((await put(w, token, { skills: ["v2"] }, iso(10))).status, 200);
-  const res = await put(w, token, { skills: ["v1"] }, iso(5));
+  // was: iso(10) / iso(5) / iso(20). Saves now can't be stamped later than the server's clock, so the
+  // times here are in the past.
+  assert.equal((await put(w, token, { skills: ["v2"] }, iso(-10))).status, 200);
+  const res = await put(w, token, { skills: ["v1"] }, iso(-15));
   assert.equal(res.status, 409);
   const body = await res.json();
   assert.equal(body.error, "stale");
-  assert.deepEqual([body.profile, body.updated], [{ skills: ["v2"] }, iso(10)]);
+  assert.deepEqual([body.profile, body.updated], [{ skills: ["v2"] }, iso(-10)]);
   assert.deepEqual((await get(w, token)).profile, { skills: ["v2"] }, "nothing overwritten");
   // The same time again (a retried save) goes through, and so does a newer one
-  assert.equal((await put(w, token, { skills: ["v2b"] }, iso(10))).status, 200);
-  const newer = await put(w, token, { skills: ["v3"] }, "2026-09-14T10:25:30.000+00:00");
-  assert.deepEqual(await newer.json(), { ok: true, updated: iso(20) }, "stored as a normal ISO time");
-  assert.deepEqual(await get(w, token), { profile: { skills: ["v3"] }, updated: iso(20) });
+  assert.equal((await put(w, token, { skills: ["v2b"] }, iso(-10))).status, 200);
+  const newer = await put(w, token, { skills: ["v3"] }, "2026-09-14T10:00:30.000+00:00");
+  assert.deepEqual(await newer.json(), { ok: true, updated: iso(-5) }, "stored as a normal ISO time");
+  assert.deepEqual(await get(w, token), { profile: { skills: ["v3"] }, updated: iso(-5) });
+});
+
+test("a save stamped in the future (a fast device clock) is stored at the server's time", async () => {
+  const w = await sync();
+  const token = await w.token();
+  const res = await put(w, token, { skills: ["fast clock"] }, iso(60));
+  assert.deepEqual(await res.json(), { ok: true, updated: iso(0) });
+  // So another device saving now isn't locked out until the fast clock's time comes round
+  assert.equal((await put(w, token, { skills: ["other device"] }, iso(0))).status, 200);
+  assert.deepEqual((await get(w, token)).profile, { skills: ["other device"] });
 });
 
 test("PUT /profile refuses a body over 256 KB or without a profile object and an ISO time", async () => {

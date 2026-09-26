@@ -194,7 +194,9 @@ The Deep Dive saved to the account: `{ "profile": { … } | null, "updated": "<I
 ### `PUT /profile` (auth)
 Body `{ "profile": { … }, "updated": "<ISO>" }`, at most 256 KB (`400 bad_request` over it, or when
 `profile` isn't an object or `updated` isn't a date). `updated` is the client's time for its latest
-edit; it is stored as `toISOString()`.
+edit; it is stored as `toISOString()`, and a time later than the Worker's own clock is stored as the
+Worker's time (a device whose clock runs fast would otherwise make every other device's save stale). The
+reply's `updated` is the time actually stored; clients keep that one.
 - The client sends only the synced subset (see the extension's `lib/sync.js`): never files, saved
   logins, API keys, or the six demographic answers. The Worker deletes those six keys
   (`gender, race, hispanic, veteran, disability, lgbtq`) from `profile.facts` again before storing.
