@@ -13901,14 +13901,16 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-09-26"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-09-26"
   },
   "boeing|wd1|INTERN": {
    "name": "The Boeing Company",
@@ -17904,9 +17906,10 @@
   "nike|wd1|nke": {
    "name": "Nike",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-23",
-   "sector": "hospitality_sports"
+   "sector": "hospitality_sports",
+   "last_fail": "2026-09-26"
   },
   "nio|wd3|NIO_Careers": {
    "name": "Nio",
