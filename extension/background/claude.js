@@ -3,7 +3,7 @@
 import { callGemini, callWorker, taskFor } from "./gemini.js";
 import { recordUsage } from "../lib/usage.js";
 import { WORKER_URL } from "../lib/config.js";
-import { ensureToken } from "../lib/auth.js";
+import { ensureToken, refreshAfter401 } from "../lib/auth.js";
 
 const URL = "https://api.anthropic.com/v1/messages";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -15,7 +15,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Every own-key call is priced and added to the monthly total; the cost comes back as resp.cost_usd.
 export async function callAI({ ai, model, kind, task, run_id, ...opts }) {
   if (ai && ai.provider === "internscout") {
-    const resp = await callWorker({ url: WORKER_URL, token: await ensureToken(), refreshToken: ensureToken, task: task || taskFor(kind), run_id, ...opts });
+    // was: refreshToken: ensureToken. A 401 on a session token now drops that session (lib/auth.js).
+    const resp = await callWorker({ url: WORKER_URL, token: await ensureToken(), refreshToken: refreshAfter401, task: task || taskFor(kind), run_id, ...opts });
     resp.cost_usd = 0;
     return resp;
   }

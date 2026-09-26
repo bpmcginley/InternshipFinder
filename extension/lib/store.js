@@ -85,12 +85,16 @@ export function emptyStore() {
       max_tabs: 2, onboarded: false, deep_dive_at: null, deep_dive_run: null,
       ai_mode: "balanced",       // economy | balanced | best (see PRESETS)
       tailor_resume: "review",   // off | review (you approve each one) | auto
+      // Saving the Deep Dive to the student's account (lib/sync.js). On by default; the switch is in the
+      // Deep Dive's account box. The other two are the background's bookkeeping: when the synced part of
+      // the profile last changed (ISO), and a hash of it as of the last time it matched the account's copy.
+      cloud_sync: true, profile_updated_at: null, profile_synced_hash: null,
     },
     answers: [],       // log: {jobId, company, title, question, answer, at}
   };
 }
 
-function deepMerge(base, over) {
+export function deepMerge(base, over) {
   if (Array.isArray(base)) return Array.isArray(over) ? over : base;
   if (base && typeof base === "object") {
     const out = { ...base };

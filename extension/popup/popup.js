@@ -1,6 +1,7 @@
 import { loadStore, hasKey, isWorker } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
+import { takeRestored, restoredMessage } from "../lib/sync.js";
 
 const DASHBOARD = "https://internscout.org/";
 const $ = (id) => document.getElementById(id);
@@ -8,6 +9,12 @@ $("ver").textContent = "v" + chrome.runtime.getManifest().version;
 
 (async () => {
   const s = await loadStore();
+  // Signed in on a new computer: the Deep Dive came back from the account (lib/sync.js). Said once.
+  const r = await takeRestored();
+  if (r) {
+    $("restored").hidden = false;
+    $("restored").textContent = restoredMessage(r) + (s.files.resume ? "" : " Your files stay on each device, so add your resume in the Deep Dive.");
+  }
   if (!s.settings.onboarded || !hasKey(s)) {
     $("note").hidden = false;
     $("note").textContent = "Finish the Deep Dive to turn on Auto-Apply.";
