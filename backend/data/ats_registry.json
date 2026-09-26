@@ -13621,9 +13621,8 @@
   "basspro|wd1|careers": {
    "name": "Bass Pro Shops",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-26",
-   "last_fail": "2026-09-26"
+   "fails": 0,
+   "added": "2026-09-26"
   },
   "baxter|wd1|baxter": {
    "name": "Baxter International",
@@ -13901,16 +13900,14 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-26"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-26"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|INTERN": {
    "name": "The Boeing Company",
@@ -15245,10 +15242,9 @@
   "elevancehealth|wd1|ELV-ET": {
    "name": "Elevance Health",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-24",
-   "sector": "health",
-   "last_fail": "2026-09-26"
+   "sector": "health"
   },
   "elkay|wd1|Elkay_External": {
    "name": "Zurn Elkay Water Solutions",
