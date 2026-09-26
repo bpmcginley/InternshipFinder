@@ -33,9 +33,9 @@ function filled({ onboarded = true, updated = null, synced = null } = {}) {
   s.profile.stories.push({ theme: "challenge", situation: "a hard bug" });
   s.profile.extra["Why us?"] = "Because.";
   s.files.resume = { name: "resume.pdf", type: "application/pdf", b64: "SECRETFILEBYTES", size: 10 };
-  s.accounts.push({ domain: "acme.myworkdayjobs.com", email: "sam@school.edu", password: "Hunter2!Secret" });
-  Object.assign(s.ai, { apiKey: "sk-ant-SECRET", geminiKey: "AIzaSECRET" });
-  Object.assign(s.settings, { signup_email: "apply@school.edu", master_password: "MasterSECRET!", onboarded, deep_dive_at: onboarded ? 1758800000000 : null,
+  s.accounts.push({ domain: "acme.myworkdayjobs.com", email: "sam@school.edu", password: "placeholder-pw" });
+  Object.assign(s.ai, { apiKey: "placeholder-anthropic", geminiKey: "placeholder-gemini" });
+  Object.assign(s.settings, { signup_email: "apply@school.edu", master_password: "placeholder-master", onboarded, deep_dive_at: onboarded ? 1758800000000 : null,
     profile_updated_at: updated, profile_synced_hash: synced });
   s.answers.push({ question: "q", answer: "ANSWERSECRET" });
   s.dashboard_profile = { majors: ["Computer Science"], minors: [], class_year: "Junior", grad_term: "Spring 2028", stages: [], terms: [], states: ["MA"], work_auth: "" };
@@ -60,7 +60,7 @@ test("the synced subset leaves out demographics, logins, keys, passwords, files,
   assert.equal(sub.profile.extra["Why us?"], "Because.");
   assert.equal(sub.dashboard_profile.class_year, "Junior");
   const body = JSON.stringify({ profile: S.toServer(sub) });
-  for (const secret of ["SECRETFILEBYTES", "Hunter2!Secret", "sk-ant-SECRET", "AIzaSECRET", "MasterSECRET!", "apply@school.edu", "ANSWERSECRET",
+  for (const secret of ["SECRETFILEBYTES", "placeholder-pw", "placeholder-anthropic", "placeholder-gemini", "placeholder-master", "apply@school.edu", "ANSWERSECRET",
     "Woman", "Asian", "protected veteran", "lgbtq", "\"gender\"", "\"race\""]) assert.ok(!body.includes(secret), secret);
   // The Worker strips profile.facts again, so facts must sit right under body.profile.
   const out = S.toServer(sub);
