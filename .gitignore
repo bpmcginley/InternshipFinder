@@ -11,6 +11,7 @@ dist/
 
 # Email digest previews (growth/digest.py): rebuilt from the data on every run
 digest-preview/
+outreach-kit/
 
 # Worker: local secrets and build state - never commit
 worker/node_modules/

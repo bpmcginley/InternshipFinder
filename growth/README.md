@@ -51,6 +51,13 @@ Recompute this table with `python growth/audience.py` (it reads `docs/data`).
      sends it and what it waits for. The per-field line changed because the sender sends everyone the
      same email for now. -->
 
+## Campus partner outreach
+
+The [campus outreach kit](OUTREACH.md) now prepares major-specific partner-email and club-post drafts
+from fresh listings. The **Campus outreach kit** Action runs every Monday or by hand and saves a
+reviewable artifact. It sends nothing. Drafts are produced only for well-served undergraduate majors
+when the listing export is current; a person checks the jobs and chooses where to share them.
+
 ## Channels, and the rules each follows
 
 These rules are not negotiable: breaking them gets the brand banned from the very places the audience
@@ -92,6 +99,7 @@ Revisit a store app once there are returning users who ask for one.
 | Settings → Pages → Source: **GitHub Actions**, just before the landing-pages PR merges | The landing pages are built at deploy time; the deploy refuses to run until this is set |
 | ~~Verify internscout.org in Google Search Console~~ (done 2026-09-23) | See which searches find the pages; unlocks the store's Official URL |
 | In the Chrome Web Store developer dashboard, Store listing → **Official URL**: internscout.org | The listing then shows the site as verified, which store visitors trust |
+| Update the Chrome Web Store's **Safe by design** text using [STORE_LISTING.md](STORE_LISTING.md) | The current listing says no profile copy is kept, while signed-in Deep Dives are saved to the account by default. The listing must match the privacy policy and extension. |
 | A Cloudflare API token with Analytics read and D1 edit, saved as a repo secret | Lets the weekly report read visits and the daily metrics copy write them |
 | Ad accounts and monthly caps, when ready | Paid reach in recruiting season |
 | **Email digest 1.** Create a Buttondown account at buttondown.com and fill in its verification form: InternScout, a free opt-in weekly digest of new internships for UMass Amherst students; subscribers come only from the internscout.org form; no imported lists | Buttondown sends the digest and keeps the subscriber list, so InternScout's servers never store an email address. It reviews every new account (usually in 1 to 3 business days) before the account can collect subscribers. Budget $9 a month once per-field emails need tags: tags are a $9 add-on up to 100 subscribers and part of the $9 plan from 101 to 1,000 ($29 a month above that) |
