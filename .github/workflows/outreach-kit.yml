@@ -1,0 +1,28 @@
+name: Campus outreach kit
+
+# Drafts only: this workflow sends no email and posts to no community. A person reviews the artifact.
+on:
+  schedule:
+    - cron: "30 13 * * 1" # Mondays, after the growth report
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  draft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build drafts from the current listing export
+        run: python growth/outreach.py docs --out outreach-kit
+      - name: Save drafts for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: campus-outreach-kit
+          path: outreach-kit/
+          retention-days: 14

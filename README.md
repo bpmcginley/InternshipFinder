@@ -78,10 +78,13 @@ Hit your cap? Under **Advanced** in the extension you can use your own Gemini or
 ## Privacy in short
 
 - Search needs no account.
-- Your profile, resume and files stay in your browser and the extension.
+- Your resume and other files stay in your browser and the extension. When you sign in to the
+  extension, it saves an encrypted copy of your Deep Dive profile to your account by default so you
+  can restore it on another device. You can turn this off and delete that copy in the extension.
 - AI requests pass through our small server to Google's paid Gemini API. We don't store them,
   and they aren't used to train AI.
-- We keep only a scrambled sign-in ID, your monthly usage counts and the states you picked.
+- We keep a scrambled sign-in ID, monthly usage counts, the states you picked, and, unless you turn
+  saving off, that encrypted Deep Dive profile. We do not keep your uploaded files or saved logins.
 - Delete it all any time with **Delete my data**, then clear site data or remove the extension.
 
 Full details: **[Privacy policy](https://internscout.org/privacy.html)** ·
