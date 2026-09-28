@@ -551,6 +551,7 @@
 42.7742,
 -73.7001
 ],
+"college of medicine|PA":null,
 "collegeville (pa|PA":null,
 "collegeville|PA":[
 40.1855,
@@ -1024,6 +1025,7 @@
 40.3062,
 -80.1206
 ],
+"lehigh county|PA":null,
 "lehighton|PA":[
 40.834,
 -75.7136
@@ -1125,6 +1127,7 @@
 -77.9989
 ],
 "mcguire afb|NJ":null,
+"mckean county|PA":null,
 "mckeesport|PA":[
 40.3478,
 -79.8642
@@ -1485,6 +1488,7 @@
 39.2789,
 -74.5763
 ],
+"off campus - other|PA":null,
 "off-site employees (corp use) new jersey|NJ":null,
 "off-site employees (corp use) new york|NY":null,
 "off-site employees (corp use) pennsylvania|PA":null,
@@ -1599,6 +1603,12 @@
 -74.1718
 ],
 "pa|PA":null,
+"penn state altoona|PA":null,
+"penn state berks|PA":null,
+"penn state brandywine|PA":null,
+"penn state harrisburg|PA":null,
+"penn state university park|PA":null,
+"penn state york|PA":null,
 "pennington|NJ":[
 40.3281,
 -74.791
@@ -2107,6 +2117,10 @@
 "villanova|PA":[
 40.0412,
 -75.3311
+],
+"walden|NY":[
+41.5612,
+-74.1885
 ],
 "walnut street|PA":null,
 "wappingers falls|NY":[
