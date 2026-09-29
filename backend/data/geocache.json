@@ -268,6 +268,7 @@
 42.9784,
 -78.7998
 ],
+"annville - pennsylvania|PA":null,
 "ardmore|PA":[
 40.0079,
 -75.2911
@@ -1334,6 +1335,7 @@
 ],
 "new york office|NY":null,
 "new york privy hq|NY":null,
+"new york remote office|NY":null,
 "new york state (other|NY":null,
 "new york united states|NY":null,
 "new york virtual|NY":null,
@@ -1439,6 +1441,7 @@
 "north westchester county|NY":null,
 "ny - amherst|NY":null,
 "ny - astoria|NY":null,
+"ny - ballston spa|NY":null,
 "ny - bellport|NY":null,
 "ny - bethpage|NY":null,
 "ny - bohemia|NY":null,
@@ -2222,6 +2225,10 @@
 "westampton|NJ":[
 40.0155,
 -74.8281
+],
+"westbury|NY":[
+40.7557,
+-73.5876
 ],
 "westchester county|NY":null,
 "westwood|NJ":[

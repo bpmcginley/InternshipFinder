@@ -507,6 +507,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "dailypay": {
+   "name": "DailyPay",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-29"
+  },
   "DatologyAI": {
    "name": "DatologyAI",
    "quant": false,
@@ -1658,6 +1664,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "plot": {
+   "name": "Plot Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-29"
   },
   "pluralis-research": {
    "name": "Pluralis Research",
@@ -12088,10 +12100,9 @@
   "jobs.arkema.com": {
    "name": "Arkema",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-09-29"
+   "sector": "engineering_manufacturing"
   },
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
@@ -20228,8 +20239,9 @@
   "usertesting|wd12|UserTesting": {
    "name": "UserTesting",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-09-29"
   },
   "usfoods|wd1|usfoodscareersExternal": {
    "name": "US Foods",
