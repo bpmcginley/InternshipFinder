@@ -565,6 +565,10 @@
 -75.4512
 ],
 "columbus ave|NY":null,
+"commack|NY":[
+40.8429,
+-73.2929
+],
 "concordville|PA":[
 39.8852,
 -75.5202
@@ -859,6 +863,7 @@
 39.6427,
 -74.3339
 ],
+"guest worldwide - somerset nj|NJ":null,
 "hacc financial center|PA":null,
 "hamilton township|NJ":[
 40.2113,
@@ -993,6 +998,7 @@
 39.8467,
 -75.7117
 ],
+"king of prussia pa|PA":null,
 "kings county|NY":[
 40.6456,
 -73.9559
@@ -1113,6 +1119,7 @@
 40.7957,
 -73.6989
 ],
+"marietta pa/onsite|PA":null,
 "marlton|NJ":[
 39.9417,
 -75.094
@@ -2030,6 +2037,7 @@
 ],
 "upper merion pa/onsite|PA":null,
 "upper providence pa/onsite|PA":null,
+"upstate new york|NY":null,
 "upstate ny|NY":null,
 "upton|NY":[
 40.8695,
