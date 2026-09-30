@@ -60,6 +60,21 @@ CREATE TABLE IF NOT EXISTS tokens (
   output INTEGER NOT NULL DEFAULT 0
 );
 
+-- The same totals by task and model, with what they cost (added 2026-09-30). The month's row above
+-- could not say which task the spend went on or whether the cache was being hit, which is what every
+-- cost change has to be judged by. Totals only, like `tokens`: no user, no content.
+CREATE TABLE IF NOT EXISTS task_tokens (
+  month TEXT NOT NULL,
+  task TEXT NOT NULL,
+  model TEXT NOT NULL,
+  calls INTEGER NOT NULL DEFAULT 0,
+  prompt INTEGER NOT NULL DEFAULT 0,
+  cached INTEGER NOT NULL DEFAULT 0,
+  output INTEGER NOT NULL DEFAULT 0,
+  cents REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (month, task, model)
+);
+
 -- Accounts that pressed "Delete my data" in `month`. Their counters for that month are kept until it
 -- ends, so deleting cannot reset a limit; the daily cron then removes them and this row.
 CREATE TABLE IF NOT EXISTS forget (

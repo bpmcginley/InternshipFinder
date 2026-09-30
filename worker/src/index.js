@@ -255,7 +255,7 @@ async function route(request, env, ctx, d) {
 
       if (stream) {
         const [client, meter] = upstream.body.tee();
-        later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u)));
+        later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u, { task, model })));
         return new Response(client, {
           status: 200,
           headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
@@ -266,7 +266,7 @@ async function route(request, env, ctx, d) {
       try {
         usage = JSON.parse(text).usageMetadata || null;
       } catch {}
-      later(ctx, settle(db, user, admitted, price(usage), usage));
+      later(ctx, settle(db, user, admitted, price(usage), usage, { task, model }));
       return new Response(text, { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
     }
 

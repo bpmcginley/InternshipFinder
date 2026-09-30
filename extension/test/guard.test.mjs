@@ -341,3 +341,36 @@ test("on a cookie banner, only the choices that keep the default are offered", (
   // box and all, in the same root as the banner, and the banner is still a banner.
   assert.equal(G.consentGiveaway(stack({}, { consent: true, position: "fixed", textBox: true, hiddenBox: true }), "Accept All Cookies"), true);
 });
+
+test("choice questions the profile answers outright, and the ones left to the model", () => {
+  const f = G.choiceFact;
+  assert.equal(f("Are you legally authorized to work in the United States?"), "work_authorized");
+  assert.equal(f("Will you now or in the future require sponsorship for employment visa status in the U.S.?"), "needs_sponsorship");
+  assert.equal(f("Are you at least 18 years of age?"), "over_18");
+  assert.equal(f("Veteran Status"), "veteran");
+  assert.equal(f("Disability Status"), "disability");
+  assert.equal(f("Are you Hispanic or Latino?"), "hispanic");
+  assert.equal(f("Race"), "race");
+  assert.equal(f("Gender"), "gender");
+  // Left to the model: reverse-worded, another country, no country, two facts at once, not about age.
+  for (const q of ["Are you able to work in the US without sponsorship?", "Are you authorized to work in Canada?",
+    "Are you authorized to work?", "Race/Ethnicity (Hispanic or Latino)", "Sexual orientation",
+    "Have you worked for us in the last 18 months?", "Gender pronouns"]) assert.equal(f(q), null, q);
+});
+
+test("an option is picked only when exactly one clearly says the answer", () => {
+  const o = G.confidentOption;
+  const vets = ["Select...", "I am not a protected veteran", "I identify as one or more of the classifications of protected veteran", "I don't wish to answer"];
+  assert.equal(o(vets, "I don't wish to answer"), "I don't wish to answer");
+  const dis = ["Yes, I have a disability (or previously had a disability)", "No, I do not have a disability", "I do not want to answer"];
+  assert.equal(o(dis, "I don't wish to answer"), "I do not want to answer");
+  assert.equal(o(["Male", "Female", "Decline to self-identify"], "Decline to self-identify"), "Decline to self-identify");
+  assert.equal(o(["Yes", "No"], "No"), "No");
+  assert.equal(o(["Yes, I will require sponsorship", "No, I will not"], "No"), "No, I will not");
+  assert.equal(o(["Male", "Female", "Non-binary"], "Female"), "Female");
+  // Not sure: nothing says decline, two options might, or the value is not among them.
+  assert.equal(o(["Male", "Female"], "Decline to self-identify"), null);
+  assert.equal(o(["Prefer not to say", "Decline to answer"], "Decline to self-identify"), null);
+  assert.equal(o(["Woman", "Man"], "Female"), null);
+  assert.equal(o(["Yes", "No"], ""), null);
+});

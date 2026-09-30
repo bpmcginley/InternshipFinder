@@ -9,6 +9,7 @@ import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
+import { recordStep } from "./evalrec.js";
 // Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
 // here (in the worker) as well as in the page, and this keeps one copy with one set of tests.
 import "../agent/guard.js";
@@ -340,8 +341,11 @@ function gateIn(frames) {
   return null;
 }
 
-// Old snapshots are the bulk of the context; keep only the last two.
-function trimHistory(msgs) {
+// Old snapshots are the bulk of the context; keep only the latest (was: the last two). The tool
+// results after each step already say what was filled and what failed, so the page before this one
+// only repeated fields the model had seen, at full price on every later step of the run.
+const KEEP_SNAPSHOTS = 1;
+export function trimHistory(msgs) {
   let seen = 0;
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
@@ -349,7 +353,7 @@ function trimHistory(msgs) {
     for (const b of m.content) {
       if (b.type === "text" && b.text.startsWith("SNAPSHOT")) {
         seen++;
-        if (seen > 2) b.text = "SNAPSHOT (older page state removed)";
+        if (seen > KEEP_SNAPSHOTS) b.text = "SNAPSHOT (older page state removed)";
       }
     }
   }
@@ -357,9 +361,27 @@ function trimHistory(msgs) {
 
 const toolResult = (id, content, isError) => ({ type: "tool_result", tool_use_id: id, content: typeof content === "string" ? content : JSON.stringify(content), ...(isError ? { is_error: true } : {}) });
 
+// was: .slice(0, 5000). The description now sits in the fixed opening of every request (buildSystem),
+// where after the first step it is read from Gemini's cache at a tenth of the price, so more of it
+// costs little and grounds the free-text answers better.
 function jobIntro(job) {
   return `JOB\nCompany: ${job.company}\nTitle: ${job.title}\nLocation: ${job.location || ""}\nApply URL: ${job.apply_url}\n` +
-    `Description:\n${(job.description || "(read it from the page)").slice(0, 5000)}`;
+    `Description:\n${(job.description || "(read it from the page)").slice(0, 8000)}`;
+}
+
+// The part of every request that stays the same for a whole run: rules, the candidate, the job.
+// Gemini 3.x serves a request's repeated opening from its cache (a tenth of the input price) only
+// once that opening is about 4,096 tokens long. Rules, tools and profile came to roughly 3,000, so in
+// September under 1% of Auto-Apply's 1.25M input tokens were cached and every step paid full price
+// for the same text. The job used to open the first message instead (was: content.push(jobIntro(job))
+// on the first turn), after the part the cache can match; here it lifts the fixed opening past the
+// threshold. Nothing in it may change between steps of a run, or the cache misses from that point.
+export function buildSystem(store, job) {
+  return [
+    { type: "text", text: RULES },
+    { type: "text", text: `CANDIDATE PROFILE (JSON)\n${JSON.stringify(profileForModel(store))}` },
+    { type: "text", text: jobIntro(job), cache_control: { type: "ephemeral" } },
+  ];
 }
 
 function accountLine(store, url) {
@@ -602,7 +624,7 @@ async function loop(id) {
 
     const content = [];
     if (pending && pending.results) content.push(...pending.results);
-    if (!msgs.length) content.push({ type: "text", text: jobIntro(job) });
+    // was: if (!msgs.length) content.push({ type: "text", text: jobIntro(job) }); the job is in buildSystem now.
     if (pending && pending.note) content.push({ type: "text", text: pending.note });
     if (pre.length) content.push({ type: "text", text: `Pre-filled: ${pre.join("; ")}` });
     content.push({ type: "text", text: `SNAPSHOT\n${accountLine(store, url)}\n${snap.text}` });
@@ -611,10 +633,7 @@ async function loop(id) {
     pending = null;
     trimHistory(msgs);
 
-    const system = [
-      { type: "text", text: RULES },
-      { type: "text", text: `CANDIDATE PROFILE (JSON)\n${JSON.stringify(profileForModel(store))}`, cache_control: { type: "ephemeral" } },
-    ];
+    const system = buildSystem(store, job);
     let resp;
     try {
       resp = await callAI({ ai: store.ai, model: modelFor(store, "agent"), system, messages: msgs, tools: TOOLS, max_tokens: 8000, kind: "agent", run_id: job.run_id });
@@ -626,6 +645,9 @@ async function loop(id) {
       await saveMsgs(id, msgs);
       return;
     }
+    // Only when a developer has turned recording on (evalrec.js); the step as the model saw it.
+    await recordStep({ at: new Date().toISOString(), host: hostOf(url), company: job.company, title: job.title,
+      model: modelFor(store, "agent"), system, messages: msgs, response: resp.content, usage: resp.usage || null });
     msgs.push({ role: "assistant", content: resp.content });
     steps++;
 

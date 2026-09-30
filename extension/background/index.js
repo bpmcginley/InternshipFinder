@@ -5,6 +5,10 @@ import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
 import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
+import { ISEval } from "./evalrec.js";
+
+// For the model comparison in scripts/eval, from this service worker's console only (evalrec.js).
+self.ISEval = ISEval;
 
 const ONBOARDING = "onboarding/onboarding.html";
 const PANEL = "sidepanel/sidepanel.html";

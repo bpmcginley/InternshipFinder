@@ -356,6 +356,12 @@ test("token totals are kept per month as numbers only", async () => {
   await w.api("POST", "/ai", { token, body: aiBody("field_match", "a") });
   await w.api("POST", "/ai?stream=1", { token, body: aiBody("field_match", "b") });
   assert.deepEqual(w.db.dump().tokens, [{ month: "2026-09", calls: 2, prompt: 2000, cached: 0, output: 600 }]);
+  // And by task and model, with the cost, so a change to one task's prompts can be judged on its own.
+  const [row] = w.db.dump().task_tokens;
+  assert.equal(row.task, "field_match");
+  assert.equal(row.model, "gemini-3.5-flash-lite");
+  assert.deepEqual([row.calls, row.prompt, row.cached, row.output], [2, 2000, 0, 600]);
+  assert.ok(row.cents > 0);
 });
 
 test("Flash allowances halve on 2027-01-01, when Flash doubles in price; Flash-Lite ones do not", async () => {
