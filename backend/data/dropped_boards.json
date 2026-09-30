@@ -1,1 +1,948 @@
-{}
+{
+ "icims": {
+  "career-schwab": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-biorad": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-hrblock": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-ice": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-itcfederal": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-jkmoving": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-rcm": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-se": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-sig": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-strattec": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-tatitlek": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "external-careers-friedkin": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "jobs-tollbrothers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "studentemployment-stthomas": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "university-uber": {
+   "on": "2026-09-30",
+   "why": "robots"
+  }
+ },
+ "smartrecruiters": {
+  "3sbusinesscorporationinc1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "abbvie": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "accellearning": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "accorcorpo": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "acumatica": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "aecom2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "aerovect": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "agtechnologies1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "allegisglobalsolutions": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "analysysmason1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "apexcleanenergy": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "aristanetworks": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "askitconsulting": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "assent": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "atpco1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "atriagroupllc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "augsburguniversity-minneapolismn": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "averydennison": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "axleinformaticsllc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "barkbackllc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "bcforward3": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "behavioralconcepts": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "blinqlabs": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "boschgroup": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "californiaiso": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "canva": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "cityofphiladelphia": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "clinicalink": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "codeage": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "collabera2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "computerfutures3": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "comtechllc2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "continental": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "cornerstonebuildingbrandscareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "crowninnovationsinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "customshow": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "deegitinc3": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "dexterra": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "dpdgroupuk1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "eataly": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "educationdevelopmentcenter": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "egisgroup": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "encephaloinvestments": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "equinox": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "eurofins": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "eversana1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "experian": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "fanniemae1sb": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "flywire1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "fortunebrands": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "freshworks": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "gdmsi": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "globalchannelmanagementinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "harvarduniversity": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "hirevue": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "horizontechnologiesinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "huckadventures": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "hyatthotels": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "iflip4": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "ifs1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "inbulkscorp": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "infinitequant": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "infojiniinc1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "integratedresourcesinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "intelerad": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "interco": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "intuitive": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "iomaxisllc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "jobsforhumanity": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "kansheinfotech": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "keenfinity": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "kioxia": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "knobelsdorffenterprises": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "kostalgroup": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "laxir1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "learnkwikcom": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "legalandgeneral": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "leger2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "llnl": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "loram1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "louisdreyfuscompany": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "luxemediallc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "m3usa": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mapjectscom": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "matholdings": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mattelinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mcwaneinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "msxinternational": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "nbcuniversal3": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "necsws": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "netcompany1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "nexthink": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "nielseniq": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "northwesternmutual": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "norwegiancruiseline": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "oxfamamerica2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "paconsulting": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "pilotcompany": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "proximatetechnologiesinc1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "publicisgroupe": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "redbull": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "regdeskinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "renesaselectronics": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "respecinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "resultant": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "rrdonnelley": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "rrsgroup": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sajixsoftwaresolutionprivatelimited": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sandisk": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "satechnologiesinc4": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "servicenow": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sgs": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "shawbrook": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sightcall": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sikaag": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "skyward1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "smithsgroup2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "socotecukireland": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sodexo": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "solidigm": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "somfygroup": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sportradar": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "springventuregroup1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "stcu1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "stemxpert1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "syngentagroup": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "systemcanadatechnologies": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "thenielsencompany": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "thewonderfulcompany": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "treehousestrategyandcommunicatio": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "ttp1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "turnertownsend": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "ubisoft2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "uncommonschools": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "universityhealthnetwork": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "usm2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "veoliaenvironnementsa": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "visa": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "vusiongroupsa": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "vwhcapitalmanagementlp": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "wabashvalleypoweralliance": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "wabtec": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "wellmarkinc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "westerndigital": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "westgateresorts": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "williamsracing": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "winsupply1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  }
+ },
+ "workday": {
+  "allstate|wd5|sourcing_event": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "amfam|wd1|amfamgroupinterncareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "andersen|wd12|andersen_external_career_site": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "assurant|wd1|external_limited_posting": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "asu|wd1|asustaffcareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "autonation|wd5|careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "basspro|wd1|careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "blackrock|wd1|blackrock_early_careers_program": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "bmo|wd3|privileged": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "bpinternational|wd3|bpcareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "bpinternational|wd3|bpearlycareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "bpinternational|wd3|bpprivateexternalcareerssite": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "brookfield|wd5|brookfieldprivate": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "cat|wd5|caterpillarcareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "citi|wd5|2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "citi|wd5|citi_early_careers_events_site": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "clorox|wd1|inviteclorox": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "cohesity|wd5|cohesity_careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "conocophillips|wd1|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "disney|wd5|disneycareerdc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "doterra|wd1|doterracareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "draftkings|wd1|campus_career_portal": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "draftkings|wd1|employee_referral_portal": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "elevancehealth|wd1|elv-et": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "equifax|wd5|ur_external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "equinix|wd1|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "expedia|wd108|private": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "fhlbtopeka|wd1|fhlbt": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "fmr|wd1|targeted": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "freddiemac|wd5|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "genmab|wd3|genmab_careers_site": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "gfs|wd5|usprivate-gfs": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "glencorecorp|wd3|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "globalhr|wd5|private_posting_no_tmp": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "harman|wd3|harman": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "heinz|wd1|kraftheinz_careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "heinz|wd1|kraftheinz_careers_ur": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "homedepot|wd5|careerdepotcanada": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "hp|wd5|exteu-ac-careersite": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "jainglobal|wd5|externalsite": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "lowes|wd5|lws_external_cs": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "marvell|wd1|marvellcareers2": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "masco|wd1|masco": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mastercard|wd1|public_posting_site": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mgmresorts|wd5|mgmcareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mitre|wd5|mitre": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "mizuho|wd1|mizuho_confidential": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "my7elevenhr|wd12|careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "myview|wd3|paradox_careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "nike|wd1|nke": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "oneok|wd1|oneok_early_careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "osv-edf|wd5|confidential": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "paloaltonetworks|wd5|panwexternalcareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "pimco|wd1|pimco-careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "rbc|wd3|externalprivatepostingstudents": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "rgare|wd1|careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "richemont|wd3|richemont": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "rxo|wd501|rxojobs": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "sandvik|wd3|sandvik-jobs": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "situsamc|wd1|situsamc": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "snyk|wd103|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "swa|wd1|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "synchronyfinancial|wd5|careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "theaccessgroup|wd103|access_group_external_careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "thermofisher|wd5|thermofishercareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "thisisglobal|wd3|global": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "thyssenkruppmaterialsna|wd12|1": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "tmobile|wd1|external": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "usfoods|wd1|usfoodscareersexternal": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "verizon|wd12|verizon-careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "vishay|wd3|vishaycareers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "vitalant|wd12|careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  },
+  "xylem|wd5|xylem-careers": {
+   "on": "2026-09-30",
+   "why": "robots"
+  }
+ }
+}
