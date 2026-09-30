@@ -511,7 +511,9 @@ async function loop(id) {
     await sleep(800);
     await inject(tabId);
     store = await loadStore();
-    const facts = { ...store.profile.facts, email: store.settings.signup_email || store.profile.facts.email };
+    // job_in_us: for fastFill's "authorized to work in the country where this position is based".
+    const facts = { ...store.profile.facts, email: store.settings.signup_email || store.profile.facts.email,
+      job_in_us: globalThis.ISGuard.jobInUS(job.location) };
     // The resume goes in with the contact details when the page has one obvious box for it, on the
     // same rules-first principle: a turn spent telling the model to attach the file it was always
     // going to attach is a turn nobody gets back. Same choice of file as the upload tool makes.

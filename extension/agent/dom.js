@@ -637,13 +637,17 @@
     // work authorization and sponsorship asked the plain way round. Native selects and radio groups
     // only, which set without opening any widget; guard.js decides which questions and which option,
     // and anything it is not sure of is left for the model.
+    // Greenhouse's dropdowns (react_select) too, since 2026-09-30: its EEO and work-authorization
+    // questions are all drawn that way, and they were the most common fields the model still filled.
+    // Only a list whose options are all there to read; a searchable one (school, city) is the model's.
     for (const rec of refs.values()) {
-      if (rec.kind !== "select" && rec.kind !== "radio_group") continue;
+      if (rec.kind !== "select" && rec.kind !== "radio_group" && rec.kind !== "react_select") continue;
       const el = rec.el;
-      if (rec.kind === "select" ? (el.value && el.selectedIndex > 0) : rec.els.some((r) => r.checked || r.getAttribute("aria-checked") === "true")) continue;
-      const key = G.choiceFact([rec.label, el.name, el.id].filter(Boolean).join(" "));
+      if (rec.kind === "react_select" && (rec.searchable || !(rec.options || []).length || valueOf(el, "react_select"))) continue;
+      if (rec.kind === "select" ? (el.value && el.selectedIndex > 0) : rec.kind === "radio_group" && rec.els.some((r) => r.checked || r.getAttribute("aria-checked") === "true")) continue;
+      const key = G.choiceFact([rec.question, rec.label, el.name, el.id].filter(Boolean).join(" "), { jobInUS: !!facts.job_in_us });
       if (!key || !facts[key]) continue;
-      const options = rec.kind === "select" ? [...el.options].filter((o) => !o.disabled).map((o) => o.text) : rec.options;
+      const options = rec.kind === "select" ? [...el.options].filter((o) => !o.disabled).map((o) => o.text) : rec.options || [];
       const want = G.confidentOption(options, facts[key]);
       if (!want) continue;
       let r;
@@ -651,6 +655,10 @@
         const opt = [...el.options].find((o) => o.text === want);
         A.setNative(el, opt.value); A.blur(el);
         r = { ok: el.value === opt.value };
+      } else if (rec.kind === "react_select") {
+        r = await A.reactSelectPick(el, want);
+        // Kept only if what the widget now shows is the option chosen; anything else is left for the model.
+        if (r.ok && r.chosen && r.chosen.toLowerCase() !== String(want).toLowerCase().trim()) r = { ok: false };
       } else {
         r = A.radioPick(rec.els, rec.options, want);
       }
