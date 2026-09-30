@@ -11,8 +11,9 @@ export const FLASH_LITE = "gemini-3.5-flash-lite";
 export const TASKS = {
   field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 260, maxBodyBytes: 200_000 },
   short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 80, maxBodyBytes: 200_000 },
-  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 10, maxBodyBytes: 1_500_000 },
-  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 20, maxBodyBytes: 1_500_000 },
+  // was: resume_tailor allowance 10, autofill 20. Doubled and half again on 2026-09-30: see COSTS below.
+  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 15, maxBodyBytes: 1_500_000 },
+  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 40, maxBodyBytes: 1_500_000 },
   // The Deep Dive is done once and costs a few cents, so it is not capped (Bruce, 2026-09-18). It used
   // to be 2 a month, and the first real one ran out after two interview replies because the extension
   // sent no run_id and every reply counted as its own Deep Dive.
@@ -25,7 +26,9 @@ export const TASKS = {
 // otherwise cost ~$8.70 of AI against $4.56 net. Flash-Lite tasks keep their allowance. The plan
 // multipliers apply on top, so the paid tiers halve too. The Deep Dive has no cap, so it is not here.
 export const ALLOWANCE_CHANGES = [
-  { from: "2027-01-01", tasks: { resume_tailor: 5, autofill: 10 } },
+  // was: { resume_tailor: 5, autofill: 10 }, half of the old 10 and 20. Half of the new 15 and 40 would
+  // be 7.5 and 20; the resume row rounds up to 8, which the free ceiling still covers (COSTS below).
+  { from: "2027-01-01", tasks: { resume_tailor: 8, autofill: 20 } },
 ];
 
 // Thinking levels each model accepts, lowest first (ai.google.dev/gemini-api/docs/thinking)
@@ -108,7 +111,29 @@ export const PLANS = {
 // spend is in D1. Supporter and Pro are
 // priced against what their own plan brings in, not against the shared budget, so they are unchanged.
 // was: export const USER_BUDGET_CENTS = { free: 300, supporter: 450, pro: 1100 };
-export const USER_BUDGET_CENTS = { free: 150, supporter: 450, pro: 1100 };
+// was: export const USER_BUDGET_CENTS = { free: 150, supporter: 450, pro: 1100 };
+//
+// Recalibrated 2026-09-30, from what the AI measurably costs now (COSTS below). The paid rows are what
+// guarantees the margin: a Supporter or Pro student's AI stops for the month at their row, whatever an
+// application turns out to cost, so each row is 75% of what the plan brings in after Stripe's cut
+// ($4.56 and $11.35) and every paid month keeps at least 25% of its money, before and after Flash
+// doubles in price. (The old rows were 99% and 97%: a student who used everything left almost nothing.)
+// The allowances are then sized to fit inside the rows, so a student meets the unit allowance first and
+// the ceiling only stops an unusually expensive month:
+//   free .edu   40 Auto-Apply x 3c + 15 resumes x 1c = 135c of 150c; from 2027: 20 x 6c + 8 x 2c = 136c
+//   Supporter   2.5x: 100 x 3c + 37 x 1c = 337c of 340c;          from 2027: 50 x 6c + 20 x 2c = 340c
+//   Pro         6x:   240 x 3c + 90 x 1c = 810c of 850c;          from 2027: 120 x 6c + 48 x 2c = 816c
+// The Deep Dive stays uncapped and comes out of the same row, a few cents each.
+export const USER_BUDGET_CENTS = { free: 150, supporter: 340, pro: 850 };
+
+// What each task costs a student's row, in cents, for the sums above (not read by code). Measured on
+// 2026-09-30 after the Auto-Apply cost cuts (extension 0.5.1-0.5.2): 86 recorded steps at ~0.64c on
+// Gemini 3.8 Flash, ~3.2 steps an application, ~2c each on Greenhouse, Lever and Ashby. Planned at 3c to
+// leave room for Workday and iCIMS, whose forms run longer; doubled from 2027-01-01 with Flash's price.
+// task_tokens in D1 has the real figure per task; if it comes in above these, lower the allowances, and
+// if well below, raise them. The margin itself does not depend on them, only how often a student reaches
+// the ceiling before the allowance.
+export const COSTS = { autofill: { now: 3, from2027: 6 }, resume_tailor: { now: 1, from2027: 2 }, deep_dive: { now: 2, from2027: 4 } };
 
 // The paid plans, cheapest first. Order is what the dashboard shows.
 export const PAID_PLANS = ["supporter", "pro"];
@@ -123,6 +148,7 @@ export const PAID_PLANS = ["supporter", "pro"];
 export const REFERRAL = { bonus: { autofill: 3 }, maxRewards: 10, windowDays: 7 };
 
 export const CONFIG = {
+  COSTS,
   TASKS,
   ALLOWANCE_CHANGES,
   PLANS,

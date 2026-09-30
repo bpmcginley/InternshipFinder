@@ -161,7 +161,8 @@ describe("webhook", () => {
         ? Response.json({ id: "sub_1", status: "active", current_period_end: 1794000000, items: { data: [{ price: { id: price } }] } })
         : Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" });
 
-    for (const [price, plan, autofill] of [["price_1", "supporter", 50], ["price_pro", "pro", 120]]) {
+    // was: supporter 50, pro 120 (allowances recalibrated 2026-09-30)
+    for (const [price, plan, autofill] of [["price_1", "supporter", 100], ["price_pro", "pro", 240]]) {
       const { api, db, token } = await setup({ env: BOTH, stripe: sub(price) });
       const user = await whoami(api, token, db);
       // Stale metadata from an earlier tier must not win over the price actually being billed.

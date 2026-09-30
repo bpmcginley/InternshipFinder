@@ -26,7 +26,8 @@ test("verified .edu Google account -> edu tier, full allowance", async () => {
   assert.equal(body.month, "2026-09");
   assert.equal(body.tier, "edu");
   assert.deepEqual(body.allowance.deep_dive, { used: 0, limit: null });   // uncapped since 2026-09-18
-  assert.deepEqual(body.allowance.resume_tailor, { used: 0, limit: 10 });
+  // Allowances recalibrated 2026-09-30 (config.js USER_BUDGET_CENTS): was 10 resumes and 20 Auto-Apply for .edu.
+  assert.deepEqual(body.allowance.resume_tailor, { used: 0, limit: 15 });
 });
 
 test("personal Gmail signs in with the general tier (half, min 1)", async () => {
@@ -34,8 +35,8 @@ test("personal Gmail signs in with the general tier (half, min 1)", async () => 
   const { status, body } = await me(w, await w.token({ hd: undefined, email: "someone@gmail.com" }));
   assert.equal(status, 200);
   assert.equal(body.tier, "general");
-  assert.equal(body.allowance.resume_tailor.limit, 5);
-  assert.equal(body.allowance.autofill.limit, 10);
+  assert.equal(body.allowance.resume_tailor.limit, 7);     // was 5: half of 15, rounded down
+  assert.equal(body.allowance.autofill.limit, 20);         // was 10
   assert.equal(body.allowance.deep_dive.limit, null);
   assert.equal(body.allowance.field_match.limit, 130);
 });
@@ -124,11 +125,11 @@ test("GET /config needs no sign-in and lists both providers and both allowance t
   assert.equal(m.client_id, MS_CLIENT);
   assert.equal(m.authorize_url, "https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
   assert.deepEqual(g.scopes, ["openid", "email", "profile"]);
-  assert.equal(c.allowance.edu.resume_tailor, 10);
-  assert.equal(c.allowance.general.resume_tailor, 5);
+  assert.equal(c.allowance.edu.resume_tailor, 15);        // was 10
+  assert.equal(c.allowance.general.resume_tailor, 7);     // was 5
   // Every paid tier gets its own table, so the dashboard can say what the money buys.
-  assert.equal(c.allowance.supporter.autofill, 50);
-  assert.equal(c.allowance.pro.autofill, 120);
+  assert.equal(c.allowance.supporter.autofill, 100);      // was 50
+  assert.equal(c.allowance.pro.autofill, 240);            // was 120
   assert.equal(c.paused, false);
 });
 

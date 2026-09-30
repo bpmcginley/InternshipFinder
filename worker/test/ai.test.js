@@ -305,9 +305,19 @@ test("the real ceilings leave room for a full allowance and stay under what a pl
   // floor of 200 is the policy this test was written against rather than the thing it is checking.
   // 134 is what a full free .edu allowance costs (20 Auto-Apply at ~$0.06 plus 10 resumes), which is
   // the claim in the test's name and the number that has to stay below the ceiling.
-  assert.ok(CONFIG.USER_BUDGET_CENTS.free >= 134 && CONFIG.USER_BUDGET_CENTS.free < CONFIG.MONTHLY_BUDGET_CENTS / 10);
-  assert.ok(CONFIG.USER_BUDGET_CENTS.supporter <= 456);
-  assert.ok(CONFIG.USER_BUDGET_CENTS.pro <= 1135);
+  // was: free >= 134, supporter <= 456, pro <= 1135 (under the plan's whole net). Recalibrated 2026-09-30:
+  // a full allowance at the planned costs (config COSTS) fits under every row, now and after Flash
+  // doubles; and each paid row is at most 75% of the plan's net, so a paid month keeps 25% or more.
+  const { COSTS, TASKS, ALLOWANCE_CHANGES, PLANS, USER_BUDGET_CENTS: B } = CONFIG;
+  const later = ALLOWANCE_CHANGES.find((c) => c.from === "2027-01-01").tasks;
+  const full = (auto, resumes, when) => auto * COSTS.autofill[when] + resumes * COSTS.resume_tailor[when];
+  for (const [plan, net] of [["free", null], ["supporter", 456], ["pro", 1135]]) {
+    const m = PLANS[plan].multiplier;
+    assert.ok(full(Math.floor(TASKS.autofill.allowance * m), Math.floor(TASKS.resume_tailor.allowance * m), "now") <= B[plan], plan + " now");
+    assert.ok(full(Math.floor(later.autofill * m), Math.floor(later.resume_tailor * m), "from2027") <= B[plan], plan + " from 2027");
+    if (net) assert.ok(B[plan] <= net * 0.75, plan + " keeps a 25% margin");
+  }
+  assert.ok(B.free < CONFIG.MONTHLY_BUDGET_CENTS / 10);
 });
 
 // admit() used to read the counters and write them afterwards, so a burst sent at once all read
@@ -369,21 +379,22 @@ test("Flash allowances halve on 2027-01-01, when Flash doubles in price; Flash-L
   const flashTasks = (a) => [a.autofill, a.resume_tailor];
   const before = await setup({ now: new Date("2026-12-31T23:00:00Z") });
   let c = await (await before.api("GET", "/config")).json();
-  assert.deepEqual(flashTasks(c.allowance.edu), [20, 10]);
+  // was: [20, 10] before and [10, 5] after (general [5, 2]); allowances recalibrated 2026-09-30
+  assert.deepEqual(flashTasks(c.allowance.edu), [40, 15]);
   assert.equal(c.allowance.edu.deep_dive, null);
 
   const after = await setup({ now: new Date("2027-01-01T00:30:00Z") });
   c = await (await after.api("GET", "/config")).json();
-  assert.deepEqual(flashTasks(c.allowance.edu), [10, 5]);
-  assert.deepEqual(flashTasks(c.allowance.general), [5, 2]);
+  assert.deepEqual(flashTasks(c.allowance.edu), [20, 8]);
+  assert.deepEqual(flashTasks(c.allowance.general), [10, 4]);
   assert.equal(c.allowance.edu.deep_dive, null);
   assert.equal(c.allowance.edu.field_match, 260);
   assert.equal(c.allowance.edu.short_answer, 80);
 
-  // and the cap a signed-in student hits is the new one (autofill: 10 for .edu from January)
+  // and the cap a signed-in student hits is the new one (autofill: 20 for .edu from January)
   const token = await after.token();
-  assert.equal((await me(after, token)).allowance.autofill.limit, 10);
-  assert.equal((await me(after, token)).allowance.resume_tailor.limit, 5);
+  assert.equal((await me(after, token)).allowance.autofill.limit, 20);
+  assert.equal((await me(after, token)).allowance.resume_tailor.limit, 8);
 });
 
 test("the Deep Dive has no monthly cap: many runs, one student, never a 429 cap", async () => {
