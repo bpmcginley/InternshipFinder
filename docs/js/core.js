@@ -17,6 +17,15 @@
     VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
     PR: "Puerto Rico",
   };
+  // Canada since 2026-09-30: listings are filed by province, and "Canada" holds the ones that name no
+  // province (remote ones too). None of these codes is also a US state's.
+  const CA_PROVINCES = {
+    ON: "Ontario", QC: "Quebec", BC: "British Columbia", AB: "Alberta", MB: "Manitoba", SK: "Saskatchewan",
+    NS: "Nova Scotia", NB: "New Brunswick", NL: "Newfoundland and Labrador", PE: "Prince Edward Island",
+    NT: "Northwest Territories", NU: "Nunavut", YT: "Yukon",
+  };
+  const CANADA_KEYS = [...Object.keys(CA_PROVINCES), "Canada"];
+  const isCanadaKey = k => k === "Canada" || !!CA_PROVINCES[k];
   const BASELINE = (C.baselineStates && C.baselineStates.length) ? C.baselineStates : ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"];
   const REGION_SHORTCUTS = [
     ["Northeast", ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "PA"]],
@@ -27,6 +36,8 @@
     ["Southwest", ["TX", "AZ", "NM", "NV", "OK"]],
     ["West Coast", ["CA", "OR", "WA", "AK", "HI"]],
     ["Mountain West", ["CO", "UT", "ID", "MT", "WY", "NV"]],
+    ["Canada", CANADA_KEYS],
+    ["Ontario + Quebec", ["ON", "QC"]],
   ];
   const YEARS = [["first_year", "First-year"], ["sophomore", "Sophomore"], ["junior", "Junior"], ["senior", "Senior"], ["masters", "Master's"], ["phd", "PhD"]];
   const YEAR_LABEL = Object.fromEntries(YEARS);
@@ -57,11 +68,14 @@
     ["citizen", "U.S. citizen"],
     ["permanent", "U.S. permanent resident (green card)"],
     ["visa", "Student visa (e.g. F-1), will need sponsorship"],
+    ["canada", "Can work in Canada (citizen, permanent resident or permit)"],
     ["other", "Other / prefer not to say"],
   ];
   const FIELD_NAMES = { swe: "Software", ml: "ML / AI", pm: "Product / program mgmt", hr: "HR", ui: "UI", ux: "UX", co_op: "Co-op" };
   const fieldLabel = t => FIELD_NAMES[t] || (t.length <= 3 ? t.toUpperCase() : (t[0].toUpperCase() + t.slice(1)).replace(/_/g, " "));
-  const keyLabel = k => k === "remote" ? "US remote" : k === "US" ? "US (no state listed)" : (US_STATES[k] ? `${US_STATES[k]} (${k})` : k);
+  // was: remote, US, then US_STATES only
+  const keyLabel = k => k === "remote" ? "US remote" : k === "US" ? "US (no state listed)" : k === "Canada" ? "Canada (no province listed)"
+    : US_STATES[k] ? `${US_STATES[k]} (${k})` : CA_PROVINCES[k] ? `${CA_PROVINCES[k]} (${k})` : k;
   const termText = t => t ? String(t).replace(/\s*\bNone\b/g, "").trim() || null : null;
 
   // ---------- storage ----------
@@ -114,7 +128,7 @@
     const ks = new Set();
     for (const g of regs(x)) {
       if (g.state && g.state !== "Remote") ks.add(g.state);
-      else ks.add(g.kind === "remote" ? "remote" : "US");
+      else ks.add(g.kind === "remote" ? "remote" : g.kind === "canada" ? "Canada" : "US");
     }
     if (!ks.size && x.state) ks.add(x.state === "Remote" ? "remote" : x.state);
     Object.defineProperty(x, "_keys", { value: ks, enumerable: false });
@@ -126,7 +140,12 @@
     if (p.remote) ks.push("remote", "US");
     return ks;
   };
-  const demandStates = p => [...(p.states || []), ...(p.remote ? ["REMOTE"] : [])];
+  // was: every picked state. The Worker's /demand accepts US codes only until it is redeployed with the
+  // provinces, and one code it refuses fails the whole save, so provinces stay on this device for now.
+  const demandStates = p => [...(p.states || []).filter(s => US_STATES[s]), ...(p.remote ? ["REMOTE"] : [])];
+  // A Canadian role is usually open only to people allowed to work in Canada, which a US student
+  // generally is not without a permit. The card says so rather than leave it to the posting.
+  const inCanadaOnly = x => { const r = regs(x); return r.length > 0 && r.every(g => g.kind === "canada"); };
 
   // ---------- eligibility helpers ----------
   const restr = x => x.restrictions || [];
@@ -387,7 +406,9 @@
   })();
   const bridgeProfile = p => ({
     majors: p.majors || [], minors: p.minors || [], class_year: p.class_year || "", grad_term: p.grad_term || "",
-    stages: p.stages || [], terms: p.terms || [], states: demandStates(p), work_auth: p.work_auth || "",
+    // was: states: demandStates(p). That now leaves provinces out (for the Worker), and the extension's
+    // copy is read back into this page, so it gets every picked state and province.
+    stages: p.stages || [], terms: p.terms || [], states: [...(p.states || []), ...(p.remote ? ["REMOTE"] : [])], work_auth: p.work_auth || "",
   });
   const fromBridgeProfile = b => {
     if (!b || typeof b !== "object") return null;
@@ -705,7 +726,7 @@
   }
 
   window.IS = {
-    C, DAY, US_STATES, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
+    C, DAY, US_STATES, CA_PROVINCES, CANADA_KEYS, isCanadaKey, inCanadaOnly, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
     fieldLabel, keyLabel, termText, ls, ss,
     emptyProfile, loadProfile, saveProfile, profileKeys, demandStates,
     regs, shardKeys, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,

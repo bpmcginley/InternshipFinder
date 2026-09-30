@@ -428,8 +428,10 @@ def test_icims_site():
     # The staff engineer is not a student role; the Singapore job has no US location left.
     assert [i["title"] for i in items] == ["Summer 2027 Analyst Intern", "Undergrad ASIC Co-op",
                                            "Clinical Services Assistant"]
-    # A multi-location posting keeps its other US sites and drops the ones abroad.
-    assert items[1]["locations"] == ["San Jose, California", "Santa Clara, California"]
+    # A multi-location posting keeps its other US sites and its Canadian ones (kept since 2026-09-30,
+    # and named as Canadian), and drops the ones elsewhere abroad.
+    # was: == ["San Jose, California", "Santa Clara, California"]
+    assert items[1]["locations"] == ["San Jose, California", "Santa Clara, California", "Markham, Ontario, Canada"]
     # The employment type carries a role whose title alone would not have qualified it.
     assert items[2]["employment_type"] == "INTERN"
     # The student is sent to the employer's own page, not to the iCIMS login the API points at.

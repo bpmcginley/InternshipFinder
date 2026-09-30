@@ -5,6 +5,11 @@ from ..classify import is_internship
 
 URL = "https://apply.workable.com/api/v1/widget/accounts/{token}"
 _US = {"us", "usa", "united states", "united states of america"}
+_CANADA = {"ca", "canada"}   # kept since 2026-09-30
+
+
+def _canadian(l: dict) -> bool:
+    return (l.get("countryCode") or "").lower() == "ca" or (l.get("country") or "").lower() in _CANADA
 
 
 def parse_workable(payload: dict, co: dict) -> list[dict]:
@@ -15,11 +20,13 @@ def parse_workable(payload: dict, co: dict) -> list[dict]:
             continue
         locs = j.get("locations") or [{"country": j.get("country"), "city": j.get("city"), "region": j.get("state")}]
         us = [l for l in locs if (l.get("countryCode") or "").lower() == "us" or (l.get("country") or "").lower() in _US]
-        if not us:
+        ca = [l for l in locs if _canadian(l)]
+        if not us and not ca:
             continue
         names = [", ".join(x for x in (l.get("city"), l.get("region")) if x) or "United States" for l in us]
+        names += [", ".join(x for x in (l.get("city"), l.get("region"), "Canada") if x) for l in ca]
         if j.get("telecommuting"):
-            names.append("Remote - US")
+            names.append("Remote - US" if us else "Remote - Canada")
         out.append(board_item(co, source="workable", title=title, locations=names,
                               url=j.get("url") or j.get("shortlink"), apply_url=j.get("application_url"),
                               posted_at=j.get("published_on") or j.get("created_at"),

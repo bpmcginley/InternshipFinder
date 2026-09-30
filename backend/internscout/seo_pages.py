@@ -63,7 +63,23 @@ US_STATES = {
     "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin",
     "WY": "Wyoming", "PR": "Puerto Rico", "remote": "Remote (US)",
 }
-PLACES = set(US_STATES) - {"remote"}      # the states a posting can be filed in
+# Canada since 2026-09-30. A province is filed like a state (none of the codes is a US state's), and
+# three more kinds of page are made from the same listings: all of Canada, and each big metro, since
+# "internships in Toronto" is searched far more than "internships in Ontario". The metros are the
+# ones geo.CA_METROS groups towns under; smaller ones still count toward their province.
+CA_PROVINCES = {
+    "ON": "Ontario", "QC": "Quebec", "BC": "British Columbia", "AB": "Alberta", "MB": "Manitoba",
+    "SK": "Saskatchewan", "NS": "Nova Scotia", "NB": "New Brunswick", "NL": "Newfoundland and Labrador",
+    "PE": "Prince Edward Island", "NT": "Northwest Territories", "NU": "Nunavut", "YT": "Yukon",
+}
+CA_METRO_PAGES = {"Toronto": "ON", "Montreal": "QC", "Vancouver": "BC", "Calgary": "AB", "Ottawa": "ON",
+                  "Edmonton": "AB", "Waterloo Region": "ON"}
+US_STATES.update(CA_PROVINCES)
+US_STATES.update({"Canada": "Canada", **{m: m for m in CA_METRO_PAGES}})
+CANADA_KEYS = set(CA_PROVINCES) | {"Canada"}
+# was: set(US_STATES) - {"remote"}. "Canada" and the metros are views over the provinces, not places
+# a posting is filed in, so they do not count toward how widely a posting is spread.
+PLACES = set(US_STATES) - {"remote", "Canada"} - set(CA_METRO_PAGES)      # the states a posting can be filed in
 
 # How a field tag reads in a heading and in a URL. Tags not listed read as their own words.
 FIELD_TITLES = {
@@ -184,6 +200,13 @@ def load(site_dir: str) -> dict:
             keep = by_id.setdefault(str(x["id"]), dict(x, id=str(x["id"]), keys=set()))
             # was: keep = by_id.setdefault(x["id"], dict(x, keys=set()))
             keep["keys"].add(key)
+    for x in by_id.values():
+        # The Canada and metro pages' keys (the listing files are by province, with "Canada" for the
+        # ones that name no province): every Canadian role is in "Canada", and in its metro's.
+        regions = x.get("regions") or []
+        if any(g.get("kind") == "canada" for g in regions if isinstance(g, dict)):
+            x["keys"].add("Canada")
+        x["keys"].update(g["metro"] for g in regions if isinstance(g, dict) and g.get("metro") in CA_METRO_PAGES)
     if bad:
         print(f"[seo] warning: skipped {bad} malformed listing rows (see well_formed)", file=sys.stderr)
     listings = list(by_id.values())
@@ -268,7 +291,10 @@ def place(x: dict, state: str | None = None) -> str:
     if state == "remote":
         lead = next((g for g in regions if g.get("kind") == "remote" or g.get("state") == "Remote"), regions[0])
     elif state:
-        lead = next((g for g in regions if g.get("state") == state), regions[0])
+        # was: g.get("state") == state. A metro page leads with the location in that metro, and the
+        # Canada page with the Canadian one.
+        lead = next((g for g in regions if g.get("state") == state or g.get("metro") == state
+                     or (state == "Canada" and g.get("kind") == "canada")), regions[0])
     else:
         lead = regions[0]
     shown = "Remote" if lead.get("state") == "Remote" else (lead.get("loc") or lead.get("state") or "United States")
@@ -617,6 +643,14 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 """
 
 
+def _dash_state(state: str) -> str:
+    """The dashboard has province files, not metro or all-Canada ones: a metro opens its province, and
+    Canada every province and the no-province file."""
+    if state == "Canada":
+        return ",".join(list(CA_PROVINCES) + ["Canada"])
+    return ",".join(CA_METRO_PAGES.get(s, s) for s in state.split(","))
+
+
 def dash_link(fields=(), state: str | None = None, companies=(), new: bool = False,
               stage: str | None = None, year: str | None = None, paid: bool = False) -> str:
     """The dashboard, opened on this page's fields, states, employer, new roles, stage, class year or
@@ -626,7 +660,7 @@ def dash_link(fields=(), state: str | None = None, companies=(), new: bool = Fal
     a place."""
     q = [f"field={quote(','.join(fields), safe=',')}"] if fields else []
     if state:
-        q.append(f"state={quote(state, safe=',')}")
+        q.append(f"state={quote(_dash_state(state), safe=',')}")
     q += [f"company={quote(c)}" for c in companies]
     if new:
         q.append("new=1")
@@ -844,7 +878,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                 f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>")
         related = note + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
                                                      for t in main if t in fields])
-        where = ",".join(top(Counter(k for x in items for k in x["keys"] if k in US_STATES), 6))
+        # was: if k in US_STATES, which now holds the Canada and metro views as well.
+        where = ",".join(top(Counter(k for x in items for k in x["keys"] if k in PLACES or k == "remote"), 6))
         # was: ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
         add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
             f"{len(items):,} open internships and co-ops at {name} for college students{about}. "
@@ -915,8 +950,12 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
            "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
            + link_list("By field", sorted(((f"/internships/{field_slug(t)}/", field_title(t), len(v))
                                           for t, v in fields.items()), key=lambda p: p[1]))
+           # was: one "By state" list of every state page
            + link_list("By state", sorted(((f"/internships/{state_slug(k)}/", US_STATES[k], len(v))
-                                          for k, v in states.items()), key=lambda p: p[1]))
+                                          for k, v in states.items() if k not in CANADA_KEYS and k not in CA_METRO_PAGES),
+                                         key=lambda p: p[1]))
+           + link_list("Canada", [(f"/internships/{state_slug(k)}/", US_STATES[k], len(states[k]))
+                                  for k in ["Canada", *CA_METRO_PAGES, *CA_PROVINCES] if k in states])
            + "<section class=\"rel\"><h2>More ways to browse</h2><ul><li><a href=\"/internships/for/\">"
              f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(by_company):,} employers"
              "</a></li>" + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"

@@ -62,3 +62,17 @@ test("loadMajors falls back to the raw copy when the site's own copy fails", asy
   assert.equal(m.majors[0].name, "Nursing");
   assert.equal(IS.majorsNote(m, true), null);
 });
+
+test("Canadian listings go in their province's file, or Canada's, and the save to the Worker leaves provinces out", () => {
+  const IS = loadCore(notFound);
+  const toronto = { regions: [{ loc: "Toronto, ON", kind: "canada", state: "ON", metro: "Toronto" }] };
+  const anywhere = { regions: [{ loc: "Remote - Canada", kind: "canada", state: null }] };
+  const both = { regions: [{ loc: "Toronto, ON", kind: "canada", state: "ON" }, { loc: "Boston, MA", kind: "new_england", state: "MA" }] };
+  assert.deepEqual([...IS.shardKeys(toronto)], ["ON"]);
+  assert.deepEqual([...IS.shardKeys(anywhere)], ["Canada"]);
+  assert.equal(IS.keyLabel("ON"), "Ontario (ON)");
+  assert.equal(IS.keyLabel("Canada"), "Canada (no province listed)");
+  assert.ok(IS.inCanadaOnly(toronto) && IS.inCanadaOnly(anywhere) && !IS.inCanadaOnly(both));
+  // The Worker's /demand refuses a whole save with one code it does not know.
+  assert.deepEqual([...IS.demandStates({ states: ["MA", "ON", "Canada"], remote: true })], ["MA", "REMOTE"]);
+});

@@ -1,16 +1,21 @@
-"""Location labels: every US and US-remote role is kept. Each location gets a kind:
-new_england (ME, NH, VT, MA, RI, CT), nyc_metro (50 mi of Midtown), us (any other state, or just
-"United States") or remote. A posting is kept if ANY of its locations is in the US."""
+"""Location labels: every US and US-remote role is kept, and (since 2026-09-30) every Canadian one.
+Each location gets a kind: new_england (ME, NH, VT, MA, RI, CT), nyc_metro (50 mi of Midtown), us (any
+other state, or just "United States"), remote (US-remote), or canada (a province, or just "Canada",
+remote or not). A posting is kept if ANY of its locations is in the US or Canada."""
 from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 from .config import REGION, wanted_states
 from .geo import (REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, _US_COUNTRY_RE,  # noqa: F401
-                  city_of, haversine_miles, locate, pretty_location, state_of)
+                  ca_metro, canada_of, city_of, haversine_miles, locate, pretty_location, state_of)
 
 IN_CITY = {"boston|MA", "cambridge|MA", "new york|NY", "new york city|NY", "nyc|NY",
            "manhattan|NY", "brooklyn|NY", "queens|NY", "bronx|NY", "long island city|NY"}
 BASELINE_KINDS = ("new_england", "nyc_metro")
+# Canadian provinces whose postings get the per-posting detail calls (a description, which tags the
+# field) the way a wanted US state's do: the ones holding the big metros (Toronto, Ottawa, Waterloo,
+# Montreal, Vancouver, Calgary, Edmonton).
+CA_DETAIL_PROVINCES = frozenset({"ON", "QC", "BC", "AB"})
 ON_SITE_KINDS = ("new_england", "nyc_metro", "us")
 _SPLIT = re.compile(r"\s*(?:;|\||\s/\s|\sor\s|\n)\s*")
 # Big posting cities outside the gazetteer, so "New York, Chicago" is read as two cities, not one.
@@ -101,6 +106,9 @@ def _state(loc: str) -> str | None:
 def maybe_in_region(loc: str) -> bool:
     """Cheap, network-free check fetchers use before a per-job detail call. True for US-remote,
     an unknown state, or a wanted state (the baseline plus states students picked)."""
+    prov = canada_of(loc) if loc else None
+    if prov is not None:
+        return prov in CA_DETAIL_PROVINCES
     if not loc or _NON_US.search(loc):
         return False
     st = _state(loc)
@@ -108,7 +116,15 @@ def maybe_in_region(loc: str) -> bool:
 
 
 def classify_location(loc: str) -> dict | None:
-    """{kind: new_england|nyc_metro|us|remote, state, lat, lng, distance, in_city} or None."""
+    """{kind: new_england|nyc_metro|us|remote|canada, state, lat, lng, distance, in_city} or None.
+    A Canadian location's state is its province code (None when it names only the country), and it
+    carries the metro it is in, when it is in one of geo.CA_METROS'."""
+    prov = canada_of(loc) if loc else None
+    if prov is not None:
+        remote = bool(REMOTE_RE.search(loc))
+        hit = ca_metro(loc, prov) if not remote else None
+        return {"kind": "canada", "state": prov or None, "lat": hit and hit[0], "lng": hit and hit[1],
+                "distance": None, "in_city": False, "remote": remote, "metro": hit and hit[2]}
     if not loc or _NON_US.search(loc):
         return None
     hit = locate(loc)
@@ -227,9 +243,12 @@ def evaluate_locations(locations) -> dict:
     best = min(placed, key=lambda h: h["distance"]) if placed else (pool[0] if pool else None)
     stated = next((h["state"] for _, h in region if h["state"]), None)
     return {
-        "in_region": bool(region),                 # any US or US-remote location
+        "in_region": bool(region),                 # any US, US-remote or Canadian location
+        "in_canada": any(h["kind"] == "canada" for _, h in region),
         "is_remote": any(REMOTE_RE.search(l) for l in locs),
-        "on_site": bool(on_site),                  # has a non-remote US location
+        # has a non-remote US or Canadian location (was: US only; an in-person Toronto role scored as
+        # if it were remote, below every in-person US one)
+        "on_site": bool(on_site) or any(h["kind"] == "canada" and not h["remote"] for _, h in region),
         "within_radius": bool(local),              # has a New England / NYC-metro location
         "in_city": any(h["in_city"] for h in local),
         # "Remote" only where a location actually says so. A US location we could not pin to a state
@@ -246,8 +265,10 @@ def evaluate_locations(locations) -> dict:
         "region_locations": [pretty_location(l) for l, _ in region],
         # one entry per US location, so the dashboard can filter and show the right one
         # was: "regions": [{"loc": l, ...
+        # was: {"loc", "kind", "state"}. A Canadian entry also names its metro (Toronto, Montreal...).
         "regions": [{"loc": pretty_location(l), "kind": h["kind"],
-                     "state": h["state"] or ("Remote" if h["kind"] == "remote" else None)}
+                     "state": h["state"] or ("Remote" if h["kind"] == "remote" else None),
+                     **({"metro": h["metro"]} if h.get("metro") else {})}
                     for l, h in region],
         "best_distance": best["distance"] if best else None,
         "lat": best["lat"] if best else None,

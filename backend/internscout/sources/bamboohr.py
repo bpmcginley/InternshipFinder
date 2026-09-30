@@ -17,6 +17,7 @@ LIST_URL = "https://{token}.bamboohr.com/careers/list"
 DETAIL_URL = "https://{token}.bamboohr.com/careers/{id}/detail"
 MAX_DETAIL = 15
 _US = {"", "us", "usa", "united states", "united states of america"}
+_CANADA = {"ca", "can", "canada"}
 
 
 def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
@@ -28,14 +29,16 @@ def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
         ats, plain = j.get("atsLocation") or {}, j.get("location") or {}
         city = ats.get("city") or plain.get("city")
         state = ats.get("state") or ats.get("province") or plain.get("state")
+        canada = bool(ats.get("country")) and ats["country"].strip().lower() in _CANADA
         if ats.get("country"):
-            if ats["country"].strip().lower() not in _US:
+            # was: not in _US. Canada is kept since 2026-09-30.
+            if ats["country"].strip().lower() not in _US and not canada:
                 continue
         elif state and state.strip().lower() not in STATE_NAMES:
             continue     # no country field to go on, so a state that is not one of the 50 is abroad
-        names = [", ".join(x for x in (city, state) if x)]
+        names = [", ".join(x for x in (city, state, "Canada" if canada else None) if x)]
         if j.get("isRemote"):
-            names.append("Remote - US")
+            names.append("Remote - Canada" if canada else "Remote - US")
         it = board_item(co, source="bamboohr", title=title, locations=names,
                         url=f"https://{token}.bamboohr.com/careers/{j.get('id')}", employment_type=emp)
         it["_bh_id"] = j.get("id")

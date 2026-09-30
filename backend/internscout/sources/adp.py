@@ -22,7 +22,14 @@ def _locations(r: dict) -> list[str]:
         st = ((a.get("countrySubdivisionLevel1") or {}).get("codeValue") or "").strip()
         if name.endswith((", US", ", USA")):
             country = country or "US"
-        if country and country != "US":
+        # was: if country and country != "US": continue. Canada is kept since 2026-09-30.
+        if country and country not in ("US", "CA"):
+            continue
+        if country == "CA":
+            if a.get("cityName"):
+                out.append(", ".join(x for x in (a["cityName"], st, "Canada") if x))
+            elif "remote" in name.lower():
+                out.append("Remote - Canada")
             continue
         if a.get("cityName") and st:
             out.append(f"{a['cityName']}, {st}")

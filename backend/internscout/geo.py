@@ -163,6 +163,125 @@ def looks_us(loc: str) -> bool:
     return bool(state_of(loc) or _US_COUNTRY_RE.search(loc))
 
 
+
+# ---- Canada ------------------------------------------------------------------------------------
+# Canadian postings were read only so that they could be thrown out (everything above). Since
+# 2026-09-30 they are kept, filed by province, for Canadian students and for US students near the
+# border. None of the 13 province and territory codes is also a US state code, so a province code
+# can sit in the same "state" field and the same per-state listing files as a US state.
+PROVINCES = {
+    "AB": "Alberta", "BC": "British Columbia", "MB": "Manitoba", "NB": "New Brunswick",
+    "NL": "Newfoundland and Labrador", "NS": "Nova Scotia", "NT": "Northwest Territories", "NU": "Nunavut",
+    "ON": "Ontario", "PE": "Prince Edward Island", "QC": "Quebec", "SK": "Saskatchewan", "YT": "Yukon",
+}
+_PROVINCE_NAMES = {n.lower(): c for c, n in PROVINCES.items()}
+_PROVINCE_NAMES.update({"québec": "QC", "newfoundland": "NL"})
+_PROVINCE_NAME_RE = re.compile(
+    r"\b(" + "|".join(sorted(_PROVINCE_NAMES, key=len, reverse=True)) + r")\b", re.I)
+_PROVINCE_TOKEN = re.compile(r"\s*(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?\s*")
+_SPACED_PROVINCE = re.compile(r"^\s*([A-Za-zÀ-ÿ .'-]+?)\s+(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?\s*$")
+_SAYS_CANADA = re.compile(r"(?i:\bcanada\b)|\bCAN\b")
+_TRAILING_CA = re.compile(r",\s*CA\s*$")          # "Toronto, ON, CA": the country code, not California
+
+# The metros most Canadian internships are in, with the towns that post under them. The metro name
+# is what the dashboard and the landing pages group by. (lat, lng, province, metro)
+CA_METROS: dict[str, tuple[float, float, str, str]] = {}
+for _metro, _prov, _towns in (
+    ("Toronto", "ON", {"toronto": (43.6532, -79.3832), "mississauga": (43.5890, -79.6441),
+                       "brampton": (43.7315, -79.7624), "markham": (43.8561, -79.3370),
+                       "vaughan": (43.8361, -79.4983), "richmond hill": (43.8828, -79.4403),
+                       "oakville": (43.4675, -79.6877), "north york": (43.7615, -79.4111),
+                       "scarborough": (43.7764, -79.2318), "etobicoke": (43.6205, -79.5132),
+                       "burlington": (43.3255, -79.7990), "pickering": (43.8384, -79.0868)}),
+    ("Montreal", "QC", {"montreal": (45.5017, -73.5673), "montréal": (45.5017, -73.5673),
+                        "laval": (45.6066, -73.7124), "saint-laurent": (45.5075, -73.6897),
+                        "dorval": (45.4473, -73.7442), "longueuil": (45.5312, -73.5181),
+                        "pointe-claire": (45.4487, -73.8168), "boucherville": (45.5910, -73.4362)}),
+    ("Vancouver", "BC", {"vancouver": (49.2827, -123.1207), "burnaby": (49.2488, -122.9805),
+                         "richmond": (49.1666, -123.1336), "surrey": (49.1913, -122.8490),
+                         "north vancouver": (49.3200, -123.0724), "coquitlam": (49.2838, -122.7932)}),
+    ("Calgary", "AB", {"calgary": (51.0447, -114.0719)}),
+    ("Edmonton", "AB", {"edmonton": (53.5461, -113.4938)}),
+    ("Ottawa", "ON", {"ottawa": (45.4215, -75.6972), "kanata": (45.3088, -75.8987),
+                      "nepean": (45.3348, -75.7240)}),
+    ("Ottawa", "QC", {"gatineau": (45.4765, -75.7013)}),
+    ("Waterloo Region", "ON", {"waterloo": (43.4643, -80.5204), "kitchener": (43.4516, -80.4925),
+                               "cambridge": (43.3616, -80.3144), "guelph": (43.5448, -80.2482)}),
+    ("Quebec City", "QC", {"quebec city": (46.8139, -71.2080), "québec city": (46.8139, -71.2080),
+                           "ville de québec": (46.8139, -71.2080), "lévis": (46.8033, -71.1779)}),
+    ("Winnipeg", "MB", {"winnipeg": (49.8951, -97.1384)}),
+    ("Halifax", "NS", {"halifax": (44.6488, -63.5752), "dartmouth": (44.6713, -63.5772)}),
+    ("Hamilton", "ON", {"hamilton": (43.2557, -79.8711)}),
+    ("London", "ON", {"london": (42.9849, -81.2453)}),
+    ("Victoria", "BC", {"victoria": (48.4284, -123.3656)}),
+    ("Saskatoon", "SK", {"saskatoon": (52.1579, -106.6702)}),
+    ("Regina", "SK", {"regina": (50.4452, -104.6189)}),
+):
+    for _town, (_lat, _lng) in _towns.items():
+        CA_METROS[_town] = (_lat, _lng, _prov, _metro)
+# Towns with a bigger or equally likely US namesake. They count as Canadian only when the string also
+# says so (a province, "Canada"): "Burlington, VT", "Cambridge, MA", "Richmond, VA", "London, KY",
+# "Waterloo, IA" (John Deere), "Hamilton, NJ", "Victoria, TX" stay American, and a bare one stays unread.
+_CA_AMBIGUOUS = {"burlington", "richmond", "surrey", "cambridge", "waterloo", "hamilton", "london", "victoria",
+                 "laval", "dartmouth", "halifax", "regina", "vaughan", "nepean", "guelph", "ottawa"}
+
+
+def _ca_city(loc: str) -> str:
+    """The town a Canadian location names, with the province and anything after it dropped."""
+    first = re.split(r"[,(]", _PREFIX.sub("", loc or ""), maxsplit=1)[0]
+    spaced = _SPACED_PROVINCE.match(first)          # "Burnaby BC" -> "Burnaby"
+    if spaced:
+        first = spaced.group(1)
+    return re.sub(r"\s+", " ", first).strip().lower()
+
+
+def canada_of(loc: str) -> str | None:
+    """The province a Canadian location is in: "ON", "QC", ... "" when it says only Canada ("Remote -
+    Canada"), None when it is not Canadian. A US reading wins unless the string itself says Canada,
+    so "New Brunswick, NJ", "Ontario, CA", "Vancouver, WA" and "London, KY" stay where they are."""
+    if not loc:
+        return None
+    m = _CA_PROVINCE.match(loc)
+    if m:
+        return m.group(1)
+    us = state_of(loc)
+    token = next((t.group(1) for t in map(_PROVINCE_TOKEN.fullmatch, _TOKEN_SPLIT.split(loc)) if t), None)
+    says = bool(_SAYS_CANADA.search(loc)) or bool(token and _TRAILING_CA.search(loc))
+    town = CA_METROS.get(_ca_city(loc))
+    spaced = _SPACED_PROVINCE.match(loc)            # "Burnaby BC", "Toronto ON M5V 2T6"
+    if spaced and spaced.group(1).strip().lower() in CA_METROS and not us:
+        return spaced.group(2)
+    # "Toronto, CA": a Canadian city with the country code the US reading takes for California.
+    code_ca = bool(town and _FOREIGN_CITY_CODE.search(loc))
+    if token and (not us or says or town):
+        return token
+    name = _PROVINCE_NAME_RE.search(loc)
+    if name:
+        prov = _PROVINCE_NAMES[name.group(1).lower()]
+        if not us or says or (town and town[2] == prov):
+            return prov
+    if town and (says or code_ca or (not us and _ca_city(loc) not in _CA_AMBIGUOUS and _city_or_country(loc))):
+        return town[2]
+    if says and not us:
+        return ""
+    return None
+
+
+def _city_or_country(loc: str) -> bool:
+    """A bare town ("Toronto"), or a town and the country ("Toronto, Canada")."""
+    parts = [p.strip() for p in (loc or "").split(",") if p.strip()]
+    return len(parts) == 1 or all(_SAYS_CANADA.search(p) for p in parts[1:])
+
+
+def ca_metro(loc: str, province: str | None) -> tuple[float, float, str] | None:
+    """(lat, lng, metro) of a Canadian location's town, when it is in one of CA_METROS' metros and
+    in the province the location was read as."""
+    hit = CA_METROS.get(_ca_city(loc))
+    if hit and (not province or hit[2] == province):
+        return hit[0], hit[1], hit[3]
+    return None
+
+
 _TOKEN_SPLIT = re.compile(r"[,\-–/()|]")
 _LOOSE_STATE = re.compile(r"(?<![A-Za-z])([A-Z]{2})(?![A-Za-z])")
 _FACILITY = re.compile(r"^\s*US\s*-\s*.+\(([A-Z]{2})[A-Z]{3}\)\s*$")

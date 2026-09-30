@@ -29,7 +29,9 @@ def parse_lever(payload: list, co: dict) -> list[dict]:
             continue
         locs = list(dict.fromkeys([cats.get("location")] + list(cats.get("allLocations") or [])))
         if (j.get("workplaceType") == "remote") and not any("remote" in (l or "").lower() for l in locs):
-            locs.append("Remote" if (j.get("country") or "US").upper() == "US" else f"Remote - {j.get('country')}")
+            country = (j.get("country") or "US").upper()
+            # "Remote - CA" read as remote-in-California; Lever's country is the ISO code, and CA is Canada.
+            locs.append("Remote" if country == "US" else "Remote - Canada" if country == "CA" else f"Remote - {j.get('country')}")
         created = j.get("createdAt")
         out.append(board_item(co, source="lever", title=title, locations=locs,
                               url=j.get("hostedUrl"), apply_url=j.get("applyUrl") or j.get("hostedUrl"),
