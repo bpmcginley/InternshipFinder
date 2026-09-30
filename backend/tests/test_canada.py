@@ -133,3 +133,21 @@ def test_uhn_keeps_its_student_roles_in_toronto():
     assert items[0]["locations"] == ["Toronto, ON"]
     assert items[0]["url"] == "https://forms.uhn.ca/UHNCareers/Home/Posting/744000151069349"
     assert classify_location(items[0]["locations"][0])["metro"] == "Toronto"
+
+
+def test_the_first_canadian_scan_counts_as_new_only_what_was_posted_this_week():
+    from datetime import date, datetime, timezone
+    from internscout.export_static import mark_new
+    now = datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
+    ca = [{"kind": "canada", "state": "ON", "loc": "Toronto, ON"}]
+    old = {"regions": ca, "first_seen": "2026-09-30T19:00:00", "posted_at": "2026-08-15T00:00:00"}
+    recent = {"regions": ca, "first_seen": "2026-09-30T19:00:00", "posted_at": "2026-09-29T00:00:00"}
+    undated = {"regions": ca, "first_seen": "2026-09-30T19:00:00", "posted_at": None}
+    later = {"regions": ca, "first_seen": "2026-10-01T03:00:00", "posted_at": None}     # a later scan: the usual rule
+    us = {"regions": [{"kind": "new_england", "state": "MA", "loc": "Boston, MA"}],
+          "first_seen": "2026-09-30T19:00:00", "posted_at": None}
+    both = {"regions": ca + us["regions"], "first_seen": "2026-09-30T19:00:00", "posted_at": None}
+    rows = [old, recent, undated, later, us, both]
+    assert [seo_pages.fresh(x, now, seo_pages.FIRST_SEEN_SINCE) for x in rows] == [False, True, False, True, True, True]
+    mark_new(rows, today=date(2026, 10, 2))
+    assert [x["is_new"] for x in rows] == [False, True, False, True, True, True]     # the two rules agree

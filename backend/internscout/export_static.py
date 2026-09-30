@@ -17,7 +17,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from .db import SessionLocal, init_db
 from .models import Listing, Application
-from .seo_pages import baseline_day, placeholder_pay
+from .seo_pages import baseline_day, canada_first_scan, placeholder_pay
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, stage_of, years_of
@@ -327,6 +327,9 @@ def mark_new(listings: list[dict], today=None) -> None:
     today = today or datetime.now(timezone.utc).date()
     baseline = baseline_day(listings)
     for x in listings:
+        if canada_first_scan(x):        # seo_pages.CANADA_SINCE: new only if posted this week
+            x["is_new"] = bool(x.get("posted_at") and _seen_within(x["posted_at"], today, NEW_DAYS))
+            continue
         x["is_new"] = (_seen_within(x.get("first_seen"), today, NEW_DAYS)
                        and not (baseline and str(x.get("first_seen") or "")[:10] <= baseline)
                        and (not x.get("posted_at") or _seen_within(x["posted_at"], today, 2 * NEW_DAYS)))
