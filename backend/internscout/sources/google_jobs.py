@@ -6,15 +6,25 @@ free-text queries + location, so companies NOT in our ATS registry still get fou
 250 searches/month) in the SERPAPI_KEY env var. If absent, the source is skipped.
 """
 from __future__ import annotations
+import json
 import os
 import httpx
 from .base import client
+from ..config import DATA_DIR
 
 # Errors are logged by status or type only: httpx puts the request URL in the message, and that URL
 # carries api_key. GitHub masks the secret in Actions logs, but a local run's log would not.
 
 URL = "https://serpapi.com/search.json"
 ACCOUNT_URL = "https://serpapi.com/account.json"   # free to call; does not use a search
+# The UTC day the paid searches last ran, committed with the data. The rule used to be "the first
+# run after 00:00 UTC", read off the clock as hour < 6; GitHub starts that run 2 to 3 hours late
+# and sometimes not at all, and a run it started after 06:00, or one Keep schedule started for it,
+# searched nothing that day.
+DAY_PATH = os.path.join(DATA_DIR, "google_jobs_day.json")
+# A Google Jobs search can take SerpApi longer than the 25 seconds every other source gets: a third
+# of the searches in the week to 2026-09-30 timed out on our side (each one probably still charged).
+SEARCH_TIMEOUT = 60.0
 
 
 def daily_budget(account: dict | None, max_searches: int, monthly_default: int = 100) -> int:
@@ -29,9 +39,24 @@ def daily_budget(account: dict | None, max_searches: int, monthly_default: int =
     return max(0, budget)
 
 
-def is_daily_run(hour_utc: int) -> bool:
-    """Google Jobs runs once a day, on the first scheduled run after midnight UTC (cron 0 */6)."""
-    return hour_utc < 6
+def searched_on() -> str | None:
+    try:
+        with open(DAY_PATH, encoding="utf-8") as f:
+            return json.load(f).get("day")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def mark_searched(day: str) -> None:
+    with open(DAY_PATH, "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"day": day}, f)
+        f.write("\n")
+
+
+# was: def is_daily_run(hour_utc) -> bool: return hour_utc < 6
+def is_daily_run(today: str) -> bool:
+    """Google Jobs runs once a day: in the first run of the UTC day that gets this far."""
+    return searched_on() != today
 
 
 def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
@@ -54,8 +79,9 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     if os.environ.get("GITHUB_EVENT_NAME") == "push" and not os.environ.get("SERPAPI_EVERY_RUN"):
         print("[google_jobs] push-triggered run; paid searches are left to the scheduled run")
         return []
-    if not os.environ.get("SERPAPI_EVERY_RUN") and not is_daily_run(now.hour):
-        print("[google_jobs] runs once a day (first run after 00:00 UTC); skipping this run")
+    today = now.date().isoformat()
+    if not os.environ.get("SERPAPI_EVERY_RUN") and not is_daily_run(today):
+        print("[google_jobs] already searched today (UTC); skipping this run")
         return []
     account = None
     try:
@@ -71,6 +97,8 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     print(f"[google_jobs] budget today {max_searches} (searches left this month: {left if left is not None else 'unknown'})")
     if max_searches <= 0:
         return []
+    # Before searching, not after: a run that dies halfway has still spent those searches.
+    mark_searched(today)
     # rotate the query window each day so coverage spreads over time
     day = datetime.date.today().toordinal()
     # Searches held back every day for the thinnest field. The main list gives one query to every
@@ -97,11 +125,16 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     seen = set()
     with client() as c:
         for q, loc in pairs:   # already capped at the day's budget
+            params = {"engine": "google_jobs", "q": q, "location": loc, "hl": "en", "api_key": api_key}
             try:
-                r = c.get(URL, params={
-                    "engine": "google_jobs", "q": q, "location": loc,
-                    "hl": "en", "api_key": api_key,
-                })
+                try:
+                    r = c.get(URL, params=params, timeout=SEARCH_TIMEOUT)
+                except httpx.TimeoutException:
+                    # Asked again once. SerpApi keeps a finished search for an hour and a repeat of
+                    # the same search is answered from that for free, so this costs nothing when the
+                    # first search finished after we stopped waiting.
+                    print(f"[google_jobs] '{q}' @ {loc} timed out; asking once more")
+                    r = c.get(URL, params=params, timeout=SEARCH_TIMEOUT)
                 r.raise_for_status()
                 for j in r.json().get("jobs_results", []):
                     opts = j.get("apply_options") or []

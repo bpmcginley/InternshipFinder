@@ -1,6 +1,7 @@
 """scan_boards: which failures age a board toward MAX_FAILS, and which get a second try."""
 import httpx
 from internscout import run_ingest
+from internscout.discover import MAX_FAILS
 from internscout.sources.common import RobotsDisallowed
 
 
@@ -75,7 +76,9 @@ def test_robots_closed_boards_age_even_when_the_ats_is_systemic(monkeypatch):
     monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "fakeats", fetch)
     reg = _reg("fakeats", 12)
     run_ingest.scan_boards(reg, workers=4, verbose=False)
-    assert all(e["fails"] == 1 for e in reg["fakeats"].values())
+    # was: every board at fails == 1, to be asked again on three more days. A robots.txt "no" is
+    # final for now, so the board is marked to go at this run's prune (and kept out after it).
+    assert all(e["fails"] == MAX_FAILS and e["closed"] for e in reg["fakeats"].values())
 
 
 def test_the_second_look_counts_dead_boards_but_not_throttled_ones(monkeypatch):

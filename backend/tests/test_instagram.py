@@ -141,3 +141,11 @@ def test_a_failure_prints_meta_message_but_never_the_token(monkeypatch, capsys, 
     out = capsys.readouterr().out
     assert "SECRET-TOKEN-VALUE" not in out
     assert "replace the INSTAGRAM_TOKEN secret" in out
+
+
+def test_a_blocked_app_is_not_reported_as_an_expired_token():
+    # Every Graph API error is an OAuthException; the code and message say which problem it is.
+    blocked = ig.advice("OAuthException 200: API access blocked.")
+    assert "blocked" in blocked and "new token will not help" in blocked
+    assert "replace the INSTAGRAM_TOKEN secret" in ig.advice("OAuthException 190: Error validating access token")
+    assert "INSTAGRAM_TOKEN" not in ig.advice("OAuthException 9004: The media could not be fetched")

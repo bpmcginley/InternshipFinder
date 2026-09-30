@@ -1,0 +1,40 @@
+name: Keep schedule
+
+# GitHub starts scheduled runs late or drops them (measured 2026-09-22 to 09-30: the 6-hourly ingest
+# 2 to 5 hours late, the hourly dashboard copy 3 to 6 times a day, Tuesday's brand post 5 hours late).
+# Every half hour this starts whichever of those is overdue and not already running, through
+# workflow_dispatch, which starts at once. The late scheduled run that turns up afterwards finds the
+# work done and skips (growth/catchup.py --guard, the first step of each job).
+#
+# This workflow's own schedule is best effort too, but it only has to land now and then: each run
+# catches up everything that is due. Minutes 4 and 34 keep clear of the top of the hour, when
+# GitHub's scheduler is busiest. Free for a public repository; a run takes seconds.
+on:
+  schedule:
+    - cron: "4,34 * * * *"
+  workflow_dispatch:
+
+# actions: write is what starting another workflow needs; nothing here reads or writes the code.
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: keep-schedule
+  cancel-in-progress: true
+
+jobs:
+  catch-up:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: growth
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Start what is overdue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python growth/catchup.py
