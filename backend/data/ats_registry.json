@@ -10960,9 +10960,10 @@
   "jobs.arkema.com": {
    "name": "Arkema",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing"
+   "sector": "engineering_manufacturing",
+   "last_fail": "2026-09-30"
   },
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
@@ -11742,9 +11743,10 @@
   "aig|wd1|aig": {
    "name": "AIG",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-16",
-   "sector": "insurance_finance"
+   "sector": "insurance_finance",
+   "last_fail": "2026-09-30"
   },
   "aig|wd1|early_careers": {
    "name": "AIG",
