@@ -321,7 +321,7 @@
   // both look like "decline") is left to the model, which reads the whole question.
   const CHOICE_FACTS = [
     ["needs_sponsorship", /sponsor/],
-    ["work_authorized", /authori[sz]ed to work|authori[sz]ation to work|eligible to work|legally (?:permitted|able) to work/],
+    ["work_authorized", /authori[sz]ed to work|authori[sz]ation to work|work authori[sz]ation|eligible to work|legally (?:permitted|able) to work/],
     // Age only: "in the last 18 months" is not this question.
     ["over_18", /(?:at least|over|older than|age of|aged)\s+(?:the age of\s+)?18\b|\b18 years (?:of age|old)|\b18 or older|eighteen years/],
     ["veteran", /veteran/],
@@ -334,20 +334,43 @@
   // somewhere the profile's answers were not given for.
   const TURNED_RE = /without|not require|not need|n't require|n't need|\bno longer\b/;
   const US_RE = /united states|\bu\.?\s?s\.?a?\b|\bamerica\b/;
+  // "...in the country where this position is based": the US when the job is (ctx.jobInUS). Klaviyo and
+  // many Greenhouse boards ask it this way, and the model answered it every time the rules could not.
+  const HERE_RE = /(?:country|location) (?:where|in which) (?:this|the) (?:position|role|job) is (?:based|located)|in this country/;
   const ELSEWHERE_RE = /canada|united kingdom|\buk\b|europe|\beu\b|india|australia|germany|france|mexico/;
   const MORE_THAN_ONE_RE = /orientation|transgender|lgbt|pronoun/;
 
-  function choiceFact(label) {
+  function choiceFact(label, ctx = {}) {
     const t = String(label || "").toLowerCase();
     if (!t || MORE_THAN_ONE_RE.test(t)) return null;
-    const hits = CHOICE_FACTS.filter(([, re]) => re.test(t)).map(([k]) => k);
+    let hits = CHOICE_FACTS.filter(([, re]) => re.test(t)).map(([k]) => k);
+    // A sponsorship question nearly always says what the sponsorship is for ("... sponsorship for work
+    // authorization"), so a label naming both is the sponsorship question.
+    if (hits.length === 2 && hits.includes("needs_sponsorship") && hits.includes("work_authorized")) hits = ["needs_sponsorship"];
     if (hits.length !== 1) return null;
     const k = hits[0];
     if (k === "needs_sponsorship" || k === "work_authorized") {
       // Only the plain US question: the profile's yes/no was given for the US.
-      if (TURNED_RE.test(t) || ELSEWHERE_RE.test(t) || !US_RE.test(t)) return null;
+      // was: ... || !US_RE.test(t)
+      if (TURNED_RE.test(t) || ELSEWHERE_RE.test(t)) return null;
+      // A question naming no country is about the job's; answered only when the job is in the US
+      // (ELSEWHERE_RE above has already turned away one naming another country).
+      if (!US_RE.test(t) && !(ctx.jobInUS && (HERE_RE.test(t) || !/country|countries/.test(t)))) return null;
     }
     return k;
+  }
+
+  // Whether a job's location is in the US, for choiceFact's "country where this position is based".
+  // Only a clear yes counts: a US state code after a comma, or the country named. Canada (a province
+  // code or the name) and anything naming another country is no.
+  const STATE_CODES = "AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC|PR";
+  const STATE_AFTER_COMMA = new RegExp(",\\s*(?:" + STATE_CODES + ")\\b");
+  const PROVINCE_AFTER_COMMA = /,\s*(?:AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)\b/;
+  function jobInUS(location) {
+    const s = String(location || "");
+    if (!s || /canada|united kingdom|\bu\.?k\.?\b|india|germany|france|ireland|mexico|singapore|australia|japan|china/i.test(s)) return false;
+    if (PROVINCE_AFTER_COMMA.test(s)) return false;
+    return STATE_AFTER_COMMA.test(s) || /united states|\busa\b|\bu\.s\.?\b/i.test(s);
   }
 
   const DECLINE_RE = /decline|prefer not|rather not|choose not|do(?:n.?t| not) (?:wish|want) to|not (?:wish|want) to|not to (?:say|answer|disclose|self|identify)|no answer|not disclos/;
@@ -368,7 +391,7 @@
 
   // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
   // choiceFact and confidentOption added (2026-09-30) for fastFill's choice questions.
-  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, jobInUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

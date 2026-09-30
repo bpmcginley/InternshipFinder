@@ -374,3 +374,31 @@ test("an option is picked only when exactly one clearly says the answer", () => 
   assert.equal(o(["Woman", "Man"], "Female"), null);
   assert.equal(o(["Yes", "No"], ""), null);
 });
+
+test("the job's country: the US only when its location clearly says so", () => {
+  for (const l of ["Boston, MA", "New York, NY 10001", "Remote - United States", "Austin, TX; Remote", "San Juan, PR"]) assert.equal(G.jobInUS(l), true, l);
+  for (const l of ["Toronto, ON", "London, United Kingdom", "Remote - Canada", "", null, "Remote", "Bangalore, India"]) assert.equal(G.jobInUS(l), false, String(l));
+});
+
+test("'the country where this position is based' is the US question only for a US job", () => {
+  const q = "Do you currently have legal work authorization in the country where this position is based?";
+  assert.equal(G.choiceFact(q, { jobInUS: true }), "work_authorized");
+  assert.equal(G.choiceFact(q, { jobInUS: false }), null);
+  assert.equal(G.choiceFact(q), null);
+  assert.equal(G.choiceFact("Would you, now or in the future, require immigration sponsorship for work authorization in the country where this position is based?", { jobInUS: true }), "needs_sponsorship");
+  // Greenhouse's EEO wording
+  assert.equal(G.choiceFact("Which of the following best describes your gender identity?"), "gender");
+  assert.equal(G.choiceFact("Which of the following best describes your race/ethnicity?"), "race");
+  assert.equal(G.confidentOption(["Man", "Woman", "Non-binary", "I prefer not to answer"], "Decline to self-identify"), "I prefer not to answer");
+});
+
+test("a work question naming no country is about the job's country, so it is answered only for a US job", () => {
+  const q = "Would you, now or in the future, require immigration sponsorship for work authorization?";
+  assert.equal(G.choiceFact(q, { jobInUS: true }), "needs_sponsorship");
+  assert.equal(G.choiceFact(q, { jobInUS: false }), null);
+  assert.equal(G.choiceFact("Are you authorized to work?", { jobInUS: true }), "work_authorized");
+  // "any country" or "other countries" is not a question about this job's country
+  assert.equal(G.choiceFact("Are you authorized to work in any country other than your own?", { jobInUS: true }), null);
+  // and a reverse-worded one is still the model's, US job or not
+  assert.equal(G.choiceFact("Can you work without sponsorship?", { jobInUS: true }), null);
+});

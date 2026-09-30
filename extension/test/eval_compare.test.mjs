@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { decisions, compare, labelsOf, SENSITIVE_RE } = await import("../../scripts/eval/autofill_models.mjs");
+const { decisions, compare, labelsOf, SENSITIVE_RE, sameMeaning, monthOf } = await import("../../scripts/eval/autofill_models.mjs");
 
 const use = (name, input) => ({ type: "tool_use", name, input });
 
@@ -41,3 +41,25 @@ test("sensitive questions are the ones where a wrong answer does harm", () => {
   for (const q of ["Are you authorized to work in the US?", "Veteran status", "Are you at least 18?", "Expected salary"]) assert.match(q, SENSITIVE_RE, q);
   for (const q of ["First name", "LinkedIn profile", "Page 2 of 3", "Manager's name"]) assert.doesNotMatch(q, SENSITIVE_RE, q);
 });
+
+
+test("one date or amount written two ways counts as the same answer; different ones do not", () => {
+  assert.deepEqual(monthOf("05/01/2028"), { y: 2028, m: 5 });
+  assert.deepEqual(monthOf("2028-05-31"), { y: 2028, m: 5 });
+  assert.deepEqual(monthOf("May 2028"), { y: 2028, m: 5 });
+  assert.ok(sameMeaning("05/01/2028", "05/2028"));
+  assert.ok(sameMeaning("01/04/2027", "1/4/2027"));
+  assert.ok(sameMeaning("$33/hour", "$33/hour base"));
+  assert.ok(sameMeaning("Negotiable", "Competitive / Negotiable"));
+  // Real differences stay differences.
+  assert.ok(!sameMeaning("2025", "2024"));
+  assert.ok(!sameMeaning("September", "January"));
+  assert.ok(!sameMeaning("05/01/2028", "05/01/2027"));
+  assert.ok(!sameMeaning("$33/hour", "$40/hour"));
+  assert.ok(!sameMeaning("Yes", "No"));
+  const c = compare(decisions([use("fill", { ref: "d", text: "05/01/2028" })]), decisions([use("fill", { ref: "d", text: "2028-05-31" })]), { d: "Graduation date" });
+  assert.equal(c.same, 1);
+  assert.equal(c.differ.length, 0);
+  assert.equal(c.reworded.length, 1);
+});
+
