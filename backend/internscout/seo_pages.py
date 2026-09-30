@@ -220,6 +220,20 @@ def load(site_dir: str) -> dict:
 FIRST_SEEN_SINCE = "2026-09-18"
 
 
+# Canada was switched on this day, and its first scan found about 800 Canadian roles that had been
+# open for weeks. By first_seen alone 346 of them were "new this week". A Canadian role first seen on
+# or before this day counts as new only if the employer's own posting date is inside the week; one
+# first seen after it is new by the ordinary rule.
+CANADA_SINCE = "2026-09-30"
+
+
+def canada_first_scan(x: dict) -> bool:
+    """A role only in Canada that the first Canadian scan found (see CANADA_SINCE)."""
+    regions = [g for g in x.get("regions") or [] if isinstance(g, dict)]
+    return (bool(regions) and all(g.get("kind") == "canada" for g in regions)
+            and str(x.get("first_seen") or "")[:10] <= CANADA_SINCE)
+
+
 def baseline_day(listings: list[dict]) -> str | None:
     """The day before which "first seen" means only "already open when we started keeping dates"."""
     return FIRST_SEEN_SINCE
@@ -321,6 +335,8 @@ def fresh(x: dict, now: datetime, baseline: str | None = None) -> bool:
     if baseline and str(x.get("first_seen") or "")[:10] <= baseline:
         return False
     today = now.astimezone(timezone.utc).date()
+    if canada_first_scan(x):
+        return bool(posted and (today - posted.date()).days < NEW_DAYS)
     return bool(seen and (today - seen.date()).days < NEW_DAYS
                 and (posted is None or (today - posted.date()).days < 2 * NEW_DAYS))
     # was: seen and now - seen <= timedelta(days=NEW_DAYS)
