@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 W = {"field": 35, "location": 20, "freshness": 15, "openness": 10, "source": 5}
 SOURCE_CONFIDENCE = {  # 0..1
     "greenhouse": 1.0, "lever": 1.0, "ashby": 1.0, "workday": 1.0, "company": 1.0,
-    "smartrecruiters": 0.9, "adzuna": 0.6, "usajobs": 0.7,
+    "smartrecruiters": 0.9, "adzuna": 0.6, "usajobs": 0.7, "uhn": 1.0,
     "vanshb03": 0.5, "simplify": 0.5, "speedyapply": 0.5, "github": 0.5, "google_jobs": 0.5,
 }
 

@@ -110,3 +110,31 @@ def test_a_search_that_times_out_is_asked_once_more_and_the_day_is_recorded(monk
     assert "timed out; asking once more" in capsys.readouterr().out
     assert not gj.is_daily_run(datetime.now(timezone.utc).date().isoformat())   # recorded before searching
 
+
+
+def test_the_daily_searches_run_first_every_day_out_of_the_same_budget(monkeypatch):
+    searches = []
+
+    def handler(req):
+        if req.url.path == "/account.json":
+            return httpx.Response(200, json={"searches_per_month": 250, "total_searches_left": 200})
+        searches.append((req.url.params["q"], req.url.params["location"]))
+        return httpx.Response(200, json={"jobs_results": []})
+    _patch(monkeypatch, handler)
+    gj.fetch_google_jobs(["museum internship"], ["Boston, Massachusetts", "New York, New York"],
+                         fixed=[("Ontario Public Service student job", "Toronto, Ontario, Canada")])
+    assert searches[0] == ("Ontario Public Service student job", "Toronto, Ontario, Canada")
+    assert len(searches) == 3                       # the daily one, then one query in each of two places
+
+
+def test_the_daily_searches_never_go_past_the_budget(monkeypatch):
+    searches = []
+
+    def handler(req):
+        if req.url.path == "/account.json":
+            return httpx.Response(200, json={"searches_per_month": 31, "total_searches_left": 30})
+        searches.append(req.url.params["q"])
+        return httpx.Response(200, json={"jobs_results": []})
+    _patch(monkeypatch, handler)
+    gj.fetch_google_jobs(["museum internship"], ["Boston, Massachusetts"], fixed=[("a", "X"), ("b", "Y")])
+    assert searches == ["a"]                        # a budget of one: the first daily search, and nothing else

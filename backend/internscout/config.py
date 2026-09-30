@@ -140,6 +140,11 @@ GOOGLE_JOBS_FOCUS_QUERIES = [
     "survey research internship",
     "linguistics translation internship",
 ]
+# Searches made every day, whatever else rotates. The Ontario Public Service's job site
+# (gojobs.gov.on.ca) sits behind a bot check that answers with a CAPTCHA, which InternScout does not
+# get around, so its student and co-op postings are found the way a person would: on Google Jobs,
+# which indexes them. One of the day's searches (added 2026-09-30, with Canada).
+GOOGLE_JOBS_FIXED = [("Ontario Public Service student job", "Toronto, Ontario, Canada")]
 GOOGLE_JOBS_FOCUS_SEARCHES = int(os.environ.get("SERPAPI_FOCUS_SEARCHES", "2"))
 # Google Jobs is location-driven; one search per location per query (watch your SerpApi quota).
 GOOGLE_JOBS_LOCATIONS = [
