@@ -11246,6 +11246,13 @@
    "added": "2026-09-30",
    "last_fail": "2026-09-30"
   },
+  "DPDGroupUK1": {
+   "name": "DPD UK",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-09-30",
+   "last_fail": "2026-09-30"
+  },
   "Eataly": {
    "name": "Eataly",
    "quant": false,
@@ -12028,9 +12035,10 @@
   "careers.gulfstream.com": {
    "name": "Gulfstream Aerospace",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing"
+   "sector": "engineering_manufacturing",
+   "last_fail": "2026-09-30"
   },
   "careers.hfsinclair.com": {
    "name": "HF Sinclair",
@@ -16773,6 +16781,12 @@
    "fails": 2,
    "added": "2026-09-29",
    "last_fail": "2026-09-30"
+  },
+  "jcdecaux|wd3|ExternalSiteJCDUK": {
+   "name": "JCDecaux",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-09-30"
   },
   "jci|wd5|JCI": {
    "name": "Johnson Controls",

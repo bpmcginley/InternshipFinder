@@ -618,6 +618,10 @@
 42.9012,
 -78.3886
 ],
+"dayton|NJ":[
+40.373,
+-74.5104
+],
 "de witt|NY":null,
 "delanco|NJ":[
 40.0507,
@@ -1203,6 +1207,10 @@
 41.2495,
 -76.9267
 ],
+"montrose|NY":[
+41.2523,
+-73.9315
+],
 "moon township|PA":[
 40.5061,
 -80.2082
@@ -1669,6 +1677,7 @@
 -79.7175
 ],
 "philadelphia (malvern|PA":null,
+"philadelphia area|PA":null,
 "philadelphia clinic|PA":null,
 "philadelphia county|PA":null,
 "phillipsburg|NJ":[
