@@ -138,7 +138,9 @@ def test_dashboard_links_open_on_the_page_topic(tmp_path):
     assert 'The free <a href="/install.html?from=landing-page">Auto-Apply extension</a>' in pages["/internships/massachusetts/"]
     # docs/js/app.js takes only values shaped like these; anything else would open an empty list.
     assert all(re.fullmatch(r"[a-z_]{2,32}", t) for t in seo_pages.FIELD_TITLES)
-    assert all(re.fullmatch(r"[A-Z]{2}|remote", k) for k in seo_pages.US_STATES)
+    # was: every key of US_STATES itself. The Canada and metro pages send the dashboard their provinces.
+    assert all(re.fullmatch(r"[A-Z]{2}|remote|Canada", v) for k in seo_pages.US_STATES
+               for v in seo_pages._dash_state(k).split(","))
 
 
 def test_a_major_with_the_same_listings_as_another_page_is_folded_into_it(tmp_path):

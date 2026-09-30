@@ -5,6 +5,7 @@ from ..classify import is_internship
 
 URL = "https://{token}.recruitee.com/api/offers/"
 _US = {"us", "usa", "united states", "united states of america"}
+_CANADA = {"ca", "canada"}   # kept since 2026-09-30
 
 
 def _iso(ts: str | None) -> str | None:
@@ -21,11 +22,13 @@ def parse_recruitee(payload: dict, co: dict) -> list[dict]:
         locs = j.get("locations") or [{"city": j.get("city"), "state": j.get("state_code") or j.get("state_name"),
                                         "country": j.get("country"), "country_code": j.get("country_code")}]
         us = [l for l in locs if (l.get("country_code") or "").lower() == "us" or (l.get("country") or "").lower() in _US]
-        if not us:
+        ca = [l for l in locs if (l.get("country_code") or "").lower() == "ca" or (l.get("country") or "").lower() in _CANADA]
+        if not us and not ca:
             continue
         names = [", ".join(x for x in (l.get("city"), l.get("state_code") or l.get("state")) if x) or "United States" for l in us]
+        names += [", ".join(x for x in (l.get("city"), l.get("state_code") or l.get("state"), "Canada") if x) for l in ca]
         if j.get("remote"):
-            names.append("Remote - US")
+            names.append("Remote - US" if us else "Remote - Canada")
         desc = html_to_text((j.get("description") or "") + "\n" + (j.get("requirements") or ""))
         out.append(board_item(co, source="recruitee", title=title, locations=names, url=j.get("careers_url"),
                               apply_url=j.get("careers_apply_url"), posted_at=_iso(j.get("published_at")),

@@ -37,8 +37,9 @@ def _regions(row: Listing) -> list[dict]:
 
 
 def shard_keys(listing: dict) -> set[str]:
-    """The listing files a listing belongs in: each state it names, "remote" for US-remote roles
-    with no state, "US" for roles that name only the country.
+    """The listing files a listing belongs in: each state or Canadian province it names, "remote" for
+    US-remote roles with no state, "US" for roles that name only the country, "Canada" for Canadian
+    roles that name no province (remote ones included: Canada has no remote file of its own).
 
     This can come back empty, and a listing it comes back empty for is in no file and so cannot be
     reached from the site at all. The pipeline cannot produce one - it drops anything whose
@@ -53,7 +54,8 @@ def shard_keys(listing: dict) -> set[str]:
         if g["state"] and g["state"] != "Remote":
             keys.add(g["state"])
         else:
-            keys.add("remote" if g["kind"] == "remote" else "US")
+            # was: "remote" if remote else "US"
+            keys.add("remote" if g["kind"] == "remote" else "Canada" if g["kind"] == "canada" else "US")
     if not keys and listing.get("state"):
         keys.add("remote" if listing["state"] == "Remote" else listing["state"])
     return keys

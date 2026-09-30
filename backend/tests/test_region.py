@@ -20,7 +20,8 @@ def test_region_cases():
     assert in_region("Princeton, NJ")          # ~45 mi from Midtown
     assert in_region("Remote - US")
     assert in_region("Remote in USA")
-    assert not in_region("Remote - Canada")
+    # was: assert not in_region("Remote - Canada"). Canada is kept since 2026-09-30, as Canada.
+    assert evaluate_locations(["Remote - Canada"])["regions"] == [{"loc": "Remote - Canada", "kind": "canada", "state": None}]
     assert in_region("Remote, TX")
     for loc in ("Remote - serbia", "Remote - HU", "Virtual, BR", "Remote - SG", "Remote (India)"):
         assert not in_region(loc), loc
@@ -211,9 +212,12 @@ def test_a_us_town_named_after_a_foreign_city_is_in_its_state():
 
 def test_the_foreign_city_is_still_foreign():
     # "IN" is India's code as well as Indiana's; only the namesake towns are let through.
-    for loc in ("Bangalore, IN", "Hyderabad, IN", "Dublin, Ireland", "London, UK", "Toronto, ON",
-                "Vancouver, BC", "Paris, France", "London", "Remote - Canada"):
+    # was: the list also held "Toronto, ON", "Vancouver, BC" and "Remote - Canada", which are now kept
+    # as Canadian (test_canada.py); they still never read as a US state.
+    for loc in ("Bangalore, IN", "Hyderabad, IN", "Dublin, Ireland", "London, UK", "Paris, France", "London"):
         assert not evaluate_locations([loc])["in_region"], loc
+    for loc in ("Toronto, ON", "Vancouver, BC", "Remote - Canada"):
+        assert all(g["kind"] == "canada" for g in evaluate_locations([loc])["regions"]), loc
 
 
 def test_a_ups_site_code_names_its_state():
@@ -251,10 +255,11 @@ def test_a_canadian_province_code_is_not_california():
     # Workday writes the country first, so "CA-QC-..." used to split on the dash and read as
     # California. Eleven listings shipped in CA.json that way: RTX in Quebec, Cenovus in
     # Newfoundland. None of the province codes is also a US state code.
-    for loc in ("CA-QC-MIRABEL-M01 ~ 12800 Rue Henri-Fabre", "CA-NL-St. John's",
-                "CA-ON-Toronto", "CA-BC-Vancouver - 1055 W Georgia", "CA-AB-Calgary"):
-        assert not in_region(loc), loc
-        assert evaluate_locations([loc])["regions"] == [], loc
+    # was: assert not in_region(loc) and regions == []. Canada is kept now, filed by its province.
+    for loc, prov in (("CA-QC-MIRABEL-M01 ~ 12800 Rue Henri-Fabre", "QC"), ("CA-NL-St. John's", "NL"),
+                      ("CA-ON-Toronto", "ON"), ("CA-BC-Vancouver - 1055 W Georgia", "BC"), ("CA-AB-Calgary", "AB")):
+        regions = evaluate_locations([loc])["regions"]
+        assert [(g["kind"], g["state"]) for g in regions] == [("canada", prov)], loc
     # and California itself is untouched
     for loc in ("US-CA-San Jose", "Irvine, CA - ON SITE", "Ontario, CA", "Los Angeles, CA"):
         r = evaluate_locations([loc])

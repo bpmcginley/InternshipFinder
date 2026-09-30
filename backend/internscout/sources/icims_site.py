@@ -39,9 +39,12 @@ def _locations(d: dict) -> list[str]:
     """'Laurel, Maryland' for every US site of a posting. A posting with none is not ours."""
     out = []
     for p in [d] + list(d.get("additional_locations") or []):
-        if (p.get("country_code") or "").upper() != "US":
+        country = (p.get("country_code") or "").upper()
+        # was: != "US". Canada is kept since 2026-09-30, and says so, since its province codes are
+        # read as provinces only beside a Canadian town or the country's name.
+        if country not in ("US", "CA"):
             continue
-        name = ", ".join(x for x in (p.get("city"), p.get("state")) if x)
+        name = ", ".join(x for x in (p.get("city"), p.get("state"), "Canada" if country == "CA" else None) if x)
         if name and name not in out:
             out.append(name)
     return out

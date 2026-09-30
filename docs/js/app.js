@@ -42,6 +42,8 @@
   const parseQuery = q => (q.match(/-?"[^"]+"|\S+/g) || []).map(t => { const neg = t.length > 1 && t[0] === "-"; return { t: (neg ? t.slice(1) : t).replace(/"/g, "").toLowerCase(), neg }; }).filter(x => x.t);
   const PLACES = { "new england": { states: ["MA", "CT", "RI", "NH", "VT", "ME"] }, "nyc metro": { kind: "nyc_metro" }, "new york city": { kind: "nyc_metro" }, nyc: { kind: "nyc_metro" }, remote: { kind: "remote" } };
   Object.entries(IS.US_STATES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
+  Object.entries(IS.CA_PROVINCES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
+  PLACES.canada = { states: IS.CANADA_KEYS };
   ["ma", "ct", "ri", "nh", "vt", "nj", "ny", "ca", "tx", "fl", "nv", "wa", "il", "ga", "nc", "az", "dc", "mi", "mn", "md", "pa", "va", "tn"].forEach(c => { PLACES[c] = { states: [c.toUpperCase()] }; });
   const PLACE_KEYS = Object.keys(PLACES).sort((a, b) => b.length - a.length);
   function splitPlaces(q) {
@@ -87,6 +89,11 @@
     }
     if (x.gpa_min) { const g = p && p.gpa; out.push(g ? [g >= x.gpa_min ? "good" : "bad", `Minimum GPA ${x.gpa_min} (you: ${g})`] : ["", `Minimum GPA ${x.gpa_min}`]); }
     if (IS.noSponsorship(r)) out.push([p && p.needs_sponsorship && p.needs_sponsorship !== "No" ? "bad" : "", "No visa sponsorship"]);
+    // Every location in Canada: a US student generally needs a Canadian work permit to take it.
+    if (IS.inCanadaOnly(r)) {
+      const c = (p && p.citizenship) || "";
+      out.push([/canad/i.test(c) ? "good" : /u\.?\s?s\.?|united states|student visa/i.test(c) ? "warn" : "", "In Canada: needs Canadian work authorization"]);
+    }
     const pay = IS.payOf(r);
     if (pay === "unpaid") out.push(["warn", "Unpaid"]); else if (pay === "stipend") out.push(["", "Stipend"]);
     if (x.deadline) { const d = daysUntil(x.deadline); out.push(d < 0 ? ["bad", `Deadline passed (${fmtDay(x.deadline)})`] : [d <= 14 ? "warn" : "", `Apply by ${fmtDay(x.deadline)}${d <= 14 ? ` (${plural(d, "day")} left)` : ""}`]); }
@@ -200,7 +207,10 @@
     const all = IS.regs(r), g = all.find(x => keys.has(x.state) || (x.kind === "remote" && keys.has("remote"))) || all[0];
     // was: || "—". A muted word says what is missing; a bare dash only says something is.
     const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || h("span", { className: "muted" }, "Not listed"));
-    const sub = g && g.kind === "remote" ? "Remote" : g && g.state && !first.includes(g.state) ? g.state : null;
+    // was: remote, else the state when the first line lacks it. A Canadian place also says the country.
+    const sub = g && g.kind === "remote" ? "Remote"
+      : g && g.kind === "canada" ? (/canada/i.test(first) ? (g.remote || /remote/i.test(first) ? "Remote" : null) : `${g.state && !first.includes(g.state) ? g.state + ", " : ""}Canada`)
+      : g && g.state && !first.includes(g.state) ? g.state : null;
     const more = Math.max(0, all.length - 1);
     return h(F, null,
       h("div", { title: all.map(x => x.loc).join("; ") }, first, more > 0 && h("span", { className: "muted" }, " +" + more)),
@@ -317,7 +327,7 @@
     if (!open) return null;
     return h("section", { className: "landing", "aria-label": "About InternScout" },
       h("div", { className: "landing-main" },
-        h("h2", null, "Internships, co-ops and research for your major, anywhere in the US"),
+        h("h2", null, "Internships, co-ops and research for your major, anywhere in the US and Canada"),
         h("p", null, "InternScout gathers student opportunities from employer career sites and public job boards",
           nationwide ? ` (${nationwide.toLocaleString()} open right now)` : "", " and ranks them for your major, class year and the states you pick."),
         // was: h("p", { className: "fine" }, "Free, made by a UMass student, not affiliated with UMass Amherst.")),
@@ -511,6 +521,8 @@
     const files = (index && index.files) || {};
     const count = k => files[k] ? files[k].open : null;
     const stateList = useMemo(() => Object.entries(IS.US_STATES).sort((a, b) => a[1].localeCompare(b[1])), []);
+    // Provinces in the order most roles are in (the big metros' provinces first), then "no province".
+    const provinceList = useMemo(() => [...Object.entries(IS.CA_PROVINCES), ["Canada", "Canada, no province listed"]], []);
     const shortcut = codes => setD(s => { const all = codes.every(c => s.states.includes(c)); return { ...s, states: all ? s.states.filter(c => !codes.includes(c)) : [...new Set([...s.states, ...codes])] }; });
 
     const dots = h("div", { className: "steps", "aria-label": `Step ${step} of 3` }, [1, 2, 3].map(i => h("span", { key: i, className: cx("dot", i === step && "on", i < step && "done") }, i)));
@@ -552,6 +564,11 @@
       h("div", { className: "stategrid" }, stateList.map(([k, n]) => h("label", { key: k, className: cx("check", d.states.includes(k) && "on") },
         h("input", { type: "checkbox", checked: d.states.includes(k), onChange: () => toggle("states", k) }), " ", n,
         count(k) != null ? h("span", { className: "c" }, count(k)) : null))),
+      h("fieldset", null, h("legend", null, "Canada"),
+        h("div", { className: "stategrid" }, provinceList.map(([k, n]) => h("label", { key: k, className: cx("check", d.states.includes(k) && "on") },
+          h("input", { type: "checkbox", checked: d.states.includes(k), onChange: () => toggle("states", k) }), " ", n,
+          count(k) != null ? h("span", { className: "c" }, count(k)) : null))),
+        h("div", { className: "meta" }, "Most roles in Canada need Canadian work authorization (citizenship, permanent residence or a work permit).")),
       !d.states.length && h("div", { className: "meta" }, `No states picked: you'll see the baseline area (${IS.BASELINE.join(", ")}).`),
       h("fieldset", null, h("legend", null, "Work authorization"),
         h("div", { className: "checks" }, IS.WORK_AUTH.map(([k, l]) => h("label", { key: k, className: "check" },
@@ -600,7 +617,7 @@
       const q = new URLSearchParams(location.search), list = (k, ok) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, 6);
       // ?company= comes from an employer's page (every spelling its listings use) and matches names
       // exactly; ?new=1 from the New this week page. Both are plain values, never markup.
-      const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote)$/),
+      const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada)$/),
         company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
       if (q.get("new") === "1") link.new_only = true;
       // ?stage=, ?year= and ?paid=1 come from the co-op, research, class-year and paid pages, and
@@ -914,6 +931,7 @@
         if (p.work_auth === "citizen") e.citizenship = "U.S. citizen";
         else if (p.work_auth === "permanent") e.citizenship = "U.S. permanent resident";
         else if (p.work_auth === "visa") { e.citizenship = "Student visa"; e.needs_sponsorship = true; }
+        else if (p.work_auth === "canada") e.citizenship = "Canadian work authorization";
         if (p.class_year === "masters") e.degree = "master's"; else if (p.class_year === "phd") e.degree = "PhD"; else if (p.class_year && !e.degree) e.degree = "bachelor's";
       }
       return e;
@@ -1087,7 +1105,7 @@
       h("header", { className: "top" },
         h("div", null,
           h("h1", { className: "mark" }, "InternScout"),
-          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for UMass students, anywhere in the US.",
+          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for UMass students, anywhere in the US and Canada.",
             aboutBtn && " · ", aboutBtn)),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
