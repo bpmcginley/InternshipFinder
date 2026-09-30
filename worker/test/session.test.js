@@ -62,7 +62,7 @@ test("the tier is carried in the session: general stays general, and a Microsoft
   const gmail = await start(w, await w.token({ sub: "g-1", email: "someone@gmail.com", hd: undefined }));
   assert.equal(gmail.tier, "general");
   assert.equal((await (await me(w, gmail.session)).json()).tier, "general");
-  assert.equal((await (await me(w, gmail.session)).json()).allowance.resume_tailor.limit, 7);   // was 5
+  assert.equal((await (await me(w, gmail.session)).json()).allowance.resume_tailor.limit, 5);
   const ms = await start(w, await w.token({}, "microsoft"));
   assert.deepEqual([ms.provider, ms.tier, ms.email], ["microsoft", "edu", "student@umass.edu"]);
   assert.equal((await (await me(w, ms.session)).json()).tier, "edu");

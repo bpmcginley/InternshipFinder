@@ -308,10 +308,13 @@ test("the real ceilings leave room for a full allowance and stay under what a pl
   // was: free >= 134, supporter <= 456, pro <= 1135 (under the plan's whole net). Recalibrated 2026-09-30:
   // a full allowance at the planned costs (config COSTS) fits under every row, now and after Flash
   // doubles; and each paid row is at most 75% of the plan's net, so a paid month keeps 25% or more.
-  const { COSTS, TASKS, ALLOWANCE_CHANGES, PLANS, USER_BUDGET_CENTS: B } = CONFIG;
-  const later = ALLOWANCE_CHANGES.find((c) => c.from === "2027-01-01").tasks;
+  // Repriced 2026-09-30 ($4 and $8): the same checks against the new nets (NET_CENTS), and "from 2027"
+  // is whatever ALLOWANCE_CHANGES leaves in force then - today nothing, which is the point: no cut.
+  const { COSTS, TASKS, ALLOWANCE_CHANGES, PLANS, NET_CENTS, USER_BUDGET_CENTS: B } = CONFIG;
+  const later = { autofill: TASKS.autofill.allowance, resume_tailor: TASKS.resume_tailor.allowance,
+    ...((ALLOWANCE_CHANGES.find((c) => c.from <= "2027-01-01") || {}).tasks || {}) };
   const full = (auto, resumes, when) => auto * COSTS.autofill[when] + resumes * COSTS.resume_tailor[when];
-  for (const [plan, net] of [["free", null], ["supporter", 456], ["pro", 1135]]) {
+  for (const [plan, net] of [["free", null], ["supporter", NET_CENTS.supporter], ["pro", NET_CENTS.pro]]) {
     const m = PLANS[plan].multiplier;
     assert.ok(full(Math.floor(TASKS.autofill.allowance * m), Math.floor(TASKS.resume_tailor.allowance * m), "now") <= B[plan], plan + " now");
     assert.ok(full(Math.floor(later.autofill * m), Math.floor(later.resume_tailor * m), "from2027") <= B[plan], plan + " from 2027");
@@ -374,27 +377,34 @@ test("token totals are kept per month as numbers only", async () => {
   assert.ok(row.cents > 0);
 });
 
-test("Flash allowances halve on 2027-01-01, when Flash doubles in price; Flash-Lite ones do not", async () => {
-  // The Deep Dive left this list when its cap was removed (2026-09-18); it stays uncapped on both sides.
+// was: "Flash allowances halve on 2027-01-01, when Flash doubles in price" ([20, 10] -> [10, 5]). Since
+// the 2026-09-30 repricing the allowances already fit every ceiling at the doubled price, so nothing
+// changes that day; ALLOWANCE_CHANGES still works for the next time one is needed.
+test("the allowances hold through Flash's price rise on 2027-01-01", async () => {
   const flashTasks = (a) => [a.autofill, a.resume_tailor];
   const before = await setup({ now: new Date("2026-12-31T23:00:00Z") });
   let c = await (await before.api("GET", "/config")).json();
-  // was: [20, 10] before and [10, 5] after (general [5, 2]); allowances recalibrated 2026-09-30
-  assert.deepEqual(flashTasks(c.allowance.edu), [40, 15]);
+  assert.deepEqual(flashTasks(c.allowance.edu), [25, 10]);
   assert.equal(c.allowance.edu.deep_dive, null);
 
   const after = await setup({ now: new Date("2027-01-01T00:30:00Z") });
   c = await (await after.api("GET", "/config")).json();
-  assert.deepEqual(flashTasks(c.allowance.edu), [20, 8]);
-  assert.deepEqual(flashTasks(c.allowance.general), [10, 4]);
+  assert.deepEqual(flashTasks(c.allowance.edu), [25, 10]);
+  assert.deepEqual(flashTasks(c.allowance.general), [12, 5]);
+  assert.deepEqual(flashTasks(c.allowance.supporter), [50, 20]);
+  assert.deepEqual(flashTasks(c.allowance.pro), [100, 40]);
   assert.equal(c.allowance.edu.deep_dive, null);
   assert.equal(c.allowance.edu.field_match, 260);
   assert.equal(c.allowance.edu.short_answer, 80);
-
-  // and the cap a signed-in student hits is the new one (autofill: 20 for .edu from January)
   const token = await after.token();
-  assert.equal((await me(after, token)).allowance.autofill.limit, 20);
-  assert.equal((await me(after, token)).allowance.resume_tailor.limit, 8);
+  assert.equal((await me(after, token)).allowance.autofill.limit, 25);
+});
+
+test("a dated allowance change still applies on its day", async () => {
+  const change = [{ from: "2027-01-01", tasks: { autofill: 12 } }];
+  const after = await setup({ now: new Date("2027-01-01T00:30:00Z"), config: { ALLOWANCE_CHANGES: change } });
+  const c = await (await after.api("GET", "/config")).json();
+  assert.equal(c.allowance.edu.autofill, 12);
 });
 
 test("the Deep Dive has no monthly cap: many runs, one student, never a 429 cap", async () => {

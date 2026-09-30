@@ -170,32 +170,36 @@ rotating from test keys to live ones. Claude does none of them — keys stay wit
 Recalibrated 2026-09-30, after the Auto-Apply cost cuts brought an application from about 6.6¢ to
 about 2¢ (measured over 86 recorded steps; planned at 3¢ to leave room for longer Workday forms).
 
-| Plan | Price | Allowance (.edu) | Spending ceiling (`USER_BUDGET_CENTS`) | Kept at least |
-|---|---|---|---|---|
-| Free | — | 40 Auto-Apply, 15 resumes; Deep Dives uncapped | $1.50 | — |
-| Supporter | $5/month | 2.5× that: 100 Auto-Apply, 37 resumes | $3.40 | 25% of $4.56 net |
-| Pro | $12/month | 6× that: 240 Auto-Apply, 90 resumes | $8.50 | 25% of $11.35 net |
+Repriced the same day to volumes students actually apply at, with lower prices and no cut on
+2027-01-01:
 
-(Was: 20 / 50 / 120 Auto-Apply and 10 / 25 / 60 resumes, with ceilings of $1.50, $4.50 and $11.00.)
+| Plan | Price | Allowance (.edu), now and after 2027-01-01 | Spending ceiling (`USER_BUDGET_CENTS`) | Kept at full use (2027) |
+|---|---|---|---|---|
+| Free | — | 25 Auto-Apply, 10 resumes; Deep Dives uncapped | $1.50 | — |
+| Supporter | $4/month | 2× that: 50 Auto-Apply, 20 resumes | $2.68 | 33% of $3.58 net (never under 25%) |
+| Pro | $8/month | 4× that: 100 Auto-Apply, 40 resumes | $5.60 | 36% of $7.47 net (never under 25%) |
+
+(Was: Supporter $5 at 2.5× and Pro $12 at 6× of 20 Auto-Apply, halving on 2027-01-01.)
 
 The ceiling is what protects the margin. A paid student's AI stops for the month when they reach their
 row, whatever an application turned out to cost, and each paid row is 75% of what the plan brings in
 after Stripe's 2.9% + 30¢. So a paid month keeps at least a quarter of its money even for a student who
 uses everything, and almost nobody does. The allowances are sized to fit under the rows at the planned
-costs in `COSTS` (`src/config.js`): about 3¢ an application, 1¢ a tailored resume, 2¢ a Deep Dive. A
-student therefore meets the allowance first; the ceiling only stops an unusually expensive month. A
-non-.edu account gets half the allowance for the same price.
+costs in `COSTS` (`src/config.js`): about 2¢ an application now and 4¢ after Flash doubles in price on
+2027-01-01, 1¢ and 2¢ a tailored resume, 2¢ and 4¢ a Deep Dive. A student therefore meets the allowance
+first; the ceiling only stops an unusually expensive month. A non-.edu account gets half the allowance
+for the same price.
 
-**From 2027-01-01** Gemini 3.8 Flash doubles in price, and `ALLOWANCE_CHANGES` halves the capped Flash
-tasks that day: free .edu becomes 20 Auto-Apply and 8 resumes (Supporter 50 / 20, Pro 120 / 48), which
-is still what free students have today. The ceilings stay where they are, so the margin holds without
-touching them. The Deep Dive has no monthly cap (`allowance: null`); the rate limits and the ceiling
-bound it. Field matching and short answers run on Flash-Lite and keep their allowance.
+**On 2027-01-01** nothing changes: the allowances already fit every ceiling at the doubled price, so
+`ALLOWANCE_CHANGES` is empty (it still works if a future price change needs a dated cut). The Deep Dive
+has no monthly cap (`allowance: null`); the rate limits and the ceiling bound it. Field matching and
+short answers run on Flash-Lite and keep their allowance.
 
 Check `task_tokens` in D1 (cents per task and model) after a few weeks: if an application costs well
-under 3¢, the allowances can go up; if it costs more, lower them. Neither changes the margin, only how
-often a student meets the ceiling before the allowance. Nothing needs deploying on 2027-01-01: the
-Worker reads the date.
+under 2¢, the allowances can go up; if it costs more, lower them. Neither changes the margin, only how
+often a student meets the ceiling before the allowance. Changing a price means creating a new Stripe price and updating the matching
+secret (`STRIPE_PRICE_ID`, `STRIPE_PRICE_ID_PRO`), `PLANS` and the `*_PRICE_TEXT` vars together (step 2
+below), and deploying.
 
 A tier is offered only when its own Stripe price id is set, so you can launch Supporter alone and add
 Pro later without touching code.

@@ -62,8 +62,9 @@ PAYMENTS_ENABLED = "1"
 STRIPE_MANAGED_PAYMENTS = "1"
 # Shown on the upgrade buttons. Stripe charges whatever the price in your Stripe dashboard says,
 # so keep these in step with it.
-SUPPORTER_PRICE_TEXT = "$5/month"
-PRO_PRICE_TEXT = "$12/month"
+# was: "$5/month" and "$12/month" (repriced 2026-09-30; the Stripe prices must match: worker/README.md)
+SUPPORTER_PRICE_TEXT = "$4/month"
+PRO_PRICE_TEXT = "$8/month"
 # Where Stripe sends students back to after checkout
 # was: SITE_URL = "https://bpmcginley.github.io/InternshipFinder"
 SITE_URL = "https://internscout.org"
