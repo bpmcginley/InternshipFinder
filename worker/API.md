@@ -129,7 +129,7 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
 ```json
 { "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
   "can_upgrade": true, "can_manage": false,
-  "allowance": { "resume_tailor": { "used": 1, "limit": 10 }, "autofill": { "used": 0, "limit": 20 } } }
+  "allowance": { "resume_tailor": { "used": 1, "limit": 15 }, "autofill": { "used": 0, "limit": 40 } } }
 ```
 - **`plan`** is `free` or the id of a paid tier (`supporter`, `pro`). `limit` already includes the
   plan multiplier, so the client never multiplies anything itself.

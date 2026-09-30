@@ -167,27 +167,35 @@ and makes its checkout 404 again, without a deploy.
 The steps below are how this was turned on, and how to redo it against a new Stripe account or when
 rotating from test keys to live ones. Claude does none of them — keys stay with you.
 
-| Plan | Price | Allowance | Cost if fully used | Left over |
+Recalibrated 2026-09-30, after the Auto-Apply cost cuts brought an application from about 6.6¢ to
+about 2¢ (measured over 86 recorded steps; planned at 3¢ to leave room for longer Workday forms).
+
+| Plan | Price | Allowance (.edu) | Spending ceiling (`USER_BUDGET_CENTS`) | Kept at least |
 |---|---|---|---|---|
-| Free (.edu) | — | 20 Auto-Apply, 10 resumes; Deep Dives uncapped | ~$1.34 | — |
-| Supporter | $5/month | 2.5× that | ~$3.35 | ~27% of $4.56 net |
-| Pro | $12/month | 6× that | ~$8.04 | ~29% of $11.35 net |
+| Free | — | 40 Auto-Apply, 15 resumes; Deep Dives uncapped | $1.50 | — |
+| Supporter | $5/month | 2.5× that: 100 Auto-Apply, 37 resumes | $3.40 | 25% of $4.56 net |
+| Pro | $12/month | 6× that: 240 Auto-Apply, 90 resumes | $8.50 | 25% of $11.35 net |
 
-That last column is the worst case, a student who spends every unit; almost nobody does, so the
-everyday margin is much wider. The numbers come from about $0.06 per auto-filled application, $0.01
-per tailored resume and $0.02 per Deep Dive, minus Stripe's 2.9% + 30¢. A non-.edu account gets
-half the allowance for the same price, which also costs half as much to serve.
+(Was: 20 / 50 / 120 Auto-Apply and 10 / 25 / 60 resumes, with ceilings of $1.50, $4.50 and $11.00.)
 
-**From 2027-01-01** Gemini 3.8 Flash doubles in price, so `ALLOWANCE_CHANGES` in `src/config.js`
-halves every capped Flash task that day: free .edu becomes 10 Auto-Apply, 5 resumes, and the
-paid tiers scale from that (Supporter 25 / 13, Pro 60 / 30). The Deep Dive is a one-off worth a
-few cents, so it has no monthly cap (`allowance: null`); only the rate limits and the budget stop
-bound it. Field matching and short answers
-run on Flash-Lite and keep their allowance. A skipped rules-only application costs no unit, so each
-Auto-Apply unit spent is a run that did call the model, at nearer $0.08 than the $0.06 average; at
-double price the full-use Supporter comes to about $4.38 of AI against $4.56 net. That margin is thin,
-so check the real per-task spend in D1 after launch before the change takes effect. Nothing needs
-deploying on the day: the Worker reads the date. It does need deploying once before then.
+The ceiling is what protects the margin. A paid student's AI stops for the month when they reach their
+row, whatever an application turned out to cost, and each paid row is 75% of what the plan brings in
+after Stripe's 2.9% + 30¢. So a paid month keeps at least a quarter of its money even for a student who
+uses everything, and almost nobody does. The allowances are sized to fit under the rows at the planned
+costs in `COSTS` (`src/config.js`): about 3¢ an application, 1¢ a tailored resume, 2¢ a Deep Dive. A
+student therefore meets the allowance first; the ceiling only stops an unusually expensive month. A
+non-.edu account gets half the allowance for the same price.
+
+**From 2027-01-01** Gemini 3.8 Flash doubles in price, and `ALLOWANCE_CHANGES` halves the capped Flash
+tasks that day: free .edu becomes 20 Auto-Apply and 8 resumes (Supporter 50 / 20, Pro 120 / 48), which
+is still what free students have today. The ceilings stay where they are, so the margin holds without
+touching them. The Deep Dive has no monthly cap (`allowance: null`); the rate limits and the ceiling
+bound it. Field matching and short answers run on Flash-Lite and keep their allowance.
+
+Check `task_tokens` in D1 (cents per task and model) after a few weeks: if an application costs well
+under 3¢, the allowances can go up; if it costs more, lower them. Neither changes the margin, only how
+often a student meets the ceiling before the allowance. Nothing needs deploying on 2027-01-01: the
+Worker reads the date.
 
 A tier is offered only when its own Stripe price id is set, so you can launch Supporter alone and add
 Pro later without touching code.
