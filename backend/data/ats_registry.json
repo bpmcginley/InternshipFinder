@@ -15151,8 +15151,9 @@
   "ingredion|wd1|IngredionCareers": {
    "name": "Ingredion",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-09-30"
   },
   "ing|wd3|icsgblcor": {
    "name": "ING",
