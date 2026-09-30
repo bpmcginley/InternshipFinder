@@ -12724,9 +12724,8 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-09-30"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
@@ -15339,12 +15338,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
-  },
-  "jcdecaux|wd3|ExternalSiteJCDUK": {
-   "name": "JCDecaux",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-30"
   },
   "jcdecaux|wd3|ExternalSiteJCDUK": {
    "name": "JCDecaux",
