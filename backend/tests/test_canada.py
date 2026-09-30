@@ -117,3 +117,19 @@ def test_the_canada_views_do_not_count_as_extra_places():
 def test_an_in_person_canadian_role_ranks_like_an_in_person_us_one():
     assert evaluate_locations(["Toronto, ON"])["on_site"]
     assert not evaluate_locations(["Remote - Canada"])["on_site"]
+
+
+def test_uhn_keeps_its_student_roles_in_toronto():
+    from internscout.sources.uhn import parse_uhn
+    payload = {"data": [
+        {"id": "744000151069349", "name": "Student, Admin Support (Research)", "site": "Princess Margaret Cancer Centre",
+         "department": "Research", "employment": "Temporary Full Time"},
+        {"id": "744000152669697", "name": "Occupational Therapist - Brain Program ", "site": "Toronto Rehab",
+         "department": "Neuro Rehab Program", "employment": "Permanent Full Time"},
+        {"name": "Summer Student", "employment": "Temporary Full Time"},           # no id: no link to give
+    ]}
+    items = parse_uhn(payload)
+    assert [i["title"] for i in items] == ["Student, Admin Support (Research)"]
+    assert items[0]["locations"] == ["Toronto, ON"]
+    assert items[0]["url"] == "https://forms.uhn.ca/UHNCareers/Home/Posting/744000151069349"
+    assert classify_location(items[0]["locations"][0])["metro"] == "Toronto"

@@ -61,7 +61,7 @@ def is_daily_run(today: str) -> bool:
 
 def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
                       max_searches: int | None = None, focus_queries: list[str] | None = None,
-                      focus_searches: int = 0) -> list[dict]:
+                      focus_searches: int = 0, fixed: list[tuple[str, str]] | None = None) -> list[dict]:
     """Query Google Jobs. Stays inside the SerpApi quota by capping searches per run and
     rotating which queries are used (day-based offset), so all disciplines get covered
     across runs instead of always hitting the same few."""
@@ -104,6 +104,9 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     # Searches held back every day for the thinnest field. The main list gives one query to every
     # location per run, so a field with five queries in the list came up about one day in six;
     # these run every day, each on a different metro, before the main plan spends the rest.
+    # (query, location) pairs searched every day, first, out of the same budget: config.GOOGLE_JOBS_FIXED.
+    daily = list(fixed or [])[:max_searches]
+    max_searches -= len(daily)
     focus: list[tuple[str, str]] = []
     if focus_queries and focus_searches > 0 and locations:
         n = min(focus_searches, max_searches)
@@ -118,9 +121,9 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     start = (turn * per_loc) % max(1, len(queries))
     rotated = queries[start:] + queries[:start]
     picked = rotated[:per_loc]
-    pairs = focus + [(q, loc) for loc in locations for q in picked][:max(0, max_searches)]
-    print(f"[google_jobs] {len(focus)} focus search(es), then {len(picked)} quer(ies) x {len(locations)} "
-          f"location(s) (cap {max_searches})")
+    pairs = daily + focus + [(q, loc) for loc in locations for q in picked][:max(0, max_searches)]
+    print(f"[google_jobs] {len(daily)} daily, {len(focus)} focus search(es), then {len(picked)} quer(ies) x "
+          f"{len(locations)} location(s) (cap {max_searches})")
     out: list[dict] = []
     seen = set()
     with client() as c:
