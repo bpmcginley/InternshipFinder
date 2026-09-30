@@ -18,12 +18,20 @@ name: Brand posts
 on:
   schedule:
     - cron: "0 15 * * 2,4"    # Tuesdays and Thursdays, 11am US Eastern
+  # Also started by Keep schedule (catchup.yml) when that cron is late, which it usually is (Tuesday
+  # 2026-09-29 fired at 19:45 UTC). Only one run a day posts: see the guard job below.
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Post even if another run already posted today"
+        type: boolean
+        default: false
 
 # was: contents: read. Write is for pushing the card to the social-cards branch; nothing here
 # touches main (and a push made with this token starts no other workflow).
 permissions:
   contents: write
+  actions: read               # the guard reads this workflow's other runs
 
 concurrency:
   group: brand-posts
@@ -31,14 +39,34 @@ concurrency:
 
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
+  # A post goes out once a day at most: when another run today already reached the post job (even
+  # one that then failed on Instagram, since Bluesky may have posted first), this run skips it.
+  # force (Run workflow, ticked) overrides that.
+  guard:
+    if: ${{ !vars.SOCIAL_ENABLED || vars.SOCIAL_ENABLED != '0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      skip: ${{ steps.guard.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: growth
+      - id: guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CATCHUP_FORCE: ${{ inputs.force }}
+        run: python3 growth/catchup.py --guard social.yml
+
   post:
+    needs: guard
     # The variable reaches only this condition, never a command line.
     # was: if: vars.SOCIAL_ENABLED != '0'. An unset variable is null, and an expression comparing null
     # with a string turns both into numbers: null -> 0 and '0' -> 0, so "!= '0'" was false and every
     # run was skipped whenever the variable did not exist, the default it was meant to leave on.
     # Now: run when the variable is unset or empty (!vars.X; '' and null are falsy), or set to
     # anything but '0' (both sides strings, compared as strings). Only SOCIAL_ENABLED = 0 skips.
-    if: ${{ !vars.SOCIAL_ENABLED || vars.SOCIAL_ENABLED != '0' }}
+    if: ${{ needs.guard.outputs.skip != 'true' && (!vars.SOCIAL_ENABLED || vars.SOCIAL_ENABLED != '0') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10       # was: 5; Instagram fetches the card before it publishes
     steps:

@@ -6,7 +6,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from internscout.discover import load_registry, save_registry, seed_registry, MAX_FAILS
+from internscout.discover import load_registry, save_registry, seed_registry, drop, MAX_FAILS
 from internscout.run_ingest import scan_boards
 
 reg = load_registry()
@@ -44,7 +44,7 @@ if dead:
         print(f"kept {a}:{t} ({how})")
     dead = [d for d in dead if d not in spared]
 for a, t in dead:
-    del reg[a][t]
+    drop(reg, a, t, "robots" if reg[a][t].get("closed") else "dead")   # was: del reg[a][t]; now remembered, so discovery leaves it out
     print(f"dropped {a}:{t}")
 for a, e in reg.items():
     for t, v in e.items():

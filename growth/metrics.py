@@ -44,7 +44,8 @@ MASTODON_ACCT = os.environ.get("MASTODON_ACCT") or "internscout"
 REPO = os.environ.get("GITHUB_REPOSITORY") or "bpmcginley/InternshipFinder"
 # The jobs the dashboard watches, by workflow file: a failed or overdue one is something to look at.
 JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metrics.yml", "Dashboard copy"),
-        ("social.yml", "Brand posts"), ("growth-report.yml", "Growth report"), ("test.yml", "Tests")]
+        ("social.yml", "Brand posts"), ("growth-report.yml", "Growth report"), ("test.yml", "Tests"),
+        ("catchup.yml", "Keep schedule")]
 RECENT = 8                                  # recent posts kept per account
 GSC_SITE = os.environ.get("GSC_SITE") or "sc-domain:internscout.org"
 GSC_DAYS = 28

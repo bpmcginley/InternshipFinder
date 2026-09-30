@@ -20,7 +20,7 @@ from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
 from .config import GOOGLE_JOBS_FOCUS_QUERIES, GOOGLE_JOBS_FOCUS_SEARCHES
 from .discover import (load_registry, save_registry, seed_registry, discover, boards,
-                       label_boards, label_sectors, record_result, prune)
+                       label_boards, label_sectors, record_result, record_closed, prune, refused_count)
 from .probe import probe_boards
 from .geo import save_cache
 from .pipeline import run
@@ -125,9 +125,10 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
         systemic = set()
     for (ats, tok), r in res.items():
         if isinstance(r, RobotsDisallowed):
-            # Not a failure to report as one, but the board still has to leave the registry,
-            # and record_result is what ages a board out.
-            record_result(reg, ats, tok, False)
+            # Not a failure to report as one, but the board still has to leave the registry, and
+            # (was: record_result, four days of asking again) the employer's answer will not change
+            # by tomorrow, so it leaves now and stays out (discover.KEEP_OUT).
+            record_closed(reg, ats, tok)
         elif isinstance(r, Exception):
             # was: if ats not in systemic:
             if ats not in systemic and (systemic_guard or not _transient(r)):
@@ -196,7 +197,8 @@ def main():
         labelled = label_sectors(reg, raw)
         dropped = prune(reg)
         save_registry(reg)
-        print(f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead, "
+        print(f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead or closed, "
+              f"{refused_count()} recently dropped boards left out, "
               f"+{named} boards labelled by name, "
               f"{labelled} listings labelled from their board; "
               f"{ {a: len(b) for a, b in reg.items()} }")

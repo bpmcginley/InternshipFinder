@@ -194,10 +194,23 @@ def main(argv: list[str]) -> int:
     except (InstagramError, RuntimeError, KeyError, urllib.error.URLError) as e:
         # Meta's message, never the token or a URL carrying it.
         print(f"[instagram] failed: {type(e).__name__}: {e}")
-        if "OAuthException" in str(e) or " 190" in str(e):
-            print("[instagram] the token is invalid or expired: generate a new one in Meta's app dashboard "
-                  "and replace the INSTAGRAM_TOKEN secret (growth/README.md, Instagram)")
+        print(f"[instagram] {advice(str(e))}")
         return 1
+
+
+def advice(error: str) -> str:
+    """What to do about Meta's answer. Every Graph API error is an OAuthException, so the type alone
+    says nothing (was: any OAuthException was reported as an expired token). Code 190 is the token;
+    code 200 with "API access blocked" (every run since 2026-09-29) is Meta restricting the app, and
+    a new token will not fix that."""
+    if "API access blocked" in error:
+        return ("Meta has blocked this app's API access; a new token will not help. Open the app at "
+                "developers.facebook.com: check its Alerts, that it is Live (not Development), and that "
+                "the Instagram account is still connected to it (growth/README.md, Instagram)")
+    if " 190" in error or "expired" in error.lower() or ("invalid" in error.lower() and "token" in error.lower()):
+        return ("the token is invalid or expired: generate a new one in Meta's app dashboard and replace "
+                "the INSTAGRAM_TOKEN secret (growth/README.md, Instagram)")
+    return "see Meta's message above (growth/README.md, Instagram)"
 
 
 if __name__ == "__main__":

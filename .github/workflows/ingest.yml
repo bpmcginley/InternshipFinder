@@ -4,7 +4,12 @@ name: Ingest internships
 on:
   schedule:
     - cron: "0 */6 * * *"     # every 6 hours (UTC)
-  workflow_dispatch:            # manual "Run workflow" button
+  workflow_dispatch:            # manual "Run workflow" button; Keep schedule (catchup.yml) uses it too
+    inputs:
+      force:
+        description: "Run even if another ingest finished in the last 4 hours"
+        type: boolean
+        default: true
   push:
     branches: [main]
     # tests and one-off scripts never change what an ingest produces, so a push of only those
@@ -13,6 +18,7 @@ on:
 
 permissions:
   contents: write               # allow committing the data back
+  actions: read                 # the guard reads this workflow's other runs
 
 concurrency:
   group: ingest
@@ -20,7 +26,28 @@ concurrency:
 
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
+  # Keep schedule starts an ingest when GitHub's own schedule is hours late; the late scheduled run
+  # then arrives inside 4 hours of it and has nothing to add, so it skips (growth/catchup.py). A
+  # person's Run workflow click defaults force to true and always runs. A catch-up dispatch sends
+  # force: false, so it is guarded like the schedule.
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      skip: ${{ steps.guard.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: growth
+      - id: guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CATCHUP_FORCE: ${{ inputs.force }}
+        run: python3 growth/catchup.py --guard ingest.yml
+
   ingest:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -83,7 +110,7 @@ jobs:
           git config user.name  "internscout-bot"
           git config user.email "actions@github.com"
           # probe_cache.json earns its name only if it survives the run that filled it.
-          git add -A docs/data backend/data/ats_registry.json backend/data/geocache.json backend/data/probe_cache.json
+          git add -A docs/data backend/data/ats_registry.json backend/data/dropped_boards.json backend/data/geocache.json backend/data/probe_cache.json backend/data/google_jobs_day.json
           if git diff --staged --quiet; then
             echo "No changes."
           else

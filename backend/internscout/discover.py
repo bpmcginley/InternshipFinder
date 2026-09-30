@@ -9,11 +9,23 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 from .config import DATA_DIR
 
 REGISTRY_PATH = os.path.join(DATA_DIR, "ats_registry.json")
 MAX_FAILS = 4  # consecutive failed runs before a board is dropped
+
+# Boards dropped from the registry, and when: {ats: {token lowercased: {"on": "YYYY-MM-DD", "why"}}}.
+# A dropped board used to come straight back. The GitHub lists and Google Jobs keep old apply links
+# for months, so discovery re-added every dead board the day after prune() took it out, and it spent
+# four more days failing. In the week to 2026-09-30 that was 170 boards a night, the same ones each
+# time: 146 SmartRecruiters boards (the API host's robots.txt closes them all), and Greenhouse,
+# Ashby and Workday boards that answer 404 or 422. Now a dropped board stays out for KEEP_OUT days,
+# then may be discovered again, in case the employer came back.
+DROPPED_PATH = os.path.join(DATA_DIR, "dropped_boards.json")
+KEEP_OUT = {"dead": 45, "robots": 120}
+_DROPPED: dict[str, dict[str, dict]] = {}
+_REFUSED = [0]          # add_board calls turned away this run, for the [registry] line
 
 PATTERNS = [
     # job-boards.eu.greenhouse.io is a European employer's board; boards-api.greenhouse.io still
@@ -109,6 +121,9 @@ def load_registry() -> dict:
     boards and save them over the top - months of verified boards replaced by a dozen, with a green
     tick. A bad merge or a write cut short is the likely way to get there, so the run stops and says so.
     """
+    _DROPPED.clear()
+    _DROPPED.update(load_dropped())
+    _REFUSED[0] = 0
     try:
         with open(REGISTRY_PATH, encoding="utf-8") as f:
             return json.load(f)
@@ -116,6 +131,53 @@ def load_registry() -> dict:
         return {}
     except ValueError as e:
         raise RuntimeError(f"{REGISTRY_PATH} is not valid JSON ({e}); restore it from git before running") from e
+
+
+def load_dropped() -> dict:
+    """The dropped-board list, or {} when there is none. A damaged one is only a lost memory of what
+    failed (the boards come back and fail again), so unlike the registry it does not stop the run."""
+    try:
+        with open(DROPPED_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def kept_out(ats: str, token: str, today: date | None = None) -> bool:
+    """Whether this board was dropped recently enough that discovery should leave it out."""
+    hit = _DROPPED.get(ats, {}).get(token.lower())
+    if not hit:
+        return False
+    try:
+        on = date.fromisoformat(hit.get("on", ""))
+    except ValueError:
+        return False
+    return (today or date.today()) - on < timedelta(days=KEEP_OUT.get(hit.get("why"), KEEP_OUT["dead"]))
+
+
+def refused_count() -> int:
+    return _REFUSED[0]
+
+
+def drop(reg: dict, ats: str, token: str, why: str = "dead", today: date | None = None) -> None:
+    """Take a board out of the registry and remember it, so discovery does not put it straight back."""
+    reg.get(ats, {}).pop(token, None)
+    _DROPPED.setdefault(ats, {})[token.lower()] = {"on": (today or date.today()).isoformat(), "why": why}
+
+
+def _save_dropped(today: date | None = None) -> None:
+    today = today or date.today()
+    keep = {}
+    for ats, toks in sorted(_DROPPED.items()):
+        live = {t: v for t, v in sorted(toks.items()) if kept_out(ats, t, today)}
+        if live:
+            keep[ats] = live
+    tmp = DROPPED_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(keep, f, indent=1, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, DROPPED_PATH)
 
 
 def _board_count(reg: dict) -> int:
@@ -143,6 +205,7 @@ def save_registry(reg: dict) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=1, ensure_ascii=False)
     os.replace(tmp, REGISTRY_PATH)
+    _save_dropped()
 
 
 def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, sector: str | None = None,
@@ -157,6 +220,9 @@ def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, s
             entry["sector"] = sector
         if location and not entry.get("location"):
             entry["location"] = location
+        return False
+    if kept_out(ats, token):
+        _REFUSED[0] += 1
         return False
     boards[token] = {"name": name or token, "quant": quant, "fails": 0, "added": date.today().isoformat()}
     if sector:
@@ -350,8 +416,17 @@ def record_result(reg: dict, ats: str, token: str, ok: bool, today: date | None 
         entry["last_fail"] = day
 
 
-def prune(reg: dict) -> int:
-    dead = [(a, t) for a, e in reg.items() for t, v in e.items() if v.get("fails", 0) >= MAX_FAILS]
-    for a, t in dead:
-        del reg[a][t]
+def record_closed(reg: dict, ats: str, token: str) -> None:
+    """The board's host said no in robots.txt. Unlike a failure that is not going to change by
+    tomorrow, so the board goes at this run's prune instead of after four days of asking again."""
+    entry = reg.get(ats, {}).get(token)
+    if entry is not None:
+        entry["fails"] = MAX_FAILS
+        entry["closed"] = True
+
+
+def prune(reg: dict, today: date | None = None) -> int:
+    dead = [(a, t, v) for a, e in reg.items() for t, v in e.items() if v.get("fails", 0) >= MAX_FAILS]
+    for a, t, v in dead:
+        drop(reg, a, t, "robots" if v.get("closed") else "dead", today)
     return len(dead)
