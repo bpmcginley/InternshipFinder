@@ -393,7 +393,8 @@ export async function release(db, user, task, runId, admitted) {
 // Replaces the estimate charged at admission with what the call really cost, for the whole deployment
 // and for the account, and adds the call's token counts to the month's totals (numbers only), so the
 // share of input served from Gemini's cache can be read off one row.
-export async function settle(db, user, admitted, cents, usage) {
+// meta: {task, model} for the per-task totals (task_tokens); optional, so an old caller still settles.
+export async function settle(db, user, admitted, cents, usage, meta) {
   // was: const { month, estimate, metered } = admitted;
   const { month, day, estimate, metered } = admitted;
   const delta = (cents > 0 ? cents : 0) - estimate;
@@ -431,6 +432,14 @@ export async function settle(db, user, admitted, cents, usage) {
       "ON CONFLICT(month) DO UPDATE SET calls = calls + 1, prompt = prompt + excluded.prompt, " +
       "cached = cached + excluded.cached, output = output + excluded.output",
     ).bind(month, n("promptTokenCount"), n("cachedContentTokenCount"), n("candidatesTokenCount") + n("thoughtsTokenCount")));
+    if (meta && meta.task && meta.model) {
+      stmts.push(db.prepare(
+        "INSERT INTO task_tokens (month, task, model, calls, prompt, cached, output, cents) VALUES (?, ?, ?, 1, ?, ?, ?, ?) " +
+        "ON CONFLICT(month, task, model) DO UPDATE SET calls = calls + 1, prompt = prompt + excluded.prompt, " +
+        "cached = cached + excluded.cached, output = output + excluded.output, cents = cents + excluded.cents",
+      ).bind(month, String(meta.task), String(meta.model), n("promptTokenCount"), n("cachedContentTokenCount"),
+        n("candidatesTokenCount") + n("thoughtsTokenCount"), cents > 0 ? cents : 0));
+    }
   }
   if (stmts.length) await db.batch(stmts);
 }

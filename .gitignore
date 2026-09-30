@@ -18,3 +18,7 @@ tmp/pdfs/
 worker/node_modules/
 worker/.wrangler/
 worker/.dev.vars
+
+# Model comparison (scripts/eval): recorded Auto-Apply steps hold a real profile - never commit
+scripts/eval/*.json
+scripts/eval/eval-report.md

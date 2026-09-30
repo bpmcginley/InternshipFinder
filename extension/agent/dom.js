@@ -593,6 +593,10 @@
     [/linkedin/, "linkedin"],
     [/github/, "github"],
     [/portfolio|personal (web)?site|website/, "website"],
+    // Postal address (added 2026-09-30): three more fields the profile holds and the model used to type.
+    [/address.?line.?1|street address|address1|^\s*(home |mailing |street )?address\s*[*✱∗⁎]?\s*$/, "address"],
+    [/\bcity\b|\btown\b/, "city"],
+    [/\bzip\b|postal/, "zip"],
   ];
   const SKIP = /refer|emergency|reference|manager|supervisor|recruiter|company|employer|school|parent|guardian|middle|preferred|nick|confirm|search|verif|code|password|extension|country|device|type|other/;
 
@@ -619,7 +623,8 @@
       if (rec.kind !== "text" || rec.el.value) continue;
       const el = rec.el;
       const hint = [rec.label, el.getAttribute("autocomplete"), el.name, el.id, el.getAttribute("data-automation-id")].filter(Boolean).join(" ").toLowerCase();
-      if (SKIP.test(hint)) continue;
+      // "code" is in SKIP for verification codes; a ZIP or postal code is not one.
+      if (SKIP.test(hint.replace(/(zip|postal) ?code/g, "$1"))) continue;
       const hit = FAST.find(([re]) => re.test(hint) || re.test(rec.label.toLowerCase()));
       if (!hit) continue;
       const key = hit[1];
@@ -627,6 +632,32 @@
       if (!v) continue;
       A.setNative(el, v); A.blur(el);
       if (el.value) { el.setAttribute("data-is-filled", "1"); done.push(`${rec.label || key} = ${v}`); }
+    }
+    // Choice questions the profile answers outright: EEO (decline, the default), 18 or over, and US
+    // work authorization and sponsorship asked the plain way round. Native selects and radio groups
+    // only, which set without opening any widget; guard.js decides which questions and which option,
+    // and anything it is not sure of is left for the model.
+    for (const rec of refs.values()) {
+      if (rec.kind !== "select" && rec.kind !== "radio_group") continue;
+      const el = rec.el;
+      if (rec.kind === "select" ? (el.value && el.selectedIndex > 0) : rec.els.some((r) => r.checked || r.getAttribute("aria-checked") === "true")) continue;
+      const key = G.choiceFact([rec.label, el.name, el.id].filter(Boolean).join(" "));
+      if (!key || !facts[key]) continue;
+      const options = rec.kind === "select" ? [...el.options].filter((o) => !o.disabled).map((o) => o.text) : rec.options;
+      const want = G.confidentOption(options, facts[key]);
+      if (!want) continue;
+      let r;
+      if (rec.kind === "select") {
+        const opt = [...el.options].find((o) => o.text === want);
+        A.setNative(el, opt.value); A.blur(el);
+        r = { ok: el.value === opt.value };
+      } else {
+        r = A.radioPick(rec.els, rec.options, want);
+      }
+      if (r.ok) {
+        (rec.els || [el]).forEach((x) => x.setAttribute("data-is-filled", "1"));
+        done.push(`${rec.label || key} = ${want}`);
+      }
     }
     const slot = file && file.b64 ? loneResumeField() : null;
     if (slot) {

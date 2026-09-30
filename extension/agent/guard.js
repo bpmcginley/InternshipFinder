@@ -313,8 +313,62 @@
   };
   const consentGiveaway = (el, text) => !!consentWidget(el) && !CONSENT_OK_RE.test(text || "");
 
+  // ---- choice questions the profile answers without a model (dom.js fastFill) ----
+  // Every one of these answered by rule is a model step the student's allowance does not pay for. The
+  // rules are deliberately narrow: a question is answered only when its label names exactly one fact
+  // and exactly one option clearly says that fact's value. Anything else (a combined race/ethnicity
+  // question, a reverse-worded sponsorship question, a country other than the US, two options that
+  // both look like "decline") is left to the model, which reads the whole question.
+  const CHOICE_FACTS = [
+    ["needs_sponsorship", /sponsor/],
+    ["work_authorized", /authori[sz]ed to work|authori[sz]ation to work|eligible to work|legally (?:permitted|able) to work/],
+    // Age only: "in the last 18 months" is not this question.
+    ["over_18", /(?:at least|over|older than|age of|aged)\s+(?:the age of\s+)?18\b|\b18 years (?:of age|old)|\b18 or older|eighteen years/],
+    ["veteran", /veteran/],
+    ["disability", /disabilit/],
+    ["hispanic", /hispanic|latin[oax]/],
+    ["race", /\brace\b|ethnicit/],
+    ["gender", /\bgender\b|\bsex\b/],
+  ];
+  // A question that turns the usual meaning round ("able to work WITHOUT sponsorship"), or asks about
+  // somewhere the profile's answers were not given for.
+  const TURNED_RE = /without|not require|not need|n't require|n't need|\bno longer\b/;
+  const US_RE = /united states|\bu\.?\s?s\.?a?\b|\bamerica\b/;
+  const ELSEWHERE_RE = /canada|united kingdom|\buk\b|europe|\beu\b|india|australia|germany|france|mexico/;
+  const MORE_THAN_ONE_RE = /orientation|transgender|lgbt|pronoun/;
+
+  function choiceFact(label) {
+    const t = String(label || "").toLowerCase();
+    if (!t || MORE_THAN_ONE_RE.test(t)) return null;
+    const hits = CHOICE_FACTS.filter(([, re]) => re.test(t)).map(([k]) => k);
+    if (hits.length !== 1) return null;
+    const k = hits[0];
+    if (k === "needs_sponsorship" || k === "work_authorized") {
+      // Only the plain US question: the profile's yes/no was given for the US.
+      if (TURNED_RE.test(t) || ELSEWHERE_RE.test(t) || !US_RE.test(t)) return null;
+    }
+    return k;
+  }
+
+  const DECLINE_RE = /decline|prefer not|rather not|choose not|do(?:n.?t| not) (?:wish|want) to|not (?:wish|want) to|not to (?:say|answer|disclose|self|identify)|no answer|not disclos/;
+  const PLACEHOLDER_RE = /^(?:|select|select one|choose|choose one|please select|--.*|- select -|none selected)$/;
+  const plain = (s) => String(s || "").toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+
+  // The one option that says `value`, or null when none does or more than one might.
+  function confidentOption(options, value) {
+    const opts = (options || []).filter((o) => !PLACEHOLDER_RE.test(plain(o)));
+    const v = plain(value);
+    if (!v) return null;
+    let hits;
+    if (DECLINE_RE.test(v)) hits = opts.filter((o) => DECLINE_RE.test(plain(o)));
+    else if (v === "yes" || v === "no") hits = opts.filter((o) => plain(o) === v || plain(o).startsWith(v + " "));
+    else hits = opts.filter((o) => plain(o) === v);
+    return hits.length === 1 ? hits[0] : null;
+  }
+
   // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
-  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  // choiceFact and confidentOption added (2026-09-30) for fastFill's choice questions.
+  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
