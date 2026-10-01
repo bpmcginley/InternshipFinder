@@ -89,6 +89,17 @@ CREATE TABLE IF NOT EXISTS visit_counts (
   PRIMARY KEY (day, page, source)
 );
 
+-- Steps toward using InternScout per day (added 2026-10-01; src/visits.js EVENTS): install_click,
+-- signin_start, signin, profile, autoapply, checkout, by the page kind they happened on. Counts only,
+-- like visit_counts: nothing about who did them.
+CREATE TABLE IF NOT EXISTS event_counts (
+  day TEXT NOT NULL,
+  event TEXT NOT NULL,
+  page TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, event, page)
+);
+
 -- Accounts that pressed "Delete my data" in `month`. Their counters for that month are kept until it
 -- ends, so deleting cannot reset a limit; the daily cron then removes them and this row.
 CREATE TABLE IF NOT EXISTS forget (

@@ -11,6 +11,12 @@ import { HttpError } from "./http.js";
 const SEARCH = /(^|\.)(google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.yahoo\.com|yahoo\.com|ecosia\.org|yandex\.[a-z.]+|baidu\.com|search\.brave\.com|chatgpt\.com|perplexity\.ai|kagi\.com)$/;
 const SOCIAL = /(^|\.)(bsky\.app|t\.co|x\.com|twitter\.com|reddit\.com|instagram\.com|linkedin\.com|lnkd\.in|facebook\.com|discord\.com|discordapp\.com|mastodon\.social|threads\.net|youtube\.com|tiktok\.com|snapchat\.com)$/;
 const OWN = /(^|\.)(internscout\.org|bpmcginley\.github\.io)$|^localhost$/;
+// Coming back from signing in or from Stripe is the same visit carrying on, not a new one from "another
+// site", so these count as internal (a view, not a visit).
+const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.live\.com|checkout\.stripe\.com|billing\.stripe\.com)$/;
+// Steps toward using InternScout (added 2026-10-01), counted per day like visits: no person, just how
+// many times each happened. Only these names are counted; anything else is ignored.
+export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout"]);
 // utm_source values our own links use (growth/digest.py, growth/outreach.py) and the usual social names.
 const UTM_SOCIAL = /^(linkedin|instagram|facebook|fb|ig|reddit|bluesky|bsky|mastodon|x|twitter|threads|tiktok|youtube|discord)$/;
 // Crawlers that run scripts. Most bots never run JavaScript and so never reach this at all.
@@ -51,7 +57,7 @@ export function sourceOf(refHost, utmSource, utmMedium) {
     if (u === "chrome_web_store" || u === "extension") return "extension";
   }
   const host = String(refHost || "").toLowerCase().trim().replace(/^www\./, "");
-  if (OWN.test(host)) return u ? "other" : "internal";
+  if (OWN.test(host) || ROUND_TRIP.test(host)) return u ? "other" : "internal";
   if (!host) return u ? "other" : "direct";
   if (SEARCH.test(host)) return "search";
   if (SOCIAL.test(host)) return "social";
@@ -68,8 +74,18 @@ export async function countHit(db, request, body, now) {
   }
   if (!ua || BOT_UA.test(ua) || tooFast(request.headers.get("CF-Connecting-IP"), now)) return { counted: false };
   const page = pageKind(body.p);
-  const source = sourceOf(body.r, body.u, body.m);
   const day = now.toISOString().slice(0, 10);
+  // A step rather than a page load: one more for that event, the day and the page it happened on.
+  if (body.e !== undefined) {
+    if (!EVENTS.has(body.e)) return { counted: false };
+    const ev = await db.prepare(
+      "INSERT INTO event_counts (day, event, page, n) SELECT ?, ?, ?, 1 " +
+      "WHERE (SELECT COALESCE(SUM(n), 0) FROM event_counts WHERE day = ?) < ? " +
+      "ON CONFLICT(day, event, page) DO UPDATE SET n = n + 1",
+    ).bind(day, body.e, page, day, DAY_CAP).run();
+    return { counted: ev.meta.changes > 0 };
+  }
+  const source = sourceOf(body.r, body.u, body.m);
   const visit = source === "internal" ? 0 : 1;
   // One statement that checks the day's cap and counts, so concurrent hits cannot pass it together.
   const res = await db.prepare(

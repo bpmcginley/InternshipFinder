@@ -543,6 +543,7 @@
     ls.del(SESSION_KEY); ss.del(TOKEN_KEY);
     const s = await startSession(t);
     if (s && s.error) return { error: s.error };
+    count("signin");
     if (s) return { token: s.token, session: s };
     // was: ss.set(TOKEN_KEY, t); return { token: t };
     ss.set(TOKEN_KEY, t);
@@ -564,9 +565,14 @@
   const PROVIDER_LABELS = { google: "Google", microsoft: "Microsoft" };
 
   // Anyone can sign in; a verified school .edu email gets the larger AI allowance (the Worker decides).
+  // One step toward using InternScout, for the daily step totals (js/count.js, worker/src/visits.js
+  // EVENTS). Queued when count.js has not run yet; it sends the queue when it does.
+  const count = (event) => { (window.ISCountQ = window.ISCountQ || []).push(event); };
+
   function startSignIn(cfg, providerId) {
     const p = (cfg.providers || []).find(x => x.id === providerId);
     if (!p) return;
+    count("signin_start");
     const state = randomHex(), nonce = randomHex();
     ss.set("internscout.auth.state", state); ss.set("internscout.auth.nonce", nonce);
     const q = new URLSearchParams({
@@ -739,7 +745,7 @@
     createStore, loadMajors, majorsNote, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     // was: workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, ...
-    workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
+    workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };

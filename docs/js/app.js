@@ -845,6 +845,7 @@
     }
 
     async function billing(kind, plan) {
+      if (kind === "checkout") IS.count("checkout");
       setBusy(kind === "checkout" ? "Opening Stripe…" : "Opening your billing page…");
       const r = await IS.billingUrl(auth.token, kind, plan);
       setBusy("");
@@ -869,6 +870,7 @@
     }, [info.installed, p]);
 
     function saveProfile(d) {
+      if (!p) IS.count("profile");   // the first profile on this device, not every edit
       const s = IS.saveProfile(d);
       setP(s); setSetupOpen(false); setLimit(PAGE);
       setF(x => ({ ...x, states: [], ...initF(s) }));
@@ -1027,6 +1029,7 @@
       if (res.error) { setNote("Couldn't queue: " + res.error); return; }
       setSel(new Set());
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
+      if (added) IS.count("autoapply");
       setNote(`Queued ${plural(added, "application")}${skipped ? ` (${skipped} already queued)` : ""}. Each one is filled in and left for you to submit.`);
       list.forEach(r => { if (st(r.id) === "none") setAppState(r.id, "interested"); });
       IS.ext.call({ type: "open_panel" });

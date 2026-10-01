@@ -30,6 +30,10 @@ test("sources match growth/metrics.py, with our own tagged links first", () => {
   assert.equal(sourceOf("", "digest", "email"), "email");
   assert.equal(sourceOf("", "linkedin"), "social");
   assert.equal(sourceOf("internscout.org", "campus_partner"), "other", "a tagged link is never internal");
+  // back from signing in or from Stripe: the same visit going on
+  assert.equal(sourceOf("accounts.google.com"), "internal");
+  assert.equal(sourceOf("login.microsoftonline.com"), "internal");
+  assert.equal(sourceOf("checkout.stripe.com"), "internal");
 });
 
 test("POST /hit counts views and visits per day, page and source", async () => {
@@ -62,6 +66,19 @@ test("one address can't run up the count, and a day stops at the cap", async () 
   await w.db.prepare("UPDATE visit_counts SET views = ?").bind(DAY_CAP).run();
   await hit(w, { p: "/install" });
   assert.equal((await rows(w)).length, 1, "past the day's cap nothing new is counted");
+});
+
+test("steps are counted by event and page, and only known ones", async () => {
+  const w = await setup();
+  await hit(w, { e: "install_click", p: "/internships/ohio/" });
+  await hit(w, { e: "install_click", p: "/internships/texas/" });
+  await hit(w, { e: "signin", p: "/" });
+  await hit(w, { e: "made_up", p: "/" });
+  const ev = (await w.db.dump()).event_counts.map(({ event, page, n }) => ({ event, page, n }))
+    .sort((a, b) => a.event.localeCompare(b.event));
+  assert.deepEqual(ev, [{ event: "install_click", page: "landing", n: 2 }, { event: "signin", page: "dashboard", n: 1 }]);
+  assert.deepEqual(await rows(w), [], "a step is not a page load");
+  assert.equal((await hit(w, { e: "signin" }, { ...SITE, Origin: "https://evil.example" })).status, 403);
 });
 
 test("a bad body is refused", async () => {
