@@ -7,7 +7,7 @@ import vm from "node:vm";
 
 const COUNT = readFileSync(new URL("../../docs/js/count.js", import.meta.url), "utf8");
 
-function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued } = {}) {
+function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage } = {}) {
   const sent = [], listeners = {};
   const ctx = {
     location: { hostname: host, pathname: path, search },
@@ -17,6 +17,7 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
     URL, URLSearchParams, JSON,
   };
   ctx.window = ctx;
+  if (storage) ctx.localStorage = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
   if (queued) ctx.ISCountQ = queued;
   vm.createContext(ctx);
   vm.runInContext(COUNT, ctx);
@@ -39,6 +40,21 @@ test("local copies and automated browsers send nothing, and steps there are drop
     ctx.ISCountQ.push("profile");
     assert.equal(sent.length, 0);
   }
+});
+
+test("?nocount=1 stops counting this browser on every later load, and ?nocount=0 starts it again", () => {
+  const storage = new Map();
+  let r = load({ storage, search: "?nocount=1" });
+  r.ctx.ISCount("signin");
+  assert.equal(r.sent.length, 0, "the load that sets it is not counted");
+  assert.equal(storage.get("internscout.nocount"), "1");
+  r = load({ storage, path: "/internships/ohio/" });
+  r.ctx.ISCount("install_click");
+  assert.equal(r.sent.length, 0, "a later page sends neither its load nor its steps");
+  assert.throws(() => r.click("https://chromewebstore.google.com/detail/x"), TypeError, "no click listener is attached at all");
+  r = load({ storage, search: "?nocount=0" });
+  assert.equal(r.sent.length, 1);
+  assert.equal(storage.has("internscout.nocount"), false);
 });
 
 test("steps count once per page load, queued ones included, and store links count as install clicks", () => {

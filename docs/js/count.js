@@ -10,7 +10,18 @@
 // count as "install_click" on every page without the page having to say so.
 (function () {
   var API = "https://internscout-api.bpmcginley.workers.dev/hit";
-  var live = /^(internscout\.org|bpmcginley\.github\.io)$/.test(location.hostname) && !navigator.webdriver && !!navigator.sendBeacon;
+  // "Don't count this browser" (2026-10-01), for the owner's own visits: ?nocount=1 on any page turns
+  // it on, ?nocount=0 off, and the dashboard's admin menu (?admin=1) has a switch. One setting in
+  // local storage; the load that sets it is not counted either.
+  var KEY = "internscout.nocount", off = false;
+  try {
+    var nc = new URLSearchParams(location.search).get("nocount");
+    if (nc === "1") localStorage.setItem(KEY, "1");
+    else if (nc === "0") localStorage.removeItem(KEY);
+    off = localStorage.getItem(KEY) === "1";
+  } catch (e) {}
+  // was: var live = /^(...)$/.test(location.hostname) && !navigator.webdriver && !!navigator.sendBeacon;
+  var live = /^(internscout\.org|bpmcginley\.github\.io)$/.test(location.hostname) && !navigator.webdriver && !!navigator.sendBeacon && !off;
   var beacon = function (data) {
     try { navigator.sendBeacon(API, new Blob([JSON.stringify(data)], { type: "text/plain" })); } catch (e) {}
   };
