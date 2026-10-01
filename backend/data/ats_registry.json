@@ -619,6 +619,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ema": {
+   "name": "Ema",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-01"
+  },
   "embedding-vc": {
    "name": "Creatify",
    "quant": false,
@@ -2792,8 +2798,9 @@
   "auctane": {
    "name": "Auctane",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-01"
   },
   "audaxgroup": {
    "name": "Audax Group",
@@ -9233,6 +9240,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "weloglobal": {
+   "name": "Welo Global",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-01"
+  },
   "wepclinical": {
    "name": "WEP Clinical",
    "quant": false,
@@ -10682,6 +10695,12 @@
   }
  },
  "workable": {
+  "acclaro": {
+   "name": "Acclaro",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-01"
+  },
   "al-warren-oil-company-inc": {
    "name": "Al Warren Oil Company",
    "quant": false,
