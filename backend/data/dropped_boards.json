@@ -174,8 +174,44 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "careers-beyondsoft": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
   "careers-biorad": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-cadent": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-cvpcorp": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-empowerai": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-endeavorair": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-epeconsulting": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-federatedinsurance": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-framatome": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-growfinancial": {
+   "on": "2026-10-01",
    "why": "robots"
   },
   "careers-hrblock": {
@@ -186,12 +222,48 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-ipipeline": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
   "careers-itcfederal": {
    "on": "2026-09-30",
    "why": "robots"
   },
   "careers-jkmoving": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-jointcommission": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-kinaxis": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-magaero": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-markon": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-nikkiso": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-peraton": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-powerschool": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-qinetiqus": {
+   "on": "2026-10-01",
    "why": "robots"
   },
   "careers-rcm": {
@@ -201,6 +273,10 @@
   "careers-revolutioncompany": {
    "on": "2026-10-01",
    "why": "dead"
+  },
+  "careers-scires": {
+   "on": "2026-10-01",
+   "why": "robots"
   },
   "careers-se": {
    "on": "2026-09-30",
@@ -222,12 +298,32 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-wipfli": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-wseinc": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
   "external-careers-friedkin": {
    "on": "2026-09-30",
    "why": "robots"
   },
+  "internships-aei": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
   "jobs-tollbrothers": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "main-princeton": {
+   "on": "2026-10-01",
+   "why": "robots"
+  },
+  "officejobs-truemfg": {
+   "on": "2026-10-01",
    "why": "robots"
   },
   "studentemployment-stthomas": {
@@ -236,6 +332,10 @@
   },
   "university-uber": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "uscareers-willkie": {
+   "on": "2026-10-01",
    "why": "robots"
   }
  },

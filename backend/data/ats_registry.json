@@ -6484,12 +6484,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-beyondsoft": {
-   "name": "Beyondsoft",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-bgca": {
    "name": "Boys & Girls Clubs of America",
    "quant": false,
@@ -6515,12 +6509,6 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "government_policy"
-  },
-  "careers-cadent": {
-   "name": "Adtheorant",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "careers-calamp": {
    "name": "CalAmp",
@@ -6580,12 +6568,6 @@
   },
   "careers-cotiviti": {
    "name": "Cotiviti",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-cvpcorp": {
-   "name": "Fidelity National Financial",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -6651,38 +6633,14 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-empowerai": {
-   "name": "Empower AI",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-endeavorair": {
-   "name": "Endeavor Air",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-enfra": {
    "name": "Bernhard",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-epeconsulting": {
-   "name": "Electric Power Engineers",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-eyesouthpartners": {
    "name": "EyeSouth Partners",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-federatedinsurance": {
-   "name": "Federated Insurance",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -6695,12 +6653,6 @@
   },
   "careers-filtrationgroupcorp": {
    "name": "Filtration Group",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-framatome": {
-   "name": "Framatome",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -6749,12 +6701,6 @@
   },
   "careers-gotyto": {
    "name": "TALON",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-growfinancial": {
-   "name": "Grow Financial Federal Credit Union",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -6809,23 +6755,11 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-ipipeline": {
-   "name": "iPipeline",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-iridium": {
    "name": "Iridium Communications",
    "quant": false,
    "fails": 0,
    "added": "2026-09-30"
-  },
-  "careers-jointcommission": {
-   "name": "Joint Commission International",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "careers-kci": {
    "name": "KCI Technologies",
@@ -6845,12 +6779,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-kinaxis": {
-   "name": "Kinaxis",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-lmi": {
    "name": "LMI ",
    "quant": false,
@@ -6863,20 +6791,8 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-magaero": {
-   "name": " MAG Aerospace",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-magnera": {
    "name": "Magnera",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-markon": {
-   "name": "Markon",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -6904,12 +6820,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-24"
-  },
-  "careers-nikkiso": {
-   "name": "Nikkiso",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "careers-nrdc": {
    "name": "NRDC",
@@ -6949,32 +6859,14 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-peraton": {
-   "name": "Peraton",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-persistentsystems": {
    "name": "Persistent Systems",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-powerschool": {
-   "name": "PowerSchool Group",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-psaairlines": {
    "name": "PSA Airlines",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-qinetiqus": {
-   "name": "QinetiQ",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -7005,12 +6897,6 @@
   },
   "careers-sas": {
    "name": "SAS",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-scires": {
-   "name": "Scientific Research Corporation",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -7192,18 +7078,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-wipfli": {
-   "name": "Wipfli",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-wseinc": {
-   "name": "Weston & Sampson",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careersen-mackenzieinvestments": {
    "name": "Mackenzie Investments",
    "quant": false,
@@ -7279,12 +7153,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "internships-aei": {
-   "name": "American Enterprise Institute",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "jmp-sas": {
    "name": "JMP Statistical Discovery",
    "quant": false,
@@ -7311,19 +7179,6 @@
   },
   "kphcareers-kphhealthcareservices": {
    "name": "KPH Healthcare Services",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "main-princeton": {
-   "name": "Princeton University",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15",
-   "sector": "education_research"
-  },
-  "officejobs-truemfg": {
-   "name": "True Manufacturing",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -7368,12 +7223,6 @@
   },
   "uscareers-waters": {
    "name": "Waters Corporation",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "uscareers-willkie": {
-   "name": "Willkie Farr & Gallagher",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
