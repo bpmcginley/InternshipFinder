@@ -402,3 +402,18 @@ test("a work question naming no country is about the job's country, so it is ans
   // and a reverse-worded one is still the model's, US job or not
   assert.equal(G.choiceFact("Can you work without sponsorship?", { jobInUS: true }), null);
 });
+
+test("Workday's address dropdowns: State and Country are the profile's, a phone code is not", () => {
+  const G = globalThis.ISGuard;
+  assert.equal(G.addressFact("State*"), "state");
+  assert.equal(G.addressFact("Address addressSection_countryRegion"), "state");
+  assert.equal(G.addressFact("Country* countryDropdown"), "country");
+  assert.equal(G.addressFact("Country Phone Code"), null);
+  assert.equal(G.addressFact("Country of citizenship"), null);
+  assert.equal(G.addressFact("Are you legally authorized to work in the United States?"), null);
+  assert.equal(G.addressFact("Statement of purpose"), null);
+  assert.equal(G.stateName("ma"), "Massachusetts");
+  assert.equal(G.stateName("Massachusetts"), "Massachusetts");
+  assert.ok(G.isUS("United States of America") && G.isUS("United States") && G.isUS("USA"));
+  assert.ok(!G.isUS("Canada") && !G.isUS("United Kingdom"));
+});

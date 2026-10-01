@@ -389,9 +389,31 @@
     return hits.length === 1 ? hits[0] : null;
   }
 
+  // Workday's address dropdowns (added 2026-10-01): State and Country are menu-style lists the profile
+  // answers. A phone's country code or device type is not the address.
+  const US_STATE_NAMES = { AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado",
+    CT: "Connecticut", DE: "Delaware", DC: "District of Columbia", FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho",
+    IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+    MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska",
+    NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York", NC: "North Carolina",
+    ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island",
+    SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
+    WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", PR: "Puerto Rico" };
+  // "MA" -> "Massachusetts"; a name, or anything else, as it was.
+  const stateName = (v) => US_STATE_NAMES[String(v || "").trim().toUpperCase()] || String(v || "").trim();
+  function addressFact(label) {
+    const t = String(label || "").toLowerCase();
+    if (/phone|dial|calling|citizenship|nationality|birth|issu|passport/.test(t)) return null;
+    if (/\bstate\b|province|countryregion|state\/region/.test(t)) return "state";
+    if (/\bcountry\b|countrydropdown/.test(t) && !/\bstate\b/.test(t)) return "country";
+    return null;
+  }
+  // Workday names the US "United States of America"; the profile says "United States".
+  const isUS = (v) => /^(united states( of america)?|usa?|u\.s\.a?\.?)$/i.test(String(v || "").trim());
+
   // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
   // choiceFact and confidentOption added (2026-09-30) for fastFill's choice questions.
-  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, jobInUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 15; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 16; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -585,7 +585,8 @@
   }
 
   const FAST = [
-    [/given-name|first.?name|firstname|legalname--firstname/, "first_name"],
+    // was: /given-name|first.?name|firstname|legalname--firstname/. Workday labels it "Given Name(s)".
+    [/given-name|given ?names?|first.?name|firstname|legalname--firstname/, "first_name"],
     [/family-name|last.?name|family.?name|surname|lastname|legalname--lastname/, "last_name"],
     [/^\s*(full ?name|name|your name|legal name)\s*[*✱∗⁎]?\s*$/, "full_name"],
     [/\bemail\b|e-mail/, "email"],
@@ -641,6 +642,21 @@
     // questions are all drawn that way, and they were the most common fields the model still filled.
     // Only a list whose options are all there to read; a searchable one (school, city) is the model's.
     for (const rec of refs.values()) {
+      // Workday's menu-style dropdowns (listbox) too, since 2026-10-01: the address's State and Country,
+      // and the same work-authorization, sponsorship, age and EEO questions as above. Their options only
+      // exist once open, so workdayChoose opens one, reads it, and picks only an exact single match.
+      if (rec.kind === "listbox") {
+        const el = rec.el;
+        if (valueOf(el, "listbox")) continue;
+        const label = [rec.question, rec.label, el.getAttribute("data-automation-id"), el.id].filter(Boolean).join(" ");
+        const key = G.addressFact(label) || G.choiceFact(label, { jobInUS: !!facts.job_in_us });
+        if (!key || !facts[key]) continue;
+        const value = key === "state" ? G.stateName(facts.state) : facts[key];
+        const r = await A.workdayChoose(el, (opts) => G.confidentOption(opts, value) ||
+          (key === "country" && G.isUS(value) ? opts.find((o) => G.isUS(o)) || null : null));
+        if (r.ok) { el.setAttribute("data-is-filled", "1"); done.push(`${rec.label || key} = ${r.chosen}`); }
+        continue;
+      }
       if (rec.kind !== "select" && rec.kind !== "radio_group" && rec.kind !== "react_select") continue;
       const el = rec.el;
       if (rec.kind === "react_select" && (rec.searchable || !(rec.options || []).length || valueOf(el, "react_select"))) continue;
