@@ -76,7 +76,7 @@ Every error is JSON `{ "error": code, "message": text }`:
 | 401 | `auth` | missing, expired or invalid token, or an unknown or expired session |
 | 409 | `stale` | `PUT /profile` older than the saved copy; includes `profile` and `updated` (the saved copy) |
 | 409 | `subscribed` | `DELETE /me` while a paid plan is live |
-| 429 | `cap` | monthly allowance for the task is used up; includes `task`, `resets` (ISO date) |
+| 429 | `cap` | monthly allowance for the task is used up; includes `task`, `resets` (ISO date), `tier`, `upgrade` (a bigger plan is on offer) and `offer` (that plan, as `upgrade_offer` in `GET /me`, or `null`) |
 | 429 | `rate` | this caller's per-minute or per-day call limit; includes `retry_after` (s) |
 | 503 | `busy` | everyone's calls together hit `GLOBAL_RPM` for this minute; nothing to do with this caller's own limits, so retry after `retry_after` (s) |
 | 503 | `paused` | global monthly budget reached; search still works |
@@ -129,6 +129,7 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
 ```json
 { "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
   "can_upgrade": true, "can_manage": false,
+  "upgrade_offer": { "plan": "supporter", "label": "Supporter", "price": "$4/month", "allowance": { "resume_tailor": 20, "autofill": 50 } },
   "allowance": { "resume_tailor": { "used": 1, "limit": 15 }, "autofill": { "used": 0, "limit": 40 } } }
 ```
 - **`plan`** is `free` or the id of a paid tier (`supporter`, `pro`). `limit` already includes the
@@ -136,6 +137,9 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
 - **`plan_renews`** is the paid-through date (ISO) while subscribed, else `null`.
 - **`can_upgrade`** is true when payments are on and a larger tier than the current one is offered, so
   it stays true for a Supporter while Pro exists and goes false on the top tier.
+- **`upgrade_offer`** is the smallest plan above the current one and the monthly allowance it would give
+  this student (at their own tier, so a non-.edu account sees its share), or `null` when there is none.
+  The dashboard and the extension's Upgrade button quote it.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
 - **Invite units** (see `GET /invite`) are already in `limit`: it is the month's allowance, or what was
   used if invite units took the student past it, plus the invite units left. So `limit - used` is always

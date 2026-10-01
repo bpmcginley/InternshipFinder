@@ -759,6 +759,12 @@
       return () => { live = false; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); };
     }, [auth.token, dropToken]);
 
+    // The extension's Upgrade button (a job paused on a used-up allowance) opens /?upgrade=<plan>.
+    // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
+    // gives, then presses checkout here themselves.
+    const [upgradeAsk, setUpgradeAsk] = useState(() => new URLSearchParams(location.search).get("upgrade") || "");
+    useEffect(() => { if (upgradeAsk) history.replaceState(null, "", location.pathname); }, []);
+
     // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
     // moment later, so check once now and once shortly after before saying anything.
     useEffect(() => {
@@ -1082,7 +1088,17 @@
     // allowance (limit > 0): a limit of 0 is Auto-Apply switched off, and limits.js won't spend
     // invite runs on a switched-off task, so "used up" and "invite a classmate" would both be wrong.
     const autoAllow = me && me.allowance && me.allowance.autofill;
-    const outOfRuns = !!(auth.token && me && !me.paused && inviteOffer && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // was: ... && !me.paused && inviteOffer && autoAllow && ...: the notice only showed while invites were on,
+    // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
+    const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
+    // upgrade_offer, at their tier; a Worker from before 2026-09-30 sends none, so no run count).
+    const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
+    const offerRuns = offerPl && me && me.upgrade_offer && me.upgrade_offer.plan === offerPl.plan && me.upgrade_offer.allowance
+      ? me.upgrade_offer.allowance.autofill : null;
+    const offerBtn = (label) => offerPl && h("button", { type: "button", className: "btn primary", disabled: !!busy, title: upgradeTitle(offerPl),
+      onClick: () => billing("checkout", offerPl.plan) }, label || `Get ${offerPl.label}${offerPl.price ? ` · ${offerPl.price}` : ""}`);
+    const offerWords = offerPl && (offerRuns ? `${offerPl.label} gives you ${offerRuns} a month. ` : `${offerPl.label} gives you ${offerPl.multiplier}× the allowance. `);
     // me.month is the Worker's UTC month ("2026-09"); the allowance resets on the 1st of the next one.
     const monthMatch = /^(\d{4})-(\d{2})$/.exec((me && me.month) || "");
     const resetDay = monthMatch
@@ -1183,12 +1199,24 @@
         // was: `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
         `Sign in with your school (.edu) email (Google works for most schools) and you'll both get ${inviteWords}. Searching needs no account.`),
       // The invite link hides while the invite panel below is already open; the plan buttons are in the header.
+      // was: the invite came first and the plans were "above", which since the Account menu (2026-09-26)
+      // they no longer are. The plan now has its own button here, and the invite follows when on.
       outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
         `They come back on ${resetDay}. `,
-        !invite && h("a", { href: "#", onClick: prevent(openInvite) }, "Invite a classmate"),
-        // was: ` for ${inviteWords} each`. An inviter is rewarded for their first REFERRAL.maxRewards
-        // classmates only (worker/src/referral.js), so "each" was false for the heaviest users.
-        `${invite ? "Share your invite link below" : `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates`}${upgrades.length ? ". Or pick a plan above" : ""}.`),
+        offerPl && h(F, null, offerWords, offerBtn(), " "),
+        inviteOffer && (invite ? `${offerPl ? "Or share" : "Share"} your invite link below.` : h(F, null,
+          h("a", { href: "#", onClick: prevent(openInvite) }, offerPl ? "Or invite a classmate" : "Invite a classmate"),
+          // An inviter is rewarded for their first REFERRAL.maxRewards classmates only (worker/src/referral.js).
+          `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates.`))),
+      // Arrived from the extension's Upgrade button, with runs still left or before /me has loaded.
+      !outOfRuns && upgradeAsk && h("div", { className: "notice" },
+        !auth.token ? "Sign in (top right) to pick a plan. A plan raises how many Auto-Apply runs you get each month. "
+          : !me ? "Loading your plan… "
+          : offerPl ? h(F, null, h("b", null, `${offerPl.label}${offerPl.price ? ` · ${offerPl.price}` : ""}. `),
+            offerRuns ? `${offerRuns} Auto-Apply runs a month. Cancel any time. ` : `${offerPl.multiplier}× the monthly AI allowance. Cancel any time. `,
+            offerBtn("Continue to checkout"), " ")
+          : `You're on the ${IS.PLAN_LABELS[me.plan] || me.plan} plan${me.plan === "free" ? "" : " already"}. `,
+        h("a", { href: "#", onClick: prevent(() => setUpgradeAsk("")) }, "Not now")),
       auth.token && invite && h("div", { className: "notice invite" },
         h("b", null, "Invite classmates. "),
         // was: `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`

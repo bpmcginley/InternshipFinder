@@ -1,6 +1,6 @@
 // Allowance, per-run, rate and budget checks over D1. Counters only, never request content.
 import { HttpError } from "./http.js";
-import { canUpgrade } from "./billing.js";
+import { canUpgrade, paymentsInfo } from "./billing.js";
 import { forgetStatements } from "./referral.js";
 import { forgetSessions } from "./session.js";
 import { forgetProfile } from "./profile.js";
@@ -160,6 +160,25 @@ export function allowanceFor(config, env, task, tier, plan = "free", now = new D
   return Math.max(1, Math.floor((base * pct) / 100));
 }
 
+// The smallest paid plan above the student's, with what it would give THIS student for each capped
+// task: a non-.edu account gets GENERAL_ALLOWANCE_PCT of a paid plan too, so the /config table (the
+// .edu figures) would overstate it for them. null when no bigger plan is on offer. The cap error and
+// /me carry it, so the extension and the dashboard can say "Supporter, $4/month: 50 Auto-Apply runs a
+// month" rather than a bare "upgrade".
+export function upgradeOffer(env, config, tier, plan = "free", now = new Date()) {
+  if (!canUpgrade(env, config, plan)) return null;
+  const mine = (config.PLANS[plan] || config.PLANS.free).multiplier;
+  const next = paymentsInfo(env, config).plans.filter((p) => p.multiplier > mine)
+    .sort((a, b) => a.multiplier - b.multiplier)[0];
+  if (!next) return null;
+  const allowance = {};
+  for (const task of Object.keys(config.TASKS)) {
+    const n = allowanceFor(config, env, task, tier, next.plan, now);
+    if (n != null) allowance[task] = n;
+  }
+  return { plan: next.plan, label: next.label, price: next.price, allowance };
+}
+
 // What one account may spend in a month, in cents. A plan's row in USER_BUDGET_CENTS, scaled like the
 // allowances for a "general" account. null means no per-account ceiling.
 export function userBudgetCents(config, env, tier, plan = "free") {
@@ -247,7 +266,10 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   // `upgrade` tells the client whether a bigger plan exists for this student, so it never offers one
   // that is switched off or that they are already on.
   // `tier` lets the client skip "a .edu email gets twice as much" for a student who already has one.
-  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: canUpgrade(env, config, plan), tier });
+  // was: const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: canUpgrade(env, config, plan), tier });
+  // `offer` (upgradeOffer) names the next plan and what it gives, for the extension's Upgrade button.
+  const cap = (msg) => new HttpError(429, "cap", msg, { task, resets: nextMonth(now), upgrade: canUpgrade(env, config, plan), tier,
+    offer: upgradeOffer(env, config, tier, plan, now) });
 
   const runKey = [user, month, task, runId];
   const ins = await db.prepare("INSERT OR IGNORE INTO runs (user_hash, month, task, run_id, calls) VALUES (?, ?, ?, ?, 0)")

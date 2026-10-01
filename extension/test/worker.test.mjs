@@ -103,6 +103,14 @@ test("error mapping gives clear student-facing messages", () => {
   assert.doesNotMatch(workerError(429, { error: "cap", task: "autofill", resets: "2026-10-01", tier: "edu" }).message, /\.edu email/);
   assert.match(workerError(429, { error: "cap", task: "autofill", resets: "2026-10-01", tier: "general" }).message, /\.edu email/);
   assert.match(workerError(429, { error: "cap", message: "run limit" }).message, /call limit/);
+  // With the Worker's offer, the message names the plan, price and allowance, and the error carries it
+  const offered = workerError(429, { error: "cap", task: "autofill", resets: "2026-10-01", tier: "edu", upgrade: true,
+    offer: { plan: "supporter", label: "Supporter", price: "$4/month", allowance: { autofill: 50, resume_tailor: 20 } } });
+  assert.match(offered.message, /Supporter \(\$4\/month\) gives you 50 a month/);
+  assert.deepEqual(offered.offer, { plan: "supporter", label: "Supporter", price: "$4/month", units: 50 });
+  // No offer when the plan is not on (upgrade false), or for a run's call limit (no reset date)
+  assert.equal(workerError(429, { error: "cap", task: "autofill", resets: "2026-10-01", upgrade: false, offer: null }).offer, undefined);
+  assert.equal(workerError(429, { error: "cap", message: "run limit", upgrade: true, offer: { plan: "pro", allowance: { autofill: 100 } } }).offer, undefined);
   assert.match(workerError(429, { error: "rate", retry_after: 40 }).message, /40 seconds/);
   assert.match(cap.message, /\.edu email get twice/);
   assert.match(workerError(503, { error: "paused" }).message, /paused for everyone/);

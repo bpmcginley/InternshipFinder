@@ -52,6 +52,11 @@ function jobCard(j) {
       // Chrome only grants a site from a click on an extension page, which is what this is.
       h += `<div class="msg">${esc(j.reason)}</div>`;
       btns.push(["allow_host", `Allow ${esc(hostOf(j.needs_host))}`, "primary"]);
+    } else if (j.upgrade) {
+      // Out of this month's Auto-Apply runs, with a bigger plan on offer: checkout is on the dashboard
+      // (it holds the sign-in Stripe needs). Resume once the plan is active, or after the 1st.
+      h += `<div class="msg">${esc(j.reason)}</div>`;
+      btns.push(["upgrade", esc(`Get ${j.upgrade.label}${j.upgrade.price ? ` · ${j.upgrade.price}` : ""}`), "primary"], ["resume", "Resume"]);
     } else {
       h += `<div class="msg">${esc(j.reason)}</div>`;
       btns.push(["resume", "Resume", "primary"]);
@@ -116,6 +121,9 @@ async function renderQueue() {
       const r = await send({ type: "auth:signin" });
       if (r && r.signedIn) await control(id, "resume");
       else render();
+    } else if (act === "upgrade") {
+      const j = jobs.find((x) => x.id === id);
+      if (j && j.upgrade) chrome.tabs.create({ url: "https://internscout.org/?upgrade=" + encodeURIComponent(j.upgrade.plan) });
     } else if (act === "answer") {
       const v = (drafts[id] || "").trim();
       if (!v) return;

@@ -2,7 +2,7 @@
 // content.js / workday.js and generalised: native setters, react-select via fiber
 // selectOption, Workday listboxes, ARIA comboboxes, radios, files.
 (function () {
-  if (window.ISActions && window.ISActions.v >= 5) return; // bump with dom.js V when this file changes
+  if (window.ISActions && window.ISActions.v >= 6) return; // bump with dom.js V when this file changes
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
   const low = (s) => norm(s).toLowerCase();
@@ -208,7 +208,21 @@
     };
     const searchable = rsSearchable(h.sp);
     if (!searchable) consider(rsFlat(h.sp.options));
-    else for (const q of searchTerms(value)) { consider(await rsSearch(input, h, q)); if (score >= 60) break; }
+    else {
+      const qs = searchTerms(value);
+      for (let i = 0; i < qs.length; i++) {
+        const got = await rsSearch(input, h, qs[i]);
+        consider(got);
+        if (score >= 60) break;
+        // A props search that never answers: type the way a person does and click what the menu shows.
+        if (i === 0 && !got.length && typeof h.sp.loadOptions !== "function") {
+          const typed = await reactSelectTypePick(input, value);
+          if (typed.ok) return typed;
+          seen.push(...(typed.options || []));
+          break;
+        }
+      }
+    }
     // A search that matched nothing still leaves the model guessing; the empty search shows what exists
     // (Greenhouse "Degree" / "Discipline" are async lists with no options until something is typed).
     if ((!pick || score < 30) && searchable && !seen.length) {
@@ -222,8 +236,58 @@
     }
     (fiberProp(input, "selectOption", 40) || h.so)(pick);
     await sleep(250);
+    const shown = reactSelectValue(input), label = rsLabel(h.sp, pick);
+    // Greenhouse's Country shows only "+1" once picked, and Canada is +1 too: report the whole option.
+    return { ok: !!shown, chosen: shown && label.includes(shown) ? label : shown || label, options: shown ? undefined : options };
+  }
+
+  // The menu's option elements. Menus can be portalled out of the container, so also look them up by
+  // react-select's own ids ("react-select-<instance>-option-3"; Greenhouse sets the input id to the instance).
+  function rsDomOptions(input, c) {
+    const id = input.id || "";
+    const prefix = !id ? "" : /^react-select-/.test(id) ? id.replace(/-input$/, "") : "react-select-" + id;
+    return [...new Set([
+      ...(prefix ? document.querySelectorAll(`[id^="${CSS.escape(prefix)}-option"]`) : []),
+      ...c.querySelectorAll('[class*="select__option"], [class*="-option"], [role="option"]'),
+      ...document.querySelectorAll('[class*="select__menu-portal"] [class*="option"]'),
+    // "-option" also matches the "No options" notice (select__menu-notice--no-options)
+    ])].filter((o) => visible(o) && !/menu-notice/.test(typeof o.className === "string" ? o.className : ""));
+  }
+
+  // Greenhouse's newer boards (Location (City), 2026-09-30) start the geocode search from the input's
+  // own change event. Calling onInputChange from props sets the text, but the results never reach the
+  // props we can read: isLoading stays true and options stay empty, while the menu a person sees fills
+  // in. So type each search term, wait for the menu, and click the best option element.
+  async function reactSelectTypePick(input, value) {
+    const c = reactSelectContainer(input) || input.parentElement;
+    const control = c.querySelector('[class*="select__control"], [class*="-control"]') || input;
+    const optionsNow = () => rsDomOptions(input, c);
+    mouseClick(control); input.focus(); await sleep(80);
+    let pick = null, score = 0;
+    const seen = [];
+    for (const q of searchTerms(value)) {
+      // Clear first, so the last term's results are not read as this one's.
+      if (input.value) { setNative(input, ""); await waitFor(() => !optionsNow().length, 1500); }
+      setNative(input, q); keyEcho(input, q);
+      if (!(await waitFor(optionsNow, 6000, 150)).length) continue;
+      await sleep(250); // debounced searches can redraw once more
+      for (const o of optionsNow()) {
+        const l = norm(o.textContent), s = scoreOption(l, value);
+        seen.push(l);
+        if (s > score) { score = s; pick = o; }
+      }
+      if (score >= 60) break;
+    }
+    const options = [...new Set(seen)].slice(0, 40);
+    if (!pick || score < 30 || !pick.isConnected) {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: false, options };
+    }
+    const label = norm(pick.textContent);
+    mouseClick(pick);
+    await sleep(250);
     const shown = reactSelectValue(input);
-    return { ok: !!shown, chosen: shown || rsLabel(h.sp, pick), options: shown ? undefined : options };
+    return { ok: !!shown, chosen: shown || label, options: shown ? undefined : options };
   }
 
   // Fallback when React internals aren't reachable: open the menu and click an option.
@@ -445,7 +509,7 @@
     return true;
   }
 
-  window.ISActions = { v: 5, sleep, norm, low, visible, setNative, blur, mouseClick, best, scoreOption, getFiber, fiberProp, deepQueryAll, typeahead,
+  window.ISActions = { v: 6, sleep, norm, low, visible, setNative, blur, mouseClick, best, scoreOption, getFiber, fiberProp, deepQueryAll, typeahead,
     waitFor, isReactSelect, reactSelectPick, reactSelectContainer, reactSelectOptions, reactSelectValue, workdayPick, ariaComboPick, nativeSelect, radioPick, setChecked,
     b64ToFile, setFileInput, dropFile, searchSelectPick, LIB_BOX_SEL };
 })();
