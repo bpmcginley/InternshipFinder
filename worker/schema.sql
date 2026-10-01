@@ -75,6 +75,20 @@ CREATE TABLE IF NOT EXISTS task_tokens (
   PRIMARY KEY (month, task, model)
 );
 
+-- Exact page-load totals per day (added 2026-09-30; src/visits.js), because Cloudflare Web Analytics
+-- samples about one load in ten. `page` is a kind (dashboard, landing, install, legal, other) and
+-- `source` where the load came from (direct, search, social, email, extension, other, or internal for
+-- a load from another page of the site). `visits` leaves out the internal ones, as Cloudflare does.
+-- Totals only: no visitor, address, cookie or full referrer.
+CREATE TABLE IF NOT EXISTS visit_counts (
+  day TEXT NOT NULL,
+  page TEXT NOT NULL,
+  source TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  visits INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, page, source)
+);
+
 -- Accounts that pressed "Delete my data" in `month`. Their counters for that month are kept until it
 -- ends, so deleting cannot reset a limit; the daily cron then removes them and this row.
 CREATE TABLE IF NOT EXISTS forget (

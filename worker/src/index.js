@@ -9,6 +9,7 @@ import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest
 import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
+import { countHit } from "./visits.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -289,6 +290,14 @@ async function route(request, env, ctx, d) {
       const { body } = await readJson(request, 10_000);
       await setDemand(db, user, cleanStates(body), now);
       return json({ ok: true });
+    }
+
+    // One page load on the site (docs/js/count.js, sent with sendBeacon): adds one to the day's exact
+    // visit totals (visits.js). No sign-in, nothing about the visitor kept.
+    case "POST /hit": {
+      const { body } = await readJson(request, 2_000);
+      await countHit(db, request, body, now);
+      return new Response(null, { status: 204 });
     }
 
     case "GET /demand": {

@@ -464,7 +464,10 @@
 <div id="root"></div>
 <noscript><p>InternScout needs JavaScript to search and rank listings. Without it, <a href="internships/">browse open internships by field, state or major</a>. The raw data is public at <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/docs/data">github.com/bpmcginley/InternshipFinder</a>.</p></noscript>
 <!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
-     and nothing that identifies a visitor; see privacy.html. The token is public by design. -->
+     and nothing that identifies a visitor; see privacy.html. The token is public by design.
+     js/count.js (2026-09-30) is the exact counter, since Cloudflare samples. The landing pages copy
+     both tags from here (backend/internscout/seo_pages.py beacon_from). -->
+<script defer src="/js/count.js"></script>
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>
 </body>
 </html>

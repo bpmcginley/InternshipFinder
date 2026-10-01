@@ -181,7 +181,14 @@
            "no analytics" stopped being true. What it collects is what Cloudflare documents for the
            beacon: it sets no cookies and no local storage and does not fingerprint, so this names the
            tool and says what it does rather than keeping the old absolute. -->
-      <li>We count page visits with <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a>. It uses no cookies and doesn't identify you: it sees which page was loaded, the referring site, your browser type, a rough country and how fast the page loaded. We don't use ad trackers, and we set no cookies of our own.</li>
+      <!-- was: <li>We count page visits with <a href="https://www.cloudflare.com/web-analytics/" ...>Cloudflare Web Analytics</a>. It uses no cookies and doesn't identify you: it sees which page was loaded, the referring site, your browser type, a rough country and how fast the page loaded. We don't use ad trackers, and we set no cookies of our own.</li>
+           Our own counter (docs/js/count.js, worker/src/visits.js) was added 2026-09-30, because
+           Cloudflare samples page loads. It sends the path, the referring host and utm_source /
+           utm_medium; the Worker keeps only daily totals by page kind and source. The address is held
+           in memory for the current minute to stop floods and never written, which is why it is named. -->
+      <li>We count page visits with <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a>. It uses no cookies and doesn't identify you: it sees which page was loaded, the referring site, your browser type, a rough country and how fast the page loaded.</li>
+      <li>Because Cloudflare only samples visits, our own server also counts them. Each page load sends the page's address, the name of the site that linked to it (such as google.com, not the full link) and any campaign tag on the link. We keep only daily totals by kind of page and where visits came from, for example "landing pages, from search: 12". Your IP address is seen only to stop floods of fake visits; it's held in memory for a minute and never saved.</li>
+      <li>We don't use ad trackers, and we set no cookies of our own.</li>
     </ul>
 
     <h2>Your profile and files</h2>
@@ -489,6 +496,7 @@
 </div>
 <!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
      and nothing that identifies a visitor; see privacy.html. The token is public by design. -->
+<script defer src="/js/count.js"></script>
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>
 </body>
 </html>
