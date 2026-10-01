@@ -8,9 +8,12 @@ workers_dev = true
 [observability]
 enabled = false
 
-# Daily cleanup of old rate buckets and runs
+# Daily cleanup of old rate buckets and runs; and, every half hour, the repository's clock: GitHub drops
+# most of its own scheduled runs here, so this starts "Keep schedule" (src/clock.js; needs the
+# GITHUB_DISPATCH_TOKEN secret, and does nothing without it).
 [triggers]
-crons = ["17 7 * * *"]
+# was: crons = ["17 7 * * *"]
+crons = ["17 7 * * *", "4,34 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -19,6 +22,8 @@ database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 
 # was: # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
 # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
+# GITHUB_DISPATCH_TOKEN (a fine-grained GitHub token, InternshipFinder only, "Actions: Read and
+# write": lets src/clock.js start the catch-up workflow every half hour),
 # PROFILE_KEY (32 random bytes, base64; encrypts saved Deep Dives, and saving is off while it is unset),
 # and for the optional paid plans: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
 # (Supporter) and STRIPE_PRICE_ID_PRO (Pro). A plan whose price id is unset is simply not offered.
