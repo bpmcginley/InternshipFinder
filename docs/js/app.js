@@ -5,6 +5,9 @@
   const h = React.createElement, F = React.Fragment;
   const IS = window.IS, C = IS.C;
   const ADMIN = new URLSearchParams(location.search).get("admin") === "1";
+  // "Don't count this browser" (js/count.js), switched from the admin menu.
+  const NOCOUNT_KEY = "internscout.nocount";
+  const noCount = () => { try { return localStorage.getItem(NOCOUNT_KEY) === "1"; } catch (e) { return false; } };
 
   const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
@@ -1158,6 +1161,12 @@
             ].filter(Boolean),
             admin: ADMIN ? [
               { key: "rescan", label: "Rescan", desc: "Run the scanner on GitHub now", onClick: rescan, disabled: !!busy },
+              // js/count.js reads this setting when a page loads, so a change applies from the next load.
+              // Raw localStorage, not IS.ls (which JSON-encodes): count.js and ?nocount=1 store a plain "1".
+              { key: "nocount", label: noCount() ? "Count this browser's visits" : "Don't count this browser's visits",
+                desc: "For your own visits, so they stay out of the analytics. Applies from the next page load.",
+                onClick: () => { const off = noCount(); try { if (off) localStorage.removeItem(NOCOUNT_KEY); else localStorage.setItem(NOCOUNT_KEY, "1"); } catch (e) { }
+                  setBusy(off ? "This browser's visits count again" : "This browser's visits won't be counted"); setTimeout(() => setBusy(""), 4000); } },
               ghToken && { key: "forget", label: "Forget token", onClick: () => { localStorage.removeItem("internscout.gh_token"); setGhToken(""); setBusy("Token cleared"); } },
             ].filter(Boolean) : null,
           }))),
