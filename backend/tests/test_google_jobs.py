@@ -138,3 +138,29 @@ def test_the_daily_searches_never_go_past_the_budget(monkeypatch):
     _patch(monkeypatch, handler)
     gj.fetch_google_jobs(["museum internship"], ["Boston, Massachusetts"], fixed=[("a", "X"), ("b", "Y")])
     assert searches == ["a"]                        # a budget of one: the first daily search, and nothing else
+
+
+def test_canada_gets_a_metro_a_day_and_every_pair_in_turn():
+    from internscout.config import GOOGLE_JOBS_CANADA_LOCATIONS as places, GOOGLE_JOBS_CANADA_QUERIES as queries
+    from internscout.config import canada_searches
+    start = 739000
+    week = [canada_searches(start + d)[0][1] for d in range(len(places))]
+    assert sorted(week) == sorted(places)                       # each metro once every six days
+    pairs = {canada_searches(start + d)[0] for d in range(len(places) * len(queries))}
+    assert len(pairs) == len(places) * len(queries)             # every pair within 36 days
+    assert canada_searches(start, n=0) == []
+
+
+def test_a_canadian_search_asks_for_canadian_results(monkeypatch):
+    seen = []
+
+    def handler(req):
+        if req.url.path == "/account.json":
+            return httpx.Response(200, json={"searches_per_month": 250, "total_searches_left": 200})
+        seen.append((req.url.params["location"], req.url.params.get("gl")))
+        return httpx.Response(200, json={"jobs_results": []})
+    _patch(monkeypatch, handler)
+    gj.fetch_google_jobs(["museum internship"], ["Boston, Massachusetts"],
+                         fixed=[("co-op student 2027", "Toronto, Ontario, Canada")])
+    assert seen[0] == ("Toronto, Ontario, Canada", "ca")
+    assert ("Boston, Massachusetts", None) in seen
