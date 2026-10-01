@@ -282,7 +282,8 @@ def test_spellings_of_one_employer_share_a_page_and_a_role_counts_once(tmp_path)
     pages = {p["path"]: p for p in seo_pages.build(site)}
     assert "/internships/at/the-boeing-company/" not in pages
     boeing = pages["/internships/at/boeing/"]
-    assert len(boeing["items"]) == 12 and "Boeing Internships – 12 Open Now" in boeing["html"]
+    # was: "Boeing Internships – 12 Open Now". Since 2026-10-01 the title names the term most roles share.
+    assert len(boeing["items"]) == 12 and "Boeing Internships (Summer 2027) – 12 Open" in boeing["html"]
     assert "company=Boeing&amp;company=The%20Boeing%20Company" in boeing["html"]
     assert '<a href="/internships/at/boeing/">The Boeing Company</a>' in pages["/internships/massachusetts/"]["html"]
     assert seo_pages.employer_key("Magna International") == seo_pages.employer_key("Magna")
@@ -465,3 +466,43 @@ def test_new_means_the_same_calendar_week_the_dashboard_counts():
     now = datetime(2026, 9, 28, 11, tzinfo=timezone.utc)
     assert not seo_pages.fresh({"first_seen": "2026-09-21T20:00:00+00:00"}, now, "2026-09-18")   # 7 days back
     assert seo_pages.fresh({"first_seen": "2026-09-22T01:00:00+00:00"}, now, "2026-09-18")       # 6 days back
+
+
+def test_employer_pages_answer_when_where_and_pay_from_their_own_roles(tmp_path):
+    rows = [_row(i, company_name="Big Co", salary="$38.00", regions=[{"loc": "Denver, Colorado", "kind": "us", "state": "CO"}])
+            for i in range(8)]
+    rows += [_row(10 + i, company_name="Big Co", term="Winter 2027", salary="$22.50 - $31.50",
+                  regions=[{"loc": "Denver, CO", "kind": "us", "state": "CO"}]) for i in range(2)]
+    rows += [_row(20 + i, company_name="Big Co", salary="$90,000 a year") for i in range(2)]   # yearly: not an hourly rate
+    site = _site(tmp_path, {"MA": rows, "CO": []})
+    h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/big-co/")
+    assert "<title>Big Co Internships (Summer 2027) – 12 Open | InternScout</title>" in h
+    assert "Listed pay $22.50–$38/hour." in h
+    assert "<dt>Listed pay</dt><dd>$22.50 to $38 an hour, on 10 of 12 roles</dd>" in h
+    facts = h.split('<dl class="facts">')[1].split("</dl>")[0]
+    assert "Denver, CO (10)" in facts and "Colorado" not in facts       # one place, however it's spelled
+    assert "Summer 2027 is the most common start: 10 of the 12 open roles. Others start in Winter 2027." in h
+    assert "<h2>Does Big Co pay interns?</h2><p>10 of the 12 open roles list pay, from $22.50 to $38 an hour.</p>" in h
+
+
+def test_employer_pages_say_so_when_postings_leave_things_out(tmp_path):
+    rows = [_row(i, company_name="Quiet Co", term=None) for i in range(10)]
+    rows[0]["term"] = "Summer 2027"
+    site = _site(tmp_path, {"MA": rows})
+    h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/quiet-co/")
+    assert "<title>Quiet Co Internships – 10 Open | InternScout</title>" in h      # no term most roles share
+    assert "None of the 10 open postings lists pay." in h
+    assert "Only 1 of the 10 open roles gives a start term: Summer 2027. The rest don’t say." in h
+
+
+def test_employer_pages_link_similar_employers_and_field_pages_link_employers(tmp_path):
+    a = [_row(i, company_name="Rocket Co", tags=("aerospace",)) for i in range(10)]
+    b = [_row(20 + i, company_name="Orbit Co", tags=("aerospace",)) for i in range(12)]
+    c = [_row(40 + i, company_name="Bank Co", tags=("finance",)) for i in range(10)]
+    site = _site(tmp_path, {"MA": a + b + c})
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    rocket = pages["/internships/at/rocket-co/"]
+    assert '<h2>Similar employers</h2><ul><li><a href="/internships/at/orbit-co/">Orbit Co</a>' in rocket
+    assert "bank-co" not in rocket.split("Similar employers")[1].split("</section>")[0]
+    field = next(h for p, h in pages.items() if "Employers hiring in" in h and "orbit-co" in h)
+    assert field.index("/internships/at/orbit-co/") < field.index("/internships/at/rocket-co/", field.index("Employers hiring in"))

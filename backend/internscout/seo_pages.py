@@ -578,7 +578,11 @@ ul.jobs{list-style:none;padding:0;margin:24px 0;border-top:1px solid var(--rule)
 .go{grid-column:2;grid-row:1/span 3;align-self:center;font-size:14px;white-space:nowrap}
 .more,.follow{color:var(--ink2)}section.rel h2{font:600 20px/1.3 "Source Serif 4",Georgia,serif;margin:36px 0 8px}
 section.rel ul{list-style:none;padding:0;margin:0;columns:2;column-gap:28px}
-section.rel li{padding:3px 0;break-inside:avoid}.n{color:var(--ink3);font-size:13px}
+section.rel li{padding:3px 0;break-inside:avoid}
+.facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:20px 0 24px;padding:16px 18px;
+background:var(--panel);border:1px solid var(--rule);border-radius:8px}.facts dt{color:var(--ink3)}.facts dd{margin:0}
+section.faq h2{font:600 18px/1.3 "Source Serif 4",Georgia,serif;margin:28px 0 6px}section.faq p{margin:0;color:var(--ink2)}
+@media (max-width:560px){.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}.n{color:var(--ink3);font-size:13px}
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
 footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:26px}section.rel ul{columns:1}
 .job{grid-template-columns:1fr}.go{grid-column:1;grid-row:auto;margin-top:4px}}
@@ -697,10 +701,11 @@ def fits_line(majors: list[str]) -> str:
 
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
-                 here: str | None = None, tail: str = TAIL, about: frozenset = frozenset()) -> str:
+                 here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "") -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
-    return (f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>" + fits_line(fits or []) +
+    # `extra`: the employer pages' "at a glance" list, under the opening paragraph (2026-10-01).
+    return (f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>" + fits_line(fits or []) + extra +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
             f"<ul class=\"jobs\">{listing_rows(items, now, state, here)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
@@ -715,6 +720,168 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
             + "<p class=\"follow\">Applying to a few? The free <a href=\"/install.html?from=landing-page\">Auto-Apply extension</a> "
               "fills in the application for you and stops at the submit button.</p>"
             + related)
+
+
+# ---------------------------------------------------------------- employer pages
+# Added 2026-10-01. Search Console showed the employer pages are what people find ("blue origin
+# internships", "autozone internships"), at positions 6 to 12 with almost no clicks. A page that answers
+# the follow-up questions (when, where, does it pay) from its own listings is worth more to a reader
+# than a bare list, and its title can match "blue origin internships summer 2027". Every fact below is
+# counted from the open roles; when the postings don't say, the page says that rather than guess.
+
+_STATE_NAMES = {name: code for code, name in US_STATES.items() if len(code) == 2}
+_HOURLY = re.compile(r"\b(hour|hr|hourly)\b", re.I)
+_NOT_HOURLY = re.compile(r"\b(year|yr|annual|annually|month|week|stipend|salary)\b", re.I)
+
+
+def long_day(stamp) -> str:
+    d = _when(stamp)
+    return f"{d:%B} {d.day}, {d.year}" if d else ""
+
+
+def money(v: float) -> str:
+    return f"${v:,.2f}".replace(".00", "")
+
+
+def hourly_range(items: list[dict]) -> tuple[float, float, int] | None:
+    """Lowest and highest hourly rate the postings list, and how many list one. A bare amount counts as
+    hourly only under $200 (student pay quoted without a unit is an hourly rate); a yearly salary or a
+    stipend is left out rather than turned into a made-up hourly figure."""
+    lo = hi = None
+    n = 0
+    for x in items:
+        s = real_salary(x)
+        if not s or _NOT_HOURLY.search(s):
+            continue
+        nums = [float(a.replace(",", "")) for a in _AMOUNT.findall(s)]
+        nums = [v for v in nums if 7 <= v < 200] if (_HOURLY.search(s) or all(v < 200 for v in nums)) else []
+        if not nums:
+            continue
+        n += 1
+        lo = min([*nums, *([lo] if lo is not None else [])])
+        hi = max([*nums, *([hi] if hi is not None else [])])
+    return (lo, hi, n) if n else None
+
+
+def dated_terms(items: list[dict]) -> Counter:
+    """Start terms that name a year ("Summer 2027"); a bare season is a board that gave none."""
+    return Counter(x["term"] for x in items if x.get("term") and re.search(r"\d{4}", str(x["term"])))
+
+
+def main_term(items: list[dict]) -> str | None:
+    """The start term at least half the roles share, for the title; None when no one term does."""
+    terms = dated_terms(items)
+    if not terms:
+        return None
+    term, n = min(terms.items(), key=lambda kv: (-kv[1], kv[0]))
+    return term if n * 2 >= len(items) else None
+
+
+def place_name(g: dict) -> str:
+    """One region as a reader names it: "Denver, CO", "Remote". "West Des Moines, Iowa" and
+    "West Des Moines, IA" are one place, so a spelled-out state is shortened."""
+    if g.get("kind") == "remote" or g.get("state") == "Remote":
+        return "Remote"
+    loc = str(g.get("loc") or g.get("state") or "").strip()
+    m = re.match(r"^(.*),\s*([A-Za-z .]+)$", loc)
+    if m and m.group(2).strip() in _STATE_NAMES:
+        loc = f"{m.group(1)}, {_STATE_NAMES[m.group(2).strip()]}"
+    return loc
+
+
+def places(items: list[dict]) -> list[tuple[str, int]]:
+    """Every place with open roles, most first; a role in three cities counts once in each."""
+    c: Counter = Counter()
+    for x in items:
+        names = {place_name(g) for g in x.get("regions") or []} or ({"Remote"} if x.get("is_remote") else set())
+        c.update(n for n in names if n)
+    return sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+def counted(pairs: list[tuple[str, int]], n: int) -> str:
+    """ "Denver, CO (17), Huntsville, AL (13) and 4 more" """
+    shown = [f"{name} ({k})" for name, k in pairs[:n]]
+    rest = len(pairs) - n
+    return join_words(shown + ([plural(rest, "more place")] if rest > 0 else []))
+
+
+def employer_facts(name: str, items: list[dict], fields_main: list[str]) -> tuple[str, str]:
+    """The "at a glance" list and the questions section for one employer's page, as HTML."""
+    n = len(items)
+    stages = Counter(s for x in items for s in x.get("stage") or [])
+    kinds_ = [plural(stages[s], label) for s, label in (("internship", "internship"), ("co_op", "co-op"),
+              ("research", "research position"), ("fellowship", "fellowship")) if stages.get(s)]
+    terms = dated_terms(items)
+    term_pairs = sorted(terms.items(), key=lambda kv: (-kv[1], kv[0]))
+    where = places(items)
+    remote = dict(where).get("Remote", 0)
+    pay = hourly_range(items)
+    paid = sum(1 for x in items if is_paid(x))
+    posted = sorted(d for d in (_when(x.get("posted_at") or x.get("first_seen")) for x in items) if d)
+    field_counts = Counter(t for x in items for t in set(x.get("field_tags") or []) if t in fields_main)
+
+    rows = [("Open roles", f"{n:,}" + (f": {join_words(kinds_)}" if len(kinds_) > 1 else ""))]
+    if term_pairs:
+        rows.append(("Start", counted(term_pairs, 3).replace("more place", "more term")))
+    if where:
+        rows.append(("Where", counted(where, 3)))
+    if pay:
+        lo, hi, k = pay
+        rows.append(("Listed pay", f"{money(lo)}{'' if lo == hi else ' to ' + money(hi)} an hour, on {k} of {n} roles"))
+    else:
+        rows.append(("Listed pay", "Not given in the postings" if not paid else f"{paid} of {n} roles say they are paid; no rate given"))
+    if field_counts:
+        rows.append(("Fields", join_words([f"{field_title(t)} ({field_counts[t]})" for t in fields_main if field_counts[t]])))
+    if posted:
+        rows.append(("Newest posting", long_day(posted[-1].isoformat())))
+    facts = "<dl class=\"facts\">" + "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in rows) + "</dl>"
+
+    qa = []
+    dated = sum(terms.values())
+    if term_pairs and dated * 2 < n:
+        # Most postings give no term: say how few do, rather than call one "the most common".
+        a = (f"Only {dated} of the {n} open roles {'gives' if dated == 1 else 'give'} a start term: "
+             f"{join_words([t for t, _ in term_pairs[:4]])}. The rest don’t say.")
+    elif term_pairs:
+        top_term, top_n = term_pairs[0]
+        a = (f"All {n} open roles start in {top_term}." if top_n == n else
+             f"{top_term} is the most common start: {top_n} of the {n} open roles.")
+        others = [t for t, _ in term_pairs[1:4]]
+        if others:
+            a += f" Others start in {join_words(others)}."
+        unsaid = n - dated
+        if unsaid:
+            a += f" {unsaid} {'doesn’t' if unsaid == 1 else 'don’t'} say."
+    else:
+        a = "The open postings don’t give a start term. Each posting below has the details."
+    qa.append((f"When do {name} internships start?", a))
+    if where:
+        a = f"The open roles are in {counted([w for w in where if w[0] != 'Remote'] or where, 5)}."
+        if remote and len(where) > 1:
+            a += f" {plural(remote, 'role')} can be done remotely."
+        qa.append((f"Where are {name} internships?", a))
+    if pay:
+        lo, hi, k = pay
+        a = (f"{k} of the {n} open roles list pay: {money(lo)} an hour." if lo == hi else
+             f"{k} of the {n} open roles list pay, from {money(lo)} to {money(hi)} an hour.")
+    elif paid:
+        a = f"{paid} of the {n} open roles say they are paid, but the postings don’t give a rate."
+    else:
+        a = f"None of the {n} open postings lists pay."
+    qa.append((f"Does {name} pay interns?", a))
+    if posted:
+        first, last = long_day(posted[0].isoformat()), long_day(posted[-1].isoformat())
+        if posted[0].year == posted[-1].year:          # "September 1 and September 30, 2026"
+            first = first.rsplit(",", 1)[0]
+        a = (f"The open roles were posted on {last}." if first == last.rsplit(",", 1)[0] else
+             f"The open roles were posted between {first} and {last}.")
+        qa.append((f"When does {name} post internships?", a + " InternScout checks for new ones every day."))
+    qa.append((f"How do I apply to {name}?",
+               f"Every role on this page links to the application on {name}’s own site. "
+               "InternScout doesn’t take applications or fees."))
+    questions = ("<section class=\"faq\">" + "".join(f"<h2>{esc(q)}</h2><p>{esc(a)}</p>" for q, a in qa)
+                 + "</section>")
+    return facts, questions
 
 
 # ---------------------------------------------------------------- build
@@ -823,6 +990,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                       "lastmod": max((f for f in found if f), default=None)})
 
     root = ("/internships/", "Internships")
+    page_name = {EMPLOYERS[nm]: nm for nm in by_company}     # employer page -> the name it goes by
 
     for t, items in sorted(fields.items()):
         name = field_title(t)
@@ -833,6 +1001,11 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                             [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states])
         emp = join_words(top(Counter(x["company_name"] for x in items if x.get("company_name")), 3))
         # was: emp = join_words([c for c, _ in Counter(x["company_name"] for x in items).most_common(3)])
+        # The employers in this field that have a page of their own (2026-10-01), so search engines
+        # reach the employer pages from the field pages as well as from single listing rows.
+        hiring = Counter(EMPLOYERS[x["company_name"]] for x in items if x.get("company_name") in EMPLOYERS)
+        related += link_list(f"Employers hiring in {lower_name(name)}",
+                             [(pth, page_name[pth], k) for pth, k in sorted(hiring.items(), key=lambda kv: (-kv[1], kv[0]))[:RELATED]])
         add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
             f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
@@ -885,9 +1058,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
                          fits=[n for n in fits[path] if n != name]), items)
 
+    # Each employer's main fields, for "Similar employers": others that hire in the same fields.
+    company_fields = {nm: top(Counter(t for x in its for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
+                      for nm, its in by_company.items()}
+
     for name, items in sorted(by_company.items()):
         path = EMPLOYERS[name]
-        main = top(Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
+        main = company_fields[name]
         # was: top = [t for t, _ in Counter(t for x in items for t in set(...) - SKIP_FIELDS).most_common(3)]
         covered = sum(1 for x in items if set(x.get("field_tags") or []) & set(main))
         fields_words = join_words([lower_name(field_title(t)) for t in main])
@@ -896,17 +1073,36 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                  f", including roles in {fields_words}") if main else ""
         note = (f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
                 f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>")
-        related = note + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                                                     for t in main if t in fields])
+        facts, questions = employer_facts(name, items, main)
+        # Ranked by fields shared, then size; the tie goes to the name, so every build agrees.
+        similar = sorted(((len(set(main) & set(f)), len(by_company[o]), o) for o, f in company_fields.items()
+                          if o != name and set(main) & set(f)), key=lambda t: (-t[0], -t[1], t[2]))[:RELATED]
+        # was: related = note + link_list("Related fields", ...)
+        related = (questions + note
+                   + link_list("Similar employers", [(EMPLOYERS[o], o, k) for _, k, o in similar])
+                   + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
+                                                  for t in main if t in fields]))
         # was: if k in US_STATES, which now holds the Canada and metro views as well.
         where = ",".join(top(Counter(k for x in items for k in x["keys"] if k in PLACES or k == "remote"), 6))
         # was: ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
-        add(path, f"{name} Internships – {len(items):,} Open Now | InternScout",
-            f"{len(items):,} open internships and co-ops at {name} for college students{about}. "
-            f"Updated {updated}. Free search, no sign-up.",
+        # was: f"{name} Internships – {len(items):,} Open Now | InternScout", and a description of
+        # "N open internships and co-ops at X for college students{about}". The start term in the title
+        # matches "blue origin internships summer 2027"; places and pay are what a searcher picks on.
+        term = main_term(items)
+        top_places = [p for p, _ in places(items) if p != "Remote"][:3]
+        pay = hourly_range(items)
+        co_ops = sum(1 for x in items if "co_op" in (x.get("stage") or []))
+        desc = (f"{len(items):,} open {name} internships{' and co-ops' if co_ops else ''}"
+                + (f" for {term}" if term else "")
+                + (f" in {join_words(top_places)}" if top_places else "") + "."
+                + (f" Listed pay {money(pay[0])}{'' if pay[0] == pay[1] else '–' + money(pay[1])}/hour." if pay else
+                   f" Roles in {fields_words}." if main else "")
+                + f" Updated {updated}. Free, no sign-up.")
+        add(path, f"{name} Internships{f' ({term})' if term else ''} – {len(items):,} Open | InternScout",
+            desc,
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
             listing_body(items, f"at {name}", "", now, related,
-                         dash=dash_link(state=where, companies=spellings[name]), here=path), items)
+                         dash=dash_link(state=where, companies=spellings[name]), here=path, extra=facts), items)
 
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
     # already uses is skipped, like a field slug that names a state.
