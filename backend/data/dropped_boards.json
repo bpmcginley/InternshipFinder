@@ -1,8 +1,178 @@
 {
+ "ashby": {
+  "atomicsemi": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "conductorone": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "genesis-therapeutics": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "iacollaborative": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "inspiration-commerce-group": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "latitude": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "lindy": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "mach": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "mentis": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "mtesting.ai": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "odin-dynamics": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "orbitalmaterials": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "tuesday-lab": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "veeda-labs": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "whatnot": {
+   "on": "2026-10-01",
+   "why": "dead"
+  }
+ },
+ "eightfold": {
+  "aexp": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "zebra": {
+   "on": "2026-10-01",
+   "why": "dead"
+  }
+ },
+ "greenhouse": {
+  "appliedintuition": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "arcellx": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "arine": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "bitgointernships": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "campusopportunities": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "capitalrx": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "dustyrobotics": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "fireworksai": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "forerunner": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "galileofinancialtechnologies": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "glossgenius": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "ibkr": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "iherb": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "maintainx": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "marqeta": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "memphismeats": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "mqreferrals": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "optirtc": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "seamlessai": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "superbet": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "transcarent": {
+   "on": "2026-10-01",
+   "why": "dead"
+  }
+ },
  "icims": {
+  "campus-americas": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "campus-globalcareers-atlassian": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "career-schwab": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "careers-americas": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "careers-biorad": {
    "on": "2026-09-30",
@@ -28,9 +198,17 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-revolutioncompany": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "careers-se": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "careers-sharpusa": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "careers-sig": {
    "on": "2026-09-30",
@@ -59,6 +237,30 @@
   "university-uber": {
    "on": "2026-09-30",
    "why": "robots"
+  }
+ },
+ "lever": {
+  "calstart": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "sanctuary": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "xpansiv": {
+   "on": "2026-10-01",
+   "why": "dead"
+  }
+ },
+ "rippling": {
+  "acretrader-jobs": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "etg": {
+   "on": "2026-10-01",
+   "why": "dead"
   }
  },
  "smartrecruiters": {
@@ -651,7 +853,29 @@
    "why": "robots"
   }
  },
+ "taleo": {
+  "energytransfer|etp_ext": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "jacobs|ex3": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "kp|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  }
+ },
  "workday": {
+  "activision|wd1|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "activision|wd1|king_external_careers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "allstate|wd5|sourcing_event": {
    "on": "2026-09-30",
    "why": "robots"
@@ -659,6 +883,10 @@
   "amfam|wd1|amfamgroupinterncareers": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "amplify|wd1|amplify_careers": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "andersen|wd12|andersen_external_career_site": {
    "on": "2026-09-30",
@@ -704,9 +932,17 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "cambiahealth|wd1|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "cat|wd5|caterpillarcareers": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "cff|wd1|explore-career-opportunities": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "citi|wd5|2": {
    "on": "2026-09-30",
@@ -716,21 +952,45 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "cliftonlarsonallen|wd1|cla": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "clorox|wd1|inviteclorox": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "cmu|wd5|cmu": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "cohesity|wd5|cohesity_careers": {
    "on": "2026-09-30",
    "why": "robots"
   },
+  "comcast|wd5|comcast_careers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "condenast|wd5|condecareers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "conocophillips|wd1|external": {
    "on": "2026-09-30",
    "why": "robots"
   },
+  "dell|wd1|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "disney|wd5|disneycareerdc": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "donaldson|wd5|donaldsoncareers": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "doterra|wd1|doterracareers": {
    "on": "2026-09-30",
@@ -755,6 +1015,10 @@
   "equinix|wd1|external": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "evrazna|wd5|evraz": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "expedia|wd108|private": {
    "on": "2026-09-30",
@@ -788,6 +1052,10 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "gtsgbu|wd3|careers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "harman|wd3|harman": {
    "on": "2026-09-30",
    "why": "robots"
@@ -808,9 +1076,37 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "idexx|wd1|idexx": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "insmed|wd5|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "jainglobal|wd5|externalsite": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "justfab|wd1|fabletics": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "justfab|wd1|savagex": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "kar|wd1|openlane_careers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "lilly|wd5|cmp": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "livenation|wd503|en": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "lowes|wd5|lws_external_cs": {
    "on": "2026-09-30",
@@ -832,6 +1128,10 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "milestone|wd1|milestone_external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "mitre|wd5|mitre": {
    "on": "2026-09-30",
    "why": "robots"
@@ -848,17 +1148,53 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "netflix|wd1|netflix": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "ngc|wd1|northrop_grumman_restricted_site": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "nike|wd1|nke": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "nio|wd3|nio_careers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "nrel|wd5|nrel": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "oneok|wd1|oneok_early_careers": {
    "on": "2026-09-30",
    "why": "robots"
   },
+  "osv-cci|wd1|ccicareers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "osv-chegg|wd5|chegg": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "osv-edf|wd5|confidential": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "osv-rubicon|wd5|magnitecareers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "osv-tifec|wd5|fanthreesixty": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "otis|wd5|rec_ext_gateway": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "paloaltonetworks|wd5|panwexternalcareers": {
    "on": "2026-09-30",
@@ -868,9 +1204,21 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "plexus|wd5|plexus_careers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "procasemanagement|wd1|pcm": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "rbc|wd3|externalprivatepostingstudents": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "redbulltechnology|wd3|rb_racing": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "rgare|wd1|careers": {
    "on": "2026-09-30",
@@ -883,6 +1231,10 @@
   "rxo|wd501|rxojobs": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "sallie-mae|wd5|careers": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "sandvik|wd3|sandvik-jobs": {
    "on": "2026-09-30",
@@ -900,9 +1252,17 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "symbotic|wd1|symbotic": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "synchronyfinancial|wd5|careers": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "takeda|wd3|external": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "theaccessgroup|wd103|access_group_external_careers": {
    "on": "2026-09-30",
@@ -932,6 +1292,30 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "vhr-epri|wd1|epricareers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "vhr-genband|wd1|ribboncareers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "vhr-otsuka|wd1|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "vhr-otsuka|wd1|recorexternal": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "vhr-pbs|wd5|pbscareers": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
+  "vhr-unither|wd5|external": {
+   "on": "2026-10-01",
+   "why": "dead"
+  },
   "vishay|wd3|vishaycareers": {
    "on": "2026-09-30",
    "why": "robots"
@@ -939,6 +1323,10 @@
   "vitalant|wd12|careers": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "walmart|wd5|walmartexternal": {
+   "on": "2026-10-01",
+   "why": "dead"
   },
   "xylem|wd5|xylem-careers": {
    "on": "2026-09-30",
