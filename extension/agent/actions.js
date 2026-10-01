@@ -2,7 +2,7 @@
 // content.js / workday.js and generalised: native setters, react-select via fiber
 // selectOption, Workday listboxes, ARIA comboboxes, radios, files.
 (function () {
-  if (window.ISActions && window.ISActions.v >= 6) return; // bump with dom.js V when this file changes
+  if (window.ISActions && window.ISActions.v >= 7) return; // bump with dom.js V when this file changes
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
   const low = (s) => norm(s).toLowerCase();
@@ -402,6 +402,31 @@
     return { ok: true, chosen: norm(btn.textContent) };
   }
 
+  // fastFill's careful pick for a menu-style dropdown (Workday, 2026-10-01): open it, read its options,
+  // and pick only the one decide(options) names. When decide names none (no exact, single match), the
+  // menu is closed untouched and the question stays the model's. workdayPick, the model's tool, picks
+  // the best fuzzy match instead, which is right when the model chose the answer and wrong for a rule.
+  async function workdayChoose(btn, decide) {
+    const menuId = btn.getAttribute("aria-haspopup") !== "listbox" && (btn.getAttribute("aria-controls") || btn.getAttribute("data-menu-id"));
+    const optionsNow = () => (menuId ? (document.getElementById(menuId) ? listboxOptions(document.getElementById(menuId)) : []) : listboxOptions());
+    const close = async () => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      btn.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await sleep(200);
+    };
+    mouseClick(btn);
+    const opts = await waitFor(optionsNow, 1500);
+    const texts = opts.map((o) => norm(o.textContent));
+    const want = texts.length ? decide(texts) : null;
+    const i = want == null ? -1 : texts.indexOf(want);
+    if (i < 0) { await close(); return { ok: false, options: texts.slice(0, 40) }; }
+    mouseClick(opts[i]);
+    await sleep(400);
+    if (optionsNow().length) await close();      // a menu that stayed open after the pick
+    const shown = norm(btn.textContent);
+    return { ok: shown.toLowerCase() === want.toLowerCase(), chosen: shown };
+  }
+
   async function ariaComboPick(el, value) {
     const input = el.tagName === "INPUT" ? el : el.querySelector("input") || el;
     mouseClick(input);
@@ -509,7 +534,7 @@
     return true;
   }
 
-  window.ISActions = { v: 6, sleep, norm, low, visible, setNative, blur, mouseClick, best, scoreOption, getFiber, fiberProp, deepQueryAll, typeahead,
-    waitFor, isReactSelect, reactSelectPick, reactSelectContainer, reactSelectOptions, reactSelectValue, workdayPick, ariaComboPick, nativeSelect, radioPick, setChecked,
+  window.ISActions = { v: 7, sleep, norm, low, visible, setNative, blur, mouseClick, best, scoreOption, getFiber, fiberProp, deepQueryAll, typeahead,
+    waitFor, isReactSelect, reactSelectPick, reactSelectContainer, reactSelectOptions, reactSelectValue, workdayPick, workdayChoose, ariaComboPick, nativeSelect, radioPick, setChecked,
     b64ToFile, setFileInput, dropFile, searchSelectPick, LIB_BOX_SEL };
 })();
