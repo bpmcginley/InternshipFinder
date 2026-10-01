@@ -42,7 +42,10 @@ def keep_at(need: int) -> int:
     topic hovering at the line does not vanish and come back between deploys (a search engine that
     finds a URL gone drops it, and takes weeks to trust it again)."""
     return need * 2 // 3
-MIN_EMPLOYER = 10       # open roles an employer needs before it gets a page of its own
+# was: 10. Lowered 2026-10-01: Search Console showed "[employer] internships" is how people find the site,
+# and since the employer pages carry the facts box and answers (employer_facts), a page with 5 roles
+# still says something worth reading. 270 more employers qualified that day.
+MIN_EMPLOYER = 5        # open roles an employer needs before it gets a page of its own
 MIN_KIND = 25           # ...and a start term, paid, co-op, research or class-year page (see kinds())
 PER_PAGE = 40           # listings shown on one page; the dashboard has the rest
 NEW_DAYS = 7
@@ -783,6 +786,8 @@ def place_name(g: dict) -> str:
     if g.get("kind") == "remote" or g.get("state") == "Remote":
         return "Remote"
     loc = str(g.get("loc") or g.get("state") or "").strip()
+    # "New York, New York, United States" is "New York, NY": the country goes, then the state shortens.
+    loc = re.sub(r",\s*(United States( of America)?|USA|US)$", "", loc).strip()
     m = re.match(r"^(.*),\s*([A-Za-z .]+)$", loc)
     if m and m.group(2).strip() in _STATE_NAMES:
         loc = f"{m.group(1)}, {_STATE_NAMES[m.group(2).strip()]}"

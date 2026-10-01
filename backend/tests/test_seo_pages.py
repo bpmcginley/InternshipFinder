@@ -506,3 +506,19 @@ def test_employer_pages_link_similar_employers_and_field_pages_link_employers(tm
     assert "bank-co" not in rocket.split("Similar employers")[1].split("</section>")[0]
     field = next(h for p, h in pages.items() if "Employers hiring in" in h and "orbit-co" in h)
     assert field.index("/internships/at/orbit-co/") < field.index("/internships/at/rocket-co/", field.index("Employers hiring in"))
+
+
+def test_place_names_read_the_way_people_write_them():
+    name = lambda loc: seo_pages.place_name({"loc": loc})
+    assert name("New York, New York, United States") == "New York, NY"
+    assert name("Austin, Texas, USA") == "Austin, TX"
+    assert name("West Des Moines, Iowa") == "West Des Moines, IA"
+    assert name("Denver, CO") == "Denver, CO"
+    assert seo_pages.place_name({"kind": "remote", "state": "Remote"}) == "Remote"
+
+
+def test_an_employer_with_five_roles_gets_a_page(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i, company_name="Five Co") for i in range(5)]
+                            + [_row(10 + i, company_name="Four Co") for i in range(4)]})
+    paths = _paths(seo_pages.build(site))
+    assert "/internships/at/five-co/" in paths and "/internships/at/four-co/" not in paths
