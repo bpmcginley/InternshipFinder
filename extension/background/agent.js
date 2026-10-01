@@ -477,7 +477,7 @@ async function loop(id) {
     if (job.status !== "working") return; // waiting for the human to approve it
   }
   let tabId = await ensureTab(job);
-  job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "", needs_auth: false });
+  job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null });
   const msgs = await loadMsgs(id);
   const fails = {};
   let pending = job.pending || null;
@@ -643,7 +643,10 @@ async function loop(id) {
       // Sign-in, allowance, rate or pause: hand the job to the student instead of failing it; Resume retries this step.
       if (!NEEDS_YOU_CODES.has(e && e.code)) throw e;
       msgs.pop();
-      await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
+      // was: await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
+      // `upgrade` (a used-up allowance with a bigger plan on offer) puts an Upgrade button on the job card.
+      await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth",
+        upgrade: e.code === "cap" && e.offer ? e.offer : null });
       await saveMsgs(id, msgs);
       return;
     }

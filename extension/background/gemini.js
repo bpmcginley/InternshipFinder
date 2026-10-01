@@ -135,14 +135,20 @@ const OWN_KEY_HINT = "or add your own key under Deep Dive → Setup → Advanced
 // Turns a Worker error reply into an Error with .code and a message a student can act on.
 export function workerError(status, data = {}) {
   const code = data.error || (status === 401 ? "auth" : status === 503 ? "paused" : status === 429 ? "rate" : status >= 500 ? "upstream" : "bad_request");
-  let msg;
+  let msg, offer = null;
   if (code === "auth") msg = `${SIGN_IN_HINT} to use AI features, then try again.`;
   else if (code === "cap") {
     const label = { resume_tailor: "tailored-resume", autofill: "Auto-Apply", deep_dive: "Deep Dive", field_match: "field-matching", short_answer: "short-answer" }[data.task] || "AI";
     const resets = data.resets ? ` It resets ${new Date(data.resets).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}.` : "";
     // The Worker sets `upgrade` only when the Supporter plan is switched on, so we never advertise
     // a plan that doesn't exist.
-    const more = data.upgrade ? " To raise it, open the InternScout dashboard and press Upgrade, or " : " To keep going now, ";
+    // was: const more = data.upgrade ? " To raise it, open the InternScout dashboard and press Upgrade, or " : " To keep going now, ";
+    // Since 2026-09-30 the Worker also names the next plan and what it gives this student (limits.js
+    // upgradeOffer), so say that instead of a bare "Upgrade"; the job card adds a button for it.
+    const units = data.upgrade && data.resets && data.offer && data.offer.allowance ? data.offer.allowance[data.task] : null;
+    if (units) offer = { plan: data.offer.plan, label: data.offer.label || data.offer.plan, price: data.offer.price || "", units };
+    const more = offer ? ` ${offer.label}${offer.price ? ` (${offer.price})` : ""} gives you ${offer.units} a month: upgrade on the InternScout dashboard. Or, to keep going now, `
+      : data.upgrade ? " To raise it, open the InternScout dashboard and press Upgrade, or " : " To keep going now, ";
     // The Worker says which tier hit the cap; a student who already has the .edu allowance is not told to get one.
     const edu = data.tier === "edu" ? "" : " Accounts with a school .edu email get twice as much.";
     msg = data.resets
@@ -158,6 +164,7 @@ export function workerError(status, data = {}) {
   const e = new Error(msg);
   e.code = code;
   e.status = status;
+  if (offer) e.offer = offer;
   if (data.retry_after) e.retry_after = +data.retry_after;
   return e;
 }

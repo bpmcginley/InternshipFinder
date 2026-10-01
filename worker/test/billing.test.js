@@ -318,6 +318,10 @@ describe("running out", () => {
     let err = await (await api("POST", "/ai", { token: t, body: aiBody("deep_dive", "run-z") })).json();
     assert.equal(err.error, "cap");
     assert.equal(err.upgrade, true);
+    // The offer names the plan and what it gives this student, so the extension can say so.
+    assert.equal(err.offer.plan, "supporter");
+    assert.equal(err.offer.allowance.deep_dive, 4); // 2 at 2x
+    assert.equal((await (await api("GET", "/me", { token: t })).json()).upgrade_offer.plan, "supporter");
 
     const user = await whoami(api, token, db);
     await post(api, completed(user));
@@ -326,6 +330,7 @@ describe("running out", () => {
     err = await (await api("POST", "/ai", { token: t, body: aiBody("deep_dive", "run-y") })).json();
     assert.equal(err.error, "cap");
     assert.equal(err.upgrade, false);
+    assert.equal(err.offer, null);
   });
 });
 

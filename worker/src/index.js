@@ -6,7 +6,7 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { createSession, dropExpiredSessions, endSession, isSessionToken } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
-import { admit, allowanceFor, cleanup, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
@@ -126,6 +126,8 @@ async function route(request, env, ctx, d) {
         plan: mine.plan,
         plan_renews: mine.periodEnd,
         can_upgrade: canUpgrade(env, d.config, mine.plan),
+        // The next plan up and its allowances at this student's tier (null when there is none).
+        upgrade_offer: upgradeOffer(env, d.config, who.tier, mine.plan, now),
         can_manage: paymentsOn(env, d.config) && !!mine.customer,
         tier: who.tier,
         // isPaused takes a plan because the day's stop only applies to free accounts (limits.js).
