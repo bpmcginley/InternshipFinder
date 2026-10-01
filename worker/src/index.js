@@ -10,6 +10,7 @@ import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, month
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countHit } from "./visits.js";
+import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -332,6 +333,11 @@ export async function handle(request, env, ctx, deps = {}) {
 export default {
   fetch: (request, env, ctx) => handle(request, env, ctx),
   scheduled(event, env, ctx) {
+    // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
+    if (event && event.cron === CLOCK_CRON) {
+      ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
+      return;
+    }
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));

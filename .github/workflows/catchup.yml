@@ -9,6 +9,10 @@ name: Keep schedule
 # This workflow's own schedule is best effort too, but it only has to land now and then: each run
 # catches up everything that is due. Minutes 4 and 34 keep clear of the top of the hour, when
 # GitHub's scheduler is busiest. Free for a public repository; a run takes seconds.
+#
+# Since 2026-10-01 the InternScout Worker starts this every half hour as well (worker/src/clock.js,
+# Cloudflare's cron triggers, which fire on time): GitHub had dropped all but 1 to 3 of this
+# workflow's 48 daily starts. This schedule stays as the backup.
 on:
   schedule:
     - cron: "4,34 * * * *"
