@@ -18,6 +18,12 @@ this refreshes the working token once it is REFRESH_EVERY old and keeps the resu
 (the owner generated a fresh one) has a different hash, so it takes over at once. Without
 CLOUDFLARE_API_TOKEN nothing can be kept, and every run says so.
 
+Thursdays (since 2026-10-01) it posts a Reel instead: post.json says "reel": true and DIR/reel.mp4 is
+beside it (growth/reels.py). A video can't be fetched from raw.githubusercontent.com (it serves no
+video type), so the Reel uses Meta's resumable upload: create a REELS container, send the file's bytes
+to the upload URI it returns, wait for processing, publish. If any of that fails, the run posts the
+picture card instead, so the day still gets its post.
+
 Run from the repo root:
   python growth/instagram.py out/post.json          # print what would be posted
   python growth/instagram.py out/post.json --send   # refresh the token if due, then post
@@ -45,6 +51,9 @@ UA = {"User-Agent": "InternScout-brand-posts/1.0 (+https://internscout.org)"}
 REFRESH_EVERY = timedelta(days=7)       # well inside the 60-day life, and a refresh needs a day-old token
 IMAGE_WAIT = 120                        # seconds to wait for the pushed card to be served
 CONTAINER_WAIT = 90                     # seconds to wait for Instagram to fetch it
+REEL_WAIT = 300                         # seconds to wait for Instagram to process a Reel
+# Where a Reel's bytes go when the container's answer has no `uri` (it normally does).
+RUPLOAD = "https://rupload.facebook.com/ig-api-upload/v23.0"
 
 
 class InstagramError(RuntimeError):
@@ -150,22 +159,64 @@ def wait_for_image(url: str, timeout: int = IMAGE_WAIT, sleep=time.sleep) -> Non
         sleep(5)
 
 
-def publish(token: str, image_url: str, caption: str, sleep=time.sleep, timeout: int = CONTAINER_WAIT) -> str:
-    """The new post's media id."""
+def _ig_id(token: str) -> str:
     me = _request("GET", "me", {"fields": "user_id,username", "access_token": token})
-    ig_id = me.get("user_id") or me.get("id")
-    container = _request("POST", f"{ig_id}/media", {"image_url": image_url, "caption": caption,
-                                                    "access_token": token})["id"]
+    return me.get("user_id") or me.get("id")
+
+
+def _wait(container: str, token: str, what: str, timeout: int, sleep, every: int) -> None:
+    """Until Instagram has the container's media ready (status_code FINISHED)."""
     end = time.monotonic() + timeout
     while True:
         status = _request("GET", container, {"fields": "status_code", "access_token": token}).get("status_code")
         if status == "FINISHED":
-            break
+            return
         if status in ("ERROR", "EXPIRED"):
-            raise InstagramError(f"Instagram could not take the image (container {status})")
+            raise InstagramError(f"Instagram could not take the {what} (container {status})")
         if time.monotonic() > end:
-            raise InstagramError("Instagram took too long to fetch the image")
-        sleep(3)
+            raise InstagramError(f"Instagram took too long to process the {what}")
+        sleep(every)
+
+
+def publish(token: str, image_url: str, caption: str, sleep=time.sleep, timeout: int = CONTAINER_WAIT) -> str:
+    """The new post's media id."""
+    ig_id = _ig_id(token)
+    container = _request("POST", f"{ig_id}/media", {"image_url": image_url, "caption": caption,
+                                                    "access_token": token})["id"]
+    _wait(container, token, "image", timeout, sleep, 3)
+    return _request("POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token})["id"]
+
+
+def _upload(uri: str, token: str, data: bytes) -> dict:
+    """Send a Reel's bytes in one piece. The token goes in the Authorization header, never printed."""
+    req = urllib.request.Request(uri, data=data, method="POST",
+                                 headers={**UA, "Authorization": f"OAuth {token}", "offset": "0",
+                                          "file_size": str(len(data)), "Content-Type": "application/octet-stream"})
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read())
+            msg = (err.get("debug_info") or err.get("error") or {}).get("message") or f"HTTP {e.code}"
+        except (ValueError, AttributeError):
+            msg = f"HTTP {e.code}"
+        raise InstagramError(f"the video upload failed: {msg}") from None
+
+
+def publish_reel(token: str, video_path: str, caption: str, sleep=time.sleep, timeout: int = REEL_WAIT,
+                 upload=None) -> str:
+    """Post the video as a Reel (also shown on the profile grid); the new post's media id."""
+    with open(video_path, "rb") as f:
+        data = f.read()
+    ig_id = _ig_id(token)
+    # thumb_offset: the cover is the title slide, a second in, after its fade has settled.
+    made = _request("POST", f"{ig_id}/media", {"media_type": "REELS", "upload_type": "resumable",
+                                               "caption": caption, "share_to_feed": "true",
+                                               "thumb_offset": "1000", "access_token": token})
+    container = made["id"]
+    (upload or _upload)(made.get("uri") or f"{RUPLOAD}/{container}", token, data)
+    _wait(container, token, "video", timeout, sleep, 5)
     return _request("POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token})["id"]
 
 
@@ -177,6 +228,10 @@ def main(argv: list[str]) -> int:
             post = json.load(f)
         print(post["instagram_caption"])
         print(f"[instagram] image: {post['card_url']}")
+        reel = os.path.join(os.path.dirname(os.path.abspath(args[0])), "reel.mp4")
+        post["reel_path"] = reel if post.get("reel") and os.path.exists(reel) else None
+        if post["reel_path"]:
+            print(f"[instagram] reel: {reel} ({os.path.getsize(reel) // 1024} KB)")
     if "--send" not in argv:
         return 0
     secret = os.environ.get("INSTAGRAM_TOKEN")
@@ -188,6 +243,13 @@ def main(argv: list[str]) -> int:
         if not post:
             print("[instagram] nothing to post this run; token checked")
             return 0
+        if post.get("reel_path"):
+            try:
+                print(f"[instagram] reel posted: {publish_reel(token, post['reel_path'], post['instagram_caption'])}")
+                return 0
+            except (InstagramError, urllib.error.URLError, OSError) as e:
+                # The day still gets its post: the card, the way every other day posts.
+                print(f"[instagram] reel failed ({type(e).__name__}: {e}); posting the card instead")
         wait_for_image(post["card_url"])
         print(f"[instagram] posted: {publish(token, post['card_url'], post['instagram_caption'])}")
         return 0
