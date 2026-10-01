@@ -72,7 +72,7 @@ systems in one sentence. Describe what the extension works on in general words i
 <!-- was: > • Sign in with Google or Microsoft to use the AI features. There's nothing to set up. A school .edu email gets twice the monthly AI use. -->
 <!-- was: > • Each student gets a free monthly allowance. The extension shows what's left. -->
 <!-- The old block said the product is free, full stop. Paid plans went live in worker/wrangler.toml
-     (PAYMENTS_ENABLED = "1", Supporter $5/month, Pro $12/month) and Bruce confirmed on 2026-09-19 that
+     (PAYMENTS_ENABLED = "1", Supporter $5/month, Pro $12/month, repriced to $4 and $8 on 2026-09-30) and Bruce confirmed on 2026-09-19 that
      they stay on at launch, so "FREE FOR STUDENTS" is now a false pricing claim on a listing that has
      purchasable tiers behind it — the exact shape of "undisclosed paid feature" the store rejects for.
      Prices and plan labels below come from worker/src/config.js PLANS, not from memory. -->
@@ -90,7 +90,7 @@ systems in one sentence. Describe what the extension works on in general words i
      promised an allowance the code will not grant on the path it recommends. The extension already tells
      the student the whole rule at extension/onboarding/onboarding.js line 188. -->
 > • A school .edu email doubles that free allowance — sign in with Google using that address. A personal Microsoft account cannot prove a school domain, so it stays on the smaller allowance even if the address ends in .edu.
-> • Optional paid plans raise it further — Supporter $5/month, Pro $12/month — and you upgrade on the dashboard, not in the extension. Staying on the free allowance is a real option; nothing expires into a paywall.
+> • Optional paid plans raise it further — Supporter $4/month, Pro $8/month — and you upgrade on the dashboard, not in the extension. Staying on the free allowance is a real option; nothing expires into a paywall.
 <!-- Added, not replacing anything: the extension ships a bring-your-own-key path that this block never
      mentioned. extension/lib/store.js line 80 carries `ai: { provider: "internscout", apiKey: "",
      geminiKey: "" }`, the Deep Dive Setup step offers "Your own Anthropic (Claude) key" and "Your own
@@ -316,6 +316,6 @@ Chrome counts data as "collected" when it leaves the device. Profile data stays 
   needs sign-in, the Deep Dive included** — signed out it returns 401. Do not invite the reviewer to try an
   AI feature signed out.
 - Reviewer notes must also disclose the paid plans, because they are live (`PAYMENTS_ENABLED = "1"` in
-  `worker/wrangler.toml`): Supporter $5/month and Pro $12/month, both optional, both bought through Stripe
+  `worker/wrangler.toml`): Supporter $4/month and Pro $8/month, both optional, both bought through Stripe
   Checkout on the dashboard and never inside the extension. Declare the item as offering in-app purchases /
   subscriptions in the Dashboard's pricing section so the listing and the code agree.

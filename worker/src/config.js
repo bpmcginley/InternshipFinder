@@ -11,9 +11,10 @@ export const FLASH_LITE = "gemini-3.5-flash-lite";
 export const TASKS = {
   field_match:   { model: FLASH_LITE, maxOutputTokens: 1024, thinkingLevel: "minimal", thinkingBudget: 0,    allowance: 260, maxBodyBytes: 200_000 },
   short_answer:  { model: FLASH_LITE, maxOutputTokens: 2048, thinkingLevel: "low",     thinkingBudget: 1024, allowance: 80, maxBodyBytes: 200_000 },
-  // was: resume_tailor allowance 10, autofill 20. Doubled and half again on 2026-09-30: see COSTS below.
-  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 15, maxBodyBytes: 1_500_000 },
-  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 40, maxBodyBytes: 1_500_000 },
+  // was: resume_tailor 10, autofill 20 (then briefly 15 and 40). Set on 2026-09-30 to what a month of
+  // real applying looks like and to hold through Flash's price rise with no cut: see USER_BUDGET_CENTS.
+  resume_tailor: { model: FLASH,      maxOutputTokens: 8192, thinkingLevel: "medium",  thinkingBudget: 4096, allowance: 10, maxBodyBytes: 1_500_000 },
+  autofill:      { model: FLASH,      maxOutputTokens: 4096, thinkingLevel: "low",     thinkingBudget: 2048, allowance: 25, maxBodyBytes: 1_500_000 },
   // The Deep Dive is done once and costs a few cents, so it is not capped (Bruce, 2026-09-18). It used
   // to be 2 a month, and the first real one ran out after two interview replies because the extension
   // sent no run_id and every reply counted as its own Deep Dive.
@@ -25,11 +26,12 @@ export const TASKS = {
 // halve that day and a full month still costs what it did: a Supporter who uses every unit would
 // otherwise cost ~$8.70 of AI against $4.56 net. Flash-Lite tasks keep their allowance. The plan
 // multipliers apply on top, so the paid tiers halve too. The Deep Dive has no cap, so it is not here.
-export const ALLOWANCE_CHANGES = [
-  // was: { resume_tailor: 5, autofill: 10 }, half of the old 10 and 20. Half of the new 15 and 40 would
-  // be 7.5 and 20; the resume row rounds up to 8, which the free ceiling still covers (COSTS below).
-  { from: "2027-01-01", tasks: { resume_tailor: 8, autofill: 20 } },
-];
+//
+// None is scheduled now (2026-09-30). was: { from: "2027-01-01", tasks: { resume_tailor: 5, autofill: 10 } },
+// a halving for the price rise. After the Auto-Apply cost cuts an application costs about 2c, so about
+// 4c at the new price, and the allowances below already fit every plan's ceiling at that. The table
+// stays for the day a price change does need one.
+export const ALLOWANCE_CHANGES = [];
 
 // Thinking levels each model accepts, lowest first (ai.google.dev/gemini-api/docs/thinking)
 export const THINKING_LEVELS = {
@@ -63,15 +65,12 @@ const PRO_RATE = { perMinute: 25, perDay: 2000 };
 // busy; a plan's multiplier scales every task allowance in TASKS, and the .edu doubling applies on
 // top, so a UMass supporter gets twice what a non-UMass supporter does.
 //
-// The multipliers are set so a plan still pays for itself even when a .edu student uses every unit
-// of it. An auto-filled application is what dominates the bill, at roughly $0.06 of Gemini once the
-// rules-first path has skipped the applications that need no model at all; a tailored resume is
-// about $0.01 and a Deep Dive about $0.02. Stripe keeps 2.9% + 30c, so at the ceiling:
-//   Supporter $5  -> $4.56 net, 50 autofills + 25 resumes + 5 Deep Dives = about $3.35 (27% left)
-//   Pro       $12 -> $11.35 net, 120 autofills + 60 resumes + 12 Deep Dives = about $8.04 (29% left)
-// Almost nobody empties a month's allowance, so the everyday margin is far wider than that; the
-// ceiling is what stops a heavy month from costing more than it brought in. Raising a multiplier
-// without raising the price eats it fast: 3x on Supporter is already near break-even.
+// Repriced 2026-09-30 (was: Supporter $5 at 2.5x, Pro $12 at 6x, which came to 50 and 120 applications,
+// then briefly 100 and 240, more than anyone applies to in a month). Now Supporter is $4 for twice the
+// free allowance and Pro $8 for four times it: 50 and 100 applications, what a student in full search
+// actually sends. Stripe keeps 2.9% + 30c, so $4 nets $3.58 and $8 nets $7.47. What each plan's month
+// can cost is capped at 75% of that by USER_BUDGET_CENTS, and the sums there show a full month fits
+// under the cap at the expected costs, now and after Flash doubles in price.
 //
 // `priceEnv` names the wrangler secret holding that plan's Stripe Price id. A plan whose secret is
 // unset is simply not offered, so one tier can go live before the other.
@@ -84,8 +83,9 @@ export const PLANS = {
   // reach for that var and believe it worked.
   // free has no `rate` of its own: it uses CONFIG.RATE below. To change it, edit FREE_RATE here.
   free: { multiplier: 1 },
-  supporter: { multiplier: 2.5, priceText: "$5/month", priceEnv: "STRIPE_PRICE_ID", textEnv: "SUPPORTER_PRICE_TEXT", label: "Supporter", rate: PAID_RATE },
-  pro: { multiplier: 6, priceText: "$12/month", priceEnv: "STRIPE_PRICE_ID_PRO", textEnv: "PRO_PRICE_TEXT", label: "Pro", rate: PRO_RATE },
+  // was: multiplier 2.5 at "$5/month", and 6 at "$12/month"
+  supporter: { multiplier: 2, priceText: "$4/month", priceEnv: "STRIPE_PRICE_ID", textEnv: "SUPPORTER_PRICE_TEXT", label: "Supporter", rate: PAID_RATE },
+  pro: { multiplier: 4, priceText: "$8/month", priceEnv: "STRIPE_PRICE_ID_PRO", textEnv: "PRO_PRICE_TEXT", label: "Pro", rate: PRO_RATE },
 };
 
 // What one account may cost in a month, in cents, whatever tasks it is spent on. A full free .edu
@@ -113,27 +113,30 @@ export const PLANS = {
 // was: export const USER_BUDGET_CENTS = { free: 300, supporter: 450, pro: 1100 };
 // was: export const USER_BUDGET_CENTS = { free: 150, supporter: 450, pro: 1100 };
 //
-// Recalibrated 2026-09-30, from what the AI measurably costs now (COSTS below). The paid rows are what
-// guarantees the margin: a Supporter or Pro student's AI stops for the month at their row, whatever an
-// application turns out to cost, so each row is 75% of what the plan brings in after Stripe's cut
-// ($4.56 and $11.35) and every paid month keeps at least 25% of its money, before and after Flash
-// doubles in price. (The old rows were 99% and 97%: a student who used everything left almost nothing.)
-// The allowances are then sized to fit inside the rows, so a student meets the unit allowance first and
-// the ceiling only stops an unusually expensive month:
-//   free .edu   40 Auto-Apply x 3c + 15 resumes x 1c = 135c of 150c; from 2027: 20 x 6c + 8 x 2c = 136c
-//   Supporter   2.5x: 100 x 3c + 37 x 1c = 337c of 340c;          from 2027: 50 x 6c + 20 x 2c = 340c
-//   Pro         6x:   240 x 3c + 90 x 1c = 810c of 850c;          from 2027: 120 x 6c + 48 x 2c = 816c
-// The Deep Dive stays uncapped and comes out of the same row, a few cents each.
-export const USER_BUDGET_CENTS = { free: 150, supporter: 340, pro: 850 };
+// was: export const USER_BUDGET_CENTS = { free: 150, supporter: 340, pro: 850 };  (for $5 and $12)
+//
+// Set 2026-09-30 with the $4 and $8 prices. The paid rows are what guarantees the margin: a Supporter
+// or Pro student's AI stops for the month at their row, whatever an application turns out to cost, so
+// each row is 75% of what the plan brings in after Stripe's cut ($3.58 and $7.47) and every paid month
+// keeps at least 25% of its money. The allowances fit inside the rows at the expected costs (COSTS
+// below), both now and after Flash doubles on 2027-01-01, so no allowance has to be cut that day:
+//               allowance (.edu)            now (2c / 1c)   from 2027 (4c / 2c)   row
+//   free        25 Auto-Apply, 10 resumes   60c             120c                  150c
+//   Supporter   50 Auto-Apply, 20 resumes   120c            240c                  268c  (33% kept at full use)
+//   Pro         100 Auto-Apply, 40 resumes  240c            480c                  560c  (36% kept at full use)
+// If applications cost more than expected, a heavy student reaches the row before the allowance; the
+// margin holds either way. The Deep Dive stays uncapped and comes out of the same row, a few cents each.
+export const USER_BUDGET_CENTS = { free: 150, supporter: 268, pro: 560 };
 
-// What each task costs a student's row, in cents, for the sums above (not read by code). Measured on
-// 2026-09-30 after the Auto-Apply cost cuts (extension 0.5.1-0.5.2): 86 recorded steps at ~0.64c on
-// Gemini 3.8 Flash, ~3.2 steps an application, ~2c each on Greenhouse, Lever and Ashby. Planned at 3c to
-// leave room for Workday and iCIMS, whose forms run longer; doubled from 2027-01-01 with Flash's price.
-// task_tokens in D1 has the real figure per task; if it comes in above these, lower the allowances, and
-// if well below, raise them. The margin itself does not depend on them, only how often a student reaches
-// the ceiling before the allowance.
-export const COSTS = { autofill: { now: 3, from2027: 6 }, resume_tailor: { now: 1, from2027: 2 }, deep_dive: { now: 2, from2027: 4 } };
+// What each task is expected to cost a student's row, in cents, for the sums above (not read by code).
+// Measured 2026-09-30 after the Auto-Apply cost cuts (extension 0.5.1-0.5.2): 86 recorded steps at ~0.64c
+// on Gemini 3.8 Flash, ~3.2 steps an application, so ~2c; doubled from 2027-01-01 with Flash's price.
+// (was: planned at 3c and 6c, which forced a cut at the new year.) task_tokens in D1 has the real figure
+// per task: if it comes in above these, heavy students meet their ceiling before their allowance (the
+// margin holds regardless); if below, the allowances can go up.
+export const COSTS = { autofill: { now: 2, from2027: 4 }, resume_tailor: { now: 1, from2027: 2 }, deep_dive: { now: 2, from2027: 4 } };
+// What each paid plan brings in after Stripe's 2.9% + 30c, in cents, for the 75% rule above.
+export const NET_CENTS = { supporter: 358, pro: 747 };
 
 // The paid plans, cheapest first. Order is what the dashboard shows.
 export const PAID_PLANS = ["supporter", "pro"];
@@ -149,6 +152,7 @@ export const REFERRAL = { bonus: { autofill: 3 }, maxRewards: 10, windowDays: 7 
 
 export const CONFIG = {
   COSTS,
+  NET_CENTS,
   TASKS,
   ALLOWANCE_CHANGES,
   PLANS,

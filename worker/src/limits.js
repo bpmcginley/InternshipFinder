@@ -47,9 +47,27 @@ export async function spend(db, month) {
 // is the honest one. A caller that knows the student's plan should pass it.
 export async function isPaused(db, env, config, now, plan = "free") {
   // was: return (await spend(db, monthOf(now))) >= budgetCents(env, config);
-  if ((await spend(db, monthOf(now))) >= budgetCents(env, config)) return true;
+  // was: if ((await spend(db, monthOf(now))) >= budgetCents(env, config)) return true;
+  // The month's stop is the free tier's now, like the day's (see freeMonthSpend); a budget of 0 is
+  // still the switch that pauses AI for everyone.
+  const budget = budgetCents(env, config);
+  if (!(budget > 0)) return true;
   if (plan !== "free") return false;
+  if ((await freeMonthSpend(db, monthOf(now))) >= budget) return true;
   return (await daySpend(db, dayOf(now))) >= dailyBudgetCents(env, config);
+}
+
+// The month's spend by FREE accounts (Bruce, 2026-09-30). MONTHLY_BUDGET_CENTS used to stop AI for
+// everyone once ALL accounts together had spent it, so a heavy free month would have told a paying
+// Supporter or Pro "paused until next month" on a budget they did not drain - the same thing the day's
+// share already refused to do to them (2026-09-19). A paid account is bounded by its own
+// USER_BUDGET_CENTS row, which keeps a quarter of what the plan brings in, so the shared budget is now
+// the free tier's alone. Kept in the `spend` table under the day rows' sentinel with the month as its
+// key ("2026-09", which no day key equals), so cleanup() drops it at month end like the rest. The
+// `budget` table still adds up everything, paid and free, for the dashboard.
+export async function freeMonthSpend(db, month) {
+  const row = await db.prepare("SELECT cents FROM spend WHERE user_hash = ? AND month = ?").bind(GLOBAL_USER, month).first();
+  return row ? row.cents : 0;
 }
 
 export async function addSpend(db, month, cents) {
@@ -177,7 +195,9 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   const rate = (config.PLANS[plan] || config.PLANS.free).rate || config.RATE;
   const month = monthOf(now);
   const today = dayOf(now);
-  if ((await spend(db, month)) >= budgetCents(env, config)) {
+  // was: if ((await spend(db, month)) >= budgetCents(env, config)) {   (everyone's spend, everyone stopped)
+  const budget = budgetCents(env, config);
+  if (!(budget > 0) || (plan === "free" && (await freeMonthSpend(db, month)) >= budget)) {
     throw new HttpError(503, "paused", "AI features are paused until next month because the budget is used up. Search still works.");
   }
   // was: // Checked after the month's stop so a genuinely empty month still says "until next month". This one
@@ -282,7 +302,8 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   // unit; `bonusLeft` is how many invite units remain, for the X-InternScout-Remaining header.
   const extraRow = limit > 0 ? await db.prepare("SELECT granted - used AS left FROM bonus WHERE user_hash = ? AND task = ?")
     .bind(user, task).first() : null;
-  const admitted = { month, day: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false,
+  // `freeMonth` is set, like `day`, only where the free tier's month row is charged (below).
+  const admitted = { month, day: null, freeMonth: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false,
                      bonusTook, bonusLeft: extraRow ? Math.max(0, extraRow.left) : 0 };
   // The account's own ceiling. Without it the only thing between one modified client and the whole
   // month's budget is the daily rate limit: a task with no unit cap, a fresh run_id per call and a
@@ -335,6 +356,13 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
                           { retry_after: Math.ceil((midnight - now.getTime()) / 1000) });
     }
     admitted.day = today;
+    // The free tier's month, read at the top of this function (freeMonthSpend). Charged here, after
+    // the day's, so a call the day refused never reaches it.
+    await db.prepare(
+      "INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, ?) " +
+      "ON CONFLICT(user_hash, month) DO UPDATE SET cents = cents + excluded.cents",
+    ).bind(GLOBAL_USER, month, admitted.estimate).run();
+    admitted.freeMonth = month;
   }
   await addSpend(db, month, admitted.estimate);
   // was: // Charged to the day as well as the month, so the ceiling above sees the estimate that has just
@@ -360,7 +388,7 @@ export const shownLimit = (limit, used, bonusLeft) => (limit == null ? null : Ma
 // buckets keep their count, since the call was made.
 export async function release(db, user, task, runId, admitted) {
   // was: const { month, isNew, estimate, metered } = admitted;
-  const { month, day, isNew, estimate, metered, bonusTook } = admitted;
+  const { month, day, freeMonth, isNew, estimate, metered, bonusTook } = admitted;
   const stmts = [];
   if (isNew) {
     stmts.push(db.prepare("DELETE FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?").bind(user, month, task, runId));
@@ -386,6 +414,7 @@ export async function release(db, user, task, runId, admitted) {
       stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?").bind(estimate, GLOBAL_USER, day));
     }
     if (metered) stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?").bind(estimate, user, month));
+    if (freeMonth) stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents - ?) WHERE user_hash = ? AND month = ?").bind(estimate, GLOBAL_USER, freeMonth));
   }
   await db.batch(stmts);
 }
@@ -396,7 +425,7 @@ export async function release(db, user, task, runId, admitted) {
 // meta: {task, model} for the per-task totals (task_tokens); optional, so an old caller still settles.
 export async function settle(db, user, admitted, cents, usage, meta) {
   // was: const { month, estimate, metered } = admitted;
-  const { month, day, estimate, metered } = admitted;
+  const { month, day, freeMonth, estimate, metered } = admitted;
   const delta = (cents > 0 ? cents : 0) - estimate;
   const stmts = [];
   if (delta !== 0) {
@@ -423,6 +452,11 @@ export async function settle(db, user, admitted, cents, usage, meta) {
     }
     if (metered) {
       stmts.push(db.prepare("UPDATE spend SET cents = MAX(0, cents + ?) WHERE user_hash = ? AND month = ?").bind(delta, user, month));
+    }
+    if (freeMonth) {
+      stmts.push(db.prepare(
+        "INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, MAX(0, ?)) " +
+        "ON CONFLICT(user_hash, month) DO UPDATE SET cents = MAX(0, cents + ?)").bind(GLOBAL_USER, freeMonth, delta, delta));
     }
   }
   if (usage) {

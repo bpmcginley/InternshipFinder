@@ -149,7 +149,7 @@ describe("webhook", () => {
     assert.equal(after.plan, "supporter");
     assert.equal(after.can_upgrade, false);
     assert.equal(after.can_manage, true);
-    assert.equal(after.allowance.autofill.limit, before.allowance.autofill.limit * 2.5);
+    assert.equal(after.allowance.autofill.limit, before.allowance.autofill.limit * 2);   // was * 2.5
     assert.equal(after.plan_renews, "2026-11-06T21:20:00.000Z");
   });
 
@@ -161,8 +161,8 @@ describe("webhook", () => {
         ? Response.json({ id: "sub_1", status: "active", current_period_end: 1794000000, items: { data: [{ price: { id: price } }] } })
         : Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" });
 
-    // was: supporter 50, pro 120 (allowances recalibrated 2026-09-30)
-    for (const [price, plan, autofill] of [["price_1", "supporter", 100], ["price_pro", "pro", 240]]) {
+    // was: supporter 50, pro 120 at $5 and $12; repriced 2026-09-30 to $4 (2x) and $8 (4x) of 25
+    for (const [price, plan, autofill] of [["price_1", "supporter", 50], ["price_pro", "pro", 100]]) {
       const { api, db, token } = await setup({ env: BOTH, stripe: sub(price) });
       const user = await whoami(api, token, db);
       // Stale metadata from an earlier tier must not win over the price actually being billed.
@@ -180,7 +180,7 @@ describe("webhook", () => {
     assert.deepEqual(one.payments.plans.map((p) => p.plan), ["supporter"]);
     const two = await (await (await setup({ env: BOTH })).api("GET", "/config")).json();
     assert.deepEqual(two.payments.plans.map((p) => p.plan), ["supporter", "pro"]);
-    assert.deepEqual(two.payments.plans.map((p) => p.multiplier), [2.5, 6]);
+    assert.deepEqual(two.payments.plans.map((p) => p.multiplier), [2, 4]);
   });
 
   // Stripe's newer API versions put the renewal date on the subscription item instead.

@@ -7,7 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NOW, fakeD1, makeEnv } from "./helpers.js";
 import { CONFIG } from "../src/config.js";
-import { GLOBAL_USER, addDaySpendUnder, admit, release, settle } from "../src/limits.js";
+import { GLOBAL_USER, addDaySpendUnder, admit, freeMonthSpend, isPaused, release, settle } from "../src/limits.js";
 
 const DAY = "2026-09-14";        // NOW is 2026-09-14T10:05:30Z
 const MONTH = "2026-09";
@@ -103,4 +103,52 @@ test("two admissions racing for the last of the day's share: one is charged, one
   assert.equal(accountCents(db), 6);
   assert.equal(db.dump().usage.reduce((s, r) => s + r.units, 0), 1);
   assert.equal(db.dump().runs.length, 1);
+});
+
+
+// Bruce, 2026-09-30: the month's budget is the free tier's too. A paying student is bounded by their
+// own USER_BUDGET_CENTS row (a quarter of their plan's money kept), so free accounts emptying the
+// month must never answer them "paused until next month".
+test("the month's budget stops free students and lets paying ones through", async () => {
+  const db = fakeD1();
+  const env = makeEnv({ MONTHLY_BUDGET_CENTS: "100" });
+  await db.prepare("INSERT INTO spend (user_hash, month, cents) VALUES (?, ?, 100)").bind(GLOBAL_USER, MONTH).run();
+
+  await assert.rejects(
+    () => ask(db, env, "free-user", "free", "r-free"),
+    (e) => e.status === 503 && e.code === "paused" && /next month/.test(e.message),
+  );
+  assert.equal(await isPaused(db, env, CONFIG, NOW, "free"), true);
+
+  for (const plan of ["supporter", "pro"]) {
+    assert.equal(await isPaused(db, env, CONFIG, NOW, plan), false, plan + " is not told AI is paused");
+    const a = await ask(db, env, plan + "-a", plan, "r-" + plan + "-a");
+    assert.equal(a.freeMonth, null, "a paid call does not ride on the free month");
+    await settle(db, plan + "-a", a, 12, null);
+    const b = await ask(db, env, plan + "-b", plan, "r-" + plan + "-b");
+    await release(db, plan + "-b", "field_match", "r-" + plan + "-b", b);
+  }
+  assert.equal(await freeMonthSpend(db, MONTH), 100, "paid calls neither add to nor take from the free month");
+});
+
+test("a free call is charged to the free month, and settle() and release() correct it", async () => {
+  const db = fakeD1();
+  const env = makeEnv({ MONTHLY_BUDGET_CENTS: "1000" });
+  const a = await ask(db, env, "f-a", "free", "r-a", 6);
+  assert.equal(a.freeMonth, MONTH);
+  assert.equal(await freeMonthSpend(db, MONTH), 6);
+  await settle(db, "f-a", a, 2, null);                 // the call really cost 2c
+  assert.equal(await freeMonthSpend(db, MONTH), 2);
+  const b = await ask(db, env, "f-b", "free", "r-b", 6);
+  await release(db, "f-b", "field_match", "r-b", b);    // Gemini failed: nothing was spent
+  assert.equal(await freeMonthSpend(db, MONTH), 2);
+});
+
+test("a budget of 0 still pauses AI for everyone, paid accounts included", async () => {
+  const db = fakeD1();
+  const env = makeEnv({ MONTHLY_BUDGET_CENTS: "0" });
+  for (const plan of ["free", "supporter", "pro"]) {
+    assert.equal(await isPaused(db, env, CONFIG, NOW, plan), true, plan);
+    await assert.rejects(() => ask(db, env, plan + "-z", plan, "r-z-" + plan), (e) => e.code === "paused", plan);
+  }
 });

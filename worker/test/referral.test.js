@@ -34,7 +34,7 @@ test("a new .edu classmate who claims an invite gets 3 extra Auto-Apply runs, an
   assert.deepEqual(await res.json(), { ok: true, bonus: { autofill: 3 }, inviter_rewarded: true });
   for (const t of [inviter, friend]) {
     const a = (await me(w, t)).allowance.autofill;
-    assert.deepEqual([a.used, a.limit, a.bonus], [0, 43, 3]);     // 40 for .edu (was 20), plus 3
+    assert.deepEqual([a.used, a.limit, a.bonus], [0, 28, 3]);     // 25 for .edu (was 20), plus 3
   }
   assert.equal((await invite(w, inviter)).rewarded, 1);
   // once per account, never your own, and only a real code
