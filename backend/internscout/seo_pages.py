@@ -586,14 +586,18 @@ footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:26px}section.re
 """
 
 def beacon_from(site_dir: str) -> str:
-    """The analytics snippet exactly as the dashboard carries it, so there is one copy to change.
-    (Its token is public by design, but a second hard-coded copy here could drift from the first.)"""
+    """The analytics snippets exactly as the dashboard carries them, so there is one copy to change.
+    (Its token is public by design, but a second hard-coded copy here could drift from the first.)
+    Since 2026-09-30 that is two tags: the exact visit counter (js/count.js) and Cloudflare's beacon."""
     try:
         with open(os.path.join(site_dir, "index.html"), encoding="utf-8") as f:
-            m = re.search(r"<script[^>]*cloudflareinsights[^>]*></script>", f.read())
-        return m.group(0) if m else ""
+            html = f.read()
     except OSError:
         return ""
+    # was: one re.search for the cloudflareinsights tag
+    tags = [re.search(r"<script[^>]*/js/count\.js[^>]*></script>", html),
+            re.search(r"<script[^>]*cloudflareinsights[^>]*></script>", html)]
+    return "\n".join(m.group(0) for m in tags if m)
 
 
 BEACON = ""   # set by build() from the site's own index.html

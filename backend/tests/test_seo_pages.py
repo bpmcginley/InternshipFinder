@@ -118,6 +118,15 @@ def test_analytics_snippet_comes_from_the_dashboard(tmp_path):
     assert all("cloudflareinsights" not in p["html"] for p in seo_pages.build(site))
 
 
+def test_visit_counter_comes_from_the_dashboard_too(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
+    counter = '<script defer src="/js/count.js"></script>'
+    beacon = "<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{}'></script>"
+    (tmp_path / "index.html").write_text(f"<html><body>{counter}\n{beacon}</body></html>", encoding="utf-8")
+    pages = seo_pages.build(site)
+    assert pages and all(counter in p["html"] and beacon in p["html"] for p in pages)
+
+
 def test_field_and_state_slugs_never_collide():
     states = {seo_pages.state_slug(k) for k in seo_pages.US_STATES}
     assert not states & {seo_pages.field_slug(t) for t in seo_pages.FIELD_TITLES}

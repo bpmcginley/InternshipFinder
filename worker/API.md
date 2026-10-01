@@ -285,6 +285,17 @@ Body:
 ### `POST /demand` (auth)
 Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (max 60). Replaces the user's row. Returns `{ "ok": true }`.
 
+### `POST /hit` (site only, no auth)
+One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
+`{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email" }` (path, referring
+host, utm_source, utm_medium; all optional). Answers `204` and adds one to `visit_counts` for the UTC
+day, the page kind (`dashboard`, `landing`, `install`, `legal`, `other`) and the source (`direct`,
+`search`, `social`, `email`, `extension`, `other`, or `internal` for a load from another page of the
+site, which counts as a view but not a visit). Nothing about the visitor is stored.
+`403` unless `Origin` is the live site. Script-running crawlers (by user agent), more than 30 hits a
+minute from one address (counted in memory only), and anything past 50,000 views in a day are
+answered `204` but not counted.
+
 ### `GET /demand` (CI only)
 Needs `Authorization: Bearer <DEMAND_TOKEN>` (a secret). Returns:
 ```json
