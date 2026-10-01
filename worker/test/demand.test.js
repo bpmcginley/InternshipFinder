@@ -48,3 +48,11 @@ test("only users active in the last 90 days count", async () => {
   await w.api("GET", "/me", { token: await w.token() });
   assert.deepEqual((await (await counts(w)).json()).states, { TX: 1 });
 });
+
+test("Canadian provinces are counted like states (2026-10-01); a country is not", async () => {
+  const w = await setup();
+  const token = await w.token();
+  assert.equal((await w.api("POST", "/demand", { token, body: { states: ["on", "QC", "MA", "REMOTE"] } })).status, 200);
+  assert.deepEqual((await (await counts(w)).json()).states, { MA: 1, ON: 1, QC: 1, REMOTE: 1 });
+  assert.equal((await w.api("POST", "/demand", { token, body: { states: ["CANADA"] } })).status, 400);
+});

@@ -108,7 +108,9 @@ def maybe_in_region(loc: str) -> bool:
     an unknown state, or a wanted state (the baseline plus states students picked)."""
     prov = canada_of(loc) if loc else None
     if prov is not None:
-        return prov in CA_DETAIL_PROVINCES
+        # was: prov in CA_DETAIL_PROVINCES. A province students picked (the ingest's wanted states,
+        # from the Worker's /demand) gets the detail calls too, like a picked US state.
+        return prov in CA_DETAIL_PROVINCES or prov in wanted_states()
     if not loc or _NON_US.search(loc):
         return False
     st = _state(loc)

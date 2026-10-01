@@ -142,7 +142,9 @@
   };
   // was: every picked state. The Worker's /demand accepts US codes only until it is redeployed with the
   // provinces, and one code it refuses fails the whole save, so provinces stay on this device for now.
-  const demandStates = p => [...(p.states || []).filter(s => US_STATES[s]), ...(p.remote ? ["REMOTE"] : [])];
+  // was: .filter(s => US_STATES[s]). The Worker accepts province codes since 2026-10-01; "Canada" (the
+  // file of roles naming no province) is not a place to scan, so it stays on this device.
+  const demandStates = p => [...(p.states || []).filter(s => US_STATES[s] || CA_PROVINCES[s]), ...(p.remote ? ["REMOTE"] : [])];
   // A Canadian role is usually open only to people allowed to work in Canada, which a US student
   // generally is not without a permit. The card says so rather than leave it to the posting.
   const inCanadaOnly = x => { const r = regs(x); return r.length > 0 && r.every(g => g.kind === "canada"); };
