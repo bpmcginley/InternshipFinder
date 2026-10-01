@@ -178,6 +178,10 @@ STATE_METROS = {
     "UT": "Salt Lake City, Utah", "VA": "Arlington, Virginia", "WA": "Seattle, Washington",
     "WV": "Charleston, West Virginia", "WI": "Milwaukee, Wisconsin", "WY": "Cheyenne, Wyoming",
     "PR": "San Juan, Puerto Rico",
+    # Provinces students pick (2026-10-01): the big metro in each, as SerpApi names it.
+    "ON": "Toronto, Ontario, Canada", "QC": "Montreal, Quebec, Canada", "BC": "Vancouver, British Columbia, Canada",
+    "AB": "Calgary, Alberta, Canada", "MB": "Winnipeg, Manitoba, Canada", "NS": "Halifax, Nova Scotia, Canada",
+    "SK": "Saskatoon, Saskatchewan, Canada",
 }
 
 

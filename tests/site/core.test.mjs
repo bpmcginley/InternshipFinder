@@ -74,5 +74,6 @@ test("Canadian listings go in their province's file, or Canada's, and the save t
   assert.equal(IS.keyLabel("Canada"), "Canada (no province listed)");
   assert.ok(IS.inCanadaOnly(toronto) && IS.inCanadaOnly(anywhere) && !IS.inCanadaOnly(both));
   // The Worker's /demand refuses a whole save with one code it does not know.
-  assert.deepEqual([...IS.demandStates({ states: ["MA", "ON", "Canada"], remote: true })], ["MA", "REMOTE"]);
+  // was: ["MA", "REMOTE"]. The Worker counts provinces since 2026-10-01; "Canada" (no province) stays here.
+  assert.deepEqual([...IS.demandStates({ states: ["MA", "ON", "Canada"], remote: true })], ["MA", "ON", "REMOTE"]);
 });

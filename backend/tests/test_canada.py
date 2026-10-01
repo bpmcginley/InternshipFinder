@@ -151,3 +151,11 @@ def test_the_first_canadian_scan_counts_as_new_only_what_was_posted_this_week():
     assert [seo_pages.fresh(x, now, seo_pages.FIRST_SEEN_SINCE) for x in rows] == [False, True, False, True, True, True]
     mark_new(rows, today=date(2026, 10, 2))
     assert [x["is_new"] for x in rows] == [False, True, False, True, True, True]     # the two rules agree
+
+
+def test_a_province_students_picked_gets_the_detail_calls(monkeypatch):
+    assert not maybe_in_region("Halifax, NS")
+    monkeypatch.setenv("INTERNSCOUT_WANTED_STATES", "NS")
+    assert maybe_in_region("Halifax, NS")
+    from internscout.config import google_jobs_locations
+    assert "Halifax, Nova Scotia, Canada" in google_jobs_locations()

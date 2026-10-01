@@ -1,9 +1,12 @@
 // Area demand: the states signed-in students want. One row per user, replaced on change.
 import { HttpError } from "./http.js";
 
+// Canada's provinces and territories since 2026-10-01 (none is also a US code), so a student who
+// picks Ontario counts toward where the ingest scans in detail, like one who picks Ohio.
 export const STATES = new Set((
   "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY " +
-  "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR GU VI AS MP REMOTE"
+  "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR GU VI AS MP REMOTE " +
+  "AB BC MB NB NL NS NT NU ON PE QC SK YT"
 ).split(" "));
 
 export function cleanStates(body) {
@@ -13,7 +16,8 @@ export function cleanStates(body) {
   }
   const out = [...new Set(list.map((s) => String(s).trim().toUpperCase()))];
   if (out.some((s) => !STATES.has(s))) {
-    throw new HttpError(400, "bad_request", "states must be USPS codes or REMOTE");
+    // was: "states must be USPS codes or REMOTE"
+    throw new HttpError(400, "bad_request", "states must be USPS codes, Canadian province codes or REMOTE");
   }
   return out.sort();
 }
