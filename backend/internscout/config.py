@@ -146,6 +146,29 @@ GOOGLE_JOBS_FOCUS_QUERIES = [
 # which indexes them. One of the day's searches (added 2026-09-30, with Canada).
 GOOGLE_JOBS_FIXED = [("Ontario Public Service student job", "Toronto, Ontario, Canada")]
 GOOGLE_JOBS_FOCUS_SEARCHES = int(os.environ.get("SERPAPI_FOCUS_SEARCHES", "2"))
+# Canada's big metros (added 2026-10-01). Canada came in 2026-09-30 through the job boards; Google
+# Jobs still searched only US cities, apart from the Ontario Public Service search above. One search a
+# day goes to Canada, out of the same budget (the US rotation gets one fewer), on a metro and a query
+# that both turn over: each metro every 6 days, every metro-query pair within 36. Canadian postings
+# say "summer student" and "co-op" more than "internship", so the queries do too.
+GOOGLE_JOBS_CANADA_LOCATIONS = [
+    "Toronto, Ontario, Canada", "Montreal, Quebec, Canada", "Vancouver, British Columbia, Canada",
+    "Calgary, Alberta, Canada", "Ottawa, Ontario, Canada", "Waterloo, Ontario, Canada",
+]
+GOOGLE_JOBS_CANADA_QUERIES = [
+    "summer student internship 2027", "co-op student 2027", "university internship summer 2027",
+    "engineering co-op student", "business analyst intern student", "research assistant summer student",
+]
+GOOGLE_JOBS_CANADA_SEARCHES = int(os.environ.get("SERPAPI_CANADA_SEARCHES", "1"))
+
+
+def canada_searches(day: int, n: int = GOOGLE_JOBS_CANADA_SEARCHES) -> list[tuple[str, str]]:
+    """Today's Canadian (query, metro) pairs. day is a date's ordinal. The metro and the query both
+    move on every day, and the query shifts one more each time the metros have all had a turn, so
+    each metro meets every query within 36 days."""
+    places, queries = GOOGLE_JOBS_CANADA_LOCATIONS, GOOGLE_JOBS_CANADA_QUERIES
+    return [(queries[(d + d // len(places)) % len(queries)], places[d % len(places)])
+            for d in (day + i for i in range(max(0, n)))]
 # Google Jobs is location-driven; one search per location per query (watch your SerpApi quota).
 GOOGLE_JOBS_LOCATIONS = [
     "Boston, Massachusetts",

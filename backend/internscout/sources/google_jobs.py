@@ -129,6 +129,9 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     with client() as c:
         for q, loc in pairs:   # already capped at the day's budget
             params = {"engine": "google_jobs", "q": q, "location": loc, "hl": "en", "api_key": api_key}
+            if loc.endswith(", Canada"):
+                # Google's Canadian results (2026-10-01): without it a Toronto search leans on US postings.
+                params["gl"] = "ca"
             try:
                 try:
                     r = c.get(URL, params=params, timeout=SEARCH_TIMEOUT)

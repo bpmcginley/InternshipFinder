@@ -12,13 +12,14 @@ import argparse
 import time
 import httpx
 from collections import Counter
+from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, fetch_uhn, BOARD_FETCHERS
 from .sources.base import client
 from .sources.common import RobotsDisallowed
 from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
-from .config import GOOGLE_JOBS_FOCUS_QUERIES, GOOGLE_JOBS_FOCUS_SEARCHES, GOOGLE_JOBS_FIXED
+from .config import GOOGLE_JOBS_FOCUS_QUERIES, GOOGLE_JOBS_FOCUS_SEARCHES, GOOGLE_JOBS_FIXED, canada_searches
 from .discover import (load_registry, save_registry, seed_registry, discover, boards,
                        label_boards, label_sectors, record_result, record_closed, prune, refused_count)
 from .probe import probe_boards
@@ -181,7 +182,9 @@ def main():
             items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, google_jobs_locations(), max_searches=GOOGLE_JOBS_MAX_SEARCHES,
                                       focus_queries=focus_queries,
                                       focus_searches=GOOGLE_JOBS_FOCUS_SEARCHES,
-                                      fixed=GOOGLE_JOBS_FIXED)
+                                      # was: fixed=GOOGLE_JOBS_FIXED. Today's Canadian metro search
+                                      # (2026-10-01) runs every day beside it, from the same budget.
+                                      fixed=GOOGLE_JOBS_FIXED + canada_searches(date.today().toordinal()))
             found += discover(reg, items)
             raw += items
         if raw:
