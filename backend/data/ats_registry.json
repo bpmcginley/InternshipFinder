@@ -2798,9 +2798,8 @@
   "auctane": {
    "name": "Auctane",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-01"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "audaxgroup": {
    "name": "Audax Group",
@@ -7181,8 +7180,9 @@
   "jobs-legrand": {
    "name": "Legrand",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-10-01"
   },
   "kphcareers-kphhealthcareservices": {
    "name": "KPH Healthcare Services",
@@ -13980,8 +13980,9 @@
   "gehc|wd5|GEHC_ExternalSite": {
    "name": "GE Healthcare",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-01"
   },
   "geico|wd1|External": {
    "name": "Geico",

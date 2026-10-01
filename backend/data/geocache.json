@@ -265,6 +265,7 @@
 40.1545,
 -75.2222
 ],
+"amherst-new york-united states of america|NY":null,
 "amherst|NY":[
 42.9784,
 -78.7998
@@ -743,6 +744,7 @@
 40.6054,
 -73.7551
 ],
+"farmingdale-new york-united states of america|NY":null,
 "farrell|PA":[
 41.212,
 -80.5016
@@ -1019,6 +1021,10 @@
 40.8529,
 -73.1151
 ],
+"lakehurst|NJ":[
+40.0146,
+-74.3113
+],
 "lakewood|NJ":[
 40.0941,
 -74.215
@@ -1042,6 +1048,10 @@
 "lawrence|PA":[
 40.3062,
 -80.1206
+],
+"lebanon|PA":[
+40.343,
+-76.4234
 ],
 "lehigh county|PA":null,
 "lehighton|PA":[
@@ -1488,6 +1498,7 @@
 "ny - merrick|NY":null,
 "ny - middle village|NY":null,
 "ny - new york (10173|NY":null,
+"ny - new york city|NY":null,
 "ny - new york|NY":[
 40.6379,
 -74.1856
@@ -1694,6 +1705,7 @@
 40.1339,
 -75.5173
 ],
+"picatinny arsenal|NJ":null,
 "pine brook|NJ":[
 40.8604,
 -74.3404
