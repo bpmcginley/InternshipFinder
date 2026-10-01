@@ -118,7 +118,9 @@ test("GLOBAL_RPM overrides config, and no configured ceiling means no global lim
 
 test("budget reached -> 503 paused, and Gemini is not called", async () => {
   const w = await setup();
-  await w.db.prepare("INSERT INTO budget (month, spend_cents) VALUES ('2026-09', 2500)").run();
+  // was: INSERT INTO budget ... 2500 (everyone's spend). The month's stop counts free accounts only
+  // since 2026-09-30, so this fills the free tier's month row ("*", "2026-09").
+  await w.db.prepare("INSERT INTO spend (user_hash, month, cents) VALUES ('*', '2026-09', 2500)").run();
   const token = await w.token();
   const res = await w.api("POST", "/ai", { token, body: aiBody() });
   assert.equal(res.status, 503);
@@ -129,6 +131,15 @@ test("budget reached -> 503 paused, and Gemini is not called", async () => {
 
   const zero = await setup({ env: { MONTHLY_BUDGET_CENTS: "0" } });
   assert.equal((await zero.api("POST", "/ai", { token: await zero.token(), body: aiBody() })).status, 503);
+});
+
+test("spending by paid accounts does not count toward the free tier's month", async () => {
+  const w = await setup();
+  // Everyone's total is far over the $25 test budget, but none of it was free spending.
+  await w.db.prepare("INSERT INTO budget (month, spend_cents) VALUES ('2026-09', 9999)").run();
+  const token = await w.token();
+  assert.equal((await w.api("POST", "/ai", { token, body: aiBody() })).status, 200);
+  assert.equal((await (await w.api("GET", "/config")).json()).paused, false);
 });
 
 test("each call's usage is priced and added to the month's budget", async () => {
