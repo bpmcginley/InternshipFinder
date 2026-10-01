@@ -36,6 +36,9 @@ jobs:
           # pillow: growth/cards.py's tests draw a real card (DejaVu is on the runner image).
           # cryptography: growth/metrics.py signs the Search Console sign-in with it.
           pip install pytest pillow cryptography
+          # ffmpeg: growth/reels.py's test renders a real Reel and checks it with ffprobe (it is skipped
+          # where ffmpeg is missing, so a failed install only loses that one check).
+          sudo apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: the Reel render test is skipped"
       - name: Run tests
         working-directory: backend
         run: python -m pytest tests/ -q

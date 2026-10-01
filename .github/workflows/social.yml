@@ -68,7 +68,7 @@ jobs:
     # anything but '0' (both sides strings, compared as strings). Only SOCIAL_ENABLED = 0 skips.
     if: ${{ needs.guard.outputs.skip != 'true' && (!vars.SOCIAL_ENABLED || vars.SOCIAL_ENABLED != '0') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10       # was: 5; Instagram fetches the card before it publishes
+    timeout-minutes: 15       # was: 10 (and 5 before); a Thursday Reel is uploaded and processed first
     steps:
       - uses: actions/checkout@v7
 
@@ -78,9 +78,12 @@ jobs:
 
       - name: Card fonts and Pillow
         # IBM Plex is the site's typeface (growth/cards.py falls back to DejaVu without it).
+        # ffmpeg stitches the Thursday Reel (growth/reels.py). Without it the Reel is skipped and
+        # Instagram gets the card, so a failed install must not fail the run.
         run: |
           sudo apt-get install -y -qq fonts-ibm-plex >/dev/null
           python -m pip install -q pillow
+          sudo apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: a Thursday posts the card, not a Reel"
 
       - name: Post
         id: post

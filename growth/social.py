@@ -159,6 +159,10 @@ CARD_BRANCH = "social-cards"
 CARD_BASE = f"https://raw.githubusercontent.com/bpmcginley/InternshipFinder/{CARD_BRANCH}/"
 IG_CAPTION_MAX = 2200     # Instagram's caption limit, in characters
 LINKEDIN_MAX = 3000       # a LinkedIn post's limit
+# Thursdays post a Reel instead of the picture card (growth/reels.py, added 2026-10-01); Tuesdays stay a
+# card, so the two can be compared. Monday is 0.
+REEL_WEEKDAY = 3
+REELS_FROM = "2026-10-08"   # the first Reel Thursday: 2026-10-01 stays a card, the first post since Meta's block
 SLOGAN = "Built by one student, made for all students."
 DISCLAIMER = "Not affiliated with UMass Amherst."
 
@@ -198,6 +202,15 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
           "times a day. Searching is free and needs no account.\n\n"
           f"{url}\n\n{SLOGAN} {DISCLAIMER}\n\n{tags}")
     card_name = f"{today:%Y-%m-%d}-{slug}.jpg"
+    # The Reel's role slides: one role per employer first, so four slides show four employers.
+    roles, seen = [], set()
+    for x in items:
+        if len(roles) == 4:
+            break
+        co = x.get("company_name") or ""
+        if co and co not in seen and x.get("title"):
+            seen.add(co)
+            roles.append({"company": co, "title": x["title"], "place": sp.place(x), "pay": sp.pay_text(x)})
     return {
         "field": field, "slug": slug, "url": url, "text": text, "count": len(items),
         "eyebrow": f"New this week · {now:%b} {now.day}",
@@ -208,6 +221,8 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
         "card_url": CARD_BASE + card_name,
         "instagram_caption": ig[:IG_CAPTION_MAX],
         "linkedin_text": li[:LINKEDIN_MAX],
+        "roles": roles,
+        "reel": today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
     }
 
 
@@ -221,6 +236,14 @@ def write_out(site_dir: str, out_dir: str) -> dict | None:
         json.dump(data, f, ensure_ascii=False, indent=1)
     import cards      # imported here: only the card needs Pillow, the text posts don't
     cards.render(data, os.path.join(out_dir, "card.jpg"))
+    # On a Reel day the video goes beside the card. The card is still made: LinkedIn's draft carries
+    # it, and Instagram falls back to it if the video can't be made or published.
+    if data.get("reel"):
+        try:
+            import reels
+            reels.render(data, os.path.join(out_dir, "reel.mp4"))
+        except Exception as e:      # a missing ffmpeg or font must not stop the text posts
+            print(f"[social] no reel this time ({type(e).__name__}: {e}); Instagram gets the card")
     return data
 
 
