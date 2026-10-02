@@ -57,8 +57,9 @@ def test_closed_and_non_web_links_are_left_out(tmp_path):
     rows.append(_row(4, status="closed"))
     rows.append(_row(5, apply_url="javascript:alert(1)"))
     site = _site(tmp_path, {"MA": rows})
-    # Only 4 usable listings, so nothing but the hubs is built.
-    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/"}
+    # Only 4 usable listings, so nothing but the hubs, and /about/ and /compare/ (2026-10-02), is built.
+    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/"}
+    # was: == {"/internships/", "/internships/for/", "/internships/at/"}
 
 
 def test_job_board_text_is_escaped(tmp_path):
@@ -106,6 +107,9 @@ def test_sitemap_and_robots(tmp_path):
     assert "Sitemap: https://internscout.org/sitemap.xml" in robots
     # The dashboard at / reads ./data/ in the browser; a crawler barred from it sees an empty shell.
     assert "Disallow" not in robots          # was: assert "Disallow: /data/" in robots
+    # AI search and answer crawlers are named only in a comment: "User-agent: *" already lets them in.
+    assert "User-agent: *\nAllow: /" in robots and "OAI-SearchBot" in robots and "ClaudeBot" in robots
+    assert robots.count("User-agent:") == 1
     assert os.path.exists(os.path.join(site, "internships", "massachusetts", "index.html"))
 
 
@@ -202,8 +206,10 @@ def test_lastmod_follows_the_listings_and_hubs_carry_no_one_item_breadcrumb(tmp_
     assert "<loc>https://internscout.org/internships/massachusetts/</loc><lastmod>2026-09-22</lastmod>" in sitemap
     assert "<loc>https://internscout.org/install.html</loc></url>" in sitemap
     html = {p["path"]: p["html"] for p in pages}
-    assert "application/ld+json" not in html["/internships/"]
-    assert "application/ld+json" in html["/internships/massachusetts/"]
+    # The hub carries the Organization and WebSite blocks since 2026-10-02, but still no breadcrumb.
+    assert "BreadcrumbList" not in html["/internships/"]      # was: "application/ld+json" not in ...
+    assert '"@type": "Organization"' in html["/internships/"]
+    assert "BreadcrumbList" in html["/internships/massachusetts/"]   # was: "application/ld+json" in ...
 
 
 def test_page_text_keeps_acronyms_and_skips_yearless_terms(tmp_path):
@@ -522,3 +528,149 @@ def test_an_employer_with_five_roles_gets_a_page(tmp_path):
                             + [_row(10 + i, company_name="Four Co") for i in range(4)]})
     paths = _paths(seo_pages.build(site))
     assert "/internships/at/five-co/" in paths and "/internships/at/four-co/" not in paths
+
+
+# ---- for AI assistants and answer engines (added 2026-10-02)
+
+def _pay_site(tmp_path):
+    """30 roles at $20-$49 an hour across six employers, and pay that must never be ranked as hourly:
+    yearly salaries, salaries in thousands, and a role only in Canada (Canadian dollars)."""
+    rows = [_row(i, company_name=f"Pay Co {i % 6}", salary=f"${20 + i}/hr") for i in range(30)]
+    rows += [_row(100 + i, company_name="Salary Co", salary="$150,000 a year") for i in range(5)]
+    rows += [_row(200 + i, company_name="Thousands Co", salary="$120k") for i in range(5)]
+    canada = [_row(300, company_name="Maple Co", salary="$95/hr",
+                   regions=[{"loc": "Toronto, ON", "kind": "canada", "state": "ON"}])]
+    return _site(tmp_path, {"MA": rows, "ON": canada})
+
+
+def _ld_blocks(html):
+    return [json.loads(b) for b in re.findall(r'<script type="application/ld\+json">(.*?)</script>', html)]
+
+
+def test_hourly_rate_skips_amounts_that_only_look_hourly():
+    rate = lambda s: seo_pages.hourly_rate({"salary": s})        # noqa: E731
+    # Maven Securities' employer page said "$110 an hour" for a $110k salary.
+    for salary in ("$110k", "$95K – $100K", "$80k-$120k", "$75 to $100,", "$60.500", "$90,000 a year",
+                   "$6,100 month", "$25/week", "$1,300", "$0.00 - $999.99 Hour"):
+        assert rate(salary) is None, salary
+    assert rate("$25/hr") == (25, 25) and rate("$22.50 - $31.50") == (22.5, 31.5)
+    assert rate("$63.53-$68.41/ hr") == (63.53, 68.41)
+    assert seo_pages.hourly_range([{"salary": "$110k"}, {"salary": "$30/hr"}]) == (30, 30, 1)
+
+
+def test_highest_paying_ranks_clear_hourly_rates_and_leaves_yearly_pay_out(tmp_path):
+    site = _pay_site(tmp_path)
+    pages = seo_pages.build(site)
+    by_path = {p["path"]: p["html"] for p in pages}
+    h = by_path["/internships/highest-paying/"]
+    assert "<title>Highest-Paying Internships – Up to $49 an Hour Listed | InternScout</title>" in h
+    assert "is $49 an hour, at" in h
+    # Yearly salaries, salaries in thousands and Canadian dollars are never ranked, nor shown as an hourly figure.
+    for absent in ("Salary Co", "Thousands Co", "Maple Co", "$150", "$120", "$95"):
+        assert absent not in h.split("<main>")[1].split("How this is counted")[0], absent
+    assert "Roles only in Canada (1 with a rate) are left out" in h
+    # At most PAY_PER_EMPLOYER roles from one employer: six employers, so 18 in the list.
+    jobs = h.split('<ul class="jobs">')[1].split("</ul>")[0]
+    assert jobs.count('<li class="job">') == 6 * seo_pages.PAY_PER_EMPLOYER
+    # The field table counts the roles that list a rate out of the field's open roles, median of $20-$49.
+    assert "30 of 41" in h and "$34.50" in h
+    # Employers link to their own pages, and the hub links this one.
+    assert '<a href="/internships/at/pay-co-5/">Pay Co 5</a>' in h
+    assert 'href="/internships/highest-paying/"' in by_path["/internships/"]
+    assert [b["@type"] for b in _ld_blocks(h)] == ["BreadcrumbList"]
+    seo_pages.write(site, pages)
+    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    assert "<loc>https://internscout.org/internships/highest-paying/</loc>" in sitemap
+
+
+def test_no_highest_paying_page_without_enough_listed_rates(tmp_path):
+    rows = [_row(i, salary="$25/hr") for i in range(seo_pages.MIN_PAY_ROLES - 1)]
+    rows += [_row(100 + i, salary="$85,000 /Yr") for i in range(20)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    assert "/internships/highest-paying/" not in pages
+    assert "highest-paying" not in pages["/internships/"] and "highest-paying" not in pages["/about/"]
+
+
+def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
+    site = _pay_site(tmp_path)
+    pages = seo_pages.build(site)
+    by_path = {p["path"]: p["html"] for p in pages}
+    about = by_path["/about/"]
+    blocks = _ld_blocks(about)
+    assert [b["@type"] for b in blocks] == ["BreadcrumbList", "Organization", "WebSite", "FAQPage"]
+    faq = {q["name"]: q["acceptedAnswer"]["text"] for q in blocks[3]["mainEntity"]}
+    assert faq["Does Auto-Apply submit applications for me?"].startswith("No.")
+    assert faq["Is InternScout affiliated with UMass Amherst?"].startswith("No.")
+    assert faq["Is InternScout free?"].startswith("Yes.")
+    assert "41 open internships, co-ops and research roles from 9 employers in 1 field" in faq["What is InternScout?"]
+    assert {"Which majors is InternScout for?", "Where do the listings come from?", "How often is InternScout updated?",
+            "How is InternScout different from Simplify or Jobright?"} <= set(faq)
+    # The pay answer's median and top leave out roles only in Canada, and it says so (review, 2026-10-02):
+    # Maple Co's $95 is a rate, but in Canadian dollars, so the highest is $49.
+    pay = faq["How much do internships on InternScout pay?"]
+    assert "only in Canada" in pay and "the highest is $49 an hour" in pay
+    assert "$4 or $8 a month" in faq["How is InternScout different from Simplify or Jobright?"]
+    assert seo_pages.COMPARE_AS_OF in faq["How is InternScout different from Simplify or Jobright?"]
+    # The page shows the same answers, each under its own heading.
+    assert "<h2>Does Auto-Apply submit applications for me?</h2><p>No." in about
+    assert seo_pages.SLOGAN in about and blocks[1]["slogan"] == seo_pages.SLOGAN
+    compare = by_path["/compare/"]
+    assert _ld_blocks(compare)[0]["@type"] == "BreadcrumbList"
+    for fact in ("$39.99/month ($19.99/week, $89.99 for 3 months)", "Turbo $39.99/month ($17.99/week)",
+                 "as of October 1, 2026", "Not affiliated with Simplify or Jobright.",
+                 "https://help.simplify.jobs/articles/5623502-whats-included-in-simplify-features-and-pricing",
+                 "https://jobscan.co/blog/jobscan-vs-jobright", "never submits", "Job seekers at every level"):
+        assert fact in compare, fact
+    seo_pages.write(site, pages)
+    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    assert "<loc>https://internscout.org/about/</loc>" in sitemap and "<loc>https://internscout.org/compare/</loc>" in sitemap
+    # Every page's footer reaches both.
+    assert all('href="/about/"' in h and 'href="/compare/"' in h for h in by_path.values())
+
+
+def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
+    site = _pay_site(tmp_path)
+    seo_pages.write(site, seo_pages.build(site))
+    short = open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
+    full = open(os.path.join(site, "llms-full.txt"), encoding="utf-8").read()
+    # llmstxt.org: an H1 name, a blockquote summary, then sections of markdown links.
+    assert short.startswith("# InternScout\n\n> InternScout (https://internscout.org) is a free internship search")
+    # Counted from this data (41 open, 9 employers, 1 field) and dated from the export, not the clock.
+    assert "As of September 23, 2026 it lists 41 open internships, co-ops and research roles from 9 employers in 1 field" in short
+    for path in ("/", "/about/", "/compare/", "/internships/highest-paying/", "/internships/", "/internships/at/",
+                 "/internships/for/", "/internships/mechanical-engineering/", "/install.html", "/privacy", "/terms",
+                 "/llms-full.txt"):
+        assert f"](https://internscout.org{path})" in short, path
+    assert seo_pages.SLOGAN in short and "never submits" in short and "$4/month" in short
+    assert "## Optional" in short
+    assert full.startswith("# InternScout\n\n> ")
+    assert "- [Mechanical Engineering](https://internscout.org/internships/mechanical-engineering/): 41 open" in full
+    assert "the highest is $49 an hour" in full and "Not affiliated with UMass Amherst" in full
+    assert "Data as of September 23, 2026." in full
+    # Only employers with enough open roles have a page, so llms-full doesn't say every one does (review).
+    assert "Every field, state, employer and major with enough open roles has a plain page" in full
+    assert "and so are roles only in Canada (paid in Canadian dollars)" in full
+    # Not a page: no sitemap entry, but robots.txt and /about/ point to it.
+    assert "llms" not in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    assert "https://internscout.org/llms.txt" in open(os.path.join(site, "robots.txt"), encoding="utf-8").read()
+
+
+def test_nothing_built_names_the_founder(tmp_path):
+    # The brand stays one student's, unnamed, on the site and in what answer engines read.
+    site = _pay_site(tmp_path)
+    pages = seo_pages.build(site)
+    seo_pages.write(site, pages)
+    texts = [p["html"] for p in pages] + [open(os.path.join(site, n), encoding="utf-8").read()
+                                          for n in ("llms.txt", "llms-full.txt", "robots.txt", "404.html")]
+    assert not [t[:80] for t in texts if re.search(r"bruce|mcginley", t, re.I)]
+
+
+def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
+    # docs/index.html is hand-written; its JSON-LD must say what seo_pages.ORGANIZATION and WEBSITE say.
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    html = open(os.path.join(backend, "..", "docs", "index.html"), encoding="utf-8").read()
+    blocks = _ld_blocks(html.replace("\n", ""))
+    assert len(blocks) == 1
+    graph = blocks[0]["@graph"]
+    strip = lambda o: {k: v for k, v in o.items() if k != "@context"}          # noqa: E731
+    assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]
