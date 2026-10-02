@@ -222,7 +222,10 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
         "instagram_caption": ig[:IG_CAPTION_MAX],
         "linkedin_text": li[:LINKEDIN_MAX],
         "roles": roles,
-        "reel": today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
+        # The same tags as the captions, for channels that build their own text from post.json
+        # (growth/youtube.py's Short description, added 2026-10-02), so every channel tags alike.
+        "hashtags": tags.split(),
+        "reel":today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
     }
 
 

@@ -11,6 +11,9 @@ name: Brand posts
 # Instagram when INSTAGRAM_TOKEN is set. A LinkedIn draft of the same post is saved to D1 for the
 # private analytics page, since LinkedIn gives a page this size no posting API.
 #
+# On a Reel day (Thursdays) the same video also goes to YouTube as a Short (growth/youtube.py, added
+# 2026-10-02) once YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET and YOUTUBE_REFRESH_TOKEN are set.
+#
 # Kill switch: set the repository variable SOCIAL_ENABLED to 0 (Settings -> Secrets and variables ->
 # Actions -> Variables) and every run, scheduled or by hand, is skipped without posting. Unset or any
 # other value, it runs as before. Unlike the digest's DIGEST_ENABLED, this one is on by default,
@@ -68,7 +71,7 @@ jobs:
     # anything but '0' (both sides strings, compared as strings). Only SOCIAL_ENABLED = 0 skips.
     if: ${{ needs.guard.outputs.skip != 'true' && (!vars.SOCIAL_ENABLED || vars.SOCIAL_ENABLED != '0') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15       # was: 10 (and 5 before); a Thursday Reel is uploaded and processed first
+    timeout-minutes: 20       # was: 15 (10, 5 before); a Thursday Reel goes to Instagram, then to YouTube
     steps:
       - uses: actions/checkout@v7
 
@@ -130,3 +133,14 @@ jobs:
         run: |
           if [ -f out/post.json ]; then python growth/instagram.py out/post.json --send
           else python growth/instagram.py --send; fi
+
+      - name: YouTube Short
+        # The Thursday Reel, cross-posted as a Short. Only when a Reel was made; without the three
+        # secrets it says why and stays green. It runs whatever Instagram did, and a failed upload
+        # turns the run red without touching the posts already made.
+        if: ${{ !cancelled() && hashFiles('out/reel.mp4') != '' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python growth/youtube.py out/post.json --send
