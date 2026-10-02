@@ -70,3 +70,5 @@ def test_captions_fit_each_network_and_carry_the_slogan_and_disclaimer(monkeypat
     assert "link in bio" in data["instagram_caption"]           # Instagram captions aren't clickable
     assert data["url"] in data["linkedin_text"]                  # LinkedIn's are
     assert data["instagram_caption"].count("#") <= 30            # Instagram's hashtag limit
+    # The tags travel in post.json too, for channels that write their own text (growth/youtube.py).
+    assert data["hashtags"][0] == "#Accounting" and " ".join(data["hashtags"]) in data["instagram_caption"]
