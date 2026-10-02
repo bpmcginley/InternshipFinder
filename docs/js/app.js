@@ -642,6 +642,9 @@
     const [invited, setInvited] = useState(() => IS.ls.get(IS.INVITE_KEY, null));
     const [invite, setInvite] = useState(null);
     const [inviteNote, setInviteNote] = useState("");
+    // The one-time invite nudge (added 2026-10-02; core.js inviteNudgeDue): on for the rest of this page
+    // load once a first Auto-Apply or first profile triggers it, until Not now or the panel opens.
+    const [nudge, setNudge] = useState(false);
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
@@ -831,7 +834,17 @@
       if (invite) { setInvite(null); return; }
       setInviteNote("");
       const r = await IS.fetchInvite(auth.token);
-      if (r) setInvite(r); else setNote("Couldn't load your invite link. Try again in a minute.");
+      // was: if (r) setInvite(r); else setNote("Couldn't load your invite link. Try again in a minute.");
+      // An opened panel (from the nudge or the Account menu) retires the nudge for good, and counts as the
+      // "invite_open" step (worker/src/visits.js EVENTS), once per page load like every step.
+      if (r) { setInvite(r); setNudge(false); IS.markInviteNudge("opened"); IS.count("invite_open"); }
+      else setNote("Couldn't load your invite link. Try again in a minute.");
+    }
+    // A good moment just happened (first Auto-Apply queued, first profile saved): offer the invite
+    // once, if it can be offered at all. Marked as shown straight away, so a reload never repeats it.
+    function offerNudge() {
+      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return;
+      IS.markInviteNudge(); setNudge(true);
     }
     async function shareInvite() {
       // was: const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
@@ -873,7 +886,8 @@
     }, [info.installed, p]);
 
     function saveProfile(d) {
-      if (!p) IS.count("profile");   // the first profile on this device, not every edit
+      // was: if (!p) IS.count("profile");   // the first profile on this device, not every edit
+      if (!p) { IS.count("profile"); offerNudge(); }   // the first profile on this device, not every edit
       const s = IS.saveProfile(d);
       setP(s); setSetupOpen(false); setLimit(PAGE);
       setF(x => ({ ...x, states: [], ...initF(s) }));
@@ -1032,7 +1046,8 @@
       if (res.error) { setNote("Couldn't queue: " + res.error); return; }
       setSel(new Set());
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
-      if (added) IS.count("autoapply");
+      // was: if (added) IS.count("autoapply");
+      if (added) { IS.count("autoapply"); offerNudge(); }
       setNote(`Queued ${plural(added, "application")}${skipped ? ` (${skipped} already queued)` : ""}. Each one is filled in and left for you to submit.`);
       list.forEach(r => { if (st(r.id) === "none") setAppState(r.id, "interested"); });
       IS.ext.call({ type: "open_panel" });
@@ -1206,6 +1221,16 @@
       info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
+      // The one-time invite nudge (2026-10-02), right under the "Queued" or "Profile saved" note it follows.
+      // It steps aside for the out-of-runs notice, which already offers the invite, and for the panel itself.
+      nudge && auth.token && inviteOffer && !invite && !outOfRuns && h("div", { className: "notice", role: "status" },
+        h("b", null, inviteOffer.bonus && inviteOffer.bonus.autofill ? "Nice work. Want more free Auto-Apply runs? " : "Nice work. Want more free AI use? "),
+        // The same terms as the invite panel: the reward lands when a new classmate ("joins": first week,
+        // worker/src/referral.js) signs in through the link with a .edu email, for up to REFERRAL.maxRewards.
+        `Invite a classmate: when they join through your link with a school (.edu) email, you each get ${inviteWords} (for up to ${inviteOffer.max} classmates).`,
+        h("div", { className: "invite-row" },
+          h("button", { type: "button", className: "btn primary", onClick: openInvite }, "Get my invite link"),
+          h("button", { type: "button", className: "btn", onClick: () => { IS.markInviteNudge("dismissed"); setNudge(false); } }, "Not now"))),
       // Arrived through a classmate's link, not signed in yet: say what signing in gets them.
       invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
         // was: `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),

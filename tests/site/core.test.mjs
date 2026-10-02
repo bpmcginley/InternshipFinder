@@ -77,3 +77,27 @@ test("Canadian listings go in their province's file, or Canada's, and the save t
   // was: ["MA", "REMOTE"]. The Worker counts provinces since 2026-10-01; "Canada" (no province) stays here.
   assert.deepEqual([...IS.demandStates({ states: ["MA", "ON", "Canada"], remote: true })], ["MA", "ON", "REMOTE"]);
 });
+
+test("the invite nudge is offered once, only to a signed-in student while invites are on", () => {
+  const IS = loadCore(notFound);
+  const offer = { bonus: { autofill: 3 }, max: 10 };
+  const base = { signedIn: true, offer, panelOpen: false, seen: IS.inviteNudgeSeen() };
+  assert.equal(base.seen, false, "a fresh browser has not seen it");
+  assert.equal(IS.inviteNudgeDue(base), true);
+  assert.equal(IS.inviteNudgeDue({ ...base, signedIn: false }), false, "signed out: no invite link to give");
+  assert.equal(IS.inviteNudgeDue({ ...base, offer: null }), false, "the Worker offers no invites");
+  assert.equal(IS.inviteNudgeDue({ ...base, offer: { bonus: {}, max: 10 } }), false, "an invite worth nothing");
+  assert.equal(IS.inviteNudgeDue({ ...base, panelOpen: true }), false, "the invite panel is already open");
+  // Shown once: the day it was shown is kept, and any value at all stops it for good.
+  assert.equal(IS.INVITE_NUDGE_KEY, "internscout.invite_nudge");
+  IS.markInviteNudge();
+  assert.match(IS.ls.get(IS.INVITE_NUDGE_KEY), /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(IS.inviteNudgeSeen(), true);
+  assert.equal(IS.inviteNudgeDue({ ...base, seen: IS.inviteNudgeSeen() }), false);
+  // Not now, or opening the panel (from the nudge or the Account menu), replaces the date.
+  IS.markInviteNudge("dismissed");
+  assert.equal(IS.ls.get(IS.INVITE_NUDGE_KEY), "dismissed");
+  IS.markInviteNudge("opened");
+  assert.equal(IS.ls.get(IS.INVITE_NUDGE_KEY), "opened");
+  assert.equal(IS.inviteNudgeSeen(), true);
+});
