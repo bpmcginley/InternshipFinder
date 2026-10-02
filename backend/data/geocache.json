@@ -458,6 +458,10 @@
 -80.0834
 ],
 "carneys point|NJ":null,
+"carteret|NJ":[
+40.5773,
+-74.2282
+],
 "catskill|NY":[
 42.2173,
 -73.8646
@@ -1445,6 +1449,7 @@
 "nj-jersey city|NJ":null,
 "nj-parsippany|NJ":null,
 "nj-swedesboro|NJ":null,
+"njm - trenton|NJ":null,
 "nj|NJ":[
 40.7568,
 -74.0608
@@ -1544,6 +1549,10 @@
 "oil city|PA":[
 41.4341,
 -79.7085
+],
+"oneonta|NY":[
+42.4535,
+-75.063
 ],
 "ontario|NY":[
 43.2209,

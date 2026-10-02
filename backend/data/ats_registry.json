@@ -1689,6 +1689,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "range": {
+   "name": "Range",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "rapdev": {
    "name": "RapDev",
    "quant": false,
@@ -3374,6 +3380,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "datacor": {
+   "name": "Datacor",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "datadog": {
    "name": "Datadog",
    "quant": false,
@@ -3385,13 +3397,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "designmehair": {
-   "name": "DESIGNME Hair",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-01"
   },
   "detroitlions": {
    "name": "Detroit Lions",
@@ -3916,6 +3921,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "gassouth": {
+   "name": "Gas South",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "gcmgrosvenor": {
    "name": "GCM Grosvenor",
    "quant": false,
@@ -4019,6 +4030,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "nonprofit"
+  },
+  "gleanwork": {
+   "name": "Glean",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "globalizationpartners": {
    "name": "Globalization Partners",
@@ -5225,13 +5242,6 @@
    "fails": 0,
    "added": "2026-09-18"
   },
-  "postman": {
-   "name": "Postman",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-29",
-   "last_fail": "2026-10-01"
-  },
   "practisinglawinstitute": {
    "name": "Practising Law Institute",
    "quant": false,
@@ -5395,6 +5405,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "riotgamesup": {
+   "name": "Riot Games",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "rise8": {
    "name": "Rise8",
@@ -6423,6 +6439,12 @@
    "added": "2026-09-15",
    "sector": "economic_consulting"
   },
+  "campus-us-corgan": {
+   "name": "Corgan",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "careers-advocatesinc": {
    "name": "Advocates",
    "quant": false,
@@ -6827,6 +6849,12 @@
    "fails": 0,
    "added": "2026-09-24"
   },
+  "careers-novelis": {
+   "name": "Novelis",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "careers-nrdc": {
    "name": "NRDC",
    "quant": false,
@@ -7137,9 +7165,9 @@
   "globalcareers-atlassian": {
    "name": "Atlassian",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-30",
-   "last_fail": "2026-10-01"
+   "last_fail": "2026-10-02"
   },
   "gsk-us-earlytalent": {
    "name": "GSK",
@@ -7180,9 +7208,9 @@
   "jobs-legrand": {
    "name": "Legrand",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-15",
-   "last_fail": "2026-10-01"
+   "last_fail": "2026-10-02"
   },
   "kphcareers-kphhealthcareservices": {
    "name": "KPH Healthcare Services",
@@ -7268,6 +7296,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
+  },
+  "careers.certara.com": {
+   "name": "Certara",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "careers.chick-fil-a.com": {
    "name": "Chick-fil-A",
@@ -9016,9 +9050,9 @@
   "saronic": {
    "name": "Saronic",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-01"
+   "last_fail": "2026-10-02"
   },
   "secureframe": {
    "name": "Secureframe",
@@ -10248,9 +10282,9 @@
   "gitar-careers": {
    "name": "Gitar, Inc.",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-14",
-   "last_fail": "2026-10-01"
+   "last_fail": "2026-10-02"
   },
   "greengas": {
    "name": "Mobius Renewables",
@@ -10457,10 +10491,10 @@
   "careers.gulfstream.com": {
    "name": "Gulfstream Aerospace",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing",
-   "last_fail": "2026-10-01"
+   "last_fail": "2026-10-02"
   },
   "careers.hfsinclair.com": {
    "name": "HF Sinclair",
@@ -14487,6 +14521,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "huntingtonhospital|wd5|HuntingtonHospitalCareers": {
+   "name": "Huntington Hospital",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "huntington|wd12|HNBcareers": {
    "name": "Huntington Bancshares",
    "quant": false,
@@ -16306,6 +16346,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "primient|wd1|External_Careers": {
+   "name": "Primient",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "progyny|wd5|progyny": {
    "name": "Progyny",

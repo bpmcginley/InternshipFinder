@@ -96,6 +96,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "designmehair": {
+   "on": "2026-10-02",
+   "why": "dead"
+  },
   "dustyrobotics": {
    "on": "2026-10-01",
    "why": "dead"
@@ -142,6 +146,10 @@
   },
   "optirtc": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "postman": {
+   "on": "2026-10-02",
    "why": "dead"
   },
   "seamlessai": {
