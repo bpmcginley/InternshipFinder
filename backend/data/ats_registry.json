@@ -931,6 +931,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "helion": {
+   "name": "Helion Energy",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "heliux": {
    "name": "Heliux",
    "quant": false,
@@ -990,6 +996,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "humanoid": {
+   "name": "Humanoid",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "hypercubic": {
    "name": "Hypercubic",
@@ -9086,6 +9098,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "shopback-2": {
+   "name": "ShopBack",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "shopreli": {
    "name": "Reli",
    "quant": false,
@@ -10935,6 +10953,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "mindex": {
+   "name": "Mindex",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
+  },
   "northwell-health": {
    "name": "Northwell Health",
    "quant": false,
@@ -11159,6 +11183,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "aba|wd1|aba": {
+   "name": "American Bankers Association",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "abbott|wd5|abbottcareers": {
    "name": "Abbott",
@@ -15141,8 +15171,9 @@
   "liveramp|wd5|LiveRampCareers": {
    "name": "LiveRamp",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-02"
   },
   "llbean|wd1|LLBean_Careers": {
    "name": "L.L.Bean",
@@ -16556,6 +16587,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "regeneron|wd1|Careers": {
+   "name": "Regeneron Pharmaceuticals",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-02"
   },
   "regions|wd5|regions_careers": {
    "name": "Regions Bank",
