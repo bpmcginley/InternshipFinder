@@ -1327,6 +1327,10 @@
 40.6984,
 -74.4015
 ],
+"new stanton|PA":[
+40.2192,
+-79.6097
+],
 "new windsor|NY":[
 41.4768,
 -74.0238
@@ -1387,6 +1391,7 @@
 40.2294,
 -74.9365
 ],
+"newyork|NY":null,
 "niagara falls|NY":[
 43.0844,
 -79.0615
@@ -1788,6 +1793,10 @@
 -73.9528
 ],
 "remote|PA":null,
+"rensselaer|NY":[
+42.6406,
+-73.7448
+],
 "rhinebeck|NY":[
 41.9268,
 -73.9128
@@ -1934,6 +1943,7 @@
 40.0084,
 -79.0781
 ],
+"sophia antipolis|NY":null,
 "south new jersey|NJ":null,
 "south plainfield|NJ":[
 40.5793,
@@ -2138,6 +2148,7 @@
 "usa nj iselin|NJ":null,
 "usa ny new york city 3 times square|NY":null,
 "usa ny new york city 66 hudson blvd e|NY":null,
+"usa ny new york east 42nd street|NY":null,
 "usa ny uniondale 1500 rxr plaza|NY":null,
 "usa pa clarks summit|PA":null,
 "usa pa lancaster|PA":null,
