@@ -43,6 +43,7 @@ Recompute this table with `python growth/audience.py` (it reads `docs/data`).
 | **Keep schedule** (`growth/catchup.py`) | Running | GitHub starts scheduled runs hours late or not at all (2026-09-22 to 09-30: the 6-hourly ingest 2 to 5 hours late, the hourly dashboard copy 3 to 6 times a day, Tuesday's post 5 hours late). Every half hour this starts whichever job is overdue (ingest over 6 hours since the last one that ran, dashboard copy over 70 minutes, a Tuesday or Thursday post not started by 11am Eastern). The late scheduled run that follows sees the work done and skips: an ingest inside 4 hours of one that succeeded, a post on a day another run already posted. A person's Run workflow click on the ingest always runs; on Brand posts, tick force to post a second time in a day. |
 | **Visit counting** | Running | Cloudflare Web Analytics on every page, cookieless. |
 | **Weekly growth report** (`growth/report.py`) | Built | Every Monday a GitHub issue labelled `growth-report`: visits without bots, top landing pages and referrers, the share of visits that came in through any landing page (once the Cloudflare token is added), the states students picked (in order, with no counts, because the issue is public), which majors are served and which are thin, where the focus searches are going, and the landing-page count. Last week's issue closes itself. Run it any time with `python growth/report.py`. |
+| **Every-major list** (`growth/every_major_list.py`) | Built, waiting for its repository (added 2026-10-02) | A public GitHub README of open Summer 2027 roles for every major, rebuilt after each site deploy and pushed to its own repository. See [below](#every-major-internship-list). |
 
 <!-- was: | **Brand posts** (`growth/social.py`) | Built, waiting for accounts | Tuesdays and Thursdays it writes a post from the data (one field's new roles nearby this week, linking its page) and sends it to InternScout's Bluesky, Mastodon or Discord, whichever has secrets set. Until then the weekly report carries the post as a draft. | -->
 <!-- The brand posts row now says when a run posts nothing or fails, what it links, and how to
@@ -58,6 +59,47 @@ The [campus outreach kit](OUTREACH.md) now prepares major-specific partner-email
 from fresh listings. The **Campus outreach kit** Action runs every Monday or by hand and saves a
 reviewable artifact. It sends nothing. Drafts are produced only for well-served undergraduate majors
 when the listing export is current; a person checks the jobs and chooses where to share them.
+
+## Every-major internship list
+
+Added 2026-10-02. Students watch GitHub lists of internships (a README of tables kept current by a
+bot), but the well-known ones are tech only. `growth/every_major_list.py` writes the same kind of list
+for every major: **"Summer 2027 Internships — Every Major"**, a README with a "New this week" table,
+a contents table of every field with at least 5 open Summer 2027 roles, and one table per field
+(Company, Role, Location, Pay, Posted, Apply) of its newest roles, linking the field's landing page for
+the rest. Each field also gets `fields/<slug>.md` with up to 200 roles. It lists only roles whose
+posting names Summer 2027 as the start term, so the title is true; everything else is on the site.
+
+- Every Apply link goes straight to the employer's posting, as on the site; company names link to the
+  employer's InternScout page when it has one. Job-board text is escaped, so it can't break a table.
+- The README shows as many rows per field as fit in 450 KB (GitHub stops rendering at about 512 KB):
+  30 a field on 2026-10-02.
+- It is dated from the export's day, so a run on unchanged data writes the same bytes and the
+  workflow commits nothing.
+- Issues on the list's repository are the "report a bad listing" channel its footer points to.
+
+The **Every-major list** workflow (`.github/workflows/every-major-list.yml`) runs after each Deploy
+site run and by hand. Until the secret below exists it prints a notice and succeeds. Try it locally
+with `python growth/every_major_list.py docs --out every-major-list`.
+
+**One-time setup (the owner):**
+
+1. Create the public repository **bpmcginley/internships-every-major** on GitHub, ticking **Add a
+   README file** (the workflow can't check out a repository with no commits; its README is replaced on
+   the first run). Description: *Summer 2027 internships for every major, not only tech. Updated
+   several times a day from employers' own job boards by InternScout.* Website: `https://internscout.org`.
+   Topics: `internships`, `summer-2027`, `college`, `students`, `every-major` (optionally also
+   `internship` and `co-op`). Keep Issues on: the list asks people to report bad listings there.
+2. Create a fine-grained personal access token: GitHub → Settings → Developer settings → Personal
+   access tokens → Fine-grained tokens → Generate new token. Name `every-major-list`, Resource owner
+   bpmcginley, Expiration up to a year (put a reminder in the calendar), Repository access **Only
+   select repositories** → `internships-every-major`, Permissions → Repository permissions →
+   **Contents: Read and write** (Metadata: Read is added by itself). Nothing else.
+3. Save it in **this** repository as the Actions secret `EVERY_MAJOR_LIST_TOKEN`
+   (`gh secret set EVERY_MAJOR_LIST_TOKEN --repo bpmcginley/InternshipFinder`, then paste). Paste it
+   only into GitHub.
+4. Actions → **Every-major list** → Run workflow, then open the list's repository and check the
+   README. After that it updates after every deploy by itself.
 
 ## Channels, and the rules each follows
 
@@ -113,6 +155,7 @@ Revisit a store app once there are returning users who ask for one.
 | **Email digest 8.** Uncomment the two `schedule:` lines in `.github/workflows/digest.yml` | The digest then goes to every subscriber on Mondays at 8am Eastern, with nothing to click. A send to everyone first asks Buttondown whether an email already went out or was scheduled in the last six days, and refuses if so, so a rerun can't send a second copy (`--allow-same-week` overrides it, run by hand, only after checking the dashboard). If a run ever says **Status UNKNOWN**, the send got no answer or a 5xx error and may still be going out: look for that email in Buttondown's sent and scheduled emails before doing anything else, and don't send the draft or rerun until you have |
 | **Email digest 9.** Decide whether digests should also appear on Buttondown's public web archive. They don't unless the send step adds `--public-archive`. Keep an eye on complaints (0.1% at most) and failed deliveries (1% at most) | Those are Buttondown's limits for every newsletter. It also contacts the account when opens fall to 10% or clicks to 1% |
 | Brand accounts (Bluesky, Mastodon, a Discord server), with their secrets in the repo, when ready. Bluesky posts. **Mastodon** has posted nothing yet: at mastodon.social, as @internscout, Preferences → Development → New application (name InternScout, scope `write:statuses` only), open it, copy **Your access token**, and save it as the repo secret `MASTODON_TOKEN` (`gh secret set MASTODON_TOKEN --repo bpmcginley/InternshipFinder`, then paste). `MASTODON_URL` is already set | Lets the brand posts go out on their own; see growth/social.py for the secret names |
+| **Every-major list.** Create the public repo `bpmcginley/internships-every-major` (with a README), a fine-grained token with Contents read/write on it alone, save the token as the secret `EVERY_MAJOR_LIST_TOKEN`, and run the Every-major list workflow once: the steps are under [Every-major internship list](#every-major-internship-list) | The workflow publishes the list there after each deploy, and does nothing until the secret exists |
 | **Instagram 1.** In the Instagram app, as @internscout: Settings → Account type and tools → **Switch to professional account** (Creator or Business; either works), and set the bio link to `https://internscout.org` | Meta's publishing API works only for professional accounts. Captions can't carry a clickable link, so each one says "link in bio" |
 | **Instagram 2.** At developers.facebook.com, **Create app** → use case **"Manage messaging & content on Instagram"** → in the app, **Instagram → API setup with Instagram login** → **Add account**, and log in as @internscout there | This is the "Instagram API with Instagram Login": no Facebook Page needed. While the app stays in development mode it can post only to accounts added to it, which is all it needs |
 | **Instagram 3.** In that API setup, **Generate token** for @internscout (grant `instagram_business_basic` and `instagram_business_content_publish`), copy it, and save it as the repo secret `INSTAGRAM_TOKEN`. Paste it only into GitHub | Meta's tokens last 60 days. `growth/instagram.py` refreshes the working token weekly and keeps it in D1 (table `social_tokens`), so the secret keeps working. Replacing the secret with a newly generated token takes over at once |

@@ -1,0 +1,94 @@
+name: Every-major list
+
+# Added 2026-10-02. After each site deploy, growth/every_major_list.py rebuilds the public
+# "Summer 2027 Internships — Every Major" README (and one file per field) from the same data the
+# site was deployed with, and pushes it to its own repository, bpmcginley/internships-every-major.
+# The output is dated from the export's day and every order breaks its ties, so a run on unchanged
+# data changes no file and makes no commit.
+#
+# Needs the repository secret EVERY_MAJOR_LIST_TOKEN: a fine-grained personal access token with
+# Contents: read and write on bpmcginley/internships-every-major only (setup: growth/README.md,
+# "Every-major internship list"). Without it every run stops at the first step with a notice and
+# succeeds, so nothing goes red before the list's repository exists. The token reaches only the
+# checkout of that repository, which keeps it for the push; it is never on a command line or printed.
+on:
+  # The deploy is what follows each ingest (pages.yml), so this runs on the data the site now shows.
+  workflow_run:
+    workflows: ["Deploy site"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read              # this repository is only read; the push uses the token above
+
+concurrency:
+  group: every-major-list
+  cancel-in-progress: false   # two pushes in a row are fine; a cancelled one half-way is not
+
+# Pinned to ubuntu-24.04 like the other workflows: ubuntu-latest moves to Ubuntu 26 on 2026-10-19.
+jobs:
+  publish:
+    # A failed deploy published nothing new, so there is nothing new to list either.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check for the token
+        id: token
+        env:
+          # Only whether it is set reaches the shell, never the token itself.
+          HAS_TOKEN: ${{ secrets.EVERY_MAJOR_LIST_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" = "true" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::EVERY_MAJOR_LIST_TOKEN is not set, so the every-major list was not published. One-time setup: growth/README.md, 'Every-major internship list'."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.token.outputs.ready == 'true'
+        with:
+          ref: main             # after a deploy: the commit it deployed, or a newer one
+          persist-credentials: false
+
+      # The repository needs one commit before this can check it out (an empty repository has no
+      # branch), which is why the setup says to create it with a README.
+      - name: Check out the list's repository
+        if: steps.token.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: bpmcginley/internships-every-major
+          token: ${{ secrets.EVERY_MAJOR_LIST_TOKEN }}
+          path: list
+
+      - uses: actions/setup-python@v7
+        if: steps.token.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Build the list
+        if: steps.token.outputs.ready == 'true'
+        env:
+          # A backstop, as in pages.yml: the build breaks every tie itself.
+          PYTHONHASHSEED: "0"
+        # The live sitemap tells seo_pages which pages the site serves now, so every field page the list
+        # links is one that is deployed (as in pages.yml; without it, pages are judged as new).
+        # seo_pages and the list use only the standard library, so nothing is installed.
+        run: |
+          curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
+          python growth/every_major_list.py docs --out list $( [ -f live-sitemap.xml ] && echo --live-sitemap live-sitemap.xml )
+
+      - name: Commit and push if anything changed
+        if: steps.token.outputs.ready == 'true'
+        working-directory: list
+        run: |
+          git add -A -- README.md fields
+          if git diff --cached --quiet; then
+            echo "The list is unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "InternScout"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Update the list ($(date -u +%F))"
+          git push -q origin HEAD   # the branch checked out: the list repository's default branch

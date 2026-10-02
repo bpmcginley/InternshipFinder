@@ -12,6 +12,8 @@ dist/
 # Email digest previews (growth/digest.py): rebuilt from the data on every run
 digest-preview/
 outreach-kit/
+# The every-major list (growth/every_major_list.py) is published to its own repository, never here
+every-major-list/
 tmp/pdfs/
 
 # Worker: local secrets and build state - never commit
