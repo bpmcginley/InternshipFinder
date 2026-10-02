@@ -637,6 +637,20 @@
   // on every page load with the same token.
   const INVITE_TRIED_KEY = "internscout.invite.tried";
   const INVITE_CODE = /^[a-hj-km-np-z2-9]{8}$/;
+  // The invite nudge (added 2026-10-02). The invite used to live only in the Account menu, where few
+  // students look. It is offered once, right after a good moment (a first Auto-Apply queued or a first
+  // profile saved), as a notice the student can wave off. localStorage holds the day it was shown,
+  // then "dismissed" (Not now) or "opened" (the invite panel was opened, from here or the menu); any
+  // value at all means this browser never sees it again.
+  const INVITE_NUDGE_KEY = "internscout.invite_nudge";
+  // Pure, so the rule is tested (tests/site/core.test.mjs): signed in, the Worker offers invites with a
+  // reward to name, the panel isn't already open, and this browser hasn't had the nudge before.
+  function inviteNudgeDue({ signedIn, offer, panelOpen, seen }) {
+    return !!(signedIn && offer && offer.bonus && Object.keys(offer.bonus).length && !panelOpen && !seen);
+  }
+  const inviteNudgeSeen = () => ls.get(INVITE_NUDGE_KEY, null) != null;
+  // how: "dismissed" or "opened"; with nothing, the day it was shown, so a reload doesn't show it twice.
+  const markInviteNudge = how => ls.set(INVITE_NUDGE_KEY, how || new Date().toISOString().slice(0, 10));
   async function fetchInvite(token) {
     if (!workerOn() || !token) return null;
     try {
@@ -747,6 +761,7 @@
     // was: workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, ...
     workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
+    INVITE_NUDGE_KEY, inviteNudgeDue, inviteNudgeSeen, markInviteNudge,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

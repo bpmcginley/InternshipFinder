@@ -294,7 +294,9 @@ day, the page kind (`dashboard`, `landing`, `install`, `legal`, `other`) and the
 site, which counts as a view but not a visit). Nothing about the visitor is stored.
 With `"e"` it is a step instead of a page load: `{ "e": "signin", "p": "/" }` adds one to
 `event_counts` for the day, the step and the page kind. Steps: `install_click`, `signin_start`,
-`signin`, `profile`, `autoapply`, `checkout`; any other name is ignored. A load arriving from Google or
+`signin`, `profile`, `autoapply`, `checkout`, `invite_open` (a signed-in student opened their invite
+link panel, from the one-time nudge after a first Auto-Apply or profile or from the Account menu; added
+2026-10-02); any other name is ignored. A load arriving from Google or
 Microsoft sign-in or from Stripe counts as `internal` (the same visit going on).
 `403` unless `Origin` is the live site. Script-running crawlers (by user agent), more than 30 hits a
 minute from one address (counted in memory only), and anything past 50,000 views in a day are
