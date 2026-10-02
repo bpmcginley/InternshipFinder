@@ -407,6 +407,16 @@
     .whyg{gap:var(--s4)}
   }
 </style>
+<!-- Who runs this site, for search and answer engines (added 2026-10-02). Data only: the browser
+     never runs a JSON-LD block, so it cannot touch the app below. The same two objects as
+     backend/internscout/seo_pages.py ORGANIZATION and WEBSITE, which the /internships/ hub and
+     /about/ carry; backend/tests/test_seo_pages.py checks the two agree. -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/","logo":"https://internscout.org/icon512.png","slogan":"Built by one student, made for all students.","description":"A free internship search for college students of every major in the US and Canada.","sameAs":["https://mastodon.social/@internscout"]},
+{"@type":"WebSite","@id":"https://internscout.org/#website","name":"InternScout","url":"https://internscout.org/","inLanguage":"en-US","publisher":{"@id":"https://internscout.org/#organization"}}
+]}
+</script>
 <script>
   // Public settings for this page. Nothing secret belongs here (see worker/API.md).
   window.CONFIG = {

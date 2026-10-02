@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers.js";
-import { DAY_CAP, pageKind, sourceOf } from "../src/visits.js";
+import { DAY_CAP, EVENTS, pageKind, sourceOf } from "../src/visits.js";
 
 const SITE = { Origin: "https://internscout.org", "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130" };
 const hit = (w, body, headers = SITE) => w.api("POST", "/hit", { body, headers });
@@ -79,6 +79,15 @@ test("steps are counted by event and page, and only known ones", async () => {
   assert.deepEqual(ev, [{ event: "install_click", page: "landing", n: 2 }, { event: "signin", page: "dashboard", n: 1 }]);
   assert.deepEqual(await rows(w), [], "a step is not a page load");
   assert.equal((await hit(w, { e: "signin" }, { ...SITE, Origin: "https://evil.example" })).status, 403);
+});
+
+test("opening the invite panel is a step of its own", async () => {
+  const w = await setup();
+  assert.ok(EVENTS.has("invite_open"));
+  await hit(w, { e: "invite_open", p: "/" });
+  await hit(w, { e: "invite_open", p: "/" });
+  const ev = (await w.db.dump()).event_counts.map(({ event, page, n }) => ({ event, page, n }));
+  assert.deepEqual(ev, [{ event: "invite_open", page: "dashboard", n: 2 }]);
 });
 
 test("a bad body is refused", async () => {

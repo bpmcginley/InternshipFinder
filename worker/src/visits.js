@@ -16,7 +16,10 @@ const OWN = /(^|\.)(internscout\.org|bpmcginley\.github\.io)$|^localhost$/;
 const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.live\.com|checkout\.stripe\.com|billing\.stripe\.com)$/;
 // Steps toward using InternScout (added 2026-10-01), counted per day like visits: no person, just how
 // many times each happened. Only these names are counted; anything else is ignored.
-export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout"]);
+// "invite_open" (added 2026-10-02): a signed-in student opened their invite link panel, from the
+// one-time nudge after a first Auto-Apply or profile, or from the Account menu (docs/js/app.js).
+// was: export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout"]);
+export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open"]);
 // utm_source values our own links use (growth/digest.py, growth/outreach.py) and the usual social names.
 const UTM_SOCIAL = /^(linkedin|instagram|facebook|fb|ig|reddit|bluesky|bsky|mastodon|x|twitter|threads|tiktok|youtube|discord)$/;
 // Crawlers that run scripts. Most bots never run JavaScript and so never reach this at all.
