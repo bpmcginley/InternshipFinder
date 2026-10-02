@@ -62,7 +62,10 @@ HEADER = "| Company | Role | Location | Pay | Posted | Apply |\n|---|---|---|---
 # Characters that mean something inside a table cell or a link's text. A "|" ends the cell (GitHub
 # reads it so even inside a link), brackets start a link, and <, > and & would let a company called
 # "<img src=...>" put HTML in the README. Each is escaped, so job-board text only ever reads as text.
-_MD_SPECIAL = re.compile(r"([\\|\[\]*_`~])")
+# "$" too (added 2026-10-02): GitHub renders $...$ as math, so a pay cell like "$17.90-$50.90 per
+# hour" (22 README lines on 2026-10-02) showed "17.90-" as a formula; "\$" reads as a plain "$".
+_MD_SPECIAL = re.compile(r"([\\|\[\]*_`~$])")
+# was: re.compile(r"([\\|\[\]*_`~])")
 # (A title with "www.example.com" in it is still turned into a link by GitHub's autolinking; that
 # only links what the posting itself says, so it is left alone.)
 
@@ -72,7 +75,6 @@ def md(value, limit: int | None = None) -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     if limit and len(text) > limit:
         text = text[:limit - 1].rstrip() + "…"
-    # Only an & that starts an entity ("&copy;") needs escaping; "AT&T" reads as itself.
     # Only an & that starts an entity ("&copy;") needs escaping; "AT&T" and "Oil & Gas" read as
     # themselves, and stay readable in the raw file.
     text = re.sub(r"&(?=#?\w+;)", "&amp;", text).replace("<", "&lt;").replace(">", "&gt;")
@@ -139,7 +141,9 @@ def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
     return {"now": now, "roles": roles, "fields": fields, "links": links, "new": new,
             "total": len(d["listings"]), "employers": dict(sp.EMPLOYERS),
             "new_page": "/internships/new/" in by_path,
-            "employer_count": len({sp.employer_key(x.get("company_name") or "") for x in roles})}
+            # Only roles that name their employer: a blank name would count as one more employer.
+            "employer_count": len({sp.employer_key(x["company_name"]) for x in roles if x.get("company_name")})}
+            # was: len({sp.employer_key(x.get("company_name") or "") for x in roles})
 
 
 # ---------------------------------------------------------------- rendering

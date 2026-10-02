@@ -59,6 +59,8 @@ def test_job_board_text_cannot_break_a_cell_or_make_a_link():
     assert "&amp;copy;" in out and "AT&T" in out          # an entity is escaped, a bare & is left
     assert "\n" not in out and out.endswith("next")
     assert eml.md("x" * 500, 20) == "x" * 19 + "…"
+    # GitHub reads $...$ as math: a pay range would show as a formula (added 2026-10-02).
+    assert eml.md("$17.90-$50.90 per hour") == "\\$17.90-\\$50.90 per hour"
 
 
 def test_links_are_web_addresses_that_stay_inside_their_cell():
@@ -124,6 +126,8 @@ def test_listings_missing_optional_fields_still_render(tmp_path):
     cells = [c.strip() for c in BAR.split(line)[1:-1]]
     assert cells[0] == "" and cells[2] == "United States" and cells[3] == "" and cells[4] == ""
     assert "Untagged Intern" not in files["fields/mechanical-engineering.md"]
+    # The role with no company is listed but is not counted as an employer (added 2026-10-02).
+    assert "at 6 employers in the US and Canada" in files["README.md"]
 
 
 # ---------------------------------------------------------------- caps and size
