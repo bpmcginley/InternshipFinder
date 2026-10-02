@@ -59,6 +59,13 @@ from fresh listings. The **Campus outreach kit** Action runs every Monday or by 
 reviewable artifact. It sends nothing. Drafts are produced only for well-served undergraduate majors
 when the listing export is current; a person checks the jobs and chooses where to share them.
 
+## Directory listings
+
+The [directory kit](DIRECTORIES.md) (added 2026-10-02) has paste-ready copy, within each site's
+limits, for free listings on AlternativeTo, SaaSHub, Product Hunt, Uneed, Future Tools, MicroLaunch,
+Peerlist and There's An AI For That, in order of expected value, with each site's rules and a "do not"
+list (no upvote requests, no fake reviews). Each needs the owner's own account, so a person submits.
+
 ## Channels, and the rules each follows
 
 These rules are not negotiable: breaking them gets the brand banned from the very places the audience
@@ -103,6 +110,7 @@ Revisit a store app once there are returning users who ask for one.
 | Update the Chrome Web Store's **Safe by design** text using [STORE_LISTING.md](STORE_LISTING.md) | The current listing says no profile copy is kept, while signed-in Deep Dives are saved to the account by default. The listing must match the privacy policy and extension. |
 | A Cloudflare API token with Analytics read and D1 edit, saved as a repo secret | Lets the weekly report read visits and the daily metrics copy write them |
 | Ad accounts and monthly caps, when ready | Paid reach in recruiting season |
+| Directory listings: work down the checklist in [DIRECTORIES.md](DIRECTORIES.md), pasting its copy and submitting from your own accounts | Free, lasting links and listings next to Jobright and Simplify. Each site needs a sign-in, and Product Hunt and Peerlist need a personal profile, so only the owner can submit |
 | **Email digest 1.** Create a Buttondown account at buttondown.com and fill in its verification form: InternScout, a free opt-in weekly digest of new internships for UMass Amherst students; subscribers come only from the internscout.org form; no imported lists | Buttondown sends the digest and keeps the subscriber list, so InternScout's servers never store an email address. It reviews every new account (usually in 1 to 3 business days) before the account can collect subscribers. Budget $9 a month once per-field emails need tags: tags are a $9 add-on up to 100 subscribers and part of the $9 plan from 101 to 1,000 ($29 a month above that) |
 | **Email digest 2.** In Buttondown, Settings → Domains: add internscout.org as the sending domain. In Cloudflare, DNS → Records: add each CNAME and TXT record exactly as Buttondown shows it, with every CNAME set to **DNS only** (grey cloud), then click Check records in Buttondown. If internscout.org already has an SPF record (`v=spf1 ...`), merge Buttondown's into it, since a domain can have only one. Add a DMARC record too: TXT `_dmarc` with `v=DMARC1; p=none; rua=mailto:hello@internscout.org`. Then set the newsletter's From address to hello@internscout.org and check that inbox receives mail | Gmail and Yahoo expect SPF, DKIM and DMARC on the domain mail comes from, and may send mail without them to spam. Students' replies go to the From address |
 | **Email digest 3.** In the newsletter's settings in Buttondown: (a) switch **open tracking OFF** and **click tracking OFF**; (b) switch **double opt-in ON**, so a new subscriber gets one confirmation email and nothing else until they click its link. Then confirm both before going on: reopen the settings and check both tracking switches still read off and double opt-in on; subscribe a spare address of your own on Buttondown's subscribe page and check it gets the confirmation email and is listed as unconfirmed until you click it. **Only after both are confirmed**, paste the form address into `CONFIG.digest.formAction` in `docs/index.html` (the comment there says what goes in it). In the first test copy (step 7), check again that the links go straight to internscout.org and the job sites, not through a Buttondown redirect | `docs/privacy.html` promises both: open and click tracking are off for this email, and nothing arrives until the subscriber confirms. The sign-up form stays hidden while `formAction` is empty, so no one can sign up before those promises are true. Tracking would also send every click through Buttondown's servers first |
