@@ -24,11 +24,14 @@ import os
 import re
 import sys
 from collections import Counter
+from statistics import median
 from datetime import datetime, timezone
 from urllib.parse import quote
 
 SITE = "https://internscout.org"
-MIN_OPEN = 5            # no page for fewer open listings than this
+# In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
+SLOGAN = "Built by one student, made for all students."
+MIN_OPEN = 5           # no page for fewer open listings than this
 # A field in one state needs more: at 5, 900 near-identical pages would be most of the site, the shape
 # search engines treat as doorway pages. At 15 about 400 remain, each a list worth reading.
 MIN_COMBO = 15
@@ -590,7 +593,15 @@ footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:v
 footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:26px}section.rel ul{columns:1}
 .job{grid-template-columns:1fr}.go{grid-column:1;grid-row:auto;margin-top:4px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
+.tablewrap{overflow-x:auto;margin:16px 0 8px}table.data{width:100%;border-collapse:collapse;font-size:15px}
+table.data th,table.data td{text-align:left;vertical-align:top;padding:9px 14px 9px 0;border-bottom:1px solid var(--rule)}
+table.data thead th{border-bottom:1px solid var(--ink);font-weight:600}table.data td.num{white-space:nowrap}
+section.prose h2{font:600 22px/1.3 "Source Serif 4",Georgia,serif;margin:34px 0 6px}.src{color:var(--ink3);font-size:14px}
+table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:14px}table.data th,table.data td{padding-right:10px}}
 """
+# The last five lines (2026-10-02) are the tables and headed sections of /compare/ and
+# /internships/highest-paying/. A wide table scrolls inside .tablewrap, never the page; the
+# comparison's four wordy columns keep a readable width on a phone and scroll there instead.
 
 def beacon_from(site_dir: str) -> str:
     """The analytics snippets exactly as the dashboard carries them, so there is one copy to change.
@@ -613,26 +624,40 @@ BASELINE: str | None = None   # set by build(): see baseline_day
 # the clock, so two builds of the same data are the same bytes (the 404 page and every feed's
 # lastBuildDate differed on each deploy).
 GENERATED: datetime | None = None
+# set by build(): llms.txt and llms-full.txt (llms_files), which write() puts at the site's root.
+TEXTS: dict[str, str] = {}
+
+
+def ld_script(obj) -> str:
+    """One JSON-LD block, safe to put in a page whatever its strings hold.
+
+    "</" inside a script block would end it early, and so can "<!--" followed by "<script": an
+    employer named "<!--<script>" puts the parser in a state where the real </script> no longer
+    closes the block, and the page after it becomes script. So no "<", ">" or "&" appears in the
+    block at all: JSON reads <, > and & as the same characters, and they only ever
+    occur inside strings (they are not JSON punctuation), so replacing them is always safe."""
+    ld_json = (json.dumps(obj, ensure_ascii=False)
+               .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+    # was: ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
+    return f'<script type="application/ld+json">{ld_json}</script>'
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
-         body: str, updated: str, index: bool = True, feed: bool = False) -> str:
+         body: str, updated: str, index: bool = True, feed: bool = False, ld: tuple | list = ()) -> str:
+    """ld: more JSON-LD objects for the head (added 2026-10-02: the Organization, WebSite and
+    FAQPage blocks of the hub and /about/), each in its own block after the breadcrumb trail."""
     url = SITE + path
     crumb_html = " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1]) + \
                  (f" › {esc(crumbs[-1][1])}" if crumbs else "")
-    ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
-          "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": t, "item": SITE + h}
-                              for i, (h, t) in enumerate(crumbs)]}
-    # "</" inside a script block would end it early, and so can "<!--" followed by "<script": an
-    # employer named "<!--<script>" puts the parser in a state where the real </script> no longer
-    # closes the block, and the page after it becomes script. So no "<", ">" or "&" appears in the
-    # block at all: JSON reads <, > and & as the same characters, and they only ever
-    # occur inside strings (they are not JSON punctuation), so replacing them is always safe.
-    ld_json = (json.dumps(ld, ensure_ascii=False)
-               .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
-    # was: ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
+    trail = {"@context": "https://schema.org", "@type": "BreadcrumbList",
+             "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": t, "item": SITE + h}
+                                 for i, (h, t) in enumerate(crumbs)]}
     # A breadcrumb trail of one is not a trail (Google reports it as invalid), so the hub has none.
-    ld_tag = f'<script type="application/ld+json">{ld_json}</script>' if len(crumbs) > 1 else ""
+    # (The escaping that was here is ld_script's, since 2026-10-02.)
+    ld_tag = "\n".join(([ld_script(trail)] if len(crumbs) > 1 else []) + [ld_script(o) for o in ld])
+    # was: ld_tag = f'<script type="application/ld+json">{ld_json}</script>' if len(crumbs) > 1 else ""
+    # The footer links /about/ and /compare/ from every page (2026-10-02), so crawlers and answer
+    # engines reach the pages that say what InternScout is. was: only Privacy and Terms.
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -662,7 +687,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>Built by one student, made for all students.</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/about/">About</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
 </body>
@@ -746,24 +771,34 @@ def money(v: float) -> str:
     return f"${v:,.2f}".replace(".00", "")
 
 
+# Pay text whose numbers only look hourly (added 2026-10-02, found building /internships/highest-paying/):
+# "$110k" and "$95K – $100K" are yearly salaries written in thousands, and Maven Securities' employer
+# page said "$110 an hour"; "$75 to $100," ends in a comma, so the figure was cut off mid-number; and
+# "$60.500" is $60,500 with a point for the comma.
+_THOUSANDS = re.compile(r"\d\s*k\b", re.I)
+_CUT_OFF = re.compile(r"\d,\s*$")
+_POINT_THOUSANDS = re.compile(r"\d\.\d{3}\b")
+
+
+def hourly_rate(x: dict) -> tuple[float, float] | None:
+    """One posting's listed hourly rate as (low, high), or None when it gives no clear one. A bare
+    amount counts as hourly only under $200 (student pay quoted without a unit is an hourly rate); a
+    yearly salary, monthly or weekly pay or a stipend is left out rather than turned into a made-up
+    hourly figure, and so is pay text that only looks hourly (_THOUSANDS, _CUT_OFF, _POINT_THOUSANDS)."""
+    s = real_salary(x)
+    if not s or any(r.search(s) for r in (_NOT_HOURLY, _THOUSANDS, _CUT_OFF, _POINT_THOUSANDS)):
+        return None
+    # was: if not s or _NOT_HOURLY.search(s): continue   (inside hourly_range's loop)
+    nums = [float(a.replace(",", "")) for a in _AMOUNT.findall(s)]
+    nums = [v for v in nums if 7 <= v < 200] if (_HOURLY.search(s) or all(v < 200 for v in nums)) else []
+    return (min(nums), max(nums)) if nums else None
+
+
 def hourly_range(items: list[dict]) -> tuple[float, float, int] | None:
-    """Lowest and highest hourly rate the postings list, and how many list one. A bare amount counts as
-    hourly only under $200 (student pay quoted without a unit is an hourly rate); a yearly salary or a
-    stipend is left out rather than turned into a made-up hourly figure."""
-    lo = hi = None
-    n = 0
-    for x in items:
-        s = real_salary(x)
-        if not s or _NOT_HOURLY.search(s):
-            continue
-        nums = [float(a.replace(",", "")) for a in _AMOUNT.findall(s)]
-        nums = [v for v in nums if 7 <= v < 200] if (_HOURLY.search(s) or all(v < 200 for v in nums)) else []
-        if not nums:
-            continue
-        n += 1
-        lo = min([*nums, *([lo] if lo is not None else [])])
-        hi = max([*nums, *([hi] if hi is not None else [])])
-    return (lo, hi, n) if n else None
+    """Lowest and highest hourly rate the postings list, and how many list one (see hourly_rate)."""
+    rates = [r for r in (hourly_rate(x) for x in items) if r]
+    # was: the parsing now in hourly_rate, inline in a loop here.
+    return (min(lo for lo, _ in rates), max(hi for _, hi in rates), len(rates)) if rates else None
 
 
 def dated_terms(items: list[dict]) -> Counter:
@@ -889,6 +924,526 @@ def employer_facts(name: str, items: list[dict], fields_main: list[str]) -> tupl
     return facts, questions
 
 
+# ---------------------------------------------------------------- for AI assistants and answer engines
+# Added 2026-10-02. ChatGPT search, Claude, Perplexity, Gemini and Google's AI Overviews, and Copilot
+# answer "is there a free internship search for my major?" from pages they can read and quote. These
+# give them what a student asks first, each answer in the opening sentence of its section, and every
+# number counted from the same export the listing pages are built from: /about/, /compare/,
+# /internships/highest-paying/, and /llms.txt and /llms-full.txt (the llmstxt.org format). Nothing
+# is shown only to crawlers: they are ordinary pages, linked from every footer and in the sitemap.
+# The founder is never named here, as on the rest of the site; the brand speaks for itself.
+
+ORG_ID, SITE_ID = SITE + "/#organization", SITE + "/#website"
+ORGANIZATION = {"@context": "https://schema.org", "@type": "Organization", "@id": ORG_ID, "name": "InternScout",
+                "url": SITE + "/", "logo": SITE + "/icon512.png", "slogan": SLOGAN,
+                "description": "A free internship search for college students of every major in the US and Canada.",
+                # The brand's own profile, which links back here (docs/index.html: rel="me").
+                "sameAs": ["https://mastodon.social/@internscout"]}
+WEBSITE = {"@context": "https://schema.org", "@type": "WebSite", "@id": SITE_ID, "name": "InternScout",
+           "url": SITE + "/", "inLanguage": "en-US", "publisher": {"@id": ORG_ID}}
+
+# The plans as worker/src/config.js prices them (PLANS: supporter, pro; repriced 2026-09-30).
+PLAN_PRICES = (("Supporter", "$4"), ("Pro", "$8"))
+
+# The applicant tracking systems a listing's "ats" names, as their makers write them. "other" (an
+# employer's own careers site, or a public list) is left out of the count of roles taken straight
+# from an employer's job board.
+ATS_NAMES = {"workday": "Workday", "greenhouse": "Greenhouse", "oracle": "Oracle", "icims": "iCIMS",
+             "icims_site": "iCIMS", "ashby": "Ashby", "lever": "Lever", "eightfold": "Eightfold",
+             "taleo": "Taleo", "bamboohr": "BambooHR", "jazzhr": "JazzHR", "workable": "Workable",
+             "successfactors": "SuccessFactors", "rippling": "Rippling", "smartrecruiters": "SmartRecruiters",
+             "jobvite": "Jobvite"}
+
+
+def pct(k: int, n: int) -> str:
+    """k of n as a whole percent, rounded down like summary()'s "N% list pay"."""
+    return f"{k * 100 // n}%" if n else "0%"
+
+
+def site_facts(listings: list[dict]) -> dict:
+    """What the whole export says about InternScout's coverage: the numbers /about/, /compare/ and
+    llms.txt state, so they all agree with each other and with the listing pages."""
+    fields = Counter(t for x in listings for t in set(x.get("field_tags") or []) - SKIP_FIELDS)
+    boards = Counter(ATS_NAMES[x["ats"]] for x in listings if x.get("ats") in ATS_NAMES)
+    keys = {k for x in listings for k in x["keys"]}
+    canada = sum(1 for x in listings
+                 if any(isinstance(g, dict) and g.get("kind") == "canada" for g in x.get("regions") or []))
+    return {"open": len(listings),
+            "employers": len({employer_key(x["company_name"]) for x in listings if x.get("company_name")}),
+            "fields": fields, "boards": boards, "from_boards": sum(boards.values()), "canada": canada,
+            # The 50 states only: DC and Puerto Rico are counted on their own pages, not here.
+            "states": sorted(k for k in keys if k in PLACES and k not in CA_PROVINCES and k not in ("DC", "PR")),
+            "provinces": sorted(k for k in keys if k in CA_PROVINCES),
+            "paid": sum(1 for x in listings if is_paid(x)),
+            "hourly": sum(1 for x in listings if hourly_rate(x))}
+
+
+def coverage_line(f: dict) -> str:
+    """ "14,366 open internships, co-ops and research roles from 1,702 employers in 65 fields" """
+    return (f"{plural(f['open'], 'open internship, co-op and research role', 'open internships, co-ops and research roles')}"
+            f" from {plural(f['employers'], 'employer')} in {plural(len(f['fields']), 'field')}")
+
+
+def boards_line(f: dict) -> str:
+    """Where the listings come from, counted: "86% of open roles come straight from employers' own
+    applicant tracking systems (Workday, Greenhouse, Oracle, iCIMS, Ashby and Lever are the largest)"."""
+    if not f["from_boards"]:
+        return "every open role links to the posting on the employer's own site"
+    return (f"{pct(f['from_boards'], f['open'])} of open roles come straight from employers' own applicant "
+            f"tracking systems ({join_words(top(f['boards'], 6))} are the largest)")
+
+
+def word_list(words: list[str]) -> str:
+    """join_words with a comma before the last "and", for names that hold an "and" themselves:
+    "finance, data science and analytics, and operations"."""
+    return join_words(words) if len(words) < 3 else ", ".join(words[:-1]) + ", and " + words[-1]
+
+
+def canada_only(x: dict) -> bool:
+    """A role whose every location is in Canada, so its pay is most likely in Canadian dollars."""
+    regions = [g for g in x.get("regions") or [] if isinstance(g, dict)]
+    return bool(regions) and all(g.get("kind") == "canada" for g in regions)
+
+
+# ---- /internships/highest-paying/
+
+MIN_PAY_ROLES = 25      # open roles with a clear hourly rate before the page is made (as MIN_KIND)
+MIN_PAY_FIELD = 10      # ...in one field before the field has a row in the by-field table
+MIN_PAY_EMPLOYER = 3    # ...at one employer before it has a row in the employers table
+PAY_TOP = 30            # roles in the top list
+PAY_PER_EMPLOYER = 3    # at most this many of them from one employer, so one employer's many
+                        # identical postings don't fill the list
+PAY_EMPLOYERS = 25      # rows in the employers table
+_GRADUATE = re.compile(r"\b(ph\.?\s?d|mba|master'?s?|graduate)\b", re.I)
+
+
+def rate_words(lo: float, hi: float) -> str:
+    return (money(lo) if lo == hi else f"{money(lo)}–{money(hi)}") + " an hour"
+
+
+def pay_report(listings: list[dict], fields: dict[str, list]) -> dict:
+    """The highest listed hourly pay among the open roles: the top roles, the median and top rate by
+    field, and the employers that list the most. Only hourly_rate's clear hourly figures count; a
+    yearly salary or stipend is left out, never converted. The same role on two of one employer's
+    boards counts once (as dedupe_roles, but across every employer at once). Roles only in Canada are
+    left out: their pay is in Canadian dollars, and a ranking in two currencies ranks neither."""
+    seen, roles = set(), []
+    for x in newest_first(listings):
+        r = hourly_rate(x)
+        if not r or canada_only(x):
+            continue
+        # The same title, place and rate is the same role, even under two spellings of the employer
+        # ("Cadence" and "Cadence Design Systems" both posted Software Intern, San Jose, $31.63-$58.75).
+        key = (re.sub(r"\W+", " ", (x.get("title") or "").lower()).strip(), place(x), r)
+        if key not in seen:
+            seen.add(key)
+            roles.append((x, r[0], r[1]))
+    mid = lambda lo, hi: (lo + hi) / 2              # noqa: E731  a range counts as its midpoint in a median
+    # Ranked by the top of the range, then its bottom; ties go to the name, title and id, so every
+    # build of the same data lists them in the same order.
+    ranked = sorted(roles, key=lambda r: (-r[2], -r[1], str(r[0].get("company_name") or ""),
+                                          str(r[0].get("title") or ""), r[0]["id"]))
+    per: Counter = Counter()
+    top_roles = []
+    for r in ranked:
+        k = employer_key(r[0].get("company_name") or "")
+        if per[k] < PAY_PER_EMPLOYER and len(top_roles) < PAY_TOP:
+            per[k] += 1
+            top_roles.append(r)
+    by_field = []
+    for t in sorted(fields):
+        rates = [(lo, hi) for x, lo, hi in roles if t in (x.get("field_tags") or [])]
+        if len(rates) >= MIN_PAY_FIELD:
+            by_field.append((t, len(rates), median(mid(lo, hi) for lo, hi in rates), max(hi for _, hi in rates)))
+    by_field.sort(key=lambda r: (-r[2], -r[3], field_title(r[0])))
+    groups: dict[str, list] = {}
+    for x, lo, hi in roles:
+        if x.get("company_name"):
+            groups.setdefault(employer_key(x["company_name"]), []).append((x, lo, hi))
+    by_employer = []
+    for _, rs in sorted(groups.items()):
+        if len(rs) < MIN_PAY_EMPLOYER:
+            continue
+        names = Counter(x["company_name"] for x, _, _ in rs)
+        name = min(names, key=lambda n: (-names[n], len(n), n))        # the spelling build() picks
+        by_employer.append((name, len(rs), median(mid(lo, hi) for _, lo, hi in rs),
+                            min(lo for _, lo, _ in rs), max(hi for _, _, hi in rs)))
+    by_employer.sort(key=lambda r: (-r[2], -r[4], r[0]))
+    return {"roles": roles, "top": top_roles, "by_field": by_field, "by_employer": by_employer[:PAY_EMPLOYERS],
+            "employers_listing": sum(1 for rs in groups.values() if len(rs) >= MIN_PAY_EMPLOYER),
+            "median": median(mid(lo, hi) for _, lo, hi in roles) if roles else None,
+            # Roles whose pay is given some other way: a yearly salary, monthly pay, a stipend.
+            "other_pay": sum(1 for x in listings if real_salary(x) and not hourly_rate(x)),
+            "canada": sum(1 for x in listings if hourly_rate(x) and canada_only(x))}
+
+
+def pay_rows(top_roles: list[tuple], now: datetime) -> str:
+    rows = []
+    for x, lo, hi in top_roles:
+        meta = [esc(place(x))] + ([esc(str(x["term"]))] if x.get("term") else [])
+        new_tag = ' <span class="new">New</span>' if fresh(x, now, BASELINE) else ""
+        rows.append(
+            '<li class="job">'
+            f'<div class="co">{company_link(x.get("company_name") or "")}{new_tag}</div>'
+            f'<div class="role">{esc(x.get("title") or "")}</div>'
+            f'<div class="meta">{" · ".join(meta)} · <span class="pay">{esc(rate_words(lo, hi))}</span></div>'
+            f'<a class="go" href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" target="_blank">Open posting</a>'
+            "</li>")
+    return "\n".join(rows)
+
+
+def table(head: list[str], rows: list[list[str]], num_from: int = 1, cls: str = "data") -> str:
+    """An HTML table; cells are HTML already. Columns from num_from on hold figures and don't wrap."""
+    th = "".join(f"<th scope=\"col\">{h}</th>" for h in head)
+    body = "".join("<tr>" + "".join(f"<td class=\"num\">{c}</td>" if i >= num_from else
+                                    (f"<th scope=\"row\">{c}</th>" if i == 0 else f"<td>{c}</td>")
+                                    for i, c in enumerate(r)) + "</tr>" for r in rows)
+    return f"<div class=\"tablewrap\"><table class=\"{cls}\"><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>"
+
+
+def pay_page(rep: dict, f: dict, now: datetime, fields: dict[str, list], paid_page: bool) -> tuple[str, str, str]:
+    """(title, description, body) of /internships/highest-paying/."""
+    x0, _, hi0 = rep["top"][0]
+    n, k = f["open"], f["hourly"]
+    grad = sum(1 for x, _, _ in rep["top"] if _GRADUATE.search(x.get("title") or ""))
+    lede = (f"The highest hourly pay listed on an open internship, co-op or research role is "
+            f"{esc(money(hi0))} an hour, at {company_link(x0.get('company_name') or '')} "
+            f"({esc(x0.get('title') or '')}). Across the {len(rep['roles']):,} open roles that list a clear "
+            f"hourly rate, the median is {esc(money(round(rep['median'], 2)))} an hour.")
+    body = [f"<p class=\"lede\">{lede}</p>",
+            f"<a class=\"cta\" href=\"{dash_link(paid=True)}\">See every paid role on the dashboard</a>",
+            "<section class=\"prose\"><h2>Top internships by listed hourly pay</h2>",
+            f"<p class=\"more\">The {len(rep['top'])} open roles with the highest listed rate, at most "
+            f"{PAY_PER_EMPLOYER} from one employer."
+            + (f" {grad} of them {'is' if grad == 1 else 'are'} for graduate students (the title says PhD, "
+               "MBA, master’s or graduate)." if grad else "") + "</p>",
+            f"<ul class=\"jobs\">{pay_rows(rep['top'], now)}</ul></section>"]
+    if rep["by_field"]:
+        rows = [[f"<a href=\"/internships/{field_slug(t)}/\">{esc(field_title(t))}</a>",
+                 f"{c:,} of {len(fields[t]):,}", esc(money(round(m, 2))), esc(money(h))]
+                for t, c, m, h in rep["by_field"]]
+        body.append("<section class=\"prose\"><h2>Listed pay by field</h2>"
+                    f"<p>The {len(rep['by_field'])} fields where at least {MIN_PAY_FIELD} open roles list an "
+                    "hourly rate, by median rate. The count is of roles that list a rate, out of the field’s "
+                    "open roles; most postings in every field give no rate.</p>"
+                    + table(["Field", "Roles listing a rate", "Median", "Highest"], rows) + "</section>")
+    if rep["by_employer"]:
+        rows = [[company_link(nm), f"{c:,}", esc(money(round(m, 2))), esc(rate_words(lo, hi).replace(" an hour", ""))]
+                for nm, c, m, lo, hi in rep["by_employer"]]
+        body.append("<section class=\"prose\"><h2>Top-paying employers</h2>"
+                    f"<p>Employers with at least {MIN_PAY_EMPLOYER} open roles that list an hourly rate, by "
+                    f"median rate: the top {len(rows)} of {rep['employers_listing']:,}.</p>"
+                    + table(["Employer", "Roles listing a rate", "Median", "Range"], rows) + "</section>")
+    body.append(
+        "<section class=\"prose\"><h2>How this is counted</h2>"
+        f"<p>{f['paid']:,} of the {n:,} open roles ({pct(f['paid'], n)}) list pay or say they are paid, and "
+        f"{k:,} ({pct(k, n)}) give a clear hourly rate. A rate counts when the posting gives it per hour, or "
+        "as amounts under $200 with no unit, which is how student pay is usually written. Yearly salaries, "
+        "monthly or weekly pay and stipends are left out, never converted to an hourly figure "
+        f"(that leaves out {plural(rep['other_pay'], 'role')}), and so are amounts written in thousands "
+        "(“$100k”), placeholder figures such as “$0.00”, and pay text that is cut off. A range counts as "
+        "its midpoint in the medians, and roles are ranked by the top of their range. "
+        + (f"Roles only in Canada ({rep['canada']:,} with a rate) are left out of this page, since their pay "
+           "is in Canadian dollars. " if rep["canada"] else "")
+        + "The same role "
+        "posted on two of an employer’s boards counts once. Every figure is what the employer’s posting "
+        "says; check the posting before you rely on it.</p>"
+        + ("<p>Every role that lists pay or says it is paid, hourly or not: "
+           "<a href=\"/internships/paid/\">paid internships</a>.</p>" if paid_page else "")
+        + "</section>")
+    title = f"Highest-Paying Internships – Up to {money(hi0)} an Hour Listed | InternScout"
+    desc = (f"The highest hourly pay listed on {len(rep['roles']):,} open internships, co-ops and research roles: "
+            f"top roles, median pay by field and top-paying employers. Updated {long_day(now.isoformat())}.")
+    return title, desc, "".join(body)
+
+
+# ---- /about/
+
+def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tuple[str, str, str]]:
+    """(question, answer, extra HTML) for /about/. The answer is plain text, the same words in the page
+    and in its FAQPage block; the extra (a link) is the page's only."""
+    top_fields = [lower_name(field_title(t)) for t in top(f["fields"], 5)]
+    plans = " and ".join(f"{name} ({price} a month)" for name, price in PLAN_PRICES)
+    qa = [
+        ("What is InternScout?",
+         f"InternScout is a free internship search for college students of every major in the US and "
+         f"Canada. It lists {coverage_line(f)}, collected from employers’ own job boards several times a "
+         f"day. {SLOGAN}", ""),
+        ("Is InternScout free?",
+         "Yes. Searching, ranking and browsing every listing are free and need no account. The optional "
+         "Auto-Apply Chrome extension is free with a monthly allowance, which a school .edu email doubles; "
+         f"optional {plans} plans raise the allowance.", ""),
+        ("Which majors is InternScout for?",
+         f"Every major. Open roles are sorted into {len(f['fields'])} fields; the largest right now are "
+         f"{word_list(top_fields)}, and there are pages for {majors} majors.",
+         " <a href=\"/internships/for/\">Internships by major</a>."),
+        ("Where do the listings come from?",
+         f"From employers’ public job boards: {boards_line(f)}. InternScout respects each site’s robots.txt, "
+         "and every listing links to the posting on the employer’s own site.", ""),
+        ("How often is InternScout updated?",
+         f"Several times a day. Each run looks for new roles and drops ones that have closed; "
+         f"{plural(new, 'role was', 'roles were')} found in the last week.",
+         " <a href=\"/internships/new/\">New this week</a>." if new >= MIN_OPEN else ""),
+        ("Does Auto-Apply submit applications for me?",
+         "No. The Auto-Apply extension fills in the application with AI and stops at the submit button. "
+         "You review every answer and press Submit yourself.",
+         " <a href=\"/install.html?from=about\">Install guide</a>."),
+        ("Is InternScout affiliated with UMass Amherst?",
+         "No. InternScout was built by a UMass Amherst student, but it is not affiliated with or endorsed "
+         "by UMass Amherst, or by any employer it lists.", ""),
+        ("How is InternScout different from Simplify or Jobright?",
+         "InternScout is only for students looking for internships, co-ops and research, its search is "
+         "free with no account, its paid plans are $4 or $8 a month, and its extension never submits. "
+         "Simplify and Jobright cover job seekers at every level; Simplify+ is $39.99 a month, and Jobscan "
+         "reported Jobright’s Turbo plan at $39.99 a month (as of October 1, 2026).",
+         " <a href=\"/compare/\">The full comparison, with sources</a>."),
+    ]
+    if rep:
+        qa.append(("How much do internships on InternScout pay?",
+                   f"{pct(f['hourly'], f['open'])} of open roles list a clear hourly rate. Among those, "
+                   f"the median is {money(round(rep['median'], 2))} an hour and the highest is "
+                   f"{money(rep['top'][0][2])} an hour.",
+                   " <a href=\"/internships/highest-paying/\">Highest-paying internships</a>."))
+    qa.append(("Who makes InternScout?",
+               f"One college student builds and runs it, for students everywhere. {SLOGAN}", ""))
+    return qa
+
+
+def about_page(f: dict, qa: list[tuple[str, str, str]], updated: str) -> tuple[str, str, str, list]:
+    """(title, description, body, JSON-LD) of /about/."""
+    faq = {"@context": "https://schema.org", "@type": "FAQPage",
+           "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}}
+                          for q, a, _ in qa]}
+    body = (f"<p class=\"lede\">InternScout is a free internship search for college students of every major "
+            f"in the US and Canada: {esc(coverage_line(f))}, as of {esc(updated)}.</p>"
+            "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
+            "<section class=\"faq\">" + "".join(f"<h2>{esc(q)}</h2><p>{esc(a)}{extra}</p>" for q, a, extra in qa)
+            + "</section>"
+            "<p class=\"more\">A plain-text summary for AI assistants: <a href=\"/llms.txt\">llms.txt</a> "
+            "(and the longer <a href=\"/llms-full.txt\">llms-full.txt</a>).</p>")
+    return ("About InternScout – Free Internship Search for Every Major | InternScout",
+            f"InternScout is a free internship search for college students of every major: {coverage_line(f)}. "
+            "No account needed.", body, [ORGANIZATION, WEBSITE, faq])
+
+
+# ---- /compare/
+# Competitor facts only with a source and a date, printed on the page (the same ones as the comparison
+# card, growth/comparison.py). To refresh: check both sources, then COMPARE_AS_OF and the rows.
+COMPARE_AS_OF = "October 1, 2026"
+COMPARE_SOURCES = [
+    ("Simplify", "https://help.simplify.jobs/articles/5623502-whats-included-in-simplify-features-and-pricing",
+     "Simplify Help Center, article on Simplify’s features and pricing, checked October 1, 2026"),
+    ("Jobright", "https://jobscan.co/blog/jobscan-vs-jobright",
+     "Jobscan blog, Jobscan vs Jobright, July 2026 (Jobright publishes no student pricing)"),
+]
+COMPARE_ROWS = [
+    ("Made for", "College students of every major: internships, co-ops and research, US and Canada",
+     "Job seekers at every level", "Job seekers at every level"),
+    ("Free", "Search and browsing, with no account; the Auto-Apply extension up to a monthly allowance "
+             "(doubled with a school .edu email)",
+     "Autofill extension (Copilot), job tracker and resume builder", "A free tier that runs on daily credits"),
+    ("Paid plan", "Optional: Supporter $4/month, Pro $8/month",
+     "Simplify+ $39.99/month ($19.99/week, $89.99 for 3 months)",
+     "Turbo $39.99/month ($17.99/week), as reported by Jobscan"),
+    ("AI resume tailoring", "In the extension, within the monthly allowance",
+     "Simplify+ (with AI cover letters)", "Not covered by the source below"),
+    ("Who submits the application", "Always you: Auto-Apply fills the form and never submits", "You",
+     "You, or its AI Agent (supervised or fully automatic)"),
+]
+
+
+def compare_page(f: dict) -> tuple[str, str, str]:
+    """(title, description, body) of /compare/."""
+    rows = [[esc(label)] + [esc(c) for c in cells] for label, *cells in COMPARE_ROWS]
+    # "every major" shown, not only said: fields far from engineering that have open roles today.
+    wide = [lower_name(field_title(t)) for t in ("nursing", "health", "social_work", "education", "arts", "journalism")
+            if f["fields"].get(t, 0) >= MIN_OPEN][:3]
+    breadth = f", from engineering and finance to {esc(word_list(wide))}" if wide else ""
+    sources = "".join(f"<li>{esc(name)}: <a href=\"{esc(url)}\" rel=\"noopener\">{esc(what)}</a></li>"
+                      for name, url, what in COMPARE_SOURCES)
+    body = (
+        "<p class=\"lede\">InternScout, Simplify and Jobright all help you find jobs and fill in applications. "
+        "They differ in who they are for, what they cost, and who presses Submit. Simplify and Jobright cover "
+        "every career level; InternScout lists only internships, co-ops and research roles for college "
+        f"students: {f['open']:,} open today, from {plural(f['employers'], 'employer')} in "
+        f"{plural(len(f['fields']), 'field')}.</p>"
+        + table(["", "InternScout", "Simplify", "Jobright"], rows, num_from=99, cls="data cmp")
+        + f"<p class=\"src\">Competitor facts as of {COMPARE_AS_OF}, from the sources below. Prices change; "
+          "check each company’s site before you pay.</p>"
+        "<section class=\"prose\"><h2>Who each one is for</h2>"
+        "<p>Simplify and Jobright are built for job seekers at every level, so they are the better fit if you "
+        "also want full-time or experienced roles. InternScout is built only for college students looking for "
+        f"internships, co-ops and research positions, in every major{breadth}.</p>"
+        "<h2>What each one costs</h2>"
+        "<p>Simplify’s autofill extension (Copilot), job tracker and resume builder are free; Simplify+ is "
+        "$39.99 a month, $19.99 a week or $89.99 for three months, and adds AI resume tailoring and cover "
+        "letters. Jobright publishes no student pricing; Jobscan reported its Turbo plan at $39.99 a month "
+        "($17.99 a week), and its free tier runs on daily credits. InternScout’s search is free with no "
+        "account, its Auto-Apply extension is free up to a monthly allowance (doubled with a school .edu "
+        "email), and its optional Supporter and Pro plans are $4 and $8 a month.</p>"
+        "<h2>Who presses Submit</h2>"
+        "<p>With Simplify’s extension, you submit each application yourself. Jobright’s AI Agent can submit "
+        "applications for you, supervised or fully automatically. InternScout’s Auto-Apply fills in the form "
+        "and stops: you review every answer and press Submit, every time.</p>"
+        f"<h2>Sources</h2><ul>{sources}</ul>"
+        "<p class=\"src\">Not affiliated with Simplify or Jobright. Names are used only to compare.</p></section>"
+        "<a class=\"cta\" href=\"/\">Try InternScout’s search, free</a>")
+    return ("InternScout vs Simplify vs Jobright – Price and Features Compared | InternScout",
+            "InternScout, Simplify and Jobright compared: who each is for, free tiers, paid plans ($4–$8 vs "
+            f"$39.99 a month) and who submits applications. Sources dated {COMPARE_AS_OF}.", body)
+
+
+# ---- /llms.txt and /llms-full.txt
+
+def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majors: int, employers: int,
+               new: int, updated: str) -> dict[str, str]:
+    """The two llmstxt.org files: llms.txt, an H1, a one-paragraph summary and lists of links to the
+    pages that matter; llms-full.txt, the longer description an assistant can quote from. made is
+    every page this build wrote (path -> (heading, open roles)), so neither links a page that isn't
+    there. Dated from the data, like everything else a build writes."""
+    def link(path: str, label: str | None = None, note: str = "") -> str:
+        return f"- [{label or made[path][0]}]({SITE}{path})" + (f": {note}" if note else "")
+
+    field_pages = [(t, n) for t, n in sorted(f["fields"].items(), key=lambda kv: (-kv[1], kv[0]))
+                   if f"/internships/{field_slug(t)}/" in made]
+    state_pages = sorted(((p, h, n) for p, (h, n) in made.items()
+                          if p.count("/") == 3 and p.startswith("/internships/") and h.startswith("Internships in ")),
+                         key=lambda e: (-e[2], e[0]))
+    browse = [p for p in ("/internships/new/", "/internships/paid/", "/internships/co-op/", "/internships/research/",
+                          "/internships/for-freshmen/", "/internships/for-sophomores/") if p in made]
+    plans = ", ".join(f"{name} {price}/month" for name, price in PLAN_PRICES)
+    summary_ = (f"InternScout ({SITE}) is a free internship search for college students of every major in the "
+                f"US and Canada. As of {updated} it lists {coverage_line(f)}, collected several times a day from "
+                f"employers' own job boards. Search is free and needs no account. {SLOGAN}")
+    facts = [
+        "Key facts:",
+        "",
+        "- Free: searching, ranking and browsing every listing; no account needed.",
+        "- Optional Chrome extension, InternScout Auto-Apply: fills in applications with AI and never submits "
+        "them (the student reviews and submits). Free with a monthly allowance; a school .edu email doubles it. "
+        f"Optional paid plans: {plans}.",
+        f"- Coverage: {f['open']:,} open roles from {f['employers']:,} employers, in {len(f['fields'])} fields, "
+        f"{len(f['states'])} of the 50 US states and {len(f['provinces'])} Canadian provinces and territories. "
+        f"{boards_line(f)[0].upper()}{boards_line(f)[1:]}.",
+        "- Updated several times a day. Every listing links to the employer's own posting.",
+        "- Not affiliated with UMass Amherst, or with any employer it lists.",
+    ]
+    main_pages = [link("/", "Dashboard", "search every open listing and rank it for your major, class year and states"),
+                  link("/about/", "About InternScout", "what it is, what is free, where listings come from, in direct answers"),
+                  link("/compare/", "InternScout vs Simplify vs Jobright", "prices and features compared, with dated sources")]
+    if "/internships/highest-paying/" in made:
+        main_pages.append(link("/internships/highest-paying/", "Highest-paying internships",
+                               "top listed hourly pay by role, field and employer, rebuilt every update"))
+    main_pages.append(link("/install.html", "Auto-Apply extension install guide",
+                           "the free Chrome extension that fills applications and never submits"))
+    lines = ["# InternScout", "", f"> {summary_}", "", *facts, "",
+             "## Main pages", "", *main_pages, "",
+             "## Browse internships", "",
+             link("/internships/", "All internships by field, state, employer and major", f"{f['open']:,} open roles"),
+             link("/internships/at/", "Internships by employer", f"{employers:,} employers with their own page"),
+             link("/internships/for/", "Internships by major", f"{majors} majors"),
+             *[link(p, note=f"{made[p][1]:,} open") for p in browse],
+             *[link(f"/internships/{field_slug(t)}/", note=f"{made[f'/internships/{field_slug(t)}/'][1]:,} open")
+               for t, _ in field_pages[:12]],
+             *[link(p, note=f"{n:,} open") for p, _, n in state_pages[:8]],
+             "",
+             "## Feeds", "",
+             *([link("/internships/new/feed.xml", "New internships this week (RSS)")] if "/internships/new/" in made else []),
+             "- Every field, state, major and employer page has an RSS feed of its newest roles at its own "
+             "address plus feed.xml"
+             + (f", for example {SITE}/internships/{field_slug(field_pages[0][0])}/feed.xml" if field_pages else ""),
+             "",
+             "## Policies", "",
+             link("/privacy", "Privacy policy"), link("/terms", "Terms of use"),
+             "",
+             "## Optional", "",
+             link("/llms-full.txt", "Full description", "coverage, top fields and employers, pay, how it works, limits"),
+             ""]
+    short = "\n".join(lines)
+
+    top_emp = sorted(((p, h, n) for p, (h, n) in made.items()
+                      if p.startswith("/internships/at/") and p != "/internships/at/"), key=lambda e: (-e[2], e[0]))
+    full = ["# InternScout", "", f"> {summary_}", "",
+            f"Data as of {updated}. Every number below is counted from the listings open on that day.", "",
+            "## What InternScout is", "",
+            "InternScout is a website (internscout.org) for finding internships, co-ops, research positions and "
+            "fellowships. It collects open roles from employers' public job boards, sorts them by field, location, "
+            "start term and class year, and ranks them for the major, class year and states a student picks. "
+            "Each listing links to the application on the employer's own site; InternScout takes no applications "
+            "and charges employers nothing.", "",
+            "## Who it is for", "",
+            f"College students of every major, in the US and Canada. Open roles are sorted into {len(f['fields'])} "
+            f"fields (all of them are listed below); the largest are "
+            f"{word_list([lower_name(field_title(t)) for t in top(f['fields'], 5)])}. There are browse pages for "
+            f"{majors} majors.", "",
+            "## How it works", "",
+            f"- Listings come from employers' public job boards: {boards_line(f)}. Each site's robots.txt is respected.",
+            "- Several times a day the listings are refreshed: new roles are added and closed ones removed.",
+            "- The dashboard (https://internscout.org/) filters by field, state, start term, class year, paid "
+            "roles and new roles, and ranks the rest for the student's profile. No account is needed.",
+            "- Every field, state, employer and major has a plain page under https://internscout.org/internships/ "
+            "with its newest open roles and an RSS feed.", "",
+            "## What is free and what is paid", "",
+            "- Free: search, ranking, the browse pages, the RSS feeds. No account.",
+            "- Free with a monthly allowance: the InternScout Auto-Apply Chrome extension, which fills in "
+            "applications with AI and never submits them; the student reviews every answer and presses Submit. "
+            "A school .edu email doubles the allowance.",
+            f"- Optional paid plans raise the allowance: {plans}.", "",
+            "## Coverage", "",
+            f"- Open roles: {f['open']:,}",
+            f"- Employers: {f['employers']:,} ({employers:,} with their own page)",
+            f"- Fields: {len(f['fields'])}",
+            f"- Places: {len(f['states'])} of the 50 US states, and {len(f['provinces'])} Canadian provinces and "
+            f"territories ({f['canada']:,} roles in Canada)",
+            f"- Found in the last week: {new:,}",
+            f"- List pay or say they are paid: {f['paid']:,} ({pct(f['paid'], f['open'])}); a clear hourly rate: "
+            f"{f['hourly']:,} ({pct(f['hourly'], f['open'])})", "",
+            # Every field, largest first, so "does it have nursing internships?" has an answer here; a
+            # field with a page of its own is a link.
+            "## Fields, by open roles", "",
+            *[link(f"/internships/{field_slug(t)}/", field_title(t), f"{n:,} open")
+              if f"/internships/{field_slug(t)}/" in made else f"- {field_title(t)}: {n:,} open"
+              for t, n in sorted(f["fields"].items(), key=lambda kv: (-kv[1], kv[0]))], "",
+            "## Employers with the most open roles", "",
+            *[link(p, h.replace("Internships at ", ""), f"{n:,} open") for p, h, n in top_emp[:15]], ""]
+    if rep:
+        x0, _, hi0 = rep["top"][0]
+        full += ["## Pay", "",
+                 f"Among the {len(rep['roles']):,} open roles that list a clear hourly rate, the median is "
+                 f"{money(round(rep['median'], 2))} an hour; the highest is {money(hi0)} an hour "
+                 f"({x0.get('company_name') or ''}, {x0.get('title') or ''}). Yearly salaries and stipends are "
+                 "left out, never converted. "
+                 + (f"Highest median by field: {join_words([f'{field_title(t)} ({money(round(m, 2))})' for t, _, m, _ in rep['by_field'][:3]])}. "
+                    if rep["by_field"] else "")
+                 + f"Details: {SITE}/internships/highest-paying/", ""]
+    full += ["## How to use it", "",
+             "1. Open https://internscout.org/ and pick your major, class year and the states you want (or remote).",
+             "2. Filter by start term, paid roles or new this week, and open the postings that fit.",
+             "3. Apply on the employer's own site. The optional Auto-Apply extension can fill in the form; you "
+             "review it and submit.",
+             "4. To follow a field or a state, subscribe to its page's RSS feed in a feed reader, Discord or Slack.", "",
+             "## Compared with Simplify and Jobright", "",
+             f"As of {COMPARE_AS_OF}: Simplify+ is $39.99/month ($19.99/week, $89.99 for 3 months); its autofill "
+             "extension (Copilot), tracker and resume builder are free, AI resume tailoring and cover letters are "
+             "Simplify+, and the user submits (source: help.simplify.jobs/articles/5623502-whats-included-in-simplify-"
+             "features-and-pricing). Jobright publishes no student pricing; Jobscan reported Turbo at $39.99/month "
+             "($17.99/week), its free tier uses daily credits, and its AI Agent can submit applications, supervised "
+             "or fully automatically (source: jobscan.co/blog/jobscan-vs-jobright, July 2026). Both cover every job "
+             "level. InternScout: free search, a free extension allowance, $4 and $8 plans, never submits, every "
+             f"major. Details: {SITE}/compare/", "",
+             "## Limits", "",
+             "- Only roles posted on public job boards InternScout scans are listed; a site whose robots.txt says "
+             "no is not scanned, so some employers are missing.",
+             "- Most postings do not give pay, a start term or the class years they take; pages say so rather than guess.",
+             "- Listings can close between updates. Always check the posting on the employer's site before applying.",
+             "- InternScout does not apply for anyone, and its extension never submits an application.", "",
+             "## Disclaimer", "",
+             "InternScout is a free internship search built by a UMass Amherst student. Not affiliated with UMass "
+             "Amherst, or with any employer it lists. Not affiliated with Simplify or Jobright.", "",
+             SLOGAN, ""]
+    return {"llms.txt": short, "llms-full.txt": "\n".join(full)}
+
+
 # ---------------------------------------------------------------- build
 
 def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset()) -> list[dict]:
@@ -983,14 +1538,14 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         by_company[name], spellings[name] = items, sorted(names)
         EMPLOYERS.update({n: path for n in names})
 
-    def add(path, title, desc, h1, crumbs, body, items=None, state=None):
+    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=()):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
         found = [str(x.get("first_seen") or "")[:10] for x in (listings if items is None else items)]
         # The live sitemap's lastmod is a floor: when the newest role on a page closes, the newest left
         # is older, and a lastmod that goes backwards is one a search engine stops trusting.
         found.append(live.get(path) or "" if isinstance(live, dict) else "")
-        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, feed=items is not None),
+        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, feed=items is not None, ld=ld),
                       "items": items, "h1": h1, "state": state,
                       "lastmod": max((f for f in found if f), default=None)})
 
@@ -1147,6 +1702,17 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # new role: that was 1,800 items and 800 KB, fetched every few hours by every subscriber.
         pages[-1]["feed_limit"] = NEW_FEED        # was: None (every new role)
 
+    # The highest listed hourly pay (2026-10-02), made before the hubs so the hub can link it. Kept
+    # like any other page once live (enough), since its URL is the one a search result points at.
+    facts = site_facts(listings)
+    pay_path = "/internships/highest-paying/"
+    rep = pay_report(listings, fields)
+    if enough(len(rep["roles"]), pay_path, MIN_PAY_ROLES) and rep["top"]:
+        t_, d_, b_ = pay_page(rep, facts, now, fields, any(p == "/internships/paid/" for p, _, _ in kind_made))
+        add(pay_path, t_, d_, "Highest-paying internships", [root, (pay_path, "Highest-paying")], b_)
+    else:
+        rep = None
+
     # Hubs last, so they only link to pages that exist.
     add("/internships/at/", f"Internships by Employer – {len(by_company):,} Employers | InternScout",
         f"Open internships and co-ops at {len(by_company):,} employers hiring college students now, from each "
@@ -1183,11 +1749,25 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                             if len(new) >= MIN_OPEN else "")
            + "".join(f"<li><a href=\"{p}\">{esc(k['h1'][0].upper() + k['h1'][1:])}</a> "
                      f"<span class=\"n\">{len(v):,}</span></li>" for p, k, v in kind_made)
+           + (f"<li><a href=\"{pay_path}\">Highest-paying internships</a> <span class=\"n\">{len(rep['roles']):,}</span></li>"
+              if rep else "")
            + "</ul></section>")
     add("/internships/", f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout",
         f"{len(listings):,} open internships, co-ops and research roles for college students, updated "
         f"{updated}. Browse by field, state or major. Free, no sign-up.",
-        "Browse internships", [root], hub)
+        "Browse internships", [root], hub, ld=[ORGANIZATION, WEBSITE])
+    # was: "Browse internships", [root], hub)   (no JSON-LD: a one-item breadcrumb is none, see page)
+
+    # What InternScout is, for people and for answer engines (2026-10-02). After the hubs: they link
+    # only pages that exist.
+    qa = about_answers(facts, len(majors_made), len(new), rep)
+    t_, d_, b_, ld_ = about_page(facts, qa, updated)
+    add("/about/", t_, d_, "About InternScout", [("/", "InternScout"), ("/about/", "About")], b_, ld=ld_)
+    t_, d_, b_ = compare_page(facts)
+    add("/compare/", t_, d_, "InternScout vs Simplify vs Jobright", [("/", "InternScout"), ("/compare/", "Compare")], b_)
+    global TEXTS
+    made = {p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0) for p in pages}
+    TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)
     return pages
 
 
@@ -1226,9 +1806,22 @@ def write(site_dir: str, pages: list[dict]) -> None:
         # No "Disallow: /data/": the dashboard at / (canonical, and in the sitemap) fetches its listings
         # from ./data/ in the browser, and a crawler barred from them renders it as an empty shell. The
         # files there are JSON, which search engines do not list as pages anyway.
-        f.write(f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
+        # The comment (2026-10-02) only says out loud what "User-agent: *" already allows: AI search and
+        # answer crawlers read the site like any other. A group of their own would change nothing, and
+        # a crawler that matches a named group ignores the "*" one, so a later edit to one could
+        # silently stop applying to them.
+        f.write("# Every crawler is welcome, AI search and answer engines included: GPTBot, OAI-SearchBot,\n"
+                "# ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Google-Extended, Bingbot and\n"
+                f"# Applebot-Extended. A summary for language models: {SITE}/llms.txt\n"
+                f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
+        # was: f.write(f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
         # was: f.write("User-agent: *\nAllow: /\n# Raw listing data; the pages under /internships/ are the readable form.\n"
         #              f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
+    # llms.txt and llms-full.txt (2026-10-02): not in the sitemap, which lists pages; answer engines
+    # look for them at the root by name, and robots.txt and /about/ point to them.
+    for name, text in TEXTS.items():
+        with open(os.path.join(site_dir, name), "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
 
 
 def live_paths(sitemap: str) -> dict[str, str]:
