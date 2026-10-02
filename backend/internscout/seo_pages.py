@@ -1193,16 +1193,20 @@ def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tupl
          "by UMass Amherst, or by any employer it lists.", ""),
         ("How is InternScout different from Simplify or Jobright?",
          "InternScout is only for students looking for internships, co-ops and research, its search is "
-         "free with no account, its paid plans are $4 or $8 a month, and its extension never submits. "
-         "Simplify and Jobright cover job seekers at every level; Simplify+ is $39.99 a month, and Jobscan "
-         "reported Jobright’s Turbo plan at $39.99 a month (as of October 1, 2026).",
+         f"free with no account, its paid plans are {' or '.join(p for _, p in PLAN_PRICES)} a month, and its "
+         "extension never submits. Simplify and Jobright cover job seekers at every level; Simplify+ is "
+         f"$39.99 a month, and Jobscan reported Jobright’s Turbo plan at $39.99 a month (as of {COMPARE_AS_OF}).",
+         # was: "... paid plans are $4 or $8 a month ... (as of October 1, 2026)." written out, so a
+         # repricing or a refreshed comparison would have left this answer behind (2026-10-02 review).
          " <a href=\"/compare/\">The full comparison, with sources</a>."),
     ]
     if rep:
         qa.append(("How much do internships on InternScout pay?",
-                   f"{pct(f['hourly'], f['open'])} of open roles list a clear hourly rate. Among those, "
-                   f"the median is {money(round(rep['median'], 2))} an hour and the highest is "
-                   f"{money(rep['top'][0][2])} an hour.",
+                   f"{pct(f['hourly'], f['open'])} of open roles list a clear hourly rate. Leaving out roles "
+                   f"only in Canada, paid in Canadian dollars, the median is {money(round(rep['median'], 2))} "
+                   f"an hour and the highest is {money(rep['top'][0][2])} an hour.",
+                   # was: "... list a clear hourly rate. Among those, the median is ...": the median and
+                   # top are pay_report's, which leaves out roles only in Canada (2026-10-02 review).
                    " <a href=\"/internships/highest-paying/\">Highest-paying internships</a>."))
     qa.append(("Who makes InternScout?",
                f"One college student builds and runs it, for students everywhere. {SLOGAN}", ""))
@@ -1381,8 +1385,10 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
             "- Several times a day the listings are refreshed: new roles are added and closed ones removed.",
             "- The dashboard (https://internscout.org/) filters by field, state, start term, class year, paid "
             "roles and new roles, and ranks the rest for the student's profile. No account is needed.",
-            "- Every field, state, employer and major has a plain page under https://internscout.org/internships/ "
-            "with its newest open roles and an RSS feed.", "",
+            "- Every field, state, employer and major with enough open roles has a plain page under "
+            "https://internscout.org/internships/ with its newest open roles and an RSS feed.", "",
+            # was: "- Every field, state, employer and major has a plain page ...": only employers with
+            # MIN_OPEN open roles do (702 of 1,725 on 2026-10-02), so the claim was not true (review).
             "## What is free and what is paid", "",
             "- Free: search, ranking, the browse pages, the RSS feeds. No account.",
             "- Free with a monthly allowance: the InternScout Auto-Apply Chrome extension, which fills in "
@@ -1412,7 +1418,11 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
                  f"Among the {len(rep['roles']):,} open roles that list a clear hourly rate, the median is "
                  f"{money(round(rep['median'], 2))} an hour; the highest is {money(hi0)} an hour "
                  f"({x0.get('company_name') or ''}, {x0.get('title') or ''}). Yearly salaries and stipends are "
-                 "left out, never converted. "
+                 "left out, never converted, and so are roles only in Canada (paid in Canadian dollars); the "
+                 "same role posted twice counts once. "
+                 # was: "... left out, never converted. ": without the rest, this count (pay_report's)
+                 # and the Coverage section's "a clear hourly rate" count read as two answers to one
+                 # question (1,732 and 1,775 on 2026-10-02; review).
                  + (f"Highest median by field: {join_words([f'{field_title(t)} ({money(round(m, 2))})' for t, _, m, _ in rep['by_field'][:3]])}. "
                     if rep["by_field"] else "")
                  + f"Details: {SITE}/internships/highest-paying/", ""]

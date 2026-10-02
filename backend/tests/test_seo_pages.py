@@ -605,6 +605,12 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     assert "41 open internships, co-ops and research roles from 9 employers in 1 field" in faq["What is InternScout?"]
     assert {"Which majors is InternScout for?", "Where do the listings come from?", "How often is InternScout updated?",
             "How is InternScout different from Simplify or Jobright?"} <= set(faq)
+    # The pay answer's median and top leave out roles only in Canada, and it says so (review, 2026-10-02):
+    # Maple Co's $95 is a rate, but in Canadian dollars, so the highest is $49.
+    pay = faq["How much do internships on InternScout pay?"]
+    assert "only in Canada" in pay and "the highest is $49 an hour" in pay
+    assert "$4 or $8 a month" in faq["How is InternScout different from Simplify or Jobright?"]
+    assert seo_pages.COMPARE_AS_OF in faq["How is InternScout different from Simplify or Jobright?"]
     # The page shows the same answers, each under its own heading.
     assert "<h2>Does Auto-Apply submit applications for me?</h2><p>No." in about
     assert seo_pages.SLOGAN in about and blocks[1]["slogan"] == seo_pages.SLOGAN
@@ -641,6 +647,9 @@ def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
     assert "- [Mechanical Engineering](https://internscout.org/internships/mechanical-engineering/): 41 open" in full
     assert "the highest is $49 an hour" in full and "Not affiliated with UMass Amherst" in full
     assert "Data as of September 23, 2026." in full
+    # Only employers with enough open roles have a page, so llms-full doesn't say every one does (review).
+    assert "Every field, state, employer and major with enough open roles has a plain page" in full
+    assert "and so are roles only in Canada (paid in Canadian dollars)" in full
     # Not a page: no sitemap entry, but robots.txt and /about/ point to it.
     assert "llms" not in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert "https://internscout.org/llms.txt" in open(os.path.join(site, "robots.txt"), encoding="utf-8").read()
