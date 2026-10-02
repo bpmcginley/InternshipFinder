@@ -20,8 +20,9 @@ OAuth client). A refresh token keeps working while it is used (Google drops one 
 months, and one from an app left in "Testing" after 7 days: growth/README.md, YouTube).
 
 Quota (checked 2026-10-02 against developers.google.com/youtube/v3/getting-started, updated
-2026-09-14): since 2026-06-01 videos.insert has a bucket of its own, 100 uploads a day by default, and
-an upload costs 1 of them. (Before that it cost about 1,600 of the 10,000 daily units.) The duplicate
+2026-09-14, and the API's revision history, entries of 2025-12-04 and 2026-06-01): since 2026-06-01
+videos.insert has a bucket of its own, 100 uploads a day by default, and an upload costs 1 of them.
+(It cost about 1,600 of the 10,000 daily units until 2025-12-04, then about 100.) The duplicate
 check costs 2 units of the 10,000 shared by everything else. One Short a week is far inside both.
 
 Uploads from an API project that has not passed YouTube's compliance audit are locked private
@@ -201,9 +202,12 @@ def _parse_time(s: str | None) -> datetime | None:
 
 
 def already_posted(token: str, title: str, now: datetime | None = None) -> str | None:
-    """The id of an upload from the last SAME_POST with this exact title, if the channel has one.
-    The guard job lets a person force a second Brand posts run on one day (to retry Instagram, say),
-    and that run must not put the same Short up twice."""
+    """The id of an upload from the last SAME_POST with this title, or any other title of ours (one
+    ending in #Shorts), if the channel has one. The guard job lets a person force a second Brand posts
+    run on one day (to retry Instagram, say), and that run must not put the same Short up twice.
+    Matching the exact title alone missed that: the data refreshes several times a day, so a rerun
+    hours later can count 26 roles where the first said 25 (or pick another field), and its title
+    differs from the Short already up. (Widened 2026-10-02.)"""
     now = now or datetime.now(timezone.utc)
     _, _, body = _call("GET", f"{API}/channels?part=contentDetails&mine=true", token=token)
     items = json.loads(body or b"{}").get("items") or []
@@ -215,7 +219,9 @@ def already_posted(token: str, title: str, now: datetime | None = None) -> str |
     for it in json.loads(body or b"{}").get("items") or []:
         sn = it.get("snippet") or {}
         when = _parse_time(sn.get("publishedAt"))
-        if sn.get("title") == title and when and now - when < SAME_POST:
+        mine = sn.get("title") or ""
+        # was: if sn.get("title") == title and when and now - when < SAME_POST:
+        if (mine == title or mine.endswith("#Shorts")) and when and now - when < SAME_POST:
             return (sn.get("resourceId") or {}).get("videoId") or "?"
     return None
 

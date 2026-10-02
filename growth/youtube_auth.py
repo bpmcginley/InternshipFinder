@@ -119,8 +119,10 @@ def main() -> int:
     try:
         tokens = exchange(client_id, client_secret, code, verifier, redirect_uri)
         name = channel_name(tokens["access_token"])
-    except youtube.YouTubeError as e:
-        print(f"[youtube_auth] failed: {e}")
+    # was: except youtube.YouTubeError as e: (an answer without an access token, or an unreachable
+    # Google, ended in a traceback rather than this line)
+    except (youtube.YouTubeError, OSError, KeyError, ValueError) as e:
+        print(f"[youtube_auth] failed: {type(e).__name__}: {e}")
         return 1
     if not tokens.get("refresh_token"):
         print("[youtube_auth] Google sent no refresh token. Remove the app's access at "

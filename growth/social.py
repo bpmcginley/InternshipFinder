@@ -225,7 +225,7 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
         # The same tags as the captions, for channels that build their own text from post.json
         # (growth/youtube.py's Short description, added 2026-10-02), so every channel tags alike.
         "hashtags": tags.split(),
-        "reel":today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
+        "reel": today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
     }
 
 

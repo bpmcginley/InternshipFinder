@@ -214,6 +214,15 @@ def test_a_forced_rerun_does_not_upload_the_same_short_twice(run, capsys):
     assert not any(r.get_method() == "PUT" for r in fake.requests)
 
 
+def test_a_rerun_after_a_data_refresh_still_sees_todays_short(monkeypatch):
+    """The data refreshes between runs: a forced rerun can count one more role (or pick another
+    field), so its title differs from the Short already up, and it must still not upload a second."""
+    earlier = yt.title_for({**POST, "count": 17})
+    fake = FakeGoogle(*channel([(earlier, NOW - timedelta(hours=3), "EARLIER")]))
+    monkeypatch.setattr(yt.urllib.request, "urlopen", fake)
+    assert yt.already_posted("ACCESS-TOKEN", yt.title_for(POST), NOW) == "EARLIER"
+
+
 def test_last_weeks_short_with_the_same_title_is_no_reason_to_skip(monkeypatch):
     title = yt.title_for(POST)
     fake = FakeGoogle(*channel([(title, NOW - timedelta(days=7), "LASTWEEK"), ("Another Short", NOW, "OTHER")]))
