@@ -318,6 +318,10 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "globalcareers-atlassian": {
+   "on": "2026-10-03",
+   "why": "dead"
+  },
   "internships-aei": {
    "on": "2026-10-01",
    "why": "robots"
@@ -368,6 +372,10 @@
   },
   "etg": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "gitar-careers": {
+   "on": "2026-10-03",
    "why": "dead"
   }
  },
@@ -959,6 +967,12 @@
   "winsupply1": {
    "on": "2026-09-30",
    "why": "robots"
+  }
+ },
+ "successfactors": {
+  "careers.gulfstream.com": {
+   "on": "2026-10-03",
+   "why": "dead"
   }
  },
  "taleo": {

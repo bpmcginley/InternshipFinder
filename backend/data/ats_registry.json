@@ -2717,6 +2717,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "arcboatcompany": {
+   "name": "Arc",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "arcesiumllc": {
    "name": "Arcesium",
    "quant": false,
@@ -4274,6 +4280,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "icon": {
+   "name": "ICON",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "ideo": {
    "name": "IDEO",
    "quant": false,
@@ -4722,6 +4734,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "mastercontrol": {
+   "name": "MasterControl",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "mavensecuritiesholdingltd": {
    "name": "Maven Securities",
    "quant": false,
@@ -4869,6 +4887,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-17"
+  },
+  "natera": {
+   "name": "Natera",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
   },
   "nationallifeinsurancecompany": {
    "name": "National Life",
@@ -6364,6 +6388,12 @@
    "fails": 0,
    "added": "2026-09-24"
   },
+  "xai": {
+   "name": "xAI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "xairatherapeutics": {
    "name": "Xaira Therapeutics",
    "quant": false,
@@ -7174,13 +7204,6 @@
    "added": "2026-09-15",
    "sector": "hospitality_sports"
   },
-  "globalcareers-atlassian": {
-   "name": "Atlassian",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-30",
-   "last_fail": "2026-10-02"
-  },
   "gsk-us-earlytalent": {
    "name": "GSK",
    "quant": false,
@@ -7220,9 +7243,9 @@
   "jobs-legrand": {
    "name": "Legrand",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-15",
-   "last_fail": "2026-10-02"
+   "last_fail": "2026-10-03"
   },
   "kphcareers-kphhealthcareservices": {
    "name": "KPH Healthcare Services",
@@ -9062,9 +9085,9 @@
   "saronic": {
    "name": "Saronic",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-02"
+   "last_fail": "2026-10-03"
   },
   "secureframe": {
    "name": "Secureframe",
@@ -10297,13 +10320,6 @@
    "fails": 0,
    "added": "2026-09-14"
   },
-  "gitar-careers": {
-   "name": "Gitar, Inc.",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-14",
-   "last_fail": "2026-10-02"
-  },
   "greengas": {
    "name": "Mobius Renewables",
    "quant": false,
@@ -10418,6 +10434,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "plmrcareers": {
+   "name": "Palomar Holdings",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "rev-robotics": {
    "name": "REV Robotics",
    "quant": false,
@@ -10505,14 +10527,6 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "energy_environment"
-  },
-  "careers.gulfstream.com": {
-   "name": "Gulfstream Aerospace",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-10-02"
   },
   "careers.hfsinclair.com": {
    "name": "HF Sinclair",
@@ -10863,6 +10877,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "disa-technologies": {
+   "name": "DISA Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "double-eleven": {
    "name": "Double Eleven",
    "quant": false,
@@ -10952,6 +10972,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "mila-2": {
+   "name": "Montreal Institute for Learning Algorithms",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
   },
   "mindex": {
    "name": "Mindex",
@@ -11049,6 +11075,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "scout-clean-energy": {
+   "name": "Scout Clean Energy",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
   },
   "skygig": {
    "name": "SkyGig",
@@ -14463,6 +14495,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "hl|wd1|Campus": {
+   "name": "Houlihan Lokey",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "hmhw|wd12|hmh_careers": {
    "name": "HMH",
    "quant": false,
@@ -15171,9 +15209,9 @@
   "liveramp|wd5|LiveRampCareers": {
    "name": "LiveRamp",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-02"
+   "last_fail": "2026-10-03"
   },
   "llbean|wd1|LLBean_Careers": {
    "name": "L.L.Bean",
@@ -17200,6 +17238,12 @@
    "fails": 0,
    "added": "2026-09-30"
   },
+  "spartannash|wd1|SpartanNash_Careers": {
+   "name": "SpartanNash",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "spectris|wd3|HBK_Careers": {
    "name": "Hottinger Brüel & Kjaer (HBK)",
    "quant": false,
@@ -17328,6 +17372,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sterlingmets|wd5|Mets": {
+   "name": "New York Mets",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
   },
   "stevens|wd5|External": {
    "name": "Stevens Institute of Technology",
