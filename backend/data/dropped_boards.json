@@ -234,6 +234,10 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-iridium": {
+   "on": "2026-10-03",
+   "why": "robots"
+  },
   "careers-itcfederal": {
    "on": "2026-09-30",
    "why": "robots"
@@ -282,6 +286,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "careers-sas": {
+   "on": "2026-10-03",
+   "why": "robots"
+  },
   "careers-scires": {
    "on": "2026-10-01",
    "why": "robots"
@@ -294,6 +302,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "careers-shawmut": {
+   "on": "2026-10-03",
+   "why": "robots"
+  },
   "careers-sig": {
    "on": "2026-09-30",
    "why": "robots"
@@ -304,6 +316,10 @@
   },
   "careers-tatitlek": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-werfen": {
+   "on": "2026-10-03",
    "why": "robots"
   },
   "careers-wipfli": {
@@ -322,8 +338,16 @@
    "on": "2026-10-03",
    "why": "dead"
   },
+  "ideas-sas": {
+   "on": "2026-10-03",
+   "why": "robots"
+  },
   "internships-aei": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "jmp-sas": {
+   "on": "2026-10-03",
    "why": "robots"
   },
   "jobs-tollbrothers": {

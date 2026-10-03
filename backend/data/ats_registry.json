@@ -6825,12 +6825,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-iridium": {
-   "name": "Iridium Communications",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-30"
-  },
   "careers-kci": {
    "name": "KCI Technologies",
    "quant": false,
@@ -6971,12 +6965,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-sas": {
-   "name": "SAS",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-sdsurf": {
    "name": "SDSU Research Foundation",
    "quant": false,
@@ -6989,12 +6977,6 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "behavioral_health"
-  },
-  "careers-shawmut": {
-   "name": "Shawmut Design and Construction",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "careers-slco": {
    "name": "Salt Lake County",
@@ -7136,12 +7118,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-werfen": {
-   "name": "Werfen",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-westernsouthern": {
    "name": "Western & Southern Financial Group",
    "quant": false,
@@ -7212,18 +7188,6 @@
   },
   "homeoffice-na-urbn": {
    "name": "URBN",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "ideas-sas": {
-   "name": "IDeaS",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "jmp-sas": {
-   "name": "JMP Statistical Discovery",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
