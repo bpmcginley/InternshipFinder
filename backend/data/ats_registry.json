@@ -283,6 +283,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "blp-digital": {
+   "name": "blp",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
+  },
   "bracket-bot": {
    "name": "Bracket Bot",
    "quant": false,
@@ -12500,6 +12506,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-17"
+  },
+  "cadence|wd1|University_Talent_NCG": {
+   "name": "Cadence Design Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-03"
   },
   "cae|wd3|career": {
    "name": "CAE",
