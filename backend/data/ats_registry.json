@@ -1497,6 +1497,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "pangramlabs": {
+   "name": "Pangram Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-04"
+  },
   "paragon": {
    "name": "Paragon",
    "quant": false,
