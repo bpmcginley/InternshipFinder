@@ -7334,6 +7334,12 @@
    "added": "2026-09-18",
    "sector": "hospitality_sports"
   },
+  "careers.docusign.com": {
+   "name": "DocuSign",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-04"
+  },
   "careers.fastenterprises.com": {
    "name": "FAST Enterprises",
    "quant": false,
@@ -10115,8 +10121,9 @@
   "1x": {
    "name": "1X",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-10-04"
   },
   "transperfect": {
    "name": "TransPerfect",
