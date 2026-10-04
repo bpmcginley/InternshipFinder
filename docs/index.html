@@ -418,6 +418,9 @@
     table.list .rowbtn,table.list .report{margin-top:0}
     table.list .c-links .report{display:none}
     tbody tr.why td{padding:var(--s4)}
+    /* A narrow desktop window (no touch) still gets the row Auto-Apply explainer; the card rule above
+       zeroes every td's padding, so give it back like the Why panel's (2026-10-04). */
+    tbody tr.aa-info td{padding:var(--s2) var(--s4)}
     .whyg{gap:var(--s4)}
   }
 </style>
