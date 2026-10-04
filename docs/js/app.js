@@ -769,6 +769,9 @@
     // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
     // gives, then presses checkout here themselves.
     const [upgradeAsk, setUpgradeAsk] = useState(() => new URLSearchParams(location.search).get("upgrade") || "");
+    // The plans announcement (2026-10-04): hidden once dismissed for this announcement.
+    const [plansSeen, setPlansSeen] = useState(() => { try { return localStorage.getItem(IS.PLANS_BANNER_KEY) === IS.PLANS_BANNER_ID; } catch (e) { return false; } });
+    const hidePlans = () => { try { localStorage.setItem(IS.PLANS_BANNER_KEY, IS.PLANS_BANNER_ID); } catch (e) { } setPlansSeen(true); };
     useEffect(() => { if (upgradeAsk) history.replaceState(null, "", location.pathname); }, []);
 
     // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
@@ -1204,6 +1207,21 @@
           loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` and ${keys.length - 8} more` : "", ". ",
           h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", "."))),
 
+      // Plans announcement (2026-10-04): every number comes from the Worker's /config (IS.plansBanner).
+      // Signed-in free students get a checkout button for the first plan; everyone else the comparison.
+      (() => {
+        const pb = !plansSeen && IS.plansBanner(auth.cfg, me);
+        if (!pb) return null;
+        const first = pb.plans[0];
+        return h("div", { className: "notice plans", role: "note" },
+          h("b", null, `New: Auto-Apply plans now start at ${pb.from}. `),
+          `It's free with any email (${pb.free} applications filled a month, or ${pb.edu} with a school .edu email), and `,
+          pb.plans.map((pl, i) => `${pl.label} gives you ${pl.runs} for ${pl.price}`).join(", or "), ". It never submits for you. ",
+          auth.token && me && me.can_upgrade
+            ? h("button", { type: "button", className: "btn primary", disabled: !!busy, onClick: () => billing("checkout", first.plan) }, `Get ${first.label} · ${first.price}`)
+            : h("a", { href: "/compare/" }, "See how it compares"),
+          " ", h("a", { href: "#", onClick: prevent(hidePlans), "aria-label": "Hide this announcement" }, "Hide"));
+      })(),
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
       // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
