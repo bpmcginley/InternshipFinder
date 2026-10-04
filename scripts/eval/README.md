@@ -23,9 +23,21 @@ on real applications, before any student gets it.
 5. Paste the clipboard into `scripts/eval/steps.json`. This file holds your profile and the pages you
    applied to. It's in `.gitignore`, so don't force-add it, and delete it when you're done.
 
+Recording uses Auto-Apply as normal, so each application counts against your own monthly allowance.
+
 ## 2. Replay them against both models
 
-From the repository root, with your own Gemini API key, the same kind the Worker uses:
+On Windows, from the repository root, right after the `copy(...)` line above:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/eval/run.ps1 -FromClipboard
+```
+
+It saves the clipboard to `scripts/eval/steps.json`, shows how many steps and applications were
+recorded and roughly what the replay costs, asks before spending anything, then asks for your Gemini
+API key at a hidden prompt (it never lands in a file or your shell history).
+
+Or, anywhere, with your own Gemini API key, the same kind the Worker uses:
 
 ```bash
 GEMINI_API_KEY=your-key node scripts/eval/autofill_models.mjs scripts/eval/steps.json
@@ -42,6 +54,12 @@ often the production model disagrees with itself, which is the fair bar for a ch
   graduation and similar questions. These are listed first, one by one.
 - **Missed / extra fields:** fields only one of the two filled.
 - **Free-text answers:** set side by side for you to judge. They are not scored automatically.
+- **What routing would save:** which steps a router would hand to Flash-Lite (plain form steps: no
+  empty free-text box, no failed action just before, no final submit button on the page), both
+  models' accuracy on just those steps, the cost of one application with and without routing, now
+  and after Flash doubles on 2027-01-01, the monthly saving at 19, 300 and 3,000 applications, and
+  how much of a paid plan's net a student at full use leaves. `--dry` prints the step counts and the
+  replay's estimated cost without calling any model.
 
 Suggested rule for switching: Flash-Lite's field agreement within 3 points of Flash's own, **zero**
 sensitive disagreements, and free-text answers you'd be happy to send. If it passes, the next step
