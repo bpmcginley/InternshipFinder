@@ -31,6 +31,19 @@ from urllib.parse import quote
 SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
 SLOGAN = "Built by one student, made for all students."
+# The extension's Chrome Web Store listing, the same URL docs/install.html links (2026-10-04).
+STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"
+# The listings' "ats" values whose application sites are in extension/manifest.json host_permissions,
+# so Auto-Apply fills them with no extra permission (jazzhr applies on applytojob.com). Left out:
+# "other" and "icims_site", whose employers' own domains are only optional permissions there.
+# tests/test_seo_pages.py checks each one against the manifest.
+SUPPORTED_ATS = frozenset({"workday", "greenhouse", "oracle", "icims", "ashby", "lever", "eightfold",
+                           "smartrecruiters", "successfactors", "taleo", "bamboohr", "rippling", "jazzhr",
+                           "workable", "jobvite", "recruitee", "adp", "paylocity"})
+# The free monthly Auto-Apply allowance. Must match worker/src/config.js: TASKS[task].allowance for a
+# school .edu account, and GENERAL_ALLOWANCE_PCT (50, rounded down) of it for any other email.
+FREE_EDU = {"autofill": 25, "resume_tailor": 10}
+FREE_GENERAL = {"autofill": 12, "resume_tailor": 5}
 MIN_OPEN = 5           # no page for fewer open listings than this
 # A field in one state needs more: at 5, 900 near-identical pages would be most of the site, the shape
 # search engines treat as doorway pages. At 15 about 400 remain, each a list worth reading.
@@ -514,7 +527,10 @@ def same_list(owner: frozenset, mine: frozenset) -> bool:
     return owner == mine or len(owner & mine) * 10 >= SAME_SHARE * 10 * len(mine)
 
 
-def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None) -> str:
+def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None,
+                 src: str = "seo-field") -> str:
+    """src: where the page sits (seo-employer, seo-state, ...), carried into the install page's ?from=
+    by each row's "Auto-Apply this" link, so its store link's utm_source says which pages install."""
     rows = []
     for x in shown(items, state):
         # was: ordered = newest_first(items) if state else near_home_first(items)
@@ -530,14 +546,46 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
         new_tag = ' <span class="new">New</span>' if new else ""
         pay_tag = f' · <span class="pay">{pay}</span>' if pay else ""
         href = esc(safe_url(x["apply_url"]))
+        # On a site Auto-Apply fills, a quiet second link to the install page (2026-10-04). Internal,
+        # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
+        aa = (f' <a class="aa" href="/install.html?from={esc(src)}-row">Auto-Apply this</a>'
+              if x.get("ats") in SUPPORTED_ATS else "")
         rows.append(
             '<li class="job">'
             f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)}{pay_tag}</div>'
-            f'<a class="go" href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>'
+            f'<a class="go" href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
             "</li>")
     return "\n".join(rows)
+
+
+def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str:
+    """What the free extension would do for the roles this page lists, counted from them (2026-10-04):
+    "12 of these 40 applications are on Workday, Greenhouse or another site ...". Nothing when none of
+    them is on a site it fills. Two buttons, one shown: on a computer straight to the store (count.js
+    counts it as install_click), on a phone or tablet, which can't add extensions, to the install page,
+    which says to send the link to a laptop. The same media query as install.html's, so no script."""
+    rows = shown(items, state)
+    on = Counter(x["ats"] for x in rows if x.get("ats") in SUPPORTED_ATS)
+    n, m = sum(on.values()), len(rows)
+    if not n:
+        return ""
+    # Workday first when the page has it (the one students know by name), then by count.
+    named = [ATS_NAMES.get(k, k) for k in sorted(on, key=lambda k: (k != "workday", -on[k], k))]
+    if len(named) == 1:
+        where = f"{named[0]}, a site"
+    elif len(named) == 2:
+        where = f"{named[0]} or {named[1]}, sites"
+    else:
+        where = f"{named[0]}, {named[1]} or another site"
+    who = ("This application is" if m == 1 else f"All {m} of these applications are") if n == m else \
+          f"{n} of these {m} applications {'is' if n == 1 else 'are'}"
+    label = "Add Auto-Apply to Chrome, free"
+    return (f"<div class=\"aa-card\"><p>{who} on {esc(where)} the free Auto-Apply extension can fill in from "
+            f"your resume. It stops at Submit: you review {'it' if n == 1 else 'each one'} and send it yourself.</p>"
+            f"<a class=\"cta ext-desk\" href=\"{STORE_URL}?utm_source={esc(src)}\">{label}</a>"
+            f"<a class=\"cta ext-touch\" href=\"/install.html?from={esc(src)}\">{label}</a></div>")
 
 
 def company_link(name: str, here: str | None = None) -> str:
@@ -598,10 +646,20 @@ table.data th,table.data td{text-align:left;vertical-align:top;padding:9px 14px 
 table.data thead th{border-bottom:1px solid var(--ink);font-weight:600}table.data td.num{white-space:nowrap}
 section.prose h2{font:600 22px/1.3 "Source Serif 4",Georgia,serif;margin:34px 0 6px}.src{color:var(--ink3);font-size:14px}
 table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:14px}table.data th,table.data td{padding-right:10px}}
+.aa-card{margin:18px 0 0;padding:14px 18px 6px;background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+.aa-card p{margin:0;color:var(--ink2)}.aa-card .cta{margin:10px 0 8px}
+.ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}.ext-touch{display:inline-block}}
+.aa{grid-column:2;align-self:start;font-size:13px;color:var(--ink3);white-space:nowrap}
+.job:has(.aa) .go{grid-row:1/span 2;align-self:end}
+@media (max-width:560px){.aa{grid-column:1}.job:has(.aa) .go{grid-row:auto}}
 """
 # The last five lines (2026-10-02) are the tables and headed sections of /compare/ and
 # /internships/highest-paying/. A wide table scrolls inside .tablewrap, never the page; the
 # comparison's four wordy columns keep a readable width on a phone and scroll there instead.
+# The six after them (2026-10-04) are autoapply_card and a row's "Auto-Apply this" link. The card's
+# store button shows on a computer and its install-page button on a phone or tablet (install.html's
+# query: touch is the primary input and nothing hovers). A row with the link moves "Open posting" up
+# so the two stack in the right-hand column; on a phone both go under the row's text.
 
 def beacon_from(site_dir: str) -> str:
     """The analytics snippets exactly as the dashboard carries them, so there is one copy to change.
@@ -658,6 +716,8 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
     # was: ld_tag = f'<script type="application/ld+json">{ld_json}</script>' if len(crumbs) > 1 else ""
     # The footer links /about/ and /compare/ from every page (2026-10-02), so crawlers and answer
     # engines reach the pages that say what InternScout is. was: only Privacy and Terms.
+    # The header names what the install page offers and that it costs nothing (2026-10-04).
+    # was: <a href="/install.html">Extension</a>
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -680,7 +740,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 </head>
 <body>
 <div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Extension</a></nav></header>
+<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a></nav></header>
 <main>
 <p class="crumbs">{crumb_html}</p>
 <h1>{esc(h1)}</h1>
@@ -729,13 +789,17 @@ def fits_line(majors: list[str]) -> str:
 
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
-                 here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "") -> str:
+                 here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "",
+                 src: str = "seo-field") -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
     # `extra`: the employer pages' "at a glance" list, under the opening paragraph (2026-10-01).
+    # `src`: which kind of page this is, for the install links' ?from= and the store's utm_source
+    # (2026-10-04; see autoapply_card).
     return (f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>" + fits_line(fits or []) + extra +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
-            f"<ul class=\"jobs\">{listing_rows(items, now, state, here)}</ul>"
+            + autoapply_card(items, src, state)
+            + f"<ul class=\"jobs\">{listing_rows(items, now, state, here, src)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
             + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
@@ -744,8 +808,9 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
             # page rather than the store: it's ours, so the link stays inside the site, and it tells a
             # phone reader to send it to a laptop instead of dropping them on a store page that can't
             # install anything. ?from= becomes the store link's utm_source there (install.html's
-            # canonical link keeps it one page to search engines).
-            + "<p class=\"follow\">Applying to a few? The free <a href=\"/install.html?from=landing-page\">Auto-Apply extension</a> "
+            # canonical link keeps it one page to search engines). Since 2026-10-04 the tag says which
+            # kind of page (src). was: ?from=landing-page on every page.
+            + f"<p class=\"follow\">Applying to a few? The free <a href=\"/install.html?from={esc(src)}\">Auto-Apply extension</a> "
               "fills in the application for you and stops at the submit button.</p>"
             + related)
 
@@ -944,6 +1009,10 @@ WEBSITE = {"@context": "https://schema.org", "@type": "WebSite", "@id": SITE_ID,
 
 # The plans as worker/src/config.js prices them (PLANS: supporter, pro; repriced 2026-09-30).
 PLAN_PRICES = (("Supporter", "$4"), ("Pro", "$8"))
+# The free allowance in numbers, from FREE_EDU and FREE_GENERAL (2026-10-04). was: "a monthly allowance,
+# doubled with a school .edu email", which is not exact (25 is not twice 12) and told a reader nothing.
+FREE_WORDS = (f"{FREE_EDU['autofill']} Auto-Apply runs and {FREE_EDU['resume_tailor']} tailored resumes a month "
+              f"with a school .edu email ({FREE_GENERAL['autofill']} and {FREE_GENERAL['resume_tailor']} otherwise)")
 
 # The applicant tracking systems a listing's "ats" names, as their makers write them. "other" (an
 # employer's own careers site, or a public list) is left out of the count of roles taken straight
@@ -952,7 +1021,9 @@ ATS_NAMES = {"workday": "Workday", "greenhouse": "Greenhouse", "oracle": "Oracle
              "icims_site": "iCIMS", "ashby": "Ashby", "lever": "Lever", "eightfold": "Eightfold",
              "taleo": "Taleo", "bamboohr": "BambooHR", "jazzhr": "JazzHR", "workable": "Workable",
              "successfactors": "SuccessFactors", "rippling": "Rippling", "smartrecruiters": "SmartRecruiters",
-             "jobvite": "Jobvite"}
+             "jobvite": "Jobvite", "recruitee": "Recruitee", "adp": "ADP", "paylocity": "Paylocity"}
+# was: ... "jobvite": "Jobvite"}. The last three (2026-10-04) are in SUPPORTED_ATS, so autoapply_card
+# can name them; no listing carries them yet, so no count on /about/ changes.
 
 
 def pct(k: int, n: int) -> str:
@@ -1171,8 +1242,8 @@ def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tupl
          f"day. {SLOGAN}", ""),
         ("Is InternScout free?",
          "Yes. Searching, ranking and browsing every listing are free and need no account. The optional "
-         "Auto-Apply Chrome extension is free with a monthly allowance, which a school .edu email doubles; "
-         f"optional {plans} plans raise the allowance.", ""),
+         f"Auto-Apply Chrome extension is free for {FREE_WORDS}; optional {plans} plans raise the allowance.", ""),
+        # was: "... is free with a monthly allowance, which a school .edu email doubles; ..."
         ("Which majors is InternScout for?",
          f"Every major. Open roles are sorted into {len(f['fields'])} fields; the largest right now are "
          f"{word_list(top_fields)}, and there are pages for {majors} majors.",
@@ -1243,14 +1314,18 @@ COMPARE_SOURCES = [
 COMPARE_ROWS = [
     ("Made for", "College students of every major: internships, co-ops and research, US and Canada",
      "Job seekers at every level", "Job seekers at every level"),
-    ("Free", "Search and browsing, with no account; the Auto-Apply extension up to a monthly allowance "
-             "(doubled with a school .edu email)",
+    # was: "...; the Auto-Apply extension up to a monthly allowance (doubled with a school .edu email)"
+    ("Free", f"Search and browsing, with no account; {FREE_WORDS}",
      "Autofill extension (Copilot), job tracker and resume builder", "A free tier that runs on daily credits"),
+    # Jobright's 3-month price and its Resume AI are from the same Jobscan article, re-read 2026-10-04:
+    # Turbo quarterly $89.99 (about $30 a month), and Resume AI tailors a resume in about a minute; it
+    # does not say which plan includes Resume AI, so neither does this.
+    # was: "Turbo $39.99/month ($17.99/week), as reported by Jobscan" and "Not covered by the source below"
     ("Paid plan", "Optional: Supporter $4/month, Pro $8/month",
      "Simplify+ $39.99/month ($19.99/week, $89.99 for 3 months)",
-     "Turbo $39.99/month ($17.99/week), as reported by Jobscan"),
+     "Turbo $39.99/month ($17.99/week, $89.99 for 3 months), as reported by Jobscan"),
     ("AI resume tailoring", "In the extension, within the monthly allowance",
-     "Simplify+ (with AI cover letters)", "Not covered by the source below"),
+     "Simplify+ (with AI cover letters)", "Resume AI, about a minute a resume (plan not stated by the source)"),
     ("Who submits the application", "Always you: Auto-Apply fills the form and never submits", "You",
      "You, or its AI Agent (supervised or fully automatic)"),
 ]
@@ -1282,9 +1357,10 @@ def compare_page(f: dict) -> tuple[str, str, str]:
         "<p>Simplify’s autofill extension (Copilot), job tracker and resume builder are free; Simplify+ is "
         "$39.99 a month, $19.99 a week or $89.99 for three months, and adds AI resume tailoring and cover "
         "letters. Jobright publishes no student pricing; Jobscan reported its Turbo plan at $39.99 a month "
-        "($17.99 a week), and its free tier runs on daily credits. InternScout’s search is free with no "
-        "account, its Auto-Apply extension is free up to a monthly allowance (doubled with a school .edu "
-        "email), and its optional Supporter and Pro plans are $4 and $8 a month.</p>"
+        "($17.99 a week or $89.99 for three months), and its free tier runs on daily credits. InternScout’s "
+        f"search is free with no account, its Auto-Apply extension is free for {FREE_WORDS}, and its "
+        "optional Supporter and Pro plans are $4 and $8 a month.</p>"
+        # was: "... ($17.99 a week), ... is free up to a monthly allowance (doubled with a school .edu email), ..."
         "<h2>Who presses Submit</h2>"
         "<p>With Simplify’s extension, you submit each application yourself. Jobright’s AI Agent can submit "
         "applications for you, supervised or fully automatically. InternScout’s Auto-Apply fills in the form "
@@ -1324,8 +1400,9 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
         "",
         "- Free: searching, ranking and browsing every listing; no account needed.",
         "- Optional Chrome extension, InternScout Auto-Apply: fills in applications with AI and never submits "
-        "them (the student reviews and submits). Free with a monthly allowance; a school .edu email doubles it. "
+        f"them (the student reviews and submits). Free for {FREE_WORDS}. "
         f"Optional paid plans: {plans}.",
+        # was: "... Free with a monthly allowance; a school .edu email doubles it. ..." (2026-10-04)
         f"- Coverage: {f['open']:,} open roles from {f['employers']:,} employers, in {len(f['fields'])} fields, "
         f"{len(f['states'])} of the 50 US states and {len(f['provinces'])} Canadian provinces and territories. "
         f"{boards_line(f)[0].upper()}{boards_line(f)[1:]}.",
@@ -1393,7 +1470,8 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
             "- Free: search, ranking, the browse pages, the RSS feeds. No account.",
             "- Free with a monthly allowance: the InternScout Auto-Apply Chrome extension, which fills in "
             "applications with AI and never submits them; the student reviews every answer and presses Submit. "
-            "A school .edu email doubles the allowance.",
+            f"The allowance is {FREE_WORDS}.",
+            # was: "A school .edu email doubles the allowance." (2026-10-04)
             f"- Optional paid plans raise the allowance: {plans}.", "",
             "## Coverage", "",
             f"- Open roles: {f['open']:,}",
@@ -1559,6 +1637,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                       "items": items, "h1": h1, "state": state,
                       "lastmod": max((f for f in found if f), default=None)})
 
+    # Each listing page's src (2026-10-04, see autoapply_card): seo-field for a field and a field in a
+    # state, seo-state for a state, province or city, seo-employer, and seo-hub for the rest.
     root = ("/internships/", "Internships")
     page_name = {EMPLOYERS[nm]: nm for nm in by_company}     # employer page -> the name it goes by
 
@@ -1580,7 +1660,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
             f"{name} internships", [root, (path, name)],
-            listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path)), items)
+            listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path),
+                         src="seo-field"), items)
 
     for k, items in sorted(states.items()):
         where = US_STATES[k]
@@ -1594,7 +1675,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", [root, (path, where)],
-            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k)), items, k)
+            listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k),
+                         src="seo-state"), items, k)
 
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
@@ -1609,7 +1691,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             "Free search for college students, no sign-up.",
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
-            listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k)), items, k)
+            listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k),
+                         src="seo-field"), items, k)
 
     majors_made = []
     for m, tags, items, path in major_rows:
@@ -1626,7 +1709,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"Internships for {name} majors",
             [root, ("/internships/for/", "By major"), (path, name)],
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
-                         fits=[n for n in fits[path] if n != name]), items)
+                         fits=[n for n in fits[path] if n != name], src="seo-hub"), items)
 
     # Each employer's main fields, for "Similar employers": others that hire in the same fields.
     company_fields = {nm: top(Counter(t for x in its for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
@@ -1672,7 +1755,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             desc,
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
             listing_body(items, f"at {name}", "", now, related,
-                         dash=dash_link(state=where, companies=spellings[name]), here=path, extra=facts), items)
+                         dash=dash_link(state=where, companies=spellings[name]), here=path, extra=facts,
+                         src="seo-employer"), items)
 
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
     # already uses is skipped, like a field slug that names a state.
@@ -1695,7 +1779,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         add(path, k["title"].format(n=n) + " | InternScout", k["desc"].format(n=n, updated=updated),
             k["h1"], [root, (path, k["crumb"])],
             listing_body(items, k["what"], "", now, related, dash=dash_link(**k["dash"]),
-                         tail=k.get("tail", TAIL), about=k.get("about", frozenset())), items)
+                         tail=k.get("tail", TAIL), about=k.get("about", frozenset()), src="seo-hub"), items)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
     if len(new) >= MIN_OPEN:
@@ -1707,7 +1791,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                          "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
                          f"{NEW_FEED} newest roles found this week, so a Discord or Slack channel can follow "
                          "just this one.</p>",
-                         dash=dash_link(new=True)), new)
+                         dash=dash_link(new=True), src="seo-hub"), new)
         # More than the usual newest 25, since this one feed may be a club's only one, but not every
         # new role: that was 1,800 items and 800 KB, fetched every few hours by every subscriber.
         pages[-1]["feed_limit"] = NEW_FEED        # was: None (every new role)

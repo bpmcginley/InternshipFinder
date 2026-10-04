@@ -11,12 +11,14 @@ Sources as of 2026-10-01:
   Simplify+  $19.99/week, $39.99/month, $89.99/3 months; autofill (Copilot), tracker and resume builder
              free; resume tailoring and cover letters are Simplify+; the user submits.
              help.simplify.jobs/articles/5623502-whats-included-in-simplify-features-and-pricing
-  Jobright   publishes no student prices. Turbo $39.99/month ($17.99/week), free tier with daily
-             credits; its AI Agent can submit applications (supervised or fully automatic).
+  Jobright   publishes no student prices. Turbo $39.99/month ($17.99/week; $89.99 for 3 months, read
+             2026-10-04), free tier with daily credits; its AI Agent can submit applications
+             (supervised or fully automatic).
              jobscan.co/blog/jobscan-vs-jobright (July 30, 2026). Jobright's own blog said $29.99/month
              in July 2025, so check the checkout price before paying to promote this.
   InternScout  worker/src/config.js: .edu free 25 Auto-Apply + 10 tailored resumes a month, other
-             emails half; Supporter $4 (2x), Pro $8 (4x). The extension never presses Submit.
+             emails 12 and 5 (GENERAL_ALLOWANCE_PCT 50, rounded down); Supporter $4 (2x), Pro $8 (4x).
+             The extension never presses Submit.
 
 No competitor logos, and the card says InternScout is not affiliated with either.
 """
@@ -37,15 +39,22 @@ RULE = (226, 222, 212)        # --rule #e2ded4
 AS_OF = "October 1, 2026"
 HEADLINE = ("Paid plans: $4 a month", "vs $39.99 a month")
 COLS = [("", 250), ("InternScout", 270), ("Simplify", 230), ("Jobright", 230)]
+# The free monthly allowance. Must match worker/src/config.js: TASKS[task].allowance for a school .edu
+# account, and GENERAL_ALLOWANCE_PCT (50, rounded down) of it for any other email; the same numbers as
+# backend/internscout/seo_pages.py FREE_EDU and FREE_GENERAL (2026-10-04).
+FREE_EDU = {"autofill": 25, "resume_tailor": 10}
+FREE_GENERAL = {"autofill": 12, "resume_tailor": 5}
 ROWS = [
     ("Paid plan", ["$4 or $8 / month", "$39.99 / month", "$39.99 / month"]),
-    ("Free AI-filled applications", ["25 a month*", "Basic autofill, free", "Daily credits"]),
-    ("Free AI-tailored resumes", ["10 a month*", "Paid plan only", "Daily credits"]),
+    ("Free AI-filled applications", [f"{FREE_EDU['autofill']} a month*", "Basic autofill, free", "Daily credits"]),
+    ("Free AI-tailored resumes", [f"{FREE_EDU['resume_tailor']} a month*", "Paid plan only", "Daily credits"]),
     ("Who presses Submit", ["Always you", "You", "You, or its AI agent"]),
     ("Built for", ["Internships, co-ops, research", "All job levels", "All job levels"]),
 ]
 NOTES = [
-    "* With a school .edu email; other emails get half. Supporter $4 doubles it, Pro $8 quadruples it.",
+    f"* With a school .edu email; other emails get {FREE_GENERAL['autofill']} and {FREE_GENERAL['resume_tailor']}. "
+    "Supporter $4 doubles it, Pro $8 quadruples it.",
+    # was: "* With a school .edu email; other emails get half. ..." (25 is not twice 12; 2026-10-04)
     "Simplify+ price from help.simplify.jobs. Jobright doesn't publish student prices: Turbo price as",
     f"reported by Jobscan, July 2026. Prices as of {AS_OF}. Not affiliated with Simplify or Jobright.",
 ]
