@@ -22,7 +22,14 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
   vm.createContext(ctx);
   vm.runInContext(COUNT, ctx);
   const bodies = () => sent.map((s) => JSON.parse(s.blob.text));
-  const click = (href) => listeners.click({ target: { closest: () => ({ href }) } });
+  // was: const click = (href) => listeners.click({ target: { closest: () => ({ href }) } });
+  // `cls` is the link's class: closest() finds it for "a[href]" always, and for a class selector only
+  // when one of the selector's parts names that class.
+  const click = (href, cls) => {
+    const link = { href };
+    const closest = (sel) => (sel === "a[href]" || (cls && sel.split(",").some((s) => s.trim() === `a.${cls}[href]`)) ? link : null);
+    return listeners.click({ target: { closest } });
+  };
   return { ctx, sent, bodies, click };
 }
 
@@ -67,4 +74,16 @@ test("steps count once per page load, queued ones included, and store links coun
   const steps = bodies().filter((b) => b.e).map((b) => b.e);
   assert.deepEqual(steps, ["signin_start", "signin", "autoapply", "install_click"]);
   assert.ok(bodies().every((b) => b.p === "/"));
+});
+
+test("opening a posting from a landing page or the dashboard is a posting_click, once per page load", () => {
+  const landing = load({ path: "/internships/ohio/" });
+  landing.click("https://boards.greenhouse.io/acme/jobs/1", "go");
+  landing.click("https://boards.greenhouse.io/acme/jobs/2", "go");
+  landing.click("https://internscout.org/install.html");          // any other link is not a posting
+  assert.deepEqual(landing.bodies().filter((b) => b.e), [{ e: "posting_click", p: "/internships/ohio/" }]);
+  const dash = load();
+  dash.click("https://jobs.lever.co/acme/1", "open-link");
+  dash.click("https://chromewebstore.google.com/detail/x", "nav");
+  assert.deepEqual(dash.bodies().filter((b) => b.e).map((b) => b.e), ["posting_click", "install_click"]);
 });

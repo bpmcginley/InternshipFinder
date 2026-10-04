@@ -7,7 +7,9 @@
 // Since 2026-10-01 it also counts steps toward using InternScout (window.ISCount("signin") and the
 // rest of worker/src/visits.js EVENTS), the same way: a daily total per step, nothing about who.
 // Each step counts once per page load, so a double click is one. Clicks on a Chrome Web Store link
-// count as "install_click" on every page without the page having to say so.
+// count as "install_click" on every page without the page having to say so, and since 2026-10-04 a
+// click on "Open posting" (a.go on the generated landing pages, a.open-link on the dashboard) counts as
+// "posting_click" the same way, once per page load like every step.
 (function () {
   var API = "https://internscout-api.bpmcginley.workers.dev/hit";
   // "Don't count this browser" (2026-10-01), for the owner's own visits: ?nocount=1 on any page turns
@@ -37,9 +39,14 @@
   window.ISCountQ = { push: window.ISCount };
   if (!live) return;
   // Any link to the extension's store page, on any page (landing pages, install guide, dashboard).
+  // And a posting opened from a landing page or the dashboard: the step after a search, which the
+  // counts could not see before.
   document.addEventListener("click", function (ev) {
-    var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
+    // was: var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
+    var t = ev.target && ev.target.closest ? ev.target : null;
+    var a = t ? t.closest("a[href]") : null;
     if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
+    if (t && t.closest("a.go[href], a.open-link[href]")) window.ISCount("posting_click");
   }, true);
   var send = function () {
     var q = new URLSearchParams(location.search), ref = "";

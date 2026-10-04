@@ -7,7 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NOW, fakeD1, makeEnv } from "./helpers.js";
 import { CONFIG } from "../src/config.js";
-import { GLOBAL_USER, addDaySpendUnder, admit, freeMonthSpend, isPaused, release, settle } from "../src/limits.js";
+import { GLOBAL_USER, addDaySpendUnder, admit, cleanup, freeMonthSpend, isPaused, release, settle } from "../src/limits.js";
 
 const DAY = "2026-09-14";        // NOW is 2026-09-14T10:05:30Z
 const MONTH = "2026-09";
@@ -151,4 +151,66 @@ test("a budget of 0 still pauses AI for everyone, paid accounts included", async
     assert.equal(await isPaused(db, env, CONFIG, NOW, plan), true, plan);
     await assert.rejects(() => ask(db, env, plan + "-z", plan, "r-z-" + plan), (e) => e.code === "paused", plan);
   }
+});
+
+// Funnel steps the Worker counts for itself (visits.js countEvent, added 2026-10-04), and the record of
+// calls per run that the monthly cleanup used to throw away.
+const counted = (db, event) =>
+  db.dump().event_counts.filter((r) => r.event === event).map(({ day, page, n }) => ({ day, page, n }));
+const autofill = (db, env, user, run, now = NOW) =>
+  admit(db, env, CONFIG, user, "autofill", run, now, "edu", "free", 1);
+
+test("a run refused because the month's allowance is spent is counted as cap_hit, by task", async () => {
+  const db = fakeD1();
+  const env = makeEnv();
+  const config = { ...CONFIG, TASKS: { ...CONFIG.TASKS, autofill: { ...CONFIG.TASKS.autofill, allowance: 1 } } };
+  await admit(db, env, config, "u-cap", "autofill", "r1", NOW, "edu", "free", 1);
+  assert.deepEqual(counted(db, "cap_hit"), [], "a run inside the allowance is not a cap hit");
+  for (const run of ["r2", "r3"]) {
+    await assert.rejects(() => admit(db, env, config, "u-cap", "autofill", run, NOW, "edu", "free", 1), (e) => e.code === "cap");
+  }
+  assert.deepEqual(counted(db, "cap_hit"), [{ day: DAY, page: "autofill", n: 2 }]);
+});
+
+test("first_autofill is counted once per account per month, and only once Gemini has answered", async () => {
+  const db = fakeD1();
+  const env = makeEnv();
+  // The first run fails and is given back, so the retry is still the month's first and counts then.
+  const failed = await autofill(db, env, "u-first", "r1");
+  await release(db, "u-first", "autofill", "r1", failed);
+  assert.deepEqual(counted(db, "first_autofill"), [], "a failed run is not a first Auto-Apply");
+  const first = await autofill(db, env, "u-first", "r2");
+  await settle(db, "u-first", first, 1, null, { task: "autofill", model: "m" });
+  // A second call in the same run, and a second run, are not firsts.
+  await settle(db, "u-first", await autofill(db, env, "u-first", "r2"), 1, null, { task: "autofill", model: "m" });
+  await settle(db, "u-first", await autofill(db, env, "u-first", "r3"), 1, null, { task: "autofill", model: "m" });
+  // Another task's first run is not an Auto-Apply.
+  await settle(db, "u-first", await ask(db, env, "u-first", "free", "fm"), 1, null, { task: "field_match", model: "m" });
+  assert.deepEqual(counted(db, "first_autofill"), [{ day: DAY, page: "worker", n: 1 }]);
+  // A new month starts the count again.
+  const oct = new Date("2026-10-02T09:00:00Z");
+  await settle(db, "u-first", await autofill(db, env, "u-first", "r4", oct), 1, null, { task: "autofill", model: "m" });
+  assert.deepEqual(counted(db, "first_autofill").map((r) => r.day), [DAY, "2026-10-02"]);
+});
+
+test("the monthly cleanup keeps how many calls each past run took before it deletes the runs", async () => {
+  const db = fakeD1();
+  const add = (month, task, calls, i) =>
+    db.prepare("INSERT INTO runs (user_hash, month, task, run_id, calls) VALUES (?, ?, ?, ?, ?)").bind("u" + i, month, task, "r" + i, calls).run();
+  let i = 0;
+  for (const calls of [0, 1, 2, 3, 4, 5, 8, 9, 15, 16, 30, 31, 60]) await add("2026-09", "autofill", calls, i++);
+  await add("2026-09", "deep_dive", 1, i++);
+  await add("2026-10", "autofill", 7, i++);   // this month's: still live, neither counted nor deleted
+  const oct = new Date("2026-10-01T00:10:00Z");
+  await cleanup(db, oct);
+  const hist = () => db.dump().run_hist.map(({ month, task, bucket, n }) => `${month} ${task} ${bucket} ${n}`).sort();
+  assert.deepEqual(hist(), [
+    "2026-09 autofill 1 2", "2026-09 autofill 16-30 2", "2026-09 autofill 2 1", "2026-09 autofill 3-4 2",
+    "2026-09 autofill 31+ 2", "2026-09 autofill 5-8 2", "2026-09 autofill 9-15 2", "2026-09 deep_dive 1 1",
+  ]);
+  assert.deepEqual(db.dump().runs.map((r) => r.month), ["2026-10"]);
+  // The next day's cleanup finds no September runs left and leaves the histogram as it was.
+  await cleanup(db, new Date("2026-10-02T00:10:00Z"));
+  assert.equal(hist().length, 8);
+  assert.ok(hist().includes("2026-09 autofill 1 2"));
 });

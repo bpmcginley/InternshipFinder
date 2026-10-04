@@ -296,11 +296,18 @@ With `"e"` it is a step instead of a page load: `{ "e": "signin", "p": "/" }` ad
 `event_counts` for the day, the step and the page kind. Steps: `install_click`, `signin_start`,
 `signin`, `profile`, `autoapply`, `checkout`, `invite_open` (a signed-in student opened their invite
 link panel, from the one-time nudge after a first Auto-Apply or profile or from the Account menu; added
-2026-10-02); any other name is ignored. A load arriving from Google or
-Microsoft sign-in or from Stripe counts as `internal` (the same visit going on).
+2026-10-02), `posting_click` (a click through to a posting: `a.go` on a landing page, `a.open-link` on
+the dashboard; added 2026-10-04); any other name is ignored. The Worker adds its own steps to the same
+table (`src/visits.js` `SERVER_EVENTS`, added 2026-10-04), which `/hit` never accepts: `new_account`
+(an account seen for the first time; page `extension` or `dashboard` by `Origin`), `ext_signin`
+(`POST /session` from the extension), `first_autofill` (an account's first answered Auto-Apply run of
+the month), `cap_hit` (a run refused at the monthly allowance; page is the task) and `paid` (a live-mode
+`checkout.session.completed` that left a plan active, once per Stripe event id; page is the plan).
+A load arriving from Google or Microsoft sign-in or from Stripe counts as `internal` (the same visit going on).
 `403` unless `Origin` is the live site. Script-running crawlers (by user agent), more than 30 hits a
 minute from one address (counted in memory only), and anything past 50,000 views in a day are
-answered `204` but not counted.
+answered `204` but not counted. The Worker's own steps are not under that daily cap (2026-10-04), so a
+flood of forged browser steps cannot stop a real sign-in or sale from being counted.
 
 ### `GET /demand` (CI only)
 Needs `Authorization: Bearer <DEMAND_TOKEN>` (a secret). Returns:
@@ -366,8 +373,9 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
     `SITE_URL` (where Stripe returns to)
 <!-- was: - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `plans`, `stripe_events`. -->
 - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `spend`, `tokens`, `forget`,
-  `plans`, `stripe_events`, `invite_codes`, `referrals`, `bonus`, `accounts`, `inviters`, `sessions`, `profiles`.
-  The schema is in `worker/schema.sql`.
+  `plans`, `stripe_events`, `invite_codes`, `referrals`, `bonus`, `accounts`, `inviters`, `sessions`, `profiles`,
+  `task_tokens`, `visit_counts`, `event_counts` and `run_hist` (calls per run, by month, task and bucket, kept
+  by the daily cron when it drops a past month's `runs`; added 2026-10-04). The schema is in `worker/schema.sql`.
 
 ## Dashboard ↔ extension bridge
 - The existing bridge (`extension/bridge/bridge.js`) relays `{__internscout:"req", id, msg}`. The background worker handles it by `msg.type`.

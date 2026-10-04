@@ -9,7 +9,7 @@ import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest
 import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
-import { countHit } from "./visits.js";
+import { countEvent, countHit } from "./visits.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
@@ -24,6 +24,15 @@ const EXTENSION_ORIGINS = [
 // internscout.org is the site's own domain. The github.io origin stays for tabs opened before the
 // switch; GitHub Pages redirects every new visit to internscout.org.
 const DEFAULT_ORIGINS = ["https://internscout.org", "https://bpmcginley.github.io", "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
+
+// Which client sent a request, by its Origin, for the funnel steps the Worker counts (visits.js
+// countEvent, added 2026-10-04): "extension", "dashboard" (the site) or "worker" (anything else).
+function clientOf(request) {
+  const origin = request.headers.get("Origin") || "";
+  if (EXTENSION_ORIGINS.includes(origin)) return "extension";
+  if (/^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/.test(origin)) return "dashboard";
+  return "worker";
+}
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");
@@ -118,7 +127,8 @@ async function route(request, env, ctx, d) {
 
     case "GET /me": {
       const user = await signIn();
-      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
+      // was: later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
+      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
       const month = monthOf(now);
       const used = await usageFor(db, user, month);
       const mine = await planOf(db, user);
@@ -158,6 +168,9 @@ async function route(request, env, ctx, d) {
       const { provider, claims, tier } = await verifyIdToken(token, env, { fetch: d.fetch, now: now.getTime() });
       const user = await userHash(provider, claims, env);
       const { token: session, expires } = await createSession(db, { user, tier, provider }, now);
+      // A sign-in from the extension, the step between the store click and a first Auto-Apply that
+      // nothing counted before (2026-10-04). Counts sign-ins, not accounts; new_account counts those.
+      if (clientOf(request) === "extension") later(ctx, countEvent(db, now.toISOString(), "ext_signin", "extension"));
       // The email is echoed for the client to show ("Signed in as ..."); it is not stored.
       const email = claims.email || claims.preferred_username || null;
       return json({ session, account: user.slice(0, 16), email, provider, tier, expires });
@@ -252,7 +265,8 @@ async function route(request, env, ctx, d) {
         await release(db, user, task, runId, admitted);
         throw e;
       }
-      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
+      // was: later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
+      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
 
       const headers = { "X-InternScout-Model": model, "X-InternScout-Remaining": String(remainingOf(admitted)) };
       const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
