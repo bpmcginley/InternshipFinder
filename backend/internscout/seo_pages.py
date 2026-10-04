@@ -26,7 +26,7 @@ import sys
 from collections import Counter
 from statistics import median
 from datetime import datetime, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
@@ -40,6 +40,14 @@ STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpn
 SUPPORTED_ATS = frozenset({"workday", "greenhouse", "oracle", "icims", "ashby", "lever", "eightfold",
                            "smartrecruiters", "successfactors", "taleo", "bamboohr", "rippling", "jazzhr",
                            "workable", "jobvite", "recruitee", "adp", "paylocity"})
+# The hosts those systems apply on, as extension/lib/hosts.js ATS_HOSTS lists them (the manifest's
+# host_permissions). The "ats" alone is not enough (2026-10-04): an employer can serve its SuccessFactors
+# or Greenhouse board from its own domain (careers.qorvo.com, careers.withwaymo.com), and there the
+# extension has to ask the student for that one site first. autofills() wants both.
+AUTOFILL_HOSTS = ("myworkdayjobs.com", "myworkdaysite.com", "greenhouse.io", "lever.co", "ashbyhq.com",
+                  "smartrecruiters.com", "oraclecloud.com", "icims.com", "taleo.net", "workable.com",
+                  "rippling.com", "bamboohr.com", "jobvite.com", "recruitee.com", "adp.com",
+                  "successfactors.com", "paylocity.com", "applytojob.com", "eightfold.ai")
 # The free monthly Auto-Apply allowance. Must match worker/src/config.js: TASKS[task].allowance for a
 # school .edu account, and GENERAL_ALLOWANCE_PCT (50, rounded down) of it for any other email.
 FREE_EDU = {"autofill": 25, "resume_tailor": 10}
@@ -549,7 +557,7 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
         # On a site Auto-Apply fills, a quiet second link to the install page (2026-10-04). Internal,
         # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
         aa = (f' <a class="aa" href="/install.html?from={esc(src)}-row">Auto-Apply this</a>'
-              if x.get("ats") in SUPPORTED_ATS else "")
+              if autofills(x) else "")
         rows.append(
             '<li class="job">'
             f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
@@ -560,6 +568,15 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
     return "\n".join(rows)
 
 
+def autofills(x: dict) -> bool:
+    """Whether Auto-Apply fills this listing's application with no extra permission: a system it knows,
+    on that system's own host (extension/lib/hosts.js isAtsHost). 2026-10-04."""
+    if x.get("ats") not in SUPPORTED_ATS:
+        return False
+    host = (urlparse(x.get("apply_url") or "").hostname or "").lower()
+    return any(host == h or host.endswith("." + h) for h in AUTOFILL_HOSTS)
+
+
 def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str:
     """What the free extension would do for the roles this page lists, counted from them (2026-10-04):
     "12 of these 40 applications are on Workday, Greenhouse or another site ...". Nothing when none of
@@ -567,7 +584,8 @@ def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str
     counts it as install_click), on a phone or tablet, which can't add extensions, to the install page,
     which says to send the link to a laptop. The same media query as install.html's, so no script."""
     rows = shown(items, state)
-    on = Counter(x["ats"] for x in rows if x.get("ats") in SUPPORTED_ATS)
+    on = Counter(x["ats"] for x in rows if autofills(x))
+    # was: ... if x.get("ats") in SUPPORTED_ATS (counted SuccessFactors boards on employers' own domains)
     n, m = sum(on.values()), len(rows)
     if not n:
         return ""
@@ -651,7 +669,7 @@ table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:14px}tab
 .ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}.ext-touch{display:inline-block}}
 .aa{grid-column:2;align-self:start;font-size:13px;color:var(--ink3);white-space:nowrap}
 .job:has(.aa) .go{grid-row:1/span 2;align-self:end}
-@media (max-width:560px){.aa{grid-column:1}.job:has(.aa) .go{grid-row:auto}}
+@media (max-width:560px){.aa{grid-column:1;margin-top:6px}.job:has(.aa) .go{grid-row:auto}}
 """
 # The last five lines (2026-10-02) are the tables and headed sections of /compare/ and
 # /internships/highest-paying/. A wide table scrolls inside .tablewrap, never the page; the
@@ -659,7 +677,8 @@ table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:14px}tab
 # The six after them (2026-10-04) are autoapply_card and a row's "Auto-Apply this" link. The card's
 # store button shows on a computer and its install-page button on a phone or tablet (install.html's
 # query: touch is the primary input and nothing hovers). A row with the link moves "Open posting" up
-# so the two stack in the right-hand column; on a phone both go under the row's text.
+# so the two stack in the right-hand column; on a phone both go under the row's text, 8px apart so a
+# thumb meant for "Open posting" doesn't land on the install page (was: 2px, the grid gap).
 
 def beacon_from(site_dir: str) -> str:
     """The analytics snippets exactly as the dashboard carries them, so there is one copy to change.

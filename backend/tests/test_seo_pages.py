@@ -681,9 +681,41 @@ def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
 
 # ---- Auto-Apply on the listing pages (2026-10-04)
 
-def _ats(i, ats=None):
-    """A row as build() loads it (with the keys it is filed under), on applicant tracking system ats."""
-    return {**_row(i, **({"ats": ats} if ats else {})), "keys": {"MA"}}
+def _ats(i, ats=None, host=None):
+    """A row as build() loads it (with the keys it is filed under), on applicant tracking system ats,
+    applying on that system's own host (ATS_HOSTS below) unless host says otherwise."""
+    over = {"ats": ats} if ats else {}
+    host = host or (ATS_HOSTS[ats].split("*.")[1].split("/")[0] if ats in ATS_HOSTS else None)
+    if host:
+        over["apply_url"] = f"https://co{i}.{host}/job/{i}"
+    return {**_row(i, **over), "keys": {"MA"}}
+
+
+def test_an_employer_domain_is_not_counted_even_on_a_supported_ats():
+    # A SuccessFactors or Greenhouse board an employer serves from its own domain needs the student to
+    # allow that site first, so the page doesn't count it (extension/lib/hosts.js isAtsHost).
+    own = [_ats(i, "successfactors", host="careers.qorvo.com") for i in range(5)]
+    assert not any(seo_pages.autofills(x) for x in own)
+    assert seo_pages.autoapply_card(own, "seo-employer") == ""
+    assert seo_pages.autofills(_ats(0, "successfactors"))
+    # A lookalike host is not the system's: notmyworkdayjobs.com, or myworkdayjobs.com.evil.example.
+    for h in ("notmyworkdayjobs.com", "myworkdayjobs.com.evil.example"):
+        assert not seo_pages.autofills(_ats(0, "workday", host=h)), h
+    mixed = own + [_ats(10 + i, "workday") for i in range(3)]
+    assert "3 of these 8 applications are on Workday, a site" in seo_pages.autoapply_card(mixed, "seo-employer")
+    html = seo_pages.listing_rows(mixed, seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc))
+    assert html.count('class="aa"') == 3
+
+
+def test_autofill_hosts_are_the_extensions():
+    # The same list as extension/lib/hosts.js ATS_HOSTS, the hosts Auto-Apply needs no permission for.
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    with open(os.path.join(backend, "..", "extension", "lib", "hosts.js"), encoding="utf-8") as f:
+        src = f.read()
+    block = re.search(r"export const ATS_HOSTS = \[(.*?)\];", src, re.S).group(1)
+    assert set(re.findall(r'"([a-z0-9.-]+)"', block)) == set(seo_pages.AUTOFILL_HOSTS)
+    # Every supported system's host is one of them.
+    assert all(h.split("*.")[1].split("/")[0] in seo_pages.AUTOFILL_HOSTS for h in ATS_HOSTS.values())
 
 
 def test_autoapply_card_counts_only_what_the_extension_fills():
@@ -721,7 +753,8 @@ def test_rows_link_auto_apply_only_on_supported_sites():
 
 
 def test_employer_page_offers_auto_apply_with_its_own_tag(tmp_path):
-    rows = [_row(i, company_name="Big Co", ats="workday") for i in range(seo_pages.MIN_EMPLOYER)]
+    rows = [_row(i, company_name="Big Co", ats="workday", apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}")
+            for i in range(seo_pages.MIN_EMPLOYER)]
     pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
     own = pages["/internships/at/big-co/"]
     assert "utm_source=seo-employer" in own and "stops at Submit" in own
