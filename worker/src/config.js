@@ -68,7 +68,8 @@ const PRO_RATE = { perMinute: 25, perDay: 2000 };
 // Repriced 2026-09-30 (was: Supporter $5 at 2.5x, Pro $12 at 6x, which came to 50 and 120 applications,
 // then briefly 100 and 240, more than anyone applies to in a month). Now Supporter is $4 for twice the
 // free allowance and Pro $8 for four times it: 50 and 100 applications, what a student in full search
-// actually sends. Stripe keeps 2.9% + 30c, so $4 nets $3.58 and $8 nets $7.47. What each plan's month
+// actually sends. Stripe keeps about 15% of a $4 sale (see NET_CENTS), so $4 nets about $3.40 and $8
+// about $7.10 (was: "Stripe keeps 2.9% + 30c, so $4 nets $3.58 and $8 nets $7.47"). What each plan's month
 // can cost is capped at 75% of that by USER_BUDGET_CENTS, and the sums there show a full month fits
 // under the cap at the expected costs, now and after Flash doubles in price.
 //
@@ -117,16 +118,18 @@ export const PLANS = {
 //
 // Set 2026-09-30 with the $4 and $8 prices. The paid rows are what guarantees the margin: a Supporter
 // or Pro student's AI stops for the month at their row, whatever an application turns out to cost, so
-// each row is 75% of what the plan brings in after Stripe's cut ($3.58 and $7.47) and every paid month
-// keeps at least 25% of its money. The allowances fit inside the rows at the expected costs (COSTS
-// below), both now and after Flash doubles on 2027-01-01, so no allowance has to be cut that day:
+// each row is 75% of what the plan brings in after Stripe's cut (NET_CENTS: about $3.40 and $7.10) and
+// every paid month keeps at least 25% of its money. The allowances fit inside the rows at the expected
+// costs (COSTS below), both now and after Flash doubles on 2027-01-01, so no allowance has to be cut that day:
 //               allowance (.edu)            now (2c / 1c)   from 2027 (4c / 2c)   row
 //   free        25 Auto-Apply, 10 resumes   60c             120c                  150c
-//   Supporter   50 Auto-Apply, 20 resumes   120c            240c                  268c  (33% kept at full use)
-//   Pro         100 Auto-Apply, 40 resumes  240c            480c                  560c  (36% kept at full use)
+//   Supporter   50 Auto-Apply, 20 resumes   120c            240c                  255c  (29% kept at full use)
+//   Pro         100 Auto-Apply, 40 resumes  240c            480c                  532c  (32% kept at full use)
 // If applications cost more than expected, a heavy student reaches the row before the allowance; the
 // margin holds either way. The Deep Dive stays uncapped and comes out of the same row, a few cents each.
-export const USER_BUDGET_CENTS = { free: 150, supporter: 268, pro: 560 };
+// was: export const USER_BUDGET_CENTS = { free: 150, supporter: 268, pro: 560 };  (75% of 358c and 747c,
+// nets that assumed Stripe took only 2.9% + 30c; lowered 2026-10-04 to 75% of the measured nets)
+export const USER_BUDGET_CENTS = { free: 150, supporter: 255, pro: 532 };
 
 // What each task is expected to cost a student's row, in cents, for the sums above (not read by code).
 // Measured 2026-09-30 after the Auto-Apply cost cuts (extension 0.5.1-0.5.2): 86 recorded steps at ~0.64c
@@ -135,8 +138,12 @@ export const USER_BUDGET_CENTS = { free: 150, supporter: 268, pro: 560 };
 // per task: if it comes in above these, heavy students meet their ceiling before their allowance (the
 // margin holds regardless); if below, the allowances can go up.
 export const COSTS = { autofill: { now: 2, from2027: 4 }, resume_tailor: { now: 1, from2027: 2 }, deep_dive: { now: 2, from2027: 4 } };
-// What each paid plan brings in after Stripe's 2.9% + 30c, in cents, for the 75% rule above.
-export const NET_CENTS = { supporter: 358, pro: 747 };
+// What each paid plan brings in after Stripe's fees, in cents, for the 75% rule above. Measured
+// 2026-10-04 from the live $5 test charge's balance transactions (531c with sales tax): 45c processing
+// (2.9% + 30c), 19c + 1c tax Managed Payments (~3.5%) and 4c Billing (~0.7%), all charged on the
+// tax-inclusive total. Applied to $4 and $8 plus ~6% tax that is ~61c and ~93c, so ~15% and ~12%.
+// was: export const NET_CENTS = { supporter: 358, pro: 747 };  (2.9% + 30c only)
+export const NET_CENTS = { supporter: 340, pro: 710 };
 
 // The paid plans, cheapest first. Order is what the dashboard shows.
 export const PAID_PLANS = ["supporter", "pro"];
