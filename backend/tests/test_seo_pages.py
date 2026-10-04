@@ -147,8 +147,10 @@ def test_dashboard_links_open_on_the_page_topic(tmp_path):
     assert 'href="/?state=MA"' in pages["/internships/massachusetts/"]
     assert 'href="/?field=mechanical&amp;state=MA"' in pages["/internships/mechanical-engineering/massachusetts/"]
     assert 'href="/?field=mechanical,aerospace"' in pages["/internships/for/mechanical-engineering-majors/"]
-    # Every listing page offers the extension through the site's own install page.
-    assert 'The free <a href="/install.html?from=landing-page">Auto-Apply extension</a>' in pages["/internships/massachusetts/"]
+    # Every listing page offers the extension through the site's own install page, tagged with the kind
+    # of page it is on (2026-10-04; was: ?from=landing-page on every page).
+    assert 'The free <a href="/install.html?from=seo-state">Auto-Apply extension</a>' in pages["/internships/massachusetts/"]
+    assert 'The free <a href="/install.html?from=seo-field">Auto-Apply extension</a>' in pages["/internships/mechanical-engineering/"]
     # docs/js/app.js takes only values shaped like these; anything else would open an empty list.
     assert all(re.fullmatch(r"[a-z_]{2,32}", t) for t in seo_pages.FIELD_TITLES)
     # was: every key of US_STATES itself. The Canada and metro pages send the dashboard their provinces.
@@ -616,7 +618,8 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     assert seo_pages.SLOGAN in about and blocks[1]["slogan"] == seo_pages.SLOGAN
     compare = by_path["/compare/"]
     assert _ld_blocks(compare)[0]["@type"] == "BreadcrumbList"
-    for fact in ("$39.99/month ($19.99/week, $89.99 for 3 months)", "Turbo $39.99/month ($17.99/week)",
+    # was: "Turbo $39.99/month ($17.99/week)"; the 3-month price is from the same source (2026-10-04).
+    for fact in ("$39.99/month ($19.99/week, $89.99 for 3 months)", "Turbo $39.99/month ($17.99/week, $89.99 for 3 months)",
                  "as of October 1, 2026", "Not affiliated with Simplify or Jobright.",
                  "https://help.simplify.jobs/articles/5623502-whats-included-in-simplify-features-and-pricing",
                  "https://jobscan.co/blog/jobscan-vs-jobright", "never submits", "Job seekers at every level"):
@@ -674,3 +677,132 @@ def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
     graph = blocks[0]["@graph"]
     strip = lambda o: {k: v for k, v in o.items() if k != "@context"}          # noqa: E731
     assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]
+
+
+# ---- Auto-Apply on the listing pages (2026-10-04)
+
+def _ats(i, ats=None, host=None):
+    """A row as build() loads it (with the keys it is filed under), on applicant tracking system ats,
+    applying on that system's own host (ATS_HOSTS below) unless host says otherwise."""
+    over = {"ats": ats} if ats else {}
+    host = host or (ATS_HOSTS[ats].split("*.")[1].split("/")[0] if ats in ATS_HOSTS else None)
+    if host:
+        over["apply_url"] = f"https://co{i}.{host}/job/{i}"
+    return {**_row(i, **over), "keys": {"MA"}}
+
+
+def test_an_employer_domain_is_not_counted_even_on_a_supported_ats():
+    # A SuccessFactors or Greenhouse board an employer serves from its own domain needs the student to
+    # allow that site first, so the page doesn't count it (extension/lib/hosts.js isAtsHost).
+    own = [_ats(i, "successfactors", host="careers.qorvo.com") for i in range(5)]
+    assert not any(seo_pages.autofills(x) for x in own)
+    assert seo_pages.autoapply_card(own, "seo-employer") == ""
+    assert seo_pages.autofills(_ats(0, "successfactors"))
+    # A lookalike host is not the system's: notmyworkdayjobs.com, or myworkdayjobs.com.evil.example.
+    for h in ("notmyworkdayjobs.com", "myworkdayjobs.com.evil.example"):
+        assert not seo_pages.autofills(_ats(0, "workday", host=h)), h
+    mixed = own + [_ats(10 + i, "workday") for i in range(3)]
+    assert "3 of these 8 applications are on Workday, a site" in seo_pages.autoapply_card(mixed, "seo-employer")
+    html = seo_pages.listing_rows(mixed, seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc))
+    assert html.count('class="aa"') == 3
+
+
+def test_autofill_hosts_are_the_extensions():
+    # The same list as extension/lib/hosts.js ATS_HOSTS, the hosts Auto-Apply needs no permission for.
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    with open(os.path.join(backend, "..", "extension", "lib", "hosts.js"), encoding="utf-8") as f:
+        src = f.read()
+    block = re.search(r"export const ATS_HOSTS = \[(.*?)\];", src, re.S).group(1)
+    assert set(re.findall(r'"([a-z0-9.-]+)"', block)) == set(seo_pages.AUTOFILL_HOSTS)
+    # Every supported system's host is one of them.
+    assert all(h.split("*.")[1].split("/")[0] in seo_pages.AUTOFILL_HOSTS for h in ATS_HOSTS.values())
+
+
+def test_autoapply_card_counts_only_what_the_extension_fills():
+    assert seo_pages.autoapply_card([_ats(i, "other") for i in range(6)], "seo-field") == ""
+    assert seo_pages.autoapply_card([_ats(i, "icims_site") for i in range(6)], "seo-field") == ""
+    rows = ([_ats(i, "greenhouse") for i in range(3)] + [_ats(10 + i, "workday") for i in range(2)]
+            + [_ats(20 + i, "other") for i in range(4)] + [_ats(30, "lever")])
+    card = seo_pages.autoapply_card(rows, "seo-employer")
+    # Workday is named first when the page has it, then by count; a third kind is "another site".
+    assert "6 of these 10 applications are on Workday, Greenhouse or another site" in card
+    assert "stops at Submit" in card
+    assert f'href="{seo_pages.STORE_URL}?utm_source=seo-employer"' in card
+    assert 'href="/install.html?from=seo-employer"' in card
+    assert card.count('class="cta ext-desk"') == 1 and card.count('class="cta ext-touch"') == 1
+    # One kind, and no Workday: the most common one, by name.
+    one = seo_pages.autoapply_card([_ats(i, "greenhouse") for i in range(5)], "seo-hub")
+    assert "All 5 of these applications are on Greenhouse, a site the free" in one
+    # Counted over the rows the page shows (PER_PAGE), not every listing it has.
+    many = [_ats(i, "ashby") for i in range(seo_pages.PER_PAGE + 10)]
+    assert f"All {seo_pages.PER_PAGE} of these" in seo_pages.autoapply_card(many, "seo-field")
+    for word in ("hurry", "only ", "left", "today", "limited", "now"):
+        assert word not in card.lower(), word
+
+
+def test_rows_link_auto_apply_only_on_supported_sites():
+    rows = [_ats(0, "workday"), _ats(1, "other"), _ats(2, "icims_site"), _ats(3)]
+    html = seo_pages.listing_rows(rows, seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc),
+                                  src="seo-state")
+    jobs = html.split("</li>")
+    assert sum('class="aa"' in j for j in jobs) == 1
+    workday = next(j for j in jobs if "Mechanical Intern 0" in j)
+    assert '<a class="aa" href="/install.html?from=seo-state-row">Auto-Apply this</a>' in workday
+    # Internal links only: the rows never repeat the store link.
+    assert "chromewebstore" not in html
+
+
+def test_employer_page_offers_auto_apply_with_its_own_tag(tmp_path):
+    rows = [_row(i, company_name="Big Co", ats="workday", apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}")
+            for i in range(seo_pages.MIN_EMPLOYER)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    own = pages["/internships/at/big-co/"]
+    assert "utm_source=seo-employer" in own and "stops at Submit" in own
+    assert "install.html?from=seo-employer-row" in own
+    assert f"All {seo_pages.MIN_EMPLOYER} of these applications are on Workday" in own
+    # The phone/tablet switch is CSS only, the same media query as install.html.
+    assert ".ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}" in own
+    assert '<a href="/install.html">Auto-Apply (free)</a>' in own
+    assert "utm_source=seo-state" in pages["/internships/massachusetts/"]
+    assert "utm_source=seo-hub" in pages["/internships/new/"]
+
+
+def test_no_auto_apply_card_where_no_listing_is_on_a_supported_site(tmp_path):
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))}
+    ma = pages["/internships/massachusetts/"]
+    assert "aa-card\"" not in ma and "chromewebstore" not in ma and 'class="aa"' not in ma
+    assert 'href="/install.html?from=seo-state"' in ma          # the quiet follow line stays
+
+
+def test_compare_and_about_state_the_free_allowance_in_numbers(tmp_path):
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))}
+    words = "25 Auto-Apply runs and 10 tailored resumes a month with a school .edu email (12 and 5 otherwise)"
+    assert seo_pages.FREE_WORDS == words
+    for path in ("/compare/", "/about/"):
+        assert words in pages[path], path
+        assert "doubl" not in pages[path].split("<main>")[1], path
+    assert "Resume AI" in pages["/compare/"]
+
+
+# The host each supported "ats" applies on, as extension/manifest.json host_permissions writes it.
+ATS_HOSTS = {
+    "workday": "https://*.myworkdayjobs.com/*", "greenhouse": "https://*.greenhouse.io/*",
+    "oracle": "https://*.oraclecloud.com/*", "icims": "https://*.icims.com/*",
+    "ashby": "https://*.ashbyhq.com/*", "lever": "https://*.lever.co/*",
+    "eightfold": "https://*.eightfold.ai/*", "smartrecruiters": "https://*.smartrecruiters.com/*",
+    "successfactors": "https://*.successfactors.com/*", "taleo": "https://*.taleo.net/*",
+    "bamboohr": "https://*.bamboohr.com/*", "rippling": "https://*.rippling.com/*",
+    "jazzhr": "https://*.applytojob.com/*", "workable": "https://*.workable.com/*",
+    "jobvite": "https://*.jobvite.com/*", "recruitee": "https://*.recruitee.com/*",
+    "adp": "https://*.adp.com/*", "paylocity": "https://*.paylocity.com/*",
+}
+
+
+def test_supported_ats_are_the_extensions_own_hosts():
+    # A page must not offer Auto-Apply on a site the extension needs an optional permission for.
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    with open(os.path.join(backend, "..", "extension", "manifest.json"), encoding="utf-8") as f:
+        hosts = set(json.load(f)["host_permissions"])
+    assert set(ATS_HOSTS) == seo_pages.SUPPORTED_ATS
+    assert not [k for k, h in ATS_HOSTS.items() if h not in hosts]
+    assert not {"other", "icims_site"} & seo_pages.SUPPORTED_ATS
