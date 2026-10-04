@@ -133,3 +133,15 @@ test("the breaker stops after twelve turns on one page even when the page keeps 
   assert.equal(moved.stop, false);
   assert.equal(moved.state.turnsHere, 0);
 });
+
+test("a select still on its placeholder option keeps its list, even when that option has a value", () => {
+  // <option value="-1">Select One</option> reads back as "Select One" (dom.js valueOf), which is no answer.
+  for (const ph of ["Select One", "-- Select --", "Please select", "Choose one"]) {
+    const { text, shown } = formatSnapshot(page(ph, ""), {});
+    assert.match(text, new RegExp(`"State" = "${ph}" options: Alabama`));
+    assert.ok(!shown.has("State"));
+  }
+  // A real answer that happens to start with the same letters is still an answer.
+  const sel = formatSnapshot(page("Selected states", ""), {}).text;
+  assert.match(sel, /"State" = "Selected states" \(30 options\)/);
+});

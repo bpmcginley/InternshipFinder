@@ -207,6 +207,11 @@ async function act(tabId, fullRef, action, payload) {
 // empty one, or one that has failed, keeps its list, because those are the ones the model must choose for.
 const LISTED_CHOICES = ["select", "react_select"];
 const hasValue = (v) => v !== undefined && v !== null && v !== "" && v !== false;
+// A native <select> whose placeholder option carries a value ("-1", "0") reads back as "Select One"
+// (dom.js valueOf), yet it holds no answer and its real options are what the model needs. Close
+// to the test dom.js uses to drop that option from the list, with a word boundary so "Selected" is an answer.
+const PLACEHOLDER_VALUE = /^[-–—.\s]*(select|choose|please select)\b|^\s*--/i;
+const answered = (v) => hasValue(v) && !PLACEHOLDER_VALUE.test(String(v));
 
 export function formatSnapshot(frames, fails = {}) {
   const index = {};
@@ -232,9 +237,9 @@ export function formatSnapshot(frames, fails = {}) {
       let s = `[${ref}] ${e.kind}${e.type && e.type !== "text" ? `(${e.type})` : ""}${e.required ? " *" : ""} "${e.label}"`;
       if (e.question) s += ` in "${e.question}"`;
       s += ` = ${JSON.stringify(e.value === undefined ? "" : e.value)}`;
-      if (hasValue(e.value) && e.label) shown.add(e.label);
+      if (answered(e.value) && e.label) shown.add(e.label);
       // was: every choice field listed all its options and its placeholder, filled or not.
-      const brief = LISTED_CHOICES.includes(e.kind) && hasValue(e.value) && !fails[ref];
+      const brief = LISTED_CHOICES.includes(e.kind) && answered(e.value) && !fails[ref];
       if (e.options && e.options.length) s += brief ? ` (${e.options.length} options)` : ` options: ${e.options.join(" | ")}`;
       if (e.placeholder && !brief) s += ` placeholder=${JSON.stringify(e.placeholder)}`;
       if (e.maxlength) s += ` maxlength=${e.maxlength}`;

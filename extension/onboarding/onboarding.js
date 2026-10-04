@@ -417,8 +417,11 @@ async function extract(btn, out) {
   const live = (el, sel) => (el && el.isConnected ? el : $(sel));
   if (btn) btn.disabled = true;
   if (out) busy(out, "Reading your resume… (about 30 seconds)");
+  // The file this read is about. A different resume chosen while it runs is read straight after (below),
+  // and "Last read" names the file that was read, not whichever one is chosen when the answer comes back.
+  const file = S.files.resume;
   try {
-    const content = [docBlock(S.files.resume, "Resume"), docBlock(S.files.cv, "CV")].filter(Boolean);
+    const content = [docBlock(file, "Resume"), docBlock(S.files.cv, "CV")].filter(Boolean);
     if (!content.length) throw new Error("Couldn't read the resume file. Try a PDF.");
     content.push({ type: "text", text: `Extract this applicant's details as JSON only, no commentary. Use "" or [] when unknown; never guess.
 {"facts":{"first_name":"","last_name":"","email":"","phone":"","city":"","state":"","zip":"","linkedin":"","github":"","website":""},
@@ -436,7 +439,7 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
     for (const k of ["education", "experience", "projects", "links"]) if (Array.isArray(x[k]) && x[k].length) p[k] = x[k];
     if (x.skills) p.skills = { technical: x.skills.technical || [], tools: x.skills.tools || [], soft: x.skills.soft || [] };
     if (!S.settings.signup_email && p.facts.email) S.settings.signup_email = p.facts.email;
-    S.settings.extracted_from = S.files.resume.name;
+    S.settings.extracted_from = file.name;   // was: S.files.resume.name
     await save(true);
     const o = live(out, "#exout");
     if (o) o.innerHTML = `<span class="ok">Found ${p.education.length} school(s), ${p.experience.length} role(s), ${p.projects.length} project(s).</span>`;
@@ -448,6 +451,8 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
     const b = live(btn, "#extract");
     if (b) b.disabled = !S.files.resume;
     drawQuick();   // reading the resume can fill in the sign-up email
+    const now = S.files.resume;
+    if (now && hasKey(S) && $("#exout") && !(file && now.name === file.name && now.b64 === file.b64)) extract($("#extract"), $("#exout")).catch(() => {});
   }
 }
 
