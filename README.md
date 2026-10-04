@@ -58,18 +58,19 @@ so each signed-in user gets a monthly allowance. Current limits (they may change
 | Feature | School .edu account | Other accounts |
 |---|---|---|
 | Tailored resumes | 10 | 5 |
-| Auto-Apply runs | 20 | 10 |
+| Auto-Apply runs | 25 | 12 |
 | Deep Dives | no limit | no limit |
 
 There are also small limits on how fast you can make AI calls. The extension and dashboard show
 what you have left. Allowances reset on the 1st of each month.
 
 If the whole project's AI budget runs out in a month, AI features pause for everyone until the
-next month. Search keeps working. Optional Supporter ($5/month) and Pro ($12/month) plans raise
+next month. Search keeps working. Optional Supporter ($4/month) and Pro ($8/month) plans raise
 your allowance and exist only to cover the AI bill. Search will stay free.
 
 On January 1, 2027 Google doubles the price of the model behind Auto-Apply, tailored resumes and
-the Deep Dive, so the Auto-Apply and tailored-resume allowances halve on that date.
+the Deep Dive. The allowances above were set on 2026-09-30 to hold through that, so no cut is
+scheduled (worker/src/config.js ALLOWANCE_CHANGES is empty).
 
 Hit your cap? Under **Advanced** in the extension you can use your own Gemini or Anthropic API key.
 

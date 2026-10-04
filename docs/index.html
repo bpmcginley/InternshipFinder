@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>InternScout</title>
+<!-- was: <title>InternScout</title> -->
+<title>InternScout: Free Internship Search for Every Major</title>
 <!-- was: <meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick."/> -->
 <!-- Paid plans went live 2026-09-19 (worker/wrangler.toml: PAYMENTS_ENABLED=1, Supporter $5/month,
      Pro $12/month; repriced to $4 and $8 on 2026-09-30), so "free" standing alone now overstates it. What is still true, and is the reason
@@ -16,7 +17,11 @@
      "Free" claim the sentence was lengthened to qualify. This one is 152 characters, so the qualifier
      survives. og:description below keeps the full 164, because Discord, Slack and iMessage show far
      more of a blurb than a search result does. -->
-<meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in; paid plans add AI."/>
+<!-- was: <meta name="description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in; paid plans add AI."/> -->
+<!-- 2026-10-04: "for UMass students" turned away everyone else, and the listings were never UMass-only.
+     149 characters, so the paid-plans qualifier still survives the cut; og:description below now
+     carries the same sentence, since the longer form no longer fits under 155 either. -->
+<meta name="description" content="Free internship, co-op and research search for college students in every major, ranked by major, class year and state. No sign-in; paid plans add AI."/>
 
 <!-- Link previews. Before today a link pasted into a group chat, Discord or a text message rendered as
      a bare grey URL: no title, no image, no blurb. Nearly every install starts with one student sending
@@ -32,7 +37,8 @@
      project path on github.io, so a root-relative /icon128.png would 404, and scrapers resolve a
      relative image against the absolute og:url below." -->
 <meta property="og:title" content="InternScout · internships ranked for your major"/>
-<meta property="og:description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in needed; paid plans only add AI."/>
+<!-- was: <meta property="og:description" content="Free internship, co-op and research search for UMass students, ranked for your major, class year and the states you pick. No sign-in needed; paid plans only add AI."/> -->
+<meta property="og:description" content="Free internship, co-op and research search for college students in every major, ranked by major, class year and state. No sign-in; paid plans add AI."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://internscout.org/"/>
 <!-- The landing pages under internships/ link here with ?field= and ?state= so the list opens on what the
@@ -150,6 +156,8 @@
   .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;
     transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}
   .btn:hover:not(:disabled){border-color:var(--ink3)}
+  /* A link dressed as a button (the landing's Add Auto-Apply, 2026-10-04) shouldn't keep the link underline. */
+  a.btn{text-decoration:none}
   /* Press feedback: the button moves a pixel down while held. */
   .btn:active:not(:disabled){transform:translateY(1px)}
   .btn:disabled{opacity:.45;cursor:default}
@@ -325,6 +333,12 @@
   .open-link:hover{text-decoration-color:var(--ink)}
   .rowbtn{margin-top:7px;font:500 12.5px var(--sans);color:var(--accent);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
   .rowbtn:hover{text-decoration:underline;text-underline-offset:3px}
+  /* The row Auto-Apply shown before the extension is installed (2026-10-04): quieter than the real one,
+     and it opens a one-line explainer row instead of queueing anything. */
+  .rowbtn.try{color:var(--ink2);font-weight:400}
+  .rowbtn.try:hover,.rowbtn.try[aria-expanded=true]{color:var(--accent)}
+  tbody tr.aa-info td,tbody tr.aa-info:hover td{background:var(--sunk);font-size:13px;color:var(--ink2);padding:var(--s2) var(--s4)}
+  tr.aa-info a{color:var(--accent);font-weight:500}
   .report{display:inline-block;margin-top:7px;font-size:12px;color:var(--ink3);text-decoration:none}
   .report:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .whybtn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
@@ -389,7 +403,7 @@
     table.list thead{display:none}
     table.list,table.list tbody{display:block;width:100%}
     table.list tr{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s1) var(--s3);padding:var(--s3) var(--s4);border-bottom:1px solid var(--rule)}
-    table.list tr.why{display:block;padding:0}
+    table.list tr.why,table.list tr.aa-info{display:block;padding:0}
     table.list tbody td{display:block;border:0;padding:0;width:auto;min-width:0}
     table.list .c-co{flex:1 1 100%;order:0}
     table.list .c-chk{order:1;margin-left:auto;width:auto}
@@ -404,6 +418,9 @@
     table.list .rowbtn,table.list .report{margin-top:0}
     table.list .c-links .report{display:none}
     tbody tr.why td{padding:var(--s4)}
+    /* A narrow desktop window (no touch) still gets the row Auto-Apply explainer; the card rule above
+       zeroes every td's padding, so give it back like the Why panel's (2026-10-04). */
+    tbody tr.aa-info td{padding:var(--s2) var(--s4)}
     .whyg{gap:var(--s4)}
   }
 </style>

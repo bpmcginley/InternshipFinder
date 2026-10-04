@@ -14,6 +14,11 @@
   const STATE_LABEL = { none: "Not started", interested: "Interested", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
   const JOB_LABEL = { queued: "Queued", working: "Agent working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
   const ATS = { greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", workday: "Workday", smartrecruiters: "SmartRecruiters", icims: "iCIMS", icims_site: "iCIMS", oracle: "Oracle", bamboohr: "BambooHR", workable: "Workable", taleo: "Taleo" };
+  // Application sites the extension can fill in out of the box: the `ats` values whose apply hosts are
+  // in extension/manifest.json host_permissions (jazzhr is applytojob.com). Not "other" or "icims_site",
+  // whose custom domains are only optional permissions. The SEO pages (seo_pages.py) use the same list.
+  const SUPPORTED_ATS = new Set(["workday", "greenhouse", "oracle", "icims", "ashby", "lever", "eightfold", "smartrecruiters",
+    "successfactors", "taleo", "bamboohr", "rippling", "jazzhr", "workable", "jobvite", "recruitee", "adp", "paylocity"]);
   const ACTIVE = ["queued", "working", "needs_you", "ready_to_submit"];
   const PAGE = 150;
   // Descriptions run about 1 KB per open listing. Up to this many open listings they are downloaded
@@ -260,7 +265,12 @@
   }
 
   // Memoised: ticking one checkbox or typing in the search box used to redraw all 150 rows.
-  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, onAuto, open, onWhy, elig, patterns }) {
+  // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, onAuto, open, onWhy, elig, patterns }) {
+  // `canTry` (2026-10-04): a desktop browser without the extension. Such a visitor never saw the word
+  // Auto-Apply on a row, so a row it could fill now says so and opens a one-line explainer.
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, open, onWhy, elig, patterns }) {
+    const [aaOpen, setAaOpen] = useState(false);
+    const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
     const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
@@ -301,7 +311,12 @@
         h("td", { className: "c-links" },
           r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener" }, "Open posting") : h("span", { className: "muted" }, "No link"),
           !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", onClick: () => onAuto([r]) }, "Auto-Apply")),
+          tryAuto && h("div", null, h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply")),
           h("div", null, h("a", { className: "report", href: IS.reportUrl(r), target: "_blank", rel: "noopener", title: "Wrong tag, dead link or not a student role? Tell us." }, "Report")))),
+      // Its own full-width row, like the Why panel, so the nowrap links column doesn't widen the table.
+      tryAuto && aaOpen && h("tr", { className: "aa-info", id: "aa-" + r.id }, h("td", { colSpan: cols },
+        "The free InternScout extension fills this application from your resume. You review it and press Submit yourself. Free monthly allowance. ",
+        h("a", { href: installUrl("dashboard-row"), target: "_blank", rel: "noopener" }, "Add it to Chrome"))),
       open && h("tr", { className: "why" }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns }))));
   });
 
@@ -326,7 +341,9 @@
   // actually configured with rather than a second copy that can drift.
   // When closed it renders nothing: the "About InternScout" link lives in the header tagline, so
   // the page no longer carries a second strip of small print under the header just to hold it.
-  function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans }) {
+  // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans }) {
+  // `installed` hides the Add Auto-Apply button once the extension is there.
+  function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans, installed }) {
     if (!open) return null;
     return h("section", { className: "landing", "aria-label": "About InternScout" },
       h("div", { className: "landing-main" },
@@ -367,6 +384,8 @@
           h("li", null, "Signing in with Google or Microsoft is optional. It lets your chosen states count toward where we scan in more detail.")),
         h("div", { className: "landing-actions" },
           h("button", { type: "button", className: "btn primary", onClick: onSetup }, hasProfile ? "Edit my profile" : "Set up your profile"),
+          // Added 2026-10-04: until now the only way to the extension from here was the footer link.
+          !installed && h("a", { className: "btn", href: installUrl("landing"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome"),
           h("button", { type: "button", className: "btn quiet", onClick: () => setOpen(false) }, "Hide this"))));
   }
 
@@ -1026,6 +1045,8 @@
     const jobCounts = useMemo(() => { const c = {}; Object.values(queue.jobs || {}).forEach(j => { c[j.status] = (c[j.status] || 0) + 1; }); return c; }, [queue]);
 
     const canAuto = info.installed;
+    // A desktop browser we know has no extension (a phone can't add one), for the rows' Auto-Apply explainer.
+    const canTry = info.checked && !info.installed && !info.stale && !touchOnly();
     const check = useCallback((id, on) => setSel(s => { const n = new Set(s); on ? n.add(id) : n.delete(id); return n; }), []);
     const onWhy = useCallback(id => setOpenId(o => o === id ? null : id), []);
     const selectable = shown.filter(r => r.apply_url && !jobs[String(r.id)]);
@@ -1145,7 +1166,9 @@
       h("header", { className: "top" },
         h("div", null,
           h("h1", { className: "mark" }, "InternScout"),
-          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for UMass students, anywhere in the US and Canada.",
+          // was: ... : "Internships, co-ops and research for UMass students, anywhere in the US and Canada.",
+          // The listings, majors and states were never UMass-only, and the line read as a gate to everyone else.
+          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for students in every major, anywhere in the US and Canada.",
             aboutBtn && " · ", aboutBtn)),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
@@ -1190,7 +1213,8 @@
           }))),
 
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
-      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
+      // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
+      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale }),
       // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
       // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
       setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
@@ -1207,6 +1231,24 @@
           loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` and ${keys.length - 8} more` : "", ". ",
           h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", "."))),
 
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
+      // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
+      // The extension is free to install, but its Auto-Apply spends the monthly AI allowance, so
+      // calling the whole thing "free" stopped being the full story on 2026-09-19. The Deep Dive does
+      // not: worker/src/config.js gives deep_dive `allowance: null`, i.e. no monthly cap.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on your free monthly AI allowance. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // The allowance exists only per account: worker/src/index.js signs the user in on every
+      // POST /ai and serves the counts from GET /me. This notice sits under copy that promises
+      // search is free with no sign-in, so the account has to be named here or it reads as carried
+      // over. The account is free, which is why that word stays.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // "Install guide" pointed at the by-hand steps; since 2026-09-22 it's one click in the Web Store.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
+      // 2026-10-04: no longer waits for a saved profile (`&& p`), so a first visit hears about Auto-Apply
+      // before it is asked to fill anything in, and it sits above the plans banner so what the extension
+      // does comes before what it costs. was: it came after the plans banner and the stale-extension note.
+      info.checked && !info.installed && !info.stale && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
       // Plans announcement (2026-10-04): every number comes from the Worker's /config (IS.plansBanner).
       // Signed-in free students get a checkout button for the first plan; everyone else the comparison.
       (() => {
@@ -1223,20 +1265,6 @@
           " ", h("a", { href: "#", onClick: prevent(hidePlans), "aria-label": "Hide this announcement" }, "Hide"));
       })(),
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
-      // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
-      // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
-      // The extension is free to install, but its Auto-Apply spends the monthly AI allowance, so
-      // calling the whole thing "free" stopped being the full story on 2026-09-19. The Deep Dive does
-      // not: worker/src/config.js gives deep_dive `allowance: null`, i.e. no monthly cap.
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on your free monthly AI allowance. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
-      // The allowance exists only per account: worker/src/index.js signs the user in on every
-      // POST /ai and serves the counts from GET /me. This notice sits under copy that promises
-      // search is free with no sign-in, so the account has to be named here or it reads as carried
-      // over. The account is free, which is why that word stays.
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
-      // "Install guide" pointed at the by-hand steps; since 2026-09-22 it's one click in the Web Store.
-      info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
       // The one-time invite nudge (2026-10-02), right under the "Queued" or "Profile saved" note it follows.
@@ -1329,7 +1357,7 @@
                 sortTh("company", "Company and role"), h("th", { scope: "col" }, "Field"), h("th", { scope: "col" }, "Location and term"),
                 sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", { scope: "col" }, "Your status"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")))),
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
+                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
 
       // Below the list and above the footer links, so it never pushes a listing down.
