@@ -1,7 +1,7 @@
 {
   "name": "InternScout",
   "short_name": "InternScout",
-  "description": "Internships, co-ops and research for UMass students, ranked for your major, class year and the states you pick.",
+  "description": "Internships, co-ops and research for college students in every major, ranked for your major, class year and the states you pick.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
