@@ -306,7 +306,8 @@ the month), `cap_hit` (a run refused at the monthly allowance; page is the task)
 A load arriving from Google or Microsoft sign-in or from Stripe counts as `internal` (the same visit going on).
 `403` unless `Origin` is the live site. Script-running crawlers (by user agent), more than 30 hits a
 minute from one address (counted in memory only), and anything past 50,000 views in a day are
-answered `204` but not counted.
+answered `204` but not counted. The Worker's own steps are not under that daily cap (2026-10-04), so a
+flood of forged browser steps cannot stop a real sign-in or sale from being counted.
 
 ### `GET /demand` (CI only)
 Needs `Authorization: Bearer <DEMAND_TOKEN>` (a secret). Returns:

@@ -122,6 +122,16 @@ test("countEvent adds to the same daily totals, only for the Worker's own steps,
   assert.equal(await countEvent(broken, "2026-09-14", "paid"), false);
 });
 
+test("a day filled to the cap with browser steps still counts the Worker's own", async () => {
+  const w = await setup();
+  await hit(w, { e: "posting_click", p: "/" });
+  const today = (await w.db.dump()).event_counts[0].day;
+  await w.db.prepare("UPDATE event_counts SET n = ?").bind(DAY_CAP).run();
+  await hit(w, { e: "install_click", p: "/" });
+  assert.equal(await countEvent(w.db, today, "paid", "supporter"), true, "forged clicks must not hide a sale");
+  assert.deepEqual((await events(w)).map((r) => r.event), ["paid", "posting_click"]);
+});
+
 test("a sign-in from the extension and a first-seen account are counted, with nothing about who", async () => {
   const w = await setup();
   const EXT = { Origin: "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi" };

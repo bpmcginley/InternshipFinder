@@ -79,7 +79,7 @@ export function sourceOf(refHost, utmSource, utmMedium) {
   return "other";
 }
 
-// One more for an event on a day and page, under the same day's cap as everything else in the table.
+// One more for a browser's step on a day and page, under the same day's cap as the visit counts.
 async function addEvent(db, day, event, page) {
   const ev = await db.prepare(
     "INSERT INTO event_counts (day, event, page, n) SELECT ?, ?, ?, 1 " +
@@ -92,10 +92,17 @@ async function addEvent(db, day, event, page) {
 // A step the Worker saw for itself (SERVER_EVENTS), added to the same daily total as a browser's step.
 // Nothing about the account goes in: the day, the event, a page or plan or task name, and one more.
 // Never throws, so counting cannot fail the request or the webhook it rides on; false if not counted.
+// Not under DAY_CAP: that cap is shared with /hit, so anyone could fill it with forged browser steps
+// and the day's real sign-ins and sales would then go uncounted. These rows cannot multiply (the pages
+// are a fixed few names) and each one needs a real account, run or Stripe event, so they need no cap.
+// was: return await addEvent(db, String(day).slice(0, 10), event, String(page).slice(0, 32));
 export async function countEvent(db, day, event, page = "worker") {
   if (!SERVER_EVENTS.has(event)) return false;
   try {
-    return await addEvent(db, String(day).slice(0, 10), event, String(page).slice(0, 32));
+    const ev = await db.prepare(
+      "INSERT INTO event_counts (day, event, page, n) VALUES (?, ?, ?, 1) ON CONFLICT(day, event, page) DO UPDATE SET n = n + 1",
+    ).bind(String(day).slice(0, 10), event, String(page).slice(0, 32)).run();
+    return ev.meta.changes > 0;
   } catch (e) {
     console.error("countEvent failed:", e && e.name);
     return false;
