@@ -7334,6 +7334,12 @@
    "added": "2026-09-18",
    "sector": "hospitality_sports"
   },
+  "careers.div.energy": {
+   "name": "Diversified Energy",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-04"
+  },
   "careers.docusign.com": {
    "name": "DocuSign",
    "quant": false,
@@ -10832,6 +10838,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "cornerstone-research-group-inc": {
+   "name": "CRG Defense",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-04"
   },
   "cvshealth": {
    "name": "CVS Health",
