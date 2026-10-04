@@ -92,12 +92,26 @@ CREATE TABLE IF NOT EXISTS visit_counts (
 -- Steps toward using InternScout per day (added 2026-10-01; src/visits.js EVENTS): install_click,
 -- signin_start, signin, profile, autoapply, checkout, by the page kind they happened on. Counts only,
 -- like visit_counts: nothing about who did them.
+-- Since 2026-10-04 also posting_click from the site, and steps only the Worker sees (SERVER_EVENTS:
+-- new_account, ext_signin, first_autofill, cap_hit, paid), whose `page` is the client ("extension",
+-- "dashboard"), the task (cap_hit), the plan (paid) or "worker".
 CREATE TABLE IF NOT EXISTS event_counts (
   day TEXT NOT NULL,
   event TEXT NOT NULL,
   page TEXT NOT NULL,
   n INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, event, page)
+);
+
+-- How many calls runs took, kept when the daily cron drops a past month's `runs` (added 2026-10-04;
+-- src/limits.js cleanup()). `n` runs of `task` in `month` took a number of calls in `bucket`: "1", "2",
+-- "3-4", "5-8", "9-15", "16-30" or "31+". Counts only: no account, no run id.
+CREATE TABLE IF NOT EXISTS run_hist (
+  month TEXT NOT NULL,
+  task TEXT NOT NULL,
+  bucket TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (month, task, bucket)
 );
 
 -- Accounts that pressed "Delete my data" in `month`. Their counters for that month are kept until it

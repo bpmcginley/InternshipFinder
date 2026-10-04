@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers.js";
-import { DAY_CAP, EVENTS, pageKind, sourceOf } from "../src/visits.js";
+import { DAY_CAP, EVENTS, SERVER_EVENTS, countEvent, pageKind, sourceOf } from "../src/visits.js";
 
 const SITE = { Origin: "https://internscout.org", "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130" };
 const hit = (w, body, headers = SITE) => w.api("POST", "/hit", { body, headers });
@@ -88,6 +88,54 @@ test("opening the invite panel is a step of its own", async () => {
   await hit(w, { e: "invite_open", p: "/" });
   const ev = (await w.db.dump()).event_counts.map(({ event, page, n }) => ({ event, page, n }));
   assert.deepEqual(ev, [{ event: "invite_open", page: "dashboard", n: 2 }]);
+});
+
+// Funnel steps added 2026-10-04. A click through to a posting comes from the site; the rest only the
+// Worker sees, and a browser must not be able to send them (a forged "paid" would be a fake sale).
+const events = async (w) => (await w.db.dump()).event_counts.map(({ event, page, n }) => ({ event, page, n }))
+  .sort((a, b) => (a.event + a.page).localeCompare(b.event + b.page));
+
+test("a click through to a posting is a step the site sends; the Worker's own steps are not", async () => {
+  const w = await setup();
+  await hit(w, { e: "posting_click", p: "/internships/ohio/" });
+  await hit(w, { e: "posting_click", p: "/" });
+  for (const e of SERVER_EVENTS) {
+    assert.ok(!EVENTS.has(e), e + " must not be accepted from /hit");
+    await hit(w, { e, p: "/" });
+  }
+  assert.deepEqual(await events(w), [{ event: "posting_click", page: "dashboard", n: 1 }, { event: "posting_click", page: "landing", n: 1 }]);
+});
+
+test("countEvent adds to the same daily totals, only for the Worker's own steps, and never throws", async () => {
+  const w = await setup();
+  assert.equal(await countEvent(w.db, "2026-09-14T10:05:30Z", "paid", "supporter"), true);
+  assert.equal(await countEvent(w.db, "2026-09-14", "paid", "supporter"), true);
+  assert.equal(await countEvent(w.db, "2026-09-14", "first_autofill"), true);
+  assert.equal(await countEvent(w.db, "2026-09-14", "install_click"), false, "a browser step is the site's to send");
+  assert.equal(await countEvent(w.db, "2026-09-14", "made_up"), false);
+  assert.deepEqual((await w.db.dump()).event_counts.map(({ day, event, page, n }) => ({ day, event, page, n }))
+    .sort((a, b) => a.event.localeCompare(b.event)), [
+    { day: "2026-09-14", event: "first_autofill", page: "worker", n: 1 },
+    { day: "2026-09-14", event: "paid", page: "supporter", n: 2 },
+  ]);
+  const broken = { prepare: () => { throw new Error("D1 down"); } };
+  assert.equal(await countEvent(broken, "2026-09-14", "paid"), false);
+});
+
+test("a sign-in from the extension and a first-seen account are counted, with nothing about who", async () => {
+  const w = await setup();
+  const EXT = { Origin: "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi" };
+  assert.equal((await w.api("POST", "/session", { token: await w.token(), headers: EXT })).status, 200);
+  assert.equal((await w.api("POST", "/session", { token: await w.token(), headers: SITE })).status, 200);
+  // The account is new to the Worker on its first /me; later calls see it already.
+  assert.equal((await w.api("GET", "/me", { token: await w.token(), headers: EXT })).status, 200);
+  assert.equal((await w.api("GET", "/me", { token: await w.token(), headers: EXT })).status, 200);
+  assert.equal((await w.api("GET", "/me", { token: await w.token({ sub: "other-student" }), headers: SITE })).status, 200);
+  assert.deepEqual(await events(w), [
+    { event: "ext_signin", page: "extension", n: 1 },
+    { event: "new_account", page: "dashboard", n: 1 },
+    { event: "new_account", page: "extension", n: 1 },
+  ]);
 });
 
 test("a bad body is refused", async () => {

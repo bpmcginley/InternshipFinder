@@ -49,6 +49,13 @@ JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metr
 RECENT = 8                                  # recent posts kept per account
 GSC_SITE = os.environ.get("GSC_SITE") or "sc-domain:internscout.org"
 GSC_DAYS = 28
+# was: 15 queries and 10 pages. With ~1,264 generated pages, the top 10 said nothing about which of
+# them Google shows but nobody clicks (2026-10-04). LOW_CTR_* pick those out for the snapshot.
+GSC_QUERIES = 100
+GSC_PAGES = 200
+LOW_CTR_MIN_IMPRESSIONS = 50
+LOW_CTR_BELOW = 0.01
+LOW_CTR_KEEP = 25
 GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
 SITE = "https://internscout.org"
 STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"
@@ -279,7 +286,10 @@ def _gsc_totals(rows: list[dict]) -> dict:
 def search_console(now: datetime) -> dict:
     """The last 28 days of Google searches for the site: clicks, impressions and average position by
     day, and the top queries and pages. dataState "all" includes the last two days, which Google
-    finalises later, so the newest days can still move a little."""
+    finalises later, so the newest days can still move a little.
+    low_ctr_pages (2026-10-04): pages Google showed at least LOW_CTR_MIN_IMPRESSIONS times that were
+    clicked under LOW_CTR_BELOW of the time, most shown first, at most LOW_CTR_KEEP: the titles and
+    descriptions most worth rewriting."""
     key = os.environ.get("GSC_SERVICE_ACCOUNT")
     if not key:
         raise ValueError("no GSC_SERVICE_ACCOUNT")
@@ -295,12 +305,21 @@ def search_console(now: datetime) -> dict:
                       "position": round(r.get("position", 0), 1)}
     days = [{"day": r["keys"][0], **cell(r)} for r in _gsc_rows(token, {**base, "dimensions": ["date"], "rowLimit": 100})]
     queries = [{"query": r["keys"][0], **cell(r)}
-               for r in _gsc_rows(token, {**base, "dimensions": ["query"], "rowLimit": 15})]
+               for r in _gsc_rows(token, {**base, "dimensions": ["query"], "rowLimit": GSC_QUERIES})]   # was: 15
     pages = [{"path": urllib.parse.urlparse(r["keys"][0]).path or "/", **cell(r)}
-             for r in _gsc_rows(token, {**base, "dimensions": ["page"], "rowLimit": 10})]
+             for r in _gsc_rows(token, {**base, "dimensions": ["page"], "rowLimit": GSC_PAGES})]    # was: 10
     since7 = (end - timedelta(days=6)).isoformat()
+    # was: return {..., "queries": queries, "pages": pages}
     return {"site": GSC_SITE, "days": sorted(days, key=lambda d: d["day"]), "totals_28d": _gsc_totals(days),
-            "totals_7d": _gsc_totals([d for d in days if d["day"] >= since7]), "queries": queries, "pages": pages}
+            "totals_7d": _gsc_totals([d for d in days if d["day"] >= since7]), "queries": queries, "pages": pages,
+            "low_ctr_pages": low_ctr_pages(pages)}
+
+
+def low_ctr_pages(pages: list[dict]) -> list[dict]:
+    """Pages shown often and rarely clicked, each with its ctr, most impressions first (see above)."""
+    out = [{**p, "ctr": round(p["clicks"] / p["impressions"], 4)} for p in pages
+           if p["impressions"] >= LOW_CTR_MIN_IMPRESSIONS and p["clicks"] / p["impressions"] < LOW_CTR_BELOW]
+    return sorted(out, key=lambda p: -p["impressions"])[:LOW_CTR_KEEP]
 
 
 def printable(snap: dict) -> dict:

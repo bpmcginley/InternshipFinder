@@ -208,6 +208,20 @@ describe("webhook", () => {
     assert.equal((await db.dump()).plans.length, 1);
   });
 
+  // The funnel's last step (visits.js countEvent, added 2026-10-04): one live checkout is one "paid",
+  // whatever Stripe retries, and a test-mode checkout is none.
+  it("counts a live checkout as paid once, by plan, and a test-mode one not at all", async () => {
+    const { api, db, token } = await setup({ env: PAID });
+    const user = await whoami(api, token, db);
+    const paid = () => db.dump().event_counts.filter((r) => r.event === "paid").map(({ day, page, n }) => ({ day, page, n }));
+    await post(api, { ...completed(user), id: "evt_test", livemode: false });
+    assert.deepEqual(paid(), [], "test mode is Bruce trying it out");
+    await post(api, { ...completed(user), livemode: true });
+    const again = await post(api, { ...completed(user), livemode: true });
+    assert.equal((await again.json()).repeat, true);
+    assert.deepEqual(paid(), [{ day: "2026-09-14", page: "supporter", n: 1 }]);
+  });
+
   it("drops the plan when the subscription ends", async () => {
     const { api, db, token } = await setup({ env: PAID });
     const user = await whoami(api, token, db);

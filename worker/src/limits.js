@@ -4,6 +4,7 @@ import { canUpgrade, paymentsInfo } from "./billing.js";
 import { forgetStatements } from "./referral.js";
 import { forgetSessions } from "./session.js";
 import { forgetProfile } from "./profile.js";
+import { countEvent } from "./visits.js";
 
 export const monthOf = (d) => d.toISOString().slice(0, 7);
 
@@ -300,6 +301,10 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     }
     if (!row) {
       await db.prepare("DELETE FROM runs WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ?").bind(...runKey).run();
+      // A funnel step (visits.js, added 2026-10-04): a run turned away because the month's allowance
+      // is spent, by task. Each refused run counts, so this is how often the cap bites, not how many
+      // students it bit. countEvent never throws, so the student still gets the cap error below.
+      await countEvent(db, today, "cap_hit", task);
       throw cap(`Monthly ${task} allowance is used up`);
     }
     used = row.units;
@@ -325,8 +330,15 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
   const extraRow = limit > 0 ? await db.prepare("SELECT granted - used AS left FROM bonus WHERE user_hash = ? AND task = ?")
     .bind(user, task).first() : null;
   // `freeMonth` is set, like `day`, only where the free tier's month row is charged (below).
+  // was: const admitted = { month, day: null, freeMonth: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false,
+  // was:                    bonusTook, bonusLeft: extraRow ? Math.max(0, extraRow.left) : 0 };
+  // `firstAutofill` (2026-10-04) is today's date when this run took the account's usage for Auto-Apply
+  // from 0 to 1 this month, else null. settle() counts it as "first_autofill" once Gemini has
+  // answered, rather than here: a run that fails is given back by release() and the retry is the
+  // first again, which counted here would have been counted twice.
   const admitted = { month, day: null, freeMonth: null, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false,
-                     bonusTook, bonusLeft: extraRow ? Math.max(0, extraRow.left) : 0 };
+                     bonusTook, bonusLeft: extraRow ? Math.max(0, extraRow.left) : 0,
+                     firstAutofill: task === "autofill" && isNew && used === 1 ? today : null };
   // The account's own ceiling. Without it the only thing between one modified client and the whole
   // month's budget is the daily rate limit: a task with no unit cap, a fresh run_id per call and a
   // large body would pause AI for everyone. It is set well above what a full allowance costs, so a
@@ -498,6 +510,9 @@ export async function settle(db, user, admitted, cents, usage, meta) {
     }
   }
   if (stmts.length) await db.batch(stmts);
+  // The account's first Auto-Apply of the month, answered (admit() sets firstAutofill). settle() runs
+  // once per call, and only the run's first call has isNew, so a run counts once.
+  if (admitted.firstAutofill) await countEvent(db, admitted.firstAutofill, "first_autofill");
 }
 
 // "Delete my data". Chosen states, earlier months and the plan row go at once. This month's counters
@@ -525,12 +540,26 @@ export async function deleteUser(db, user, now = new Date()) {
 // `spend` sweep takes the day's-share rows with it, because a day in a past month sorts below that
 // month's own key ("2026-09-14" < "2026-10"); today's row is longer than the current month's key and
 // so is never swept out from under a live day.
+// Before last month's runs go, how many calls each run took is kept as a count of runs per bucket
+// (run_hist, added 2026-10-04): the only record of how many calls an Auto-Apply application really
+// takes, which every allowance and per-run limit is set from. Counts by month, task and bucket only.
+// Only here, not in deleteUser(): a past month's runs reach this exactly once, on the first cron of
+// the next month, and the upsert sets rather than adds, so a repeat could not count them twice.
+// A run whose Worker died before its first call (calls 0) goes in the "1" bucket.
+const RUN_BUCKET = "CASE WHEN calls <= 1 THEN '1' WHEN calls = 2 THEN '2' WHEN calls <= 4 THEN '3-4' " +
+  "WHEN calls <= 8 THEN '5-8' WHEN calls <= 15 THEN '9-15' WHEN calls <= 30 THEN '16-30' ELSE '31+' END";
+
 export async function cleanup(db, now) {
   const day = new Date(now.getTime() - 2 * 86400e3).toISOString().slice(0, 10);
   const yearAgo = monthOf(new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), 1)));
   await db.batch([
     db.prepare("DELETE FROM rate WHERE bucket >= 'd:' AND bucket < ?").bind("d:" + day),
     db.prepare("DELETE FROM rate WHERE bucket >= 'm:' AND bucket < ?").bind("m:" + day),
+    // In the same batch (one transaction) as the DELETE after it, so the runs are never gone uncounted.
+    db.prepare(
+      `INSERT INTO run_hist (month, task, bucket, n) SELECT month, task, ${RUN_BUCKET} AS bucket, COUNT(*) FROM runs ` +
+      "WHERE month < ? GROUP BY month, task, bucket ON CONFLICT(month, task, bucket) DO UPDATE SET n = excluded.n",
+    ).bind(monthOf(now)),
     db.prepare("DELETE FROM runs WHERE month < ?").bind(monthOf(now)),
     db.prepare("DELETE FROM spend WHERE month < ?").bind(monthOf(now)),
     // Accounts that asked to be deleted: the counters kept to the end of that month go now.

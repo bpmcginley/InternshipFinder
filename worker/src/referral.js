@@ -2,6 +2,7 @@
 // Rules and amounts are REFERRAL in config.js; spending the extra units is limits.js admit(). Only
 // hashed ids, a random code, dates and counts are stored (schema.sql).
 import { HttpError } from "./http.js";
+import { countEvent } from "./visits.js";
 
 // No 0/o, 1/l/i: a code is sometimes read off a screen or a flyer and typed.
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -10,8 +11,14 @@ export const CODE = /^[a-hj-km-np-z2-9]{8}$/;
 const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => ALPHABET[b % ALPHABET.length]).join("");
 
 // The day the Worker first saw this account. Written on /me, /ai and a claim; a no-op after the first.
-export async function noteAccount(db, user, now) {
-  await db.prepare("INSERT OR IGNORE INTO accounts (user_hash, first) VALUES (?, ?)").bind(user, now.toISOString()).run();
+// The first time is also counted as a "new_account" step (visits.js, added 2026-10-04): a number for
+// the day and where it came from ("extension", "dashboard"), never which account.
+// was: export async function noteAccount(db, user, now) {
+// was:   await db.prepare("INSERT OR IGNORE INTO accounts (user_hash, first) VALUES (?, ?)").bind(user, now.toISOString()).run();
+// was: }
+export async function noteAccount(db, user, now, from = "worker") {
+  const r = await db.prepare("INSERT OR IGNORE INTO accounts (user_hash, first) VALUES (?, ?)").bind(user, now.toISOString()).run();
+  if (r.meta.changes === 1) await countEvent(db, now.toISOString(), "new_account", from);
 }
 
 // The student's invite code, made on first ask. INSERT OR IGNORE covers both a code that happens to be

@@ -206,6 +206,20 @@ def test_search_console_reads_days_queries_and_pages(monkeypatch):
     assert got["totals_7d"]["clicks"] == 2 and got["totals_7d"]["position"] == 10.0
     assert got["queries"][0] == {"query": "finance internships boston", "clicks": 2, "impressions": 40, "position": 8.2}
     assert got["pages"][0]["path"] == "/internships/finance/"
+    # 2026-10-04: more rows asked for, and 2 clicks in 90 is not a low click-through page.
+    assert [b["rowLimit"] for b in bodies[1:]] == [100, 200]
+    assert got["low_ctr_pages"] == []
+
+
+def test_low_ctr_pages_are_shown_often_and_rarely_clicked_most_shown_first():
+    page = lambda path, clicks, impressions: {"path": path, "clicks": clicks, "impressions": impressions, "position": 9.0}  # noqa: E731
+    pages = [page("/a/", 0, 49), page("/b/", 1, 60), page("/c/", 0, 500), page("/d/", 5, 400),
+             page("/e/", 1, 150), page("/f/", 1, 100)]
+    got = metrics.low_ctr_pages(pages)
+    # /a/ is shown too rarely to judge; /b/ (1.7%), /d/ (1.25%) and /f/ (exactly 1%) are clicked enough.
+    assert [(p["path"], p["ctr"]) for p in got] == [("/c/", 0.0), ("/e/", 0.0067)]
+    many = [page(f"/p{i}/", 0, 100 + i) for i in range(40)]
+    assert len(metrics.low_ctr_pages(many)) == 25 and metrics.low_ctr_pages(many)[0]["path"] == "/p39/"
 
 
 def test_search_queries_stay_out_of_the_public_run_log():

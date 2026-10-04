@@ -4,6 +4,7 @@
 // What we keep: the user_hash, the Stripe customer and subscription ids, a status and the paid-through
 // date. Stripe holds the card, the name and the email; they never reach this Worker or D1.
 import { HttpError } from "./http.js";
+import { countEvent } from "./visits.js";
 
 const API = "https://api.stripe.com/v1/";
 // The same version the webhook endpoint is set to, so events and API replies share one shape.
@@ -254,6 +255,11 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
     }
     if (!plan || !config.PLANS[plan] || plan === "free") plan = (config.PAID_PLANS || ["supporter"])[0];
     await savePlan(db, user, { plan, status, customer: o.customer, subscription: o.subscription, periodEnd }, now);
+    // The last funnel step (visits.js, added 2026-10-04): a checkout that left a plan active, counted
+    // by plan. Live mode only, so Bruce's test-mode checkouts stay out of it. applyEvent() only gets
+    // here for an event id it has not seen (firstTime), so a Stripe retry is not counted again, and
+    // countEvent never throws, so it cannot undo the plan that was just saved.
+    if (event.livemode === true && ACTIVE.has(status)) await countEvent(db, now.toISOString(), "paid", plan);
     return { ok: true };
   }
 

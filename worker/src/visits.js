@@ -18,8 +18,20 @@ const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.l
 // many times each happened. Only these names are counted; anything else is ignored.
 // "invite_open" (added 2026-10-02): a signed-in student opened their invite link panel, from the
 // one-time nudge after a first Auto-Apply or profile, or from the Account menu (docs/js/app.js).
+// "posting_click" (added 2026-10-04): a click through to a posting, from a landing page's a.go link or
+// the dashboard's a.open-link (docs/js/count.js). The store click was the last step the site could see.
 // was: export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout"]);
-export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open"]);
+// was: export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open"]);
+export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open",
+  "posting_click"]);
+// Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
+// table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
+//   new_account     the Worker saw an account for the first time (an accounts row was made)
+//   ext_signin      a sign-in from the extension (POST /session with the extension's Origin)
+//   first_autofill  an account's first Auto-Apply run of the month that Gemini answered
+//   cap_hit         a run refused because the month's allowance was used up; page is the task
+//   paid            a live Stripe checkout that left a plan active; page is the plan
+export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid"]);
 // utm_source values our own links use (growth/digest.py, growth/outreach.py) and the usual social names.
 const UTM_SOCIAL = /^(linkedin|instagram|facebook|fb|ig|reddit|bluesky|bsky|mastodon|x|twitter|threads|tiktok|youtube|discord)$/;
 // Crawlers that run scripts. Most bots never run JavaScript and so never reach this at all.
@@ -67,6 +79,29 @@ export function sourceOf(refHost, utmSource, utmMedium) {
   return "other";
 }
 
+// One more for an event on a day and page, under the same day's cap as everything else in the table.
+async function addEvent(db, day, event, page) {
+  const ev = await db.prepare(
+    "INSERT INTO event_counts (day, event, page, n) SELECT ?, ?, ?, 1 " +
+    "WHERE (SELECT COALESCE(SUM(n), 0) FROM event_counts WHERE day = ?) < ? " +
+    "ON CONFLICT(day, event, page) DO UPDATE SET n = n + 1",
+  ).bind(day, event, page, day, DAY_CAP).run();
+  return ev.meta.changes > 0;
+}
+
+// A step the Worker saw for itself (SERVER_EVENTS), added to the same daily total as a browser's step.
+// Nothing about the account goes in: the day, the event, a page or plan or task name, and one more.
+// Never throws, so counting cannot fail the request or the webhook it rides on; false if not counted.
+export async function countEvent(db, day, event, page = "worker") {
+  if (!SERVER_EVENTS.has(event)) return false;
+  try {
+    return await addEvent(db, String(day).slice(0, 10), event, String(page).slice(0, 32));
+  } catch (e) {
+    console.error("countEvent failed:", e && e.name);
+    return false;
+  }
+}
+
 export async function countHit(db, request, body, now) {
   const ua = request.headers.get("User-Agent") || "";
   // Only the live site sends hits (a browser always sets Origin on this cross-site POST); a local copy
@@ -80,13 +115,10 @@ export async function countHit(db, request, body, now) {
   const day = now.toISOString().slice(0, 10);
   // A step rather than a page load: one more for that event, the day and the page it happened on.
   if (body.e !== undefined) {
+    // Browser steps only: SERVER_EVENTS are not in EVENTS, so they stop here.
     if (!EVENTS.has(body.e)) return { counted: false };
-    const ev = await db.prepare(
-      "INSERT INTO event_counts (day, event, page, n) SELECT ?, ?, ?, 1 " +
-      "WHERE (SELECT COALESCE(SUM(n), 0) FROM event_counts WHERE day = ?) < ? " +
-      "ON CONFLICT(day, event, page) DO UPDATE SET n = n + 1",
-    ).bind(day, body.e, page, day, DAY_CAP).run();
-    return { counted: ev.meta.changes > 0 };
+    // was: the INSERT inline here; it moved to addEvent() so countEvent() writes the same row.
+    return { counted: await addEvent(db, day, body.e, page) };
   }
   const source = sourceOf(body.r, body.u, body.m);
   const visit = source === "internal" ? 0 : 1;
