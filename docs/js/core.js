@@ -679,6 +679,24 @@
   // Fallback names for the paid tiers. /config carries the real labels; this is for when it hasn't
   // loaded yet, or an older page meets a tier it doesn't know.
   const PLAN_LABELS = { supporter: "Supporter", pro: "Pro" };
+  // The plans announcement (added 2026-10-04): what free and each paid plan give in Auto-Apply runs,
+  // read from the Worker's /config (allowance tables and payments.plans), so it can never state a
+  // number the server doesn't serve. null when payments are off, the tables are missing, or the
+  // student already pays. PLANS_BANNER_KEY remembers a dismissal by announcement, so a later one shows.
+  const PLANS_BANNER_KEY = "internscout.plans_banner";
+  const PLANS_BANNER_ID = "2026-10-plans";
+  function plansBanner(cfg, me) {
+    const pay = cfg && cfg.payments, al = cfg && cfg.allowance;
+    if (!pay || !pay.enabled || !al || !al.edu || !al.general) return null;
+    if (me && me.plan && me.plan !== "free") return null;
+    const runs = t => t && t.autofill;
+    const plans = (pay.plans || []).filter(pl => runs(al[pl.plan]) && pl.price)
+      .sort((a, b) => a.multiplier - b.multiplier)
+      .map(pl => ({ plan: pl.plan, label: pl.label || PLAN_LABELS[pl.plan] || pl.plan, price: pl.price, runs: runs(al[pl.plan]) }));
+    if (!plans.length || runs(al.general) == null || runs(al.edu) == null) return null;
+    return { free: runs(al.general), edu: runs(al.edu), plans, from: plans[0].price };
+  }
+
   const leftOf = (me, task) => { const a = me && me.allowance && me.allowance[task]; return a ? Math.max(0, (a.limit || 0) - (a.used || 0)) : null; };
   // "Auto-Apply runs: 20 of 20 left" lines plus the tier, for a tooltip.
   function allowanceText(me) {
@@ -760,7 +778,7 @@
     ext, bridgeProfile, fromBridgeProfile,
     // was: workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, ...
     workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
-    fetchMe, leftOf, allowanceText, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
+    fetchMe, leftOf, allowanceText, plansBanner, PLANS_BANNER_KEY, PLANS_BANNER_ID, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     INVITE_NUDGE_KEY, inviteNudgeDue, inviteNudgeSeen, markInviteNudge,
     reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };

@@ -101,3 +101,22 @@ test("the invite nudge is offered once, only to a signed-in student while invite
   assert.equal(IS.ls.get(IS.INVITE_NUDGE_KEY), "opened");
   assert.equal(IS.inviteNudgeSeen(), true);
 });
+
+test("the plans announcement states only what /config serves, and not to paying students", () => {
+  const IS = loadCore(() => new Promise(() => {}));
+  const cfg = {
+    payments: { enabled: true, plans: [
+      { plan: "pro", label: "Pro", price: "$8/month", multiplier: 4 },
+      { plan: "supporter", label: "Supporter", price: "$4/month", multiplier: 2 }] },
+    allowance: { general: { autofill: 12 }, edu: { autofill: 25 }, supporter: { autofill: 50 }, pro: { autofill: 100 } },
+  };
+  const b = IS.plansBanner(cfg, null);
+  assert.equal(b.from, "$4/month");
+  assert.equal(b.free, 12);
+  assert.equal(b.edu, 25);
+  assert.deepEqual(b.plans.map(p => [p.label, p.runs, p.price]), [["Supporter", 50, "$4/month"], ["Pro", 100, "$8/month"]]);
+  assert.equal(IS.plansBanner(cfg, { plan: "supporter" }), null);
+  assert.ok(IS.plansBanner(cfg, { plan: "free" }));
+  assert.equal(IS.plansBanner({ ...cfg, payments: { enabled: false, plans: [] } }, null), null);
+  assert.equal(IS.plansBanner({ payments: cfg.payments }, null), null);
+});
