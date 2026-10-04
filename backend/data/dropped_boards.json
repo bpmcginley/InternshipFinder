@@ -350,6 +350,10 @@
    "on": "2026-10-03",
    "why": "robots"
   },
+  "jobs-legrand": {
+   "on": "2026-10-04",
+   "why": "dead"
+  },
   "jobs-tollbrothers": {
    "on": "2026-09-30",
    "why": "robots"
@@ -382,6 +386,10 @@
   },
   "sanctuary": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "saronic": {
+   "on": "2026-10-04",
    "why": "dead"
   },
   "xpansiv": {

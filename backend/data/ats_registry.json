@@ -7210,13 +7210,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "jobs-legrand": {
-   "name": "Legrand",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-15",
-   "last_fail": "2026-10-03"
-  },
   "kphcareers-kphhealthcareservices": {
    "name": "KPH Healthcare Services",
    "quant": false,
@@ -7966,6 +7959,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "government_policy"
+  },
+  "oneworldglobalservices": {
+   "name": "oneworldglobalservices",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-04"
   },
   "openroadmedia": {
    "name": "Open Road Integrated Media",
@@ -9051,13 +9050,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "saronic": {
-   "name": "Saronic",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-03"
   },
   "secureframe": {
    "name": "Secureframe",
@@ -10748,6 +10740,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "ants-sports": {
+   "name": "ANTS Sports",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-04"
   },
   "arena-investors-lp": {
    "name": "Arena Investors I Quaestor Advisors",
@@ -15185,9 +15183,9 @@
   "liveramp|wd5|LiveRampCareers": {
    "name": "LiveRamp",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-03"
+   "last_fail": "2026-10-04"
   },
   "llbean|wd1|LLBean_Careers": {
    "name": "L.L.Bean",
@@ -18272,10 +18270,9 @@
   "warnerbros|wd5|global": {
    "name": "Warner Bros. Discovery",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "media",
-   "last_fail": "2026-10-03"
+   "sector": "media"
   },
   "washpost|wd5|washingtonpostcareers": {
    "name": "Washpost",
