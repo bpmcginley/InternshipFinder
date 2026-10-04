@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { decisions, compare, labelsOf, SENSITIVE_RE, sameMeaning, monthOf } = await import("../../scripts/eval/autofill_models.mjs");
+const { decisions, compare, labelsOf, SENSITIVE_RE, sameMeaning, monthOf, routable, savings } = await import("../../scripts/eval/autofill_models.mjs");
 
 const use = (name, input) => ({ type: "tool_use", name, input });
 
@@ -63,3 +63,33 @@ test("one date or amount written two ways counts as the same answer; different o
   assert.equal(c.reworded.length, 1);
 });
 
+
+// The savings section (2026-10-04): which steps a router would send to the cheaper model, and the sums.
+const snapMsg = (body, extra = []) => [{ role: "user", content: [...extra, { type: "text", text: "SNAPSHOT\n" + body }] }];
+
+test("only plain form steps count as routable", () => {
+  assert.equal(routable(snapMsg('[0:f1] select *"Veteran status" = "" options: Yes | No\n[0:f2] text "First name" = "Ada"')), true);
+  // an empty free-text box to write: production's model
+  assert.equal(routable(snapMsg('[0:f3] textarea *"Why do you want to work here?" = ""')), false);
+  assert.equal(routable(snapMsg('[0:f4] rich_text "Cover letter" = ""')), false);
+  // a filled one is fine
+  assert.equal(routable(snapMsg('[0:f3] textarea "Why us?" = "Because..."')), true);
+  // the "is it finished" step, and the step after a failed action
+  assert.equal(routable(snapMsg('[0:b1] "Submit" BLOCKED (final submit, human only)')), false);
+  assert.equal(routable(snapMsg('[0:f1] text "City" = ""', [{ type: "tool_result", tool_use_id: "t1", content: "no such option", is_error: true }])), false);
+  assert.equal(routable([{ role: "user", content: [{ type: "text", text: "no snapshot" }] }]), false);
+});
+
+test("savings: routed steps take the cheaper cost, and the plan margins follow the config", () => {
+  const row = (app, routable, cheap, prod) => ({ app, routable, cheap: { now: cheap, later: cheap }, prod: { now: prod, later: prod * 2 } });
+  const rows = [row("a", true, 0.2, 0.5), row("a", false, 0.2, 0.5), row("b", true, 0.2, 0.5), row("b", true, 0.2, 0.5)];
+  const config = { TASKS: { autofill: { allowance: 25 } }, PAID_PLANS: ["supporter"], PLANS: { supporter: { multiplier: 2 } }, NET_CENTS: { supporter: 340 } };
+  const s = savings(rows, config);
+  assert.equal(s.apps, 2);
+  assert.equal(s.routableSteps, 3);
+  assert.ok(Math.abs(s.now.prodOnly - 1.0) < 1e-9);            // 4 steps x 0.5c over 2 applications
+  assert.ok(Math.abs(s.now.routed - 0.55) < 1e-9);             // (3 x 0.2 + 0.5) / 2
+  assert.ok(Math.abs(s.later.routed - 0.8) < 1e-9);            // (3 x 0.2 + 1.0) / 2
+  assert.deepEqual(s.plans.map((p) => [p.plan, p.runs, p.net]), [["supporter", 50, 340]]);
+  assert.ok(Math.abs(s.plans[0].later.prodOnly - (340 - 50 * 2) / 340) < 1e-9);
+});
