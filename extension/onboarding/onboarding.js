@@ -4,6 +4,7 @@ import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/au
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
+import { quickStartReady, finishOnboarding } from "./quickstart.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -11,6 +12,9 @@ const STEPS = [
   ["setup", "Setup"], ["files", "Files"], ["facts", "Quick facts"],
   ["interview", "Interview"], ["voice", "Voice"], ["review", "Review"],
 ];
+// Auto-Apply can be turned on from Files (2026-10-04); these three make its answers better and are
+// labelled as optional in the step bar. doneFor() still counts them, so the side panel still suggests them.
+const OPTIONAL_STEPS = ["facts", "interview", "voice"];
 let S = await loadStore();
 let rerun = !!S.settings.onboarded;   // was: const. A restore from the account (below) makes this a rerun.
 let step = new URLSearchParams(location.search).get("step") || (rerun ? "review" : "setup");
@@ -100,7 +104,12 @@ function wireNav() {
   main.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 }
 function render() {
-  stepsEl.innerHTML = STEPS.map(([id, t]) => `<button data-step="${id}" class="${id === step ? "on" : ""} ${doneFor(id) ? "done" : ""}">${t}</button>`).join("");
+  const tab = ([id, t]) => `<button data-step="${id}" class="${id === step ? "on" : ""} ${doneFor(id) ? "done" : ""}">${t}</button>`;
+  // was: stepsEl.innerHTML = STEPS.map(tab).join("");
+  const opt = STEPS.filter(([id]) => OPTIONAL_STEPS.includes(id));
+  stepsEl.innerHTML = STEPS.filter(([id]) => id === "setup" || id === "files").map(tab).join("")
+    + `<div class="optgrp"><span class="optlabel">Optional: better answers</span><div class="steps">${opt.map(tab).join("")}</div></div>`
+    + STEPS.filter(([id]) => id === "review").map(tab).join("");
   stepsEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.step)));
   ({ setup, files, facts, interview, voice, review })[step]();
   if (restoredNote) main.insertAdjacentHTML("afterbegin", `<div class="banner">${esc(restoredNote)}</div>`);
@@ -129,19 +138,31 @@ chrome.storage.onChanged.addListener(async (ch, area) => {
 });
 
 // ---------- 1. setup ----------
-function setup() {
+// On InternScout's AI, Setup is two things: sign in, and the email for job-site accounts. Everything
+// else keeps its default and sits under Advanced, closed (2026-10-04), with the same ids so the
+// handlers below still bind. A student on their own API key gets Advanced open, since their key is there.
+// was: AI provider, Tailored resumes, AI spending and Job-site accounts (email, passwords, tabs) as open cards.
+function setup(advOpen = false) {
   main.innerHTML = `
     ${rerun ? `<div class="banner">You've done the Deep Dive before. Everything you entered is kept, so just update what changed.</div>` : ""}
     <h2>Setup</h2><p class="lead">${isWorker(S.ai)
       ? "Auto-Apply uses InternScout's free AI: sign in with Google or Microsoft and there's nothing else to set up. Your passwords stay in this browser."
       : "Auto-Apply uses your own AI API key. The key and your passwords stay in this browser."}</p>
+    ${isWorker(S.ai) ? `<div class="card"><h3>Sign in</h3>
+      <div id="acct"><span class="small muted"><span class="spin"></span>Checking sign-in…</span></div>
+    </div>` : ""}
+    <div class="card"><h3>Email for applications</h3>
+      <p class="small muted" style="margin-top:0">Workday, iCIMS and similar sites need an account. The agent creates it for you with this email. Passwords are filled in by the extension itself and never shown to the AI.</p>
+      <label class="f" style="margin-bottom:0"><span>Email for applications and sign-ups</span><input type="email" id="email" value="${esc(S.settings.signup_email || S.profile.facts.email)}"></label>
+    </div>
+    <details class="adv" ${advOpen || !isWorker(S.ai) ? "open" : ""}><summary>Advanced</summary>
     <div class="card"><h3>AI provider</h3>
       <label class="f"><span>Provider</span><select id="provider">
         <option value="internscout">InternScout (free, sign in with Google or Microsoft)</option>
         <option value="anthropic">Your own Anthropic (Claude) key</option>
         <option value="gemini">Your own Google (Gemini) key</option></select></label>
       ${isWorker(S.ai)
-        ? `<div id="acct"><span class="small muted"><span class="spin"></span>Checking sign-in…</span></div>`
+        ? `<p class="small muted" style="margin:0">InternScout's AI is free within a monthly allowance. To use your own Anthropic or Google API key instead, pick it here.</p>`
         : isGemini(S.ai)
         ? `<label class="f"><span>Gemini key (from aistudio.google.com → Get API key)</span><input type="password" id="key" value="${esc(S.ai.geminiKey)}" placeholder="AIza…"></label>`
         : `<label class="f"><span>Anthropic key (from console.anthropic.com → API keys)</span><input type="password" id="key" value="${esc(S.ai.apiKey)}" placeholder="sk-ant-…"></label>`}
@@ -165,14 +186,13 @@ function setup() {
       <div id="prices" class="grid"></div>
     </div>`}
     <div class="card"><h3>Job-site accounts</h3>
-      <p class="small muted" style="margin-top:0">Workday, iCIMS and similar sites need an account. The agent creates it for you with this email. Passwords are filled in by the extension itself and never shown to the AI.</p>
-      <label class="f"><span>Email for applications and sign-ups</span><input type="email" id="email" value="${esc(S.settings.signup_email || S.profile.facts.email)}"></label>
       <label class="f"><span>Passwords</span><select id="pwmode">
         <option value="unique">A unique strong password per site (saved in the Accounts tab)</option>
         <option value="master">One password I choose for every site</option></select></label>
       <label class="f" id="masterwrap"><span>Your password (must satisfy strict rules: 12+ chars, upper, lower, number, symbol)</span><input type="password" id="master" value="${esc(S.settings.master_password)}"></label>
-      <label class="f"><span>Applications to work on at once</span><select id="tabs">${[1, 2, 3, 4].map((n) => `<option ${n === S.settings.max_tabs ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+      <label class="f" style="margin-bottom:0"><span>Applications to work on at once</span><select id="tabs">${[1, 2, 3, 4].map((n) => `<option ${n === S.settings.max_tabs ? "selected" : ""}>${n}</option>`).join("")}</select></label>
     </div>
+    </details>
     <div id="need" class="small warn"></div>
     ${navButtons(null, "files")}`;
   $("#provider").value = isWorker(S.ai) ? "internscout" : isGemini(S.ai) ? "gemini" : "anthropic";
@@ -184,7 +204,7 @@ function setup() {
     S.ai.provider = e.target.value;
     S.ai.model = modelFor(S, "agent");
     save();
-    setup();
+    setup(true);   // stay open on the choice just made
   });
   $("#pwmode").value = S.settings.password_mode;
   const syncMaster = () => { $("#masterwrap").hidden = $("#pwmode").value !== "master"; };
@@ -216,9 +236,13 @@ async function fillAccount(msg) {
   if (!$("#acct")) return; // moved to another step meanwhile
   const note = msg ? `<p class="small err" style="margin:8px 0 0">${esc(msg)}</p>` : "";
   if (!a || a.error || !a.signedIn) {
+    // was: "Sign in with Google (UMass email)", which read as a button only UMass students could use.
+    // "Larger", not "twice": the Worker gives a non-.edu account half the allowance rounded down
+    // (GENERAL_ALLOWANCE_PCT), so 25 Auto-Apply runs against 12, not exactly double.
     box.innerHTML = `
-      <p class="small" style="margin:0 0 10px">Sign in to use the AI. Any Google account or personal Microsoft account works. School Microsoft accounts (like @umass.edu Outlook) need IT approval, so use Google with your school email for the larger .edu allowance.</p>
-      <div class="row"><button class="btn blue" data-signin="google">Sign in with Google (UMass email)</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
+      <p class="small" style="margin:0 0 10px">Sign in to use the AI. Any Google account or personal Microsoft account works. School Microsoft accounts (like @umass.edu Outlook) need IT approval, so sign in with Google using your school email.</p>
+      <div class="row"><button class="btn blue" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
+      <p class="small muted" style="margin:6px 0 0">A school .edu email gives a larger free monthly allowance.</p>
       ${note || (a && a.error ? `<p class="small err" style="margin:8px 0 0">${esc(a.error)}</p>` : "")}`;
     box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
       box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
@@ -326,15 +350,19 @@ function files() {
       <button class="btn small" id="addpaste">Add pasted text</button>
     </div>
     <div class="card"><h3>Read my files</h3>
-      <p class="small muted" style="margin-top:0">Claude reads your resume${S.files.cv ? " and CV" : ""} and fills in your education, experience, projects, skills and contact info. You can edit all of it in Review.</p>
-      <div class="row"><button class="btn primary" id="extract" ${S.files.resume ? "" : "disabled"}>Read my resume</button><span id="exout" class="small">${S.settings.extracted_from ? `<span class="ok">Last read: ${esc(S.settings.extracted_from)}</span>` : ""}</span></div>
+      <p class="small muted" style="margin-top:0">${isWorker(S.ai) ? "InternScout's AI" : isGemini(S.ai) ? "Gemini" : "Claude"} reads your resume${S.files.cv ? " and CV" : ""} and fills in your education, experience, projects, skills and contact info. You can edit all of it in Review.</p>
+      <div class="row"><button class="btn primary" id="extract" ${S.files.resume && !extracting ? "" : "disabled"}>Read my resume</button><span id="exout" class="small">${extracting ? `<span class="spin"></span>Reading your resume… (about 30 seconds)` : S.settings.extracted_from ? `<span class="ok">Last read: ${esc(S.settings.extracted_from)}</span>` : ""}</span></div>
     </div>
+    <div class="card" id="quick" hidden></div>
     <div id="ferr" class="err small"></div>
     ${navButtons("setup", "facts")}`;
   const err = (e) => { $("#ferr").textContent = e.message || String(e); };
   main.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => main.querySelector(`[data-slot=${b.dataset.pick}]`).click()));
   main.querySelectorAll("[data-slot]").forEach((inp) => inp.addEventListener("change", async () => {
-    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); await save(true); files(); wireNav(); } catch (e) { err(e); }
+    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); await save(true); files(); wireNav(); } catch (e) { err(e); return; }
+    // A new resume is read straight away (2026-10-04) rather than waiting for "Read my resume", which
+    // students skipped: the profile stayed empty and every application had to ask the model for it.
+    if (inp.dataset.slot === "resume" && hasKey(S)) extract($("#extract"), $("#exout")).catch(err);
   }));
   main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; await save(true); files(); wireNav(); }));
   main.querySelectorAll("[data-rms]").forEach((b) => b.addEventListener("click", async () => { S.files.samples.splice(+b.dataset.rms, 1); await save(true); files(); wireNav(); }));
@@ -349,11 +377,46 @@ function files() {
     await save(true); files(); wireNav();
   });
   $("#extract").addEventListener("click", () => extract($("#extract"), $("#exout")).catch(err));
+  drawQuick();
 }
 
+// "Turn on Auto-Apply now" on the Files step, once the AI, a resume and the sign-up email are there:
+// the same finish as Review's button (finishOnboarding), so a student can start applying without the
+// optional steps. Redrawn after a resume is read, since reading it can fill in the sign-up email.
+function drawQuick(msg = "") {
+  const box = $("#quick");
+  if (!box) return;
+  box.hidden = !quickStartReady(S);
+  if (box.hidden) return;
+  box.innerHTML = S.settings.onboarded
+    ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
+       <p class="small muted" style="margin:6px 0 0">Quick facts, Interview and Voice are optional. They make the answers on your applications better, and you can do them any time.</p>`
+    : `<h3>Ready to apply</h3>
+       <p class="small muted" style="margin-top:0">Your resume and your email for applications are in, which is all Auto-Apply needs. Quick facts, Interview and Voice are optional: they make the answers better, and you can do them later.</p>
+       <div class="row"><button class="btn primary" id="quickgo">Turn on Auto-Apply now</button></div>`;
+  if ($("#quickgo")) $("#quickgo").addEventListener("click", async () => {
+    $("#quickgo").disabled = true;
+    await finishAndRender();
+    drawQuick("Saved. Auto-Apply is on.");
+  });
+}
+
+// Both finish buttons (Files' quick start, Review's finish). was: the body of Review's #finishall handler.
+async function finishAndRender() {
+  await finishOnboarding(S, save);
+  render();
+}
+
+// One read at a time: the automatic one when a resume is chosen and the button can overlap, and two
+// reads of one resume would be two AI calls for the same answer.
+let extracting = false;
 async function extract(btn, out) {
-  btn.disabled = true;
-  busy(out, "Reading your resume… (about 30 seconds)");
+  if (extracting) return;
+  extracting = true;
+  // files() redraws itself (another file added meanwhile), so write to whatever is on the page now.
+  const live = (el, sel) => (el && el.isConnected ? el : $(sel));
+  if (btn) btn.disabled = true;
+  if (out) busy(out, "Reading your resume… (about 30 seconds)");
   try {
     const content = [docBlock(S.files.resume, "Resume"), docBlock(S.files.cv, "CV")].filter(Boolean);
     if (!content.length) throw new Error("Couldn't read the resume file. Try a PDF.");
@@ -375,10 +438,17 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
     if (!S.settings.signup_email && p.facts.email) S.settings.signup_email = p.facts.email;
     S.settings.extracted_from = S.files.resume.name;
     await save(true);
-    out.innerHTML = `<span class="ok">Found ${p.education.length} school(s), ${p.experience.length} role(s), ${p.projects.length} project(s).</span>`;
+    const o = live(out, "#exout");
+    if (o) o.innerHTML = `<span class="ok">Found ${p.education.length} school(s), ${p.experience.length} role(s), ${p.projects.length} project(s).</span>`;
   } catch (e) {
-    out.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-  } finally { btn.disabled = false; }
+    const o = live(out, "#exout");
+    if (o) o.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  } finally {
+    extracting = false;
+    const b = live(btn, "#extract");
+    if (b) b.disabled = !S.files.resume;
+    drawQuick();   // reading the resume can fill in the sign-up email
+  }
 }
 
 // ---------- 3. facts ----------
@@ -596,13 +666,17 @@ const GOAL_FIELDS = [
   ["career", "Career goals"], ["why_field", "Why this field"], ["why_internship", "What you want from an internship"],
   ["interests", "Interests"], ["strengths", "Strengths"], ["growth_areas", "Growth areas"],
 ];
+// The JSON lists sit under "Edit raw data", closed (2026-10-04). was: one open code box per list,
+// which made Review read as something a student had to check line by line before finishing.
 function review() {
   const p = S.profile;
   const missing = STEPS.filter(([id]) => id !== "review" && !doneFor(id)).map(([, t]) => t);
   main.innerHTML = `<h2>Review</h2><p class="lead">Everything the agent knows about you. Edit anything; changes save automatically.</p>
     ${missing.length ? `<div class="card warn">Still to do: ${missing.join(", ")}. Auto-Apply works best with everything filled.</div>` : ""}
     <div class="card"><h3>Goals</h3>${GOAL_FIELDS.map(([k, t]) => `<label class="f"><span>${t}</span><textarea data-goal="${k}" style="min-height:54px">${esc(p.goals[k])}</textarea></label>`).join("")}</div>
+    <details class="adv"><summary>Edit raw data</summary>
     ${JSON_SECTIONS.map(([k, t]) => `<div class="card"><h3>${t}</h3><textarea class="code" data-json="${k}">${esc(JSON.stringify(p[k], null, 2))}</textarea><div class="small" data-jerr="${k}"></div></div>`).join("")}
+    </details>
     <div class="card"><div class="row"><button class="btn primary" id="finishall" ${hasKey(S) && S.files.resume ? "" : "disabled"}>${rerun ? "Save Deep Dive" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${hasKey(S) && S.files.resume ? "" : "Needs an API key and a resume first."}</span></div></div>
     ${navButtons("voice", null)}`;
   main.querySelectorAll("[data-goal]").forEach((el) => el.addEventListener("input", () => { p.goals[el.dataset.goal] = el.value; save(); }));
@@ -617,11 +691,7 @@ function review() {
     } catch (e) { msg.innerHTML = `<span class="err">Not saved: ${esc(e.message)}</span>`; }
   }));
   $("#finishall").addEventListener("click", async () => {
-    S.settings.onboarded = true;
-    S.settings.deep_dive_at = Date.now();
-    S.settings.deep_dive_run = null;   // the next Deep Dive is a new run
-    await save(true);
-    render();
+    await finishAndRender();
     $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>`;
   });
 }
