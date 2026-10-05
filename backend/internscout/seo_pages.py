@@ -670,7 +670,22 @@ table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:14px}tab
 .aa{grid-column:2;align-self:start;font-size:13px;color:var(--ink3);white-space:nowrap}
 .job:has(.aa) .go{grid-row:1/span 2;align-self:end}
 @media (max-width:560px){.aa{grid-column:1;margin-top:6px}.job:has(.aa) .go{grid-row:auto}}
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0 6px}
+.tier{position:relative;display:flex;flex-direction:column;padding:20px 18px 16px;background:var(--panel);
+border:1px solid var(--rule);border-radius:10px}.tier.pick{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.tier h2{font:600 20px/1.2 "Source Serif 4",Georgia,serif;margin:0}
+.tier .price{font:600 30px/1.1 "Source Serif 4",Georgia,serif;margin:8px 0 2px}
+.tier .price span{font:14px/1 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink3)}
+.tier .blurb{color:var(--ink2);margin:0 0 10px;font-size:15px}
+.tier ul{margin:0 0 14px;padding-left:18px;color:var(--ink2);font-size:15px;flex:1}.tier li{margin:4px 0}
+.tier .cta{margin:0;text-align:center}
+.badge{position:absolute;top:-11px;left:16px;background:var(--accent);color:var(--paper);font-size:12px;
+font-weight:600;padding:3px 9px;border-radius:999px}
+.anchor{font-size:17px;margin:20px 0 0}ul.plain{padding-left:18px;color:var(--ink2)}ul.plain li{margin:6px 0}
+@media (max-width:720px){.tiers{grid-template-columns:1fr}}
 """
+# The last eleven lines (2026-10-05) are /pricing/: three tier cards in a row, the recommended one
+# ringed in the accent with a "Most popular" badge, stacked on a phone.
 # The last five lines (2026-10-02) are the tables and headed sections of /compare/ and
 # /internships/highest-paying/. A wide table scrolls inside .tablewrap, never the page; the
 # comparison's four wordy columns keep a readable width on a phone and scroll there instead.
@@ -737,6 +752,9 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
     # engines reach the pages that say what InternScout is. was: only Privacy and Terms.
     # The header names what the install page offers and that it costs nothing (2026-10-04).
     # was: <a href="/install.html">Extension</a>
+    # Pricing, Compare and About are in the nav since 2026-10-05 (the audit: the comparison page, the
+    # site's best price story, was reachable only from the footer, and the prices had no page at all).
+    # was: <nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a></nav>
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -759,14 +777,14 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 </head>
 <body>
 <div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a></nav></header>
+<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
 <main>
 <p class="crumbs">{crumb_html}</p>
 <h1>{esc(h1)}</h1>
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/about/">About</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
 </body>
@@ -1033,6 +1051,50 @@ PLAN_PRICES = (("Supporter", "$4"), ("Pro", "$8"))
 FREE_WORDS = (f"{FREE_EDU['autofill']} Auto-Apply runs and {FREE_EDU['resume_tailor']} tailored resumes a month "
               f"with a school .edu email ({FREE_GENERAL['autofill']} and {FREE_GENERAL['resume_tailor']} otherwise)")
 
+# Each plan's multiplier on the free allowance (worker/src/config.js PLANS), and what that comes to,
+# worked out the way worker/src/limits.js allowanceFor does: a .edu account gets round(units x multiplier),
+# anyone else floor(half of that), never below 1. So Supporter is 50 runs with a .edu email and 25 without.
+# Added 2026-10-05 for /pricing/, which states every tier in numbers.
+PLAN_MULTIPLIER = {"Free": 1, "Supporter": 2, "Pro": 4}
+PLAN_SHORT = {"Free": "Enough to try it on real applications.",
+              "Supporter": "Covers the AI bill for a month of steady applying.",
+              "Pro": "For a full-time search: a hundred applications a month."}
+RECOMMENDED_PLAN = "Supporter"
+
+
+def plan_allowance(name: str) -> tuple[dict, dict]:
+    """(.edu, other) monthly allowances of a plan, per task, as the Worker computes them."""
+    m = PLAN_MULTIPLIER[name]
+    edu = {k: round(v * m) for k, v in FREE_EDU.items()}
+    other = {k: max(1, (v * m) // 2) for k, v in FREE_EDU.items()}
+    return edu, other
+
+
+def _offer(name: str, price: str) -> dict:
+    """One schema.org Offer for a plan: price per month in USD, from PLAN_PRICES ("$4" -> "4")."""
+    edu, other = plan_allowance(name)
+    amount = price.lstrip("$") if price != "$0" else "0"
+    offer = {"@type": "Offer", "name": name, "price": amount, "priceCurrency": "USD",
+             "url": SITE + "/pricing/#" + name.lower(), "availability": "https://schema.org/InStock",
+             "description": f"{edu['autofill']} Auto-Apply runs and {edu['resume_tailor']} tailored resumes a month with a "
+                            f"school .edu email ({other['autofill']} and {other['resume_tailor']} otherwise)"}
+    if amount != "0":
+        offer["priceSpecification"] = {"@type": "UnitPriceSpecification", "price": amount, "priceCurrency": "USD",
+                                       "billingIncrement": 1, "unitCode": "MON"}
+    return offer
+
+
+# The product and its three offers, for answer engines asked "how much does InternScout cost" (the audit
+# of 2026-10-05: Organization and WebSite were there, no Product or Offer). On /pricing/ and, the same
+# object, in docs/index.html; backend/tests/test_seo_pages.py checks the two agree.
+PRODUCT = {"@context": "https://schema.org", "@type": "Product", "@id": SITE + "/#product",
+           "name": "InternScout Auto-Apply",
+           "description": "A free internship search for college students of every major, with a Chrome extension that "
+                          "fills in applications from your resume and never submits them. Search needs no account; the "
+                          "extension has a free monthly allowance, and two paid plans raise it.",
+           "brand": {"@id": ORG_ID}, "url": SITE + "/pricing/", "image": SITE + "/icon512.png",
+           "offers": [_offer("Free", "$0")] + [_offer(name, price) for name, price in PLAN_PRICES]}
+
 # The applicant tracking systems a listing's "ats" names, as their makers write them. "other" (an
 # employer's own careers site, or a public list) is left out of the count of roles taken straight
 # from an employer's job board.
@@ -1261,7 +1323,8 @@ def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tupl
          f"day. {SLOGAN}", ""),
         ("Is InternScout free?",
          "Yes. Searching, ranking and browsing every listing are free and need no account. The optional "
-         f"Auto-Apply Chrome extension is free for {FREE_WORDS}; optional {plans} plans raise the allowance.", ""),
+         f"Auto-Apply Chrome extension is free for {FREE_WORDS}; optional {plans} plans raise the allowance.",
+         " <a href=\"/pricing/\">Plans and prices</a>."),
         # was: "... is free with a monthly allowance, which a school .edu email doubles; ..."
         ("Which majors is InternScout for?",
          f"Every major. Open roles are sorted into {len(f['fields'])} fields; the largest right now are "
@@ -1298,8 +1361,18 @@ def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tupl
                    # was: "... list a clear hourly rate. Among those, the median is ...": the median and
                    # top are pay_report's, which leaves out roles only in Canada (2026-10-02 review).
                    " <a href=\"/internships/highest-paying/\">Highest-paying internships</a>."))
+    # In the first person since 2026-10-05 (the audit asked for the "why I built this" behind the slogan).
+    # Still no name: the site speaks as the brand, as the module comment above says.
+    # was: f"One college student builds and runs it, for students everywhere. {SLOGAN}"
     qa.append(("Who makes InternScout?",
-               f"One college student builds and runs it, for students everywhere. {SLOGAN}", ""))
+               "One college student builds and runs it, for students everywhere. I started it during my own "
+               "internship search, when every morning meant checking ten different job boards, most of what they "
+               "showed was stale or not for students, and everything I had applied to lived in a messy "
+               "spreadsheet. So I wrote a scanner that reads employers' own job boards several times a day and "
+               "keeps only the student roles, and put a free search in front of it that needs no account. The "
+               "Auto-Apply extension came later, for the hours that go into typing the same resume into the same "
+               "form on Workday and Greenhouse. It never submits for you: it is your application, and you press "
+               f"Submit. {SLOGAN}", ""))
     return qa
 
 
@@ -1392,6 +1465,73 @@ def compare_page(f: dict) -> tuple[str, str, str]:
             f"$39.99 a month) and who submits applications. Sources dated {COMPARE_AS_OF}.", body)
 
 
+# ---- /pricing/
+# Added 2026-10-05 after the site audit: the prices lived only in the dashboard's dismissible plans notice
+# and the /about/ FAQ, with no page of their own, no link in the nav, no tier picked out, and the
+# $4-against-$39.99 comparison far from any price. Every number here comes from the same constants as
+# /about/ and /compare/ (FREE_EDU, PLAN_PRICES, PLAN_MULTIPLIER), which mirror worker/src/config.js.
+
+def tier_card(name: str, price: str) -> str:
+    """One plan as a card: name, price, what it is for, what it gives, and where to get it."""
+    edu, other = plan_allowance(name)
+    pick = name == RECOMMENDED_PLAN
+    lines = [f"{edu['autofill']} Auto-Apply runs and {edu['resume_tailor']} tailored resumes a month with a school .edu email",
+             f"{other['autofill']} runs and {other['resume_tailor']} resumes with any other email"]
+    if name == "Free":
+        lines = ["Search, ranking and browsing every listing, with no account"] + lines
+        cta = "<a class=\"cta\" href=\"/\">Search free</a>"
+    else:
+        lines = ["Everything in Free"] + lines + ["Cancel any time; the plan runs to the end of the month you paid for"]
+        # The dashboard reads ?upgrade= and offers that plan's checkout (docs/js/app.js), after sign-in.
+        cta = f"<a class=\"cta\" href=\"/?upgrade={name.lower()}\">Get {esc(name)}</a>"
+    return (f"<section class=\"tier{' pick' if pick else ''}\" id=\"{name.lower()}\">"
+            + ("<span class=\"badge\">Most popular</span>" if pick else "")
+            + f"<h2>{esc(name)}</h2>"
+            + f"<p class=\"price\">{esc(price)}<span>{' a month' if price != '$0' else ''}</span></p>"
+            + f"<p class=\"blurb\">{esc(PLAN_SHORT[name])}</p>"
+            + "<ul>" + "".join(f"<li>{esc(line)}</li>" for line in lines) + "</ul>" + cta + "</section>")
+
+
+def pricing_page() -> tuple[str, str, str, list]:
+    """(title, description, body, JSON-LD) of /pricing/."""
+    cards = "".join(tier_card(name, price) for name, price in (("Free", "$0"), *PLAN_PRICES))
+    low = PLAN_PRICES[0][1]
+    body = (
+        "<p class=\"lede\">Search is free, with no account. The Auto-Apply extension has a free monthly allowance, "
+        "and two plans raise it. Every price is per month, and you can cancel any time.</p>"
+        f"<div class=\"tiers\">{cards}</div>"
+        # The anchor next to the price, in the audit's words. The competitor figures are /compare/'s, with
+        # their sources and date there.
+        f"<p class=\"anchor\">Simplify+ and Jobright Turbo run $39.99 a month. This is {esc(low)}, for students only. "
+        f"<a href=\"/compare/\">The full comparison, with sources</a> (prices as of {esc(COMPARE_AS_OF)}).</p>"
+        "<section class=\"prose\">"
+        "<h2>Before you pay</h2><ul class=\"plain\">"
+        "<li><strong>No refunds by default.</strong> The AI cost is spent when a run happens. Start on the free "
+        "tier, and pay only if you hit the cap.</li>"
+        "<li><strong>The extension never submits.</strong> It fills in the form and stops at the Submit button; "
+        "you review every answer before it sends.</li>"
+        "<li><strong>Cancel any time.</strong> Stripe takes the payment and runs the billing page (Manage plan on "
+        "the dashboard); InternScout never sees your card.</li></ul>"
+        "<h2>What a run is</h2>"
+        "<p>One Auto-Apply run is one application filled in. One tailored resume is one resume rewritten for one "
+        "posting. The allowance resets on the 1st of each month. The Deep Dive, the profile interview you do "
+        "once, has no monthly cap of its own.</p>"
+        "<h2>What a school email changes</h2>"
+        f"<p>A verified .edu email, from Google or Microsoft, about doubles what any plan gives: {esc(FREE_WORDS)} "
+        "on the free tier, and the same again for Supporter and Pro. Any other email still gets every plan, at "
+        "the lower numbers above.</p>"
+        "<h2>Who it is for</h2>"
+        "<p>College students looking for internships, co-ops and research roles, in every major. It is not for "
+        "experienced job seekers: if you want full-time or senior roles, Simplify and Jobright cover every level, "
+        "and <a href=\"/compare/\">the comparison</a> says what each costs.</p></section>")
+    plans = " and ".join(f"{name} {price}" for name, price in PLAN_PRICES)
+    # The description is under 155 characters, so a search result shows the $39.99 anchor too.
+    return ("InternScout Pricing – Free Search, Auto-Apply Plans from " + low + " a Month | InternScout",
+            f"Free to search, no account. The Auto-Apply extension has a free monthly allowance; {plans} a month "
+            "raise it. Simplify+ and Jobright Turbo are $39.99.",
+            body, [ORGANIZATION, PRODUCT])
+
+
 # ---- /llms.txt and /llms-full.txt
 
 def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majors: int, employers: int,
@@ -1430,6 +1570,7 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
     ]
     main_pages = [link("/", "Dashboard", "search every open listing and rank it for your major, class year and states"),
                   link("/about/", "About InternScout", "what it is, what is free, where listings come from, in direct answers"),
+                  link("/pricing/", "Plans and prices", f"free search; the Auto-Apply extension's free allowance and the {plans} plans"),
                   link("/compare/", "InternScout vs Simplify vs Jobright", "prices and features compared, with dated sources")]
     if "/internships/highest-paying/" in made:
         main_pages.append(link("/internships/highest-paying/", "Highest-paying internships",
@@ -1878,6 +2019,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     add("/about/", t_, d_, "About InternScout", [("/", "InternScout"), ("/about/", "About")], b_, ld=ld_)
     t_, d_, b_ = compare_page(facts)
     add("/compare/", t_, d_, "InternScout vs Simplify vs Jobright", [("/", "InternScout"), ("/compare/", "Compare")], b_)
+    t_, d_, b_, ld_ = pricing_page()
+    add("/pricing/", t_, d_, "Plans and prices", [("/", "InternScout"), ("/pricing/", "Pricing")], b_, ld=ld_)
     global TEXTS
     made = {p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0) for p in pages}
     TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)

@@ -57,9 +57,10 @@ def test_closed_and_non_web_links_are_left_out(tmp_path):
     rows.append(_row(4, status="closed"))
     rows.append(_row(5, apply_url="javascript:alert(1)"))
     site = _site(tmp_path, {"MA": rows})
-    # Only 4 usable listings, so nothing but the hubs, and /about/ and /compare/ (2026-10-02), is built.
-    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/"}
-    # was: == {"/internships/", "/internships/for/", "/internships/at/"}
+    # Only 4 usable listings, so nothing but the hubs, and /about/, /compare/ (2026-10-02) and /pricing/
+    # (2026-10-05), is built.
+    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/", "/pricing/"}
+    # was: == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/"}
 
 
 def test_job_board_text_is_escaped(tmp_path):
@@ -640,7 +641,7 @@ def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
     assert short.startswith("# InternScout\n\n> InternScout (https://internscout.org) is a free internship search")
     # Counted from this data (41 open, 9 employers, 1 field) and dated from the export, not the clock.
     assert "As of September 23, 2026 it lists 41 open internships, co-ops and research roles from 9 employers in 1 field" in short
-    for path in ("/", "/about/", "/compare/", "/internships/highest-paying/", "/internships/", "/internships/at/",
+    for path in ("/", "/about/", "/pricing/", "/compare/", "/internships/highest-paying/", "/internships/", "/internships/at/",
                  "/internships/for/", "/internships/mechanical-engineering/", "/install.html", "/privacy", "/terms",
                  "/llms-full.txt"):
         assert f"](https://internscout.org{path})" in short, path
@@ -676,7 +677,39 @@ def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
     assert len(blocks) == 1
     graph = blocks[0]["@graph"]
     strip = lambda o: {k: v for k, v in o.items() if k != "@context"}          # noqa: E731
-    assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]
+    # was: == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]; the Product with its three
+    # offers joined them on 2026-10-05, so the prices are machine-readable on the page students land on.
+    assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE), strip(seo_pages.PRODUCT)]
+
+
+# ---- /pricing/ (2026-10-05)
+
+def test_pricing_page_states_every_tier_in_numbers_with_a_product_schema(tmp_path):
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))}
+    pricing = pages["/pricing/"]
+    # The allowances are the Worker's own arithmetic: .edu = round(free x multiplier), other = floor(half).
+    assert seo_pages.plan_allowance("Supporter") == ({"autofill": 50, "resume_tailor": 20}, {"autofill": 25, "resume_tailor": 10})
+    assert seo_pages.plan_allowance("Pro") == ({"autofill": 100, "resume_tailor": 40}, {"autofill": 50, "resume_tailor": 20})
+    for text in ("<h2>Free</h2>", "<h2>Supporter</h2>", "<h2>Pro</h2>", "$4<span> a month</span>", "$8<span> a month</span>",
+                 "50 Auto-Apply runs and 20 tailored resumes a month with a school .edu email", "25 runs and 10 resumes with any other email",
+                 "100 Auto-Apply runs and 40 tailored resumes a month", "12 runs and 5 resumes with any other email",
+                 # One tier is picked out, with the badge, and the anchor sits next to the price.
+                 'class="tier pick" id="supporter"', "Most popular", "Simplify+ and Jobright Turbo run $39.99 a month. This is $4, for students only.",
+                 # The money objections, beside the price, not only in the terms.
+                 "No refunds by default.", "The extension never submits.", "Cancel any time.",
+                 'href="/?upgrade=supporter"', 'href="/?upgrade=pro"', seo_pages.COMPARE_AS_OF, "not for experienced job seekers"):
+        assert text in pricing, text
+    assert pricing.count('class="badge"') == 1
+    blocks = _ld_blocks(pricing)
+    assert [b["@type"] for b in blocks] == ["BreadcrumbList", "Organization", "Product"]
+    offers = {o["name"]: o for o in blocks[2]["offers"]}
+    assert [(o["price"], o["priceCurrency"]) for o in offers.values()] == [("0", "USD"), ("4", "USD"), ("8", "USD")]
+    assert offers["Supporter"]["priceSpecification"] == {"@type": "UnitPriceSpecification", "price": "4", "priceCurrency": "USD", "billingIncrement": 1, "unitCode": "MON"}
+    assert "priceSpecification" not in offers["Free"] and blocks[2]["brand"] == {"@id": "https://internscout.org/#organization"}
+    # Every page's nav and footer reach it, and so does the FAQ's free answer.
+    assert all('<a href="/pricing/">Pricing</a>' in h for h in pages.values())
+    assert 'href="/pricing/">Plans and prices</a>' in pages["/about/"]
+    assert "I started it during my own internship search" in pages["/about/"]
 
 
 # ---- Auto-Apply on the listing pages (2026-10-04)
