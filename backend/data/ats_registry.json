@@ -7563,10 +7563,9 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-10-05"
+   "sector": "health"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
@@ -16762,9 +16761,8 @@
   "roberthalf|wd1|protivitiexperiencedcareers": {
    "name": "Protiviti",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-05"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "roberthalf|wd1|ProtivitiNA": {
    "name": "Protiviti",
