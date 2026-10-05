@@ -519,7 +519,18 @@
 <script defer src="js/app.js"></script>
 </head>
 <body>
-<div id="root"></div>
+<!-- The hero in plain HTML (2026-10-05): the dashboard is drawn by js/app.js, so a fetcher that runs
+     no script (most AI crawlers, and the audit's recheck) used to see an empty page: no h1, no nav, no
+     way to search. This is the same header app.js renders, in the same classes, with a link in place
+     of the live count and the button; React replaces it the moment it mounts. -->
+<div id="root">
+<div class="wrap"><header class="top">
+<div class="brand"><a class="mark" href="/">InternScout</a><nav class="sitenav" aria-label="Site"><a href="internships/">Browse</a><a href="install.html?from=dashboard-nav">Auto-Apply (free)</a><a href="pricing/">Pricing</a><a href="compare/">Compare</a><a href="about/">About</a></nav></div>
+<div class="hero"><h1>Every student internship, co-op and research role, in one free search.</h1>
+<p class="sub">Stop checking ten job boards every morning: every open role, updated several times a day, no account needed. Every major, anywhere in the US and Canada. Sign in is optional.</p>
+<div class="hero-actions"><a class="btn primary" href="internships/">Search internships free · no account</a></div></div>
+</header></div>
+</div>
 <noscript><p>InternScout needs JavaScript to search and rank listings. Without it, <a href="internships/">browse open internships by field, state or major</a>. The raw data is public at <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/docs/data">github.com/bpmcginley/InternshipFinder</a>.</p></noscript>
 <!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
      and nothing that identifies a visitor; see privacy.html. The token is public by design.
