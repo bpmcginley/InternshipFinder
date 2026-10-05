@@ -289,6 +289,12 @@
    "fails": 0,
    "added": "2026-10-03"
   },
+  "bobyard": {
+   "name": "Bobyard",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-05"
+  },
   "bracket-bot": {
    "name": "Bracket Bot",
    "quant": false,
@@ -2944,8 +2950,9 @@
   "bcg": {
    "name": "Boston Consulting Group",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-05"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -3870,6 +3877,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "foundenergy": {
+   "name": "Found Energy",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-05"
   },
   "fourhands": {
    "name": "Four Hands",
@@ -7260,6 +7273,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "uscareers-idemia": {
+   "name": "IDEMIA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-05"
+  },
   "uscareers-lennox": {
    "name": "Lennox International",
    "quant": false,
@@ -10324,6 +10343,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "joinroot": {
+   "name": "Root Insurance",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-05"
   },
   "journaltech": {
    "name": "Journal Technologies",
@@ -15582,6 +15607,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "midlandsb|wd1|msbcareers": {
+   "name": "Midland States Bank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-05"
   },
   "mii|wd5|MiTek": {
    "name": "MiTek",

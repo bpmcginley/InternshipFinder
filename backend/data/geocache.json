@@ -672,6 +672,10 @@
 -74.416
 ],
 "east farmingdale (tr)|NY":null,
+"east northport|NY":[
+40.8768,
+-73.3246
+],
 "east orange|NJ":[
 40.7642,
 -74.215
@@ -1483,6 +1487,7 @@
 -74.4765
 ],
 "north jersey|NJ":null,
+"north new york city|NY":null,
 "north tonawanda|NY":[
 43.0408,
 -78.8661
@@ -1542,6 +1547,7 @@
 "ny - seaford|NY":null,
 "ny - staten island|NY":null,
 "ny - sunnyside|NY":null,
+"ny - tarrytown|NY":null,
 "ny - wantagh|NY":null,
 "ny - west islip|NY":null,
 "ny - whitestone|NY":null,
@@ -1996,6 +2002,7 @@
 ],
 "sophia antipolis|NY":null,
 "south new jersey|NJ":null,
+"south new york city|NY":null,
 "south plainfield|NJ":[
 40.5793,
 -74.4115
@@ -2294,6 +2301,7 @@
 -73.681
 ],
 "watertown-fort drum|NY":null,
+"wayne pa|PA":null,
 "waynesburg|PA":[
 39.8956,
 -80.1848
