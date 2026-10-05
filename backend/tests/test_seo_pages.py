@@ -839,3 +839,33 @@ def test_supported_ats_are_the_extensions_own_hosts():
     assert set(ATS_HOSTS) == seo_pages.SUPPORTED_ATS
     assert not [k for k, h in ATS_HOSTS.items() if h not in hosts]
     assert not {"other", "icims_site"} & seo_pages.SUPPORTED_ATS
+
+
+# ---- the page's own data as a chart (2026-10-05, the SEO audit's g_multimodal)
+
+def test_listing_pages_carry_a_chart_of_their_own_numbers(tmp_path):
+    rows = {"MA": [_row(i) for i in range(8)], "CA": [_row(100 + i) for i in range(5)]}
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, rows))}
+    field = pages["/internships/mechanical-engineering/"]
+    # An <img> with alt text that states the same numbers the bars show.
+    m = re.search(r'<figure class="chart"><img src="data:image/svg\+xml[^"]*" alt="([^"]+)"', field)
+    assert m, "no chart on the field page"
+    assert m.group(1).startswith("Bar chart of the 13 open roles on this page by state: ")
+    assert "Massachusetts 8" in m.group(1) and "California 5" in m.group(1)
+    assert "Where these 13 roles are" in field
+    # A state page has one place, so it compares employers instead.
+    assert "by employer" in pages["/internships/massachusetts/"] or 'class="chart"' not in pages["/internships/massachusetts/"]
+
+
+def test_no_chart_when_there_is_nothing_to_compare():
+    one_place = [{**_row(i), "keys": {"MA"}} for i in range(5)]
+    assert seo_pages.chart_figure(one_place) == ""                       # one state: no bars to compare
+    two = one_place + [{**_row(9), "keys": {"CA"}}]
+    fig = seo_pages.chart_figure(two)
+    assert 'alt="Bar chart of the 6 open roles on this page by state: Massachusetts 5, California 1."' in fig
+    # Eight employers in one state: six bars, and the other two said in the alt and caption.
+    many = [{**_row(i, company_name=f"Co {i}"), "keys": {"MA"}} for i in range(8)]
+    dim, pairs = seo_pages.chart_counts(many, "MA")
+    assert dim == "employer" and len(pairs) == 8
+    fig = seo_pages.chart_figure(many, "MA")
+    assert fig.count("%3Crect") == 6 and "; 2 more at 2 other employers." in fig and "Not shown: 2 more at 2 other employers." in fig

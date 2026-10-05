@@ -666,6 +666,8 @@ section.prose h2{font:600 22px/1.3 "Source Serif 4",Georgia,serif;margin:34px 0 
 table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:14px}table.data th,table.data td{padding-right:10px}}
 .aa-card{margin:18px 0 0;padding:14px 18px 6px;background:var(--panel);border:1px solid var(--rule);border-radius:8px}
 .aa-card p{margin:0;color:var(--ink2)}.aa-card .cta{margin:10px 0 8px}
+figure.chart{margin:8px 0 18px}figure.chart img{display:block;max-width:100%;height:auto}
+figure.chart figcaption{color:var(--ink3);font-size:14px;margin-top:4px}
 .ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}.ext-touch{display:inline-block}}
 .aa{grid-column:2;align-self:start;font-size:13px;color:var(--ink3);white-space:nowrap}
 .job:has(.aa) .go{grid-row:1/span 2;align-self:end}
@@ -824,6 +826,66 @@ def fits_line(majors: list[str]) -> str:
             f"{'majors' if len(majors) > 1 else 'majors too'}.</p>") if majors else ""
 
 
+# ---- the page's own data as a chart (2026-10-05)
+# The SEO audit (g_multimodal) found 115 of 297 pages with no image at all. Each listing page now carries
+# one small bar chart drawn from its own open roles, with alt text that states the same numbers, so a
+# reader (or a crawler, or a screen reader) gets them either way. It is an <img> of an SVG data URI:
+# no extra files, nothing fetched, and the SVG's own media query follows the reader's dark mode.
+CHART_BARS = 6
+
+
+def chart_counts(items: list[dict], state: str | None) -> tuple[str, list[tuple[str, int]]]:
+    """(what the bars are, [(label, roles)]) for a page's chart: by state where the page spans states
+    (field, employer and hub pages), by employer where it is one place (state and field-in-state pages).
+    A role filed in two states counts in each, as on the state pages themselves."""
+    c: Counter = Counter()
+    if state is None:
+        for x in items:
+            c.update("Remote" if k == "remote" else US_STATES[k] for k in x.get("keys") or () if k in PLACES or k == "remote")
+        dim = "state"
+    else:
+        c.update(x["company_name"] for x in items if x.get("company_name"))
+        dim = "employer"
+    pairs = sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))
+    return dim, pairs
+
+
+def chart_figure(items: list[dict], state: str | None = None) -> str:
+    """A bar chart of the page's open roles, or "" when there is nothing to compare (one group)."""
+    dim, pairs = chart_counts(items, state)
+    if len(pairs) < 2:
+        return ""
+    # The rest is said in words, not drawn: one "everything else" bar dwarfed the bars it summed.
+    rows, rest = pairs[:CHART_BARS], sum(n for _, n in pairs[CHART_BARS:])
+    others = len(pairs) - len(rows)
+    top = max(n for _, n in rows)
+    # Narrow, with large type: on a phone the image scales to ~335px wide and the labels must stay readable.
+    w, label_w, bar_w, row_h = 520, 190, 270, 30
+    h = row_h * len(rows) + 8
+    bars = "".join(
+        f'<text x="{label_w - 10}" y="{i * row_h + 22}" text-anchor="end" class="l">{esc(lbl[:22])}</text>'
+        f'<rect x="{label_w}" y="{i * row_h + 6}" width="{max(2, round(bar_w * n / top))}" height="20" rx="3" class="b"/>'
+        f'<text x="{label_w + max(2, round(bar_w * n / top)) + 8}" y="{i * row_h + 22}" class="n">{n:,}</text>'
+        for i, (lbl, n) in enumerate(rows))
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
+           '<style>.l,.n{font:17px system-ui,-apple-system,"Segoe UI",sans-serif;fill:#454a52}.n{fill:#17191c}'
+           '.b{fill:#1d5c46}@media (prefers-color-scheme:dark){.l{fill:#b8b6af}.n{fill:#ecebe6}.b{fill:#7cc3a1}}</style>'
+           + bars + "</svg>")
+    total = len(items)
+    what = "by state" if dim == "state" else "by employer"
+    more = (f"; {rest:,} more in {plural(others, 'other state')}" if dim == "state"
+            else f"; {rest:,} more at {plural(others, 'other employer')}") if others else ""
+    alt = (f"Bar chart of the {total:,} open roles on this page {what}: "
+           + ", ".join(f"{lbl} {n:,}" for lbl, n in rows) + more + ".")
+    caption = ((f"Where these {total:,} roles are" if dim == "state" else f"Who is hiring these {total:,} roles")
+               + ", counted from the open listings" + (" (a role in two states counts in each)" if dim == "state" else "")
+               + (f". Not shown: {more[2:]}." if more else "."))
+    # '#' must be encoded: unescaped it starts a fragment and cuts the image off at the first colour.
+    src = "data:image/svg+xml;charset=utf-8," + quote(svg, safe=" =:/;,.-()'")
+    return (f'<figure class="chart"><img src="{esc(src)}" alt="{esc(alt)}" width="{w}" height="{h}" loading="lazy"/>'
+            f"<figcaption>{esc(caption)}</figcaption></figure>")
+
+
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
                  here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "",
@@ -839,6 +901,8 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
             + f"<ul class=\"jobs\">{listing_rows(items, now, state, here, src)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
+            # The page's own numbers as a chart, under the list it summarises (2026-10-05, g_multimodal).
+            + chart_figure(items, state)
             + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
               "<a href=\"feed.xml\">RSS feed</a></p>"
             # The extension has been in the Chrome Web Store since 2026-09-22. This links the install
