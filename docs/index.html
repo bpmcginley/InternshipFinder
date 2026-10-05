@@ -116,7 +116,19 @@
   /* was: align-items:flex-end, with every control in .top-r. The header now holds the everyday
      actions only; account details are in the Account menu (.acct below). */
   header.top{position:relative;display:flex;align-items:center;gap:var(--s4) var(--s5);flex-wrap:wrap;padding:var(--s5) 0 var(--s4);border-bottom:1px solid var(--ink)}
-  .mark{font:600 30px/1 var(--serif);letter-spacing:-.6px;margin:0}
+  /* was: .mark{font:600 30px/1 ...} as the page's h1. Since 2026-10-05 the brand is a link on one line
+     with the site nav, and the h1 is the headline in .hero below, which takes the header's full width. */
+  .mark{font:600 26px/1 var(--serif);letter-spacing:-.6px;margin:0;color:inherit;text-decoration:none}
+  .brand{display:flex;align-items:baseline;gap:var(--s2) var(--s5);flex-wrap:wrap}
+  .sitenav{display:flex;gap:4px 14px;flex-wrap:wrap}
+  .sitenav a{color:var(--ink2);font-size:14px;text-decoration:none;transition:color var(--t-fast) ease-out}
+  .sitenav a:hover{color:var(--ink)}
+  .hero{flex-basis:100%;max-width:72ch}
+  .hero h1{font:600 26px/1.2 var(--serif);letter-spacing:-.4px;margin:0;text-wrap:balance}
+  .hero .sub{margin:6px 0 0;font-size:15px}
+  .hero-actions{display:flex;gap:var(--s2);flex-wrap:wrap;margin-top:12px}
+  .signin-open{display:inline-flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
+  .signin-note{color:var(--ink3);font-size:12.5px;max-width:34ch;line-height:1.35}
   .sub{color:var(--ink2);margin-top:8px;font-size:14px}
   .sub a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
   .sub a:hover{text-decoration-color:var(--ink)}
@@ -147,7 +159,9 @@
   .acct-item:hover:not(:disabled),.acct-item:focus-visible{background:var(--sunk)}
   .acct-item:disabled{color:var(--ink3);cursor:default}
   @media (max-width:640px){
-    .top-r{margin-left:0;width:100%;justify-content:flex-start}
+    /* order:1 (2026-10-05): on a phone the controls wrapped between the nav and the headline, so the
+       first thing under "InternScout" was a Set up profile button. The hero comes first now. */
+    .top-r{margin-left:0;width:100%;justify-content:flex-start;order:1}
     /* On a phone the panel spans the header instead of hanging off the button. */
     .acct{position:static}
     .acct-panel{left:0;right:0;width:auto}
@@ -233,6 +247,12 @@
   .notice b{color:var(--ink)}
   .notice a{color:var(--accent);font-weight:500}
   .notice.quietnote{border-color:var(--rule);font-size:13px}
+  /* What students say (2026-10-05): shown only when CONFIG.testimonials has real quotes. */
+  .said{margin:var(--s4) 0 0;padding:var(--s4) var(--s4) var(--s2);background:var(--panel);border:1px solid var(--rule);border-radius:6px}
+  .said h2{font:600 16px/1.3 var(--serif);margin:0 0 8px}
+  .said ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--s3) var(--s5)}
+  .said blockquote{margin:0;color:var(--ink);font-size:14.5px}
+  .said .who{color:var(--ink3);font-size:13px;margin:4px 0 8px}
   /* The invite panel: the student's link, selectable, beside a Share or Copy button. */
   .invite-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
   .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
@@ -425,13 +445,15 @@
   }
 </style>
 <!-- Who runs this site, for search and answer engines (added 2026-10-02). Data only: the browser
-     never runs a JSON-LD block, so it cannot touch the app below. The same two objects as
-     backend/internscout/seo_pages.py ORGANIZATION and WEBSITE, which the /internships/ hub and
-     /about/ carry; backend/tests/test_seo_pages.py checks the two agree. -->
+     never runs a JSON-LD block, so it cannot touch the app below. The same objects as
+     backend/internscout/seo_pages.py ORGANIZATION, WEBSITE and (since 2026-10-05, so the prices are
+     machine-readable: the audit found none) PRODUCT with its three offers, which the /internships/ hub,
+     /about/ and /pricing/ carry; backend/tests/test_seo_pages.py checks they agree. -->
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
 {"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/","logo":"https://internscout.org/icon512.png","slogan":"Built by one student, made for all students.","description":"A free internship search for college students of every major in the US and Canada.","sameAs":["https://mastodon.social/@internscout"]},
-{"@type":"WebSite","@id":"https://internscout.org/#website","name":"InternScout","url":"https://internscout.org/","inLanguage":"en-US","publisher":{"@id":"https://internscout.org/#organization"}}
+{"@type":"WebSite","@id":"https://internscout.org/#website","name":"InternScout","url":"https://internscout.org/","inLanguage":"en-US","publisher":{"@id":"https://internscout.org/#organization"}},
+{"@type":"Product","@id":"https://internscout.org/#product","name":"InternScout Auto-Apply","description":"A free internship search for college students of every major, with a Chrome extension that fills in applications from your resume and never submits them. Search needs no account; the extension has a free monthly allowance, and two paid plans raise it.","brand":{"@id":"https://internscout.org/#organization"},"url":"https://internscout.org/pricing/","image":"https://internscout.org/icon512.png","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD","url":"https://internscout.org/pricing/#free","availability":"https://schema.org/InStock","description":"25 Auto-Apply runs and 10 tailored resumes a month with a school .edu email (12 and 5 otherwise)"},{"@type":"Offer","name":"Supporter","price":"4","priceCurrency":"USD","url":"https://internscout.org/pricing/#supporter","availability":"https://schema.org/InStock","description":"50 Auto-Apply runs and 20 tailored resumes a month with a school .edu email (25 and 10 otherwise)","priceSpecification":{"@type":"UnitPriceSpecification","price":"4","priceCurrency":"USD","billingIncrement":1,"unitCode":"MON"}},{"@type":"Offer","name":"Pro","price":"8","priceCurrency":"USD","url":"https://internscout.org/pricing/#pro","availability":"https://schema.org/InStock","description":"100 Auto-Apply runs and 40 tailored resumes a month with a school .edu email (50 and 20 otherwise)","priceSpecification":{"@type":"UnitPriceSpecification","price":"8","priceCurrency":"USD","billingIncrement":1,"unitCode":"MON"}}]}
 ]}
 </script>
 <script>
@@ -480,6 +502,15 @@
     // newsletter's footer setting in Buttondown: CAN-SPAM wants a postal address in every email,
     // and Buttondown does not add one itself.
     digest: { provider: "Buttondown", formAction: "" },
+    // Social proof (2026-10-05 audit). Both stay empty until there is something real: js/app.js renders
+    // nothing for an empty list or a null rating, so nothing invented can ship from here.
+    // testimonials: words a student actually wrote, with their permission, first name only, e.g.
+    //   { quote: "I filled out 30 Workday forms in a night", name: "Priya", who: "Nursing, class of 2028" }
+    testimonials: [],
+    // storeRating: the Chrome Web Store listing's own rating and count, copied with the date it was read,
+    // e.g. { value: "4.8", count: 12, asOf: "November 1, 2026" }. Until then the dashboard says when the
+    // store accepted the extension (September 22, 2026).
+    storeRating: null,
   };
 </script>
 <script crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>

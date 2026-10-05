@@ -331,7 +331,8 @@
       const t = setTimeout(() => { sent.current = text; onChange(text); }, 200);
       return () => clearTimeout(t);
     }, [text]);
-    return h("input", { type: "text", "aria-label": "Search", placeholder: 'Search: nursing boston -unpaid "research assistant"', value: text,
+    // id: the hero's "Search free" button focuses this box (2026-10-05).
+    return h("input", { id: "q", type: "text", "aria-label": "Search", placeholder: 'Search: nursing boston -unpaid "research assistant"', value: text,
       onChange: e => setText(e.target.value), onKeyDown: e => { if (e.key === "Enter") { sent.current = text; onChange(text); } } });
   }
 
@@ -345,9 +346,12 @@
   // `installed` hides the Add Auto-Apply button once the extension is there.
   function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans, installed }) {
     if (!open) return null;
-    return h("section", { className: "landing", "aria-label": "About InternScout" },
+    // was: "aria-label": "About InternScout" and h2 "Internships, co-ops and research for your major,
+    // anywhere in the US and Canada": the header's h1 says that now (2026-10-05), so this strip is
+    // what it does and how, under its own name.
+    return h("section", { className: "landing", "aria-label": "How InternScout works" },
       h("div", { className: "landing-main" },
-        h("h2", null, "Internships, co-ops and research for your major, anywhere in the US and Canada"),
+        h("h2", null, "What InternScout does"),
         h("p", null, "InternScout gathers student opportunities from employer career sites and public job boards",
           nationwide ? ` (${nationwide.toLocaleString()} open right now)` : "", " and ranks them for your major, class year and the states you pick."),
         // was: h("p", { className: "fine" }, "Free, made by a UMass student, not affiliated with UMass Amherst.")),
@@ -373,7 +377,10 @@
         // honest use reaching it. And nothing enforces "one-time": onboarding.js clears the run id when
         // a Dive finishes ("the next Deep Dive is a new run") and this same file offers an onboarded
         // student the button again, so it is a habit, not a limit.
-          ". The Deep Dive has no monthly run allowance of its own, though a per-account AI budget still applies, and it runs on the same free account. Made by a UMass student, not affiliated with UMass Amherst.")),
+          ". The Deep Dive has no monthly run allowance of its own, though a per-account AI budget still applies, and it runs on the same free account. Made by a UMass student, not affiliated with UMass Amherst."),
+        // Who it is not for, in so many words (2026-10-05 audit): the scope was only implied.
+        h("p", { className: "fine" }, "Not for experienced job seekers: if you want full-time or senior roles, Simplify and Jobright cover every level. ",
+          h("a", { href: "compare/" }, "See how they compare"), ".")),
       // The "Start in 3 steps" list that used to sit here repeated the setup card's own three
       // steps one screen higher. One copy, on the card, is enough.
       h("div", null, h("h3", null, "How it works"),
@@ -788,6 +795,8 @@
     // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
     // gives, then presses checkout here themselves.
     const [upgradeAsk, setUpgradeAsk] = useState(() => new URLSearchParams(location.search).get("upgrade") || "");
+    // The header's sign-in is one quiet button until pressed (2026-10-05); this is whether it has been.
+    const [signInOpen, setSignInOpen] = useState(false);
     // The plans announcement (2026-10-04): hidden once dismissed for this announcement.
     const [plansSeen, setPlansSeen] = useState(() => { try { return localStorage.getItem(IS.PLANS_BANNER_KEY) === IS.PLANS_BANNER_ID; } catch (e) { return false; } });
     const hidePlans = () => { try { localStorage.setItem(IS.PLANS_BANNER_KEY, IS.PLANS_BANNER_ID); } catch (e) { } setPlansSeen(true); };
@@ -1141,8 +1150,15 @@
     const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
     const offerRuns = offerPl && me && me.upgrade_offer && me.upgrade_offer.plan === offerPl.plan && me.upgrade_offer.allowance
       ? me.upgrade_offer.allowance.autofill : null;
-    const offerBtn = (label) => offerPl && h("button", { type: "button", className: "btn primary", disabled: !!busy, title: upgradeTitle(offerPl),
-      onClick: () => billing("checkout", offerPl.plan) }, label || `Get ${offerPl.label}${offerPl.price ? ` · ${offerPl.price}` : ""}`);
+    // was: const offerBtn = (label) => offerPl && h("button", { ... offerPl ... });
+    // `pl` lets the ?upgrade= notice offer the plan /pricing/ named rather than always the next one up.
+    const offerBtn = (label, pl = offerPl) => pl && h("button", { type: "button", className: "btn primary", disabled: !!busy, title: upgradeTitle(pl),
+      onClick: () => billing("checkout", pl.plan) }, label || `Get ${pl.label}${pl.price ? ` · ${pl.price}` : ""}`);
+    // /pricing/ links here as /?upgrade=supporter or /?upgrade=pro (2026-10-05). The named plan, when it
+    // is one this student can move up to; otherwise the next one up, as before.
+    const askedPl = upgrades.find(pl => pl.plan === upgradeAsk) || offerPl;
+    const askedRuns = askedPl && me && me.upgrade_offer && me.upgrade_offer.plan === askedPl.plan && me.upgrade_offer.allowance
+      ? me.upgrade_offer.allowance.autofill : null;
     const offerWords = offerPl && (offerRuns ? `${offerPl.label} gives you ${offerRuns} a month. ` : `${offerPl.label} gives you ${offerPl.multiplier}× the allowance. `);
     // me.month is the Worker's UTC month ("2026-09"); the allowance resets on the 1st of the next one.
     const monthMatch = /^(\d{4})-(\d{2})$/.exec((me && me.month) || "");
@@ -1155,21 +1171,46 @@
     // .edu domain, from Google or Microsoft alike, and GENERAL_ALLOWANCE_PCT is "50", so .edu is
     // exactly double and everyone else still gets an allowance. Say both plainly.
     const signInTitle = "Optional and free. Search and this dashboard work without it. Any Google or Microsoft account works, from any school or none; a verified .edu address doubles your free monthly AI allowance. Signing in also lets your chosen states count toward where we scan in more detail.";
-    const signInBtn = auth.cfg && !auth.token && auth.cfg.providers.map(pr =>
+    // was: const signInBtn = auth.cfg && !auth.token && auth.cfg.providers.map(pr => h("button", { ... className: "btn" ... }));
+    // The two provider buttons, which the footer still shows side by side.
+    const signInProviders = auth.cfg && !auth.token && auth.cfg.providers.map(pr =>
       // was: h("button", { ... }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
       // The " (UMass email)" suffix was wrong twice over: no account has to be UMass, and nothing has
       // to be .edu at all. A .edu only doubles the allowance, which the tooltip now says.
       h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
+    // In the header, one quiet button until it is pressed (2026-10-05 audit): two full-weight sign-in
+    // buttons were the most prominent thing on a page whose point is that search needs no account, and
+    // "optional" lived in a tooltip. The note says it in visible words once the choice opens.
+    const signInBtn = signInProviders && (signInOpen
+      ? h("span", { className: "signin-open" }, signInProviders,
+        h("span", { className: "signin-note" }, "Optional and free. Adds a monthly AI allowance for Auto-Apply; a school .edu email gets about twice as much."))
+      : h("button", { type: "button", className: "btn quiet", title: signInTitle, onClick: () => setSignInOpen(true) }, "Sign in · optional"));
 
-    const aboutBtn = !landingOpen && h("button", { type: "button", onClick: () => setLandingOpen(true) }, "About InternScout");
+    // was: const aboutBtn = !landingOpen && h("button", { ... }, "About InternScout");
+    // "About" in the nav is the /about/ page now; the in-page strip is what it says, how it works.
+    const howBtn = !landingOpen && h("button", { type: "button", onClick: () => setLandingOpen(true) }, "How it works");
+    // The hero's one action (2026-10-05): straight to the search box. A first visit has the setup card
+    // open above the list; closing it is what Skip does, and the list is what was asked for.
+    const goSearch = () => {
+      if (setupOpen) closeSetup();
+      setTimeout(() => { const q = document.getElementById("q"); if (q) { q.focus(); q.scrollIntoView({ block: "center" }); } }, 0);
+    };
+    const openCount = nationwide ? nationwide.toLocaleString() : null;
     return h("div", { className: "wrap" },
       h("header", { className: "top" },
-        h("div", null,
-          h("h1", { className: "mark" }, "InternScout"),
-          // was: ... : "Internships, co-ops and research for UMass students, anywhere in the US and Canada.",
-          // The listings, majors and states were never UMass-only, and the line read as a gate to everyone else.
-          h("div", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}` : "Internships, co-ops and research for students in every major, anywhere in the US and Canada.",
-            aboutBtn && " · ", aboutBtn)),
+        // was: one block of h1.mark "InternScout" and .sub, with the h1 the brand name only. The audit
+        // (2026-10-05) found no audience, category or promise in the heading, the pain students name
+        // (ten job boards, stale postings) nowhere in the hero, and no way to About or Compare from this
+        // page but the footer. Now: the brand and a site nav on one line, the controls on the right, and
+        // under them the page's h1 with the pain line and the free search as the first action.
+        h("div", { className: "brand" },
+          h("a", { className: "mark", href: "/" }, "InternScout"),
+          h("nav", { className: "sitenav", "aria-label": "Site" },
+            h("a", { href: "internships/" }, "Browse"),
+            h("a", { href: "install.html?from=dashboard-nav" }, "Auto-Apply (free)"),
+            h("a", { href: "pricing/" }, "Pricing"),
+            h("a", { href: "compare/" }, "Compare"),
+            h("a", { href: "about/" }, "About"))),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
         // header keeps the everyday actions and the account details live in the Account menu.
@@ -1210,7 +1251,16 @@
                   setBusy(off ? "This browser's visits count again" : "This browser's visits won't be counted"); setTimeout(() => setBusy(""), 4000); } },
               ghToken && { key: "forget", label: "Forget token", onClick: () => { localStorage.removeItem("internscout.gh_token"); setGhToken(""); setBusy("Token cleared"); } },
             ].filter(Boolean) : null,
-          }))),
+          })),
+        h("div", { className: "hero" },
+          h("h1", null, "Every student internship, co-op and research role, in one free search."),
+          // was: ... : "Internships, co-ops and research for students in every major, anywhere in the US and Canada.",
+          // The listings, majors and states were never UMass-only, and the line read as a gate to everyone else.
+          h("p", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}`
+            : `Stop checking ten job boards every morning: ${openCount ? openCount + " open roles" : "every open role"}, updated several times a day, no account needed. Every major, anywhere in the US and Canada.`,
+            howBtn && " · ", howBtn),
+          !p && h("div", { className: "hero-actions" },
+            h("button", { type: "button", className: "btn primary", onClick: goSearch }, `Search ${openCount ? openCount + " " : ""}internships free · no account`)))),
 
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
@@ -1248,9 +1298,17 @@
       // 2026-10-04: no longer waits for a saved profile (`&& p`), so a first visit hears about Auto-Apply
       // before it is asked to fill anything in, and it sits above the plans banner so what the extension
       // does comes before what it costs. was: it came after the plans banner and the stale-extension note.
-      info.checked && !info.installed && !info.stale && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
+      info.checked && !info.installed && !info.stale && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome"),
+        // A dated third-party fact beside the store link (2026-10-05 audit): the listing's own rating and
+        // count once it has them (CONFIG.storeRating, copied from the store with its date), until then
+        // when the store accepted it. Nothing here is made up: the date is the store's approval.
+        C.storeRating
+          ? `. Rated ${C.storeRating.value} from ${C.storeRating.count} ratings on the Chrome Web Store, as of ${C.storeRating.asOf}.`
+          : ". In the Chrome Web Store since September 22, 2026."),
       // Plans announcement (2026-10-04): every number comes from the Worker's /config (IS.plansBanner).
       // Signed-in free students get a checkout button for the first plan; everyone else the comparison.
+      // Since 2026-10-05 it also says the one thing the terms say about money that a buyer should hear
+      // first (no refunds by default), and links the pricing page, which is the price's home now.
       (() => {
         const pb = !plansSeen && IS.plansBanner(auth.cfg, me);
         if (!pb) return null;
@@ -1258,12 +1316,23 @@
         return h("div", { className: "notice plans", role: "note" },
           h("b", null, `New: Auto-Apply plans now start at ${pb.from}. `),
           `It's free with any email (${pb.free} applications filled a month, or ${pb.edu} with a school .edu email), and `,
-          pb.plans.map((pl, i) => `${pl.label} gives you ${pl.runs} for ${pl.price}`).join(", or "), ". It never submits for you. ",
+          pb.plans.map((pl, i) => `${pl.label} gives you ${pl.runs} for ${pl.price}`).join(", or "),
+          // was: ". It never submits for you. "
+          ". It never submits for you. No refunds by default: the AI cost is spent when a run happens, so start free and pay only if you hit the cap. ",
           auth.token && me && me.can_upgrade
             ? h("button", { type: "button", className: "btn primary", disabled: !!busy, onClick: () => billing("checkout", first.plan) }, `Get ${first.label} · ${first.price}`)
-            : h("a", { href: "/compare/" }, "See how it compares"),
+            : h("a", { href: "pricing/" }, "Plans and prices"),
+          " ", h("a", { href: "compare/" }, "How it compares"),
           " ", h("a", { href: "#", onClick: prevent(hidePlans), "aria-label": "Hide this announcement" }, "Hide"));
       })(),
+      // What students say (2026-10-05 audit): only words a student actually wrote, with permission, from
+      // CONFIG.testimonials in index.html. The list is empty until there are some, and then this renders
+      // nothing, so no invented quote can ever appear here.
+      C.testimonials && C.testimonials.length > 0 && h("section", { className: "said", "aria-labelledby": "said-title" },
+        h("h2", { id: "said-title" }, "What students say"),
+        h("ul", null, C.testimonials.map((t, i) => h("li", { key: i },
+          h("blockquote", null, `“${t.quote}”`),
+          h("div", { className: "who" }, t.name, t.who ? `, ${t.who}` : ""))))),
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
@@ -1295,9 +1364,10 @@
       !outOfRuns && upgradeAsk && h("div", { className: "notice" },
         !auth.token ? "Sign in (top right) to pick a plan. A plan raises how many Auto-Apply runs you get each month. "
           : !me ? "Loading your plan… "
-          : offerPl ? h(F, null, h("b", null, `${offerPl.label}${offerPl.price ? ` · ${offerPl.price}` : ""}. `),
-            offerRuns ? `${offerRuns} Auto-Apply runs a month. Cancel any time. ` : `${offerPl.multiplier}× the monthly AI allowance. Cancel any time. `,
-            offerBtn("Continue to checkout"), " ")
+          // was: offerPl ? ... offerRuns ... offerBtn("Continue to checkout") (always the next plan up)
+          : askedPl ? h(F, null, h("b", null, `${askedPl.label}${askedPl.price ? ` · ${askedPl.price}` : ""}. `),
+            askedRuns ? `${askedRuns} Auto-Apply runs a month. Cancel any time. ` : `${askedPl.multiplier}× the monthly AI allowance. Cancel any time. `,
+            offerBtn("Continue to checkout", askedPl), " ")
           : `You're on the ${IS.PLAN_LABELS[me.plan] || me.plan} plan${me.plan === "free" ? "" : " already"}. `,
         h("a", { href: "#", onClick: prevent(() => setUpgradeAsk("")) }, "Not now")),
       auth.token && invite && h("div", { className: "notice invite" },
@@ -1382,7 +1452,8 @@
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
           C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs"),
-          signInBtn)));
+          // was: signInBtn (the same two buttons the header showed; the header's is one quiet button now)
+          signInProviders)));
   }
 
   ReactDOM.createRoot(document.getElementById("root")).render(h(App));
