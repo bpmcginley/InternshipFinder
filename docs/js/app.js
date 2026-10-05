@@ -1257,7 +1257,9 @@
           // was: ... : "Internships, co-ops and research for students in every major, anywhere in the US and Canada.",
           // The listings, majors and states were never UMass-only, and the line read as a gate to everyone else.
           h("p", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}`
-            : `Stop checking ten job boards every morning: ${openCount ? openCount + " open roles" : "every open role"}, updated several times a day, no account needed. Every major, anywhere in the US and Canada.`,
+            // was: `Stop checking ten job boards every morning: ${...}, updated several times a day, no account needed. ...`
+            // Two sentences since 2026-10-05, like the static copy in index.html (the audit's sentence length).
+            : `Stop checking ten job boards every morning. ${openCount ? openCount + " open roles are" : "Every open role is"} here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada.`,
             howBtn && " · ", howBtn),
           !p && h("div", { className: "hero-actions" },
             h("button", { type: "button", className: "btn primary", onClick: goSearch }, `Search ${openCount ? openCount + " " : ""}internships free · no account`)))),

@@ -451,7 +451,7 @@
      /about/ and /pricing/ carry; backend/tests/test_seo_pages.py checks they agree. -->
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
-{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/","logo":"https://internscout.org/icon512.png","slogan":"Built by one student, made for all students.","description":"A free internship search for college students of every major in the US and Canada.","sameAs":["https://mastodon.social/@internscout"]},
+{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/","logo":"https://internscout.org/icon512.png","slogan":"Built by one student, made for all students.","description":"A free internship search for college students of every major in the US and Canada.","sameAs":["https://mastodon.social/@internscout","https://www.instagram.com/internscout/","https://www.youtube.com/channel/UCnGXwtRhylBhkb8X6e_2uFg","https://www.facebook.com/profile.php?id=61595289743197","https://x.com/useinternscout","https://www.tiktok.com/@useinternscout","https://www.reddit.com/user/InternScout/"]},
 {"@type":"WebSite","@id":"https://internscout.org/#website","name":"InternScout","url":"https://internscout.org/","inLanguage":"en-US","publisher":{"@id":"https://internscout.org/#organization"}},
 {"@type":"Product","@id":"https://internscout.org/#product","name":"InternScout Auto-Apply","description":"A free internship search for college students of every major, with a Chrome extension that fills in applications from your resume and never submits them. Search needs no account; the extension has a free monthly allowance, and two paid plans raise it.","brand":{"@id":"https://internscout.org/#organization"},"url":"https://internscout.org/pricing/","image":"https://internscout.org/icon512.png","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD","url":"https://internscout.org/pricing/#free","availability":"https://schema.org/InStock","description":"25 Auto-Apply runs and 10 tailored resumes a month with a school .edu email (12 and 5 otherwise)"},{"@type":"Offer","name":"Supporter","price":"4","priceCurrency":"USD","url":"https://internscout.org/pricing/#supporter","availability":"https://schema.org/InStock","description":"50 Auto-Apply runs and 20 tailored resumes a month with a school .edu email (25 and 10 otherwise)","priceSpecification":{"@type":"UnitPriceSpecification","price":"4","priceCurrency":"USD","billingIncrement":1,"unitCode":"MON"}},{"@type":"Offer","name":"Pro","price":"8","priceCurrency":"USD","url":"https://internscout.org/pricing/#pro","availability":"https://schema.org/InStock","description":"100 Auto-Apply runs and 40 tailored resumes a month with a school .edu email (50 and 20 otherwise)","priceSpecification":{"@type":"UnitPriceSpecification","price":"8","priceCurrency":"USD","billingIncrement":1,"unitCode":"MON"}}]}
 ]}
@@ -522,12 +522,15 @@
 <!-- The hero in plain HTML (2026-10-05): the dashboard is drawn by js/app.js, so a fetcher that runs
      no script (most AI crawlers, and the audit's recheck) used to see an empty page: no h1, no nav, no
      way to search. This is the same header app.js renders, in the same classes, with a link in place
-     of the live count and the button; React replaces it the moment it mounts. -->
+     of the live count and the button; React replaces it the moment it mounts.
+     The sub line is four short sentences since 2026-10-05 (the audit measured it at over 25 words a
+     sentence); app.js says the same, with the live count.
+     was: <p class="sub">Stop checking ten job boards every morning: every open role, updated several times a day, no account needed. Every major, anywhere in the US and Canada. Sign in is optional.</p> -->
 <div id="root">
 <div class="wrap"><header class="top">
 <div class="brand"><a class="mark" href="/">InternScout</a><nav class="sitenav" aria-label="Site"><a href="internships/">Browse</a><a href="install.html?from=dashboard-nav">Auto-Apply (free)</a><a href="pricing/">Pricing</a><a href="compare/">Compare</a><a href="about/">About</a></nav></div>
 <div class="hero"><h1>Every student internship, co-op and research role, in one free search.</h1>
-<p class="sub">Stop checking ten job boards every morning: every open role, updated several times a day, no account needed. Every major, anywhere in the US and Canada. Sign in is optional.</p>
+<p class="sub">Stop checking ten job boards every morning. Every open role is here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada. Sign in is optional.</p>
 <div class="hero-actions"><a class="btn primary" href="internships/">Search internships free · no account</a></div></div>
 </header></div>
 </div>

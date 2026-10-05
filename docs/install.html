@@ -36,6 +36,14 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icon48.png"/>
 <link rel="icon" type="image/png" sizes="128x128" href="icon128.png"/>
 <link rel="apple-touch-icon" href="icon128.png"/>
+<!-- The install steps as a HowTo, dated (2026-10-05; the audit asked for a published and an updated
+     date on the page and in structured data). datePublished is the day this page was first committed
+     (git log), dateModified the last day its words changed: bump it when they do. The publisher is
+     the brand, by its @id from backend/internscout/seo_pages.py ORGANIZATION; no author, as on the
+     rest of the site. The steps are the three under the heading, in the same words. -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"HowTo","@id":"https://internscout.org/install.html#howto","name":"Install the InternScout Auto-Apply extension","description":"Add the free InternScout Auto-Apply extension from the Chrome Web Store in desktop Chrome, Edge or Brave, pin it to the toolbar and sign in with Google or Microsoft. About a minute.","url":"https://internscout.org/install.html","inLanguage":"en-US","datePublished":"2026-09-15","dateModified":"2026-10-05","totalTime":"PT1M","publisher":{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/"},"isPartOf":{"@id":"https://internscout.org/#website"},"step":[{"@type":"HowToStep","position":1,"name":"Add it from the Chrome Web Store","text":"Open the listing, click Add to Chrome, then Add extension. In Edge, click Allow extensions from other stores first. The Deep Dive setup opens in a new tab.","url":"https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"},{"@type":"HowToStep","position":2,"name":"Pin it to your toolbar","text":"Click the puzzle-piece icon next to the address bar, then the pin next to InternScout Auto-Apply."},{"@type":"HowToStep","position":3,"name":"Sign in with Google or Microsoft","text":"Click the InternScout icon and choose Sign in with Google or Sign in with Microsoft. Sign-in is only needed for AI features like Auto-Apply and tailored resumes."}]}
+</script>
 <style>
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
@@ -142,8 +150,16 @@
 
   <main>
     <h1>Install the extension</h1>
+    <!-- The answer first (2026-10-05): the opening paragraph says how to install it, whole, in under
+         60 words, before the dates, the phone banner and the steps. It sits above the phone banner
+         because it is the answer the page exists for; the banner still comes before the steps it is
+         about. was: the first paragraph was the "About a minute" meta line, and the lede below it
+         said only that the extension is in the store. -->
+    <p class="lede">To install the InternScout Auto-Apply extension, open its Chrome Web Store listing in desktop Chrome, Edge or Brave, click <strong>Add to Chrome</strong>, then <strong>Add extension</strong>. Pin it next to the address bar and sign in with Google or Microsoft. It takes about a minute, updates itself, and is free. Searching on the dashboard needs none of this.</p>
     <!-- was: <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop</p> -->
-    <p class="meta">About a minute · Chrome, Edge or Brave on a laptop or desktop</p>
+    <!-- The dates match the HowTo block in the head: published is the day the page was first
+         committed, updated the last day its words changed. was: no dates on the page. -->
+    <p class="meta">About a minute · Chrome, Edge or Brave on a laptop or desktop · Published <time datetime="2026-09-15">September 15, 2026</time> · Updated <time datetime="2026-10-05">October 5, 2026</time></p>
 
     <!-- Phone-only banner. Hidden on desktop by CSS, not by script, so it is right even before the
          page's JavaScript runs. See the .phonebar rules for why the media query is written as it is. -->
@@ -170,7 +186,8 @@
     <!-- was: <p class="lede">The InternScout Auto-Apply extension isn't in the Chrome Web Store yet. Until it is, you install it by hand. These steps show you how.</p>
          The store approved it on 2026-09-22, so the by-hand steps moved down to "Install by hand instead"
          for the few people who still need them, and the store button is step 1. -->
-    <p class="lede">InternScout Auto-Apply is in the Chrome Web Store. Add it in a click, and it keeps itself up to date.</p>
+    <!-- was: <p class="lede">InternScout Auto-Apply is in the Chrome Web Store. Add it in a click, and it keeps itself up to date.</p>
+         Folded into the opening paragraph above (2026-10-05). -->
     <p>You don't need the extension to search. The <a href="index.html">dashboard</a> works on its own. The extension adds your Deep Dive profile and Auto-Apply, which fills out applications and stops at the submit button.</p>
 
     <ol class="steps">

@@ -1,5 +1,6 @@
 """The crawlable landing pages: made only where there is enough to show, safe against whatever a job
 board puts in a title, and pointing only at real web links."""
+import html as html_mod
 import json
 import os
 import re
@@ -219,7 +220,8 @@ def test_page_text_keeps_acronyms_and_skips_yearless_terms(tmp_path):
     rows = [_row(i, tags=("ml",), term="Summer 2027" if i < 4 else "Summer") for i in range(7)]
     site = _site(tmp_path, {"MA": rows})
     html = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/machine-learning-ai/")
-    assert "open student roles in machine learning and AI," in html
+    # was: "open student roles in machine learning and AI," (one sentence with the range; split 2026-10-05)
+    assert "open student roles in machine learning and AI. They range from internships to co-ops and research." in html
     assert "The most common start term is Summer 2027." in html
 
 
@@ -566,7 +568,8 @@ def test_highest_paying_ranks_clear_hourly_rates_and_leaves_yearly_pay_out(tmp_p
     pages = seo_pages.build(site)
     by_path = {p["path"]: p["html"] for p in pages}
     h = by_path["/internships/highest-paying/"]
-    assert "<title>Highest-Paying Internships – Up to $49 an Hour Listed | InternScout</title>" in h
+    # was: "... Up to $49 an Hour Listed | InternScout" (67 characters; fit_title drops "Listed", 2026-10-05)
+    assert "<title>Highest-Paying Internships – Up to $49 an Hour | InternScout</title>" in h
     assert "is $49 an hour, at" in h
     # Yearly salaries, salaries in thousands and Canadian dollars are never ranked, nor shown as an hourly figure.
     for absent in ("Salary Co", "Thousands Co", "Maple Co", "$150", "$120", "$95"):
@@ -580,7 +583,8 @@ def test_highest_paying_ranks_clear_hourly_rates_and_leaves_yearly_pay_out(tmp_p
     # Employers link to their own pages, and the hub links this one.
     assert '<a href="/internships/at/pay-co-5/">Pay Co 5</a>' in h
     assert 'href="/internships/highest-paying/"' in by_path["/internships/"]
-    assert [b["@type"] for b in _ld_blocks(h)] == ["BreadcrumbList"]
+    # was: == ["BreadcrumbList"]; every page carries the Organization since 2026-10-05.
+    assert [b["@type"] for b in _ld_blocks(h)] == ["BreadcrumbList", "Organization"]
     seo_pages.write(site, pages)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert "<loc>https://internscout.org/internships/highest-paying/</loc>" in sitemap
@@ -607,7 +611,9 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     assert faq["Is InternScout free?"].startswith("Yes.")
     assert "41 open internships, co-ops and research roles from 9 employers in 1 field" in faq["What is InternScout?"]
     assert {"Which majors is InternScout for?", "Where do the listings come from?", "How often is InternScout updated?",
-            "How is InternScout different from Simplify or Jobright?"} <= set(faq)
+            "How is InternScout different from Simplify or Jobright?", "How are InternScout's pages made?"} <= set(faq)
+    # The editorial disclosure (2026-10-05) says what AI does and does not do, and names nobody.
+    assert "no AI writes them" in faq["How are InternScout's pages made?"]
     # The pay answer's median and top leave out roles only in Canada, and it says so (review, 2026-10-02):
     # Maple Co's $95 is a rate, but in Canadian dollars, so the highest is $49.
     pay = faq["How much do internships on InternScout pay?"]
@@ -710,6 +716,138 @@ def test_pricing_page_states_every_tier_in_numbers_with_a_product_schema(tmp_pat
     assert all('<a href="/pricing/">Pricing</a>' in h for h in pages.values())
     assert 'href="/pricing/">Plans and prices</a>' in pages["/about/"]
     assert "I started it during my own internship search" in pages["/about/"]
+
+
+# ---- titles, descriptions and structured data (the SEO audit of 2026-10-05)
+
+def _head(html, tag):
+    return html_mod.unescape(re.search(tag, html, re.S).group(1))
+
+
+def test_fit_title_keeps_the_subject_and_drops_the_count_then_the_suffix():
+    fit = seo_pages.fit_title
+    assert fit("Sports Internships – 12 Open") == "Sports Internships – 12 Open | InternScout"
+    # The count goes before the suffix does, and nothing is cut mid-word.
+    long = "Machine Learning and AI Internships in Vermont"
+    assert fit(f"{long} – 120 Open", long) == f"{long} | InternScout"
+    # 51 characters on its own: the suffix goes too, and the subject stays whole.
+    longest = "Mechanical Engineering Internships in Massachusetts"
+    assert fit(f"{longest} – 120 Open", longest) == longest
+    longer = "Environmental Science and Engineering Internships in Pennsylvania"
+    assert fit(f"{longer} – 26 Open", longer, "Environmental Internships in Pennsylvania") == \
+        "Environmental Internships in Pennsylvania | InternScout"
+    # No form fits with the suffix: the first that fits without it, else a cut at a word.
+    assert fit("Internships for Operations and Information Management Majors – 1,861 Open",
+               "Internships for Operations and Information Management Majors") == \
+        "Internships for Operations and Information Management Majors"
+    cut = fit("Executive Office for U.S. Attorneys and the Office of the U.S. Attorneys Internships")
+    assert len(cut) <= seo_pages.TITLE_MAX and cut.endswith("the Office of the")
+    assert fit("", "Arts Internships") == "Arts Internships | InternScout"        # an empty form is skipped
+
+
+def test_fit_description_cuts_at_a_sentence_and_pads_a_short_one():
+    fit = seo_pages.fit_description
+    long = ("12 open Acxiom internships in Conway, AR and New York. Roles in operations, consulting and data "
+            "science and analytics. Updated October 5, 2026. Free, no sign-up.")
+    assert len(long) > seo_pages.DESC_MAX
+    out = fit(long)
+    assert out.endswith("Updated October 5, 2026.") and 110 <= len(out) <= 160
+    # "St." is not the end of a sentence; a first sentence that is itself too long ends at a word.
+    addr = ("8 open St. Luke's University Health Network internships in Easton, PA - 1872 St Lukes Blvd, "
+            "Phillipsburg, NJ - 185 Roseberry St and Allentown, PA - 1110 American Parkway. Roles in health.")
+    out = fit(addr)
+    assert out.startswith("8 open St. Luke's University Health Network internships in Easton") and out.endswith("…")
+    assert len(out) <= 160 and " " not in out[-2:]
+    short = "534 open research positions for undergraduates, updated October 5, 2026. Free search, no sign-up."
+    out = fit(short)
+    assert out == short + " Every role links to the employer's own posting." and 110 <= len(out) <= 160
+    # The pad never repeats what the text already says.
+    assert fit("Free, no sign-up. Every role links to the employer's own posting.").endswith("Updated several times a day.")
+    assert fit(long)[:40] == fit("   " + long.replace(". ", ".  "))[:40]       # whitespace is normalised
+
+
+def test_every_generated_title_and_description_is_within_a_search_results_limits(tmp_path):
+    # A long field name in a long state, long employer names, a Canadian metro and province, and
+    # every browse page: all built, and every title 30-60 characters, every description 110-160.
+    rows = [_row(i, state="PA", tags=("environmental", "ml")) for i in range(seo_pages.MIN_COMBO)]
+    rows += [_row(100 + i, company_name="National Information Solutions Cooperative (NISC)", salary="$25/hr",
+                  regions=[{"loc": "Lake Saint Louis, MO", "kind": "us", "state": "MO"}]) for i in range(10)]
+    rows += [_row(200 + i, company_name="Executive Office for U.S. Attorneys and the Office of the U.S. Attorneys")
+             for i in range(6)]
+    rows += [_row(300 + i, salary="$30/hr", years=["first_year"], stage=["research"]) for i in range(30)]
+    toronto = [_row(400 + i, regions=[{"loc": "Toronto, ON", "kind": "canada", "state": "ON", "metro": "Toronto"}])
+               for i in range(6)]
+    waterloo = [_row(500 + i, regions=[{"loc": "Kitchener, ON", "kind": "canada", "state": "ON", "metro": "Waterloo Region"}])
+                for i in range(6)]
+    site = _site(tmp_path, {"PA": rows, "MA": rows[300:], "MO": [], "ON": toronto + waterloo},
+                 majors=[{"name": "Operations and Information Management", "tags": ["ml"], "level": "undergrad"}])
+    pages = seo_pages.build(site)
+    by_path = {p["path"]: p["html"] for p in pages}
+    for path in ("/internships/environmental/pennsylvania/", "/internships/toronto/", "/internships/canada/",
+                 "/internships/waterloo-region/", "/internships/ontario/", "/internships/research/",
+                 "/internships/for-freshmen/", "/internships/highest-paying/", "/internships/paid/",
+                 "/internships/at/national-information-solutions-cooperative-nisc/", "/about/", "/compare/", "/pricing/"):
+        assert path in by_path, path
+    for path, h in by_path.items():
+        title, desc = _head(h, r"<title>(.*?)</title>"), _head(h, r'<meta name="description" content="(.*?)"/>')
+        assert 30 <= len(title) <= seo_pages.TITLE_MAX, (path, title)
+        assert seo_pages.DESC_MIN <= len(desc) <= seo_pages.DESC_MAX, (path, desc)
+        assert title.count(seo_pages.TITLE_SUFFIX) <= 1, (path, title)
+    assert "<title>Environmental Internships in Pennsylvania | InternScout</title>" in by_path["/internships/environmental/pennsylvania/"]
+    assert "<title>Internships in Toronto – 6 Open | InternScout</title>" in by_path["/internships/toronto/"]
+    assert "<title>Research Internships for Undergraduates | InternScout</title>" in by_path["/internships/research/"]
+    assert "<title>About InternScout – Free Internship Search | InternScout</title>" in by_path["/about/"]
+    assert "<title>InternScout Pricing – Free, Upgrades from $4 | InternScout</title>" in by_path["/pricing/"]
+    # The employer description drops places until it fits, rather than being cut mid-address.
+    nisc = _head(by_path["/internships/at/national-information-solutions-cooperative-nisc/"], r'<meta name="description" content="(.*?)"/>')
+    assert nisc.startswith("10 open National Information Solutions Cooperative (NISC) internships for Summer 2027") and "…" not in nisc
+
+
+def test_every_page_carries_the_organization_once_with_the_brands_profiles(tmp_path):
+    pages = seo_pages.build(_pay_site(tmp_path))
+    for p in pages:
+        blocks = _ld_blocks(p["html"])
+        orgs = [b for b in blocks if b["@type"] == "Organization"]
+        assert len(orgs) == 1 and orgs[0] == seo_pages.ORGANIZATION, p["path"]
+        if p["items"] is not None:         # a listing page is a CollectionPage of the site
+            col = next(b for b in blocks if b["@type"] == "CollectionPage")
+            assert col["url"] == "https://internscout.org" + p["path"] and col["name"] == p["h1"]
+            assert col["isPartOf"] == {"@id": seo_pages.SITE_ID} and col["dateModified"] == p["lastmod"]
+    assert len(seo_pages.ORGANIZATION["sameAs"]) == 7
+    assert {"https://mastodon.social/@internscout", "https://x.com/useinternscout",
+            "https://www.reddit.com/user/InternScout/"} <= set(seo_pages.ORGANIZATION["sameAs"])
+
+
+def test_the_field_pages_opening_sentences_are_short(tmp_path):
+    # The audit measured the field pages' opening sentence at over 25 words: the count and the range
+    # are two sentences now, and the compare lede's "cover every level; InternScout lists..." is two.
+    site = _pay_site(tmp_path)
+    by_path = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    lede = by_path["/internships/mechanical-engineering/"].split('<p class="lede">')[1].split("</p>")[0]
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", lede) if s]
+    assert sentences[0] == "41 open student roles in mechanical engineering." and sentences[1].startswith("They range from")
+    assert max(len(s.split()) for s in sentences) <= 25
+    compare = by_path["/compare/"].split('<p class="lede">')[1].split("</p>")[0]
+    assert "every career level. InternScout lists only" in compare
+    assert max(len(s.split()) for s in re.split(r"(?<=[.!?])\s+", compare)) <= 25
+
+
+def test_the_install_page_answers_first_and_is_dated():
+    # docs/install.html is hand-written: the audit asked for the answer in the first paragraph, a
+    # published and an updated date on the page, and a dated HowTo block; no author, as everywhere.
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    html = open(os.path.join(backend, "..", "docs", "install.html"), encoding="utf-8").read()
+    html = re.sub(r"<!--.*?-->", "", html, flags=re.S)        # the "was:" comments hold old copies
+    main = html.split("<main>")[1]
+    first = re.sub(r"<[^>]+>", "", re.search(r"<p[^>]*>(.*?)</p>", main, re.S).group(1))
+    assert first.startswith("To install the InternScout Auto-Apply extension") and 40 <= len(first.split()) <= 60
+    assert '<time datetime="2026-09-15">' in main and '<time datetime="2026-10-05">' in main
+    howto = next(b for b in _ld_blocks(html.replace("\n", "")) if b["@type"] == "HowTo")
+    assert howto["datePublished"] == "2026-09-15" and howto["dateModified"] == "2026-10-05"
+    assert [s["position"] for s in howto["step"]] == [1, 2, 3] and "author" not in howto
+    assert howto["publisher"]["@id"] == seo_pages.ORG_ID
+    desc = _head(html, r'<meta name="description" content="(.*?)"/>')
+    assert seo_pages.DESC_MIN <= len(desc) <= seo_pages.DESC_MAX
 
 
 # ---- Auto-Apply on the listing pages (2026-10-04)
