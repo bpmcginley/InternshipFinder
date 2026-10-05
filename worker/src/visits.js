@@ -34,6 +34,26 @@ export const EVENTS = new Set(["install_click", "signin_start", "signin", "profi
 export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid"]);
 // utm_source values our own links use (growth/digest.py, growth/outreach.py) and the usual social names.
 const UTM_SOCIAL = /^(linkedin|instagram|facebook|fb|ig|reddit|bluesky|bsky|mastodon|x|twitter|threads|tiktok|youtube|discord)$/;
+// Which social site (added 2026-10-05; the `visit_channels` table). `source` folds every social site
+// into "social", which is what the dashboard and growth/metrics.py add up, but the weekly scorecard
+// needs YouTube, TikTok, X, Facebook, Reddit, Instagram, Bluesky and Mastodon apart. A utm_source from
+// UTM_SOCIAL names the channel, its short forms spelled out so one site is one row (fb -> facebook,
+// ig -> instagram, bsky -> bluesky, twitter -> x); otherwise the referring host's family. Only social:
+// search, direct and email have no channel, and a host not listed here records nothing.
+const UTM_ALIAS = { fb: "facebook", ig: "instagram", bsky: "bluesky", twitter: "x" };
+const CHANNEL_HOSTS = [
+  ["youtube", /(^|\.)(youtube\.com|youtu\.be)$/],
+  ["tiktok", /(^|\.)tiktok\.com$/],
+  ["x", /(^|\.)(x\.com|twitter\.com|t\.co)$/],
+  ["facebook", /(^|\.)(facebook\.com|fb\.com)$/],          // l.facebook.com, m.facebook.com included
+  ["reddit", /(^|\.)reddit\.com$/],
+  ["instagram", /(^|\.)instagram\.com$/],                  // l.instagram.com included
+  ["bluesky", /(^|\.)bsky\.app$/],
+  ["mastodon", /(^|\.)(mastodon\.[a-z.]+|mstdn\.[a-z.]+|fosstodon\.org|hachyderm\.io|mas\.to)$/],
+  ["linkedin", /(^|\.)(linkedin\.com|lnkd\.in)$/],
+  ["threads", /(^|\.)threads\.net$/],
+  ["discord", /(^|\.)(discord\.com|discordapp\.com)$/],
+];
 // Crawlers that run scripts. Most bots never run JavaScript and so never reach this at all.
 const BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|monitor|facebookexternalhit|embedly|curl|wget|python|node-fetch|axios/i;
 
@@ -77,6 +97,17 @@ export function sourceOf(refHost, utmSource, utmMedium) {
   if (SEARCH.test(host)) return "search";
   if (SOCIAL.test(host)) return "social";
   return "other";
+}
+
+// The social site a load came from, or "" when it did not come from one (added 2026-10-05). Our own
+// tagged links first (utm_source), like sourceOf(), then the referring host's family.
+export function channelOf(refHost, utmSource) {
+  const u = String(utmSource || "").toLowerCase().trim();
+  if (UTM_SOCIAL.test(u)) return UTM_ALIAS[u] || u;
+  const host = String(refHost || "").toLowerCase().trim().replace(/^www\./, "");
+  if (!host) return "";
+  for (const [channel, re] of CHANNEL_HOSTS) if (re.test(host)) return channel;
+  return "";
 }
 
 // One more for a browser's step on a day and page, under the same day's cap as the visit counts.
@@ -135,5 +166,18 @@ export async function countHit(db, request, body, now) {
     "WHERE (SELECT COALESCE(SUM(views), 0) FROM visit_counts WHERE day = ?) < ? " +
     "ON CONFLICT(day, page, source) DO UPDATE SET views = views + 1, visits = visits + excluded.visits",
   ).bind(day, page, source, visit, day, DAY_CAP).run();
-  return { counted: res.meta.changes > 0 };
+  const counted = res.meta.changes > 0;
+  // A social load once more by site (2026-10-05), only when the statement above counted it: a load the
+  // cap, the bot check or the per-minute limit left out is left out here too. Only `source` "social"
+  // (a tagged email link opened from Facebook is email, not a Facebook visit), so a day's channel rows
+  // never add up to more than its `social` row in visit_counts.
+  // was: return { counted: res.meta.changes > 0 };
+  const channel = counted && source === "social" ? channelOf(body.r, body.u) : "";
+  if (channel) {
+    await db.prepare(
+      "INSERT INTO visit_channels (day, channel, views, visits) VALUES (?, ?, 1, ?) " +
+      "ON CONFLICT(day, channel) DO UPDATE SET views = views + 1, visits = visits + excluded.visits",
+    ).bind(day, channel, visit).run();
+  }
+  return { counted };
 }

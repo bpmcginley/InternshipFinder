@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers.js";
-import { DAY_CAP, EVENTS, SERVER_EVENTS, countEvent, pageKind, sourceOf } from "../src/visits.js";
+import { DAY_CAP, EVENTS, SERVER_EVENTS, channelOf, countEvent, pageKind, sourceOf } from "../src/visits.js";
 
 const SITE = { Origin: "https://internscout.org", "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130" };
 const hit = (w, body, headers = SITE) => w.api("POST", "/hit", { body, headers });
@@ -66,6 +66,73 @@ test("one address can't run up the count, and a day stops at the cap", async () 
   await w.db.prepare("UPDATE visit_counts SET views = ?").bind(DAY_CAP).run();
   await hit(w, { p: "/install" });
   assert.equal((await rows(w)).length, 1, "past the day's cap nothing new is counted");
+});
+
+// Visits by social site (added 2026-10-05): the scorecard needs YouTube, TikTok, X and the rest apart,
+// while `source` keeps folding them into "social" for the dashboard and growth/metrics.py.
+const channels = async (w) => (await w.db.dump()).visit_channels
+  .map(({ day, channel, views, visits }) => ({ day, channel, views, visits }))
+  .sort((a, b) => a.channel.localeCompare(b.channel));
+
+test("a channel is the tagged link's utm_source, spelled out, or else the referring site's family", () => {
+  assert.equal(channelOf("", "youtube"), "youtube");
+  assert.equal(channelOf("www.google.com", "YouTube"), "youtube", "the tag wins over the referrer");
+  assert.equal(channelOf("", "fb"), "facebook");
+  assert.equal(channelOf("", "ig"), "instagram");
+  assert.equal(channelOf("", "bsky"), "bluesky");
+  assert.equal(channelOf("", "twitter"), "x");
+  assert.equal(channelOf("youtu.be"), "youtube");
+  assert.equal(channelOf("www.youtube.com"), "youtube");
+  assert.equal(channelOf("www.tiktok.com"), "tiktok");
+  assert.equal(channelOf("t.co"), "x");
+  assert.equal(channelOf("twitter.com"), "x");
+  assert.equal(channelOf("l.facebook.com"), "facebook");
+  assert.equal(channelOf("fb.com"), "facebook");
+  assert.equal(channelOf("old.reddit.com"), "reddit");
+  assert.equal(channelOf("l.instagram.com"), "instagram");
+  assert.equal(channelOf("bsky.app"), "bluesky");
+  assert.equal(channelOf("mastodon.social"), "mastodon");
+  assert.equal(channelOf("fosstodon.org"), "mastodon");
+  assert.equal(channelOf("lnkd.in"), "linkedin");
+  assert.equal(channelOf("www.google.com"), "", "search is not a channel");
+  assert.equal(channelOf(""), "", "nor direct");
+  assert.equal(channelOf("", "digest"), "", "nor email");
+  assert.equal(channelOf("example.edu", "campus_partner"), "");
+});
+
+test("POST /hit counts social loads once more by site, and only those", async () => {
+  const w = await setup();
+  await hit(w, { p: "/internships/ohio/", r: "", u: "youtube" });
+  await hit(w, { p: "/internships/ohio/", r: "", u: "youtube", m: "social" });
+  await hit(w, { p: "/", r: "l.facebook.com" });
+  await hit(w, { p: "/", r: "www.google.com" });                      // search: no channel row
+  await hit(w, { p: "/", r: "" });                                    // direct: none
+  await hit(w, { p: "/", r: "", u: "digest", m: "email" });           // email: none
+  await hit(w, { p: "/", r: "l.facebook.com", u: "digest", m: "email" });  // email, not Facebook
+  await hit(w, { p: "/", r: "snapchat.com" });                        // social, but no family: none
+  assert.deepEqual(await channels(w), [
+    { day: "2026-09-14", channel: "facebook", views: 1, visits: 1 },
+    { day: "2026-09-14", channel: "youtube", views: 2, visits: 2 },
+  ]);
+  // `source` is unchanged: every one of those is still "social" there, so the sums the dashboard
+  // and growth/metrics.py make are the same as before.
+  const social = (await rows(w)).filter((r) => r.source === "social");
+  assert.deepEqual(social, [
+    { day: "2026-09-14", page: "dashboard", source: "social", views: 2, visits: 2 },
+    { day: "2026-09-14", page: "landing", source: "social", views: 2, visits: 2 },
+  ]);
+});
+
+test("channel rows stop at the day's cap and skip robots, like the visit counts", async () => {
+  const w = await setup();
+  assert.equal((await hit(w, { p: "/", u: "tiktok" }, { ...SITE, "User-Agent": "Googlebot/2.1" })).status, 204);
+  assert.deepEqual(await channels(w), []);
+  await hit(w, { p: "/", u: "tiktok" });
+  await w.db.prepare("UPDATE visit_counts SET views = ?").bind(DAY_CAP).run();
+  await hit(w, { p: "/", u: "tiktok" });
+  await hit(w, { p: "/", r: "www.reddit.com" });
+  assert.deepEqual(await channels(w), [{ day: "2026-09-14", channel: "tiktok", views: 1, visits: 1 }],
+    "past the day's cap no channel is counted either");
 });
 
 test("steps are counted by event and page, and only known ones", async () => {
