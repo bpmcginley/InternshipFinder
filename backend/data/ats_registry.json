@@ -7563,9 +7563,10 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "health"
+   "sector": "health",
+   "last_fail": "2026-10-05"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
@@ -8215,6 +8216,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "government_policy"
+  },
+  "sikichcareers": {
+   "name": "Sikich",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-05"
   },
   "simaai": {
    "name": "SiMa.ai",
@@ -16755,8 +16762,9 @@
   "roberthalf|wd1|protivitiexperiencedcareers": {
    "name": "Protiviti",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-05"
   },
   "roberthalf|wd1|ProtivitiNA": {
    "name": "Protiviti",
