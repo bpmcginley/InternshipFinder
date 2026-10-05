@@ -344,7 +344,9 @@
   // the page no longer carries a second strip of small print under the header just to hold it.
   // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans }) {
   // `installed` hides the Add Auto-Apply button once the extension is there.
-  function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans, installed }) {
+  // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans, installed }) {
+  // `inviteOffer` and `inviteWords` are the dashboard's own (from /config invite), for the invite bullet.
+  function Landing({ open, setOpen, onSetup, hasProfile, nationwide, plans, installed, inviteOffer, inviteWords }) {
     if (!open) return null;
     // was: "aria-label": "About InternScout" and h2 "Internships, co-ops and research for your major,
     // anywhere in the US and Canada": the header's h1 says that now (2026-10-05), so this strip is
@@ -388,7 +390,13 @@
           h("li", null, "A scanner checks employer career sites and public job boards several times a day and keeps only student roles."),
           h("li", null, "Your profile stays in this browser. Ranking happens on this page; nothing about you is uploaded."),
           h("li", null, "The optional extension fills in applications for you and always stops before Submit."),
-          h("li", null, "Signing in with Google or Microsoft is optional. It lets your chosen states count toward where we scan in more detail.")),
+          h("li", null, "Signing in with Google or Microsoft is optional. It lets your chosen states count toward where we scan in more detail."),
+          // D1.3 (2026-10-05 audit): the invite mechanic was explained only after sign-in (the Account
+          // menu and the nudge), nowhere a new visitor reads. The bonus and the cap come from /config;
+          // until it answers, the sentence names no number rather than one that could drift.
+          h("li", null, inviteOffer
+            ? `Invite a classmate: when they join with a school (.edu) email, you each get ${inviteWords}${inviteOffer.max ? ` (for up to ${inviteOffer.max} classmates)` : ""}.`
+            : "Invite a classmate: when they join with a school (.edu) email, you each get extra Auto-Apply runs.")),
         h("div", { className: "landing-actions" },
           h("button", { type: "button", className: "btn primary", onClick: onSetup }, hasProfile ? "Edit my profile" : "Set up your profile"),
           // Added 2026-10-04: until now the only way to the extension from here was the footer link.
@@ -1196,6 +1204,28 @@
       setTimeout(() => { const q = document.getElementById("q"); if (q) { q.focus(); q.scrollIntoView({ block: "center" }); } }, 0);
     };
     const openCount = nationwide ? nationwide.toLocaleString() : null;
+    // A first visit: the setup card is open and nothing is saved yet (D2.3, below).
+    const firstVisit = setupOpen && !p;
+    // The plans line (D2.3, 2026-10-05 audit): once the announcement is hidden, the price kept no
+    // home on this page but the nav's Pricing link. One quiet line under the counters, from the same
+    // /config numbers as the announcement (IS.plansBanner, never hardcoded), and nothing at all on a
+    // paid plan or before /config answers, exactly as the announcement does.
+    const plansLine = plansSeen && IS.plansBanner(auth.cfg, me);
+    // Numbers get thousands separators, "You applied" appears once there is something to count,
+    // and the state list is one sentence under the numbers instead of a block floated to the right.
+    // A const since 2026-10-05 so it can render before or after the setup card (D2.3).
+    const figuresEl = h("section", { className: "figures" },
+      h("div", { className: "figrow" },
+        h("div", { className: "fig" }, h("div", { className: "n" }, figures.open.toLocaleString()), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
+        h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh.toLocaleString()), h("div", { className: "l" }, "New this week")),
+        nationwide != null && h("div", { className: "fig" }, h("div", { className: "n" }, nationwide.toLocaleString()), h("div", { className: "l" }, "Open nationwide")),
+        figures.applied > 0 && h("div", { className: "fig" }, h("div", { className: "n" }, figures.applied.toLocaleString()), h("div", { className: "l" }, "You applied"))),
+      h("div", { className: "coverage" },
+        loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` and ${keys.length - 8} more` : "", ". ",
+        h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", ".")),
+      plansLine && h("p", { className: "plansline" },
+        `Plans: free with any email; ${plansLine.plans.map(pl => `${pl.label} ${pl.price}`).join(" and ")} raise the allowance. `,
+        h("a", { href: "pricing/" }, "Prices")));
     return h("div", { className: "wrap" },
       h("header", { className: "top" },
         // was: one block of h1.mark "InternScout" and .sub, with the h1 the brand name only. The audit
@@ -1262,26 +1292,26 @@
             : `Stop checking ten job boards every morning. ${openCount ? openCount + " open roles are" : "Every open role is"} here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada.`,
             howBtn && " · ", howBtn),
           !p && h("div", { className: "hero-actions" },
-            h("button", { type: "button", className: "btn primary", onClick: goSearch }, `Search ${openCount ? openCount + " " : ""}internships free · no account`)))),
+            h("button", { type: "button", className: "btn primary", onClick: goSearch }, `Search ${openCount ? openCount + " " : ""}internships free · no account`),
+            // D2.2 (2026-10-05 audit): the second way in, the free extension, had nothing above the fold;
+            // the nearest link was the quiet notice under the counters. A plain (not primary) button,
+            // so the search stays the first action, and gone once the extension is installed or stale.
+            // was: the search button alone.
+            !(info.installed || info.stale) && h("a", { className: "btn", href: installUrl("hero"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome · free")))),
 
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
-      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale }),
+      // was: h(Landing, { ..., plans: payPlans, installed: info.installed || !!info.stale }),
+      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
+      // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
+      // counters or any statement of what is here. Now the figures come first while the setup card is
+      // open with no profile saved; once there is a profile the card is an edit form and the old order
+      // (card, then figures) stays. was: Setup, then the figures section, in every case.
+      firstVisit && figuresEl,
       // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
       // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
       setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
-
-      // Numbers get thousands separators, "You applied" appears once there is something to count,
-      // and the state list is one sentence under the numbers instead of a block floated to the right.
-      h("section", { className: "figures" },
-        h("div", { className: "figrow" },
-          h("div", { className: "fig" }, h("div", { className: "n" }, figures.open.toLocaleString()), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
-          h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh.toLocaleString()), h("div", { className: "l" }, "New this week")),
-          nationwide != null && h("div", { className: "fig" }, h("div", { className: "n" }, nationwide.toLocaleString()), h("div", { className: "l" }, "Open nationwide")),
-          figures.applied > 0 && h("div", { className: "fig" }, h("div", { className: "n" }, figures.applied.toLocaleString()), h("div", { className: "l" }, "You applied"))),
-        h("div", { className: "coverage" },
-          loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` and ${keys.length - 8} more` : "", ". ",
-          h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", "."))),
+      !firstVisit && figuresEl,
 
       // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
       // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
