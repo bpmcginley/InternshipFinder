@@ -312,6 +312,6 @@ export function tierNote(me) {
   if (me.error) return me.message || `Couldn't check your allowance (${me.error}).`;
   const paused = me.paused ? " AI is paused for everyone until next month; search still works." : "";
   return (me.tier === "edu"
-    ? "School (.edu) allowance: twice the standard. Resets on the 1st."
-    : "Standard allowance. A Google account with a .edu email gets twice as much. Resets on the 1st.") + paused;
+    ? "School (.edu) allowance: about twice the standard. Resets on the 1st."
+    : "Standard allowance. A Google account with a .edu email gets about twice as much. Resets on the 1st.") + paused;
 }

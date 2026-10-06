@@ -202,12 +202,25 @@ async function act(tabId, fullRef, action, payload) {
   }
 }
 
-function formatSnapshot(frames, fails) {
+// A dropdown that already holds an answer only needs its option count: the model reads the value, and
+// a full list of countries or schools repeated on every step was a large share of each snapshot. An
+// empty one, or one that has failed, keeps its list, because those are the ones the model must choose for.
+const LISTED_CHOICES = ["select", "react_select"];
+const hasValue = (v) => v !== undefined && v !== null && v !== "" && v !== false;
+// A native <select> whose placeholder option carries a value ("-1", "0") reads back as "Select One"
+// (dom.js valueOf), yet it holds no answer and its real options are what the model needs. Close
+// to the test dom.js uses to drop that option from the list, with a word boundary so "Selected" is an answer.
+const PLACEHOLDER_VALUE = /^[-–—.\s]*(select|choose|please select)\b|^\s*--/i;
+const answered = (v) => hasValue(v) && !PLACEHOLDER_VALUE.test(String(v));
+
+export function formatSnapshot(frames, fails = {}) {
   const index = {};
   const lines = [];
+  // Labels of fields this snapshot already shows with a value; see preFilledLine.
+  const shown = new Set();
   let hasFinal = false;
   const top = frames.find((f) => f.frameId === 0) || frames[0];
-  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal };
+  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown };
   lines.push(`URL: ${top.url}`, `TITLE: ${top.title}`);
   for (const f of frames) {
     if (f.frameId !== 0 && !f.elements.length && !f.buttons.length) continue;
@@ -224,8 +237,11 @@ function formatSnapshot(frames, fails) {
       let s = `[${ref}] ${e.kind}${e.type && e.type !== "text" ? `(${e.type})` : ""}${e.required ? " *" : ""} "${e.label}"`;
       if (e.question) s += ` in "${e.question}"`;
       s += ` = ${JSON.stringify(e.value === undefined ? "" : e.value)}`;
-      if (e.options && e.options.length) s += ` options: ${e.options.join(" | ")}`;
-      if (e.placeholder) s += ` placeholder=${JSON.stringify(e.placeholder)}`;
+      if (answered(e.value) && e.label) shown.add(e.label);
+      // was: every choice field listed all its options and its placeholder, filled or not.
+      const brief = LISTED_CHOICES.includes(e.kind) && answered(e.value) && !fails[ref];
+      if (e.options && e.options.length) s += brief ? ` (${e.options.length} options)` : ` options: ${e.options.join(" | ")}`;
+      if (e.placeholder && !brief) s += ` placeholder=${JSON.stringify(e.placeholder)}`;
       if (e.maxlength) s += ` maxlength=${e.maxlength}`;
       if (e.error) s += ` ERROR: ${e.error}`;
       if ((fails[ref] || 0) >= MAX_FIELD_FAILS) s += " (failed 3 times: skip it or pause_for_user if required)";
@@ -240,7 +256,18 @@ function formatSnapshot(frames, fails) {
     }
     if (f.text) lines.push(`PAGE TEXT: ${f.text}`);
   }
-  return { text: lines.join("\n"), index, top, hasFinal };
+  return { text: lines.join("\n"), index, top, hasFinal, shown };
+}
+
+// fastFill reports "Label = value" for each field it filled, and the snapshot right after it shows the
+// same fields with the same values, so the line said everything twice. Name only what the snapshot
+// does not show (a field that lost its value again, a file chip the page doesn't read back).
+// was: `Pre-filled: ${pre.join("; ")}`
+export function preFilledLine(pre, shown) {
+  if (!pre.length) return "";
+  const rest = pre.filter((p) => !shown.has(String(p).split(" = ")[0]));
+  if (!rest.length) return `Pre-filled ${pre.length} field(s) from the profile; their values are in the snapshot.`;
+  return `Pre-filled: ${rest.join("; ")}`;
 }
 
 // A code sitting in your inbox is yours to fetch, so the agent stops there and hands the tab
@@ -345,16 +372,38 @@ function gateIn(frames) {
 // results after each step already say what was filled and what failed, so the page before this one
 // only repeated fields the model had seen, at full price on every later step of the run.
 const KEEP_SNAPSHOTS = 1;
+// Tool results from before the last two model turns are cut to "ok" or the start of the error
+// (2026-10-04). A failed select returns every real option, and act() echoes back what it set, so old
+// results were the next-largest thing re-sent at full price on every step. Each tool_result keeps its
+// tool_use_id, so every tool call still has its answer and the request stays valid.
+const KEEP_RESULT_TURNS = 2;
+function shortResult(b) {
+  const raw = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
+  if (!b.is_error) {
+    // A human's answer to ask_user, and the other short notes, are plain strings worth keeping;
+    // what act() returns is a JSON object, and only the fact that it worked matters later.
+    try { const o = JSON.parse(raw); if (o && typeof o === "object") return "ok"; } catch (e) {}
+    return raw;
+  }
+  if (raw.startsWith("failed: ")) return raw;   // already trimmed on an earlier step
+  let err = raw;
+  try { const o = JSON.parse(raw); if (o && typeof o === "object") err = String(o.error || o.message || raw); } catch (e) {}
+  return "failed: " + err.slice(0, 120);
+}
 export function trimHistory(msgs) {
-  let seen = 0;
+  let seen = 0, turns = 0;
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
+    if (m.role === "assistant") { turns++; continue; }
     if (m.role !== "user" || !Array.isArray(m.content)) continue;
     for (const b of m.content) {
       if (b.type === "text" && b.text.startsWith("SNAPSHOT")) {
         seen++;
         if (seen > KEEP_SNAPSHOTS) b.text = "SNAPSHOT (older page state removed)";
       }
+      // The results in a user message answer the assistant turn before it, so a message with two or
+      // more assistant turns after it answers a turn older than the last two.
+      if (b.type === "tool_result" && turns >= KEEP_RESULT_TURNS) b.content = shortResult(b);
     }
   }
 }
@@ -425,6 +474,29 @@ async function tailorStep(id, job, store) {
   return job;
 }
 
+// ---------- no-progress breaker ----------
+// A run that keeps clicking a button that does nothing, or circles one page, spends a model turn on
+// every pass until MAX_STEPS, and on the InternScout AI every turn is the student's allowance. Pause
+// instead, before the next model call, once the page has come back identical three times running or
+// one page has had twelve turns. Only a pause: nothing here clicks or submits anything.
+// "One page" is the URL plus the step the page says it is on, because Workday keeps one URL for every
+// step of its application and a long one would otherwise read as twelve turns on the same page.
+export const SAME_SNAPSHOTS_MAX = 3;
+export const TURNS_PER_PAGE_MAX = 12;
+export const NO_PROGRESS_HELP = "The page isn't changing after several tries. Finish this step by hand, then press Resume.";
+export const freshProgress = () => ({ stuckSame: 0, lastText: null, turnsHere: 0, lastUrl: null });
+export function progressCheck(state, snapText, url, asleep = false) {
+  const next = {
+    // A sleeping tab answers with the same picture whatever happened; the sleepy gate in loop() owns that case.
+    stuckSame: !asleep && snapText === state.lastText ? state.stuckSame + 1 : 0,
+    lastText: snapText,
+    turnsHere: url === state.lastUrl ? state.turnsHere + 1 : 0,
+    lastUrl: url,
+  };
+  return { stop: next.stuckSame >= SAME_SNAPSHOTS_MAX || next.turnsHere >= TURNS_PER_PAGE_MAX, state: next };
+}
+const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter(Boolean)].join(" | ");
+
 // ---------- main loop ----------
 const running = new Set();
 export const isRunning = (id) => running.has(id);
@@ -484,6 +556,8 @@ async function loop(id) {
   let steps = job.steps || 0;
   // Snapshots in a row that came back identical while the tab was asleep. See the gate below.
   let sleepy = 0, sleepText = null;
+  // The no-progress breaker's counters (progressCheck). Started fresh here, so Resume gets a clean count.
+  let progress = freshProgress();
 
   while (true) {
     job = await getJob(id);
@@ -584,6 +658,8 @@ async function loop(id) {
     // stopping progress: the page has come back unchanged three snapshots running while asleep.
     if (asleep) { sleepy = snap.text === sleepText ? sleepy + 1 : 0; sleepText = snap.text; }
     else { sleepy = 0; sleepText = null; }
+    const check = progressCheck(progress, snap.text, pageKey(url, frames), asleep);
+    progress = check.state;
     const stuckAsleep = asleep && sleepy >= 2;
     const gate = gateIn(frames) || (stuckAsleep ? { kind: "background_tab", reason: "this tab is asleep in the background and the page stopped changing" } : null);
     if (gate) {
@@ -624,11 +700,23 @@ async function loop(id) {
       return;
     }
 
+    // Checked after the gates above, which say something more useful when one of them applies, and
+    // before the model is called, so a stuck page costs no further AI call. `pending` is kept, as in
+    // the MAX_STEPS stop, so the last turn's tool results still go out on Resume.
+    if (check.stop) {
+      await appendLog(job.id, { kind: "gate", text: progress.stuckSame >= SAME_SNAPSHOTS_MAX
+        ? `Paused: the page came back unchanged ${progress.stuckSame} times in a row.`
+        : `Paused: ${progress.turnsHere} turns on this page without moving on.` });
+      await updateJob(id, { status: "needs_you", reason: NO_PROGRESS_HELP, question: "", steps: 0, pending, activity: "" });
+      await saveMsgs(id, msgs);
+      return;
+    }
+
     const content = [];
     if (pending && pending.results) content.push(...pending.results);
     // was: if (!msgs.length) content.push({ type: "text", text: jobIntro(job) }); the job is in buildSystem now.
     if (pending && pending.note) content.push({ type: "text", text: pending.note });
-    if (pre.length) content.push({ type: "text", text: `Pre-filled: ${pre.join("; ")}` });
+    if (pre.length) content.push({ type: "text", text: preFilledLine(pre, snap.shown) });
     content.push({ type: "text", text: `SNAPSHOT\n${accountLine(store, url)}\n${snap.text}` });
     msgs.push({ role: "user", content });
     const prevPending = pending;
