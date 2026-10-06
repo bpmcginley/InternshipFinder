@@ -157,3 +157,24 @@ def test_new_roles_are_counted_once_per_employer(tmp_path, no_accounts):
     rows = [row(i, f"Co {i}") for i in range(5)] + [row(9, "Co 0 Inc.")]
     ranked, _, _ = social.candidates(_site(tmp_path, made, rows))
     assert [(t, len(v)) for t, v in ranked] == [("data", 5)]
+
+
+def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, monkeypatch):
+    # The analytics page can only reach D1, so the card's bytes go into the draft row.
+    import base64
+    import metrics
+    calls = []
+
+    def fake_d1(token, sql, params=None):
+        calls.append((sql, params))
+        if sql.startswith("ALTER TABLE"):
+            raise RuntimeError('D1: [{"message": "duplicate column name: image_b64"}]')
+    monkeypatch.setattr(metrics, "d1", fake_d1)
+    card = tmp_path / "card.jpg"
+    card.write_bytes(b"\xff\xd8jpeg")
+    data = {"linkedin_text": "text", "card_url": "https://example.test/c.jpg", "url": "https://internscout.org/"}
+    social.save_drafts(data, "token", str(card))
+    insert = next(p for s, p in calls if s.startswith("INSERT"))
+    assert base64.b64decode(insert[-1]) == b"\xff\xd8jpeg"
+    social.save_drafts(data, "token", str(tmp_path / "missing.jpg"))     # no card: the text still saves
+    assert [p for s, p in calls if s.startswith("INSERT")][-1][-1] is None
