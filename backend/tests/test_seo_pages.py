@@ -1007,3 +1007,117 @@ def test_no_chart_when_there_is_nothing_to_compare():
     assert dim == "employer" and len(pairs) == 8
     fig = seo_pages.chart_figure(many, "MA")
     assert fig.count("%3Crect") == 6 and "; 2 more at 2 other employers." in fig and "Not shown: 2 more at 2 other employers." in fig
+
+
+# ---- /internships/by-the-numbers/ and the listing pages' questions (2026-10-05)
+
+def test_by_the_numbers_states_the_headline_figures_dated_with_a_dataset_block(tmp_path):
+    site = _pay_site(tmp_path)
+    pages = seo_pages.build(site)
+    by_path = {p["path"]: p["html"] for p in pages}
+    h = by_path[seo_pages.NUMBERS_PATH]
+    # Counted from this data (41 open, 9 employers, 1 field) and dated from the export, not the clock.
+    assert "As of September 23, 2026, InternScout lists 41 open internships, co-ops and research roles from 9 employers in 1 field." in h
+    assert "<dt>Open roles</dt><dd>41</dd>" in h and "<dt>Employers</dt><dd>9</dd>" in h
+    assert "1 of the 50 US states and 1 Canadian province or territory" in h
+    # Pay is pay_report's, which leaves out the Canada-only role (Maple Co's $95), and says so.
+    assert "the median is $34.50 an hour and the highest is $49 an hour, as of September 23, 2026." in h
+    assert "Roles only in Canada (1 role with a rate) are left out" in h
+    assert ('The one field, by open roles on September 23, 2026: <a href="/internships/mechanical-engineering/">'
+            'Mechanical Engineering</a> (41).</p>') in h
+    assert 'Open roles by US state on September 23, 2026: <a href="/internships/massachusetts/">Massachusetts</a> (40).' in h
+    blocks = _ld_blocks(h)
+    assert [b["@type"] for b in blocks] == ["BreadcrumbList", "Dataset", "Organization"]
+    data = blocks[1]
+    assert data["dateModified"] == "2026-09-23" and data["creator"] == {"@id": seo_pages.ORG_ID}
+    measured = {v["name"]: v["value"] for v in data["variableMeasured"]}
+    assert measured["Open roles"] == 41 and measured["Employers"] == 9 and measured["Roles in Canada"] == 1
+    # Linked from the hub, from /about/'s size answer and from llms.txt's main pages.
+    assert 'href="/internships/by-the-numbers/"' in by_path["/internships/"]
+    about = by_path["/about/"]
+    faq = {q["name"]: q["acceptedAnswer"]["text"] for q in _ld_blocks(about)[3]["mainEntity"]}
+    assert faq["How big is InternScout?"].startswith("As of September 23, 2026, 41 open internships")
+    assert '<a href="/internships/by-the-numbers/">InternScout by the numbers</a>' in about
+    seo_pages.write(site, pages)
+    short = open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
+    assert "- [InternScout by the numbers](https://internscout.org/internships/by-the-numbers/)" in short.split("## Browse")[0]
+
+
+def test_no_by_the_numbers_page_on_a_handful_of_listings(tmp_path):
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))}
+    assert seo_pages.NUMBERS_PATH not in pages
+    assert "by-the-numbers" not in pages["/internships/"] and "by-the-numbers" not in pages["/about/"]
+    # The size answer is still there, without the link.
+    assert "<h2>How big is InternScout?</h2><p>As of September 23, 2026, 6 open" in pages["/about/"]
+
+
+def _faq(html):
+    """The FAQPage block's (question, answer) pairs, and the visible section's, unescaped."""
+    block = next(b for b in _ld_blocks(html) if b["@type"] == "FAQPage")
+    ld = [(q["name"], q["acceptedAnswer"]["text"]) for q in block["mainEntity"]]
+    sec = html.split('<section class="faq">')[1].split("</section>")[0]
+    shown = [(html_mod.unescape(q), html_mod.unescape(a)) for q, a in re.findall(r"<h2>(.*?)</h2><p>(.*?)</p>", sec)]
+    return ld, shown
+
+
+def test_field_state_and_combo_pages_answer_their_questions_in_text_and_json_ld(tmp_path):
+    site = _pay_site(tmp_path)
+    by_path = {p["path"]: p for p in seo_pages.build(site)}
+    field = by_path["/internships/mechanical-engineering/"]
+    ld, shown = _faq(field["html"])
+    assert ld == shown and 3 <= len(ld) <= 4
+    assert all(0 < len(a) <= seo_pages.FAQ_ANSWER_MAX for _, a in ld)
+    answers = dict(ld)
+    n = len(field["items"])
+    assert answers["How many mechanical engineering internships are open right now?"] == \
+        f"{n} open mechanical engineering internships, co-ops and research roles as of September 23, 2026, from 9 employers."
+    # Every employer has 5 roles here, so the tie goes to the name (top()).
+    assert answers["Which employers are hiring mechanical engineering interns?"] == (
+        "The employers with the most open mechanical engineering roles are Pay Co 0, Pay Co 1, Pay Co 2, Pay Co 3 "
+        "and Pay Co 4, of 9 employers hiring.")
+    # The hourly range leaves out the Canada-only role's $95 (Canadian dollars), and says so.
+    assert answers["Do mechanical engineering internships pay?"] == (
+        "41 of the 41 open roles (100%) list pay or say they are paid. Listed hourly rates run from $20 to $49 an "
+        "hour, leaving out roles only in Canada.")
+    assert answers["Where are mechanical engineering internships?"] == "The open roles are in Massachusetts (40) and Ontario (1)."
+    many = [{**_row(i, state=st), "keys": {st}} for i, st in enumerate(["MA", "NY", "CT", "RI", "NH", "VT", "ME"])]
+    assert dict(seo_pages.listing_faq(many, "mechanical", None, "x"))["Where are mechanical engineering internships?"]         .endswith("and 2 more states.")
+    # After the chart, before the follow lines.
+    h = field["html"]
+    assert h.index('class="chart"') < h.index('<section class="faq">') < h.index('class="follow"')
+    # A state page: its own cities, one spelling each; the province page's rates are Canadian dollars.
+    ma, _ = _faq(by_path["/internships/massachusetts/"]["html"])
+    assert dict(ma)["How many internships in Massachusetts are open right now?"].startswith("40 open internships")
+    assert dict(ma)["Where are internships in Massachusetts?"].startswith("The open roles are in Town 0 (1),")
+
+
+def test_canadian_pages_say_their_rates_are_canadian_dollars(tmp_path):
+    rows = [_row(i, salary=f"${25 + i}/hr", regions=[{"loc": "Toronto, Ontario, Canada", "kind": "canada", "state": "ON",
+                                                      "metro": "Toronto"}]) for i in range(6)]
+    by_path = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"ON": rows}))}
+    ld, shown = _faq(by_path["/internships/toronto/"])
+    assert ld == shown
+    answers = dict(ld)
+    assert answers["Do internships in Toronto pay?"].endswith("from $25 to $30 an hour, in Canadian dollars.")
+    # "Toronto, Ontario, Canada" is just Toronto on the Toronto page, and "Toronto, ON" on the Canada page.
+    assert answers["Where are internships in Toronto?"] == "The open roles are in Toronto (6)."
+    assert dict(_faq(by_path["/internships/canada/"])[0])["Where are internships in Canada?"] == "The open roles are in Toronto, ON (6)."
+
+
+def test_employer_pages_carry_no_faq_page_block(tmp_path):
+    rows = [_row(i, company_name="Big Co") for i in range(seo_pages.MIN_EMPLOYER)]
+    by_path = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    own = by_path["/internships/at/big-co/"]
+    assert "<h2>Does Big Co pay interns?</h2>" in own                     # its own questions, as before
+    assert "FAQPage" not in own
+    assert "FAQPage" in by_path["/internships/massachusetts/"]
+
+
+def test_no_question_without_an_answer():
+    # One employer and no places: no list of employers to name, and nowhere to say.
+    items = [{**_row(i, company_name="Solo Co", regions=[]), "keys": {"remote"}} for i in range(5)]
+    qa = dict(seo_pages.listing_faq(items, None, "remote", "September 23, 2026"))
+    assert qa["Which employers are hiring remote interns?"] == "All 5 open roles are at Solo Co."
+    assert qa["Do remote internships pay?"] == "None of the 5 open postings lists pay or says it is paid."
+    assert not any(q.startswith("Where") for q in qa)
+    assert seo_pages.listing_faq([], "swe", None, "September 23, 2026") == []
