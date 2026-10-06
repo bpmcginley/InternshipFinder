@@ -2950,9 +2950,9 @@
   "bcg": {
    "name": "Boston Consulting Group",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-05"
+   "last_fail": "2026-10-06"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -7223,18 +7223,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "jobs-bylight": {
-   "name": "By Light Professional IT Services",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "jobs-cesi": {
-   "name": "Cole Engineering Services",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "kphcareers-kphhealthcareservices": {
    "name": "KPH Healthcare Services",
    "quant": false,
@@ -10164,9 +10152,9 @@
   "1x": {
    "name": "1X",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-14",
-   "last_fail": "2026-10-05"
+   "last_fail": "2026-10-06"
   },
   "transperfect": {
    "name": "TransPerfect",
@@ -10473,8 +10461,9 @@
   "spreeai": {
    "name": "SpreeAI ",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-10-06"
   },
   "stag-careers": {
    "name": "STAG",
@@ -10808,6 +10797,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "arondite": {
+   "name": "Arondite",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "ascendis-pharma": {
    "name": "Ascendis Pharma",
@@ -15265,8 +15260,9 @@
   "logitech|wd5|Logitech": {
    "name": "Logitech",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-06"
   },
   "lonza|wd3|lonza_careers": {
    "name": "Lonza",
