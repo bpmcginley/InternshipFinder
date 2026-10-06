@@ -112,6 +112,7 @@ body { font-family: "IBM Plex Sans", Arial, Helvetica, sans-serif; color: var(--
         line-height: 1.35; display: flex; justify-content: space-between; gap: .2in }
 .foot b { font-weight: 700 }
 .foot .date { white-space: nowrap }
+.foot .code { font-weight: 700; letter-spacing: .04em }
 .foot .blank { display: inline-block; width: 1.25in; border-bottom: .015in solid var(--ink); margin-left: .05in }
 .lead b { font-weight: 700 }
 """
@@ -120,7 +121,19 @@ FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=
          '&family=IBM+Plex+Sans:wght@500;700&display=block">')
 
 
-def front(f: dict, qr: str, posted: str) -> str:
+# A small code in the footer's corner, the same on both sides, so a printed sheet says which spot's
+# QR code it carries when it is time to put it up (2026-10-06). Unknown spots print the tag itself.
+SPOT_CODES = {"general": "G", "worcesternorth": "WN", "worcestersouth": "WS", "ilcnorth": "ILC-N",
+              "haigismall": "HM", "studentunion": "SU"}
+
+
+def right(posted: str, code: str) -> str:
+    """The footer's right-hand end: the posted date when there is one, then the spot code."""
+    bits = ([f"Posted {html.escape(posted)}"] if posted else []) + ([f'<span class="code">{html.escape(code)}</span>'] if code else [])
+    return f'<span class="date">{" &middot; ".join(bits)}</span>' if bits else ""
+
+
+def front(f: dict, qr: str, posted: str, code: str = "") -> str:
     return f"""
 <section class="page"><div class="panel">
   <div class="eyebrow">Made by a UMass student · every major</div>
@@ -142,11 +155,11 @@ def front(f: dict, qr: str, posted: str) -> str:
     <div class="qr" aria-label="QR code to internscout.org">{qr}</div>
   </div>
   <div class="foot"><span><b>{html.escape(SLOGAN)}</b> Independent student project; not affiliated with
-    UMass Amherst.</span>{f'<span class="date">Posted {html.escape(posted)}</span>' if posted else ''}</div>
+    UMass Amherst.</span>{right(posted, code)}</div>
 </div></section>"""
 
 
-def back(f: dict, qr: str, posted: str) -> str:
+def back(f: dict, qr: str, posted: str, code: str = "") -> str:
     # Mirror layout: the QR tile on the left, behind the front's (right-hand) tile on a long-edge flip.
     return f"""
 <section class="page"><div class="panel">
@@ -171,7 +184,7 @@ def back(f: dict, qr: str, posted: str) -> str:
     <div class="qr" aria-label="QR code to internscout.org">{qr}</div>
   </div>
   <div class="foot"><span><b>{html.escape(SLOGAN)}</b> Independent student project; not affiliated with
-    UMass Amherst.</span>{f'<span class="date">Posted {html.escape(posted)}</span>' if posted else ''}</div>
+    UMass Amherst.</span>{right(posted, code)}</div>
 </div></section>"""
 
 
@@ -218,17 +231,18 @@ def main(argv: list[str]) -> int:
     OUT_PDF.mkdir(parents=True, exist_ok=True)
     OUT_PNG.mkdir(parents=True, exist_ok=True)
     for spot in spots:
+        code = SPOT_CODES.get(spot, spot.upper())
         url = f"{SITE}?utm_source=flyer-{spot}&utm_medium=print"
         qr = qr_svg(url)
         # A dated print gets its own file next to the undated one (2026-10-06): "10/6/2026" -> "-10-6-2026".
         dated = "-" + re.sub(r"[^0-9A-Za-z]+", "-", args.posted).strip("-") if args.posted else ""
         pdf = OUT_PDF / f"internscout-glass-{spot}{dated}.pdf"
-        render(document(front(f, qr, args.posted) + back(f, qr, args.posted)), pdf=pdf)
-        print(f"{pdf.relative_to(ROOT)}  ->  {url}")
+        render(document(front(f, qr, args.posted, code) + back(f, qr, args.posted, code)), pdf=pdf)
+        print(f"{pdf.relative_to(ROOT)}  [{code}]  ->  {url}")
         if not args.no_preview and spot == spots[0]:
             fp, bp = OUT_PNG / f"front{dated}.png", OUT_PNG / f"back{dated}.png"
-            render(document(front(f, qr, args.posted)), png=fp)
-            render(document(back(f, qr, args.posted)), png=bp)
+            render(document(front(f, qr, args.posted, code)), png=fp)
+            render(document(back(f, qr, args.posted, code)), png=bp)
             print(f"previews: {fp.relative_to(ROOT)}, {bp.relative_to(ROOT)}")
     return 0
 

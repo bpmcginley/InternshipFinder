@@ -15,7 +15,7 @@ the back. Both faces are complete flyers, because people on each side of the gla
 
 **The printed set (2026-10-06):** `internscout-glass-general.pdf` for anywhere, and one per location:
 `worcesternorth`, `worcestersouth`, `ilcnorth` (ILC North), `haigismall` (Haigis Mall), `studentunion`.
-Each was checked by decoding its QR code. They carry no date (Bruce, 2026-10-06; was a blank "Posted" line).
+Each was checked by decoding its QR code. A small code at the right end of the footer, on both sides, says which sheet is which: **G** general, **WN** Worcester North, **WS** Worcester South, **ILC-N** ILC North, **HM** Haigis Mall, **SU** Student Union (`SPOT_CODES` in the script; a new spot prints its tag in capitals). They carry no date (Bruce, 2026-10-06; was a blank "Posted" line).
 UMass posting rules ask for one, so write it on by hand where a building requires it, or print with `--posted`.
 
 **Make one per spot.** `python growth/glass_flyer.py --spots lib,isb,su` writes one
