@@ -20,6 +20,11 @@ The name and summary come from `extension/manifest.json` ("name" and "descriptio
 with a release. Bruce approved the new ones on 2026-10-06 and they ship in 0.5.5. The toolbar button's
 tooltip (`action.default_title`) stays "InternScout Auto-Apply", which reads better on hover.
 
+**Rejected 2026-10-06 for keyword spam (Chrome Web Store "Yellow Argon"):** the description's list of eleven
+application systems (Workday, Greenhouse, Lever, Ashby, iCIMS, Oracle, SmartRecruiters, SuccessFactors, Taleo,
+Workable, Jobvite) counted as excessive keywords. The list is gone; Workday is named where it describes what
+the extension does, and the summary no longer lists systems either. Don't list product names in a row here.
+
 ## Name (manifest "name", max 75 characters)
 
 Current: `InternScout Auto-Apply`
@@ -29,7 +34,8 @@ Now: `InternScout Auto-Apply: Internship Application Autofill` (55 characters)
 
 Current: Fills internship applications from your saved profile and stops at the submit button. It never
 submits an application for you.
-Now (126 characters): `Autofill internship applications on Workday, Greenhouse, Lever and more from your resume. Stops at Submit: you always send it.`
+Now (118 characters): `Autofill internship applications from your resume on the job sites employers use. Stops at Submit: you always send it.`
+(was: "...on Workday, Greenhouse, Lever and more from your resume...", taken out with the description's list below.)
 
 ## Description
 
@@ -44,7 +50,7 @@ HOW IT WORKS
 • If a page stops changing, it pauses and hands the step back to you instead of trying again and again.
 
 WHERE IT WORKS
-Workday, Greenhouse, Lever, Ashby, iCIMS, Oracle, SmartRecruiters, SuccessFactors, Taleo, Workable, Jobvite and more of the systems employers use for student hiring. Employer-run career sites may need more help from you.
+The large application systems many employers use for student hiring, including Workday. Employer-run career sites may need more help from you.
 
 WHAT IT DOES NOT DO
 • It does not submit applications. You press Submit yourself, every time.
