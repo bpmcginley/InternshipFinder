@@ -120,3 +120,15 @@ test("the plans announcement states only what /config serves, and not to paying 
   assert.equal(IS.plansBanner({ ...cfg, payments: { enabled: false, plans: [] } }, null), null);
   assert.equal(IS.plansBanner({ payments: cfg.payments }, null), null);
 });
+
+// The weekly email's "See last Monday's email" link (2026-10-06), worked out from the form's address.
+// backend/tests/test_seo_pages.py checks seo_pages.digest_archive against the same cases.
+test("digestArchive finds Buttondown's archive from the sign-up form's address, and nothing else", () => {
+  const IS = loadCore(notFound);
+  assert.equal(IS.digestArchive("https://buttondown.com/api/emails/embed-subscribe/internscout"), "https://buttondown.com/internscout/archive/");
+  assert.equal(IS.digestArchive("https://buttondown.email/api/emails/embed-subscribe/intern_scout-2/"), "https://buttondown.com/intern_scout-2/archive/");
+  for (const no of ["", undefined, "http://buttondown.com/api/emails/embed-subscribe/x", "https://example.com/api/emails/embed-subscribe/x",
+    "https://buttondown.com/api/emails/embed-subscribe/x/../y", "https://buttondown.com/api/emails/embed-subscribe/a\"onmouseover=x"]) {
+    assert.equal(IS.digestArchive(no), "", String(no));
+  }
+});

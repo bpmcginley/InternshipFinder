@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 globalThis.chrome = globalThis.chrome || { runtime: {}, storage: { local: {}, session: {} } };
-const { quickStartReady, finishOnboarding } = await import("../onboarding/quickstart.js");
+const { quickStartReady, finishOnboarding, DIGEST_URL, digestLink } = await import("../onboarding/quickstart.js");
 const { hasKey } = await import("../lib/store.js");
 
 const student = (over = {}) => ({
@@ -46,4 +46,15 @@ test("the quick-start button needs exactly the AI, a resume and the sign-up emai
     assert.equal(quickStartReady(S), want, JSON.stringify(S.ai) + JSON.stringify(S.settings) + !!S.files.resume);
     assert.equal(quickStartReady(S), !!(hasKey(S) && S.files.resume && S.settings.signup_email));
   }
+});
+
+// The weekly email's link at the end of setup (2026-10-06): optional, plain, and tagged as the
+// extension's, to the one page every channel links.
+test("the end of setup offers the weekly email as one plain link to /digest/", () => {
+  assert.equal(DIGEST_URL, "https://internscout.org/digest/?utm_source=extension&utm_medium=extension");
+  const html = digestLink();
+  assert.equal((html.match(/<a /g) || []).length, 1);
+  assert.ok(html.includes(`href="${DIGEST_URL}"`) && html.includes('target="_blank" rel="noopener"'));
+  assert.ok(html.includes("Get new internships by email every Monday"));
+  assert.ok(!/<form|<input|checked/.test(html), "a link, nothing to fill in or untick");
 });

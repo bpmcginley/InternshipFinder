@@ -30,7 +30,10 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
     const closest = (sel) => (sel === "a[href]" || (cls && sel.split(",").some((s) => s.trim() === `a.${cls}[href]`)) ? link : null);
     return listeners.click({ target: { closest } });
   };
-  return { ctx, sent, bodies, click };
+  // A form sent (2026-10-06): `cls` is the form's class, and matches() is true only for "form.<cls>".
+  // `fields` stand in for what the student typed, which count.js must never read.
+  const submit = (cls, fields = {}) => listeners.submit({ target: { ...fields, matches: (sel) => sel === `form.${cls}` } });
+  return { ctx, sent, bodies, click, submit };
 }
 
 test("one page load sends the path, the referring host and the campaign tag", () => {
@@ -86,4 +89,22 @@ test("opening a posting from a landing page or the dashboard is a posting_click,
   dash.click("https://jobs.lever.co/acme/1", "open-link");
   dash.click("https://chromewebstore.google.com/detail/x", "nav");
   assert.deepEqual(dash.bodies().filter((b) => b.e).map((b) => b.e), ["posting_click", "install_click"]);
+});
+
+test("sending a weekly email sign-up form is a digest_signup, once per page load, and nothing typed goes", () => {
+  for (const path of ["/", "/internships/machine-learning-ai/", "/internships/new/", "/digest/"]) {
+    const r = load({ path });
+    r.submit("digest", { email: { value: "someone@school.edu" }, tag: { value: "ml" } });
+    r.submit("digest");                        // a second send from the same page load is one
+    r.submit("search");                        // any other form is not a sign-up
+    const steps = r.bodies().filter((b) => b.e);
+    assert.deepEqual(steps, [{ e: "digest_signup", p: path }]);
+    assert.ok(!r.sent.some((s) => /someone|school\.edu|"ml"/.test(s.blob.text)), "never the address or the field");
+  }
+});
+
+test("a local copy counts no sign-ups and attaches no submit listener", () => {
+  const r = load({ host: "localhost" });
+  assert.throws(() => r.submit("digest"), TypeError);
+  assert.equal(r.sent.length, 0);
 });

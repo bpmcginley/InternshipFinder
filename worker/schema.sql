@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS task_tokens (
 );
 
 -- Exact page-load totals per day (added 2026-09-30; src/visits.js), because Cloudflare Web Analytics
--- samples about one load in ten. `page` is a kind (dashboard, landing, install, legal, other) and
+-- samples about one load in ten. `page` is a kind (dashboard, landing, install, legal, digest, other) and
 -- `source` where the load came from (direct, search, social, email, extension, other, or internal for
 -- a load from another page of the site). `visits` leaves out the internal ones, as Cloudflare does.
 -- Totals only: no visitor, address, cookie or full referrer.
@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS visit_channels (
 -- Since 2026-10-04 also posting_click from the site, and steps only the Worker sees (SERVER_EVENTS:
 -- new_account, ext_signin, first_autofill, cap_hit, paid), whose `page` is the client ("extension",
 -- "dashboard"), the task (cap_hit), the plan (paid) or "worker".
+-- Since 2026-10-06 also digest_signup, a weekly email sign-up form sent, on page "dashboard", "landing"
+-- or "digest" (the /digest/ page, a page kind of its own since then in visit_counts too). It's a count
+-- of forms sent; the address goes from the browser to Buttondown and never reaches the Worker.
 CREATE TABLE IF NOT EXISTS event_counts (
   day TEXT NOT NULL,
   event TEXT NOT NULL,

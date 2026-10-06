@@ -504,6 +504,12 @@
     // account's username in place of the capitals. Before pasting it, put the PO box in the
     // newsletter's footer setting in Buttondown: CAN-SPAM wants a postal address in every email,
     // and Buttondown does not add one itself.
+    // This is the one place for the address (2026-10-06). The landing pages' forms (every field page,
+    // /internships/new/ and /digest/, built by backend/internscout/seo_pages.py) and the brand posts'
+    // sign-up line (growth/social.py) read it from this line at build time, so they come on at the next
+    // deploy after it is filled in; while it is empty no page has a form at all. The "See last
+    // Monday's email" links are worked out from it too (Buttondown's archive for the same username).
+    // Keep the address in double quotes, inside the braces on the line below.
     digest: { provider: "Buttondown", formAction: "" },
     // Social proof (2026-10-05 audit). Both stay empty until there is something real: js/app.js renders
     // nothing for an empty list or a null rating, so nothing invented can ship from here.

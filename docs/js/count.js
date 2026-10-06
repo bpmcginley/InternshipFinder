@@ -9,7 +9,10 @@
 // Each step counts once per page load, so a double click is one. Clicks on a Chrome Web Store link
 // count as "install_click" on every page without the page having to say so, and since 2026-10-04 a
 // click on "Open posting" (a.go on the generated landing pages, a.open-link on the dashboard) counts as
-// "posting_click" the same way, once per page load like every step.
+// "posting_click" the same way, once per page load like every step. Since 2026-10-06 sending a weekly
+// email sign-up form (form.digest: the dashboard's, and the landing pages' and /digest/'s from
+// backend/internscout/seo_pages.py signup_form) counts as "digest_signup", once per page load. Only
+// that the form was sent goes, with this page's path like every step: never the address or a field.
 (function () {
   var API = "https://internscout-api.bpmcginley.workers.dev/hit";
   // "Don't count this browser" (2026-10-01), for the owner's own visits: ?nocount=1 on any page turns
@@ -47,6 +50,12 @@
     var a = t ? t.closest("a[href]") : null;
     if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
     if (t && t.closest("a.go[href], a.open-link[href]")) window.ISCount("posting_click");
+  }, true);
+  // A sign-up form sent. "submit" fires only once the browser has passed the form's own checks (the
+  // email box is required), and the form still posts to Buttondown in its new tab as before.
+  document.addEventListener("submit", function (ev) {
+    var f = ev.target;
+    if (f && f.matches && f.matches("form.digest")) window.ISCount("digest_signup");
   }, true);
   var send = function () {
     var q = new URLSearchParams(location.search), ref = "";

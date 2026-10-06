@@ -18,6 +18,12 @@ test("pages are counted by kind, never by the path sent", () => {
   assert.equal(pageKind("/install.html"), "install");
   assert.equal(pageKind("/privacy.html"), "legal");
   assert.equal(pageKind("/anything-made-up"), "other");
+  // The weekly email's page has a kind of its own (2026-10-06), however the path is written.
+  assert.equal(pageKind("/digest/"), "digest");
+  assert.equal(pageKind("/digest"), "digest");
+  assert.equal(pageKind("/digest/index.html"), "digest");
+  assert.equal(pageKind("/digest/?utm_source=extension&utm_medium=extension"), "digest");
+  assert.equal(pageKind("/digest/anything"), "other");
 });
 
 test("sources match growth/metrics.py, with our own tagged links first", () => {
@@ -205,6 +211,31 @@ test("a click through to a posting is a step the site sends; the Worker's own st
     await hit(w, { e, p: "/" });
   }
   assert.deepEqual(await events(w), [{ event: "posting_click", page: "dashboard", n: 1 }, { event: "posting_click", page: "landing", n: 1 }]);
+});
+
+// Added 2026-10-06: a weekly email sign-up form sent, from whichever page had the form. Only the event
+// and the page kind are stored; the body carries no address, and anything extra in it is not kept.
+test("a weekly email sign-up is a step the site sends, counted by the page the form was on", async () => {
+  const w = await setup();
+  assert.ok(EVENTS.has("digest_signup"));
+  assert.ok(!SERVER_EVENTS.has("digest_signup"));
+  await hit(w, { e: "digest_signup", p: "/" });
+  await hit(w, { e: "digest_signup", p: "/internships/machine-learning-ai/" });
+  await hit(w, { e: "digest_signup", p: "/internships/new/" });
+  await hit(w, { e: "digest_signup", p: "/digest/", email: "someone@school.edu" });
+  assert.deepEqual(await events(w), [
+    { event: "digest_signup", page: "dashboard", n: 1 },
+    { event: "digest_signup", page: "digest", n: 1 },
+    { event: "digest_signup", page: "landing", n: 2 },
+  ]);
+  assert.ok(!JSON.stringify(await w.db.dump()).includes("someone@school.edu"), "nothing but the count is kept");
+  assert.deepEqual(await rows(w), [], "a step is not a page load");
+});
+
+test("a load of the weekly email's page is counted under its own kind", async () => {
+  const w = await setup();
+  await hit(w, { p: "/digest/", r: "", u: "bluesky", m: "social" });
+  assert.deepEqual(await rows(w), [{ day: (await rows(w))[0].day, page: "digest", source: "social", views: 1, visits: 1 }]);
 });
 
 test("countEvent adds to the same daily totals, only for the Worker's own steps, and never throws", async () => {

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import urllib.request
 from collections import Counter
@@ -51,6 +52,28 @@ STALE = timedelta(days=2)   # the ingest runs several times a day; an export old
 
 
 fresh = sp.fresh      # found this week, and not an old posting a scan only just reached
+
+# The weekly email's sign-up page (2026-10-06). Once the sign-up form has an address, every post ends
+# with a line pointing there. The address is read from the one place it is pasted, CONFIG.digest.
+# formAction in docs/index.html (seo_pages.digest_form_action, which also decides whether /digest/ has
+# a form), so the line can't go out before people can sign up. Each channel's link names the channel
+# in utm_source, as the Worker spells them (worker/src/visits.js UTM_SOCIAL), with utm_medium=social,
+# the way growth/digest.py tags its own links (this file's links carried no tag before).
+DIGEST_URL = sp.SITE + sp.DIGEST_PATH
+SIGNUP = "Every Monday by email:"
+
+
+def signup_url(channel: str) -> str:
+    return f"{DIGEST_URL}?utm_source={channel}&utm_medium=social"
+
+
+def signup_line(channel: str) -> str:
+    return f"{SIGNUP} {signup_url(channel)}"
+
+
+def digest_live(site_dir: str) -> bool:
+    """Whether the weekly email's sign-up form has an address, so its page has a form."""
+    return bool(sp.digest_form_action(site_dir))
 
 
 def candidates(site_dir: str) -> tuple[list[tuple[str, list[dict]]], datetime, Counter]:
@@ -80,17 +103,21 @@ def link(field: str, open_count: int) -> str:
     return f"{sp.SITE}/?field={quote(field)}"
 
 
-def compose(field: str, items: list[dict], open_count: int) -> tuple[str, str]:
-    """(text, url). The text ends with the url, and fits in LIMIT."""
+def compose(field: str, items: list[dict], open_count: int, signup: str = "") -> tuple[str, str]:
+    """(text, url). The text ends with the url, and fits in LIMIT. With `signup` (signup_line, once the
+    weekly email is live) that line follows the url, and employers' names are dropped first to make
+    room for it; only a post too long even with none goes out without it."""
     # was: url = f"{sp.SITE}/internships/{sp.field_slug(field)}/", which 404s for a field with no page.
     url = link(field, open_count)
     name = sp.lower_name(sp.field_title(field))
     head = f"{len(items)} new {name} internships in the Northeast and remote this week"
     employers = [c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c]
-    for n in range(min(4, len(employers)), -1, -1):
-        body = head + (f", from {', '.join(employers[:n])} and more" if n else "") + f".\n\n{url}"
-        if len(body) <= LIMIT:
-            return body, url
+    # was: one loop over n, with nothing after the url.
+    for tail in ([f"\n\n{signup}"] if signup else []) + [""]:
+        for n in range(min(4, len(employers)), -1, -1):
+            body = head + (f", from {', '.join(employers[:n])} and more" if n else "") + f".\n\n{url}" + tail
+            if len(body) <= LIMIT:
+                return body, url
     return f"{head}.\n\n{url}", url
 
 
@@ -115,17 +142,25 @@ def to_bluesky(text: str, url: str) -> str:
     handle, password = os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_APP_PASSWORD"]
     s = _post_json("https://bsky.social/xrpc/com.atproto.server.createSession",
                    {"identifier": handle, "password": password})
-    raw = text.encode("utf-8")
-    start = raw.index(url.encode("utf-8"))
     record = {"$type": "app.bsky.feed.post", "text": text,
               "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"), "langs": ["en"],
               # Without a facet the address shows as plain text: Bluesky links only what it is told to.
-              "facets": [{"index": {"byteStart": start, "byteEnd": start + len(url.encode("utf-8"))},
-                          "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}]}]}
+              # was: one facet, for url; the weekly email's line (2026-10-06) is a second link.
+              "facets": link_facets(text)}
     r = _post_json("https://bsky.social/xrpc/com.atproto.repo.createRecord",
                    {"repo": s["did"], "collection": "app.bsky.feed.post", "record": record},
                    {"Authorization": f"Bearer {s['accessJwt']}"})
     return r.get("uri", "sent")
+
+
+def link_facets(text: str) -> list[dict]:
+    """A Bluesky link facet for every web address in the text, placed by byte, as Bluesky counts."""
+    out = []
+    for m in re.finditer(r"https://\S+", text):
+        start = len(text[:m.start()].encode("utf-8"))
+        out.append({"index": {"byteStart": start, "byteEnd": start + len(m.group(0).encode("utf-8"))},
+                    "features": [{"$type": "app.bsky.richtext.facet#link", "uri": m.group(0)}]})
+    return out
 
 
 def to_mastodon(text: str) -> str:
@@ -147,10 +182,21 @@ CHANNELS = [
 ]
 
 
-def draft(site_dir: str) -> tuple[str, str] | None:
+def chosen(site_dir: str) -> tuple[str, list[dict], int] | None:
+    """This run's (field, new roles, open roles in the field), or None when no field qualifies."""
     ranked, now, open_by_field = candidates(site_dir)
-    chosen = pick(ranked, now)
-    return compose(chosen[0], chosen[1], open_by_field[chosen[0]]) if chosen else None
+    c = pick(ranked, now)
+    return (c[0], c[1], open_by_field[c[0]]) if c else None
+
+
+def draft(site_dir: str, channel: str = "") -> tuple[str, str] | None:
+    """(text, url) of this run's post. With a channel ("bluesky", ...) and the weekly email live, the
+    text ends with the sign-up line tagged for that channel; without one (the printed copy and the
+    weekly report's draft), it has no sign-up line."""
+    c = chosen(site_dir)
+    if not c:
+        return None
+    return compose(*c, signup=signup_line(channel) if channel and digest_live(site_dir) else "")
 
 
 # Where growth/cards.py's JPEGs are served from: a branch of their own, so a card every few days never
@@ -184,6 +230,7 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
         return None
     field, items = chosen
     text, url = compose(field, items, open_by_field[field])
+    live = digest_live(site_dir)
     title = sp.field_title(field)
     name = sp.lower_name(title)
     employers = [c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c]
@@ -196,12 +243,15 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
     ig = (f"{len(items)} new {name} internships in the Northeast and remote this week"
           + (f", from {named} and more" if named else "") + ".\n\n"
           "Search every one free at internscout.org (link in bio), filtered to your major and the states you pick.\n\n"
-          f"{SLOGAN} {DISCLAIMER}\n\n{tags}")
+          # A caption's address isn't a link on Instagram, so this is the short form to type; the
+          # profile's own link to /digest/ is the one that carries utm_source=instagram.
+          + ("New ones by email every Monday: internscout.org/digest\n\n" if live else "")
+          + f"{SLOGAN} {DISCLAIMER}\n\n{tags}")
     li = (f"{len(items)} new {name} internships opened in the Northeast and remote this week."
           + (f"\n\nEmployers hiring include {named}." if named else "") + "\n\n"
           "InternScout lists internships, co-ops and research programs for every major, refreshed several "
           "times a day. Searching is free and needs no account.\n\n"
-          f"{url}\n\n{SLOGAN} {DISCLAIMER}\n\n{tags}")
+          f"{url}\n\n" + (f"{signup_line('linkedin')}\n\n" if live else "") + f"{SLOGAN} {DISCLAIMER}\n\n{tags}")
     card_name = f"{today:%Y-%m-%d}-{slug}.jpg"
     # The Reel's role slides: one role per employer first, so four slides show four employers.
     roles, seen = [], set()
@@ -226,6 +276,9 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
         # The same tags as the captions, for channels that build their own text from post.json
         # (growth/youtube.py's Short description, added 2026-10-02), so every channel tags alike.
         "hashtags": tags.split(),
+        # The weekly email's link for channels that write their own text from post.json (growth/youtube.py),
+        # tagged for that channel; empty until the email is live (2026-10-06).
+        "signup": {"youtube": signup_url("youtube")} if live else {},
         "reel": today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
     }
 
@@ -300,12 +353,18 @@ def main(argv: list[str]) -> int:
         # Nothing is wrong with posting itself, so the run stays green; the ingest's own run is what failed.
         print(f"[social] not posting: {why}. The ingest has probably stalled; a post now would repeat old news.")
         return 0
-    post = draft(site_dir)
-    if not post:
+    pick_ = chosen(site_dir)
+    if not pick_:
         print("[social] no field gained enough new nearby listings this week; nothing to post")
         return 0
-    text, url = post
+    text, url = compose(*pick_)
     print(text)
+    # Each account's own copy (2026-10-06): the same post, ending with the weekly email's line tagged for
+    # that account once the email is live. was: one text for every account.
+    live = digest_live(site_dir)
+    texts = {name: compose(*pick_, signup=signup_line(name.lower()) if live else "")[0] for name, _, _ in CHANNELS}
+    if live:
+        print(f"[social] each account's copy ends with: {SIGNUP} {DIGEST_URL}?utm_source=<account>&utm_medium=social")
     out_dir = next((a.split("=", 1)[1] for a in argv if a.startswith("--out=")), None)
     data, failed = None, []
     if out_dir:
@@ -335,7 +394,7 @@ def main(argv: list[str]) -> int:
         if not all(os.environ.get(k) for k in needs):
             continue
         try:
-            print(f"[social] {name}: {send(text, url)}")
+            print(f"[social] {name}: {send(texts[name], url)}")
         except Exception as e:          # one account failing must not stop the others
             # Only the type: an HTTPError's text can carry the webhook URL or the instance's answer.
             print(f"[social] {name} failed: {type(e).__name__}")

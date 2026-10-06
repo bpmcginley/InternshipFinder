@@ -765,6 +765,17 @@
     return `https://github.com/${C.repo}/issues/new?template=${encodeURIComponent(C.reportTemplate || "wrong_tag.yml")}&title=${encodeURIComponent(title)}`;
   }
 
+  // ---------- weekly email ----------
+  // The newsletter's public web archive on Buttondown, worked out from the sign-up form's address
+  // (CONFIG.digest.formAction, the one place it is pasted): ".../api/emails/embed-subscribe/NAME" ->
+  // "https://buttondown.com/NAME/archive/". "" for any other address, so the dashboard shows no
+  // "See last Monday's email" link it can't vouch for. backend/internscout/seo_pages.py digest_archive
+  // does the same for the landing pages (added 2026-10-06).
+  function digestArchive(formAction) {
+    const m = /^https:\/\/buttondown\.(?:com|email)\/api\/emails\/embed-subscribe\/([A-Za-z0-9_-]+)\/?$/.exec(String(formAction || ""));
+    return m ? `https://buttondown.com/${m[1]}/archive/` : "";
+  }
+
   window.IS = {
     C, DAY, US_STATES, CA_PROVINCES, CANADA_KEYS, isCanadaKey, inCanadaOnly, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
     fieldLabel, keyLabel, termText, ls, ss,
@@ -780,6 +791,6 @@
     workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, plansBanner, PLANS_BANNER_KEY, PLANS_BANNER_ID, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     INVITE_NUDGE_KEY, inviteNudgeDue, inviteNudgeSeen, markInviteNudge,
-    reportUrl, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
+    reportUrl, digestArchive, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();
