@@ -28,7 +28,7 @@ Proposed: `InternScout Auto-Apply: Internship Application Autofill` (55 characte
 
 Current: Fills internship applications from your saved profile and stops at the submit button. It never
 submits an application for you.
-Proposed (129 characters): `Autofill internship applications on Workday, Greenhouse, Lever and more from your resume. Stops at Submit: you always send it.`
+Proposed (126 characters): `Autofill internship applications on Workday, Greenhouse, Lever and more from your resume. Stops at Submit: you always send it.`
 
 ## Description
 
