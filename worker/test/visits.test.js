@@ -135,6 +135,40 @@ test("channel rows stop at the day's cap and skip robots, like the visit counts"
     "past the day's cap no channel is counted either");
 });
 
+// Printed flyers (2026-10-06): growth/flyers.py prints ?utm_source=flyer-<spot>&utm_medium=print.
+test("a flyer scan is source print, and its own channel per posting spot", async () => {
+  assert.equal(sourceOf("", "flyer-library", "print"), "print");
+  assert.equal(sourceOf("", "flyer", ""), "print");
+  assert.equal(channelOf("", "flyer-library"), "flyer-library");
+  assert.equal(channelOf("", "flyer-ThisIsWayTooLongForASpotTag"), "", "only short [a-z0-9-] tags");
+  assert.equal(channelOf("", "flyers"), "");
+  const w = await setup();
+  await hit(w, { p: "/", r: "", u: "flyer-library", m: "print" });
+  await hit(w, { p: "/", r: "", u: "flyer-library", m: "print" });
+  await hit(w, { p: "/", r: "", u: "flyer-isb", m: "print" });
+  assert.deepEqual(await channels(w), [
+    { day: "2026-09-14", channel: "flyer-isb", views: 1, visits: 1 },
+    { day: "2026-09-14", channel: "flyer-library", views: 2, visits: 2 },
+  ]);
+  assert.deepEqual((await rows(w)).map((r) => r.source), ["print"]);
+});
+
+test("made-up flyer tags cannot add more than a day's share of rows", async () => {
+  const w = await setup();
+  // Each from its own address, past the per-minute limit's reach.
+  for (let i = 0; i < 45; i++) {
+    await hit(w, { p: "/", r: "", u: `flyer-x${i}` }, { ...SITE, "CF-Connecting-IP": `10.0.0.${i}` });
+  }
+  const flyer = (await channels(w)).filter((c) => c.channel.startsWith("flyer"));
+  assert.equal(flyer.length, 40);
+  // A tag already counted today keeps counting, and social channels are never held back.
+  await hit(w, { p: "/", r: "", u: "flyer-x0" }, { ...SITE, "CF-Connecting-IP": "10.0.1.1" });
+  await hit(w, { p: "/", r: "", u: "youtube" }, { ...SITE, "CF-Connecting-IP": "10.0.1.2" });
+  const after = await channels(w);
+  assert.equal(after.find((c) => c.channel === "flyer-x0").views, 2);
+  assert.ok(after.find((c) => c.channel === "youtube"));
+});
+
 test("steps are counted by event and page, and only known ones", async () => {
   const w = await setup();
   await hit(w, { e: "install_click", p: "/internships/ohio/" });

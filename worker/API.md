@@ -290,7 +290,7 @@ One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` a
 `{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email" }` (path, referring
 host, utm_source, utm_medium; all optional). Answers `204` and adds one to `visit_counts` for the UTC
 day, the page kind (`dashboard`, `landing`, `install`, `legal`, `other`) and the source (`direct`,
-`search`, `social`, `email`, `extension`, `other`, or `internal` for a load from another page of the
+`search`, `social`, `email`, `extension`, `print` (a flyer's QR code), `other`, or `internal` for a load from another page of the
 site, which counts as a view but not a visit). Nothing about the visitor is stored.
 A `social` load also adds one to `visit_channels` for the day and the site (added 2026-10-05):
 `youtube`, `tiktok`, `x`, `facebook`, `reddit`, `instagram`, `bluesky`, `mastodon`, `linkedin`,
@@ -298,6 +298,10 @@ A `social` load also adds one to `visit_channels` for the day and the site (adde
 from the family of `r` (`youtu.be`, `l.facebook.com`, `t.co` and the like). `source` stays `social`,
 so the dashboard's and `growth/metrics.py`'s sums are unchanged; the weekly scorecard reads
 `SELECT channel, SUM(visits) FROM visit_channels WHERE day >= date('now','-6 day') GROUP BY channel`.
+A printed flyer's QR code (added 2026-10-06) carries `utm_source=flyer-<spot>&utm_medium=print`: its
+`source` is `print` and its channel is the tag itself (`flyer-library`), one per posting location. Tags
+must match `flyer` or `flyer-[a-z0-9]{1,16}`, and a day takes at most 40 distinct flyer channels, so a
+hand-typed URL cannot add rows without limit.
 With `"e"` it is a step instead of a page load: `{ "e": "signin", "p": "/" }` adds one to
 `event_counts` for the day, the step and the page kind. Steps: `install_click`, `signin_start`,
 `signin`, `profile`, `autoapply`, `checkout`, `invite_open` (a signed-in student opened their invite
