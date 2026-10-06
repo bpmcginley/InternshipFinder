@@ -89,6 +89,21 @@ CREATE TABLE IF NOT EXISTS visit_counts (
   PRIMARY KEY (day, page, source)
 );
 
+-- The `social` loads above once more by site (added 2026-10-05; src/visits.js channelOf()): youtube,
+-- tiktok, x, facebook, reddit, instagram, bluesky, mastodon (and linkedin, threads, discord), from the
+-- link's utm_source or else the referring host. The dashboard and growth/metrics.py keep adding up
+-- source = 'social'; the weekly scorecard reads this to tell the channels apart. A day's rows never
+-- add up to more than its `social` row in visit_counts, and they are under the same daily cap. A new
+-- table rather than a column on visit_counts, because CREATE TABLE IF NOT EXISTS never adds a column
+-- to a table that is already live. Totals only, like visit_counts.
+CREATE TABLE IF NOT EXISTS visit_channels (
+  day TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  visits INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, channel)
+);
+
 -- Steps toward using InternScout per day (added 2026-10-01; src/visits.js EVENTS): install_click,
 -- signin_start, signin, profile, autoapply, checkout, by the page kind they happened on. Counts only,
 -- like visit_counts: nothing about who did them.
