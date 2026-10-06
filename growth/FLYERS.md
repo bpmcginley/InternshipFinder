@@ -15,8 +15,8 @@ the back. Both faces are complete flyers, because people on each side of the gla
 
 **The printed set (2026-10-06):** `internscout-glass-general.pdf` for anywhere, and one per location:
 `worcesternorth`, `worcestersouth`, `ilcnorth` (ILC North), `haigismall` (Haigis Mall), `studentunion`.
-Each was checked by decoding its QR code. The "Posted" line is blank on purpose: write the date on the day
-it goes up (posting rules ask for a date).
+Each was checked by decoding its QR code. They carry no date (Bruce, 2026-10-06; was a blank "Posted" line).
+UMass posting rules ask for one, so write it on by hand where a building requires it, or print with `--posted`.
 
 **Make one per spot.** `python growth/glass_flyer.py --spots lib,isb,su` writes one
 PDF per posting location (`--posted "Oct 7, 2026"` prints a date instead of the blank line). Each QR code opens `https://internscout.org/?utm_source=flyer-<spot>&utm_medium=print`,
