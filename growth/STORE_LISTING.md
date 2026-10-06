@@ -17,18 +17,19 @@ Written 2026-10-06 from the live 0.5.4 listing. Four reasons to change it now:
 4. **The search site is the reason to install,** and the old text didn't name it or its size.
 
 The name and summary come from `extension/manifest.json` ("name" and "description"), so they only change
-with a release. They are left as they are in 0.5.5; the proposed versions are below for Bruce to decide.
+with a release. Bruce approved the new ones on 2026-10-06 and they ship in 0.5.5. The toolbar button's
+tooltip (`action.default_title`) stays "InternScout Auto-Apply", which reads better on hover.
 
 ## Name (manifest "name", max 75 characters)
 
 Current: `InternScout Auto-Apply`
-Proposed: `InternScout Auto-Apply: Internship Application Autofill` (55 characters)
+Now: `InternScout Auto-Apply: Internship Application Autofill` (55 characters)
 
 ## Summary (manifest "description", max 132 characters)
 
 Current: Fills internship applications from your saved profile and stops at the submit button. It never
 submits an application for you.
-Proposed (126 characters): `Autofill internship applications on Workday, Greenhouse, Lever and more from your resume. Stops at Submit: you always send it.`
+Now (126 characters): `Autofill internship applications on Workday, Greenhouse, Lever and more from your resume. Stops at Submit: you always send it.`
 
 ## Description
 
