@@ -2,7 +2,7 @@
 
     python growth/glass_flyer.py                      # one generic flyer, tag flyer-campus
     python growth/glass_flyer.py --spots lib,isb,su   # one PDF per posting spot
-    python growth/glass_flyer.py --posted "Oct 7, 2026"
+    python growth/glass_flyer.py --posted "Oct 7, 2026"     # default: a blank line to write the date on
 
 Writes output/pdf/internscout-glass-<spot>.pdf (page 1 = front, page 2 = back) and PNG previews of
 each side under output/flyer-preview/. Needs `segno` (pip install segno) for the QR codes and Chrome or
@@ -29,7 +29,6 @@ worked. A spot is 1-16 lowercase letters or digits.
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import html
 import io
 import json
@@ -113,6 +112,8 @@ body { font-family: "IBM Plex Sans", Arial, Helvetica, sans-serif; color: var(--
         line-height: 1.35; display: flex; justify-content: space-between; gap: .2in }
 .foot b { font-weight: 700 }
 .foot .date { white-space: nowrap }
+.foot .blank { display: inline-block; width: 1.25in; border-bottom: .015in solid var(--ink); margin-left: .05in }
+.lead b { font-weight: 700 }
 """
 
 FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black'
@@ -122,12 +123,12 @@ FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=
 def front(f: dict, qr: str, posted: str) -> str:
     return f"""
 <section class="page"><div class="panel">
-  <div class="eyebrow">For college students · every major</div>
+  <div class="eyebrow">Made by a UMass student · every major</div>
   <div class="big n">{f['roles']}</div>
   <div class="big h2">internships.</div>
   <div class="h3">Every major. One free search.</div>
-  <p class="lead">Stop checking ten job boards. Internships, co-ops and research roles from
-    {f['employers']} employers, updated several times a day.</p>
+  <p class="lead"><b>No account needed.</b> Stop checking ten job boards: {f['employers']} employers,
+    updated several times a day.</p>
   <div class="strip"><b>.edu email = 2&times; free Auto-Apply</b>: the extension that fills
     applications from your resume.</div>
   <div class="spacer"></div>
@@ -135,13 +136,13 @@ def front(f: dict, qr: str, posted: str) -> str:
     <div class="cta-text">
       <div class="scan">Scan to see internships for <u>your</u> <span class="nw">major &#8594;</span></div>
       <div class="url">internscout.org</div>
-      <div class="free">Free to use. No account. No&nbsp;credit&nbsp;card.</div>
+      <div class="free">Free to use. No&nbsp;credit&nbsp;card.</div>
       <div class="cond">Optional $4 and $8 plans only raise the AI allowance.</div>
     </div>
     <div class="qr" aria-label="QR code to internscout.org">{qr}</div>
   </div>
   <div class="foot"><span><b>{html.escape(SLOGAN)}</b> Independent student project; not affiliated with
-    UMass Amherst.</span><span class="date">Posted {html.escape(posted)}</span></div>
+    UMass Amherst.</span><span class="date">Posted {html.escape(posted) if posted else '<span class="blank"></span>'}</span></div>
 </div></section>"""
 
 
@@ -170,7 +171,7 @@ def back(f: dict, qr: str, posted: str) -> str:
     <div class="qr" aria-label="QR code to internscout.org">{qr}</div>
   </div>
   <div class="foot"><span><b>{html.escape(SLOGAN)}</b> Independent student project; not affiliated with
-    UMass Amherst.</span><span class="date">Posted {html.escape(posted)}</span></div>
+    UMass Amherst.</span><span class="date">Posted {html.escape(posted) if posted else '<span class="blank"></span>'}</span></div>
 </div></section>"""
 
 
@@ -205,8 +206,8 @@ def render(html_text: str, pdf: Path | None = None, png: Path | None = None) -> 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--spots", default="campus", help="comma-separated posting spots, e.g. lib,isb,su")
-    ap.add_argument("--posted", default=dt.date.today().strftime("%b %-d, %Y") if sys.platform != "win32"
-                    else dt.date.today().strftime("%b %#d, %Y"), help='date printed on the flyer, e.g. "Oct 7, 2026"')
+    # was: default=today's date. Each sheet goes up on its own day, so the default is a line to write on.
+    ap.add_argument("--posted", default="", help='date printed on the flyer, e.g. "Oct 7, 2026"; blank by default')
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args(argv)
     spots = [s.strip().lower() for s in args.spots.split(",") if s.strip()]

@@ -13,8 +13,13 @@ the back. Both faces are complete flyers, because people on each side of the gla
 | QR (3 in) | bottom right, "Scan to see internships for your major" | bottom left, "Scan to search 14,000+ internships" |
 | Free | "Free to use. No account. No credit card." with "Optional $4 and $8 plans only raise the AI allowance" beside it | the same |
 
-**Make one per spot.** `python growth/glass_flyer.py --spots lib,isb,su --posted "Oct 7, 2026"` writes one
-PDF per posting location. Each QR code opens `https://internscout.org/?utm_source=flyer-<spot>&utm_medium=print`,
+**The printed set (2026-10-06):** `internscout-glass-general.pdf` for anywhere, and one per location:
+`worcesternorth`, `worcestersouth`, `ilcnorth` (ILC North), `haigismall` (Haigis Mall), `studentunion`.
+Each was checked by decoding its QR code. The "Posted" line is blank on purpose: write the date on the day
+it goes up (posting rules ask for a date).
+
+**Make one per spot.** `python growth/glass_flyer.py --spots lib,isb,su` writes one
+PDF per posting location (`--posted "Oct 7, 2026"` prints a date instead of the blank line). Each QR code opens `https://internscout.org/?utm_source=flyer-<spot>&utm_medium=print`,
 which the Worker counts as source `print` with its own channel per spot (`visit_channels`), so the weekly
 numbers say which wall brought visits: `SELECT channel, SUM(visits) FROM visit_channels WHERE channel LIKE
 'flyer%' GROUP BY channel`. Spots are 1-16 lowercase letters or digits. The role count is read from
@@ -48,6 +53,20 @@ numbers say which wall brought visits: `SELECT channel, SUM(visits) FROM visit_c
   Through glass, the 3 in code still decodes; scan at a slight angle if there is glare. (Checked: both codes
   decode from the rendered page at 100%, 50% and 30% scale.)
 
+### Where and when
+
+- **Head-on glass, not side glass.** A flyer flat on a wall or partition can't be read at angles under about
+  30°, so pick glass people walk *toward* (doors, the end of a corridor, the wall facing a stair or queue),
+  not glass running alongside a corridor.
+- **Where career thinking happens:** near the career center, department lounges and study spaces, and in
+  the two weeks before a career fair. In-person channels work best for intern recruiting (NACE).
+- **Test before you leave:** scan the posted flyer from both sides of the glass, with an iPhone and an
+  Android, at about 3 ft. Scan at a slight angle if the glass reflects.
+- **Refresh every two weeks** (Student Union event postings stay up 14 days) and note the date, so a
+  sheet's scans can be read against how long it was up.
+- **Read the results on Mondays:** `SELECT channel, SUM(visits) FROM visit_channels WHERE channel LIKE
+  'flyer%' GROUP BY channel`. Steps after a scan (posting clicks, installs) show in the dashboard's funnel.
+
 ### Before posting: UMass rules
 
 - Campus regulation T90-079: "The use of wall space or other surfaces within or on the outside of campus
@@ -80,6 +99,11 @@ Amherst; a sponsoring student organization, if a board requires one, has to be a
   ([16 CFR 251.1](https://www.ecfr.gov/current/title-16/chapter-I/subchapter-B/part-251/section-251.1)).
 - **Exact numbers and the reader's own words:** precise figures read as researched; "ten job boards" and
   retyping a resume into Workday are complaints students voice themselves.
+- **Fewer steps first:** taking a step away moves behavior far more than information does (FAFSA filing
+  rose from about 40% to 55% when the form was filled in for families; Bettinger et al. 2012), so "No account
+  needed" leads the front's body and "fills applications from your resume" leads the back.
+- **A peer from the reader's own setting:** norms work best when they come from people like the reader
+  (Goldstein, Cialdini & Griskevicius 2008), hence "Made by a UMass student" on the front, with no name.
 - **A benefit line beside the QR code and the URL in type:** codes with a specific call to action are
   reported to be scanned far more than "scan me" (vendor data), and the typed URL serves anyone who will not
   scan. Size follows the 10:1 distance rule; through glass, 2.5 in or more.
