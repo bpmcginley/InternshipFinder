@@ -10539,9 +10539,8 @@
   "spreeai": {
    "name": "SpreeAI ",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-10-06"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "stag-careers": {
    "name": "STAG",
