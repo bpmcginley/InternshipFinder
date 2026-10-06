@@ -198,7 +198,11 @@
            SERVER_EVENTS: a first-seen account, a sign-in from the extension, an account's first
            Auto-Apply of the month, a run refused at the monthly limit, a plan bought), all into the
            same daily totals with no account attached. -->
-      <li>Because Cloudflare only samples visits, our own server also counts them. Each page load sends the page's address, the name of the site that linked to it (such as google.com, not the full link) and any campaign tag on the link. We keep only daily totals by kind of page and where visits came from, for example "landing pages, from search: 12". The same way, we count how many times a day a few steps happen (pressing a link to the Chrome Web Store, opening a posting, our server seeing an account for the first time, signing in on the site or in the extension, saving a first profile, starting Auto-Apply, a first Auto-Apply of the month, reaching a monthly limit, opening your invite link, opening a plan's checkout, buying a plan), as totals that say nothing about who. Your IP address is seen only to stop floods of fake visits; it's held in memory for a minute and never saved. If you open any page with <code>?nocount=1</code> at the end of its address, your browser keeps one setting that turns this counting off for it; <code>?nocount=0</code> turns it back on.</li>
+      <!-- 2026-10-06: "digest_signup" (docs/js/count.js), sending a weekly email sign-up form, joined the
+           same totals, by the kind of page the form was on. Only that the form was sent: count.js never
+           reads the address or the ticked fields, which go from the browser to Buttondown alone.
+           was: ... (pressing a link to the Chrome Web Store, opening a posting, our server seeing ...) -->
+      <li>Because Cloudflare only samples visits, our own server also counts them. Each page load sends the page's address, the name of the site that linked to it (such as google.com, not the full link) and any campaign tag on the link. We keep only daily totals by kind of page and where visits came from, for example "landing pages, from search: 12". The same way, we count how many times a day a few steps happen (pressing a link to the Chrome Web Store, opening a posting, sending the weekly email's sign-up form (only that it was sent, never the address you typed), our server seeing an account for the first time, signing in on the site or in the extension, saving a first profile, starting Auto-Apply, a first Auto-Apply of the month, reaching a monthly limit, opening your invite link, opening a plan's checkout, buying a plan), as totals that say nothing about who. Your IP address is seen only to stop floods of fake visits; it's held in memory for a minute and never saved. If you open any page with <code>?nocount=1</code> at the end of its address, your browser keeps one setting that turns this counting off for it; <code>?nocount=0</code> turns it back on.</li>
       <li>We don't use ad trackers, and we set no cookies of our own.</li>
     </ul>
 
@@ -433,7 +437,10 @@
          tracking. Whether Buttondown records opens and clicks depends on the newsletter's settings,
          which were not checked; if it is on, add a line saying so. -->
     <h2 id="digest">If you sign up for the weekly email</h2>
-    <p>The weekly email is optional. Search, your profile and everything else on InternScout work without it. You sign up with the form under the listings on the dashboard.</p>
+    <!-- was: "...You sign up with the form under the listings on the dashboard." Since 2026-10-06 the same
+         form (backend/internscout/seo_pages.py signup_form) is on each field's page, /internships/new/
+         and /digest/, posting to the same Buttondown list in the same way. -->
+    <p>The weekly email is optional. Search, your profile and everything else on InternScout work without it. You sign up with a form: under the listings on the dashboard, on each field's page and the "New internships this week" page under <a href="/internships/">internscout.org/internships</a>, or on <a href="/digest/">internscout.org/digest</a>. Every one of them works the same way, as described here.</p>
     <ul>
       <!-- was: <li><strong>What it contains:</strong> internships InternScout found in the past week, picked for the fields you ticked, with links to the postings. If you ticked none, it covers every field.</li>
            growth/digest_send.py sends one email to every subscriber, built from the fields with the most new
@@ -445,6 +452,9 @@
            That read as the whole record. Buttondown also keeps the IP address a subscriber signed up from, a
            rough location from it, and the page the form was on, and shows them on the subscriber's record. -->
       <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked, whether you have confirmed, and what Buttondown records when you sign up: the IP address you signed up from, a rough location worked out from it, and the page the form was on. Open and click tracking is switched off for this email. The list is used only to send this email, is never sold or shared, and is not copied anywhere else.</li>
+      <!-- Added 2026-10-06: the everyone-send in .github/workflows/digest.yml passes --public-archive, and the
+           forms link the archive (Buttondown's page, not ours) as "See last Monday's email". -->
+      <li><strong>Past emails are public.</strong> Each week's email is also posted on the newsletter's web archive at Buttondown, which the sign-up forms link as "See last Monday's email", so you can read one before signing up. The email is the same for everyone and has nothing about any subscriber in it. The archive is Buttondown's page, so opening it is a visit to Buttondown under its privacy policy.</li>
       <li>Signing up again with other fields adds them to the ones you had; it doesn't remove any. To drop a field, write to us, or unsubscribe and sign up again.</li>
       <li><strong>Unsubscribing:</strong> every email has an unsubscribe link at the bottom, and it stops the emails. To have your address deleted from Buttondown's list as well, write to us at the address under <em>Contact</em> below.</li>
     </ul>

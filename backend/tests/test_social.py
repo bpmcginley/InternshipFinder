@@ -178,3 +178,86 @@ def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, m
     assert base64.b64decode(insert[-1]) == b"\xff\xd8jpeg"
     social.save_drafts(data, "token", str(tmp_path / "missing.jpg"))     # no card: the text still saves
     assert [p for s, p in calls if s.startswith("INSERT")][-1][-1] is None
+
+
+# ---------------------------------------------------------------- the weekly email's line (2026-10-06)
+
+FORM = "https://buttondown.com/api/emails/embed-subscribe/internscout-test"
+
+
+def _live(site, action=FORM):
+    """The dashboard's config line, as docs/index.html writes it: the one place the form address lives."""
+    with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
+        f.write(f'<script>window.CONFIG = {{\n    digest: {{ provider: "Buttondown", formAction: "{action}" }},\n}};</script>')
+    return site
+
+
+def test_the_signup_line_is_tagged_per_channel_and_fits_bluesky():
+    items = [_x(i, "A Very Long Employer Name Incorporated %d" % i) for i in range(40)]
+    for channel in ("bluesky", "mastodon", "discord"):
+        line = social.signup_line(channel)
+        assert line == f"Every Monday by email: https://internscout.org/digest/?utm_source={channel}&utm_medium=social"
+        text, url = social.compose("ml", items, 40, signup=line)
+        assert len(text) <= social.LIMIT and text.endswith("\n\n" + line) and url in text
+    # Employers' names give way to the line, not the other way round.
+    short = [_x(i, f"Co {i}") for i in range(6)]
+    text, _ = social.compose("ml", short, 40, signup=social.signup_line("bluesky"))
+    assert text.endswith(social.signup_line("bluesky")) and "from Co" in text
+
+
+def test_a_post_too_long_for_the_line_goes_out_without_it(monkeypatch):
+    monkeypatch.setattr(social, "LIMIT", 140)
+    text, url = social.compose("ml", [_x(i, "Co") for i in range(6)], 40, signup=social.signup_line("bluesky"))
+    assert "digest" not in text and text.endswith(url) and len(text) <= 140
+
+
+def test_the_line_goes_out_only_once_the_form_has_an_address(tmp_path, monkeypatch, capsys):
+    sent = {}
+    for k in ("BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD", "MASTODON_URL", "MASTODON_TOKEN", "DISCORD_WEBHOOK_URL"):
+        monkeypatch.setenv(k, "x")
+    monkeypatch.setattr(social, "to_bluesky", lambda t, u: sent.setdefault("Bluesky", t) and "ok")
+    monkeypatch.setattr(social, "to_mastodon", lambda t: sent.setdefault("Mastodon", t) and "ok")
+    monkeypatch.setattr(social, "to_discord", lambda t: sent.setdefault("Discord", t) and "ok")
+    monkeypatch.setattr(social, "CHANNELS", [
+        ("Bluesky", ("BLUESKY_HANDLE",), lambda t, u: social.to_bluesky(t, u)),
+        ("Mastodon", ("MASTODON_URL",), lambda t, u: social.to_mastodon(t)),
+        ("Discord", ("DISCORD_WEBHOOK_URL",), lambda t, u: social.to_discord(t))])
+    site = _live(_site(tmp_path, _now() - timedelta(hours=1)), action="")
+    assert social.main(["social.py", site, "--send"]) == 0
+    assert sent and not [t for t in sent.values() if "digest" in t]                 # empty: no line anywhere
+    sent.clear()
+    _live(site)
+    assert social.main(["social.py", site, "--send"]) == 0
+    for name, text in sent.items():
+        assert text.endswith(f"https://internscout.org/digest/?utm_source={name.lower()}&utm_medium=social"), name
+        assert len(text) <= social.LIMIT
+    assert set(sent) == {"Bluesky", "Mastodon", "Discord"}
+    assert social.draft(site)[0].count("digest") == 0                                 # the report's copy
+    assert social.draft(site, "bluesky")[0].endswith("utm_source=bluesky&utm_medium=social")
+
+
+def test_bluesky_links_both_addresses_by_byte():
+    text = "5 new café internships.\n\nhttps://internscout.org/internships/x/\n\n" + social.signup_line("bluesky")
+    facets = social.link_facets(text)
+    raw = text.encode("utf-8")
+    got = [raw[f["index"]["byteStart"]:f["index"]["byteEnd"]].decode() for f in facets]
+    assert got == ["https://internscout.org/internships/x/", social.signup_url("bluesky")]
+    assert [f["features"][0]["uri"] for f in facets] == got
+
+
+def test_the_picture_channels_carry_the_line_once_live(tmp_path, monkeypatch):
+    items = [{"company_name": c, "title": "Intern", "keys": {"MA"}} for c in ["Baker Tilly", "Crowe", "MFS"] * 2]
+    monkeypatch.setattr(social, "candidates", lambda site: ([("accounting", items)], NOW, {"accounting": 200}))
+    site = str(tmp_path)
+    off = social.card_data(site, today=NOW)
+    assert off["signup"] == {} and "digest" not in off["linkedin_text"] + off["instagram_caption"]
+    on = social.card_data(_live(site), today=NOW)
+    assert social.signup_line("linkedin") in on["linkedin_text"] and len(on["linkedin_text"]) <= social.LINKEDIN_MAX
+    assert "internscout.org/digest" in on["instagram_caption"] and len(on["instagram_caption"]) <= social.IG_CAPTION_MAX
+    assert on["signup"] == {"youtube": "https://internscout.org/digest/?utm_source=youtube&utm_medium=social"}
+    # Each line still ends the post's own text, ahead of the slogan and the tags.
+    assert on["linkedin_text"].index("digest") < on["linkedin_text"].index(social.SLOGAN)
+    import youtube
+    desc = youtube.description_for(on)
+    assert "Every Monday by email: https://internscout.org/digest/?utm_source=youtube&utm_medium=social" in desc
+    assert "digest" not in youtube.description_for(off)

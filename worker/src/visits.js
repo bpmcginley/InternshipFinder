@@ -21,9 +21,13 @@ const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.l
 // "posting_click" (added 2026-10-04): a click through to a posting, from a landing page's a.go link or
 // the dashboard's a.open-link (docs/js/count.js). The store click was the last step the site could see.
 // was: export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout"]);
+// "digest_signup" (added 2026-10-06): a weekly email sign-up form was sent (docs/js/count.js), on the
+// dashboard, a landing page or /digest/. The address goes from the browser to Buttondown only; this is
+// the day's count of sends by page kind, so it can't tell a confirmed subscriber from a typo.
 // was: export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open"]);
+// was: export const EVENTS = new Set([..., "invite_open", "posting_click"]);
 export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open",
-  "posting_click"]);
+  "posting_click", "digest_signup"]);
 // Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
 // table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
 //   new_account     the Worker saw an account for the first time (an accounts row was made)
@@ -79,13 +83,15 @@ function tooFast(ip, now) {
 }
 
 // "/internships/massachusetts/" -> "landing"; anything unknown is "other", so a made-up path cannot
-// add rows. Paths are never stored as sent.
+// add rows. Paths are never stored as sent. "/digest/" (the weekly email's page, added 2026-10-06) is
+// "digest" rather than "other", so its visits and its sign-ups can be read apart from /about/ and the rest.
 export function pageKind(path) {
   const p = String(path || "/").split(/[?#]/)[0].replace(/\/index\.html$/, "/").replace(/\.html$/, "").replace(/\/+$/, "") || "/";
   if (p === "/") return "dashboard";
   if (p === "/internships" || p.startsWith("/internships/")) return "landing";
   if (p === "/install") return "install";
   if (p === "/privacy" || p === "/terms") return "legal";
+  if (p === "/digest") return "digest";
   return "other";
 }
 

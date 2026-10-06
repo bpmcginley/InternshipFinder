@@ -414,9 +414,13 @@
   // ticked box is one `tag` value. The value is the tag key ("swe"), not its label, because the key is
   // what listings carry in field_tags and it never changes wording. Buttondown adds tags on a repeat
   // sign-up rather than replacing them, so unticking a box later cannot remove a tag.
+  // The past emails (2026-10-06): Buttondown's public web archive of the newsletter, worked out from the
+  // form's address (IS.digestArchive), so a student can see what they'd get before giving an address.
+  // js/count.js counts a submit of this form (class "digest") as "digest_signup", with nothing about who.
   function Digest({ cfg, fields, hasProfile, onSetup }) {
     const [sent, setSent] = useState(false);
     const prov = cfg.provider || "Buttondown";
+    const archive = IS.digestArchive(cfg.formAction);
     // Only the form's status line changes on submit. The form and its inputs stay mounted, because
     // React can re-render before the browser has read the fields it is about to send.
     return h("form", { id: "digest-form", className: "notice quietnote digest", action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
@@ -424,6 +428,8 @@
       h("b", { id: "digest-title" }, "Email me new internships each week. "),
       `One email a week; unsubscribe any time. You'll get a confirmation email first, and nothing else arrives until you click its link. Your address${fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email, not to InternScout's servers. `,
       h("a", { href: "privacy.html#digest" }, "Details"),
+      archive && " · ",
+      archive && h("a", { href: archive, target: "_blank", rel: "noopener" }, "See last Monday's email"),
       // The key remounts the boxes when the profile's fields change, so each new field starts ticked.
       fields.length > 0
         // was: h("legend", null, "Fields from your profile")

@@ -520,6 +520,31 @@ def dedupe_roles(items: list[dict]) -> list[dict]:
     return out
 
 
+# The weekly email's "new" count (2026-10-06): moved here from growth/digest.py, which still names
+# them (digest.unique_roles, digest.new_roles), so the sign-up forms on the pages built here can quote
+# the email's own number without importing growth/. One rule, one copy.
+DIGEST_MIN_NEW = 3     # new roles a field needs in a week to get a section in the email (was: digest.MIN_NEW = 3)
+
+
+def unique_roles(items: list[dict]) -> list[dict]:
+    """One row per role. dedupe_roles matches on title and place, so it runs within each employer:
+    two companies that each post a "Software Engineering Intern" in Boston are two roles."""
+    by_employer: dict[str, list[dict]] = {}
+    for x in items:
+        by_employer.setdefault(employer_key(x.get("company_name") or ""), []).append(x)
+    return [x for group in by_employer.values() for x in dedupe_roles(group)]
+
+
+def new_roles(d: dict, now: datetime) -> list[dict]:
+    """This week's new roles, as every growth output counts them: found this week by fresh (the
+    rule /internships/new/ uses), then one row per role within each employer (unique_roles). The
+    digest's subject, the brand posts' counts, the dashboard metrics and the sign-up forms' numbers
+    all use this one number. stats.json's "new" (export_static's is_new) counts every listing a scan
+    first saw in the last week, before either step, so it runs a little higher; it is the dashboard's
+    own badge count."""
+    return unique_roles([x for x in d["listings"] if fresh(x, now, d["baseline"])])
+
+
 def student_share(items: list[dict]) -> float:
     return sum(1 for x in items if set(x.get("stage") or []) & STUDENT_STAGES) / len(items) if items else 0.0
 
@@ -757,8 +782,18 @@ border:1px solid var(--rule);border-radius:10px}.tier.pick{border-color:var(--ac
 font-weight:600;padding:3px 9px;border-radius:999px}
 .anchor{font-size:17px;margin:20px 0 0}ul.plain{padding-left:18px;color:var(--ink2)}ul.plain li{margin:6px 0}
 @media (max-width:720px){.tiers{grid-template-columns:1fr}}
+form.digest{margin:28px 0 8px;padding:16px 18px;background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+form.digest h2{font:600 20px/1.3 "Source Serif 4",Georgia,serif;margin:0 0 6px}form.digest p{margin:0 0 8px;color:var(--ink2)}
+.check{display:flex;gap:8px;align-items:baseline;color:var(--ink2);font-size:15px;margin:10px 0 0}
+.digest-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 10px}.digest-row label{font-weight:600}
+.digest-row input{flex:1 1 220px;min-width:0;max-width:340px;height:40px;padding:0 10px;border:1px solid var(--ink3);
+border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.digest-row .cta{margin:0;border:0;font:inherit;font-weight:600;cursor:pointer}form.digest .fine{font-size:14px;color:var(--ink3);margin:0}
 """
-# The last eleven lines (2026-10-05) are /pricing/: three tier cards in a row, the recommended one
+# The last seven lines (2026-10-06) are the weekly email's sign-up form (signup_form): a panel like the
+# Auto-Apply card, with the email box and button on one row that wraps on a phone. The box's border is
+# ink3, not rule, so the field itself can be seen (rule is too faint for a control you type into).
+# The eleven lines before those (2026-10-05) are /pricing/: three tier cards in a row, the recommended one
 # ringed in the accent with a "Most popular" badge, stacked on a phone.
 # The last five lines (2026-10-02) are the tables and headed sections of /compare/ and
 # /internships/highest-paying/. A wide table scrolls inside .tablewrap, never the page; the
@@ -784,7 +819,84 @@ def beacon_from(site_dir: str) -> str:
     return "\n".join(m.group(0) for m in tags if m)
 
 
+# ---- the weekly email's sign-up form (2026-10-06)
+# The form's address is pasted in one place: CONFIG.digest.formAction in docs/index.html, which the
+# dashboard's own form reads in the browser. The pages built here read it from that same file at
+# build time, as beacon_from reads the analytics tags, and growth/social.py reads it the same way. So
+# the address turns on every form, and the brand posts' sign-up line, at the next deploy, and there is
+# no second copy to forget. While it is empty no page gets a form at all: it is left out of the HTML,
+# not hidden by a script, so it is absent with JavaScript off too.
+# Only a line that starts with "digest:", so a comment that mentions the setting can't be read as it.
+_DIGEST_ACTION = re.compile(r"^\s*digest\s*:\s*\{[^{}\n]*?\bformAction\s*:\s*\"([^\"\n]*)\"", re.M)
+# Buttondown's embed-subscribe address, whose last part is the newsletter's username.
+_BUTTONDOWN_FORM = re.compile(r"^https://buttondown\.(?:com|email)/api/emails/embed-subscribe/([A-Za-z0-9_-]+)/?$")
+DIGEST_PATH = "/digest/"
+
+
+def digest_form_action(site_dir: str) -> str:
+    """CONFIG.digest.formAction from <site_dir>/index.html, or "" while it is empty, missing, or not an
+    https address (the test js/app.js makes before it shows its own form)."""
+    try:
+        with open(os.path.join(site_dir, "index.html"), encoding="utf-8") as f:
+            m = _DIGEST_ACTION.search(f.read())
+    except OSError:
+        return ""
+    action = m.group(1).strip() if m else ""
+    return action if re.match(r"^https://\S+$", action) else ""
+
+
+def digest_archive(action: str) -> str:
+    """The newsletter's public web archive on Buttondown, worked out from the form's address
+    (https://buttondown.com/api/emails/embed-subscribe/USERNAME -> https://buttondown.com/USERNAME/archive/),
+    or "" when the address is not Buttondown's. js/core.js IS.digestArchive does the same for the
+    dashboard. Buttondown's docs (docs.buttondown.com/email-archives) put the archive at
+    buttondown.com/USERNAME; /archive/ is its list of past emails, newest first."""
+    m = _BUTTONDOWN_FORM.match(action or "")
+    return f"https://buttondown.com/{m.group(1)}/archive/" if m else ""
+
+
+def signup_form(pitch: str, field: str | None = None, heading: str = "New internships by email, every Monday",
+                what: bool = True) -> str:
+    """The weekly email's sign-up form, or "" while DIGEST_FORM is empty. Built like the dashboard's
+    (js/app.js Digest): a plain form that posts straight from the browser to Buttondown, in a new tab
+    (Buttondown may ask for a CAPTCHA or a fixed typo on its own page), so the address never reaches
+    InternScout's servers. js/count.js counts a submit as "digest_signup", with nothing about who.
+    `field`: the page's field tag, offered as one unticked box that sends it as a `tag`, the dashboard
+    form's own field name and value (the tag key, not its label). Nothing is ticked for the student.
+    `pitch`: the page's own sentence (with its number) ahead of what the email is. `heading`: /digest/
+    has its own, since its h1 already says what the email is, and `what` False leaves out the sentence
+    saying what the email holds, which /digest/ lists under the form instead."""
+    if not DIGEST_FORM:
+        return ""
+    archive = digest_archive(DIGEST_FORM)
+    box = ""
+    if field:
+        name = lower_name(field_title(field))
+        box = (f'<label class="check"><input type="checkbox" name="tag" value="{esc(field)}"/> '
+               f"Save {esc(name)} with my subscription, so the email can be matched to it later</label>")
+    goes = "Your address and the field you tick go" if field else "Your address goes"
+    about = ("One email on Mondays with the fields that gained the most new roles that week, a few postings "
+             "from each and a link to the rest. For now everyone gets the same email.") if what else ""
+    lead = " ".join(p for p in (pitch, about) if p)
+    return (f'<form class="digest" action="{esc(DIGEST_FORM)}" method="post" target="_blank" rel="noopener" '
+            'aria-labelledby="digest-title">'
+            f'<h2 id="digest-title">{esc(heading)}</h2>'
+            + (f"<p>{lead}</p>" if lead else "")
+            + box +
+            '<div class="digest-row"><label for="digest-email">Email</label>'
+            '<input id="digest-email" type="email" name="email" required autocomplete="email" spellcheck="false"/>'
+            '<button type="submit" class="cta">Subscribe</button></div>'
+            # In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
+            '<input type="hidden" name="embed" value="1"/>'
+            "<p class=\"fine\">Buttondown opens in a new tab to finish. You'll get a confirmation email first, and "
+            f"nothing else arrives until you click its link. Unsubscribe any time. {goes} to Buttondown, which "
+            "sends the email, not to InternScout's servers. <a href=\"/privacy#digest\">Details</a>"
+            + (f' · <a href="{esc(archive)}" target="_blank" rel="noopener">See last Monday\'s email</a>' if archive else "")
+            + "</p></form>")
+
+
 BEACON = ""   # set by build() from the site's own index.html
+DIGEST_FORM = ""   # set by build(): the sign-up form's address (digest_form_action), "" while there is none
 BASELINE: str | None = None   # set by build(): see baseline_day
 # set by build(): when the data was exported. Everything a build writes is dated from it, never from
 # the clock, so two builds of the same data are the same bytes (the 404 page and every feed's
@@ -965,7 +1077,7 @@ def chart_figure(items: list[dict], state: str | None = None) -> str:
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
                  here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "",
-                 src: str = "seo-field", faq: str = "") -> str:
+                 src: str = "seo-field", faq: str = "", signup: str = "") -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
     # `extra`: the employer pages' "at a glance" list, under the opening paragraph (2026-10-01).
@@ -979,6 +1091,9 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
             + f"<ul class=\"jobs\">{listing_rows(items, now, state, here, src)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
+            # `signup`: the weekly email's form (signup_form, 2026-10-06), on the field pages and
+            # /internships/new/, straight after the list, where a reader has just seen what it would bring.
+            + signup
             # The page's own numbers as a chart, under the list it summarises (2026-10-05, g_multimodal).
             + chart_figure(items, state)
             + faq
@@ -1976,6 +2091,40 @@ def pricing_page() -> tuple[str, str, str, list]:
             body, [ORGANIZATION, PRODUCT])
 
 
+def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str, str, str]:
+    """(title, description, body) of /digest/, the weekly email's page (2026-10-06). `new` is this
+    week's new roles as the email counts them (new_roles) and `by_field` the same per field; new_page
+    says whether /internships/new/ was made. With no form address yet (DIGEST_FORM empty) the page has
+    no form and says sign-ups aren't open, and build() keeps it out of search and the sitemap."""
+    top3 = [t for t, k in sorted(by_field.items(), key=lambda tk: (-tk[1], field_title(tk[0])))
+            if k >= DIGEST_MIN_NEW][:3]
+    count = (f"{len(new):,} new internships in the last week"
+             + (f", the most in {esc(join_words([lower_name(field_title(t)) for t in top3]))}." if top3 else ".")
+             if len(new) >= DIGEST_MIN_NEW else "")
+    lede = (f"<p class=\"lede\">{count + ' ' if count else ''}One free email every Monday with the internships, "
+            "co-ops and research roles InternScout found that week.</p>")
+    if DIGEST_FORM:
+        body = (lede + signup_form("", heading="Sign up", what=False)
+                + "<section class=\"prose\"><h2>What you get</h2><ul class=\"plain\">"
+                "<li>One email on Mondays. It lists the fields that gained the most new roles that week, a few "
+                "postings from each, Northeast and remote first, and a link to the rest of each field.</li>"
+                "<li>For now everyone gets the same email.</li>"
+                "<li>A confirmation email comes first, and nothing else arrives until you click its link. Every "
+                "email has an unsubscribe link at the bottom.</li>"
+                "<li>Buttondown sends the email and keeps your address; InternScout's servers never see it. Open "
+                "and click tracking are off. <a href=\"/privacy#digest\">How the list is handled</a>.</li>"
+                "</ul></section>")
+    else:
+        where = ("<a href=\"/internships/new/\">New this week</a> lists every role found in the last week, and "
+                 "its RSS feed can follow it in a feed reader or a Discord or Slack channel."
+                 if new_page else "<a href=\"/internships/\">Browse open internships</a> by field, state or major.")
+        body = lede + f"<p>Sign-ups for the email aren't open yet. Until they are, {where}</p>"
+    return ("Weekly Internship Email, Every Monday",
+            "One free email every Monday with the new internships, co-ops and research roles InternScout found "
+            "that week. Confirm once, unsubscribe any time.",
+            body)
+
+
 # ---- /llms.txt and /llms-full.txt
 
 def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majors: int, employers: int,
@@ -2144,13 +2293,19 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
 def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset()) -> list[dict]:
     """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
     whose lastmod the new one never goes below."""
-    global BEACON, BASELINE, GENERATED
+    global BEACON, BASELINE, GENERATED, DIGEST_FORM
     BEACON = beacon_from(site_dir)
+    DIGEST_FORM = digest_form_action(site_dir)
     d = load(site_dir)
     BASELINE = d["baseline"]
     listings = d["listings"]
     now = _when(d["generated_at"]) or datetime.now(timezone.utc)
     GENERATED = now
+    # The weekly email's numbers for the sign-up forms (2026-10-06): this week's new roles counted as the
+    # email counts them (new_roles), in all and per field, so a page never quotes a number the email
+    # wouldn't. A field's is quoted only when it reaches DIGEST_MIN_NEW, the email's bar for a section.
+    digest_new = new_roles(d, now)
+    digest_by_field = Counter(t for x in digest_new for t in set(x.get("field_tags") or []) - SKIP_FIELDS)
     updated = f"{now:%B} {now.day}, {now.year}"
     pages: list[dict] = []
 
@@ -2233,7 +2388,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         by_company[name], spellings[name] = items, sorted(names)
         EMPLOYERS.update({n: path for n in names})
 
-    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=()):
+    # index (2026-10-06): False makes the page noindex and keeps it out of the sitemap (/digest/ until
+    # the sign-up form has an address). was: every page was indexed.
+    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
         found = [str(x.get("first_seen") or "")[:10] for x in (listings if items is None else items)]
@@ -2251,8 +2408,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             ld = [*ld, {"@context": "https://schema.org", "@type": "CollectionPage", "@id": SITE + path,
                         "url": SITE + path, "name": h1, "description": desc, "isPartOf": {"@id": SITE_ID},
                         **({"dateModified": lastmod} if lastmod else {})}]
-        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, feed=items is not None, ld=ld),
-                      "items": items, "h1": h1, "state": state, "lastmod": lastmod})
+        pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, index=index,
+                                                 feed=items is not None, ld=ld),
+                      "items": items, "h1": h1, "state": state, "lastmod": lastmod, "index": index})
 
     # Each listing page's src (2026-10-04, see autoapply_card): seo-field for a field and a field in a
     # state, seo-state for a state, province or city, seo-employer, and seo-hub for the rest.
@@ -2277,13 +2435,16 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         n = f"{len(items):,}"
         # The page's questions, on the page and as a FAQPage block (2026-10-05, listing_faq).
         qa = listing_faq(items, t, None, updated)
+        fresh_n = digest_by_field[t]
+        pitch = (f"{fresh_n:,} new {esc(lower_name(name))} internships in the last week."
+                 if fresh_n >= DIGEST_MIN_NEW else "")
         add(path, [f"{name} Internships – {n} Open Now", f"{name} Internships – {n} Open", f"{name} Internships",
                    f"{field_short(t)} Internships – {n} Open", f"{field_short(t)} Internships"],
             f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
             f"{name} internships", [root, (path, name)],
             listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path),
-                         src="seo-field", faq=faq_section(qa)), items, ld=[faq_ld(qa)])
+                         src="seo-field", faq=faq_section(qa), signup=signup_form(pitch, t)), items, ld=[faq_ld(qa)])
 
     for k, items in sorted(states.items()):
         where = US_STATES[k]
@@ -2423,6 +2584,12 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                          tail=k.get("tail", TAIL), about=k.get("about", frozenset()), src="seo-hub"), items)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
+    # This page lists every new listing, and the email counts a role posted on two of an employer's
+    # boards once, so when the two numbers differ the form says why its number is the smaller one.
+    k = len(digest_new)
+    new_pitch = ((f"{k:,} new internships in the last week" + (
+        ", each role counted once even when an employer posted it twice." if k != len(new) else "."))
+        if k >= DIGEST_MIN_NEW else "")
     if len(new) >= MIN_OPEN:
         add("/internships/new/", [f"New Internships This Week – {len(new):,} Found", "New Internships This Week"],
             f"{len(new):,} internships, co-ops and research roles for college students found in the last week, "
@@ -2432,7 +2599,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                          "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
                          f"{NEW_FEED} newest roles found this week, so a Discord or Slack channel can follow "
                          "just this one.</p>",
-                         dash=dash_link(new=True), src="seo-hub"), new)
+                         dash=dash_link(new=True), src="seo-hub", signup=signup_form(new_pitch)), new)
         # More than the usual newest 25, since this one feed may be a club's only one, but not every
         # new role: that was 1,800 items and 800 KB, fetched every few hours by every subscriber.
         pages[-1]["feed_limit"] = NEW_FEED        # was: None (every new role)
@@ -2514,6 +2681,11 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     add("/compare/", t_, d_, "InternScout vs Simplify vs Jobright", [("/", "InternScout"), ("/compare/", "Compare")], b_)
     t_, d_, b_, ld_ = pricing_page()
     add("/pricing/", t_, d_, "Plans and prices", [("/", "InternScout"), ("/pricing/", "Pricing")], b_, ld=ld_)
+    # The weekly email's own page (2026-10-06), the one address the brand posts, the extension, flyers
+    # and clubs link. Indexed only once the form has an address; until then it says sign-ups aren't open.
+    t_, d_, b_ = digest_page(digest_new, digest_by_field, len(new) >= MIN_OPEN)
+    add(DIGEST_PATH, t_, d_, "New internships by email, every Monday",
+        [("/", "InternScout"), (DIGEST_PATH, "Weekly email")], b_, index=bool(DIGEST_FORM))
     global TEXTS
     made = {p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0) for p in pages}
     TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)
@@ -2544,7 +2716,9 @@ def write(site_dir: str, pages: list[dict]) -> None:
     # than a made-up one.
     hub = next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None)
     urls = [("/", hub), ("/install.html", None), ("/privacy", None), ("/terms", None)] + \
-           [(p["path"], p.get("lastmod")) for p in pages]
+           [(p["path"], p.get("lastmod")) for p in pages if p.get("index", True)]
+    # A noindex page (index False: /digest/ before its form has an address) stays out of the sitemap.
+    # was: [(p["path"], p.get("lastmod")) for p in pages]
     with open(os.path.join(site_dir, "sitemap.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')

@@ -4,7 +4,7 @@ import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/au
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
-import { quickStartReady, finishOnboarding } from "./quickstart.js";
+import { quickStartReady, finishOnboarding, digestLink } from "./quickstart.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -390,6 +390,7 @@ function drawQuick(msg = "") {
   if (box.hidden) return;
   box.innerHTML = S.settings.onboarded
     ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
+       ${digestLink()}
        <p class="small muted" style="margin:6px 0 0">Quick facts, Interview and Voice are optional. They make the answers on your applications better, and you can do them any time.</p>`
     : `<h3>Ready to apply</h3>
        <p class="small muted" style="margin-top:0">Your resume and your email for applications are in, which is all Auto-Apply needs. Quick facts, Interview and Voice are optional: they make the answers better, and you can do them later.</p>
@@ -697,7 +698,8 @@ function review() {
   }));
   $("#finishall").addEventListener("click", async () => {
     await finishAndRender();
-    $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>`;
+    // The weekly email's link under it (2026-10-06), as on the Files step's finish (drawQuick).
+    $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}`;
   });
 }
 

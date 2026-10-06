@@ -162,6 +162,9 @@ def description_for(post: dict) -> str:
              "Search them free at internscout.org: every major, filtered to the states you pick, no account needed.",
              post.get("url") or "https://internscout.org",
              "",
+             # The weekly email's line (2026-10-06), as the other channels end with it, once it is live
+             # (social.card_data fills post["signup"] only then).
+             *([f"Every Monday by email: {post['signup']['youtube']}", ""] if (post.get("signup") or {}).get("youtube") else []),
              f"{SLOGAN} {DISCLAIMER}",
              "",
              " ".join(hashtags_for(post))]

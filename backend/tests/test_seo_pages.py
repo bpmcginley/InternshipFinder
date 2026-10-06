@@ -58,10 +58,12 @@ def test_closed_and_non_web_links_are_left_out(tmp_path):
     rows.append(_row(4, status="closed"))
     rows.append(_row(5, apply_url="javascript:alert(1)"))
     site = _site(tmp_path, {"MA": rows})
-    # Only 4 usable listings, so nothing but the hubs, and /about/, /compare/ (2026-10-02) and /pricing/
-    # (2026-10-05), is built.
-    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/", "/pricing/"}
+    # Only 4 usable listings, so nothing but the hubs, and /about/, /compare/ (2026-10-02), /pricing/
+    # (2026-10-05) and /digest/ (2026-10-06), is built.
+    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/",
+                                             "/pricing/", "/digest/"}
     # was: == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/"}
+    # was: == {..., "/about/", "/compare/", "/pricing/"}
 
 
 def test_job_board_text_is_escaped(tmp_path):
@@ -1121,3 +1123,122 @@ def test_no_question_without_an_answer():
     assert qa["Do remote internships pay?"] == "None of the 5 open postings lists pay or says it is paid."
     assert not any(q.startswith("Where") for q in qa)
     assert seo_pages.listing_faq([], "swe", None, "September 23, 2026") == []
+
+
+# ---- the weekly email's sign-up forms and /digest/ (2026-10-06)
+
+FORM = "https://buttondown.com/api/emails/embed-subscribe/internscout-test"
+
+
+def _config(tmp_path, action):
+    """A dashboard index.html with the analytics tags and CONFIG.digest as docs/index.html writes it."""
+    (tmp_path / "index.html").write_text(
+        "<html><head><script>\nwindow.CONFIG = {\n"
+        '    // paste "https://buttondown.com/api/emails/embed-subscribe/YOUR-BUTTONDOWN-USERNAME" here\n'
+        "    // Keep CONFIG.digest.formAction in double quotes: digest: { formAction: \"https://evil.example/\" }\n"
+        f'    digest: {{ provider: "Buttondown", formAction: "{action}" }},\n'
+        "};\n</script>\n"
+        '<script defer src="/js/count.js"></script></head><body></body></html>', encoding="utf-8")
+
+
+def _email_site(tmp_path, action):
+    # mechanical: 8 open, 6 of them new this week; nursing: 6 open, 2 new (below DIGEST_MIN_NEW).
+    rows = [_row(i) for i in range(6)]
+    rows += [_row(10 + i, first_seen="2026-09-10T00:00:00", posted_at="2026-09-01T00:00:00") for i in range(2)]
+    rows += [_row(30 + i, tags=("nursing",), title=f"Nursing Extern {i}") for i in range(2)]
+    rows += [_row(40 + i, tags=("nursing",), title=f"Nursing Extern {40 + i}", first_seen="2026-09-10T00:00:00",
+                  posted_at="2026-09-01T00:00:00") for i in range(4)]
+    site = _site(tmp_path, {"MA": rows})
+    _config(tmp_path, action)
+    return site
+
+
+def test_the_form_address_is_read_from_the_dashboards_config_line_only(tmp_path):
+    assert seo_pages.digest_form_action(str(tmp_path)) == ""                 # no index.html at all
+    for action, want in (("", ""), ("  ", ""), ("http://buttondown.com/x", ""), ("javascript:alert(1)", ""),
+                         (FORM, FORM)):
+        _config(tmp_path, action)
+        assert seo_pages.digest_form_action(str(tmp_path)) == want, action
+    # The real docs/index.html still has the line where this reads it, so editing the dashboard's config
+    # can't silently switch every landing page's form off.
+    docs = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__))), "..", "docs")
+    assert seo_pages._DIGEST_ACTION.search(open(os.path.join(docs, "index.html"), encoding="utf-8").read())
+
+
+def test_the_archive_is_worked_out_from_the_form_address():
+    # The same cases as tests/site/core.test.mjs checks for IS.digestArchive.
+    assert seo_pages.digest_archive(FORM) == "https://buttondown.com/internscout-test/archive/"
+    assert seo_pages.digest_archive("https://buttondown.email/api/emails/embed-subscribe/intern_scout-2/") == \
+        "https://buttondown.com/intern_scout-2/archive/"
+    for no in ("", "http://buttondown.com/api/emails/embed-subscribe/x", "https://example.com/api/emails/embed-subscribe/x",
+               "https://buttondown.com/api/emails/embed-subscribe/x/../y", 'https://buttondown.com/api/emails/embed-subscribe/a"onmouseover=x'):
+        assert seo_pages.digest_archive(no) == "", no
+
+
+def test_no_page_has_a_form_while_the_address_is_empty(tmp_path):
+    site = _email_site(tmp_path, "")
+    pages = seo_pages.build(site)
+    assert not [p["path"] for p in pages if "<form" in p["html"] or "Last Monday" in p["html"]]
+    digest = next(p for p in pages if p["path"] == "/digest/")
+    assert '<meta name="robots" content="noindex"/>' in digest["html"] and 'rel="canonical"' not in digest["html"]
+    assert "Sign-ups for the email aren't open yet" in digest["html"] and 'href="/internships/new/"' in digest["html"]
+    seo_pages.write(site, pages)
+    assert "/digest/" not in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+
+
+def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(tmp_path):
+    site = _email_site(tmp_path, FORM)
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    with_form = {path for path, html in pages.items() if "<form" in html}
+    assert with_form == {"/internships/mechanical-engineering/", "/internships/nursing/", "/internships/new/", "/digest/"}
+    archive = '<a href="https://buttondown.com/internscout-test/archive/" target="_blank" rel="noopener">See last Monday\'s email</a>'
+    for path in with_form:
+        html = pages[path]
+        form = re.search(r'<form class="digest".*?</form>', html, re.S).group(0)
+        assert f'action="{FORM}" method="post" target="_blank"' in form
+        assert 'name="email" required' in form and '<input type="hidden" name="embed" value="1"/>' in form
+        assert archive in form and 'href="/privacy#digest"' in form
+        assert "checked" not in form, "nothing is ticked for the student"
+        assert html.count("<form") == 1
+    # A field page offers its own field as one unticked tag, as the dashboard's form sends it; the others none.
+    assert '<input type="checkbox" name="tag" value="mechanical"/> Save mechanical engineering with my subscription' \
+        in pages["/internships/mechanical-engineering/"]
+    assert 'name="tag"' not in pages["/internships/new/"] and 'name="tag"' not in pages["/digest/"]
+    assert '<h2 id="digest-title">Sign up</h2>' in pages["/digest/"]
+    seo_pages.write(site, list(seo_pages.build(site)))
+    assert "<loc>https://internscout.org/digest/</loc>" in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+
+
+def test_the_pitch_quotes_the_emails_own_count_and_never_a_small_one(tmp_path):
+    site = _email_site(tmp_path, FORM)
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    d = seo_pages.load(site)
+    now = seo_pages._when(d["generated_at"])
+    new = seo_pages.new_roles(d, now)
+    assert len(new) == 8 and sum("mechanical" in x["field_tags"] for x in new) == 6
+    assert "6 new mechanical engineering internships in the last week." in pages["/internships/mechanical-engineering/"]
+    # Two new nursing roles is under the email's bar for a section, so no number at all.
+    nursing = pages["/internships/nursing/"]
+    assert "<form" in nursing and not re.search(r"\b\d+ new nursing", nursing)
+    assert "8 new internships in the last week" in pages["/digest/"]
+    assert "the most in mechanical engineering." in pages["/digest/"]          # nursing (2) is under the bar
+    assert "8 new internships in the last week." in pages["/internships/new/"]
+
+
+def test_the_new_page_says_why_its_count_differs_from_the_list(tmp_path):
+    rows = [_row(i) for i in range(6)]
+    rows.append(_row(9, company_name="Company 0", title=rows[0]["title"], regions=rows[0]["regions"]))  # second board
+    site = _site(tmp_path, {"MA": rows})
+    _config(tmp_path, FORM)
+    html = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/new/")
+    assert "6 new internships in the last week, each role counted once even when an employer posted it twice." in html
+
+
+def test_the_digest_page_has_no_number_in_a_quiet_week(tmp_path):
+    rows = [_row(i, first_seen="2026-09-10T00:00:00", posted_at="2026-09-01T00:00:00") for i in range(5)] + [_row(9)]
+    site = _site(tmp_path, {"MA": rows})
+    _config(tmp_path, FORM)
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    assert "/internships/new/" not in pages
+    lede = re.search(r'<p class="lede">(.*?)</p>', pages["/digest/"]).group(1)
+    assert lede.startswith("One free email every Monday") and "new internships" not in lede

@@ -31,7 +31,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 from internscout import seo_pages as sp  # noqa: E402
 
-MIN_NEW = 3            # new roles a field needs this week to get a section
+# was: MIN_NEW = 3. It moved to seo_pages (2026-10-06) with the "new" rule below, so the sign-up
+# forms on the landing pages quote a field's number only when the email would give it a section.
+MIN_NEW = sp.DIGEST_MIN_NEW    # new roles a field needs this week to get a section
 MAX_SECTIONS = 8       # eight fields of five roles is already a long email
 PER_SECTION = 5        # roles shown per field; the field's page has the rest
 PER_EMPLOYER = 2       # ...and at most this many from one employer, so one big poster can't fill a field
@@ -71,22 +73,11 @@ def _link(url) -> str | None:
     return u if u and not re.search(r"\s", u) else None
 
 
-def unique_roles(items: list[dict]) -> list[dict]:
-    """One row per role. dedupe_roles matches on title and place, so it runs within each employer:
-    two companies that each post a "Software Engineering Intern" in Boston are two roles."""
-    by_employer: dict[str, list[dict]] = {}
-    for x in items:
-        by_employer.setdefault(sp.employer_key(x.get("company_name") or ""), []).append(x)
-    return [x for group in by_employer.values() for x in sp.dedupe_roles(group)]
-
-
-def new_roles(d: dict, now: datetime) -> list[dict]:
-    """This week's new roles, as every growth output counts them: found this week by sp.fresh (the
-    rule /internships/new/ uses), then one row per role within each employer (unique_roles). The
-    digest's subject, the brand posts' counts and the dashboard metrics all use this one number.
-    stats.json's "new" (export_static's is_new) counts every listing a scan first saw in the last
-    week, before either step, so it runs a little higher; it is the dashboard's own badge count."""
-    return unique_roles([x for x in d["listings"] if sp.fresh(x, now, d["baseline"])])
+# Both moved to seo_pages (2026-10-06), so the landing pages' sign-up forms count new roles with this
+# same code; the names stay here for the growth scripts that call them (social, outreach, metrics,
+# every_major_list). was: def unique_roles(...) and def new_roles(...), the same bodies, here.
+unique_roles = sp.unique_roles
+new_roles = sp.new_roles
 
 
 def has_page(tag: str, open_count: int) -> bool:
