@@ -2,7 +2,7 @@
 
     python growth/glass_flyer.py                      # one generic flyer, tag flyer-campus
     python growth/glass_flyer.py --spots lib,isb,su   # one PDF per posting spot
-    python growth/glass_flyer.py --posted "Oct 7, 2026"
+    python growth/glass_flyer.py --posted 10/6/2026         # a dated copy: internscout-glass-<spot>-10-6-2026.pdf
 
 Writes output/pdf/internscout-glass-<spot>.pdf (page 1 = front, page 2 = back) and PNG previews of
 each side under output/flyer-preview/. Needs `segno` (pip install segno) for the QR codes and Chrome or
@@ -20,7 +20,7 @@ Why it looks the way it does, from the research behind it (growth/FLYERS.md has 
 - "Free" with its condition beside it (the optional plans), not in a footnote, and the .edu allowance as
   numbers: 25 Auto-Apply runs and 10 tailored resumes a month, against 12 and 5 for any other email
   (worker/src/config.js TASKS, GENERAL_ALLOWANCE_PCT). Never "applies for you": it stops at Submit.
-- Dated and with a non-affiliation line, which campus posting rules ask for.
+- A non-affiliation line, which campus posting rules ask for (they also ask for a date: --posted adds one).
 
 Each spot's QR code carries ?utm_source=flyer-<spot>&utm_medium=print; the Worker counts those visits
 as source "print", one channel per spot (worker/src/visits.js), so the weekly numbers say which wall
@@ -29,7 +29,6 @@ worked. A spot is 1-16 lowercase letters or digits.
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import html
 import io
 import json
@@ -113,6 +112,8 @@ body { font-family: "IBM Plex Sans", Arial, Helvetica, sans-serif; color: var(--
         line-height: 1.35; display: flex; justify-content: space-between; gap: .2in }
 .foot b { font-weight: 700 }
 .foot .date { white-space: nowrap }
+.foot .blank { display: inline-block; width: 1.25in; border-bottom: .015in solid var(--ink); margin-left: .05in }
+.lead b { font-weight: 700 }
 """
 
 FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black'
@@ -122,12 +123,12 @@ FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=
 def front(f: dict, qr: str, posted: str) -> str:
     return f"""
 <section class="page"><div class="panel">
-  <div class="eyebrow">For college students · every major</div>
+  <div class="eyebrow">Made by a UMass student · every major</div>
   <div class="big n">{f['roles']}</div>
   <div class="big h2">internships.</div>
   <div class="h3">Every major. One free search.</div>
-  <p class="lead">Stop checking ten job boards. Internships, co-ops and research roles from
-    {f['employers']} employers, updated several times a day.</p>
+  <p class="lead"><b>No account needed.</b> Stop checking ten job boards: {f['employers']} employers,
+    updated several times a day.</p>
   <div class="strip"><b>.edu email = 2&times; free Auto-Apply</b>: the extension that fills
     applications from your resume.</div>
   <div class="spacer"></div>
@@ -135,13 +136,13 @@ def front(f: dict, qr: str, posted: str) -> str:
     <div class="cta-text">
       <div class="scan">Scan to see internships for <u>your</u> <span class="nw">major &#8594;</span></div>
       <div class="url">internscout.org</div>
-      <div class="free">Free to use. No account. No&nbsp;credit&nbsp;card.</div>
+      <div class="free">Free to use. No&nbsp;credit&nbsp;card.</div>
       <div class="cond">Optional $4 and $8 plans only raise the AI allowance.</div>
     </div>
     <div class="qr" aria-label="QR code to internscout.org">{qr}</div>
   </div>
   <div class="foot"><span><b>{html.escape(SLOGAN)}</b> Independent student project; not affiliated with
-    UMass Amherst.</span><span class="date">Posted {html.escape(posted)}</span></div>
+    UMass Amherst.</span>{f'<span class="date">Posted {html.escape(posted)}</span>' if posted else ''}</div>
 </div></section>"""
 
 
@@ -170,7 +171,7 @@ def back(f: dict, qr: str, posted: str) -> str:
     <div class="qr" aria-label="QR code to internscout.org">{qr}</div>
   </div>
   <div class="foot"><span><b>{html.escape(SLOGAN)}</b> Independent student project; not affiliated with
-    UMass Amherst.</span><span class="date">Posted {html.escape(posted)}</span></div>
+    UMass Amherst.</span>{f'<span class="date">Posted {html.escape(posted)}</span>' if posted else ''}</div>
 </div></section>"""
 
 
@@ -205,8 +206,8 @@ def render(html_text: str, pdf: Path | None = None, png: Path | None = None) -> 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--spots", default="campus", help="comma-separated posting spots, e.g. lib,isb,su")
-    ap.add_argument("--posted", default=dt.date.today().strftime("%b %-d, %Y") if sys.platform != "win32"
-                    else dt.date.today().strftime("%b %#d, %Y"), help='date printed on the flyer, e.g. "Oct 7, 2026"')
+    # was: default=today's date, then (2026-10-06) a blank "Posted ____" line. No date unless asked for.
+    ap.add_argument("--posted", default="", help='print "Posted <date>" in the footer, e.g. "Oct 7, 2026"; none by default')
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args(argv)
     spots = [s.strip().lower() for s in args.spots.split(",") if s.strip()]
@@ -219,13 +220,16 @@ def main(argv: list[str]) -> int:
     for spot in spots:
         url = f"{SITE}?utm_source=flyer-{spot}&utm_medium=print"
         qr = qr_svg(url)
-        pdf = OUT_PDF / f"internscout-glass-{spot}.pdf"
+        # A dated print gets its own file next to the undated one (2026-10-06): "10/6/2026" -> "-10-6-2026".
+        dated = "-" + re.sub(r"[^0-9A-Za-z]+", "-", args.posted).strip("-") if args.posted else ""
+        pdf = OUT_PDF / f"internscout-glass-{spot}{dated}.pdf"
         render(document(front(f, qr, args.posted) + back(f, qr, args.posted)), pdf=pdf)
         print(f"{pdf.relative_to(ROOT)}  ->  {url}")
         if not args.no_preview and spot == spots[0]:
-            render(document(front(f, qr, args.posted)), png=OUT_PNG / "front.png")
-            render(document(back(f, qr, args.posted)), png=OUT_PNG / "back.png")
-            print(f"previews: {(OUT_PNG / 'front.png').relative_to(ROOT)}, {(OUT_PNG / 'back.png').relative_to(ROOT)}")
+            fp, bp = OUT_PNG / f"front{dated}.png", OUT_PNG / f"back{dated}.png"
+            render(document(front(f, qr, args.posted)), png=fp)
+            render(document(back(f, qr, args.posted)), png=bp)
+            print(f"previews: {fp.relative_to(ROOT)}, {bp.relative_to(ROOT)}")
     return 0
 
 
