@@ -2,7 +2,7 @@
 
     python growth/glass_flyer.py                      # one generic flyer, tag flyer-campus
     python growth/glass_flyer.py --spots lib,isb,su   # one PDF per posting spot
-    python growth/glass_flyer.py --posted "Oct 7, 2026"     # adds a "Posted" date; none by default
+    python growth/glass_flyer.py --posted 10/6/2026         # a dated copy: internscout-glass-<spot>-10-6-2026.pdf
 
 Writes output/pdf/internscout-glass-<spot>.pdf (page 1 = front, page 2 = back) and PNG previews of
 each side under output/flyer-preview/. Needs `segno` (pip install segno) for the QR codes and Chrome or
@@ -220,13 +220,16 @@ def main(argv: list[str]) -> int:
     for spot in spots:
         url = f"{SITE}?utm_source=flyer-{spot}&utm_medium=print"
         qr = qr_svg(url)
-        pdf = OUT_PDF / f"internscout-glass-{spot}.pdf"
+        # A dated print gets its own file next to the undated one (2026-10-06): "10/6/2026" -> "-10-6-2026".
+        dated = "-" + re.sub(r"[^0-9A-Za-z]+", "-", args.posted).strip("-") if args.posted else ""
+        pdf = OUT_PDF / f"internscout-glass-{spot}{dated}.pdf"
         render(document(front(f, qr, args.posted) + back(f, qr, args.posted)), pdf=pdf)
         print(f"{pdf.relative_to(ROOT)}  ->  {url}")
         if not args.no_preview and spot == spots[0]:
-            render(document(front(f, qr, args.posted)), png=OUT_PNG / "front.png")
-            render(document(back(f, qr, args.posted)), png=OUT_PNG / "back.png")
-            print(f"previews: {(OUT_PNG / 'front.png').relative_to(ROOT)}, {(OUT_PNG / 'back.png').relative_to(ROOT)}")
+            fp, bp = OUT_PNG / f"front{dated}.png", OUT_PNG / f"back{dated}.png"
+            render(document(front(f, qr, args.posted)), png=fp)
+            render(document(back(f, qr, args.posted)), png=bp)
+            print(f"previews: {fp.relative_to(ROOT)}, {bp.relative_to(ROOT)}")
     return 0
 
 
