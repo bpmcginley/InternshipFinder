@@ -3,7 +3,7 @@
   "name": "InternScout Auto-Apply: Internship Application Autofill",
   "version": "0.5.5",
   "minimum_chrome_version": "114",
-  "description": "Autofill internship applications on Workday, Greenhouse, Lever and more from your resume. Stops at Submit: you always send it.",
+  "description": "Autofill internship applications from your resume on the job sites employers use. Stops at Submit: you always send it.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0b8sFYgpG2ZcPkKjaSg4tNtFqOd1x7gBnHpoGDarAw6xBQhHQa6cHvuenLG5327cEMoF9XNN+TOM7ChVohVIZxJ4smuOI3JqjKy3B5LEM3qLVevdkQGuW8CIn088n7WuhI95eCm0iJ56Licu5uh4AwBf6kRVPA7w+Jl9yz+ErZldVmUyVweS7LhPuYMrBvvZ967NVy/7kEz7OV8VuYdr3lCuSwojmHhL5zAGQzHjjjMqugU/iu0+LN/f7bhU/JU2j82MlmAGV3nxgql6UomYAGo0caMw1CgSDLcP7y+vlWYM7t2NZQqQvJjTfjVkraBY8LhNdeGsky2w3e0/NnunGwIDAQAB",
   "permissions": [
     "storage",
