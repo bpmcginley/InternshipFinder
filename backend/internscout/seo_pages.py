@@ -1205,8 +1205,11 @@ FREE_WORDS = (f"{FREE_EDU['autofill']} Auto-Apply runs and {FREE_EDU['resume_tai
 # anyone else floor(half of that), never below 1. So Supporter is 50 runs with a .edu email and 25 without.
 # Added 2026-10-05 for /pricing/, which states every tier in numbers.
 PLAN_MULTIPLIER = {"Free": 1, "Supporter": 2, "Pro": 4}
+# Each blurb says who the tier is for (D4.2, 2026-10-05 audit): Supporter's said only what it covered.
+# Supporter is 50 runs a month with a .edu email (PLAN_MULTIPLIER), so "an application or two a day".
+# was: "Supporter": "Covers the AI bill for a month of steady applying.",
 PLAN_SHORT = {"Free": "Enough to try it on real applications.",
-              "Supporter": "Covers the AI bill for a month of steady applying.",
+              "Supporter": "For a steady search: an application or two a day, AI bill covered.",
               "Pro": "For a full-time search: a hundred applications a month."}
 RECOMMENDED_PLAN = "Supporter"
 
