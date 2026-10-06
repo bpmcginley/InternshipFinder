@@ -22,10 +22,16 @@ numbers say which wall brought visits: `SELECT channel, SUM(visits) FROM visit_c
 
 ### Printing for glass
 
-- **Paper:** matte 80-100 lb cover / cardstock (about 97-99% opaque), not 20-24 lb copy paper, which shows
-  the other side when daylight comes through the glass. Gloss adds glare; skip lamination for a 2-week post.
-- **Best show-through fix:** print the two pages single-sided and glue them back to back with a sheet of
-  black paper between. This also removes any front/back alignment drift.
+- **On ordinary letter copy paper (20-24 lb), print the two pages single-sided and tape them back to
+  back.** One sheet of copy paper is only about 80-93% opaque, so with daylight coming through the glass a
+  duplexed sheet shows the other face, mirrored, behind the text. Two sheets back to back double the paper
+  in the way and make the flyer stiff enough to stay flat. Line the two sheets up against a window or a
+  light, then tape them together along the top edge with a loop of tape (or a glue stick in the corners)
+  before mounting. A plain sheet of dark paper between the two blocks show-through completely, if you have
+  one. (2026-10-06: was "matte 80-100 lb cardstock"; standard letter paper is what's at hand.)
+- Print in color at 100% / actual size. The full yellow uses a lot of toner or ink: on an inkjet the sheet
+  can ripple, so let it dry flat before taping. Matte office paper is fine; gloss adds glare.
+- **Cardstock, if you get it:** matte 80-100 lb cover is 97-99% opaque and can be duplexed instead.
 - **If you print duplex:** portrait, **flip on long edge**, 100% / actual size, color. Walking round to the
   other side of the glass is the same as a long-edge flip, so both faces are upright. The layout is
   mirrored on purpose: the front's QR tile (bottom right) and the back's (bottom left) sit back to back, as
