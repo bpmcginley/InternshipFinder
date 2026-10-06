@@ -804,6 +804,10 @@
 40.7654,
 -73.8174
 ],
+"forest city|PA":[
+41.6515,
+-75.4666
+],
 "fort washington|PA":[
 40.1378,
 -75.2118
@@ -1380,6 +1384,7 @@
 "new york city office|NY":null,
 "new york city \u00b7 san francisco \u00b7 full-time|NY":null,
 "new york city-remote|NY":null,
+"new york metro area|NY":null,
 "new york new york united states|NY":null,
 "new york ny usa|NY":null,
 "new york ny|NY":[
@@ -2246,6 +2251,7 @@
 "usa-new jersey-piscataway township|NJ":null,
 "usa-new jersey|NJ":null,
 "usa-new york-ny-1166 avenue of americas|NY":null,
+"usa-pennsylvania-elizabethtown|PA":null,
 "usa|NJ":[
 40.603,
 -74.6874
