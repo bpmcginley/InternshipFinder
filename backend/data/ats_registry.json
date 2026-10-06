@@ -2807,6 +2807,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "asteraearlycareer2027": {
+   "name": "Astera Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "asteralabs": {
    "name": "Astera Labs",
    "quant": false,
@@ -2830,6 +2836,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "atoms": {
+   "name": "Atoms",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "attentive": {
    "name": "Attentive",
@@ -4324,6 +4336,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "iex-interns": {
+   "name": "IEX",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "imc": {
    "name": "IMC Trading",
    "quant": true,
@@ -4507,6 +4525,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "judihealth": {
+   "name": "Judi Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "jumio": {
    "name": "Jumio",
@@ -5740,6 +5764,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "solutions": {
+   "name": "Cadence Solutions",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "sonatus": {
    "name": "Sonatus",
    "quant": false,
@@ -5839,6 +5869,18 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "stackadapt-confidential": {
+   "name": "StackAdapt",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
+  "staged": {
+   "name": "KKR",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "starburst": {
    "name": "Starburst",
@@ -6363,6 +6405,12 @@
    "added": "2026-09-13",
    "sector": "quant_finance"
   },
+  "westmonroe5": {
+   "name": "West Monroe",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "wheely": {
    "name": "Wheely",
    "quant": false,
@@ -6511,6 +6559,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "economic_consulting"
+  },
+  "campus-libertymutual": {
+   "name": "Liberty Mutual",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "campus-us-corgan": {
    "name": "Corgan",
@@ -9883,6 +9937,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "fa-euwp-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
+   "name": "Mayo Clinic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "fa-euxc-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Citco",
    "quant": false,
@@ -10121,6 +10181,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "iadugs.fa.ocs.oraclecloud.com|CX_1001": {
+   "name": "Legrand",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "ibqbjb.fa.ocs.oraclecloud.com|Honeywell": {
    "name": "Honeywell",
@@ -10950,6 +11016,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "focusrite": {
+   "name": "The Focusrite Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "generation-west-virginia-1": {
    "name": "Generation West Virginia",
    "quant": false,
@@ -11009,6 +11081,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-02"
+  },
+  "mistywest": {
+   "name": "MistyWest",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "northwell-health": {
    "name": "Northwell Health",
@@ -15260,9 +15338,8 @@
   "logitech|wd5|Logitech": {
    "name": "Logitech",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-06"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "lonza|wd3|lonza_careers": {
    "name": "Lonza",
@@ -18266,6 +18343,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "visa|wd5|Visa_Early_Careers": {
+   "name": "Visa",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "vizient|wd1|Vizient_Careers": {
    "name": "Vizient ",
