@@ -14,7 +14,8 @@ With --out=DIR it also writes what the picture channels need, from the same pick
 card's numbers, an Instagram caption and a LinkedIn draft) and DIR/card.jpg (growth/cards.py). The
 Brand posts workflow then puts the card where Instagram can fetch it and runs growth/instagram.py.
 LinkedIn has no posting API open to a page this size, so its text is saved as a draft for a person
-to post (save_drafts), and the private analytics page shows it ready to copy.
+to post (save_drafts), and the private analytics page shows it ready to copy, with the card itself
+stored beside it so the page can offer it as a download (the page can't fetch images from GitHub).
 
 It posts nothing when the data export is more than STALE old: "this week" and the field it picks both
 come from the export's time, so a stalled ingest would post the same stale text run after run. When a
@@ -250,15 +251,28 @@ def write_out(site_dir: str, out_dir: str) -> dict | None:
     return data
 
 
-def save_drafts(data: dict, token: str) -> None:
+def save_drafts(data: dict, token: str, card_path: str | None = None) -> None:
     """The LinkedIn draft, into the app's D1 (table social_drafts), where the private analytics page
-    shows it ready to copy. Brand text only, like everything else growth/ writes there."""
+    shows it ready to copy. Brand text only, like everything else growth/ writes there. The card JPEG
+    (about 90 KB) goes in as base64 too: the page can only reach D1, not GitHub, so this is how its
+    Download button gets the image."""
+    import base64
     import metrics    # the same D1 helper and database the analytics copy uses
     metrics.d1(token, "CREATE TABLE IF NOT EXISTS social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
-                      "text TEXT NOT NULL, image_url TEXT, url TEXT, PRIMARY KEY (taken, channel))")
+                      "text TEXT NOT NULL, image_url TEXT, url TEXT, image_b64 TEXT, PRIMARY KEY (taken, channel))")
+    try:    # tables made before 2026-10-06 have no image column yet
+        metrics.d1(token, "ALTER TABLE social_drafts ADD COLUMN image_b64 TEXT")
+    except RuntimeError as e:
+        if "duplicate column" not in str(e):
+            raise
+    image = None
+    if card_path and os.path.exists(card_path):
+        with open(card_path, "rb") as f:
+            image = base64.b64encode(f.read()).decode("ascii")
     taken = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    metrics.d1(token, "INSERT OR REPLACE INTO social_drafts (taken, channel, text, image_url, url) VALUES (?, ?, ?, ?, ?)",
-               [taken, "linkedin", data["linkedin_text"], data["card_url"], data["url"]])
+    metrics.d1(token, "INSERT OR REPLACE INTO social_drafts (taken, channel, text, image_url, url, image_b64) "
+                      "VALUES (?, ?, ?, ?, ?, ?)",
+               [taken, "linkedin", data["linkedin_text"], data["card_url"], data["url"], image])
     # A draft is only worth posting for a week or two; keep the last 20.
     metrics.d1(token, "DELETE FROM social_drafts WHERE taken NOT IN "
                       "(SELECT taken FROM social_drafts ORDER BY taken DESC LIMIT 20)")
@@ -312,7 +326,7 @@ def main(argv: list[str]) -> int:
         return 1 if failed else 0
     if data and os.environ.get("CLOUDFLARE_API_TOKEN"):
         try:
-            save_drafts(data, os.environ["CLOUDFLARE_API_TOKEN"])
+            save_drafts(data, os.environ["CLOUDFLARE_API_TOKEN"], os.path.join(out_dir, "card.jpg"))
             print("[social] LinkedIn draft saved for the analytics page")
         except Exception as e:
             print(f"[social] LinkedIn draft failed: {type(e).__name__}")
