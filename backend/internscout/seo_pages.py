@@ -965,12 +965,14 @@ def chart_figure(items: list[dict], state: str | None = None) -> str:
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
                  here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "",
-                 src: str = "seo-field") -> str:
+                 src: str = "seo-field", faq: str = "") -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
     # `extra`: the employer pages' "at a glance" list, under the opening paragraph (2026-10-01).
     # `src`: which kind of page this is, for the install links' ?from= and the store's utm_source
     # (2026-10-04; see autoapply_card).
+    # `faq`: the field, state and field-in-state pages' questions section (faq_section, 2026-10-05),
+    # after the chart and before the follow lines; the employer pages carry theirs in `related`.
     return (f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>" + fits_line(fits or []) + extra +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
             + autoapply_card(items, src, state)
@@ -979,6 +981,7 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
             # The page's own numbers as a chart, under the list it summarises (2026-10-05, g_multimodal).
             + chart_figure(items, state)
+            + faq
             + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
               "<a href=\"feed.xml\">RSS feed</a></p>"
             # The extension has been in the Chrome Web Store since 2026-09-22. This links the install
@@ -1071,11 +1074,45 @@ def place_name(g: dict) -> str:
     return loc
 
 
-def places(items: list[dict]) -> list[tuple[str, int]]:
-    """Every place with open roles, most first; a role in three cities counts once in each."""
+_COUNTRY = re.compile(r"[\s,-]*\b(United States( of America)?|USA|U\.S\.A?\.?|Canada|CAN)\s*$", re.I)
+# Short names boards use for a city the FAQ already names in full.
+CITY_ALIASES = {"sf": "San Francisco", "nyc": "New York", "new york city": "New York"}
+
+
+def city_name(g: dict, state: str) -> str:
+    """A region's city as a state, province or metro page names it (2026-10-05): "Boston" for
+    "Boston, MA", "Boston, MA USA" and "BOSTON, Massachusetts, United States", which place_name reads
+    as three places; "Oakville" on the Toronto page for "Oakville, Ontario - Canada". The province
+    stays on the Canada page ("Toronto, ON"). A loc that names only the country or the state is ""."""
+    name = place_name(g)
+    if name == "Remote":
+        return name
+    name = place_name({"loc": _COUNTRY.sub("", name).strip(" ,-")})     # "Oakville, Ontario" -> "Oakville, ON"
+    code = CA_METRO_PAGES.get(state, state)
+    if len(code) == 2:
+        for suffix in (code, US_STATES.get(code, code)):
+            name = re.sub(rf"[\s,-]*\b{re.escape(suffix)}\s*$", "", name, flags=re.I).strip(" ,-")
+    elif state == "Canada" and name and "," not in name and g.get("state") in CA_PROVINCES:
+        name = f"{name}, {g['state']}"            # "Toronto" beside "Toronto, ON" is one place
+    # "MARKHAM" is a board shouting, "SF" is not.
+    name = " ".join(w.title() if w.isalpha() and w.isupper() and len(w) > 3 else w for w in name.split())
+    return CITY_ALIASES.get(name.lower(), name)
+
+
+def places(items: list[dict], state: str | None = None) -> list[tuple[str, int]]:
+    """Every place with open roles, most first; a role in three cities counts once in each. With
+    `state`, only the places in it (a state, metro or "Canada", as place() reads them), by city_name:
+    a Massachusetts page's "Where" answer would otherwise name New York for every role filed in both,
+    and Boston three ways (2026-10-05)."""
     c: Counter = Counter()
     for x in items:
-        names = {place_name(g) for g in x.get("regions") or []} or ({"Remote"} if x.get("is_remote") else set())
+        regions = x.get("regions") or []
+        if state:
+            regions = [g for g in regions if g.get("state") == state or g.get("metro") == state
+                       or (state == "Canada" and g.get("kind") == "canada")]
+            names = {city_name(g, state) for g in regions}
+        else:
+            names = {place_name(g) for g in regions} or ({"Remote"} if x.get("is_remote") else set())
         c.update(n for n in names if n)
     return sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))
 
@@ -1164,6 +1201,108 @@ def employer_facts(name: str, items: list[dict], fields_main: list[str]) -> tupl
     questions = ("<section class=\"faq\">" + "".join(f"<h2>{esc(q)}</h2><p>{esc(a)}</p>" for q, a in qa)
                  + "</section>")
     return facts, questions
+
+
+# ---------------------------------------------------------------- questions on the listing pages
+# Added 2026-10-05. The employer pages have answered "when, where, does it pay" from their own roles
+# since 2026-10-01; the field, state and field-in-state pages now answer the questions a student (or
+# an assistant answering one) asks of them, in the same way: "how many software engineering internships
+# are open", "which employers", "do they pay", "where". Every answer is counted from the page's own
+# listings and dated from the data, and each page carries them twice: as a visible section at the end
+# of the list, and as a FAQPage block (faq_ld) with the same plain text, so what an answer engine
+# reads is what a reader sees. A question whose answer would be empty is left out.
+
+FAQ_ANSWER_MAX = 300    # characters; an answer is quoted whole, so a long one is shortened (fewer names)
+FAQ_NAMES = 5           # employers or places named in an answer, before shortening
+
+
+def faq_ld(qa: list[tuple[str, str]]) -> dict:
+    """The FAQPage block for (question, answer) pairs; the answers are plain text, as on the page."""
+    return {"@context": "https://schema.org", "@type": "FAQPage",
+            "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}}
+                           for q, a in qa]}
+
+
+def faq_section(qa: list[tuple[str, str]]) -> str:
+    return ("<section class=\"faq\">" + "".join(f"<h2>{esc(q)}</h2><p>{esc(a)}</p>" for q, a in qa)
+            + "</section>") if qa else ""
+
+
+def faq_topic(field: str | None, state: str | None, what: str = "internships") -> str:
+    """The page's subject as a phrase: "software engineering internships in Massachusetts",
+    "internships in Canada", "remote software engineering interns" (what="interns")."""
+    lead = (lower_name(field_title(field)) + " ") if field else ""
+    if state == "remote":
+        return f"remote {lead}{what}"
+    return f"{lead}{what}" + (f" in {US_STATES[state]}" if state else "")
+
+
+def _fit_names(make, names: list[str]) -> str:
+    """make(names) with as many of the names as keep the answer within FAQ_ANSWER_MAX (one at least):
+    five employers can be five "Executive Office for U.S. Attorneys and ..." long."""
+    for k in range(len(names), 0, -1):
+        a = make(names[:k])
+        if len(a) <= FAQ_ANSWER_MAX:
+            return a
+    return a
+
+
+def listing_faq(items: list[dict], field: str | None, state: str | None, updated: str) -> list[tuple[str, str]]:
+    """(question, answer) for a field page (state None), a state, province, metro or Canada page
+    (field None) or a field in one of them. Plain text; the HTML escaping is faq_section's."""
+    n = len(items)
+    if not n:
+        return []
+    topic = faq_topic(field, state)
+    qa = []
+    employers = len({employer_key(x["company_name"]) for x in items if x.get("company_name")})
+    qa.append((f"How many {topic} are open right now?",
+               f"{n:,} open {faq_topic(field, state, 'internships, co-ops and research roles')} as of {updated}, "
+               f"from {plural(employers, 'employer')}."))
+    names = top(Counter(x["company_name"] for x in items if x.get("company_name")), FAQ_NAMES)
+    if names:
+        roles = faq_topic(field, state, "roles")
+        if employers == 1:
+            a = f"All {plural(n, 'open role')} {'is' if n == 1 else 'are'} at {names[0]}."
+        else:
+            a = _fit_names(lambda ns: (f"The employers with the most open {roles} are {join_words(ns)}"
+                                       + (f", of {employers:,} employers hiring." if employers > len(ns) else ".")), names)
+        qa.append((f"Which employers are hiring {faq_topic(field, state, 'interns')}?", a))
+    paid = sum(1 for x in items if is_paid(x))
+    if paid:
+        a = f"{paid:,} of the {n:,} open roles ({pct(paid, n)}) list pay or say they are paid."
+        # The rates on a Canada page are Canadian dollars, and on every other page a role only in
+        # Canada is left out of the range, as pay_report leaves it out of the medians.
+        canada_page = state in CANADA_KEYS or state in CA_METRO_PAGES
+        rates = hourly_range([x for x in items if canada_only(x) == canada_page])
+        if rates:
+            lo, hi, k = rates
+            a += (f" The listed hourly rate is {money(lo)} an hour" if lo == hi else
+                  f" Listed hourly rates run from {money(lo)} to {money(hi)} an hour")
+            a += (", in Canadian dollars." if canada_page else
+                  (", leaving out roles only in Canada." if any(canada_only(x) for x in items) else "."))
+    else:
+        a = f"None of the {n:,} open postings lists pay or says it is paid."
+    qa.append((f"Do {topic} pay?", a))
+    if state is None:
+        # A field page spans the country: by state and province, as its chart is. A role in two counts in each.
+        by_state = Counter(US_STATES[k] for x in items for k in x["keys"] if k in PLACES)
+        remote = sum(1 for x in items if "remote" in x["keys"])
+        where = sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))
+    elif state == "remote":
+        where, remote = [], 0          # "Remote (500)" would be the whole answer
+    else:
+        where = [w for w in places(items, state) if w[0] != "Remote"]
+        remote = sum(1 for x in items if x.get("is_remote") or "remote" in x["keys"])
+    if where:
+        # A field page counts states (and provinces), a state page places in it: "and 11 more states".
+        unit = "more state" if state is None else "more place"
+        a = _fit_names(lambda ws: f"The open roles are in {counted(where, len(ws)).replace('more place', unit)}.",
+                       where[:FAQ_NAMES])
+        if remote:
+            a += f" {plural(remote, 'role')} can be done remotely."
+        qa.append((f"Where are {topic}?", a))
+    return qa
 
 
 # ---------------------------------------------------------------- for AI assistants and answer engines
@@ -1466,9 +1605,11 @@ def pay_page(rep: dict, f: dict, now: datetime, fields: dict[str, list], paid_pa
 
 # ---- /about/
 
-def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tuple[str, str, str]]:
+def about_answers(f: dict, majors: int, new: int, rep: dict | None, updated: str = "",
+                  numbers: bool = False) -> list[tuple[str, str, str]]:
     """(question, answer, extra HTML) for /about/. The answer is plain text, the same words in the page
-    and in its FAQPage block; the extra (a link) is the page's only."""
+    and in its FAQPage block; the extra (a link) is the page's only. `numbers`: whether this build made
+    /internships/by-the-numbers/, which the size answer then links (2026-10-05)."""
     top_fields = [lower_name(field_title(t)) for t in top(f["fields"], 5)]
     plans = " and ".join(f"{name} ({price} a month)" for name, price in PLAN_PRICES)
     qa = [
@@ -1476,6 +1617,13 @@ def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tupl
          f"InternScout is a free internship search for college students of every major in the US and "
          f"Canada. It lists {coverage_line(f)}, collected from employers’ own job boards several times a "
          f"day. {SLOGAN}", ""),
+        # The headline figures, dated, in one answer (2026-10-05): what an assistant asked "how big is
+        # InternScout" should find without adding up the others.
+        ("How big is InternScout?",
+         f"As of {updated}, {coverage_line(f)}, in {len(f['states'])} of the 50 US states and "
+         f"{plural(len(f['provinces']), 'Canadian province or territory', 'Canadian provinces and territories')}. "
+         f"{plural(new, 'of them was', 'of them were')} found in the last week.",
+         f" <a href=\"{NUMBERS_PATH}\">InternScout by the numbers</a>." if numbers else ""),
         ("Is InternScout free?",
          "Yes. Searching, ranking and browsing every listing are free and need no account. The optional "
          f"Auto-Apply Chrome extension is free for {FREE_WORDS}; optional {plans} plans raise the allowance.",
@@ -1542,9 +1690,8 @@ def about_answers(f: dict, majors: int, new: int, rep: dict | None) -> list[tupl
 
 def about_page(f: dict, qa: list[tuple[str, str, str]], updated: str) -> tuple[str, str, str, list]:
     """(title, description, body, JSON-LD) of /about/."""
-    faq = {"@context": "https://schema.org", "@type": "FAQPage",
-           "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}}
-                          for q, a, _ in qa]}
+    faq = faq_ld([(q, a) for q, a, _ in qa])
+    # was: the FAQPage object written out here; faq_ld since the listing pages carry one too (2026-10-05).
     body = (f"<p class=\"lede\">InternScout is a free internship search for college students of every major "
             f"in the US and Canada: {esc(coverage_line(f))}, as of {esc(updated)}.</p>"
             "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
@@ -1557,6 +1704,132 @@ def about_page(f: dict, qa: list[tuple[str, str, str]], updated: str) -> tuple[s
     return ("About InternScout – Free Internship Search",
             f"Free internship search for every major, no account needed: {coverage_line(f)}.",
             body, [ORGANIZATION, WEBSITE, faq])
+
+
+# ---- /internships/by-the-numbers/
+# Added 2026-10-05. The figures /about/, /compare/ and llms.txt each state in passing, on a page of
+# their own: how many roles, employers, fields and places, how many are new, what the roles pay, which
+# applicant tracking systems they come from, the largest fields and the states with the most roles.
+# Each is a dated sentence an assistant can quote and a reader can check, counted from the same export
+# as every listing page and rebuilt with them, so the numbers are never older than the listings. A
+# Dataset block says the same in JSON-LD, dated from the data. Only made with MIN_KIND open roles or
+# more: a statistics page about five listings would say nothing (and the test fixtures have five).
+
+NUMBERS_PATH = "/internships/by-the-numbers/"
+NUMBERS_TOP = 10        # fields, states and tracking systems named in each list
+
+
+def numbers_page(f: dict, listings: list[dict], fields: dict, states: dict, rep: dict | None, new: int,
+                 kind_made: list, now: datetime, updated: str) -> tuple[list, str, str, list]:
+    """(title forms, description, body, JSON-LD) of /internships/by-the-numbers/."""
+    n = f["open"]
+    places_line = (f"{len(f['states'])} of the 50 US states and "
+                   f"{plural(len(f['provinces']), 'Canadian province or territory', 'Canadian provinces and territories')}")
+    rows = [("Open roles", f"{n:,}"), ("Employers", f"{f['employers']:,}"), ("Fields", f"{len(f['fields'])}"),
+            ("Places", places_line), ("New this week", f"{new:,}"),
+            ("List pay", f"{f['paid']:,} ({pct(f['paid'], n)})"),
+            ("Give an hourly rate", f"{f['hourly']:,} ({pct(f['hourly'], n)})"),
+            ("From applicant tracking systems", f"{f['from_boards']:,} ({pct(f['from_boards'], n)})")]
+    facts = "<dl class=\"facts\">" + "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in rows) + "</dl>"
+
+    # Open roles. The co-op and research counts are the kind pages' own (kinds), so they match those
+    # pages and link to them; when neither page was made, nothing is said.
+    roles = [f"On {esc(updated)} InternScout listed {esc(coverage_line(f))}.",
+             f"They are in {esc(places_line)}; {plural(f['canada'], 'role is', 'roles are')} in Canada.",
+             f"{plural(new, 'of them was', 'of them were')} found in the week to {esc(updated)}."]
+    kinds_n = {k["slug"]: (path, len(items)) for path, k, items in kind_made}
+    bits = []
+    for slug, label in (("co-op", "co-ops"), ("research", "research positions")):
+        if slug in kinds_n:
+            path, k = kinds_n[slug]
+            bits.append(f"<a href=\"{path}\">{k:,} {label}</a>")
+    if bits:
+        roles.append(f"Among them, as of {esc(updated)}: {join_words(bits)}.")
+
+    pay = [f"{f['paid']:,} of the {n:,} open roles ({pct(f['paid'], n)}) list pay or say they are paid, as of {esc(updated)}.",
+           f"{f['hourly']:,} ({pct(f['hourly'], n)}) give a clear hourly rate."]
+    if rep:
+        pay.append(f"Among the {len(rep['roles']):,} that give one and are not only in Canada (the same role on two "
+                   f"boards counted once), the median is {esc(money(round(rep['median'], 2)))} an hour and the highest "
+                   f"is {esc(money(rep['top'][0][2]))} an hour, as of {esc(updated)}.")
+        pay.append(f"Roles only in Canada ({plural(rep['canada'], 'role')} with a rate) are left out of the median and "
+                   "the top rate, since their pay is in Canadian dollars; yearly salaries and stipends are never "
+                   "turned into hourly figures. <a href=\"/internships/highest-paying/\">Highest-paying internships</a> "
+                   "has the roles, fields and employers.")
+
+    # Where the listings come from: every tracking system ATS_NAMES knows, largest first.
+    boards = sorted(f["boards"].items(), key=lambda kv: (-kv[1], kv[0]))
+    ats = [f"{f['from_boards']:,} of the {n:,} open roles ({pct(f['from_boards'], n)}) come straight from employers' "
+           f"own applicant tracking systems, as of {esc(updated)}; the other {n - f['from_boards']:,} are from "
+           "employers' own careers sites and public lists."]
+    if boards:
+        name0, n0 = boards[0]
+        ats.append(f"{esc(name0)} has the most, {n0:,} roles or {pct(n0, n)} of all open roles.")
+        if len(boards) > 1:
+            # pct rounds down, and "JazzHR 132 (0%)" reads as none.
+            share = lambda k: pct(k, n) if k * 100 >= n else "under 1%"          # noqa: E731
+            ats.append("Then " + esc(join_words([f"{nm} {k:,} ({share(k)})" for nm, k in boards[1:NUMBERS_TOP]])) + ".")
+
+    def linked(path: str | None, name: str, k: int) -> str:
+        return (f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)) + f" ({k:,})"
+
+    top_fields = sorted(f["fields"].items(), key=lambda kv: (-kv[1], kv[0]))[:NUMBERS_TOP]
+    lead = (f"The {len(top_fields)} largest of the {len(f['fields'])} fields" if len(f["fields"]) > NUMBERS_TOP
+            else f"{'Every field' if len(top_fields) > 1 else 'The one field'}")
+    largest = [f"{lead}, by open roles on {esc(updated)}: "
+               + join_words([linked(f"/internships/{field_slug(t)}/" if t in fields else None, field_title(t), k)
+                             for t, k in top_fields]) + "."
+               + (" A role tagged with two fields counts in each." if len(top_fields) > 1 else "")]
+    by_state = Counter(k for x in listings for k in x["keys"] if k in PLACES and k not in CA_PROVINCES and k not in ("DC", "PR"))
+    top_states = sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))[:NUMBERS_TOP]
+    remote = sum(1 for x in listings if "remote" in x["keys"])
+    where = []
+    if top_states:
+        lead = (f"The {len(top_states)} US states with the most open roles" if len(by_state) > NUMBERS_TOP
+                else f"Open roles by US state")
+        where.append(f"{lead} on {esc(updated)}: "
+                     + join_words([linked(f"/internships/{state_slug(k)}/" if k in states else None, US_STATES[k], c)
+                                   for k, c in top_states]) + "."
+                     + (" A role filed in two states counts in each." if len(top_states) > 1 else ""))
+    if remote:
+        where.append(f"{plural(remote, 'open role')} can be done remotely.")
+    provinces = sorted(((k, c) for k, c in Counter(k for x in listings for k in x["keys"] if k in CA_PROVINCES).items()),
+                       key=lambda kv: (-kv[1], kv[0]))[:3]
+    if provinces:
+        where.append(f"In Canada, {'the most are' if len(provinces) > 1 else 'they are'} in {join_words([linked(f'/internships/{state_slug(k)}/' if k in states else None, US_STATES[k], c) for k, c in provinces])}.")
+
+    def section(title: str, sentences: list[str]) -> str:
+        return f"<h2>{esc(title)}</h2><p>{' '.join(sentences)}</p>"
+
+    body = (f"<p class=\"lede\">As of {esc(updated)}, InternScout lists {esc(coverage_line(f))}. Every figure on this "
+            "page is counted from the open listings on that day, and the page is rebuilt with every update.</p>"
+            + facts + "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
+            + "<section class=\"prose\">" + section("Open roles", roles) + section("Pay", pay)
+            + section("Where the listings come from", ats) + section("The largest fields", largest)
+            + (section("Where the roles are", where) if where else "")
+            + section("How this is counted", [
+                f"Every figure is counted from the listings open on {esc(updated)}, the same export the listing pages "
+                "are built from. Spellings of one employer count as one employer. Pay is what the posting says, and a "
+                "role that lists none is counted as listing none. A dated figure is true of that day; the page is "
+                "rebuilt, and the date moves, with every update."])
+            + "</section>")
+    desc = (f"InternScout on {updated}: {n:,} open internships, co-ops and research roles from "
+            f"{plural(f['employers'], 'employer')} in {plural(len(f['fields']), 'field')}. What they pay, and which "
+            "job boards they come from.")
+    measured = [("Open roles", n), ("Employers", f["employers"]), ("Fields", len(f["fields"])),
+                ("US states with open roles", len(f["states"])), ("Canadian provinces and territories with open roles", len(f["provinces"])),
+                ("Roles in Canada", f["canada"]), ("Roles found in the last week", new),
+                ("Roles that list pay or say they are paid", f["paid"]), ("Roles that give an hourly rate", f["hourly"]),
+                ("Roles from employers' applicant tracking systems", f["from_boards"])]
+    if rep:
+        measured += [("Median listed hourly rate, USD, roles not only in Canada", round(rep["median"], 2)),
+                     ("Highest listed hourly rate, USD, roles not only in Canada", rep["top"][0][2])]
+    ld = {"@context": "https://schema.org", "@type": "Dataset", "@id": SITE + NUMBERS_PATH,
+          "name": "InternScout by the numbers", "url": SITE + NUMBERS_PATH, "description": desc,
+          "dateModified": f"{now:%Y-%m-%d}", "temporalCoverage": f"{now:%Y-%m-%d}",
+          "creator": {"@id": ORG_ID}, "publisher": {"@id": ORG_ID}, "isAccessibleForFree": True,
+          "variableMeasured": [{"@type": "PropertyValue", "name": k, "value": v} for k, v in measured]}
+    return [f"InternScout by the Numbers – {n:,} Open Roles", "InternScout by the Numbers"], desc, body, [ld]
 
 
 # ---- /compare/
@@ -1746,6 +2019,9 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
     if "/internships/highest-paying/" in made:
         main_pages.append(link("/internships/highest-paying/", "Highest-paying internships",
                                "top listed hourly pay by role, field and employer, rebuilt every update"))
+    if NUMBERS_PATH in made:
+        main_pages.append(link(NUMBERS_PATH, "InternScout by the numbers",
+                               "open roles, employers, fields, states, pay and job-board shares, each a dated sentence"))
     main_pages.append(link("/install.html", "Auto-Apply extension install guide",
                            "the free Chrome extension that fills applications and never submits"))
     lines = ["# InternScout", "", f"> {summary_}", "", *facts, "",
@@ -1999,13 +2275,15 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                              [(pth, page_name[pth], k) for pth, k in sorted(hiring.items(), key=lambda kv: (-kv[1], kv[0]))[:RELATED]])
         # was: add(path, f"{name} Internships – {len(items):,} Open Now | InternScout", ...
         n = f"{len(items):,}"
+        # The page's questions, on the page and as a FAQPage block (2026-10-05, listing_faq).
+        qa = listing_faq(items, t, None, updated)
         add(path, [f"{name} Internships – {n} Open Now", f"{name} Internships – {n} Open", f"{name} Internships",
                    f"{field_short(t)} Internships – {n} Open", f"{field_short(t)} Internships"],
             f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
             f"{updated}. Employers include {emp}. Free search, no sign-up.",
             f"{name} internships", [root, (path, name)],
             listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path),
-                         src="seo-field"), items)
+                         src="seo-field", faq=faq_section(qa)), items, ld=[faq_ld(qa)])
 
     for k, items in sorted(states.items()):
         where = US_STATES[k]
@@ -2017,12 +2295,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         loc = "remote" if k == "remote" else f"in {where}"
         # was: add(path, f"Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
         head = f"Internships {'(Remote)' if k == 'remote' else 'in ' + where}"
+        qa = listing_faq(items, None, k, updated)
         add(path, [f"{head} – {len(items):,} Open", head],
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", [root, (path, where)],
             listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k),
-                         src="seo-state"), items, k)
+                         src="seo-state", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
 
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
@@ -2034,6 +2313,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         loc = "remote" if k == "remote" else f"in {where}"
         # was: add(path, f"{name} Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
         at = "(Remote)" if k == "remote" else f"in {where}"
+        qa = listing_faq(items, t, k, updated)
         add(path, [f"{name} Internships {at} – {len(items):,} Open", f"{name} Internships {at}",
                    f"{field_short(t)} Internships {at} – {len(items):,} Open", f"{field_short(t)} Internships {at}"],
             f"{len(items):,} open {lower_name(name)} internships and co-ops {loc}, updated {updated}. "
@@ -2041,7 +2321,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
             listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k),
-                         src="seo-field"), items, k)
+                         src="seo-field", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
 
     majors_made = []
     for m, tags, items, path in major_rows:
@@ -2168,6 +2448,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     else:
         rep = None
 
+    # The site's figures on one page (2026-10-05, numbers_page), before the hubs so the hub, /about/ and
+    # llms.txt can link it. Kept once live like the pay page; MIN_KIND, since five roles make no statistics.
+    numbers = enough(len(listings), NUMBERS_PATH, MIN_KIND)
+    if numbers:
+        t_, d_, b_, ld_ = numbers_page(facts, listings, fields, states, rep, len(new), kind_made, now, updated)
+        add(NUMBERS_PATH, t_, d_, "InternScout by the numbers", [root, (NUMBERS_PATH, "By the numbers")], b_, ld=ld_)
+
     # Hubs last, so they only link to pages that exist.
     add("/internships/at/", [f"Internships by Employer – {len(by_company):,} Employers", "Internships by Employer"],
         f"Open internships and co-ops at {len(by_company):,} employers hiring college students now, from each "
@@ -2206,6 +2493,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                      f"<span class=\"n\">{len(v):,}</span></li>" for p, k, v in kind_made)
            + (f"<li><a href=\"{pay_path}\">Highest-paying internships</a> <span class=\"n\">{len(rep['roles']):,}</span></li>"
               if rep else "")
+           + (f"<li><a href=\"{NUMBERS_PATH}\">InternScout by the numbers</a></li>" if numbers else "")
            + "</ul></section>")
     # was: f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout" (70 characters)
     add("/internships/", [f"Browse {len(listings):,} Open Internships by Field, State and Major",
@@ -2218,7 +2506,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
 
     # What InternScout is, for people and for answer engines (2026-10-02). After the hubs: they link
     # only pages that exist.
-    qa = about_answers(facts, len(majors_made), len(new), rep)
+    qa = about_answers(facts, len(majors_made), len(new), rep, updated, numbers)
+    # was: qa = about_answers(facts, len(majors_made), len(new), rep)
     t_, d_, b_, ld_ = about_page(facts, qa, updated)
     add("/about/", t_, d_, "About InternScout", [("/", "InternScout"), ("/about/", "About")], b_, ld=ld_)
     t_, d_, b_ = compare_page(facts)
