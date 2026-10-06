@@ -7056,6 +7056,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "careers-sentinel": {
+   "name": "Sentinel Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "careers-sevenhills": {
    "name": "Seven Hills Foundation",
    "quant": false,
@@ -9455,6 +9461,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "ebwh.fa.us2.oraclecloud.com|CX_1001": {
+   "name": "Macy's",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "ebxr.fa.us2.oraclecloud.com|CX_1": {
    "name": "DTCC",
    "quant": false,
@@ -11614,6 +11626,12 @@
    "added": "2026-09-18",
    "sector": "nonprofit"
   },
+  "alston|wd1|ExternalCareer": {
+   "name": "Alston & Bird Law Firm",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-06"
+  },
   "altasciences|wd1|Careers": {
    "name": "Altasciences",
    "quant": false,
@@ -12806,9 +12824,8 @@
   "cc|wd3|ChanelCareers": {
    "name": "Chanel",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-06"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "cdw|wd5|careers": {
    "name": "CDW Corporation",
