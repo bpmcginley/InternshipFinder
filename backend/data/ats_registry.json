@@ -11885,9 +11885,10 @@
   "argonne|wd1|Argonne_Careers": {
    "name": "Argonne National Laboratory",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-16",
-   "sector": "education_research"
+   "sector": "education_research",
+   "last_fail": "2026-10-07"
   },
   "argonne|wd1|EDU_PUB": {
    "name": "Argonne National Laboratory",
@@ -13869,9 +13870,8 @@
   "eversource|wd1|ExternalSite": {
    "name": "Eversource Energy",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-07"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "evolito|wd3|Evolito_Career_Site": {
    "name": "Evolito",
