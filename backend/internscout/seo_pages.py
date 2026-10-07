@@ -1183,6 +1183,14 @@ def place_name(g: dict) -> str:
     loc = str(g.get("loc") or g.get("state") or "").strip()
     # "New York, New York, United States" is "New York, NY": the country goes, then the state shortens.
     loc = re.sub(r",\s*(United States( of America)?|USA|US)$", "", loc).strip()
+    # Workday's country-state-city form, "USA-Illinois-Chicago" or "USA-Arkansas-Ft. Smith", is
+    # "Chicago, IL" (2026-10-07; it filled Mars's whole description).
+    w = re.match(r"^(?:USA|US)-([A-Za-z .]+)-(.+)$", loc)
+    if w and w.group(1).strip() in _STATE_NAMES:
+        loc = f"{w.group(2).strip()}, {w.group(1).strip()}"
+    w = re.match(r"^(?:USA|US)-([A-Z]{2})\s+(.+)$", loc)       # and "USA-IL Oak Brook" (Winland Foods)
+    if w and w.group(1) in US_STATES:
+        loc = f"{w.group(2).strip()}, {w.group(1)}"
     m = re.match(r"^(.*),\s*([A-Za-z .]+)$", loc)
     if m and m.group(2).strip() in _STATE_NAMES:
         loc = f"{m.group(1)}, {_STATE_NAMES[m.group(2).strip()]}"
@@ -2538,18 +2546,34 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         co_ops = sum(1 for x in items if "co_op" in (x.get("stage") or []))
         # Fewer places until the description fits DESC_MAX (2026-10-05): a board's "place" can be a
         # street address, and three of them made a 330-character description. was: always three.
-        for k in (3, 2, 1, 0):
-            top_places = named[:k]
+        # 2026-10-07: employer pages ranked 8-10 for "<employer> internships" but got under 1% of clicks
+        # (Under Armour 1 of 205, Campbell 0 of 119): the employer's own careers page sits above them, so
+        # the snippet now leads with what that page doesn't show in one place: every open role on one
+        # page, the listed pay, and how recently the newest was posted (a role found this week reads as
+        # still open). was: "... Roles in <fields>. Updated <date>. Free, no sign-up."
+        newest = max((d for d in (_when(x.get("posted_at") or x.get("first_seen")) for x in items) if d),
+                     default=None)
+        newest_txt = f" Newest posted {newest:%b} {newest.day}." if newest else ""
+        pay_txt = (f" Listed pay {money(pay[0])}{'' if pay[0] == pay[1] else '–' + money(pay[1])}/hour." if pay
+                   else "")
+        # The first that fits, best first: pay and the newest posting outrank a third or second place,
+        # which outrank "Free, no sign-up"; one place outranks pay only when nothing else fits.
+        full, short = pay_txt + newest_txt + " Free, no sign-up.", pay_txt + newest_txt
+        tries = ([(k, full) for k in (3, 2, 1)] + [(k, short) for k in (3, 2, 1)]
+                 + [(0, full), (0, short), (1, newest_txt), (0, newest_txt), (0, "")])
+        desc = ""
+        for k, tail in tries:
             desc = (f"{len(items):,} open {name} internships{' and co-ops' if co_ops else ''}"
-                    + (f" for {term}" if term else "")
-                    + (f" in {join_words(top_places)}" if top_places else "") + "."
-                    + (f" Listed pay {money(pay[0])}{'' if pay[0] == pay[1] else '–' + money(pay[1])}/hour." if pay else
-                       f" Roles in {fields_words}." if main else "")
-                    + f" Updated {updated}. Free, no sign-up.")
+                    + (f" for {term}" if term else "") + " on one page"
+                    + (f", in {join_words(named[:k])}" if named[:k] else "") + "." + tail)
             if len(desc) <= DESC_MAX:
                 break
         # was: add(path, f"{name} Internships{f' ({term})' if term else ''} – {len(items):,} Open | InternScout", ...
-        add(path, [f"{name} Internships ({term}) – {len(items):,} Open" if term else "",
+        # 2026-10-07: the term goes before "Internships", as searches word it ("under armour summer 2027
+        # internship"), which also lets it fit with the count where the brackets didn't: Under Armour's
+        # title had dropped the term. was: f"{name} Internships ({term}) – {n} Open" first.
+        add(path, [f"{name} {term} Internships – {len(items):,} Open" if term else "",
+                   f"{name} Internships ({term}) – {len(items):,} Open" if term else "",
                    f"{name} Internships – {len(items):,} Open", f"{name} Internships"],
             desc,
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],

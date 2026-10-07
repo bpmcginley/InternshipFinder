@@ -295,8 +295,9 @@ def test_spellings_of_one_employer_share_a_page_and_a_role_counts_once(tmp_path)
     pages = {p["path"]: p for p in seo_pages.build(site)}
     assert "/internships/at/the-boeing-company/" not in pages
     boeing = pages["/internships/at/boeing/"]
-    # was: "Boeing Internships – 12 Open Now". Since 2026-10-01 the title names the term most roles share.
-    assert len(boeing["items"]) == 12 and "Boeing Internships (Summer 2027) – 12 Open" in boeing["html"]
+    # was: "Boeing Internships – 12 Open Now". Since 2026-10-01 the title names the term most roles share,
+    # and since 2026-10-07 before "Internships", as searches word it. was: "Boeing Internships (Summer 2027)".
+    assert len(boeing["items"]) == 12 and "Boeing Summer 2027 Internships – 12 Open" in boeing["html"]
     assert "company=Boeing&amp;company=The%20Boeing%20Company" in boeing["html"]
     assert '<a href="/internships/at/boeing/">The Boeing Company</a>' in pages["/internships/massachusetts/"]["html"]
     assert seo_pages.employer_key("Magna International") == seo_pages.employer_key("Magna")
@@ -489,8 +490,12 @@ def test_employer_pages_answer_when_where_and_pay_from_their_own_roles(tmp_path)
     rows += [_row(20 + i, company_name="Big Co", salary="$90,000 a year") for i in range(2)]   # yearly: not an hourly rate
     site = _site(tmp_path, {"MA": rows, "CO": []})
     h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/big-co/")
-    assert "<title>Big Co Internships (Summer 2027) – 12 Open | InternScout</title>" in h
+    assert "<title>Big Co Summer 2027 Internships – 12 Open | InternScout</title>" in h
     assert "Listed pay $22.50–$38/hour." in h
+    # 2026-10-07: what the employer's own careers page doesn't show in one place leads the description.
+    desc = h.split('<meta name="description" content="')[1].split('"')[0]
+    assert desc.startswith("12 open Big Co internships for Summer 2027 on one page, in Denver, CO")
+    assert "Newest posted " in desc and "Updated" not in desc and len(desc) <= 160
     assert "<dt>Listed pay</dt><dd>$22.50 to $38 an hour, on 10 of 12 roles</dd>" in h
     facts = h.split('<dl class="facts">')[1].split("</dl>")[0]
     assert "Denver, CO (10)" in facts and "Colorado" not in facts       # one place, however it's spelled
@@ -1242,3 +1247,11 @@ def test_the_digest_page_has_no_number_in_a_quiet_week(tmp_path):
     assert "/internships/new/" not in pages
     lede = re.search(r'<p class="lede">(.*?)</p>', pages["/digest/"]).group(1)
     assert lede.startswith("One free email every Monday") and "new internships" not in lede
+
+
+def test_workday_country_state_city_places_read_as_city_and_state():
+    # 2026-10-07: "USA-Illinois-Chicago" filled Mars's description; "USA-IL Oak Brook" is Winland Foods'.
+    assert seo_pages.place_name({"loc": "USA-Illinois-Chicago"}) == "Chicago, IL"
+    assert seo_pages.place_name({"loc": "USA-Arkansas-Ft. Smith"}) == "Ft. Smith, AR"
+    assert seo_pages.place_name({"loc": "USA-IL Oak Brook"}) == "Oak Brook, IL"
+    assert seo_pages.place_name({"loc": "Denver, Colorado"}) == "Denver, CO"
