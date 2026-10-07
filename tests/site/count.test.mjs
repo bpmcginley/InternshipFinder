@@ -108,3 +108,16 @@ test("a local copy counts no sign-ups and attaches no submit listener", () => {
   assert.throws(() => r.submit("digest"), TypeError);
   assert.equal(r.sent.length, 0);
 });
+
+// Added 2026-10-07: a link to the listing's reviews page (the dashboard's review line, the install
+// page) is a review_click, not an install_click; any other store link is still an install_click.
+test("a click on the store's reviews page is a review_click, and only that one", () => {
+  const r = load({ path: "/install.html" });
+  r.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews");
+  r.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews?utm_source=install-page");
+  assert.deepEqual(r.bodies().filter((b) => b.e), [{ e: "review_click", p: "/install.html" }]);
+  const d = load();
+  d.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=reviews");
+  d.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews");
+  assert.deepEqual(d.bodies().filter((b) => b.e).map((b) => b.e), ["install_click", "review_click"]);
+});

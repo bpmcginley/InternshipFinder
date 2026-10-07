@@ -42,7 +42,7 @@
      the brand, by its @id from backend/internscout/seo_pages.py ORGANIZATION; no author, as on the
      rest of the site. The steps are the three under the heading, in the same words. -->
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"HowTo","@id":"https://internscout.org/install.html#howto","name":"Install the InternScout Auto-Apply extension","description":"Add the free InternScout Auto-Apply extension from the Chrome Web Store in desktop Chrome, Edge or Brave, pin it to the toolbar and sign in with Google or Microsoft. About a minute.","url":"https://internscout.org/install.html","inLanguage":"en-US","datePublished":"2026-09-15","dateModified":"2026-10-05","totalTime":"PT1M","publisher":{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/"},"isPartOf":{"@id":"https://internscout.org/#website"},"step":[{"@type":"HowToStep","position":1,"name":"Add it from the Chrome Web Store","text":"Open the listing, click Add to Chrome, then Add extension. In Edge, click Allow extensions from other stores first. The Deep Dive setup opens in a new tab.","url":"https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"},{"@type":"HowToStep","position":2,"name":"Pin it to your toolbar","text":"Click the puzzle-piece icon next to the address bar, then the pin next to InternScout Auto-Apply."},{"@type":"HowToStep","position":3,"name":"Sign in with Google or Microsoft","text":"Click the InternScout icon and choose Sign in with Google or Sign in with Microsoft. Sign-in is only needed for AI features like Auto-Apply and tailored resumes."}]}
+{"@context":"https://schema.org","@type":"HowTo","@id":"https://internscout.org/install.html#howto","name":"Install the InternScout Auto-Apply extension","description":"Add the free InternScout Auto-Apply extension from the Chrome Web Store in desktop Chrome, Edge or Brave, pin it to the toolbar and sign in with Google or Microsoft. About a minute.","url":"https://internscout.org/install.html","inLanguage":"en-US","datePublished":"2026-09-15","dateModified":"2026-10-07","totalTime":"PT1M","publisher":{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/"},"isPartOf":{"@id":"https://internscout.org/#website"},"step":[{"@type":"HowToStep","position":1,"name":"Add it from the Chrome Web Store","text":"Open the listing, click Add to Chrome, then Add extension. In Edge, click Allow extensions from other stores first. The Deep Dive setup opens in a new tab.","url":"https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"},{"@type":"HowToStep","position":2,"name":"Pin it to your toolbar","text":"Click the puzzle-piece icon next to the address bar, then the pin next to InternScout Auto-Apply."},{"@type":"HowToStep","position":3,"name":"Sign in with Google or Microsoft","text":"Click the InternScout icon and choose Sign in with Google or Sign in with Microsoft. Sign-in is only needed for AI features like Auto-Apply and tailored resumes."}]}
 </script>
 <style>
   :root{
@@ -93,6 +93,8 @@
      is a real change of state, and the press moves the button a pixel down. */
   .btn:hover{background:var(--accent-hover)}
   .btn:active{transform:translateY(1px)}
+  /* The review line under the store button: smaller and quieter than the step it sits in. */
+  ol.steps>li p.review-ask{margin-top:10px;font-size:14px;color:var(--ink3)}
   ol.steps{list-style:none;counter-reset:step;padding:0;margin:28px 0 0}
   ol.steps>li{counter-increment:step;position:relative;padding:0 0 22px 52px;margin:0}
   ol.steps>li::before{content:counter(step);position:absolute;left:0;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:600 16px/34px var(--sans);text-align:center}
@@ -196,6 +198,10 @@
         <p>Open the listing, click <strong>Add to Chrome</strong>, then <strong>Add extension</strong>. The Deep Dive setup opens in a new tab.</p>
         <p><strong>Edge:</strong> click <strong>Allow extensions from other stores</strong> in the bar at the top of the listing first, then add it the same way. <strong>Brave</strong> works like Chrome.</p>
         <a class="btn" href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Open it in the Chrome Web Store</a>
+        <!-- Added 2026-10-07. Someone already using it lands here too (the help links point here), so the
+             review ask sits by the store button: same words for everyone, nothing offered for it.
+             js/count.js counts a click as "review_click", not "install_click". -->
+        <p class="review-ask">Using Auto-Apply? A short review helps other students find it. <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews">Leave a review</a></p>
       </li>
       <li>
         <h3>Pin it to your toolbar</h3>
@@ -230,7 +236,10 @@
         <li>Finish the <strong>Deep Dive</strong>: your resume, facts and a few short questions. Your files stay on your device; the profile it builds is saved to your account so it's there on your other devices, unless you turn that off (<a href="privacy.html#saved">what is saved</a>).</li>
         <li>Open the <a href="index.html">dashboard</a>, tick some listings and press <strong>Auto-Apply</strong>.</li>
         <li>Most applications run on a system the extension already has access to. When one is on an employer's own careers site, the job pauses and the side panel shows an <strong>Allow <em>that site</em></strong> button. Chrome then asks about that one site. Nothing else is granted, and you can say no.</li>
-        <li>If it helps you, a rating on the <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Web Store listing</a> helps other students find it.</li>
+        <!-- was: <li>If it helps you, a rating on the <a href="...hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Web Store listing</a> helps other students find it.</li>
+             2026-10-07: straight to the reviews page, and asked of everyone who uses it, not only those
+             it helped (a review either way is what the next student needs). -->
+        <li>Once you've used it on a few applications, a short review on the <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews">Chrome Web Store</a>, good or bad, helps other students find it and decide.</li>
       </ul>
     </div>
 

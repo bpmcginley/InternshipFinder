@@ -232,6 +232,21 @@ test("a weekly email sign-up is a step the site sends, counted by the page the f
   assert.deepEqual(await rows(w), [], "a step is not a page load");
 });
 
+// Added 2026-10-07: a click through to the extension's reviews page, from the site only.
+test("a click to the store's reviews page is a step the site sends, by page kind", async () => {
+  const w = await setup();
+  assert.ok(EVENTS.has("review_click"));
+  assert.ok(!SERVER_EVENTS.has("review_click"));
+  await hit(w, { e: "review_click", p: "/" });
+  await hit(w, { e: "review_click", p: "/install.html" });
+  await hit(w, { e: "review_click", p: "/install.html" });
+  assert.deepEqual(await events(w), [
+    { event: "review_click", page: "dashboard", n: 1 },
+    { event: "review_click", page: "install", n: 2 },
+  ]);
+  assert.deepEqual(await rows(w), [], "a step is not a page load");
+});
+
 test("a load of the weekly email's page is counted under its own kind", async () => {
   const w = await setup();
   await hit(w, { p: "/digest/", r: "", u: "bluesky", m: "social" });

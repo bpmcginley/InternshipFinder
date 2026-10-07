@@ -6,6 +6,7 @@ import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, en
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
 import { ISEval } from "./evalrec.js";
+import { noteFilled, answerReview, loadReview, webLineOk, FILLED, FEEDBACK_URL } from "../lib/review.js";
 
 // For the model comparison in scripts/eval, from this service worker's console only (evalrec.js).
 self.ISEval = ISEval;
@@ -13,7 +14,9 @@ self.ISEval = ISEval;
 const ONBOARDING = "onboarding/onboarding.html";
 const PANEL = "sidepanel/sidepanel.html";
 // The feedback form the dashboard already points students at (docs/index.html window.CONFIG.formUrl).
-const FEEDBACK_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
+// was: const FEEDBACK_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
+// The same address now lives in lib/review.js, whose review card links it beside "Leave a review".
+const FEEDBACK_FORM = FEEDBACK_URL;
 const ports = new Set();
 const lastStatus = new Map();
 
@@ -150,7 +153,7 @@ function cleanProfile(p) {
 
 // ---------- router ----------
 const PAGE_ALLOWED = new Set(["ping", "enqueue", "get_queue", "control", "open_deep_dive", "open_panel", "get_profile_summary",
-  "profile:set", "profile:get", "auth:token"]);
+  "profile:set", "profile:get", "auth:token", "review_ask"]);
 
 async function handle(m, sender, fromPage) {
   if (!m || typeof m !== "object") return { error: "bad message" };
@@ -159,7 +162,10 @@ async function handle(m, sender, fromPage) {
     case "ping": {
       const s = await loadStore();
       return { ok: true, version: chrome.runtime.getManifest().version, onboarded: !!s.settings.onboarded, hasKey: !!hasKey(s), spend: await spend(),
-        provider: s.ai.provider, signed_in: isWorker(s.ai) ? !!(await getToken()) : null };
+        provider: s.ai.provider, signed_in: isWorker(s.ai) ? !!(await getToken()) : null,
+        // Whether the dashboard may show its one-line review suggestion (lib/review.js webLineOk): only
+        // true or false, so a "Don't ask again" here quiets the dashboard too. Stays in this browser.
+        review_line: webLineOk(await loadReview()) };
     }
     case "enqueue": {
       const s = await loadStore();
@@ -250,6 +256,10 @@ async function handle(m, sender, fromPage) {
     case "get_tailored": {
       return { file: await getTailoredFile(m.id) };   // was: getJob(m.id).tailored.file, when the bytes sat on the job
     }
+    // The review card's buttons and the "Leave a review" links (lib/review.js). The dashboard can say so
+    // too, so a review left from there stops the card. Only "review", "never" and "later" do anything.
+    case "review_ask":
+      return { ok: true, state: await answerReview(String(m.action || "")) };
     case "open_deep_dive":
       await openDeepDive();
       return { ok: true };
@@ -294,6 +304,9 @@ onQueueChange((q) => {
     if (prev !== j.status) {
       lastStatus.set(j.id, j.status);
       if (prev && (j.status === "needs_you" || j.status === "ready_to_submit")) notify(j);
+      // An application just finished filling: count it for the review card (lib/review.js). Only a real
+      // change seen by this worker counts (prev is set), and each job counts once however often it does.
+      if (prev && FILLED.has(j.status)) noteFilled(j.id, Object.values(q.jobs)).catch(() => {});
     }
     if (j.tabId) chrome.tabs.sendMessage(j.tabId, { type: "overlay", job: publicJob(j) }, { frameId: 0 }).catch(() => {});
   }

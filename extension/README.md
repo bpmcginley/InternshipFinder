@@ -43,6 +43,10 @@ you sign out.
   *Ready to submit*, *In progress*, *Done*. Answer questions there or in the card on the tab.
 - New facts you give are saved, so you are not asked twice.
 - After you submit, the job is marked **Submitted** and the dashboard marks it Applied.
+- After your 2nd filled application, and once more after your 10th, the side panel asks for a Chrome
+  Web Store review (never while a form is being filled). **Not now** waits for the next one; **Don't ask
+  again** and **Leave a review** end it. The count and your answer stay in `chrome.storage.local`
+  (`lib/review.js`); nothing is sent. **Leave a review** is also always in the popup and the side panel.
 
 ## Safety
 <!-- was: "Clicks on submit-like buttons are refused, and Enter, `form.submit()` and `requestSubmit()`
@@ -72,7 +76,7 @@ bridge/      bridge.js (dashboard <-> extension messages)
 onboarding/  Deep Dive
 sidepanel/   queue, answers, accounts
 popup/       status + shortcuts
-lib/store.js storage schema
+lib/store.js storage schema; lib/review.js the review card (when it asks, what it says)
 test/        guard.test.mjs, fixtures/
 ```
 

@@ -814,6 +814,14 @@
     // The plans announcement (2026-10-04): hidden once dismissed for this announcement.
     const [plansSeen, setPlansSeen] = useState(() => { try { return localStorage.getItem(IS.PLANS_BANNER_KEY) === IS.PLANS_BANNER_ID; } catch (e) { return false; } });
     const hidePlans = () => { try { localStorage.setItem(IS.PLANS_BANNER_KEY, IS.PLANS_BANNER_ID); } catch (e) { } setPlansSeen(true); };
+    // The review line (2026-10-07): one quiet sentence for a student whose extension has filled a couple
+    // of applications, asking for a Chrome Web Store review. Same words for everyone, nothing offered for
+    // it. Hidden for good in this browser by "Hide" or by following it (one setting in local storage), and
+    // never shown when the extension says the student already reviewed or chose "Don't ask again" there
+    // (the ping's review_line; extension/lib/review.js). An extension too old to say falls back to whether
+    // the queue holds a filled application.
+    const [reviewHidden, setReviewHidden] = useState(() => { try { return localStorage.getItem(IS.REVIEW_LINE_KEY) === "hidden"; } catch (e) { return false; } });
+    const hideReview = () => { try { localStorage.setItem(IS.REVIEW_LINE_KEY, "hidden"); } catch (e) { } setReviewHidden(true); };
     useEffect(() => { if (upgradeAsk) history.replaceState(null, "", location.pathname); }, []);
 
     // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
@@ -1159,6 +1167,8 @@
     // was: ... && !me.paused && inviteOffer && autoAllow && ...: the notice only showed while invites were on,
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
     const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // The review line (see reviewHidden above). It waits behind any other notice rather than stacking.
+    const reviewLine = !reviewHidden && !note && !nudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
     // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
     // upgrade_offer, at their tier; a Worker from before 2026-09-30 sends none, so no run count).
     const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
@@ -1398,6 +1408,13 @@
           h("a", { href: "#", onClick: prevent(openInvite) }, offerPl ? "Or invite a classmate" : "Invite a classmate"),
           // An inviter is rewarded for their first REFERRAL.maxRewards classmates only (worker/src/referral.js).
           `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates.`))),
+      // The review line (2026-10-07). Following the link tells the extension too, so its own card stops
+      // asking. Hidden a tick later, not in the click itself: a link taken out of the page mid-click
+      // doesn't open. js/count.js counts the click as "review_click", a daily total with nothing about who.
+      reviewLine && !upgradeAsk && h("div", { className: "notice quietnote review-line" },
+        "Using Auto-Apply? A short review on the Chrome Web Store helps other students find it. ",
+        h("a", { href: IS.REVIEWS_URL, target: "_blank", rel: "noopener", onClick: () => { IS.ext.call({ type: "review_ask", action: "review" }); setTimeout(hideReview, 0); } }, "Leave a review"),
+        " ", h("a", { href: "#", style: { color: "var(--ink3)", fontWeight: 400 }, onClick: prevent(hideReview), "aria-label": "Hide this suggestion" }, "Hide")),
       // Arrived from the extension's Upgrade button, with runs still left or before /me has loaded.
       !outOfRuns && upgradeAsk && h("div", { className: "notice" },
         !auth.token ? "Sign in (top right) to pick a plan. A plan raises how many Auto-Apply runs you get each month. "

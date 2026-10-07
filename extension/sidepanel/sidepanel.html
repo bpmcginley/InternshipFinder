@@ -47,6 +47,13 @@ code{font:12px var(--mono)}
 .q{font-weight:600;margin-top:7px}
 .small{font-size:12px;color:var(--ink3)}
 a{color:var(--accent)}
+/* The review card (lib/review.js): quiet on purpose. No colour edge like the job cards, which carry
+   things the student must act on; this one can be ignored and nothing happens. */
+.card.review{background:var(--panel);border-style:dashed}
+.card.review .q{margin:0;font-weight:600}
+.card.review .msg{margin-top:4px;color:var(--ink2);font-size:12.5px}
+.card.review .fb{margin-top:8px}
+.foot{display:flex;justify-content:center;margin-top:6px}
 </style></head><body>
 <header><b>InternScout</b><nav><button data-tab="queue" class="on">Queue</button><button data-tab="answers">Answers</button><button data-tab="accounts">Accounts</button></nav></header>
 <main id="main"></main>

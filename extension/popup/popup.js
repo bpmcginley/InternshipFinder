@@ -2,6 +2,7 @@ import { loadStore, hasKey, isWorker } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { takeRestored, restoredMessage } from "../lib/sync.js";
+import { STORE_REVIEWS_URL } from "../lib/review.js";
 
 const DASHBOARD = "https://internscout.org/";
 const $ = (id) => document.getElementById(id);
@@ -85,6 +86,15 @@ $("queue").addEventListener("click", async () => {
 
 $("dash").addEventListener("click", async () => {
   await chrome.tabs.create({ url: DASHBOARD });
+  window.close();
+});
+
+// The store's reviews page in a new tab. It also tells the background, so the review card in the side
+// panel doesn't ask someone who has already gone to leave one.
+$("review").addEventListener("click", async () => {
+  // Told first: the popup closes as soon as the new tab takes focus.
+  await chrome.runtime.sendMessage({ type: "review_ask", action: "review" }).catch(() => {});
+  await chrome.tabs.create({ url: STORE_REVIEWS_URL });
   window.close();
 });
 
