@@ -386,6 +386,17 @@
   footer .links{display:flex;gap:4px 16px;flex-wrap:wrap;align-items:center;margin-top:8px}
   footer .links a{color:var(--ink2);text-decoration:none}
   footer .links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  /* The crawlable "Browse" section under the dashboard (2026-10-07): outside #root, so React never
+     replaces it and a crawler that runs no script sees every link. Quiet, like the footer. */
+  .browse{border-top:1px solid var(--rule);padding:var(--s5) 0 var(--s7);color:var(--ink3);font-size:13.5px}
+  .browse h2{font:600 18px/1.3 var(--serif);color:var(--ink);margin:0 0 var(--s3)}
+  .browse h3{font-size:13px;font-weight:600;color:var(--ink2);margin:var(--s4) 0 var(--s2);text-transform:uppercase;letter-spacing:.04em}
+  .browse ul{list-style:none;margin:0;padding:0;columns:4 180px;column-gap:var(--s5)}
+  .browse li{padding:2px 0;break-inside:avoid}
+  .browse a{color:var(--ink2);text-decoration:none}
+  .browse a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  .browse .n{color:var(--ink3);font-size:12px;margin-left:4px}
+  .browse p{margin:var(--s2) 0 0}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   noscript p{max-width:640px;margin:40px auto;padding:0 20px;color:var(--ink2)}
@@ -544,6 +555,13 @@
 </header></div>
 </div>
 <noscript><p>InternScout needs JavaScript to search and rank listings. Without it, <a href="internships/">browse open internships by field, state or major</a>. The raw data is public at <a href="https://github.com/bpmcginley/InternshipFinder/tree/main/docs/data">github.com/bpmcginley/InternshipFinder</a>.</p></noscript>
+<!-- The crawlable "Browse" section (2026-10-07). Search Console showed most landing pages "discovered -
+     currently not indexed": Google reached them three clicks from here, through /internships/. The deploy
+     (backend/internscout/seo_pages.py home_browse) writes the biggest employers, every field page, the
+     places students search and the soonest summer's "who's open now" page between the two markers, with
+     counts from the same data; what is here between them is only the fallback for a copy that was never
+     built. Outside #root, so React leaves it alone and it is in the HTML a crawler fetches. -->
+<!-- browse:start --><div class="wrap"><section class="browse" aria-labelledby="browse-title"><h2 id="browse-title">Browse open internships</h2><ul><li><a href="/internships/at/">Employers hiring now</a></li><li><a href="/internships/">By field, state or major</a></li><li><a href="/internships/new/">New this week</a></li></ul></section></div><!-- browse:end -->
 <!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
      and nothing that identifies a visitor; see privacy.html. The token is public by design.
      js/count.js (2026-09-30) is the exact counter, since Cloudflare samples. The landing pages copy

@@ -59,6 +59,28 @@ MIN_COMBO = 15
 # ...counting only postings filed in fewer states than this. One employer posting the same role in
 # 30 states would otherwise make 30 pages that differ only in the state's name.
 SPREAD = 10
+# Widened 2026-10-07: the field pages draw three times the click rate of the employer pages (Search
+# Console, 28 days to 2026-10-07: 6.1% against 2.0%), so there are more field-in-a-place pages where
+# students look. A field in a US metro (US_METRO_PAGES) gets a page at MIN_COMBO like a state; one of
+# the fields the growth plan markets first (growth/README.md, "Primary: market now": these are those
+# majors' tags in majors.json) in the Northeast, remote or a metro gets one at MIN_COMBO_PRIORITY. Every
+# page these rules add must also be its own list: MIN_EMPLOYERS_NEW employers at least (not one
+# employer's page under a place's name), and not near_same as a page already made (the field's own
+# page, the field in the metro's state, or another field in the same place).
+PRIORITY_FIELDS = frozenset({"swe", "hardware", "data", "math", "finance", "operations", "supply_chain",
+                             "consulting", "hr", "industrial"})
+PRIORITY_PLACES = frozenset({"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "PA", "remote"})   # and the metros
+MIN_COMBO_PRIORITY = 10
+MIN_EMPLOYERS_NEW = 3
+# Two pages whose full role lists overlap this much (shared roles over all roles of either, so a page
+# that holds 80% of a bigger one's roles is not "the same" until the bigger one is mostly it too) are
+# one list to a reader. A page already live is folded only at SAME_SHARE, so one hovering at the line
+# does not come and go between deploys (keep_at's reason).
+NEAR_SAME = 0.8
+
+
+def near_same(a: frozenset, b: frozenset, limit: float = NEAR_SAME) -> bool:
+    return bool(a | b) and len(a & b) >= limit * len(a | b)
 
 
 def keep_at(need: int) -> int:
@@ -110,12 +132,71 @@ CA_PROVINCES = {
 }
 CA_METRO_PAGES = {"Toronto": "ON", "Montreal": "QC", "Vancouver": "BC", "Calgary": "AB", "Ottawa": "ON",
                   "Edmonton": "AB", "Waterloo Region": "ON"}
+# US cities since 2026-10-07. Search Console's field queries read "<field> internships in <place>", and
+# students name the city ("software engineering internships nyc") at least as often as the state. The
+# export carries a metro only for Canada (geo.CA_METROS), so a US region is in one of these when it is
+# filed in the metro's state and its location names one of the metro's towns; New York City also needs
+# the region's own nyc_metro kind (region.py: within 50 miles of Midtown), so "Rochester, New York" is
+# not in it. The towns are the ones the listings name (2026-10-07 export) within a short commute of the
+# city. Boston is the inner ring, not eastern Massachusetts: drawn that wide it held 89% of the
+# Massachusetts page's roles, the same list under a second URL (see near_same).
+US_METRO_PAGES = {
+    "New York City": ("NY", "new york|nyc|manhattan|brooklyn|queens|bronx|staten island|long island city"),
+    "Boston": ("MA", "boston|cambridge|somerville|brookline|newton|watertown|waltham|medford|malden|everett|"
+                     "chelsea|revere|quincy|arlington|belmont|needham|dedham|wellesley|lexington|burlington|"
+                     "woburn|winchester|milton|braintree|canton|norwood|westwood|bedford|hanscom"),
+    "San Francisco Bay Area": ("CA", "san francisco|sf|oakland|berkeley|emeryville|alameda|san jose|palo alto|"
+                                     "mountain view|sunnyvale|santa clara|cupertino|menlo park|redwood city|"
+                                     "redwood shores|san mateo|foster city|south san francisco|san bruno|burlingame|"
+                                     "san carlos|belmont|brisbane|millbrae|fremont|newark|milpitas|los gatos|campbell|"
+                                     "pleasanton|livermore|dublin|san ramon|walnut creek|hayward|union city"),
+    "Los Angeles": ("CA", "los angeles|santa monica|el segundo|culver city|playa vista|venice|marina del rey|"
+                          "long beach|torrance|hawthorne|manhattan beach|redondo beach|carson|inglewood|burbank|"
+                          "glendale|pasadena|west hollywood|beverly hills|van nuys|northridge|seal beach|irvine|"
+                          "costa mesa|huntington beach|santa ana|anaheim|newport beach"),
+    "Seattle": ("WA", "seattle|bellevue|redmond|kirkland|bothell|renton|tukwila|kent|everett|mukilteo|issaquah|"
+                      "auburn|seatac|tacoma|puyallup|lynnwood"),
+    "Chicago": ("IL", "chicago|evanston|skokie|niles|glenview|northbrook|northfield|deerfield|lake forest|rosemont|"
+                      "des plaines|schaumburg|rolling meadows|hoffman estates|elk grove village|itasca|naperville|"
+                      "lisle|downers grove|oak brook|oakbrook terrace|westchester|lombard|warrenville|abbott park|"
+                      "north chicago|waukegan|wood dale|bolingbrook|aurora|batavia"),
+    "Austin": ("TX", "austin|round rock|cedar park|georgetown|pflugerville|taylor|leander"),
+    "Dallas–Fort Worth": ("TX", "dallas|fort worth|ft\\.? worth|plano|irving|richardson|frisco|arlington|addison|"
+                                "carrollton|coppell|westlake|grapevine|lewisville|mckinney|allen|garland|grand prairie|"
+                                "north richland hills|las colinas|denton|southlake"),
+    "Houston": ("TX", "houston|the woodlands|spring|sugar land|katy|pasadena|pearland|baytown|deer park|la porte|"
+                      "texas city|kingwood|humble|cypress|conroe|galveston"),
+    "Atlanta": ("GA", "atlanta|atl|alpharetta|duluth|dunwoody|suwanee|johns creek|kennesaw|norcross|marietta|"
+                      "sandy springs|buford|peachtree corners|lawrenceville|roswell|smyrna|decatur"),
+    "Denver": ("CO", "denver|boulder|golden|westminster|lakewood|centennial|broomfield|lone tree|greenwood village|"
+                     "littleton|englewood|louisville|lafayette|aurora|arvada|thornton|highlands ranch|longmont|superior"),
+    "Philadelphia": ("PA", "philadelphia|king of prussia|conshohocken|malvern|wayne|radnor|bala cynwyd|ardmore|exton|"
+                           "fort washington|horsham|blue bell|collegeville|spring house|west point|plymouth meeting|"
+                           "ridley park|west chester|newtown square|berwyn"),
+    "Pittsburgh": ("PA", "pittsburgh|canonsburg|cranberry|coraopolis|moon township|warrendale|murrysville|"
+                         "bridgeville|wexford"),
+}
+_US_METRO_TOWNS = {m: re.compile(rf"\b(?:{towns})\b", re.I) for m, (_, towns) in US_METRO_PAGES.items()}
+# Every metro page's state or province: the dashboard opens on it, and a page names a town without it.
+METRO_STATE = {**CA_METRO_PAGES, **{m: st for m, (st, _) in US_METRO_PAGES.items()}}
+
+
+def us_metro(g: dict) -> str | None:
+    """The US metro (US_METRO_PAGES) a region is in, or None."""
+    for m, (st, _) in US_METRO_PAGES.items():
+        if (g.get("state") == st and (m != "New York City" or g.get("kind") == "nyc_metro")
+                and _US_METRO_TOWNS[m].search(str(g.get("loc") or ""))):
+            return m
+    return None
+
+
 US_STATES.update(CA_PROVINCES)
-US_STATES.update({"Canada": "Canada", **{m: m for m in CA_METRO_PAGES}})
+US_STATES.update({"Canada": "Canada", **{m: m for m in CA_METRO_PAGES}, **{m: m for m in US_METRO_PAGES}})
 CANADA_KEYS = set(CA_PROVINCES) | {"Canada"}
 # was: set(US_STATES) - {"remote"}. "Canada" and the metros are views over the provinces, not places
 # a posting is filed in, so they do not count toward how widely a posting is spread.
-PLACES = set(US_STATES) - {"remote", "Canada"} - set(CA_METRO_PAGES)      # the states a posting can be filed in
+# was: ... - set(CA_METRO_PAGES); the US metros (2026-10-07) are views over their states the same way.
+PLACES = set(US_STATES) - {"remote", "Canada"} - set(METRO_STATE)      # the states a posting can be filed in
 
 # How a field tag reads in a heading and in a URL. Tags not listed read as their own words.
 FIELD_TITLES = {
@@ -252,6 +333,13 @@ def load(site_dir: str) -> dict:
         if any(g.get("kind") == "canada" for g in regions if isinstance(g, dict)):
             x["keys"].add("Canada")
         x["keys"].update(g["metro"] for g in regions if isinstance(g, dict) and g.get("metro") in CA_METRO_PAGES)
+        # A US metro is named on the region the way the export names a Canadian one (2026-10-07), so
+        # place(), places() and city_name read both alike.
+        for g in regions:
+            m = us_metro(g) if isinstance(g, dict) and g.get("kind") != "canada" else None
+            if m:
+                g["metro"] = m
+                x["keys"].add(m)
     if bad:
         print(f"[seo] warning: skipped {bad} malformed listing rows (see well_formed)", file=sys.stderr)
     listings = list(by_id.values())
@@ -607,6 +695,100 @@ def kinds(listings: list[dict]) -> list[dict]:
     return out
 
 
+# ---- "Summer 2027: who's open now" (2026-10-07)
+# Recruiting for a summer runs from the summer before it, and students ask which companies have opened
+# yet ("which companies have opened summer 2027 internships", "summer 2027 internships open now"). The
+# term page lists the roles; this one lists the employers, newest-opened first, each with the day its
+# first role for that summer was posted or found and how many it has open. Rebuilt with every deploy.
+
+def upcoming_summers(terms, now: datetime) -> list[str]:
+    """The "Summer YYYY" terms among `terms` still ahead: this year's until May is out, then next year's."""
+    return sorted(t for t in terms if (m := re.match(r"^Summer (\d{4})$", str(t or "")))
+                  and (int(m[1]) > now.year or (int(m[1]) == now.year and now.month <= 5)))
+
+
+def tracker_path(term: str) -> str:
+    return f"/internships/{slugify(term)}/open/"
+
+
+def opened_on(x: dict, year: int, baseline: str | None) -> tuple | None:
+    """(day, exact) a role for the summer of `year` first appeared: the earlier of its posting date and
+    the day a scan first found it. A posting date before the year ahead of the summer is a requisition
+    an employer keeps reopening (57 Summer 2027 roles on 2026-10-07 carried dates from 2016 to 2025),
+    not the day this summer opened, so it is left out. A first_seen on or before `baseline` (or a
+    Canadian role from the first Canadian scan, canada_first_scan) only says the role was open by then:
+    exact is False, and the page says "by"."""
+    days = []
+    posted, seen = _when(x.get("posted_at")), _when(x.get("first_seen"))
+    if posted and posted.year >= year - 1:
+        days.append((posted.date(), True))
+    if seen:
+        floor = bool(baseline and str(x.get("first_seen"))[:10] <= baseline) or canada_first_scan(x)
+        days.append((seen.date(), not floor))
+    # The earliest day; on a tie the exact one, so a role posted on the baseline day reads as that day.
+    return min(days, key=lambda d: (d[0], not d[1])) if days else None
+
+
+def opened_rows(items: list[dict], year: int, baseline: str | None) -> list[tuple]:
+    """One row per employer with roles in `items`: (day, exact, name, page or None, roles), newest-opened
+    first. One employer's spellings are one row (employer_key), named as its employer page is."""
+    groups: dict[str, list] = {}
+    for x in items:
+        if x.get("company_name"):
+            groups.setdefault(employer_key(x["company_name"]), []).append(x)
+    rows = []
+    for _, its in sorted(groups.items()):
+        names = Counter(x["company_name"] for x in its)
+        path = next((EMPLOYERS[n] for n in sorted(names) if n in EMPLOYERS), None)
+        name = min(names, key=lambda n: (-names[n], len(n), n))
+        days = [d for d in (opened_on(x, year, baseline) for x in its) if d]
+        if not days:
+            continue
+        day, exact = min(days, key=lambda d: (d[0], not d[1]))
+        rows.append((day, exact, name, path, len(dedupe_roles(its))))
+    return sorted(rows, key=lambda r: (-r[0].toordinal(), not r[1], r[2].lower(), r[2]))
+
+
+def short_day(day) -> str:
+    return f"{day:%b} {day.day}, {day.year}"
+
+
+def tracker_page(term: str, rows: list[tuple], roles: int, now: datetime, updated: str,
+                 term_path: str) -> tuple[list[str], str, str, str]:
+    """(title forms, description, h1, body) for one summer's tracker."""
+    today = now.astimezone(timezone.utc).date()
+    week = [r for r in rows if r[1] and (today - r[0]).days < NEW_DAYS]
+    n = len(rows)
+    lead = (f"As of {updated}, {plural(n, 'employer has', 'employers have')} opened {esc(term)} internships, "
+            f"with {roles:,} open roles between them; {len(week):,} opened this week.")
+    honest = ("These are employers InternScout found on public job boards, not every employer that will hire "
+              f"for {esc(term)}. Newest first: “Opened” is the day the employer’s first {esc(term)} role was "
+              "posted or found.")
+    floor_note = ""
+    if any(not r[1] for r in rows):
+        floor_note = ("<p class=\"more\">A date with “by” is the day InternScout began recording when it first "
+                      f"finds a posting ({long_day(FIRST_SEEN_SINCE)}, or {long_day(CANADA_SINCE)} for roles in "
+                      "Canada, which it added that day): those roles were already open then, perhaps for weeks.</p>")
+    trs = []
+    for day, exact, name, path, k in rows:
+        who = f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)
+        when = short_day(day) if exact else f"By {short_day(day)}"
+        trs.append(f"<tr><td>{who}</td><td class=\"num\">{when}</td><td class=\"num\">{k:,}</td></tr>")
+    body = (f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
+            f"<a class=\"cta\" href=\"{term_path}\">See all {roles:,} {esc(term)} roles</a>"
+            "<div class=\"tablewrap\"><table class=\"data\"><thead><tr><th>Employer</th><th>Opened</th>"
+            f"<th>{esc(term)} roles</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table></div>"
+            + floor_note
+            + "<p class=\"follow\">Roles found in the last week, whatever the term: "
+              "<a href=\"/internships/new/\">new internships this week</a>. "
+              "Every employer with five or more open roles: <a href=\"/internships/at/\">internships by employer</a>.</p>")
+    title = [f"{term} Internships Open Now: {n:,} Employers", f"Which Companies Have Opened {term} Internships",
+             f"{term} Internships Open Now"]
+    desc = (f"{n:,} companies with {term} internships open now, found on public job boards, newest first "
+            f"with the day each opened. {len(week):,} opened this week. Updated {updated}.")
+    return title, desc, f"{term} internships: who’s open now", body
+
+
 def shown(items: list[dict], state: str | None = None) -> list[dict]:
     """The PER_PAGE listings a page actually shows, in its order: what a reader, and a search engine,
     sees of it. Two pages that show the same ones are the same page to both (see same_list)."""
@@ -707,6 +889,14 @@ def company_link(name: str, here: str | None = None) -> str:
     """The company's name, linked to its employer page when it has one (here: this page's path)."""
     path = EMPLOYERS.get(name)
     return f'<a href="{esc(path)}">{esc(name)}</a>' if path and path != here else esc(name)
+
+
+EMPLOYER_PLACES = 6     # field-in-a-place pages an employer page links (2026-10-07)
+
+
+def combo_label(t: str, k: str) -> str:
+    """A field-in-a-place page as a link names it: "Software Engineering in Boston"."""
+    return f"{field_title(t)} (Remote)" if k == "remote" else f"{field_title(t)} in {US_STATES[k]}"
 
 
 def link_list(title: str, links: list[tuple[str, str, int]]) -> str:
@@ -904,6 +1094,11 @@ BASELINE: str | None = None   # set by build(): see baseline_day
 GENERATED: datetime | None = None
 # set by build(): llms.txt and llms-full.txt (llms_files), which write() puts at the site's root.
 TEXTS: dict[str, str] = {}
+# set by build(): (term, path) of the soonest summer's "who's open now" page, or None (2026-10-07).
+TRACKER: tuple[str, str] | None = None
+# set by build(): the dashboard's crawlable "Browse" section (home_browse), which write() puts into the
+# site's index.html between HOME_START and HOME_END (2026-10-07).
+HOME = ""
 
 
 def ld_script(obj) -> str:
@@ -918,6 +1113,15 @@ def ld_script(obj) -> str:
                .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
     # was: ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
     return f'<script type="application/ld+json">{ld_json}</script>'
+
+
+def footer_browse() -> str:
+    """The footer's links to the employer index and the soonest summer's tracker (2026-10-07): every
+    page then links both, so a crawler reaches every employer page in two steps from any page."""
+    links = ['<a href="/internships/at/">Employers hiring now</a>']
+    if TRACKER:
+        links.append(f'<a href="{TRACKER[1]}">{esc(TRACKER[0])}: who’s open now</a>')
+    return " · ".join(links) + " · "
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
@@ -974,7 +1178,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
 </body>
@@ -983,11 +1187,11 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 
 
 def _dash_state(state: str) -> str:
-    """The dashboard has province files, not metro or all-Canada ones: a metro opens its province, and
-    Canada every province and the no-province file."""
+    """The dashboard has state and province files, not metro or all-Canada ones: a metro opens its state
+    or province, and Canada every province and the no-province file."""
     if state == "Canada":
         return ",".join(list(CA_PROVINCES) + ["Canada"])
-    return ",".join(CA_METRO_PAGES.get(s, s) for s in state.split(","))
+    return ",".join(METRO_STATE.get(s, s) for s in state.split(","))    # was: CA_METRO_PAGES.get(s, s)
 
 
 def dash_link(fields=(), state: str | None = None, companies=(), new: bool = False,
@@ -1211,10 +1415,14 @@ def city_name(g: dict, state: str) -> str:
     if name == "Remote":
         return name
     name = place_name({"loc": _COUNTRY.sub("", name).strip(" ,-")})     # "Oakville, Ontario" -> "Oakville, ON"
-    code = CA_METRO_PAGES.get(state, state)
+    code = METRO_STATE.get(state, state)          # was: CA_METRO_PAGES.get(state, state)
     if len(code) == 2:
-        for suffix in (code, US_STATES.get(code, code)):
-            name = re.sub(rf"[\s,-]*\b{re.escape(suffix)}\s*$", "", name, flags=re.I).strip(" ,-")
+        # "New York, NY" is the city: once the code is gone, the state's name is all that is left, and
+        # it stays (2026-10-07; it was "", so the New York pages never named New York City).
+        # was: for suffix in (...): name = re.sub(...)   (the name went too)
+        bare = re.sub(rf"[\s,-]*\b{re.escape(code)}\s*$", "", name, flags=re.I).strip(" ,-")
+        named = re.sub(rf"[\s,-]*\b{re.escape(US_STATES.get(code, code))}\s*$", "", bare, flags=re.I).strip(" ,-")
+        name = bare if (not named and bare != name) else named
     elif state == "Canada" and name and "," not in name and g.get("state") in CA_PROVINCES:
         name = f"{name}, {g['state']}"            # "Toronto" beside "Toronto, ON" is one place
     # "MARKHAM" is a board shouting, "SF" is not.
@@ -2333,17 +2541,62 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
 
     fields = {t: v for t, v in by_field.items() if enough(len(v), f"/internships/{field_slug(t)}/")}
     states = {k: v for k, v in by_state.items() if enough(len(v), f"/internships/{state_slug(k)}/")}
+    def ids(items: list[dict]) -> frozenset:
+        return frozenset(x["id"] for x in items)
+
+    def fold_at(path: str) -> float:
+        return SAME_SHARE if path in live else NEAR_SAME
+
+    def employers_in(items: list[dict]) -> int:
+        return len({employer_key(x["company_name"]) for x in items if x.get("company_name")})
+
+    # A US metro gets a page only when it is its own list (2026-10-07): enough employers, and not most
+    # of its state's page under a second name.
+    for m in sorted(US_METRO_PAGES):
+        path, parent = f"/internships/{state_slug(m)}/", by_state.get(METRO_STATE[m], [])
+        if m in states and (employers_in(states[m]) < MIN_EMPLOYERS_NEW
+                            or near_same(ids(states[m]), ids(parent), fold_at(path))):
+            del states[m]
+    # Which summers get a "who's open now" page (2026-10-07): the ones still ahead whose term page is made
+    # (MIN_KIND roles, as kinds()), with MIN_OPEN employers or more. Decided before any page is drawn,
+    # since every page's footer links the soonest one (TRACKER).
+    global TRACKER
+    by_term = {}
+    for x in listings:
+        by_term.setdefault(x.get("term"), []).append(x)
+    trackers = [t for t in upcoming_summers(by_term, now)
+                if enough(len(by_term[t]), f"/internships/{slugify(t)}/", MIN_KIND)
+                and enough(employers_in(by_term[t]), tracker_path(t), MIN_OPEN)]
+    TRACKER = (trackers[0], tracker_path(trackers[0])) if trackers else None
     # A field slug and a state slug must never name the same folder.
     state_slugs = {state_slug(k) for k in states}
     fields = {t: v for t, v in fields.items() if field_slug(t) not in state_slugs}
 
     combos: dict[tuple[str, str], list] = {}
+    widen = []                                        # the 2026-10-07 rules' candidates, made after
     for t, items in sorted(fields.items()):         # was: for t, items in fields.items():
         for k in sorted(states):                      # was: for k in states:
             hit = [x for x in items if k in x["keys"]]
             local = [x for x in hit if len(x["keys"] & PLACES) < SPREAD]
-            if enough(len(local), f"/internships/{field_slug(t)}/{state_slug(k)}/", MIN_COMBO):
+            path = f"/internships/{field_slug(t)}/{state_slug(k)}/"
+            if k not in US_METRO_PAGES and enough(len(local), path, MIN_COMBO):
                 combos[(t, k)] = hit
+                continue
+            priority = t in PRIORITY_FIELDS and (k in PRIORITY_PLACES or k in US_METRO_PAGES)
+            if ((k in US_METRO_PAGES or priority) and hit
+                    and enough(len(local), path, MIN_COMBO_PRIORITY if priority else MIN_COMBO)):
+                widen.append((t, k, hit, path))
+    # The widened pages, biggest first (then by name, so every build agrees), each kept only when it is
+    # its own list: MIN_EMPLOYERS_NEW employers, and not near_same as the field's page, the field in the
+    # metro's state, or a page already made for another field in the same place ("engineering" and
+    # "mechanical" in Houston can be one list). Biggest first, so of two such pages the fuller one stays.
+    for t, k, hit, path in sorted(widen, key=lambda w: (-len(w[2]), w[0], w[1])):
+        mine = ids(hit)
+        rivals = [ids(fields[t])] + [ids(v) for (tt, kk), v in sorted(combos.items())
+                                     if kk == k or (tt == t and kk == METRO_STATE.get(k))]
+        if employers_in(hit) >= MIN_EMPLOYERS_NEW and not any(near_same(mine, r, fold_at(path)) for r in rivals):
+            combos[(t, k)] = hit
+    combos = dict(sorted(combos.items()))
 
     # A major whose page would show what a field page, or an earlier major's page, already shows would
     # be a second URL for the same list. It gets no page of its own: the majors hub links it to that
@@ -2398,10 +2651,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
 
     # index (2026-10-06): False makes the page noindex and keeps it out of the sitemap (/digest/ until
     # the sign-up form has an address). was: every page was indexed.
-    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True):
+    # dated (2026-10-07): the listings a page without a list of its own is about (a tracker's term), which
+    # date it and make it a CollectionPage like a listing page, without a feed.
+    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True, dated=None):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
-        found = [str(x.get("first_seen") or "")[:10] for x in (listings if items is None else items)]
+        about = items if items is not None else dated
+        found = [str(x.get("first_seen") or "")[:10] for x in (listings if about is None else about)]
         # The live sitemap's lastmod is a floor: when the newest role on a page closes, the newest left
         # is older, and a lastmod that goes backwards is one a search engine stops trusting.
         found.append(live.get(path) or "" if isinstance(live, dict) else "")
@@ -2411,7 +2667,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # was: every caller passed one title ending in " | InternScout", and the description as written.
         title = fit_title(*([title] if isinstance(title, str) else title))
         desc = fit_description(desc)
-        if items is not None:
+        if about is not None:          # was: if items is not None:
             # A listing page is a CollectionPage of the site (2026-10-05), dated like its sitemap entry.
             ld = [*ld, {"@context": "https://schema.org", "@type": "CollectionPage", "@id": SITE + path,
                         "url": SITE + path, "name": h1, "description": desc, "isPartOf": {"@id": SITE_ID},
@@ -2430,8 +2686,12 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         path = f"/internships/{field_slug(t)}/"
         top_states = sorted(((k, len(v)) for (tt, k), v in combos.items() if tt == t), key=lambda kv: (-kv[1], kv[0]))
         # was: key=lambda kv: -kv[1]  (and so on below: every count that can tie is broken by name)
+        # The US cities in a list of their own (2026-10-07), so "by state" still lists states.
         related = link_list(f"{name} internships by state",
-                            [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states])
+                            [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states
+                             if k not in US_METRO_PAGES])
+        related += link_list(f"{name} internships by city",
+                             [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states if k in US_METRO_PAGES])
         emp = join_words(top(Counter(x["company_name"] for x in items if x.get("company_name")), 3))
         # was: emp = join_words([c for c, _ in Counter(x["company_name"] for x in items).most_common(3)])
         # The employers in this field that have a page of their own (2026-10-01), so search engines
@@ -2439,6 +2699,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         hiring = Counter(EMPLOYERS[x["company_name"]] for x in items if x.get("company_name") in EMPLOYERS)
         related += link_list(f"Employers hiring in {lower_name(name)}",
                              [(pth, page_name[pth], k) for pth, k in sorted(hiring.items(), key=lambda kv: (-kv[1], kv[0]))[:RELATED]])
+        # The list stops at RELATED; the rest are a click away (2026-10-07).
+        if len(hiring) > RELATED:
+            related += (f"<p class=\"more\"><a href=\"/internships/at/\">All {len(by_company):,} employers hiring "
+                        f"now</a>, {len(hiring):,} of them in {esc(lower_name(name))}.</p>")
         # was: add(path, f"{name} Internships – {len(items):,} Open Now | InternScout", ...
         n = f"{len(items):,}"
         # The page's questions, on the page and as a FAQPage block (2026-10-05, listing_faq).
@@ -2461,6 +2725,15 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         related = link_list(f"Internships in {where} by field",
                             [(f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
                              for t, n in top_fields])
+        # A state links its cities, and a city its state (2026-10-07).
+        cities = sorted(((m, len(states[m])) for m in US_METRO_PAGES if m in states and METRO_STATE[m] == k),
+                        key=lambda kv: (-kv[1], kv[0]))
+        related += link_list(f"Internships in {where} by city",
+                             [(f"/internships/{state_slug(m)}/", m, n) for m, n in cities])
+        crumbs = [root, (path, where)]
+        if k in US_METRO_PAGES and METRO_STATE[k] in states:
+            st = METRO_STATE[k]
+            crumbs = [root, (f"/internships/{state_slug(st)}/", US_STATES[st]), (path, where)]
         loc = "remote" if k == "remote" else f"in {where}"
         # was: add(path, f"Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
         head = f"Internships {'(Remote)' if k == 'remote' else 'in ' + where}"
@@ -2468,7 +2741,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         add(path, [f"{head} – {len(items):,} Open", head],
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
-            f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", [root, (path, where)],
+            f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", crumbs,
             listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k),
                          src="seo-state", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
 
@@ -2476,9 +2749,15 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         name, where = field_title(t), US_STATES[k]
         path = f"/internships/{field_slug(t)}/{state_slug(k)}/"
         others = sorted(((kk, len(v)) for (tt, kk), v in combos.items() if tt == t and kk != k), key=lambda kv: (-kv[1], kv[0]))
+        # Cities and states in two lists (2026-10-07), the field in this city's state first. was: one
+        # list of every other place, which only held states.
         related = link_list(f"{name} internships in other states",
                             [(f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
-                             for kk, n in others[:RELATED]])
+                             for kk, n in [o for o in others if o[0] == METRO_STATE.get(k)]
+                             + [o for o in others if o[0] not in US_METRO_PAGES and o[0] != METRO_STATE.get(k)]][:RELATED])
+        related += link_list(f"{name} internships by city",
+                             [(f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
+                              for kk, n in others if kk in US_METRO_PAGES][:RELATED])
         loc = "remote" if k == "remote" else f"in {where}"
         # was: add(path, f"{name} Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
         at = "(Remote)" if k == "remote" else f"in {where}"
@@ -2533,7 +2812,14 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         related = (questions + note
                    + link_list("Similar employers", [(EMPLOYERS[o], o, k) for _, k, o in similar])
                    + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                                                  for t in main if t in fields]))
+                                                  for t in main if t in fields])
+                   # The field-in-a-place pages this employer's own roles are on (2026-10-07), most of
+                   # its roles first: "Software Engineering in New York City" from a bank hiring there.
+                   + link_list("Related internships by place",
+                               [(f"/internships/{field_slug(t)}/{state_slug(k)}/", combo_label(t, k), len(combos[(t, k)]))
+                                for (t, k), _ in sorted(Counter((t, k) for x in items for t in main for k in x["keys"]
+                                                                if (t, k) in combos and t in (x.get("field_tags") or [])).items(),
+                                                        key=lambda kv: (-kv[1], kv[0]))[:EMPLOYER_PLACES]]))
         # was: if k in US_STATES, which now holds the Canada and metro views as well.
         where = ",".join(top(Counter(k for x in items for k in x["keys"] if k in PLACES or k == "remote"), 6))
         # was: ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
@@ -2590,9 +2876,15 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         items = [x for x in listings if k["pick"](x)]
         if path not in taken and enough(len(items), path, MIN_KIND):
             kind_made.append((path, k, items))
+    term_paths = {f"/internships/{slugify(t)}/": t for t in trackers}
+    trackers = [t for t in trackers if any(p == f"/internships/{slugify(t)}/" for p, _, _ in kind_made)]
     for path, k, items in kind_made:
         by_tag = Counter(t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS if t in fields)
-        related = (k.get("note", "")
+        # A summer's term page leads with its employers, newest-opened first (2026-10-07).
+        lead = (f"<p class=\"more\"><a href=\"{tracker_path(term_paths[path])}\">Which employers have opened "
+                f"{esc(term_paths[path])} internships</a>, newest first, with the day each opened.</p>"
+                if path in term_paths and term_paths[path] in trackers else "")
+        related = (lead + k.get("note", "")
                    + link_list(f"{k['h1'][0].upper()}{k['h1'][1:]} by field",
                                [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
                                 for t in top(by_tag, RELATED)])     # was: for t, _ in top.most_common(RELATED)
@@ -2606,6 +2898,15 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             k["h1"], [root, (path, k["crumb"])],
             listing_body(items, k["what"], "", now, related, dash=dash_link(**k["dash"]),
                          tail=k.get("tail", TAIL), about=k.get("about", frozenset()), src="seo-hub"), items)
+
+    # The trackers themselves (tracker_page), each under its term page in the breadcrumb trail.
+    for t in trackers:
+        term_path, path = f"/internships/{slugify(t)}/", tracker_path(t)
+        year = int(t.split()[1])
+        items = by_term[t]
+        rows = opened_rows(items, year, d["baseline"])
+        t_, d_, h_, b_ = tracker_page(t, rows, len(unique_roles(items)), now, updated, term_path)
+        add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_, dated=items)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
     # This page lists every new listing, and the email counts a role posted on two of an employer's
@@ -2622,7 +2923,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             listing_body(new, "found in the last week", "", now,
                          "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
                          f"{NEW_FEED} newest roles found this week, so a Discord or Slack channel can follow "
-                         "just this one.</p>",
+                         "just this one.</p>"
+                         # The soonest summer's employers, newest-opened first (2026-10-07).
+                         + (f"<p class=\"more\">Employers rather than roles: <a href=\"{TRACKER[1]}\">"
+                            f"{esc(TRACKER[0])} internships, who’s open now</a>, newest first.</p>" if TRACKER else ""),
                          dash=dash_link(new=True), src="seo-hub", signup=signup_form(new_pitch)), new)
         # More than the usual newest 25, since this one feed may be a club's only one, but not every
         # new role: that was 1,800 items and 800 KB, fetched every few hours by every subscriber.
@@ -2653,7 +2957,11 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         "Internships by employer", [root, ("/internships/at/", "By employer")],
         f"<p class=\"lede\">Employers with about {MIN_EMPLOYER} or more open student roles, most of them "
         "internships, co-ops or research. InternScout is not affiliated with any of them.</p>"
-        + link_list("Employers", sorted(((EMPLOYERS[n], n, len(v)) for n, v in by_company.items()),
+        # The ones hiring most first (2026-10-07), then every one by name.
+        + link_list("Hiring the most right now", top_employers(by_company, HUB_TOP))
+        + (f"<p class=\"more\"><a href=\"{TRACKER[1]}\">{esc(TRACKER[0])}: who’s open now</a>, the employers "
+           f"that have opened {esc(TRACKER[0])} internships, newest first.</p>" if TRACKER else "")
+        + link_list("Every employer, A to Z", sorted(((EMPLOYERS[n], n, len(v)) for n, v in by_company.items()),
                                         key=lambda e: (e[1].lower(), e[1]))))   # was: key=lambda e: e[1].lower()
     add("/internships/for/", [f"Internships by Major – {len(majors_made)} Majors", "Internships by Major"],
         "Open internships, co-ops and research roles for every UMass Amherst major, from nursing and "
@@ -2685,6 +2993,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
            + (f"<li><a href=\"{pay_path}\">Highest-paying internships</a> <span class=\"n\">{len(rep['roles']):,}</span></li>"
               if rep else "")
            + (f"<li><a href=\"{NUMBERS_PATH}\">InternScout by the numbers</a></li>" if numbers else "")
+           + "".join(f"<li><a href=\"{tracker_path(t)}\">{esc(t)}: who’s open now</a></li>" for t in trackers)
            + "</ul></section>")
     # was: f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout" (70 characters)
     add("/internships/", [f"Browse {len(listings):,} Open Internships by Field, State and Major",
@@ -2710,10 +3019,63 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     t_, d_, b_ = digest_page(digest_new, digest_by_field, len(new) >= MIN_OPEN)
     add(DIGEST_PATH, t_, d_, "New internships by email, every Monday",
         [("/", "InternScout"), (DIGEST_PATH, "Weekly email")], b_, index=bool(DIGEST_FORM))
-    global TEXTS
+    global TEXTS, HOME
+    HOME = home_browse(pages, by_company, fields, states, trackers, len(new) >= MIN_OPEN, len(majors_made))
     made = {p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0) for p in pages}
     TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)
     return pages
+
+
+# ---- the dashboard's "Browse" section (2026-10-07)
+# Search Console (2026-10-07): 687 pages "discovered - currently not indexed", among them Boeing's, Cisco's
+# and AMD's employer pages and whole field pages, all three clicks from the home page (dashboard ->
+# /internships/ -> /internships/at/ -> employer). A crawler spends its visits on what the pages it
+# trusts most link to, and the home page is the one it trusts most. So the dashboard's HTML (written
+# into the site's index.html at deploy, outside the React root) links the biggest employers, every field
+# page and the places students search, and every field page links all of its field-in-a-place pages:
+# each of those is then one or two clicks from the home page.
+HUB_TOP = 24            # employers in /internships/at/'s "Hiring the most right now"
+HOME_EMPLOYERS = 30     # ...and in the dashboard's Browse section
+HOME_STATES_MORE = 8    # states outside the Northeast the Browse section names, the biggest first
+HOME_START, HOME_END = "<!-- browse:start -->", "<!-- browse:end -->"
+
+
+def top_employers(by_company: dict[str, list], n: int) -> list[tuple[str, str, int]]:
+    """(page, name, open roles) of the n employers with the most open roles; ties by name."""
+    return [(EMPLOYERS[nm], nm, len(v)) for nm, v in
+            sorted(by_company.items(), key=lambda kv: (-len(kv[1]), kv[0].lower(), kv[0]))[:n]]
+
+
+def home_browse(pages: list[dict], by_company: dict[str, list], fields: dict, states: dict, trackers: list[str],
+                new: bool, majors: int) -> str:
+    """The dashboard's Browse section: plain links with their counts, each to a page this build made."""
+    made = {p["path"] for p in pages}
+
+    def ul(links) -> str:
+        return "<ul>" + "".join(f"<li><a href=\"{esc(h)}\">{esc(t)}</a>"
+                                + (f"<span class=\"n\">{n:,}</span>" if n is not None else "") + "</li>"
+                                for h, t, n in links if h in made) + "</ul>"
+
+    now_links = ([(tracker_path(t), f"{t}: who’s open now", None) for t in trackers]
+                 + [(f"/internships/{slugify(t)}/", f"{t} internships", None) for t in trackers]
+                 + ([("/internships/new/", "New this week", None)] if new else [])
+                 + [("/internships/paid/", "Paid internships", None), ("/internships/highest-paying/", "Highest-paying", None),
+                    ("/internships/for/", f"By major ({majors})", None), (NUMBERS_PATH, "InternScout by the numbers", None)])
+    us = [k for k in states if k in PLACES and k not in CANADA_KEYS]
+    northeast = [k for k in ("remote", "MA", "NY", "NJ", "CT", "RI", "NH", "VT", "ME", "PA") if k in states]
+    others = sorted((k for k in us if k not in northeast), key=lambda k: (-len(states[k]), k))[:HOME_STATES_MORE]
+    cities = sorted((m for m in US_METRO_PAGES if m in states), key=lambda m: (-len(states[m]), m))
+    place = lambda k: (f"/internships/{state_slug(k)}/", "Remote" if k == "remote" else US_STATES[k], len(states[k]))  # noqa: E731
+    return ("<div class=\"wrap\"><section class=\"browse\" aria-labelledby=\"browse-title\">"
+            "<h2 id=\"browse-title\">Browse open internships</h2>"
+            "<h3>Employers hiring the most</h3>" + ul(top_employers(by_company, HOME_EMPLOYERS))
+            + f"<p><a href=\"/internships/at/\">All {len(by_company):,} employers hiring now</a></p>"
+            + "<h3>Right now</h3>" + ul(now_links)
+            + "<h3>By field</h3>" + ul(sorted(((f"/internships/{field_slug(t)}/", field_title(t), len(v))
+                                               for t, v in fields.items()), key=lambda p: p[1]))
+            + "<h3>By place</h3>" + ul([place(k) for k in northeast + cities + others])
+            + "<p><a href=\"/internships/\">Every state, province and major</a></p>"
+            + "</section></div>")
 
 
 def not_found(updated: str) -> str:
@@ -2757,10 +3119,19 @@ def write(site_dir: str, pages: list[dict]) -> None:
         # answer crawlers read the site like any other. A group of their own would change nothing, and
         # a crawler that matches a named group ignores the "*" one, so a later edit to one could
         # silently stop applying to them.
+        # Google and Bing skip the per-page RSS feeds (2026-10-07). Search Console: 687 pages "discovered -
+        # currently not indexed", and most of the 21 "crawled - currently not indexed" were feed.xml files,
+        # one per page and each linked from its page's head, so the two engines spent their visits on
+        # ~1,360 feeds instead of the pages. Feed readers and every other crawler keep the "*" group. The
+        # named group replaces "*" for those two (the warning above), so it says Allow: / again.
+        # was: f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n" after the comment.
         f.write("# Every crawler is welcome, AI search and answer engines included: GPTBot, OAI-SearchBot,\n"
                 "# ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Google-Extended, Bingbot and\n"
                 f"# Applebot-Extended. A summary for language models: {SITE}/llms.txt\n"
-                f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
+                "User-agent: *\nAllow: /\n\n"
+                "# Google and Bing: every page, but not the per-page RSS feeds, which are for feed readers.\n"
+                "User-agent: Googlebot\nUser-agent: Bingbot\nAllow: /\nDisallow: /*feed.xml$\n\n"
+                f"Sitemap: {SITE}/sitemap.xml\n")
         # was: f.write(f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
         # was: f.write("User-agent: *\nAllow: /\n# Raw listing data; the pages under /internships/ are the readable form.\n"
         #              f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
@@ -2769,6 +3140,17 @@ def write(site_dir: str, pages: list[dict]) -> None:
     for name, text in TEXTS.items():
         with open(os.path.join(site_dir, name), "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
+    # The dashboard's Browse section (home_browse), between its two markers. Only what is between them
+    # changes, so writing it twice gives the same file.
+    home = os.path.join(site_dir, "index.html")
+    if HOME and os.path.isfile(home):
+        with open(home, encoding="utf-8", newline="") as f:
+            text = f.read()
+        start, end = text.find(HOME_START), text.find(HOME_END)
+        if 0 <= start < end:
+            text = text[:start + len(HOME_START)] + HOME + text[end:]
+            with open(home, "w", encoding="utf-8", newline="") as f:
+                f.write(text)
 
 
 def live_paths(sitemap: str) -> dict[str, str]:
