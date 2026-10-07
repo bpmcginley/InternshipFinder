@@ -1452,3 +1452,34 @@ def test_the_real_dashboard_has_the_browse_markers_outside_the_react_root():
     start, end = text.find(seo_pages.HOME_START), text.find(seo_pages.HOME_END)
     assert 0 < start < end
     assert text.find('<div id="root">') < start and text.find("</noscript>") < start
+
+
+def test_a_name_that_is_not_a_company_gets_no_tracker_row_or_page(tmp_path):
+    assert not seo_pages.real_company("APPLY NOW") and not seo_pages.real_company("Confidential")
+    assert not seo_pages.real_company("1234") and not seo_pages.real_company("Hiring Now - Apply Here")
+    assert all(seo_pages.real_company(n) for n in ("PGA TOUR", "C3 AI", "HP IQ", "AMERICAN SYSTEMS", "3M"))
+    rows = [_row(i, company_name=f"Co {'ABCDE'[i % 5]}", title=f"Intern {i}") for i in range(25)]
+    rows += [_row(100 + i, company_name="APPLY NOW", title=f"Editorial Intern {i}") for i in range(6)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    tracker = pages["/internships/summer-2027/open/"]
+    assert "APPLY NOW" not in tracker and ">Co A</a>" in tracker
+    assert "5 employers have opened Summer 2027 internships, with 25 open roles between them" in tracker
+    assert "/internships/at/apply-now/" not in pages
+
+
+def test_places_that_take_the_read_with_it(tmp_path):
+    rows = [_row(i, tags=("swe",), title=f"Intern {i}",
+                 regions=[{"loc": "San Jose, CA", "kind": "us", "state": "CA"}]) for i in range(20)]
+    rows += [_row(100 + i, tags=("swe",), title=f"Intern {i}",
+                  regions=[{"loc": "Fresno, CA", "kind": "us", "state": "CA"}]) for i in range(20)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"CA": rows}))}
+    bay = pages["/internships/san-francisco-bay-area/"]
+    assert "<title>Internships in the San Francisco Bay Area | InternScout</title>" in bay
+    assert "<h1>Internships in the San Francisco Bay Area</h1>" in bay
+    assert "in the San Francisco Bay Area, updated" in _head(bay, r'<meta name="description" content="(.*?)"/>')
+    combo = pages["/internships/software-engineering/san-francisco-bay-area/"]
+    # 62 characters in full, so the title falls back to the short name rather than cutting it mid-place.
+    assert _head(combo, r"<title>(.*?)</title>") == "Software Engineering Internships in the Bay Area"
+    assert "<h1>Software Engineering internships in the San Francisco Bay Area</h1>" in combo
+    assert " in San Francisco Bay Area" not in "".join(pages.values())
+    assert seo_pages.in_place("MA") == "in Massachusetts"

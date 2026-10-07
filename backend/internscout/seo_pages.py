@@ -588,6 +588,21 @@ EMPLOYER_ALIASES = {"booz allen hamilton": "booz allen"}
 STUDENT_STAGES = {"internship", "co_op", "research", "fellowship"}
 
 
+# A company name a job board filled with something else (2026-10-07): "APPLY NOW" headed a row of the
+# Summer 2027 tracker (a Jobilize listing). Nothing upstream cleans names, so this is conservative: a
+# name with no letters, or one made only of call-to-action or placeholder words, is not an employer.
+# "PGA TOUR", "C3 AI" and "HP IQ" are real; only whole names made of these words are dropped.
+_NOT_A_NAME = frozenset({"apply", "now", "here", "click", "today", "view", "see", "more", "details", "learn",
+                         "hiring", "job", "jobs", "career", "careers", "opening", "openings", "position",
+                         "positions", "confidential", "undisclosed", "unknown", "n", "a", "na", "tbd",
+                         "company", "name", "employer", "various", "multiple", "not", "specified"})
+
+
+def real_company(name: str) -> bool:
+    words = re.findall(r"[a-z]+", (name or "").lower())
+    return bool(words) and not set(words) <= _NOT_A_NAME
+
+
 def employer_key(name: str) -> str:
     k = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9& ]+", " ", name.lower())).strip()
     k = re.sub(r"^the ", "", k)
@@ -734,7 +749,7 @@ def opened_rows(items: list[dict], year: int, baseline: str | None) -> list[tupl
     first. One employer's spellings are one row (employer_key), named as its employer page is."""
     groups: dict[str, list] = {}
     for x in items:
-        if x.get("company_name"):
+        if x.get("company_name") and real_company(x["company_name"]):      # not "APPLY NOW" (real_company)
             groups.setdefault(employer_key(x["company_name"]), []).append(x)
     rows = []
     for _, its in sorted(groups.items()):
@@ -775,7 +790,7 @@ def tracker_page(term: str, rows: list[tuple], roles: int, now: datetime, update
         when = short_day(day) if exact else f"By {short_day(day)}"
         trs.append(f"<tr><td>{who}</td><td class=\"num\">{when}</td><td class=\"num\">{k:,}</td></tr>")
     body = (f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
-            f"<a class=\"cta\" href=\"{term_path}\">See all {roles:,} {esc(term)} roles</a>"
+            f"<a class=\"cta\" href=\"{term_path}\">See every {esc(term)} role</a>"
             "<div class=\"tablewrap\"><table class=\"data\"><thead><tr><th>Employer</th><th>Opened</th>"
             f"<th>{esc(term)} roles</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table></div>"
             + floor_note
@@ -894,9 +909,21 @@ def company_link(name: str, here: str | None = None) -> str:
 EMPLOYER_PLACES = 6     # field-in-a-place pages an employer page links (2026-10-07)
 
 
+# Places read with "the" after "in" (2026-10-07): "internships in the San Francisco Bay Area".
+PLACE_THE = frozenset({"San Francisco Bay Area", "NT"})
+# ...and the shorter name a title falls back to when the full one won't fit beside a long field, as
+# FIELD_SHORT does for fields: "Software Engineering Internships in the San Francisco Bay Area" is 62.
+PLACE_SHORT = {"San Francisco Bay Area": "in the Bay Area"}
+
+
+def in_place(k: str) -> str:
+    """ "in Boston", "in the San Francisco Bay Area": a place after "in", as a sentence or title says it."""
+    return f"in {'the ' if k in PLACE_THE else ''}{US_STATES[k]}"
+
+
 def combo_label(t: str, k: str) -> str:
     """A field-in-a-place page as a link names it: "Software Engineering in Boston"."""
-    return f"{field_title(t)} (Remote)" if k == "remote" else f"{field_title(t)} in {US_STATES[k]}"
+    return f"{field_title(t)} (Remote)" if k == "remote" else f"{field_title(t)} {in_place(k)}"
 
 
 def link_list(title: str, links: list[tuple[str, str, int]]) -> str:
@@ -1565,7 +1592,7 @@ def faq_topic(field: str | None, state: str | None, what: str = "internships") -
     lead = (lower_name(field_title(field)) + " ") if field else ""
     if state == "remote":
         return f"remote {lead}{what}"
-    return f"{lead}{what}" + (f" in {US_STATES[state]}" if state else "")
+    return f"{lead}{what}" + (f" {in_place(state)}" if state else "")      # was: f" in {US_STATES[state]}"
 
 
 def _fit_names(make, names: list[str]) -> str:
@@ -2643,7 +2670,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         name = min(names, key=lambda n: (-names[n], len(n), n))                       # was: (-names[n], len(n))
         items = dedupe_roles(items)
         path = f"/internships/at/{slugify(name)}/"
-        if (not slugify(name) or path in EMPLOYERS.values() or student_share(items) < 0.5
+        # was: if (not slugify(name) or ...   (real_company since 2026-10-07)
+        if (not slugify(name) or not real_company(name) or path in EMPLOYERS.values() or student_share(items) < 0.5
                 or not enough(len(items), path, MIN_EMPLOYER)):
             continue
         by_company[name], spellings[name] = items, sorted(names)
@@ -2722,26 +2750,26 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         where = US_STATES[k]
         path = f"/internships/{state_slug(k)}/"
         top_fields = sorted(((t, len(v)) for (t, kk), v in combos.items() if kk == k), key=lambda tv: (-tv[1], tv[0]))
-        related = link_list(f"Internships in {where} by field",
+        related = link_list(f"Internships {in_place(k)} by field",
                             [(f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
                              for t, n in top_fields])
         # A state links its cities, and a city its state (2026-10-07).
         cities = sorted(((m, len(states[m])) for m in US_METRO_PAGES if m in states and METRO_STATE[m] == k),
                         key=lambda kv: (-kv[1], kv[0]))
-        related += link_list(f"Internships in {where} by city",
+        related += link_list(f"Internships {in_place(k)} by city",
                              [(f"/internships/{state_slug(m)}/", m, n) for m, n in cities])
         crumbs = [root, (path, where)]
         if k in US_METRO_PAGES and METRO_STATE[k] in states:
             st = METRO_STATE[k]
             crumbs = [root, (f"/internships/{state_slug(st)}/", US_STATES[st]), (path, where)]
-        loc = "remote" if k == "remote" else f"in {where}"
+        loc = "remote" if k == "remote" else in_place(k)        # was: f"in {where}" (in_place adds "the")
         # was: add(path, f"Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
-        head = f"Internships {'(Remote)' if k == 'remote' else 'in ' + where}"
+        head = f"Internships {'(Remote)' if k == 'remote' else in_place(k)}"
         qa = listing_faq(items, None, k, updated)
         add(path, [f"{head} – {len(items):,} Open", head],
             f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
-            f"Internships {'you can do remotely' if k == 'remote' else 'in ' + where}", crumbs,
+            f"Internships {'you can do remotely' if k == 'remote' else in_place(k)}", crumbs,
             listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k),
                          src="seo-state", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
 
@@ -2758,12 +2786,15 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         related += link_list(f"{name} internships by city",
                              [(f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
                               for kk, n in others if kk in US_METRO_PAGES][:RELATED])
-        loc = "remote" if k == "remote" else f"in {where}"
+        loc = "remote" if k == "remote" else in_place(k)        # was: f"in {where}" (in_place adds "the")
         # was: add(path, f"{name} Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
-        at = "(Remote)" if k == "remote" else f"in {where}"
+        at = "(Remote)" if k == "remote" else in_place(k)
         qa = listing_faq(items, t, k, updated)
+        at_short = PLACE_SHORT.get(k, at)
+        # was: the four forms without at_short (2026-10-07: a place that needs "the" can run long).
         add(path, [f"{name} Internships {at} – {len(items):,} Open", f"{name} Internships {at}",
-                   f"{field_short(t)} Internships {at} – {len(items):,} Open", f"{field_short(t)} Internships {at}"],
+                   f"{field_short(t)} Internships {at} – {len(items):,} Open", f"{field_short(t)} Internships {at}",
+                   f"{name} Internships {at_short}", f"{field_short(t)} Internships {at_short}"],
             f"{len(items):,} open {lower_name(name)} internships and co-ops {loc}, updated {updated}. "
             "Free search for college students, no sign-up.",
             f"{name} internships {loc}",
@@ -2905,7 +2936,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         year = int(t.split()[1])
         items = by_term[t]
         rows = opened_rows(items, year, d["baseline"])
-        t_, d_, h_, b_ = tracker_page(t, rows, len(unique_roles(items)), now, updated, term_path)
+        # The roles of the employers listed, one per role (was: len(unique_roles(items)), which also
+        # counted rows whose employer name is not a name, real_company).
+        t_, d_, h_, b_ = tracker_page(t, rows, sum(r[4] for r in rows), now, updated, term_path)
         add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_, dated=items)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
