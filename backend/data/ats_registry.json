@@ -10325,6 +10325,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "bonsairoboticsmain": {
+   "name": "Bonsai Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-07"
+  },
   "boom-supersonic": {
    "name": "Boom Supersonic",
    "quant": false,
@@ -10384,6 +10390,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "createmusicgroup": {
+   "name": "Create Music Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-07"
   },
   "democratic-national-committee": {
    "name": "Democratic National Committee",
@@ -13857,8 +13869,9 @@
   "eversource|wd1|ExternalSite": {
    "name": "Eversource Energy",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-07"
   },
   "evolito|wd3|Evolito_Career_Site": {
    "name": "Evolito",
@@ -17008,9 +17021,8 @@
   "rrhs|wd5|RRH": {
    "name": "Rochester Regional Health",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-07"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "rsm|wd1|RSMCareers": {
    "name": "RSM",
