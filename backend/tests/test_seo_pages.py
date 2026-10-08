@@ -110,11 +110,48 @@ def test_sitemap_and_robots(tmp_path):
     robots = open(os.path.join(site, "robots.txt"), encoding="utf-8").read()
     assert "Sitemap: https://internscout.org/sitemap.xml" in robots
     # The dashboard at / reads ./data/ in the browser; a crawler barred from it sees an empty shell.
-    assert "Disallow" not in robots          # was: assert "Disallow: /data/" in robots
+    assert "/data" not in robots             # was: assert "Disallow" not in robots (the feeds, 2026-10-07)
     # AI search and answer crawlers are named only in a comment: "User-agent: *" already lets them in.
-    assert "User-agent: *\nAllow: /" in robots and "OAI-SearchBot" in robots and "ClaudeBot" in robots
-    assert robots.count("User-agent:") == 1
+    assert "User-agent: *\nAllow: /\n\n" in robots and "OAI-SearchBot" in robots and "ClaudeBot" in robots
+    # was: assert robots.count("User-agent:") == 1   (Google and Bing have a group since 2026-10-07)
+    assert robots.count("User-agent:") == 3
     assert os.path.exists(os.path.join(site, "internships", "massachusetts", "index.html"))
+
+
+def _robots_groups(text):
+    """{user agent: [rules]} as RFC 9309 reads robots.txt: User-agent lines in a row share one group."""
+    groups, agents, in_agents = {}, [], False
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if ":" not in line:
+            continue
+        key, value = (s.strip() for s in line.split(":", 1))
+        if key.lower() == "user-agent":
+            agents = agents + [value] if in_agents else [value]
+            in_agents = True
+            groups.setdefault(value, [])
+        elif key.lower() in ("allow", "disallow"):
+            in_agents = False
+            for a in agents:
+                groups[a].append(f"{key}: {value}")
+    return groups
+
+
+def test_google_and_bing_skip_the_feeds_and_everyone_else_is_unchanged(tmp_path):
+    # 2026-10-07: the per-page feeds were taking Google's crawl visits from the pages themselves.
+    from internscout import feeds
+    site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
+    pages = seo_pages.build(site)
+    seo_pages.write(site, pages)
+    feeds.write_all(site, pages, seo_pages.GENERATED)
+    groups = _robots_groups(open(os.path.join(site, "robots.txt"), encoding="utf-8").read())
+    assert groups["*"] == ["Allow: /"]
+    for bot in ("Googlebot", "Bingbot"):
+        assert groups[bot] == ["Allow: /", "Disallow: /*feed.xml$"]       # a named group restates Allow
+    # The feeds are still written and still linked; only those two crawlers leave them alone.
+    page = open(os.path.join(site, "internships", "massachusetts", "index.html"), encoding="utf-8").read()
+    assert 'type="application/rss+xml"' in page and 'href="feed.xml"' in page
+    assert os.path.exists(os.path.join(site, "internships", "massachusetts", "feed.xml"))
 
 
 def test_analytics_snippet_comes_from_the_dashboard(tmp_path):
@@ -177,7 +214,8 @@ def test_every_combo_page_is_linked_from_its_field_and_state(tmp_path):
     rows = [_row(i, tags=(f"f{i % 14}", "mechanical")) for i in range(14 * seo_pages.MIN_COMBO)]
     site = _site(tmp_path, {"MA": rows})
     pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
-    combos = [p for p in pages if p.count("/") == 4 and "/for/" not in p]
+    # was: ... and "/for/" not in p   (a summer's "who's open now" page is /internships/<term>/open/)
+    combos = [p for p in pages if p.count("/") == 4 and "/for/" not in p and not p.endswith("/open/")]
     assert len(combos) > seo_pages.RELATED
     for p in combos:
         field, state = p.split("/")[2:4]
@@ -1255,3 +1293,193 @@ def test_workday_country_state_city_places_read_as_city_and_state():
     assert seo_pages.place_name({"loc": "USA-Arkansas-Ft. Smith"}) == "Ft. Smith, AR"
     assert seo_pages.place_name({"loc": "USA-IL Oak Brook"}) == "Oak Brook, IL"
     assert seo_pages.place_name({"loc": "Denver, Colorado"}) == "Denver, CO"
+
+
+# ---- 2026-10-07: US cities, the widened field-in-a-place rules, the Summer tracker and the Browse section
+
+def _at(i, loc, state, kind="us", tags=("swe",), company=None, **over):
+    return _row(i, tags=tags, company_name=company or f"Company {i}", title=f"Intern {i}",
+                regions=[{"loc": loc, "kind": kind, "state": state}], **over)
+
+
+def test_us_cities_get_pages_only_when_they_are_their_own_list(tmp_path):
+    boston = [_at(i, "Boston, MA", "MA", "new_england") for i in range(20)]
+    worcester = [_at(100 + i, "Worcester, MA", "MA", "new_england") for i in range(20)]
+    seattle = [_at(200 + i, "Seattle, WA", "WA") for i in range(12)]                 # all of Washington
+    chicago = [_at(300 + i, "Chicago, IL", "IL", company="Solo Co") for i in range(12)]   # one employer
+    peoria = [_at(400 + i, "Peoria, IL", "IL") for i in range(12)]
+    nyc = [_at(500 + i, "New York, NY", "NY", "nyc_metro") for i in range(16)]
+    rochester = [_at(600 + i, "Rochester, New York", "NY") for i in range(16)]    # "new york", not the city
+    site = _site(tmp_path, {"MA": boston + worcester, "WA": seattle, "IL": chicago + peoria, "NY": nyc + rochester})
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    assert "/internships/boston/" in pages and "/internships/software-engineering/boston/" in pages
+    assert "/internships/new-york-city/" in pages
+    assert "16 open student roles" in pages["/internships/new-york-city/"]          # Rochester is not in it
+    assert "/internships/seattle/" not in pages            # the same list as the Washington page
+    assert "/internships/software-engineering/seattle/" not in pages
+    assert "/internships/chicago/" not in pages             # one employer's roles under a city's name
+    # A city sits under its state, which links it back; the field page lists cities apart from states.
+    assert 'href="/internships/massachusetts/"' in pages["/internships/boston/"]
+    assert 'href="/internships/boston/"' in pages["/internships/massachusetts/"]
+    field = pages["/internships/software-engineering/"]
+    assert "Software Engineering internships by city" in field
+    assert 'href="/internships/software-engineering/boston/"' in field
+    # Cities are views over their states: they never count toward how widely a role is spread.
+    assert "Boston" not in seo_pages.PLACES and "New York City" not in seo_pages.PLACES
+    # The dashboard opens a city's page on its state.
+    assert 'href="/?field=swe&amp;state=MA"' in pages["/internships/software-engineering/boston/"]
+
+
+def test_a_city_page_names_new_york_city_as_new_york():
+    g = {"loc": "New York, NY", "kind": "nyc_metro", "state": "NY", "metro": "New York City"}
+    assert seo_pages.city_name(g, "NY") == "New York"            # was: "" (the state's name went too)
+    assert seo_pages.city_name(g, "New York City") == "New York"
+    assert seo_pages.city_name({"loc": "Boston, MA", "state": "MA"}, "Boston") == "Boston"
+    assert seo_pages.city_name({"loc": "Massachusetts", "state": "MA"}, "MA") == ""
+
+
+def test_marketed_fields_get_northeast_pages_at_the_lower_bar_and_others_do_not(tmp_path):
+    n = seo_pages.MIN_COMBO_PRIORITY
+    assert n < seo_pages.MIN_COMBO
+    ct = ([_at(i, f"Hartford {i}, CT", "CT", tags=("data",)) for i in range(n)]
+          + [_at(100 + i, f"Hartford {i}, CT", "CT", tags=("mechanical",)) for i in range(n)])
+    oh = ([_at(200 + i, f"Akron {i}, OH", "OH", tags=("data",)) for i in range(n)]
+          + [_at(300 + i, f"Akron {i}, OH", "OH", tags=("finance",)) for i in range(n)]
+          + [_at(400 + i, f"Akron {i}, OH", "OH", tags=("mechanical",)) for i in range(n)])
+    site = _site(tmp_path, {"CT": ct, "OH": oh})
+    paths = _paths(seo_pages.build(site))
+    assert "/internships/data-science/connecticut/" in paths                 # marketed field, Northeast
+    assert "/internships/mechanical-engineering/connecticut/" not in paths    # not marketed: MIN_COMBO
+    assert "/internships/data-science/ohio/" not in paths                     # marketed, but not the Northeast
+
+
+def test_a_widened_page_that_is_nearly_another_page_is_not_made(tmp_path):
+    # Every finance role is in Connecticut, so finance in Connecticut is the finance page again.
+    n = seo_pages.MIN_COMBO_PRIORITY
+    rows = [_at(i, f"Stamford {i}, CT", "CT", tags=("finance",)) for i in range(n)]
+    rows += [_at(100 + i, f"Stamford {i}, CT", "CT", tags=("civil",)) for i in range(n)]
+    paths = _paths(seo_pages.build(_site(tmp_path, {"CT": rows})))
+    assert "/internships/finance/" in paths and "/internships/connecticut/" in paths
+    assert "/internships/finance/connecticut/" not in paths
+    assert seo_pages.near_same(frozenset("abcde"), frozenset("abcd"))           # 4 of 5
+    assert not seo_pages.near_same(frozenset("abcde"), frozenset("abc"))        # 3 of 5
+
+
+def test_employer_pages_link_the_field_in_a_place_pages_their_roles_are_on(tmp_path):
+    rows = [_at(i, "Boston, MA", "MA", "new_england", company="Big Bank" if i < 6 else None) for i in range(20)]
+    rows += [_at(100 + i, "Worcester, MA", "MA", "new_england") for i in range(20)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    emp = pages["/internships/at/big-bank/"]
+    assert "Related internships by place" in emp
+    assert '<a href="/internships/software-engineering/boston/">Software Engineering in Boston</a>' in emp
+
+
+def test_upcoming_summers_are_the_ones_still_ahead():
+    from datetime import datetime, timezone
+    terms = ["Summer 2026", "Summer 2027", "Summer 2028", "Fall 2026", None]
+    assert seo_pages.upcoming_summers(terms, datetime(2026, 10, 7, tzinfo=timezone.utc)) == ["Summer 2027", "Summer 2028"]
+    assert seo_pages.upcoming_summers(terms, datetime(2027, 3, 1, tzinfo=timezone.utc))[0] == "Summer 2027"
+    assert seo_pages.upcoming_summers(terms, datetime(2027, 6, 1, tzinfo=timezone.utc)) == ["Summer 2028"]
+
+
+def _tracker_site(tmp_path, index_html=None):
+    def roles(name, k, start, **over):
+        return [_row(start + i, company_name=name, title=f"{name} Intern {i}", **over) for i in range(k)]
+    rows = (roles("Alpha", 6, 0, posted_at="2026-09-22T00:00:00", first_seen="2026-09-22T00:00:00")
+            + roles("Beta", 5, 10, posted_at="2026-08-01T00:00:00", first_seen="2026-09-19T00:00:00")
+            + roles("Gamma", 5, 20, posted_at=None, first_seen="2026-09-18T00:00:00")
+            # A requisition reused from 2024 is not the day Summer 2027 opened: its first_seen is.
+            + roles("Delta", 5, 30, posted_at="2024-10-01T00:00:00", first_seen="2026-09-21T00:00:00")
+            + roles("Epsilon", 5, 40, posted_at="2026-09-15T00:00:00", first_seen="2026-09-19T00:00:00"))
+    site = _site(tmp_path, {"MA": rows})
+    if index_html is not None:
+        (tmp_path / "index.html").write_text(index_html, encoding="utf-8")
+    return site
+
+
+def test_the_summer_tracker_lists_employers_newest_opened_first(tmp_path):
+    pages = {p["path"]: p for p in seo_pages.build(_tracker_site(tmp_path))}
+    path = "/internships/summer-2027/open/"
+    assert path in pages and pages[path]["lastmod"] == "2026-09-22"
+    html = pages[path]["html"]
+    rows = re.findall(r"<tr><td>(.*?)</td><td class=\"num\">(.*?)</td><td class=\"num\">(\d+)</td></tr>", html)
+    assert [(re.sub("<[^>]+>", "", n), d, k) for n, d, k in rows] == [
+        ("Alpha", "Sep 22, 2026", "6"), ("Delta", "Sep 21, 2026", "5"), ("Gamma", "By Sep 18, 2026", "5"),
+        ("Epsilon", "Sep 15, 2026", "5"), ("Beta", "Aug 1, 2026", "5")]
+    assert '<a href="/internships/at/alpha/">Alpha</a>' in html          # each employer links its page
+    assert "As of September 23, 2026, 5 employers have opened Summer 2027 internships" in html
+    assert "2 opened this week" in html                                    # Alpha and Delta; Epsilon is 8 days
+    assert "not every employer" in html and "public job boards" in html
+    assert "application/rss+xml" not in html                               # no feed of its own
+    # Linked from its term page, the new-this-week page, the hub, the employer index and every footer.
+    for p in ("/internships/summer-2027/", "/internships/new/", "/internships/", "/internships/at/",
+              "/internships/massachusetts/"):
+        assert f'href="{path}"' in pages[p]["html"], p
+    assert '<a href="/internships/summer-2027/">Summer 2027</a>' in html          # its breadcrumb
+
+
+def test_no_tracker_for_a_summer_that_has_passed(tmp_path):
+    rows = [_row(i, term="Summer 2026") for i in range(30)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    assert "/internships/summer-2026/" in pages
+    assert not any(p.endswith("/open/") for p in pages)
+    assert "/open/" not in pages["/internships/massachusetts/"]
+
+
+def test_the_dashboard_gets_a_crawlable_browse_section_between_its_markers(tmp_path):
+    shell = ("<html><body><div id=\"root\"></div>" + seo_pages.HOME_START + "<p>fallback</p>"
+             + seo_pages.HOME_END + "</body></html>")
+    site = _tracker_site(tmp_path, shell)
+    pages = seo_pages.build(site)
+    seo_pages.write(site, pages)
+    home = open(os.path.join(site, "index.html"), encoding="utf-8").read()
+    assert "fallback" not in home and home.startswith("<html><body><div id=\"root\"></div>")
+    made = {p["path"] for p in pages}
+    links = set(re.findall(r'href="([^"]+)"', home))
+    assert links <= made                                                  # only pages this build made
+    assert {"/internships/at/", "/internships/summer-2027/open/", "/internships/mechanical-engineering/",
+            "/internships/at/alpha/", "/internships/massachusetts/"} <= links
+    assert '<a href="/internships/at/alpha/">Alpha</a><span class="n">6</span>' in home
+    seo_pages.write(site, pages)                                          # writing again changes nothing
+    assert open(os.path.join(site, "index.html"), encoding="utf-8").read() == home
+    hub = next(p["html"] for p in pages if p["path"] == "/internships/at/")
+    assert "Hiring the most right now" in hub and hub.index("Alpha") < hub.index("Every employer, A to Z")
+
+
+def test_the_real_dashboard_has_the_browse_markers_outside_the_react_root():
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "index.html")
+    text = open(path, encoding="utf-8").read()
+    start, end = text.find(seo_pages.HOME_START), text.find(seo_pages.HOME_END)
+    assert 0 < start < end
+    assert text.find('<div id="root">') < start and text.find("</noscript>") < start
+
+
+def test_a_name_that_is_not_a_company_gets_no_tracker_row_or_page(tmp_path):
+    assert not seo_pages.real_company("APPLY NOW") and not seo_pages.real_company("Confidential")
+    assert not seo_pages.real_company("1234") and not seo_pages.real_company("Hiring Now - Apply Here")
+    assert all(seo_pages.real_company(n) for n in ("PGA TOUR", "C3 AI", "HP IQ", "AMERICAN SYSTEMS", "3M"))
+    rows = [_row(i, company_name=f"Co {'ABCDE'[i % 5]}", title=f"Intern {i}") for i in range(25)]
+    rows += [_row(100 + i, company_name="APPLY NOW", title=f"Editorial Intern {i}") for i in range(6)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    tracker = pages["/internships/summer-2027/open/"]
+    assert "APPLY NOW" not in tracker and ">Co A</a>" in tracker
+    assert "5 employers have opened Summer 2027 internships, with 25 open roles between them" in tracker
+    assert "/internships/at/apply-now/" not in pages
+
+
+def test_places_that_take_the_read_with_it(tmp_path):
+    rows = [_row(i, tags=("swe",), title=f"Intern {i}",
+                 regions=[{"loc": "San Jose, CA", "kind": "us", "state": "CA"}]) for i in range(20)]
+    rows += [_row(100 + i, tags=("swe",), title=f"Intern {i}",
+                  regions=[{"loc": "Fresno, CA", "kind": "us", "state": "CA"}]) for i in range(20)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"CA": rows}))}
+    bay = pages["/internships/san-francisco-bay-area/"]
+    assert "<title>Internships in the San Francisco Bay Area | InternScout</title>" in bay
+    assert "<h1>Internships in the San Francisco Bay Area</h1>" in bay
+    assert "in the San Francisco Bay Area, updated" in _head(bay, r'<meta name="description" content="(.*?)"/>')
+    combo = pages["/internships/software-engineering/san-francisco-bay-area/"]
+    # 62 characters in full, so the title falls back to the short name rather than cutting it mid-place.
+    assert _head(combo, r"<title>(.*?)</title>") == "Software Engineering Internships in the Bay Area"
+    assert "<h1>Software Engineering internships in the San Francisco Bay Area</h1>" in combo
+    assert " in San Francisco Bay Area" not in "".join(pages.values())
+    assert seo_pages.in_place("MA") == "in Massachusetts"

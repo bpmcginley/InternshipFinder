@@ -1481,6 +1481,8 @@
         h("nav", { className: "links", "aria-label": "Footer" },
           // The crawlable pages built by backend/internscout/seo_pages.py at deploy time.
           h("a", { href: "internships/" }, "Browse by field, state or major"),
+          // The employer index (2026-10-07), so every employer page is two clicks from here.
+          h("a", { href: "internships/at/" }, "Employers hiring now"),
           h("a", { href: "privacy.html" }, "Privacy"),
           h("a", { href: "terms.html" }, "Terms"),
           h("a", { href: feedbackUrl, target: "_blank", rel: "noopener" }, "Feedback"),
