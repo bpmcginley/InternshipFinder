@@ -270,6 +270,10 @@
 42.9784,
 -78.7998
 ],
+"andover|NJ":[
+40.9859,
+-74.7422
+],
 "annville - pennsylvania|PA":null,
 "ardmore|PA":[
 40.0079,
@@ -470,6 +474,10 @@
 "catskill|NY":[
 42.2173,
 -73.8646
+],
+"cedar knolls|NJ":[
+40.822,
+-74.4491
 ],
 "central valley|NY":[
 41.3317,
@@ -732,6 +740,10 @@
 -73.9727
 ],
 "erie pa|PA":null,
+"erie|NY":[
+42.6242,
+-79.067
+],
 "erie|PA":[
 42.1295,
 -80.0853
@@ -743,6 +755,10 @@
 "ewing township|NJ":[
 40.26,
 -74.7909
+],
+"ewing|NJ":[
+40.2688,
+-74.8007
 ],
 "export|PA":[
 40.4181,
@@ -912,6 +928,10 @@
 42.8269,
 -75.5444
 ],
+"hammonton|NJ":[
+39.6367,
+-74.8028
+],
 "hanover|NJ":[
 40.8174,
 -74.3954
@@ -957,6 +977,10 @@
 "hicksville|NY":[
 40.7682,
 -73.5238
+],
+"holbrook|NY":[
+40.7944,
+-73.07
 ],
 "home based-pennsylvania|PA":null,
 "homer|NY":[
@@ -1234,6 +1258,10 @@
 40.5417,
 -76.9614
 ],
+"millville|NJ":[
+39.4021,
+-75.0393
+],
 "monroeville pa|PA":null,
 "monroeville|PA":[
 40.4335,
@@ -1423,6 +1451,10 @@
 "newburgh|NY":[
 41.5001,
 -74.0098
+],
+"newton|NJ":[
+41.0583,
+-74.7531
 ],
 "newtown|PA":[
 40.2294,
@@ -1632,6 +1664,10 @@
 -76.5094
 ],
 "other remote ny|NY":null,
+"oxford|NJ":[
+40.8032,
+-74.9896
+],
 "pa - allentown|PA":null,
 "pa - allison park|PA":null,
 "pa - bangor|PA":null,
@@ -1694,6 +1730,7 @@
 "pa - nazareth|PA":null,
 "pa - new holland|PA":null,
 "pa - newtown square|PA":null,
+"pa - panama city|PA":null,
 "pa - paoli|PA":null,
 "pa - pennsburg|PA":null,
 "pa - philadelphia (19103|PA":null,
@@ -1823,6 +1860,10 @@
 40.9682,
 -74.2957
 ],
+"port republic|NJ":[
+39.5207,
+-74.4857
+],
 "pottstown|PA":[
 40.2453,
 -75.6496
@@ -1888,6 +1929,10 @@
 "rifton|NY":[
 41.8376,
 -74.0374
+],
+"ringwood|NJ":[
+41.1134,
+-74.2454
 ],
 "rit main location|NY":null,
 "riverdale|NY":[
@@ -2436,6 +2481,7 @@
 40.3816,
 -74.2233
 ],
+"work at home - pennsylvania|PA":null,
 "wynnewood|PA":[
 40.0029,
 -75.2707

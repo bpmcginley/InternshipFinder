@@ -919,6 +919,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "happyrobot.ai": {
+   "name": "Happyrobot",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-08"
+  },
   "harvey": {
    "name": "Harvey",
    "quant": false,
@@ -1965,6 +1971,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "stradahq": {
+   "name": "Strada",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-08"
+  },
   "super.com": {
    "name": "Super",
    "quant": false,
@@ -2958,13 +2970,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "bcg": {
-   "name": "Boston Consulting Group",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-07"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -5906,6 +5911,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "stateaffairs": {
+   "name": "State Affairs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-08"
+  },
   "stepstone": {
    "name": "StepStone Group",
    "quant": false,
@@ -8084,6 +8095,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "njdepartmentofenvironmentalprotection": {
+   "name": "NJ Department of Environmental Protection",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-08"
   },
   "novatechengineering": {
    "name": "Nova-Tech Engineering",
@@ -11846,6 +11863,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "applebank|wd5|applebankcareers": {
+   "name": "Apple Bank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-08"
+  },
   "applied|wd501|applied": {
    "name": "Applied Fluid Power",
    "quant": false,
@@ -11885,10 +11908,9 @@
   "argonne|wd1|Argonne_Careers": {
    "name": "Argonne National Laboratory",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-16",
-   "sector": "education_research",
-   "last_fail": "2026-10-07"
+   "sector": "education_research"
   },
   "argonne|wd1|EDU_PUB": {
    "name": "Argonne National Laboratory",
