@@ -1705,6 +1705,7 @@
 "pa - gettysburg|PA":null,
 "pa - glenolden|PA":null,
 "pa - greencastle|PA":null,
+"pa - harrisburg|PA":null,
 "pa - hatfield|PA":null,
 "pa - havertown|PA":null,
 "pa - hawley|PA":null,
@@ -1766,6 +1767,7 @@
 "pa-butler|PA":null,
 "pa-canonsburg|PA":null,
 "pa-client-state|PA":null,
+"pa-greensburg|PA":null,
 "pa-kennett square-tangent energy solutions|PA":null,
 "pa-philadelphia|PA":[
 39.9407,
@@ -2242,6 +2244,7 @@
 "us ny waterford|NY":null,
 "us pa lewistown|PA":null,
 "us pa mcelhattan|PA":null,
+"us pennsylvania (philadelphia) - office|PA":null,
 "us remote - ny|NY":null,
 "us-chicago|NY":null,
 "us-new york city|NY":null,
@@ -2324,6 +2327,10 @@
 "usa|NY":[
 43.0691,
 -76.1724
+],
+"usa|PA":[
+34.6816,
+-86.8457
 ],
 "us|NY":null,
 "us|PA":null,

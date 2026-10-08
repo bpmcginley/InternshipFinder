@@ -12220,6 +12220,12 @@
    "sector": "education_research",
    "location": "Wellesley, MA"
   },
+  "badgermeter|wd5|US_CareerSite": {
+   "name": "Badger Meter",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-08"
+  },
   "bah|wd1|BAH_Jobs": {
    "name": "Booz Allen Hamilton",
    "quant": false,
