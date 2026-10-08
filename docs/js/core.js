@@ -697,6 +697,20 @@
     return { free: runs(al.general), edu: runs(al.edu), plans, from: plans[0].price };
   }
 
+  // The dashboard's review line (added 2026-10-07; docs/js/app.js). Only for a student whose extension
+  // is set up and has filled applications: the extension says so in its ping reply (review_line, true
+  // or false, extension/lib/review.js), and false also means they reviewed or chose "Don't ask again"
+  // there. An extension from before that field falls back to the queue holding a filled application.
+  // Nothing about it leaves the browser; REVIEW_LINE_KEY is the one setting "Hide" keeps.
+  const REVIEW_LINE_KEY = "internscout.review_line";
+  const REVIEWS_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews";
+  function reviewLineDue(info, queue) {
+    if (!info || !info.installed || !info.onboarded) return false;
+    if (typeof info.review_line === "boolean") return info.review_line;
+    const jobs = Object.values((queue && queue.jobs) || {});
+    return jobs.some(j => j && (j.status === "ready_to_submit" || j.status === "submitted"));
+  }
+
   const leftOf = (me, task) => { const a = me && me.allowance && me.allowance[task]; return a ? Math.max(0, (a.limit || 0) - (a.used || 0)) : null; };
   // "Auto-Apply runs: 20 of 20 left" lines plus the tier, for a tooltip.
   function allowanceText(me) {
@@ -791,6 +805,7 @@
     workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, plansBanner, PLANS_BANNER_KEY, PLANS_BANNER_ID, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     INVITE_NUDGE_KEY, inviteNudgeDue, inviteNudgeSeen, markInviteNudge,
+    REVIEW_LINE_KEY, REVIEWS_URL, reviewLineDue,
     reportUrl, digestArchive, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
 })();

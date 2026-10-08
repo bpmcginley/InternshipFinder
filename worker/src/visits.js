@@ -26,8 +26,12 @@ const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.l
 // the day's count of sends by page kind, so it can't tell a confirmed subscriber from a typo.
 // was: export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open"]);
 // was: export const EVENTS = new Set([..., "invite_open", "posting_click"]);
+// "review_click" (added 2026-10-07): a click on a link to the extension's Chrome Web Store reviews page,
+// from the dashboard's review line or the install page (docs/js/count.js). Until then such a click
+// counted as install_click. The extension itself sends nothing: its review card is local only.
+// was: export const EVENTS = new Set([..., "posting_click", "digest_signup"]);
 export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open",
-  "posting_click", "digest_signup"]);
+  "posting_click", "digest_signup", "review_click"]);
 // Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
 // table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
 //   new_account     the Worker saw an account for the first time (an accounts row was made)

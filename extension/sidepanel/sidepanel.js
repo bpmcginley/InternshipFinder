@@ -1,6 +1,7 @@
 import { loadStore, updateStore, hasKey } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { requestHostAccess, hostOf } from "../lib/hosts.js";
+import { loadReview, shouldShow, cardCopy, STORE_REVIEWS_URL, FEEDBACK_URL, KEY as REVIEW_KEY } from "../lib/review.js";
 
 const main = document.getElementById("main");
 let tab = "queue";
@@ -79,6 +80,22 @@ function jobCard(j) {
   return h + "</div>";
 }
 
+// The review card. Same words and same three buttons for everyone who gets it, with the feedback link
+// beside them rather than in front of them (lib/review.js says why).
+function reviewCard(n) {
+  const c = cardCopy(n);
+  return `<div class="card review" role="status"><div class="q">${esc(c.title)}</div><div class="msg">${esc(c.body)}</div>`
+    + `<div class="row"><button class="b primary" data-review="review">${esc(c.review)}</button><button class="b" data-review="later">${esc(c.later)}</button><button class="b link" data-review="never">${esc(c.never)}</button></div>`
+    + `<div class="small fb"><a href="#" data-review="feedback">${esc(c.feedback)}</a></div></div>`;
+}
+// "review" opens the store's reviews page in a new tab; "feedback" opens the feedback form and leaves the
+// card as it is. The answer is kept by the background, and the queue redraws when it changes.
+async function reviewAction(act) {
+  if (act === "feedback") { chrome.tabs.create({ url: FEEDBACK_URL }); return; }
+  if (act === "review") chrome.tabs.create({ url: STORE_REVIEWS_URL });
+  await send({ type: "review_ask", action: act });
+}
+
 async function renderQueue() {
   const q = (await send({ type: "get_queue" })).queue || { order: [], jobs: {} };
   const jobs = q.order.map((id) => q.jobs[id]).filter(Boolean);
@@ -86,15 +103,23 @@ async function renderQueue() {
   let h = "";
   if (!s.settings.onboarded || !hasKey(s)) h += `<div class="card needs_you"><div class="msg">Finish the Deep Dive before using Auto-Apply.</div><div class="row"><button class="b primary" id="dive">Start Deep Dive</button></div></div>`;
   if (!jobs.length) h += `<div class="empty">No applications queued.<br>Pick internships on the dashboard and press <b>Auto-Apply</b>.<br><br><a href="https://internscout.org/" target="_blank" style="color:var(--blue)">Open dashboard ↗</a></div>`;
+  // The review card (lib/review.js) goes right under the applications that are ready, which is what it
+  // is about, and before anything still waiting. shouldShow() keeps it away while a form is being filled.
+  const rv = await loadReview();
+  const ask = shouldShow(rv, jobs) ? reviewCard(rv.filled) : "";
   for (const [name, sts] of GROUPS) {
     const list = jobs.filter((j) => sts.includes(j.status));
     if (list.length) h += `<div class="group">${name}<span class="n">${list.length}</span></div>` + list.map(jobCard).join("");
+    if (name === "Ready to submit") h += ask;
   }
   h += `<div class="group">Apply to any posting</div><form id="addurl" class="row" style="margin-top:0;flex-wrap:nowrap"><input id="url" type="url" required placeholder="https://… application link"><button class="b">Queue</button></form><div class="small" id="addmsg"></div>`;
   const sp = await spend(), avg = perApplication(jobs);
   if (sp.calls) h += `<div class="small" style="margin-top:14px">AI spend this month: <b>${money(sp.month_usd)}</b>${sp.budget ? ` of ${money(sp.budget)} budget` : ""}${avg ? ` · about ${money(avg)} per application` : ""}</div>`;
   h += `<div class="row" style="justify-content:space-between;margin-top:14px"><button class="b link" id="dive2">Redo Deep Dive</button><button class="b link" id="clear">Clear finished</button></div>`;
+  // Always here, asked or not (lib/review.js).
+  h += `<div class="foot"><button class="b link" data-review="review">Leave a review</button></div>`;
   main.innerHTML = h;
+  main.querySelectorAll("[data-review]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); reviewAction(b.dataset.review); }));
 
   main.querySelectorAll("textarea[data-ans]").forEach((t) => t.addEventListener("input", () => { drafts[t.dataset.ans] = t.value; }));
   main.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", async () => {
@@ -202,6 +227,7 @@ const doneOf = (v) => !!(v && v.settings && v.settings.onboarded);
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== "local") return;
   const flipped = ch.store && doneOf(ch.store.oldValue) !== doneOf(ch.store.newValue);
-  if ((tab === "queue" && (ch.queue || ch.usage || flipped)) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }
+  // was: if ((tab === "queue" && (ch.queue || ch.usage || flipped)) || ...
+  if ((tab === "queue" && (ch.queue || ch.usage || ch[REVIEW_KEY] || flipped)) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }
 });
 render();

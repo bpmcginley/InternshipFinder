@@ -132,3 +132,21 @@ test("digestArchive finds Buttondown's archive from the sign-up form's address, 
     assert.equal(IS.digestArchive(no), "", String(no));
   }
 });
+
+// Added 2026-10-07: the dashboard's review line (docs/js/app.js), for a student whose extension is set
+// up and has filled applications. The extension's own answer wins, so "Don't ask again" there (false)
+// quiets the dashboard too; an older extension that doesn't answer falls back to the queue.
+test("the review line is due only with the extension set up and applications filled, and the extension can say no", () => {
+  const IS = loadCore(notFound);
+  const filled = { jobs: { a: { id: "a", status: "ready_to_submit" } } };
+  const working = { jobs: { a: { id: "a", status: "working" } } };
+  const on = { installed: true, onboarded: true };
+  assert.equal(IS.reviewLineDue({ installed: false }, filled), false, "no extension");
+  assert.equal(IS.reviewLineDue({ installed: true, onboarded: false }, filled), false, "Deep Dive not done");
+  assert.equal(IS.reviewLineDue(on, filled), true, "an older extension: the queue says it has been used");
+  assert.equal(IS.reviewLineDue(on, working), false);
+  assert.equal(IS.reviewLineDue({ ...on, review_line: false }, filled), false, "reviewed, or Don't ask again, in the extension");
+  assert.equal(IS.reviewLineDue({ ...on, review_line: true }, { jobs: {} }), true, "a cleared queue: the extension's count still says so");
+  assert.equal(IS.REVIEW_LINE_KEY, "internscout.review_line");
+  assert.match(IS.REVIEWS_URL, /^https:\/\/chromewebstore\.google\.com\/detail\/internscout-auto-apply\/hpnbbpmalfjijnmpoihhjgjolhabjpgi\/reviews$/);
+});

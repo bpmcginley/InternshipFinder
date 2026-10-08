@@ -23,6 +23,8 @@ body{width:300px}
 .link{background:none;border:0;padding:0;color:var(--accent);font:inherit;cursor:pointer}
 .allow{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-variant-numeric:tabular-nums}
 .muted{color:var(--ink3)} .err{color:var(--red)}
+.foot{border-top:1px solid var(--rule);padding:9px 16px 11px;text-align:center;font-size:12px}
+.foot .link{color:var(--ink3)} .foot .link:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style></head><body>
 <div class="head"><span class="mark">InternScout</span><span class="ver" id="ver"></span></div>
 <div class="figs" id="figs" hidden>
@@ -47,5 +49,7 @@ body{width:300px}
   <button class="btn primary" id="queue">Open queue</button>
   <div class="pair"><button class="btn" id="dash">Dashboard</button><button class="btn" id="dive">Deep Dive</button></div>
 </div>
+<!-- Always here, for anyone who wants to leave a review without being asked (lib/review.js). -->
+<div class="foot"><button class="link" id="review">Leave a review</button></div>
 <script type="module" src="popup.js"></script>
 </body></html>

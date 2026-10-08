@@ -13,6 +13,8 @@
 // email sign-up form (form.digest: the dashboard's, and the landing pages' and /digest/'s from
 // backend/internscout/seo_pages.py signup_form) counts as "digest_signup", once per page load. Only
 // that the form was sent goes, with this page's path like every step: never the address or a field.
+// Since 2026-10-07 a click on a link to the listing's reviews page counts as "review_click" rather than
+// "install_click" (the dashboard's review line, the install page's review links), once per page load.
 (function () {
   var API = "https://internscout-api.bpmcginley.workers.dev/hit";
   // "Don't count this browser" (2026-10-01), for the owner's own visits: ?nocount=1 on any page turns
@@ -48,7 +50,12 @@
     // was: var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
     var t = ev.target && ev.target.closest ? ev.target : null;
     var a = t ? t.closest("a[href]") : null;
-    if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
+    // was: if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
+    // Since 2026-10-07 a link to the listing's reviews page (".../reviews") is a "review_click" instead:
+    // someone who already has the extension going to review it, not someone going to install it.
+    if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) {
+      window.ISCount(/^https:\/\/chromewebstore\.google\.com\/detail\/[^?#]*\/reviews\/?([?#]|$)/.test(a.href) ? "review_click" : "install_click");
+    }
     if (t && t.closest("a.go[href], a.open-link[href]")) window.ISCount("posting_click");
   }, true);
   // A sign-up form sent. "submit" fires only once the browser has passed the form's own checks (the
