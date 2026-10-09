@@ -9519,6 +9519,12 @@
   }
  },
  "oracle": {
+  "cva.fa.us1.oraclecloud.com|CX_3": {
+   "name": "Standard Aero",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
+  },
   "ebcs.fa.em2.oraclecloud.com|CX_1": {
    "name": "Arcadis",
    "quant": false,
