@@ -2,6 +2,13 @@
 // scores how often they would have done what production's model did. See scripts/eval/README.md.
 //
 //   GEMINI_API_KEY=... node scripts/eval/autofill_models.mjs steps.json [--models=gemini-3.5-flash-lite,gemini-3.8-flash] [--limit=N]
+//   GEMINI_API_KEY=... ANTHROPIC_API_KEY=... node scripts/eval/autofill_models.mjs steps.json --models=claude-haiku-5-5,gemini-3.8-flash
+//
+// Claude models (added 2026-10-09, to test Claude Haiku 5.5): a model id starting "claude-" is sent to
+// the Anthropic Messages API with the agent's own system prompt, history and tools. Auto-Apply keeps its
+// history in that format already (extension/background/gemini.js converts it for Gemini), so only
+// Gemini's leftovers are removed (claudeMessages). Claude's thinking depth is set with effort, from
+// --thinking or production's autofill ceiling ("low").
 //
 // steps.json comes from the extension (ISEval.export(), background/evalrec.js). Each request is built
 // the way production builds it: the extension's buildGeminiBody, then the Worker's own sanitizeRequest
@@ -27,6 +34,61 @@ const { sanitizeRequest, costCents } = await import("../../worker/src/gemini.js"
 // Questions where a wrong answer does real harm; any disagreement here is listed first in the report.
 export const SENSITIVE_RE = /authori[sz]|sponsor|visa|citizen|veteran|disabilit|gender|race|ethnic|hispanic|criminal|convict|background check|salary|compensation|\b18\b|\bage\b|clearance|relocat|start date|graduat|gpa/i;
 const FREE_TEXT_MIN = 60;          // a fill longer than this is prose, judged by a person, not by equality
+
+// USD per 1M tokens for the Claude models this test can try (prompts up to 100K tokens; Haiku 5.5 costs
+// $0.50 / $2.50 beyond that). Only the eval prices Claude: production runs on Gemini (worker/src/config.js).
+export const CLAUDE_PRICES = {
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, cached: 0.01, long: { over: 100000, input: 0.5, output: 2.5, cached: 0.05 } },
+};
+const isClaude = (model) => String(model).startsWith("claude-");
+
+// Cents for one Claude call, from the API's usage (input_tokens excludes cache reads and writes).
+export function claudeCents(model, usage) {
+  const p = CLAUDE_PRICES[model];
+  if (!p || !usage) return 0;
+  const read = usage.cache_read_input_tokens || 0, write = usage.cache_creation_input_tokens || 0;
+  const prompt = (usage.input_tokens || 0) + read + write;
+  const r = p.long && prompt > p.long.over ? p.long : p;
+  return ((usage.input_tokens || 0) * r.input + write * r.input * 1.25 + read * r.cached + (usage.output_tokens || 0) * r.output) / 1e4;
+}
+
+// The recorded history as the Anthropic API accepts it: Gemini's thought signatures (_sig) and empty
+// text parts dropped, every block cut to the fields the API knows, and tool ids made safe (Gemini's own
+// ids can hold characters Claude's ^[a-zA-Z0-9_-]+$ rejects), the same id for a call and its result.
+export function claudeMessages(messages) {
+  const ids = new Map();
+  const safe = (id) => {
+    if (!ids.has(id)) ids.set(id, String(id || "").replace(/[^a-zA-Z0-9_-]/g, "_") || `t${ids.size}`);
+    return ids.get(id);
+  };
+  const block = (b) => {
+    if (b.type === "text") return b.text ? { type: "text", text: b.text } : null;
+    if (b.type === "tool_use") return { type: "tool_use", id: safe(b.id), name: b.name, input: b.input || {} };
+    if (b.type === "tool_result") {
+      const content = typeof b.content === "string" ? b.content
+        : (b.content || []).map((c) => (c.type === "text" ? { type: "text", text: c.text || " " } : c.type === "image" ? { type: "image", source: c.source } : null)).filter(Boolean);
+      return { type: "tool_result", tool_use_id: safe(b.tool_use_id), content, ...(b.is_error ? { is_error: true } : {}) };
+    }
+    if (b.type === "image" || b.type === "document") return { type: b.type, source: b.source };
+    return null;                       // thinking and anything Gemini-only
+  };
+  return messages.map((m) => ({ role: m.role, content: typeof m.content === "string" ? m.content : m.content.map(block).filter(Boolean) }))
+    .filter((m) => typeof m.content === "string" ? m.content : m.content.length);
+}
+
+async function askClaude(model, step, key, thinking) {
+  const body = { model, max_tokens: 8000, system: step.system, messages: claudeMessages(step.messages), tools: TOOLS,
+    output_config: { effort: thinking === "minimal" ? "low" : thinking || "low" } };   // Gemini's "minimal" has no Claude level
+  const t0 = Date.now();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`${model}: HTTP ${res.status} ${(data.error && data.error.message) || ""}`);
+  if (data.stop_reason === "refusal") throw new Error(`${model}: refused (${(data.stop_details && data.stop_details.category) || "no category"})`);
+  const content = (data.content || []).filter((b) => b.type === "tool_use").map((b) => ({ type: "tool_use", name: b.name, input: b.input || {} }));
+  const c = claudeCents(model, data.usage);
+  return { content, ms: Date.now() - t0, cents: c, later: c, usage: data.usage };
+}
 
 const plain = (s) => String(s ?? "").toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
 
@@ -143,7 +205,9 @@ export function compare(base, cand, labels = {}) {
   return out;
 }
 
-async function ask(model, step, key, thinking) {
+async function ask(model, step, keys, thinking) {
+  if (isClaude(model)) return askClaude(model, step, keys.anthropic, thinking);
+  const key = keys.gemini;
   const config = { ...CONFIG, TASKS: { ...CONFIG.TASKS, autofill: { ...CONFIG.TASKS.autofill, model } } };
   const body = sanitizeRequest(buildGeminiBody({ system: step.system, messages: step.messages, tools: TOOLS, max_tokens: 8000 }), "autofill", config);
   if (thinking) body.generationConfig.thinkingConfig = { thinkingLevel: thinking };
@@ -169,14 +233,15 @@ const pct = (n, d) => (d ? `${Math.round((n * 1000) / d) / 10}%` : "n/a");
 async function main(argv) {
   const file = argv.find((a) => !a.startsWith("--"));
   const opt = (k, d) => (argv.find((a) => a.startsWith(`--${k}=`)) || "").split("=")[1] || d;
-  const key = process.env.GEMINI_API_KEY;
+  const keys = { gemini: process.env.GEMINI_API_KEY, anthropic: process.env.ANTHROPIC_API_KEY };
   const dry = argv.includes("--dry");
-  if (!file || (!key && !dry)) {
-    console.error("usage: GEMINI_API_KEY=... node scripts/eval/autofill_models.mjs steps.json [--models=a,b] [--limit=N] [--dry]");
-    return 2;
-  }
   const prod = CONFIG.TASKS.autofill.model;
   const models = opt("models", `${FLASH_LITE},${prod}`).split(",");
+  const needs = { gemini: models.some((m) => !isClaude(m)), anthropic: models.some(isClaude) };
+  if (!file || (!dry && ((needs.gemini && !keys.gemini) || (needs.anthropic && !keys.anthropic)))) {
+    console.error("usage: GEMINI_API_KEY=... [ANTHROPIC_API_KEY=... for claude-* models] node scripts/eval/autofill_models.mjs steps.json [--models=a,b] [--limit=N] [--dry]");
+    return 2;
+  }
   const cheap = models.find((m) => m !== prod);
   const steps = JSON.parse(readFileSync(file, "utf8")).steps.slice(0, Number(opt("limit", "100000")));
   const thinking = opt("thinking", "");
@@ -184,7 +249,10 @@ async function main(argv) {
   // The estimate prices each step's recorded token counts on every model, uncached.
   if (dry) {
     const apps = new Set(steps.map(appOf)).size, rt = steps.filter((s) => routable(s.messages)).length;
-    const est = steps.reduce((a, s) => a + models.reduce((b, m) => b + costCents(m, s.usage ? { ...s.usage, cachedContentTokenCount: 0 } : null, CONFIG, new Date()), 0), 0);
+    // A Claude model is estimated from the Gemini token counts (the tokenizers differ, so roughly).
+    const priced = (m, u) => (!u ? 0 : isClaude(m) ? claudeCents(m, { input_tokens: u.promptTokenCount || 0, output_tokens: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0) })
+      : costCents(m, { ...u, cachedContentTokenCount: 0 }, CONFIG, new Date()));
+    const est = steps.reduce((a, s) => a + models.reduce((b, m) => b + priced(m, s.usage), 0), 0);
     const hosts = {};
     for (const s of steps) hosts[s.host] = (hosts[s.host] || 0) + 1;
     console.log(`${steps.length} steps from ${apps} applications; ${rt} (${pct(rt, steps.length)}) are plain form steps a router would send to ${cheap || "the cheaper model"}.`);
@@ -201,7 +269,7 @@ async function main(argv) {
     for (const m of models) {
       const r = per[m];
       try {
-        got[m] = await ask(m, step, key, thinking);
+        got[m] = await ask(m, step, keys, thinking);
         const c = compare(base, decisions(got[m].content), labels);
         const where = { step: i, host: step.host, company: step.company };
         r.steps++; r.decided += c.decided; r.same += c.same; r.movesAgree += c.movesAgree ? 1 : 0; r.cents += got[m].cents; r.ms += got[m].ms;
