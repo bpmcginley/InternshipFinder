@@ -1202,6 +1202,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "mach9": {
+   "name": "Mach9",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
+  },
   "Marathon%20Fusion": {
    "name": "Marathon Fusion",
    "quant": false,
@@ -4186,6 +4192,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "guidepointsecurity": {
+   "name": "GuidePoint Security",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
   },
   "gusto": {
    "name": "Gusto",
@@ -9409,6 +9421,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "viget": {
+   "name": "Viget",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
+  },
   "vivenu": {
    "name": "Vivenu",
    "quant": false,
@@ -12638,6 +12656,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "bristolmyerssquibb|wd5|bms": {
+   "name": "Bristol Myers Squibb",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
   },
   "broadridge|wd5|careers": {
    "name": "Broadridge",
@@ -18705,6 +18729,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "education_research"
+  },
+  "wsfsbank|wd1|wsfscareers": {
+   "name": "WSFS Bank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
   },
   "wustl|wd1|external": {
    "name": "Wash U",
