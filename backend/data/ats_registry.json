@@ -1166,6 +1166,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "lendable": {
+   "name": "Lendable",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
+  },
   "linear": {
    "name": "Linear",
    "quant": false,
@@ -15977,6 +15983,18 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "mufgub|wd3|mufg-careers": {
+   "name": "Mitsubishi UFG",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
+  },
+  "mufgub|wd3|mufg-earlycareers": {
+   "name": "MUFG",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-09"
   },
   "multco|wd1|multco_jobs": {
    "name": "Multnomah County",
