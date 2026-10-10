@@ -1292,6 +1292,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "meter": {
+   "name": "Meter",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-10"
+  },
   "mindrobotics": {
    "name": "Mind Robotics",
    "quant": false,
@@ -5474,8 +5480,9 @@
   "rdccareers": {
    "name": "Realtor.com",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-10"
   },
   "readystate": {
    "name": "Readystate Asset Management",
@@ -7713,10 +7720,9 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-10-10"
+   "sector": "health"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
@@ -18758,6 +18764,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "workday|wd5|Workday_Early_Career": {
+   "name": "Workday",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-10"
   },
   "worldvision|wd1|WorldVisionInternational": {
    "name": "World Vision",
