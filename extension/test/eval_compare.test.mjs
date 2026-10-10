@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { decisions, compare, labelsOf, SENSITIVE_RE, sameMeaning, monthOf, routable, savings } = await import("../../scripts/eval/autofill_models.mjs");
+const { decisions, compare, labelsOf, SENSITIVE_RE, sameMeaning, monthOf, routable, savings, claudeMessages, claudeCents } = await import("../../scripts/eval/autofill_models.mjs");
 
 const use = (name, input) => ({ type: "tool_use", name, input });
 
@@ -92,4 +92,26 @@ test("savings: routed steps take the cheaper cost, and the plan margins follow t
   assert.ok(Math.abs(s.later.routed - 0.8) < 1e-9);            // (3 x 0.2 + 1.0) / 2
   assert.deepEqual(s.plans.map((p) => [p.plan, p.runs, p.net]), [["supporter", 50, 340]]);
   assert.ok(Math.abs(s.plans[0].later.prodOnly - (340 - 50 * 2) / 340) < 1e-9);
+});
+
+// Claude Haiku 5.5 in the comparison (2026-10-09): the recorded history goes to the Anthropic API as is,
+// minus what only Gemini understands, and its cost is priced from Claude's own usage fields.
+test("the recorded history reaches Claude without Gemini's leftovers, and tool ids still pair up", () => {
+  const out = claudeMessages([
+    { role: "user", content: [{ type: "text", text: "SNAPSHOT [f1] text \"Name\" = \"\"" }] },
+    { role: "assistant", content: [{ type: "text", text: "", _sig: "abc" }, { type: "tool_use", id: "fc/1:x", name: "fill", input: { ref: "f1", text: "Jordan" }, _sig: "def" }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "fc/1:x", content: "ok" }] },
+  ]);
+  assert.equal(out.length, 3);
+  assert.deepEqual(out[1].content, [{ type: "tool_use", id: "fc_1_x", name: "fill", input: { ref: "f1", text: "Jordan" } }]);
+  assert.equal(out[2].content[0].tool_use_id, "fc_1_x");
+  assert.ok(!JSON.stringify(out).includes("_sig"));
+});
+
+test("Claude Haiku 5.5 is priced per token, at the higher rate past 100K prompt tokens", () => {
+  // 20K in, 500 out: 20000 * $0.10 + 500 * $0.50 per 1M = $0.00225 = 0.225 cents
+  assert.ok(Math.abs(claudeCents("claude-haiku-5-5", { input_tokens: 20000, output_tokens: 500 }) - 0.225) < 1e-9);
+  // 150K in: the long-prompt rate ($0.50 / $2.50)
+  assert.ok(Math.abs(claudeCents("claude-haiku-5-5", { input_tokens: 150000, output_tokens: 0 }) - 7.5) < 1e-9);
+  assert.equal(claudeCents("claude-unknown", { input_tokens: 1000 }), 0);
 });

@@ -28,10 +28,20 @@ if ((Read-Host "Run the comparison now? (y/n)") -notmatch '^[yY]') { exit 0 }
 
 $secure = Read-Host "Gemini API key (hidden)" -AsSecureString
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+# A claude-* model in -Extra (e.g. --models=claude-haiku-5-5,gemini-3.8-flash) also needs an Anthropic
+# API key, asked for the same way (added 2026-10-09).
+$abstr = [IntPtr]::Zero
+if (($Extra -join " ") -match "claude-") {
+  $asecure = Read-Host "Anthropic API key (hidden)" -AsSecureString
+  $abstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($asecure)
+}
 try {
   $env:GEMINI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+  if ($abstr -ne [IntPtr]::Zero) { $env:ANTHROPIC_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($abstr) }
   node scripts/eval/autofill_models.mjs $Steps @Extra
 } finally {
   [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+  if ($abstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($abstr) }
   Remove-Item Env:GEMINI_API_KEY -ErrorAction SilentlyContinue
+  Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
 }

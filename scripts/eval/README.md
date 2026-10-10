@@ -65,3 +65,19 @@ Suggested rule for switching: Flash-Lite's field agreement within 3 points of Fl
 sensitive disagreements, and free-text answers you'd be happy to send. If it passes, the next step
 is routing form pages without free-text questions to Flash-Lite, with a fall-back to Flash after a
 failed action. That's a Worker change followed by a deploy.
+
+## Trying Claude Haiku 5.5 (added 2026-10-09)
+
+Claude Haiku 5.5 costs $0.10 / $0.50 per million input / output tokens, against Gemini 3.8 Flash's
+$0.75 / $3.75 (which doubles on 2027-01-01). The same replay compares it with production, using the
+same recorded steps:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/eval/run.ps1 -FromClipboard -Extra "--models=claude-haiku-5-5,gemini-3.8-flash"
+```
+
+It asks for a Gemini key (for production's own second try, the bar) and an Anthropic API key, both at
+hidden prompts. Claude gets the agent's own system prompt, history and tools; its thinking depth is
+`effort`, "low" like production's autofill ceiling, or `--thinking=medium` to try the next level.
+The switching rule is the same: within 3 points of production's agreement with itself, no sensitive
+disagreements, and free-text answers no worse.
