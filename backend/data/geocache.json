@@ -1227,6 +1227,10 @@
 40.2102,
 -77.0047
 ],
+"media|PA":[
+39.9168,
+-75.3877
+],
 "middlesex|NJ":[
 40.5735,
 -74.494
@@ -1422,6 +1426,7 @@
 "new york city & northern new jersey|NY":null,
 "new york city (hybrid|NY":null,
 "new york city - hybrid|NY":null,
+"new york city - office|NY":null,
 "new york city - us|NY":null,
 "new york city area|NY":null,
 "new york city m&s|NY":null,
@@ -1848,6 +1853,10 @@
 "pittsford|NY":[
 43.091,
 -77.5153
+],
+"pittston|PA":[
+41.3259,
+-75.7894
 ],
 "plainsboro township|NJ":[
 40.3334,

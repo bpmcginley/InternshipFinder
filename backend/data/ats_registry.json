@@ -3158,6 +3158,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "cambridgeconsultantslimited": {
+   "name": "Cambridgeconsultantslimited",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-10"
+  },
   "capstoneinvestmentadvisors": {
    "name": "Capstone Investment Advisors",
    "quant": false,
@@ -5611,6 +5617,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "sagesure": {
+   "name": "SageSure",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-10"
+  },
   "saltxc": {
    "name": "SALT XC",
    "quant": false,
@@ -6044,6 +6056,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "tenet3": {
+   "name": "Tenet3",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-10"
   },
   "tenon": {
    "name": "Tenon",
@@ -7695,9 +7713,10 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "health"
+   "sector": "health",
+   "last_fail": "2026-10-10"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
@@ -18608,6 +18627,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "wawa|wd1|careers": {
+   "name": "Wawa",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-10"
   },
   "waystar|wd1|Waystar": {
    "name": "Waystar",
