@@ -4628,6 +4628,12 @@
    "fails": 0,
    "added": "2026-10-05"
   },
+  "keepersecurity": {
+   "name": "Keeper Security",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-11"
+  },
   "kensingtontours": {
    "name": "Kensington",
    "quant": false,
@@ -5480,9 +5486,9 @@
   "rdccareers": {
    "name": "Realtor.com",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-10"
+   "last_fail": "2026-10-11"
   },
   "readystate": {
    "name": "Readystate Asset Management",
@@ -10817,10 +10823,10 @@
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing",
-   "last_fail": "2026-10-10"
+   "last_fail": "2026-10-11"
   },
   "jobs.entergy.com": {
    "name": "Entergy",
