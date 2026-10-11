@@ -598,8 +598,9 @@
   "egra": {
    "name": "Egra",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-11"
   },
   "eigen-labs": {
    "name": "Eigen Labs",
