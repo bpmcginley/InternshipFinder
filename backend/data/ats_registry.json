@@ -3108,8 +3108,9 @@
   "breezeairways": {
    "name": "Breeze Airways",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-12"
   },
   "brevium": {
    "name": "Brevium",
@@ -12317,9 +12318,8 @@
   "bakerhughes|wd5|BakerHughes": {
    "name": "Baker Hughes",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-12"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "bakertilly|wd5|BTCareers": {
    "name": "Baker Tilly",
