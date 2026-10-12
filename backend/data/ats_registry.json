@@ -598,9 +598,9 @@
   "egra": {
    "name": "Egra",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-11"
+   "last_fail": "2026-10-12"
   },
   "eigen-labs": {
    "name": "Eigen Labs",
@@ -5487,9 +5487,9 @@
   "rdccareers": {
    "name": "Realtor.com",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-11"
+   "last_fail": "2026-10-12"
   },
   "readystate": {
    "name": "Readystate Asset Management",
@@ -10824,10 +10824,10 @@
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing",
-   "last_fail": "2026-10-11"
+   "last_fail": "2026-10-12"
   },
   "jobs.entergy.com": {
    "name": "Entergy",
@@ -11304,6 +11304,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "resource-innovations": {
+   "name": "Resource Innovations",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-12"
   },
   "responsiveads-inc": {
    "name": "ResponsiveAds",
@@ -12311,8 +12317,9 @@
   "bakerhughes|wd5|BakerHughes": {
    "name": "Baker Hughes",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-12"
   },
   "bakertilly|wd5|BTCareers": {
    "name": "Baker Tilly",
@@ -12636,16 +12643,14 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-11"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-11"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|INTERN": {
    "name": "The Boeing Company",
@@ -15282,6 +15287,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "kainos|wd3|kainos": {
+   "name": "Kainos",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-12"
+  },
   "kantar|wd3|KANTAR": {
    "name": "Kantar",
    "quant": false,
@@ -16494,6 +16505,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "oumedicine|wd5|OUHealthCareers": {
+   "name": "OU Medicine",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-12"
   },
   "ovative|wd12|ovative": {
    "name": "Ovative Group",
