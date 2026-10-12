@@ -7725,6 +7725,12 @@
    "added": "2026-09-18",
    "sector": "insurance_finance"
   },
+  "jobs.aon.com": {
+   "name": "Aon",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-12"
+  },
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
@@ -12605,8 +12611,9 @@
   "bluescopenac|wd5|BNACareers": {
    "name": "BlueScope",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-12"
   },
   "bmc|wd1|BMC": {
    "name": "Boston Medical Center",
@@ -13646,9 +13653,8 @@
   "dfwairport|wd5|External": {
    "name": "Dallas Fort Worth International Airport",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-10-12"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "diamondbackenergy|wd12|DBE": {
    "name": "Diamondback Energy",

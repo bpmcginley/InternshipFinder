@@ -1438,6 +1438,7 @@
 "new york city office|NY":null,
 "new york city \u00b7 san francisco \u00b7 full-time|NY":null,
 "new york city-remote|NY":null,
+"new york hauppauge|NY":null,
 "new york metro area|NY":null,
 "new york new york united states|NY":null,
 "new york ny usa|NY":null,
@@ -1447,6 +1448,7 @@
 ],
 "new york office|NY":null,
 "new york privy hq|NY":null,
+"new york remote office (ny99|NY":null,
 "new york remote office|NY":null,
 "new york state (other|NY":null,
 "new york united states|NY":null,
@@ -1584,6 +1586,7 @@
 "ny - amherst|NY":null,
 "ny - astoria|NY":null,
 "ny - ballston spa|NY":null,
+"ny - batavia|NY":null,
 "ny - bellport|NY":null,
 "ny - bethpage|NY":null,
 "ny - bohemia|NY":null,
@@ -1682,6 +1685,10 @@
 "oil city|PA":[
 41.4341,
 -79.7085
+],
+"olean|NY":[
+42.0775,
+-78.4298
 ],
 "oneonta|NY":[
 42.4535,
