@@ -10825,10 +10825,9 @@
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
    "quant": false,
-   "fails": 3,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-10-12"
+   "sector": "engineering_manufacturing"
   },
   "jobs.entergy.com": {
    "name": "Entergy",
@@ -13647,8 +13646,9 @@
   "dfwairport|wd5|External": {
    "name": "Dallas Fort Worth International Airport",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-10-12"
   },
   "diamondbackenergy|wd12|DBE": {
    "name": "Diamondback Energy",
