@@ -18,11 +18,16 @@ on:
         description: "Send to every subscriber. Unticked, only a test copy goes to DIGEST_TEST_TO. Nothing is sent unless DIGEST_ENABLED is 1."
         type: boolean
         default: false
+      check_key:
+        description: "Only check that the BUTTONDOWN_API_KEY secret works: one read from Buttondown, nothing sent."
+        type: boolean
+        default: false
   # To send every Monday, uncomment the two schedule lines below, once a test copy has been checked
   # (growth/README.md). A scheduled run sends to every subscriber when DIGEST_ENABLED is 1, and only
   # writes the preview when it isn't.
   # schedule:
-  #   - cron: "0 12 * * 1"    # Mondays, 8am US Eastern
+  #   - cron: "0 12 * * 1"    # Mondays 12:00 UTC: 8am Eastern in daylight time (EDT), 7am in winter (EST)
+  # was: # Mondays, 8am US Eastern. GitHub's cron is UTC and doesn't follow daylight saving time.
 
 permissions:
   contents: read
@@ -58,6 +63,14 @@ jobs:
           path: digest-preview
           retention-days: 14
 
+      - name: Check the Buttondown key
+        # Run by hand with "check_key" ticked (2026-10-13): one read, the same-week check, with the key.
+        # It runs whether or not DIGEST_ENABLED is 1, sends nothing and never prints the key.
+        if: github.event_name == 'workflow_dispatch' && inputs.check_key
+        env:
+          BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
+        run: python growth/digest_send.py --check
+
       - name: Send the digest
         # digest_send.py uses only the standard library too. The input and variables reach the script
         # through env, never pasted into the command, so no value can change what the shell runs.
@@ -68,7 +81,8 @@ jobs:
         # Buttondown, which every sign-up form links as "See last Monday's email". Only the send to
         # everyone has it: a test copy's draft stays off the archive. The email is the same for every
         # subscriber and carries nothing about any of them.
-        if: vars.DIGEST_ENABLED == '1'
+        # was: if: vars.DIGEST_ENABLED == '1'. A key check sends nothing, even with sending on.
+        if: vars.DIGEST_ENABLED == '1' && !inputs.check_key
         env:
           BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
           DIGEST_POSTAL_ADDRESS: ${{ secrets.DIGEST_POSTAL_ADDRESS }}

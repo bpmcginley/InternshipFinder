@@ -436,3 +436,44 @@ def test_a_test_copy_is_not_checked_against_this_weeks_sends(site, ready, api):
     api.answers = [{"id": "em_t", "status": "draft"}, {}]
     assert digest_send.main(["digest_send.py", site, "--send", "--test-to", "hello@example.org"]) == 0
     assert [r.get_method() for r in api.requests] == ["POST", "POST"]
+
+
+def test_check_reads_once_sends_nothing_and_never_prints_the_key(ready, api, capsys):
+    api.answers = [NONE_SENT]
+    assert digest_send.main(["digest_send.py", "--check"]) == 0
+    assert [(r.get_method(), r.full_url) for r in api.requests] == [("GET", LIST_URL)]
+    out = capsys.readouterr().out
+    assert "BUTTONDOWN_API_KEY works" in out and "Nothing was sent." in out
+    assert KEY not in out
+
+
+def test_check_needs_only_the_key(monkeypatch, api, capsys):
+    monkeypatch.setenv(digest_send.KEY_ENV, KEY)        # no postal address, no site data
+    api.answers = [NONE_SENT]
+    assert digest_send.main(["digest_send.py", "--check"]) == 0
+
+
+def test_check_reports_a_refused_key(ready, api, capsys):
+    api.answers = [_refused(LIST_URL, 401, {"detail": "Invalid token."})]
+    assert digest_send.main(["digest_send.py", "--check"]) == digest_send.EXIT_PROVIDER
+    out = capsys.readouterr().out
+    assert "Check failed" in out and "email_access" in out and KEY not in out
+
+
+def test_check_says_when_a_send_this_week_would_refuse(ready, api, capsys):
+    sent = {"id": "em1", "status": "sent", "subject": "x",
+            "publish_date": datetime.now(timezone.utc).isoformat()}
+    api.answers = [{"results": [sent], "next": None}]
+    assert digest_send.main(["digest_send.py", "--check"]) == 0
+    assert "would refuse right now: em1" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("env", [{}, {"key": True}])
+def test_check_without_a_key_or_with_send_calls_nothing(monkeypatch, api, env, capsys):
+    if env:
+        monkeypatch.setenv(digest_send.KEY_ENV, KEY)
+        argv = ["digest_send.py", "--check", "--send"]
+    else:
+        argv = ["digest_send.py", "--check"]
+    assert digest_send.main(argv) == digest_send.EXIT_REFUSED
+    assert api.requests == []
