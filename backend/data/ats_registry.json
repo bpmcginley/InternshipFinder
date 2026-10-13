@@ -12816,8 +12816,9 @@
   "caci|wd1|external": {
    "name": "CACI",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-13"
   },
   "cadence|wd1|external_careers": {
    "name": "Cadence",
