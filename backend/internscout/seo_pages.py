@@ -579,6 +579,158 @@ def fit_description(text: str) -> str:
     return text
 
 
+# ---- search-result titles and descriptions written for clicks (2026-10-13)
+# Search Console, 28 days to 2026-10-13: 12,682 impressions, 166 clicks (1.31%), average position 9.3.
+# The employer pages had 4,855 of the 5,990 impressions on the top 200 pages, at a 2.3% click rate, on
+# searches worded "<employer> internships" or "<employer> internships summer 2027". So a title now
+# starts with that phrase, whole ("Under Armour Internships Summer 2027"), and what follows it is
+# dropped in a fixed order: the brand first, then the count, then the term; the employer or field and
+# "Internships" never. The count in a title is a floor ("10+ Open", COUNT_STEPS) rather than the exact
+# number: a title is what a search engine caches, and an exact count that moves on every data refresh
+# would rewrite it every few hours and show a stale number most of the time. The exact count, the
+# places, the pay and the newest posting's date go in the description, which engines refresh freely.
+# No dash separates anything in these titles and descriptions: a colon in titles, a hyphen in pay ranges
+# (a place's own name keeps its dash: Dallas–Fort Worth).
+
+# A title's count is the largest of these at or under the real one ("10+" for 10 to 14). Under 10 a
+# title names no count: "5+ Open" over a page of 9 undersells it, and the exact 9 would churn.
+COUNT_STEPS = (10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750,
+               1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000)
+# The length the new descriptions aim for: a desktop result shows about 155 characters before it cuts
+# (DESC_MAX, 160, stays the hard limit fit_description holds every page to).
+DESC_AIM = 155
+
+
+class Head(str):
+    """A title already fitted (fit_head): add() uses it as it is, rather than fitting it again."""
+
+
+def count_floor(n: int) -> str:
+    """ "10+" for 10 to 14 roles, "1,000+" for 1,000 to 1,499; "" under the smallest step (a title then
+    names no count, rather than "5+ Open")."""
+    steps = [s for s in COUNT_STEPS if s <= n]
+    if not steps:
+        return ""
+    floor = n // 5000 * 5000 if n >= 10000 else steps[-1]
+    return f"{floor:,}+"
+
+
+def fit_head(subjects: list[str], tails: list[str] = ()) -> Head:
+    """A <title> of at most TITLE_MAX characters. `subjects` are the search phrase, fullest first
+    ("Under Armour Internships Summer 2027", then "Under Armour Internships"); `tails` what may follow
+    it, fullest first (": 10+ Open Roles", ": 10+ Open"). The first that fits, trying each subject with
+    every tail and the brand, then every tail without the brand, then the brand alone, then the subject
+    alone: the brand goes first, the tail next, the subject's own extra words last. When even the last
+    subject is too long, it is cut at a word (fit_title), never mid-word."""
+    subjects = [" ".join((s or "").split()) for s in subjects]
+    subjects = [s for s in subjects if s]
+    tails = [t for t in tails if t]
+    for s in subjects:
+        for c in [s + t + TITLE_SUFFIX for t in tails] + [s + t for t in tails] + [s + TITLE_SUFFIX, s]:
+            if len(c) <= TITLE_MAX:
+                return Head(c)
+    return Head(fit_title(subjects[-1]) if subjects else "InternScout")
+
+
+def pack(leads: list[str], extras: list[str], need: int = 2, aim: int = DESC_AIM) -> str:
+    """A description from one opening sentence and optional ones. `leads` is the opening sentence,
+    fullest first (three places, two, one, none); `extras` the optional sentences, most important first.
+    The fullest lead with which the first `need` extras all fit wins (pay and the newest posting
+    outrank a second or third place); then every other extra that fits, in order. Under DESC_MIN, the
+    extras that did not fit are tried against DESC_MAX as well, and fit_description pads the rest."""
+    leads = [" ".join(x.split()) for x in leads if x]
+    extras = [" ".join(x.split()) for x in extras if x]
+    must = extras[:need]
+    lead = next((x for x in leads if len(" ".join([x, *must])) <= aim), leads[-1])
+    text = lead
+    for limit in (aim, DESC_MAX):
+        for e in extras:
+            if e not in text and len(text) + 1 + len(e) <= limit:
+                text += " " + e
+        if len(text) >= DESC_MIN:
+            break
+    return text
+
+
+def possessive(name: str) -> str:
+    """ "Bose's", "Mars's"; "the employer's" for a name too long or too odd to read well that way."""
+    return "the employer's" if len(name) > 24 or not name[-1:].isalnum() else f"{name}'s"
+
+
+def pay_words(pay: tuple | None) -> str:
+    """ "Listed pay $22-$51.25/hr." from an hourly_range, or ""."""
+    if not pay:
+        return ""
+    lo, hi = pay[0], pay[1]
+    return f"Listed pay {money(lo)}/hr." if lo == hi else f"Listed pay {money(lo)}-{money(hi)}/hr."
+
+
+def employer_title(name: str, n: int, term: str | None) -> Head:
+    """ "Under Armour Internships Summer 2027: 10+ Open | InternScout". The term is the one most of the
+    employer's roles share (main_term), so it is whatever that is, Spring 2027 or Fall 2026 as well."""
+    many = count_floor(n)
+    subjects = [f"{name} Internships {term}" if term else "", f"{name} Internships"]
+    if many:
+        return fit_head(subjects, [f": {many} Open Roles", f": {many} Open"])
+    # Under COUNT_STEPS[0] roles, "Open Roles" without a number, where it fits with the brand: it still
+    # says the page lists live openings (not reviews or salaries), and "Biogen Internships | InternScout"
+    # left half the title unused. Without a number it is worth less than the brand, so it goes first.
+    head = fit_head(subjects, [": Open Roles"])
+    return head if head.endswith(TITLE_SUFFIX) else fit_head(subjects)
+
+
+def employer_description(name: str, n: int, term: str | None, named: list[str], pay: tuple | None,
+                         newest: datetime | None, co_ops: int = 0) -> str:
+    """The employer page's description: what the employer's own careers page does not show in one
+    place. The exact count, the term, up to three places, the listed pay, how recently the newest role
+    was posted, then why InternScout: free, and every role links to the employer's own posting."""
+    own = possessive(name)
+    if n <= 0:
+        return pack([f"No {name} internships are open right now."],
+                    [f"InternScout checks {own} public job boards several times a day and lists new roles "
+                     "here as they open.", "Free, no sign-up."], need=0)
+    what = ("co-op" if co_ops else "internship") if n == 1 else f"internships{' and co-ops' if co_ops else ''}"
+    head = f"{n:,} open {name} {what}" + (f" for {term}" if term else "")
+    leads = [head + (f" in {join_words(named[:k])}" if k else "") + "." for k in (3, 2, 1, 0) if k <= len(named)]
+    newest_txt = f"Newest posted {newest:%b} {newest.day}." if newest else ""
+    return pack(leads, [pay_words(pay), newest_txt, "Free, no sign-up.",
+                        f"Every role links to {own} own posting."], need=len([x for x in (pay, newest) if x]))
+
+
+def hiring_words(items: list[dict], k: int = 3) -> str:
+    """ "Hiring now: TikTok, Tesla, ByteDance and 412 more." from the k employers with the most roles."""
+    counts = Counter(x["company_name"] for x in items if x.get("company_name") and real_company(x["company_name"]))
+    names = top(counts, k)
+    if not names:
+        return ""
+    rest = len({employer_key(c) for c in counts}) - len({employer_key(c) for c in names})
+    return (f"Hiring now: {', '.join(names)} and {rest:,} more." if rest > 0
+            else f"Hiring now: {join_words(names)}.")
+
+
+def listing_title(subjects: list[str], n: int, tail: str = "Open") -> Head:
+    """A field, place or field-in-a-place title: "Software Engineering Internships: 2,000+ Open"."""
+    many = count_floor(n)
+    return fit_head(subjects, [f": {many} {tail}"] if many else [])
+
+
+def listing_description(n: int, what: str, where: str, items: list[dict], updated: str,
+                        audience: bool = True) -> str:
+    """A field, place or field-in-a-place description: "318 open machine learning and AI internships
+    in California, most for Summer 2027. Hiring now: ... Updated October 13, 2026. Free, no sign-up."
+    `what` is the plural noun phrase ("machine learning and AI internships and co-ops"), `where` the
+    place after it ("in California", or "")."""
+    term = main_term(items)
+    tail = f", most for {term}" if term else ""
+    noun = what if n != 1 else re.sub(r"\binternships\b", "internship", what, count=1)
+    full = f"{n:,} open {noun}{' for college students' if audience else ''}{' ' + where if where else ''}{tail}."
+    short = f"{n:,} open {noun}{' ' + where if where else ''}{tail}."
+    # Fewer employers named, then the shorter opening, until both fit: three long employer names
+    # ("Internal Revenue Service, Aramco Americas, ...") would otherwise crowd out the employers entirely.
+    leads = [" ".join([lead, hiring_words(items, k)]) for k in (3, 2, 1) for lead in (full, short)] + [full, short]
+    return pack(leads, [f"Updated {updated}.", "Free, no sign-up."], need=0)
+
+
 EMPLOYERS: dict[str, str] = {}   # every spelling of a company's name -> its employer page, set by build()
 
 # Trailing words that name the same employer differently: "Magna International" is Magna, "The Boeing
@@ -668,7 +820,7 @@ def kinds(listings: list[dict]) -> list[dict]:
     for t in sorted({str(x.get("term")) for x in listings if TERM.match(str(x.get("term") or ""))},
                     key=lambda t: (TERM.match(t)[2], SEASONS[TERM.match(t)[1]])):
         out.append({"slug": slugify(t), "h1": f"{t} internships", "crumb": t, "what": f"starting {t}",
-                    "title": f"{t} Internships – {{n}} Open Now",
+                    "title": f"{t} Internships", "tails": [": {n} Open Now", ": {n} Open"],
                     "desc": f"{{n}} open {t} internships, co-ops and research roles for college students, "
                             "updated {updated}. Northeast and remote first. Free search, no sign-up.",
                     "pick": lambda x, t=t: x.get("term") == t, "dash": {}, "about": frozenset({"term"})})
@@ -678,17 +830,17 @@ def kinds(listings: list[dict]) -> list[dict]:
                   "only the ones that do. The dashboard's “Eligible year” filter keeps the rest as well.</p>")
     out += [
         {"slug": "paid", "h1": "Paid internships", "crumb": "Paid", "what": "that list pay or say they are paid",
-         "title": "Paid Internships – {n} Open with Pay Listed",
+         "title": "Paid Internships", "tails": [": {n} Open with Pay Listed", ": {n} Open"],
          "desc": "{n} open internships, co-ops and research roles that list pay or say they are paid, updated "
                  "{updated}. Free search for college students, no sign-up.",
          "pick": is_paid, "dash": {"paid": True}, "about": frozenset({"paid"})},
         {"slug": "co-op", "h1": "Co-op jobs and internships", "crumb": "Co-ops", "what": "that are co-ops",
-         "tail": "", "title": "Co-op Jobs and Internships – {n} Open",
+         "tail": "", "title": "Co-op Jobs and Internships", "tails": [": {n} Open"],
          "desc": "{n} open co-ops for college students, updated {updated}. Northeast and remote first. "
                  "Free search, no sign-up.",
          "pick": stage("co_op"), "dash": {"stage": "co_op"}, "about": frozenset({"co_op"})},
         {"slug": "research", "h1": "Research internships for undergraduates", "crumb": "Research",
-         "what": "in research", "tail": "", "title": "Research Internships for Undergraduates – {n} Open",
+         "what": "in research", "tail": "", "title": "Research Internships for Undergraduates", "tails": [": {n} Open"],
          "desc": "{n} open research positions for undergraduates, updated {updated}. Free search, no sign-up.",
          "note": "<p class=\"more\">Paid summer research programs (REUs) funded by the National Science "
                  "Foundation are listed on the <a href=\"https://www.nsf.gov/funding/initiatives/reu\">NSF's "
@@ -696,13 +848,13 @@ def kinds(listings: list[dict]) -> list[dict]:
          "pick": stage("research"), "dash": {"stage": "research"}, "about": frozenset({"research"})},
         {"slug": "for-freshmen", "h1": "Internships for freshmen", "crumb": "Open to first-years",
          "what": "whose postings say they take first-year students",
-         "title": "Internships for Freshmen – {n} Open to First-Years",
+         "title": "Internships for Freshmen", "tails": [": {n} Open to First-Years", ": {n} Open"],
          "desc": "{n} open internships and programs whose postings say they take first-year college "
                  "students, updated {updated}. Free search, no sign-up.",
          "note": years_note, "pick": year("first_year"), "dash": {"year": "first_year"}},
         {"slug": "for-sophomores", "h1": "Internships for sophomores", "crumb": "Open to sophomores",
          "what": "whose postings say they take sophomores",
-         "title": "Internships for Sophomores – {n} Open",
+         "title": "Internships for Sophomores", "tails": [": {n} Open"],
          "desc": "{n} open internships and programs whose postings say they take sophomores, updated "
                  "{updated}. Free search, no sign-up.",
          "note": years_note, "pick": year("sophomore"), "dash": {"year": "sophomore"}},
@@ -769,8 +921,8 @@ def short_day(day) -> str:
 
 
 def tracker_page(term: str, rows: list[tuple], roles: int, now: datetime, updated: str,
-                 term_path: str) -> tuple[list[str], str, str, str]:
-    """(title forms, description, h1, body) for one summer's tracker."""
+                 term_path: str) -> tuple[str, str, str, str]:
+    """(title, description, h1, body) for one summer's tracker."""
     today = now.astimezone(timezone.utc).date()
     week = [r for r in rows if r[1] and (today - r[0]).days < NEW_DAYS]
     n = len(rows)
@@ -797,8 +949,11 @@ def tracker_page(term: str, rows: list[tuple], roles: int, now: datetime, update
             + "<p class=\"follow\">Roles found in the last week, whatever the term: "
               "<a href=\"/internships/new/\">new internships this week</a>. "
               "Every employer with five or more open roles: <a href=\"/internships/at/\">internships by employer</a>.</p>")
-    title = [f"{term} Internships Open Now: {n:,} Employers", f"Which Companies Have Opened {term} Internships",
-             f"{term} Internships Open Now"]
+    # 2026-10-13: a count floor (count_floor) that holds between refreshes; the exact count is in the
+    # description. was: [f"{term} Internships Open Now: {n:,} Employers", f"Which Companies Have Opened
+    # {term} Internships", f"{term} Internships Open Now"], whose first form never fit.
+    many = count_floor(n)
+    title = fit_head([f"{term} Internships Open Now"], [f": {many} Companies"] if many else [])
     desc = (f"{n:,} companies with {term} internships open now, found on public job boards, newest first "
             f"with the day each opened. {len(week):,} opened this week. Updated {updated}.")
     return title, desc, f"{term} internships: who’s open now", body
@@ -1422,6 +1577,21 @@ def place_name(g: dict) -> str:
     w = re.match(r"^(?:USA|US)-([A-Z]{2})\s+(.+)$", loc)       # and "USA-IL Oak Brook" (Winland Foods)
     if w and w.group(1) in US_STATES:
         loc = f"{w.group(2).strip()}, {w.group(1)}"
+    # 2026-10-13, found writing the employer descriptions: Bose's "US, MA - Framingham" (beside its own
+    # "Framingham, MA", so one town counted as two), Gilead's "United States - California - Foster City",
+    # Lyft's "Toronto, Canada" (a province code is on the region), Mars's "New York - 1166" (a site number).
+    w = re.match(r"^(?:USA|US|United States)\s*,\s*([A-Z]{2})\s+-\s+(.+)$", loc)
+    if w and w.group(1) in US_STATES:
+        loc = f"{w.group(2).strip()}, {w.group(1)}"
+    w = re.match(r"^(?:USA|US|United States)\s+-\s+([A-Za-z .]+?)\s+-\s+(.+)$", loc)
+    if w and w.group(1).strip() in _STATE_NAMES:
+        loc = f"{w.group(2).strip()}, {w.group(1).strip()}"
+    w = re.match(r"^([^,]+),\s*Canada$", loc)
+    if w and g.get("state") in CA_PROVINCES:
+        loc = f"{w.group(1).strip()}, {g['state']}"
+    loc = re.sub(r"\s+-\s+\d+$", "", loc)
+    if loc.lower() in CITY_ALIASES and g.get("state") in US_STATES:       # Lyft's "SF"
+        loc = f"{CITY_ALIASES[loc.lower()]}, {g['state']}"
     m = re.match(r"^(.*),\s*([A-Za-z .]+)$", loc)
     if m and m.group(2).strip() in _STATE_NAMES:
         loc = f"{m.group(1)}, {_STATE_NAMES[m.group(2).strip()]}"
@@ -1429,6 +1599,8 @@ def place_name(g: dict) -> str:
 
 
 _COUNTRY = re.compile(r"[\s,-]*\b(United States( of America)?|USA|U\.S\.A?\.?|Canada|CAN)\s*$", re.I)
+# A place that is only a country: true of the role, but no place to name in a one-line description.
+_COUNTRY_ONLY = re.compile(r"^\s*(United States( of America)?|USA|US|U\.S\.A?\.?|Canada|CAN)\s*$", re.I)
 # Short names boards use for a city the FAQ already names in full.
 CITY_ALIASES = {"sf": "San Francisco", "nyc": "New York", "new york city": "New York"}
 
@@ -2693,7 +2865,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # `title` is one form or several, longest first, without the suffix: fit_title picks the longest
         # that fits and adds " | InternScout" (2026-10-05). The description is clamped the same day.
         # was: every caller passed one title ending in " | InternScout", and the description as written.
-        title = fit_title(*([title] if isinstance(title, str) else title))
+        # A Head is fitted already (fit_head, 2026-10-13); fit_title would add a second suffix to a short one.
+        if not isinstance(title, Head):
+            title = fit_title(*([title] if isinstance(title, str) else title))
         desc = fit_description(desc)
         if about is not None:          # was: if items is not None:
             # A listing page is a CollectionPage of the site (2026-10-05), dated like its sitemap entry.
@@ -2720,8 +2894,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                              if k not in US_METRO_PAGES])
         related += link_list(f"{name} internships by city",
                              [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in top_states if k in US_METRO_PAGES])
-        emp = join_words(top(Counter(x["company_name"] for x in items if x.get("company_name")), 3))
-        # was: emp = join_words([c for c, _ in Counter(x["company_name"] for x in items).most_common(3)])
+        # was: emp = join_words(top(Counter(...), 3)), for the description; hiring_words says it now (2026-10-13).
         # The employers in this field that have a page of their own (2026-10-01), so search engines
         # reach the employer pages from the field pages as well as from single listing rows.
         hiring = Counter(EMPLOYERS[x["company_name"]] for x in items if x.get("company_name") in EMPLOYERS)
@@ -2738,10 +2911,16 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         fresh_n = digest_by_field[t]
         pitch = (f"{fresh_n:,} new {esc(lower_name(name))} internships in the last week."
                  if fresh_n >= DIGEST_MIN_NEW else "")
-        add(path, [f"{name} Internships – {n} Open Now", f"{name} Internships – {n} Open", f"{name} Internships",
-                   f"{field_short(t)} Internships – {n} Open", f"{field_short(t)} Internships"],
-            f"{len(items):,} open {lower_name(name)} internships and co-ops for college students, updated "
-            f"{updated}. Employers include {emp}. Free search, no sign-up.",
+        # 2026-10-13: "Software Engineering Internships: 2,000+ Open" (listing_title, a count floor), and a
+        # description that says which term most roles start in and who is hiring (listing_description).
+        # was: [f"{name} Internships – {n} Open Now", f"{name} Internships – {n} Open", f"{name} Internships",
+        #       f"{field_short(t)} Internships – {n} Open", f"{field_short(t)} Internships"], and
+        #      f"{n} open {name} internships and co-ops for college students, updated {updated}. Employers
+        #      include {emp}. Free search, no sign-up."
+        co_ops = any("co_op" in (x.get("stage") or []) for x in items)
+        add(path, listing_title([f"{name} Internships", f"{field_short(t)} Internships"], len(items)),
+            listing_description(len(items), f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}", "",
+                                items, updated),
             f"{name} internships", [root, (path, name)],
             listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path),
                          src="seo-field", faq=faq_section(qa), signup=signup_form(pitch, t)), items, ld=[faq_ld(qa)])
@@ -2766,9 +2945,16 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # was: add(path, f"Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
         head = f"Internships {'(Remote)' if k == 'remote' else in_place(k)}"
         qa = listing_faq(items, None, k, updated)
-        add(path, [f"{head} – {len(items):,} Open", head],
-            f"{len(items):,} open internships, co-ops and research roles {loc}, updated {updated}. "
-            "Free search for college students, no sign-up.",
+        # 2026-10-13: listing_title and listing_description. A Canadian page names co-ops in its title
+        # when it has some: "co-op" is how students there search (Waterloo above all). was:
+        # [f"{head} – {n} Open", head], and f"{n} open internships, co-ops and research roles {loc},
+        # updated {updated}. Free search for college students, no sign-up."
+        co_ops = any("co_op" in (x.get("stage") or []) for x in items)
+        canadian = k in CANADA_KEYS or k in CA_METRO_PAGES
+        subjects = ([f"Internships and Co-ops {in_place(k)}"] if canadian and co_ops else []) + [head]
+        add(path, listing_title(subjects, len(items)),
+            listing_description(len(items), "internships and co-ops" if co_ops else "internships",
+                                "that are remote" if k == "remote" else loc, items, updated),
             f"Internships {'you can do remotely' if k == 'remote' else in_place(k)}", crumbs,
             listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k),
                          src="seo-state", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
@@ -2792,11 +2978,16 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         qa = listing_faq(items, t, k, updated)
         at_short = PLACE_SHORT.get(k, at)
         # was: the four forms without at_short (2026-10-07: a place that needs "the" can run long).
-        add(path, [f"{name} Internships {at} – {len(items):,} Open", f"{name} Internships {at}",
-                   f"{field_short(t)} Internships {at} – {len(items):,} Open", f"{field_short(t)} Internships {at}",
-                   f"{name} Internships {at_short}", f"{field_short(t)} Internships {at_short}"],
-            f"{len(items):,} open {lower_name(name)} internships and co-ops {loc}, updated {updated}. "
-            "Free search for college students, no sign-up.",
+        # 2026-10-13: listing_title and listing_description. was: [f"{name} Internships {at} – {n} Open",
+        # f"{name} Internships {at}", f"{short} Internships {at} – {n} Open", f"{short} Internships {at}",
+        # f"{name} Internships {at_short}", f"{short} Internships {at_short}"], and f"{n} open {name}
+        # internships and co-ops {loc}, updated {updated}. Free search for college students, no sign-up."
+        co_ops = any("co_op" in (x.get("stage") or []) for x in items)
+        add(path, listing_title([f"{name} Internships {at}", f"{field_short(t)} Internships {at}",
+                                 f"{name} Internships {at_short}", f"{field_short(t)} Internships {at_short}"],
+                                len(items)),
+            listing_description(len(items), f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
+                                "that are remote" if k == "remote" else loc, items, updated),
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
             listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k),
@@ -2858,7 +3049,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # "N open internships and co-ops at X for college students{about}". The start term in the title
         # matches "blue origin internships summer 2027"; places and pay are what a searcher picks on.
         term = main_term(items)
-        named = [p for p, _ in places(items) if p != "Remote"][:3]
+        # A place that names only a country ("Canada", 6 of Lyft's roles) says nothing beside "Toronto, ON".
+        named = [p for p, _ in places(items) if p != "Remote" and not _COUNTRY_ONLY.match(p)][:3]
         pay = hourly_range(items)
         co_ops = sum(1 for x in items if "co_op" in (x.get("stage") or []))
         # Fewer places until the description fits DESC_MAX (2026-10-05): a board's "place" can be a
@@ -2870,28 +3062,16 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # still open). was: "... Roles in <fields>. Updated <date>. Free, no sign-up."
         newest = max((d for d in (_when(x.get("posted_at") or x.get("first_seen")) for x in items) if d),
                      default=None)
-        newest_txt = f" Newest posted {newest:%b} {newest.day}." if newest else ""
-        pay_txt = (f" Listed pay {money(pay[0])}{'' if pay[0] == pay[1] else '–' + money(pay[1])}/hour." if pay
-                   else "")
-        # The first that fits, best first: pay and the newest posting outrank a third or second place,
-        # which outrank "Free, no sign-up"; one place outranks pay only when nothing else fits.
-        full, short = pay_txt + newest_txt + " Free, no sign-up.", pay_txt + newest_txt
-        tries = ([(k, full) for k in (3, 2, 1)] + [(k, short) for k in (3, 2, 1)]
-                 + [(0, full), (0, short), (1, newest_txt), (0, newest_txt), (0, "")])
-        desc = ""
-        for k, tail in tries:
-            desc = (f"{len(items):,} open {name} internships{' and co-ops' if co_ops else ''}"
-                    + (f" for {term}" if term else "") + " on one page"
-                    + (f", in {join_words(named[:k])}" if named[:k] else "") + "." + tail)
-            if len(desc) <= DESC_MAX:
-                break
-        # was: add(path, f"{name} Internships{f' ({term})' if term else ''} – {len(items):,} Open | InternScout", ...
-        # 2026-10-07: the term goes before "Internships", as searches word it ("under armour summer 2027
-        # internship"), which also lets it fit with the count where the brackets didn't: Under Armour's
-        # title had dropped the term. was: f"{name} Internships ({term}) – {n} Open" first.
-        add(path, [f"{name} {term} Internships – {len(items):,} Open" if term else "",
-                   f"{name} Internships ({term}) – {len(items):,} Open" if term else "",
-                   f"{name} Internships – {len(items):,} Open", f"{name} Internships"],
+        # 2026-10-13 (employer_title, employer_description): still under 1% (Under Armour 1 click in 348
+        # impressions at 9.2). The title starts with the search's own words, "Under Armour Internships
+        # Summer 2027", with a count floor that does not change on every refresh; the description keeps
+        # the exact count, places, pay and newest date, and ends on why click (free, the employer's own
+        # posting) where it fits. was: [f"{name} {term} Internships – {n} Open", f"{name} Internships
+        # ({term}) – {n} Open", f"{name} Internships – {n} Open", f"{name} Internships"], and the
+        # description "{n} open {name} internships for {term} on one page, in {places}. Listed pay
+        # $a–$b/hour. Newest posted {day}. Free, no sign-up." built here.
+        desc = employer_description(name, len(items), term, named, pay, newest, co_ops)
+        add(path, employer_title(name, len(items), term),
             desc,
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
             listing_body(items, f"at {name}", "", now, related,
@@ -2924,8 +3104,12 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         n = f"{len(items):,}"
         # The title loses what follows the count, then the count (2026-10-05): "Research Internships for
         # Undergraduates – 534 Open" is 64 with the suffix. was: k["title"].format(n=n) + " | InternScout"
-        full = k["title"].format(n=n)
-        add(path, [full, re.sub(r"(– [\d,]+ Open).*", r"\1", full), full.split(" – ")[0]], k["desc"].format(n=n, updated=updated),
+        # 2026-10-13: the subject and its tails apart (fit_head), the count a floor (count_floor) and no
+        # dash. was: full = k["title"].format(n=n), one string with " – {n} Open", and the forms
+        # [full, full up to the count, full.split(" – ")[0]].
+        floor = count_floor(len(items))
+        add(path, fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
+            k["desc"].format(n=n, updated=updated),
             k["h1"], [root, (path, k["crumb"])],
             listing_body(items, k["what"], "", now, related, dash=dash_link(**k["dash"]),
                          tail=k.get("tail", TAIL), about=k.get("about", frozenset()), src="seo-hub"), items)

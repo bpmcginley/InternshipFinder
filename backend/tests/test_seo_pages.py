@@ -335,7 +335,9 @@ def test_spellings_of_one_employer_share_a_page_and_a_role_counts_once(tmp_path)
     boeing = pages["/internships/at/boeing/"]
     # was: "Boeing Internships – 12 Open Now". Since 2026-10-01 the title names the term most roles share,
     # and since 2026-10-07 before "Internships", as searches word it. was: "Boeing Internships (Summer 2027)".
-    assert len(boeing["items"]) == 12 and "Boeing Summer 2027 Internships – 12 Open" in boeing["html"]
+    # 2026-10-13: the search's own words first, then a count floor. was: "Boeing Summer 2027 Internships – 12 Open".
+    assert len(boeing["items"]) == 12
+    assert "<title>Boeing Internships Summer 2027: 10+ Open Roles | InternScout</title>" in boeing["html"]
     assert "company=Boeing&amp;company=The%20Boeing%20Company" in boeing["html"]
     assert '<a href="/internships/at/boeing/">The Boeing Company</a>' in pages["/internships/massachusetts/"]["html"]
     assert seo_pages.employer_key("Magna International") == seo_pages.employer_key("Magna")
@@ -383,7 +385,8 @@ def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp
     assert len(pages["/internships/summer-2027/"]["items"]) == 30
     assert all(x["stage"] == ["co_op"] for x in pages["/internships/co-op/"]["items"])
     assert len(pages["/internships/for-freshmen/"]["items"]) == 26          # only postings that say so
-    assert "<title>Summer 2027 Internships – 30 Open Now | InternScout</title>" in pages["/internships/summer-2027/"]["html"]
+    # was: "Summer 2027 Internships – 30 Open Now | InternScout" (2026-10-13: a count floor, no dash)
+    assert "<title>Summer 2027 Internships: 30+ Open Now | InternScout</title>" in pages["/internships/summer-2027/"]["html"]
     # The co-op page's opening doesn't claim "from internships to co-ops and research".
     assert "26 open student roles that are co-ops." in pages["/internships/co-op/"]["html"]
     # Each opens the dashboard on the matching filter, and the hub links every one.
@@ -528,12 +531,14 @@ def test_employer_pages_answer_when_where_and_pay_from_their_own_roles(tmp_path)
     rows += [_row(20 + i, company_name="Big Co", salary="$90,000 a year") for i in range(2)]   # yearly: not an hourly rate
     site = _site(tmp_path, {"MA": rows, "CO": []})
     h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/big-co/")
-    assert "<title>Big Co Summer 2027 Internships – 12 Open | InternScout</title>" in h
-    assert "Listed pay $22.50–$38/hour." in h
+    # was: "Big Co Summer 2027 Internships – 12 Open | InternScout" (2026-10-13)
+    assert "<title>Big Co Internships Summer 2027: 10+ Open Roles | InternScout</title>" in h
     # 2026-10-07: what the employer's own careers page doesn't show in one place leads the description.
-    desc = h.split('<meta name="description" content="')[1].split('"')[0]
-    assert desc.startswith("12 open Big Co internships for Summer 2027 on one page, in Denver, CO")
-    assert "Newest posted " in desc and "Updated" not in desc and len(desc) <= 160
+    desc = _head(h, r'<meta name="description" content="(.*?)"/>')
+    # was: "12 open Big Co internships for Summer 2027 on one page, in Denver, CO" and "$22.50–$38/hour".
+    assert desc.startswith("12 open Big Co internships for Summer 2027 in Denver, CO, Town 20, MA and Town 21, MA.")
+    assert "Listed pay $22.50-$38/hr." in desc
+    assert "Newest posted " in desc and "Updated" not in desc and len(desc) <= seo_pages.DESC_AIM
     assert "<dt>Listed pay</dt><dd>$22.50 to $38 an hour, on 10 of 12 roles</dd>" in h
     facts = h.split('<dl class="facts">')[1].split("</dl>")[0]
     assert "Denver, CO (10)" in facts and "Colorado" not in facts       # one place, however it's spelled
@@ -546,7 +551,7 @@ def test_employer_pages_say_so_when_postings_leave_things_out(tmp_path):
     rows[0]["term"] = "Summer 2027"
     site = _site(tmp_path, {"MA": rows})
     h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/quiet-co/")
-    assert "<title>Quiet Co Internships – 10 Open | InternScout</title>" in h      # no term most roles share
+    assert "<title>Quiet Co Internships: 10+ Open Roles | InternScout</title>" in h      # no term most roles share
     assert "None of the 10 open postings lists pay." in h
     assert "Only 1 of the 10 open roles gives a start term: Summer 2027. The rest don’t say." in h
 
@@ -838,9 +843,12 @@ def test_every_generated_title_and_description_is_within_a_search_results_limits
         assert 30 <= len(title) <= seo_pages.TITLE_MAX, (path, title)
         assert seo_pages.DESC_MIN <= len(desc) <= seo_pages.DESC_MAX, (path, desc)
         assert title.count(seo_pages.TITLE_SUFFIX) <= 1, (path, title)
-    assert "<title>Environmental Internships in Pennsylvania | InternScout</title>" in by_path["/internships/environmental/pennsylvania/"]
-    assert "<title>Internships in Toronto – 6 Open | InternScout</title>" in by_path["/internships/toronto/"]
-    assert "<title>Research Internships for Undergraduates | InternScout</title>" in by_path["/internships/research/"]
+    # 2026-10-13: the count (a floor, under 10 none) outranks the brand. was: "Environmental Internships in
+    # Pennsylvania | InternScout", "Internships in Toronto – 6 Open | InternScout" and "Research Internships
+    # for Undergraduates | InternScout".
+    assert "<title>Environmental Internships in Pennsylvania: 15+ Open</title>" in by_path["/internships/environmental/pennsylvania/"]
+    assert "<title>Internships in Toronto | InternScout</title>" in by_path["/internships/toronto/"]
+    assert "<title>Research Internships for Undergraduates: 30+ Open</title>" in by_path["/internships/research/"]
     assert "<title>About InternScout – Free Internship Search | InternScout</title>" in by_path["/about/"]
     assert "<title>InternScout Pricing – Free, Upgrades from $4 | InternScout</title>" in by_path["/pricing/"]
     # The employer description drops places until it fits, rather than being cut mid-address.
@@ -1474,12 +1482,136 @@ def test_places_that_take_the_read_with_it(tmp_path):
                   regions=[{"loc": "Fresno, CA", "kind": "us", "state": "CA"}]) for i in range(20)]
     pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"CA": rows}))}
     bay = pages["/internships/san-francisco-bay-area/"]
-    assert "<title>Internships in the San Francisco Bay Area | InternScout</title>" in bay
+    # was: "Internships in the San Francisco Bay Area | InternScout" (2026-10-13: the count before the brand)
+    assert "<title>Internships in the San Francisco Bay Area: 20+ Open</title>" in bay
     assert "<h1>Internships in the San Francisco Bay Area</h1>" in bay
-    assert "in the San Francisco Bay Area, updated" in _head(bay, r'<meta name="description" content="(.*?)"/>')
+    assert "for college students in the San Francisco Bay Area, most for Summer 2027." in         _head(bay, r'<meta name="description" content="(.*?)"/>')
     combo = pages["/internships/software-engineering/san-francisco-bay-area/"]
     # 62 characters in full, so the title falls back to the short name rather than cutting it mid-place.
-    assert _head(combo, r"<title>(.*?)</title>") == "Software Engineering Internships in the Bay Area"
+    assert _head(combo, r"<title>(.*?)</title>") == "Software Engineering Internships in the Bay Area: 20+ Open"
     assert "<h1>Software Engineering internships in the San Francisco Bay Area</h1>" in combo
     assert " in San Francisco Bay Area" not in "".join(pages.values())
     assert seo_pages.in_place("MA") == "in Massachusetts"
+
+
+# ---- 2026-10-13: titles and descriptions written for clicks (employer_title, listing_title and the rest)
+
+_DASHES = ("—", "–")         # em and en dash
+
+
+def test_count_floor_steps_down_and_names_no_count_under_ten():
+    floor = seo_pages.count_floor
+    assert [floor(n) for n in (0, 1, 5, 9)] == ["", "", "", ""]
+    assert [floor(n) for n in (10, 14, 15, 99, 100, 103, 2446, 6081, 12345)] == \
+        ["10+", "10+", "15+", "75+", "100+", "100+", "2,000+", "5,000+", "10,000+"]
+
+
+def test_fit_head_drops_the_brand_then_the_tail_then_the_subjects_extra_words():
+    fit = seo_pages.fit_head
+    subj = ["Under Armour Internships Summer 2027", "Under Armour Internships"]
+    # 66 with "Open Roles" and the brand; the shorter tail keeps the brand.
+    assert fit(subj, [": 10+ Open Roles", ": 10+ Open"]) == "Under Armour Internships Summer 2027: 10+ Open | InternScout"
+    # A tail that only fits without the brand outranks the brand.
+    long = ["Campbell Soup Company Internships Summer 2027", "Campbell Soup Company Internships"]
+    assert fit(long, [": 10+ Open"]) == "Campbell Soup Company Internships Summer 2027: 10+ Open"
+    # The term outranks the tail: no room for both, the term stays.
+    longer = ["Blue Cross Blue Shield of Michigan Internships Summer 2027",
+              "Blue Cross Blue Shield of Michigan Internships"]
+    assert fit(longer, [": 10+ Open"]) == "Blue Cross Blue Shield of Michigan Internships Summer 2027"
+    # Nothing fits: the last subject, cut at a word, never mid-word.
+    name = "Executive Office for United States Attorneys and the Office of the Attorneys"
+    cut = fit([f"{name} Internships Summer 2027", f"{name} Internships"], [": 10+ Open"])
+    assert len(cut) <= seo_pages.TITLE_MAX and f"{name} Internships".startswith(cut)
+    assert cut == "Executive Office for United States Attorneys and the Office" and isinstance(cut, seo_pages.Head)
+
+
+def test_employer_titles_lead_with_the_search_phrase_for_every_count_and_term():
+    title = seo_pages.employer_title
+    assert title("Under Armour", 10, "Summer 2027") == "Under Armour Internships Summer 2027: 10+ Open | InternScout"
+    assert title("Lyft", 18, "Summer 2027") == "Lyft Internships Summer 2027: 15+ Open Roles | InternScout"
+    assert title("Rivian", 41, "Spring 2027") == "Rivian Internships Spring 2027: 40+ Open Roles | InternScout"
+    assert title("Gilead Sciences", 103, None) == "Gilead Sciences Internships: 100+ Open Roles | InternScout"
+    # Under 10 roles, no number: the exact one would change with every refresh.
+    assert title("Medtronic", 9, "Summer 2027") == "Medtronic Internships Summer 2027: Open Roles | InternScout"
+    assert title("Medtronic", 1, "Summer 2027") == title("Medtronic", 0, "Summer 2027")
+    assert title("ADT", 7, None) == "ADT Internships: Open Roles | InternScout"
+    assert title("Campbell Soup Company", 6, "Summer 2027") == "Campbell Soup Company Internships Summer 2027 | InternScout"
+    # A long name keeps its term over the brand and the count, and is never cut mid-word.
+    assert title("Blue Cross Blue Shield of Michigan", 12, "Summer 2027") == \
+        "Blue Cross Blue Shield of Michigan Internships Summer 2027"
+    for name in ("X", "M&T Bank", "Blue Cross Blue Shield of Michigan", "A" * 80, "Executive Office for U.S. Attorneys"):
+        for n in (0, 1, 9, 10, 1000):
+            for term in (None, "Summer 2027", "Fall 2026", "Winter 2027"):
+                t = title(name, n, term)
+                assert 0 < len(t) <= seo_pages.TITLE_MAX, t
+                assert not any(d in t for d in _DASHES) and t.count(seo_pages.TITLE_SUFFIX) <= 1, t
+                assert t.startswith(name[:20]), t
+
+
+def test_employer_descriptions_count_right_and_fit_for_zero_one_and_many():
+    from datetime import datetime
+    desc = seo_pages.employer_description
+    day = datetime(2026, 10, 13)
+    many = desc("Bose", 12, None, ["Framingham, MA", "Atlanta, GA", "Bloomfield Hills, MI"], (22.0, 51.25, 9), day,
+                co_ops=2)
+    assert many.startswith("12 open Bose internships and co-ops in Framingham, MA, Atlanta, GA and Bloomfield Hills, MI.")
+    assert "Listed pay $22-$51.25/hr." in many and "Newest posted Oct 13." in many
+    one = desc("Acme", 1, "Summer 2027", ["Boston, MA"], None, day)
+    assert one.startswith("1 open Acme internship for Summer 2027 in Boston, MA.") and "internships" not in one
+    assert desc("Acme", 1, None, [], None, day, co_ops=1).startswith("1 open Acme co-op.")
+    zero = desc("Acme", 0, "Summer 2027", [], None, None)
+    assert zero.startswith("No Acme internships are open right now.") and "0 open" not in zero
+    # Pay and the newest posting outrank a second and third place.
+    places = ["Lake Saint Louis, MO", "Fort Lauderdale, FL", "Colorado Springs, CO"]
+    d = desc("National Information Solutions Cooperative (NISC)", 10, "Summer 2027", places, (25.0, 25.0, 10), day)
+    assert "Listed pay $25/hr." in d and "Newest posted Oct 13." in d and "Colorado Springs" not in d
+    assert "(NISC)'s" not in d                     # too long a name for a possessive
+    for name in ("X", "Under Armour", "Blue Cross Blue Shield of Michigan", "A" * 120):
+        for n in (0, 1, 5, 2446):
+            for pay in (None, (18.0, 28.0, 3)):
+                text = seo_pages.fit_description(desc(name, n, "Summer 2027", ["Baltimore, MD", "Austin, TX"], pay, day))
+                assert seo_pages.DESC_MIN <= len(text) <= seo_pages.DESC_MAX, text
+                assert not any(dash in text for dash in _DASHES), text
+
+
+def test_listing_descriptions_name_the_term_and_who_is_hiring():
+    rows = [_row(i, company_name=f"Co {'ABCDE'[i % 5]}") for i in range(20)]
+    text = seo_pages.listing_description(20, "mechanical engineering internships", "in Massachusetts", rows,
+                                         "October 13, 2026")
+    assert text.startswith("20 open mechanical engineering internships for college students in Massachusetts, "
+                           "most for Summer 2027. Hiring now: Co A, Co B, Co C and 2 more.")
+    assert len(text) <= seo_pages.DESC_AIM and not any(d in text for d in _DASHES)
+    # No term most roles share: no "most for".
+    mixed = [_row(i, term=("Summer 2027", "Fall 2027", None)[i % 3]) for i in range(9)]
+    assert "most for" not in seo_pages.listing_description(9, "internships", "", mixed, "October 13, 2026")
+
+
+def test_canadian_place_pages_name_co_ops_and_places_read_cleanly(tmp_path):
+    rows = [_row(i, stage=["co_op"] if i % 2 else ["internship"], term="Winter 2027",
+                 regions=[{"loc": "Kitchener, ON", "kind": "canada", "state": "ON", "metro": "Waterloo Region"}])
+            for i in range(12)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"ON": rows}))}
+    h = pages["/internships/waterloo-region/"]
+    assert _head(h, r"<title>(.*?)</title>") == "Internships and Co-ops in Waterloo Region: 10+ Open"
+    assert "12 open internships and co-ops for college students in Waterloo Region, most for Winter 2027." in \
+        _head(h, r'<meta name="description" content="(.*?)"/>')
+    # The places boards write that read as two towns, a site number or a country.
+    name = seo_pages.place_name
+    assert name({"loc": "US, MA - Framingham", "state": "MA"}) == "Framingham, MA"
+    assert name({"loc": "United States - California - Foster City", "state": "CA"}) == "Foster City, CA"
+    assert name({"loc": "Toronto, Canada", "state": "ON"}) == "Toronto, ON"
+    assert name({"loc": "SF", "state": "CA"}) == "San Francisco, CA"
+    assert name({"loc": "New York - 1166", "state": "NY"}) == "New York"
+    assert name({"loc": "Canada", "state": None}) == "Canada"           # kept on the page; left out of descriptions
+
+
+def test_no_rewritten_title_or_description_carries_a_dash_or_an_exact_count(tmp_path):
+    for p in seo_pages.build(_pay_site(tmp_path)):
+        path = p["path"]
+        if p["items"] is None or path in ("/internships/at/", "/internships/new/") or path.startswith("/internships/for/"):
+            continue                  # the hubs, the majors and the new-this-week page keep their 2026-10-05 titles
+        title = _head(p["html"], r"<title>(.*?)</title>")
+        desc = _head(p["html"], r'<meta name="description" content="(.*?)"/>')
+        assert not any(d in title + desc for d in _DASHES), (path, title, desc)
+        n = len(p["items"])
+        assert f"{n:,} Open" not in title or seo_pages.count_floor(n) == f"{n:,}+", (path, title)
