@@ -11,6 +11,7 @@ import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
+import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -315,6 +316,13 @@ async function route(request, env, ctx, d) {
       return new Response(null, { status: 204 });
     }
 
+    // The interest form on /employers/ (leads.js, added 2026-10-13): no sign-in, the site's Origin only,
+    // a honeypot, and a per-address daily limit. Stores the lead for Bruce to read; takes no payment.
+    case "POST /employer-interest": {
+      const { body } = await readJson(request, MAX_LEAD_BYTES);
+      return json(await takeLead(db, request, env, body, now, (p) => later(ctx, p)));
+    }
+
     case "GET /demand": {
       const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
       if (!env.DEMAND_TOKEN || !token || !(await sameSecret(token, env.DEMAND_TOKEN))) {
@@ -354,6 +362,9 @@ export default {
     }
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
-    ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
+    // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
+    // dropOldLeads (2026-10-13): employer form leads older than a year (leads.js LEAD_DAYS).
+    ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
+      dropOldLeads(env.DB, now)]));
   },
 };

@@ -108,6 +108,8 @@
          2026-10-06; the review suggestions, their local settings and the review link count, 2026-10-07) -->
     <!-- was: <p class="meta">Last updated October 7, 2026</p>  (the Auto-Apply suggestion after opening a
          posting, its two counts and its two browser settings, added 2026-10-13) -->
+    <!-- Still October 13, 2026: the employer interest form (#employers, docs/employers/index.html) was
+         added the same day, so the date stands for both changes. -->
     <p class="meta">Last updated October 13, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
          the whole product "free" without qualification is no longer true. Search still is. -->
@@ -149,6 +151,9 @@
         <!-- Added with the weekly email sign-up (docs/js/app.js Digest). It is the one place a student
              hands over an email address on purpose, so the short version says who ends up holding it. -->
         <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. Buttondown also records the IP address you sign up from. <a href="#digest">Details below</a>.</li>
+        <!-- Added 2026-10-13 with the employer page. Its form is the one place InternScout's own server keeps
+             a name and an email address, so the short version says so. -->
+        <li>If you're an employer and fill in the interest form on <a href="/employers/">internscout.org/employers</a>, we keep what you type there, for up to a year, only to contact you about InternScout for employers. <a href="#employers">Details below</a>.</li>
         <li>We never see your password.</li>
         <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
              The invite records Delete my data keeps (see #delete) are part of what "it" covers, so the
@@ -418,7 +423,10 @@
     <!-- was: <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
          The saved Deep Dive (2026-09-26) has the student's name and contact email in it, so the flat
          "names, emails" no longer holds without naming that one exception. -->
-    <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+    <!-- was: <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+         The employer interest form (2026-10-13) keeps a name and a work email in worker/schema.sql
+         `employer_leads`, so it is named as the second exception. -->
+    <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), and what an employer sends us through the <a href="#employers">employer interest form</a>, we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
     <!-- The weekly email adds nothing to the table above: the form posts from the browser straight to
          Buttondown and never touches the Worker. This line is here so "we don't store emails" isn't
          read as "no one keeps the address you gave for the email". -->
@@ -470,6 +478,19 @@
       <li><strong>Unsubscribing:</strong> every email has an unsubscribe link at the bottom, and it stops the emails. To have your address deleted from Buttondown's list as well, write to us at the address under <em>Contact</em> below.</li>
     </ul>
 
+    <!-- Facts from worker/src/leads.js and worker/schema.sql `employer_leads` (added 2026-10-13): what the
+         row holds, that no IP address is in it, the salted-hash day counter in `rate` (swept by
+         limits.js cleanup() two days on), and dropOldLeads(), which deletes rows older than 365 days. -->
+    <h2 id="employers">If you fill in the employer interest form</h2>
+    <p>The form on <a href="/employers/">internscout.org/employers</a> is for companies that might want featured listings or promoted roles later. Students never see it or need it, and nothing on it is sold or paid for.</p>
+    <ul>
+      <li><strong>What we keep:</strong> what you type into the form (your name, work email and company, and, if you fill them in, your role or title, who you're hiring for, the boxes you tick and your message), and when you sent it. It is stored on InternScout's server (a Cloudflare database). Your IP address is not kept with it.</li>
+      <li><strong>Why:</strong> only so the person running InternScout can read it and contact you about InternScout for employers. It isn't added to the weekly email, sold, shared, or used for anything else.</li>
+      <li><strong>Stopping spam:</strong> to stop one place from flooding the form, our server counts how many times it was sent from each network address that day. The count is kept under a scrambled form of the address (a salted hash), never the address itself, and is deleted within two days.</li>
+      <li><strong>How long:</strong> up to a year from when you sent it, then it is deleted automatically.</li>
+      <li><strong>Deleting it sooner:</strong> write to us at the address under <em>Contact</em> below, from the email you used or naming it, and we'll delete it.</li>
+    </ul>
+
     <h2 id="delete">Delete your data</h2>
     <ol>
       <!-- was: <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
@@ -482,6 +503,7 @@
       <!-- was: <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li> -->
       <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords. That doesn't reach the copy of your Deep Dive saved to your account: turn saving off or press Delete my data first.</li>
       <!-- Delete my data only reaches the Worker, and the weekly email's list lives at Buttondown. -->
+      <li><strong>The employer interest form:</strong> write to us at the address below and we'll delete what you sent. <strong>Delete my data</strong> doesn't cover it, since it isn't tied to a sign-in. It is deleted automatically a year after you sent it.</li>
       <li><strong>The weekly email:</strong> use the unsubscribe link in any of the emails. <strong>Delete my data</strong> can't reach it, because the address is kept by Buttondown, not by our server. To have it deleted from Buttondown's list as well, write to us at the address below.</li>
     </ol>
     <!-- was: <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use.</p>

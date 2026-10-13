@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<!-- The employer page (added 2026-10-13). Hand-written like install.html, not built by
+     backend/internscout/seo_pages.py, so it is copied to the site as it is; write() lists it in
+     sitemap.xml and page() links it from every landing page's footer. Its shell (header, nav, footer,
+     colours) is copied from page() and its CSS, so it looks like /about/ and /pricing/.
+     Its job is a test: would employers pay to feature internships? Nothing is sold here and no price is
+     named. The form posts to the Worker (worker/src/leads.js, POST /employer-interest), which keeps the
+     lead in D1 for Bruce to read. What is kept and for how long: /privacy#employers. -->
+<title>For Employers: Reach Students in Every Major | InternScout</title>
+<meta name="description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours, and tell us if you'd want featured roles."/>
+<link rel="canonical" href="https://internscout.org/employers/"/>
+<meta property="og:title" content="For Employers: Reach Students in Every Major | InternScout"/>
+<meta property="og:description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours, and tell us if you'd want featured roles."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://internscout.org/employers/"/>
+<meta property="og:image" content="https://internscout.org/og-preview.png"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="icon" type="image/png" sizes="48x48" href="/icon48.png"/>
+<link rel="apple-touch-icon" href="/icon128.png"/>
+<!-- The same two blocks a generated page carries: its breadcrumb trail and the Organization, here by
+     its @id (the full Organization is on / and /about/). -->
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"InternScout","item":"https://internscout.org/"},{"@type":"ListItem","position":2,"name":"For employers","item":"https://internscout.org/employers/"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://internscout.org/employers/#webpage","url":"https://internscout.org/employers/","name":"InternScout for employers","description":"How internships get listed on InternScout, how to add or correct a listing, and a form to say you would want featured listings.","inLanguage":"en-US","isPartOf":{"@id":"https://internscout.org/#website"},"publisher":{"@id":"https://internscout.org/#organization"}}</script>
+<style>
+:root{--paper:#f6f4ef;--panel:#fffefb;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;
+--accent:#1d5c46;--accent-soft:#e3eee8;--accent-hover:#164a38;--err:#a3321f;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--paper:#131416;--panel:#1a1b1e;--ink:#ecebe6;--ink2:#b8b6af;
+--ink3:#95948e;--rule:#2c2d31;--accent:#7cc3a1;--accent-soft:#1c2a24;--accent-hover:#95d2b3;--err:#f0937f;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);
+font:16px/1.6 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px 64px}a{color:var(--accent)}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 20px;flex-wrap:wrap;
+padding:22px 0 14px;border-bottom:1px solid var(--ink)}
+.mark{font:600 22px/1 "Source Serif 4",Georgia,serif;color:var(--ink);text-decoration:none}
+nav{display:flex;gap:4px 14px;flex-wrap:wrap}
+nav a{color:var(--ink2);font-size:14px;text-decoration:none;transition:color 140ms ease-out}nav a:hover{color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.crumbs{font-size:14px;color:var(--ink3);margin:22px 0 0}.crumbs a{color:var(--ink3)}
+h1{font:600 32px/1.2 "Source Serif 4",Georgia,serif;margin:10px 0 8px}
+.lede{color:var(--ink2);font-size:17px;margin:0 0 6px;max-width:680px}
+section.prose h2{font:600 22px/1.3 "Source Serif 4",Georgia,serif;margin:34px 0 6px}
+section.prose p{color:var(--ink2);margin:0 0 10px;max-width:680px}
+ul.plain{padding-left:18px;color:var(--ink2);max-width:680px}ul.plain li{margin:6px 0}
+.cta{display:inline-block;padding:10px 16px;border-radius:6px;background:var(--accent);
+color:var(--paper);font-weight:600;text-decoration:none;transition:background-color 140ms ease-out}
+.cta:hover{background:var(--accent-hover)}.cta:active{transform:translateY(1px)}
+form.lead,.done{margin:16px 0 8px;padding:18px 18px 14px;background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}
+.f{margin:0 0 14px;min-width:0}.f.wide{grid-column:1/-1}
+.f label,fieldset legend{display:block;font-weight:600;margin:0 0 4px;padding:0}
+.opt{font-weight:400;color:var(--ink3)}
+.hint{color:var(--ink3);font-size:14px;margin:-2px 0 6px}
+.f input,.f textarea{display:block;width:100%;min-width:0;padding:8px 10px;border:1px solid var(--ink3);
+border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.f input{height:42px}.f textarea{min-height:110px;resize:vertical}
+.f input[aria-invalid=true],.f textarea[aria-invalid=true]{border-color:var(--err);box-shadow:0 0 0 1px var(--err)}
+.err{color:var(--err);font-size:14px;margin:4px 0 0}
+fieldset{border:0;padding:0;margin:0 0 14px;min-width:0}
+.check{display:flex;gap:10px;align-items:baseline;color:var(--ink2);margin:6px 0}
+.check input{width:18px;height:18px;margin:0;flex:none;position:relative;top:3px;accent-color:var(--accent)}
+.hp{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+button.cta{border:0;font:inherit;font-weight:600;cursor:pointer}button.cta[disabled]{cursor:progress}
+.fine{font-size:14px;color:var(--ink3);margin:10px 0 0}
+.status{margin:10px 0 0;color:var(--err)}.status:empty{display:none}
+.done h2{font:600 20px/1.3 "Source Serif 4",Georgia,serif;margin:0 0 6px}.done p{margin:0;color:var(--ink2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
+footer a{color:var(--ink2)}
+@media (max-width:560px){h1{font-size:26px}.grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
+<main>
+<p class="crumbs"><a href="/">InternScout</a> › For employers</p>
+<h1>Reach students in every major</h1>
+<!-- The number: "14,000+" as written (docs/data/stats.json said 14,653 open on 2026-10-13), and the
+     script at the bottom puts the current count, rounded down to the thousand, in its place. -->
+<p class="lede">InternScout is a free internship search for college students in the US and Canada. It lists <span id="open-count">14,000+</span> open internships, co-ops and research roles in every major, collected several times a day from employers' own job boards. Students search it for free, with no account.</p>
+
+<section class="prose">
+<h2>Your internships may already be here</h2>
+<p>If your company posts internships on a public job board, such as Workday, Greenhouse, iCIMS, Ashby or Lever, InternScout probably lists them already. You don't need to do anything, and it costs nothing.</p>
+<p>Each listing links to the posting on your own careers site, so students apply through your system. InternScout takes no applications and doesn't stand between you and an applicant. To check, search for your company on the <a href="/">dashboard</a> or in the list of <a href="/internships/at/">employers hiring now</a>.</p>
+
+<h2>Add a missing board, or fix or remove a listing</h2>
+<p>If your internships aren't showing up, send us the address of your careers page or job board and we'll look at adding it. If a listing is wrong, has closed, or shouldn't be there, send its link and we'll correct or remove it.</p>
+<p>Email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>, or use the <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">feedback form</a>. InternScout is run by one student, so expect a reply within a few days.</p>
+
+<h2>What students use it for</h2>
+<ul class="plain">
+<li>Searching every listing and ranking it for their major, class year and the states they pick.</li>
+<li>Browsing pages for each field, state, major and employer, each linking to the original postings.</li>
+<li>Filling in applications with the optional, free <a href="/install.html">Auto-Apply</a> Chrome extension. It never submits: the student reviews every answer and presses Submit.</li>
+</ul>
+
+<h2 id="interest">Featured listings: would you want them?</h2>
+<p>We're planning featured listings and promoted roles. If you'd want to reach students in every major, tell us and we'll get in touch before anything launches. There's nothing to buy yet and no price to agree to. This form only tells us you're interested.</p>
+</section>
+
+<form class="lead" id="lead" novalidate aria-labelledby="interest">
+<div class="grid">
+<div class="f">
+<label for="name">Name</label>
+<input id="name" name="name" type="text" required maxlength="100" autocomplete="name"/>
+<p class="err" id="name-err" hidden></p>
+</div>
+<div class="f">
+<label for="email">Work email</label>
+<input id="email" name="email" type="email" required maxlength="254" autocomplete="email" spellcheck="false"/>
+<p class="err" id="email-err" hidden></p>
+</div>
+<div class="f">
+<label for="company">Company</label>
+<input id="company" name="company" type="text" required maxlength="120" autocomplete="organization"/>
+<p class="err" id="company-err" hidden></p>
+</div>
+<div class="f">
+<label for="title">Role or title <span class="opt">(optional)</span></label>
+<input id="title" name="title" type="text" maxlength="100" autocomplete="organization-title"/>
+<p class="err" id="title-err" hidden></p>
+</div>
+<div class="f wide">
+<label for="hiring_for">Hiring interns for <span class="opt">(optional)</span></label>
+<p class="hint" id="hiring_for-hint">Fields or majors, for example mechanical engineering, accounting or biology.</p>
+<input id="hiring_for" name="hiring_for" type="text" maxlength="300" aria-describedby="hiring_for-hint"/>
+<p class="err" id="hiring_for-err" hidden></p>
+</div>
+</div>
+<fieldset>
+<legend>What would you want? <span class="opt">(optional)</span></legend>
+<label class="check"><input type="checkbox" name="wants" value="featured"/> Featured listings</label>
+<label class="check"><input type="checkbox" name="wants" value="promoted"/> Promoted roles in search results</label>
+<label class="check"><input type="checkbox" name="wants" value="majors_schools"/> Reaching specific majors or schools</label>
+<label class="check"><input type="checkbox" name="wants" value="other"/> Something else (tell us below)</label>
+</fieldset>
+<div class="f">
+<label for="message">Message <span class="opt">(optional)</span></label>
+<textarea id="message" name="message" maxlength="2000" rows="4"></textarea>
+<p class="err" id="message-err" hidden></p>
+</div>
+<!-- The honeypot (worker/src/leads.js isBot): off-screen, hidden from screen readers and skipped by
+     Tab, so only a script that fills every box fills it. -->
+<div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"/></div>
+<button type="submit" class="cta" id="send">Send</button>
+<p class="status" id="status" role="alert"></p>
+<p class="fine">We'll only use this to contact you about InternScout for employers. <a href="/privacy#employers">How it's kept</a></p>
+<noscript><p class="fine">This form needs JavaScript. You can email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a> instead.</p></noscript>
+</form>
+<div class="done" id="done" tabindex="-1" hidden>
+<h2>Thanks, we got it</h2>
+<p id="done-text">We'll get in touch before anything launches.</p>
+</div>
+</main>
+<footer><strong>Built by one student, made for all students.</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/internships/at/">Employers hiring now</a> · <a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" aria-current="page">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+</div>
+<script>
+// The open-role count from the dashboard's own stats file, rounded down to the thousand ("14,000+"),
+// so the line stays true if the count falls. If the file can't be read, the written number stays.
+(function () {
+  if (!window.fetch) return;
+  fetch("/data/stats.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
+    var n = s && Number(s.open);
+    if (n >= 1000) document.getElementById("open-count").textContent = (Math.floor(n / 1000) * 1000).toLocaleString("en-US") + "+";
+  }).catch(function () {});
+})();
+
+// The interest form. Checked here first (the Worker checks the same things again), then sent as JSON
+// to the Worker, which stores it (worker/src/leads.js). Nothing is kept in the browser.
+(function () {
+  var API = "https://internscout-api.bpmcginley.workers.dev/employer-interest";
+  var form = document.getElementById("lead"), send = document.getElementById("send"), status = document.getElementById("status");
+  var EMAIL = /^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+  var FIELDS = ["name", "email", "company", "title", "hiring_for", "message"];
+  var val = function (id) { return form.elements[id].value.trim(); };
+
+  function mark(id, msg) {
+    var input = form.elements[id], err = document.getElementById(id + "-err");
+    if (!input || !err) return;
+    var hint = document.getElementById(id + "-hint");
+    var by = (hint ? hint.id + " " : "") + (msg ? err.id : "");
+    if (by.trim()) input.setAttribute("aria-describedby", by.trim()); else input.removeAttribute("aria-describedby");
+    if (msg) { input.setAttribute("aria-invalid", "true"); err.textContent = msg; err.hidden = false; }
+    else { input.removeAttribute("aria-invalid"); err.textContent = ""; err.hidden = true; }
+  }
+
+  function check() {
+    var bad = [];
+    var need = { name: "Enter your name.", email: "Enter your work email.", company: "Enter your company." };
+    FIELDS.forEach(function (id) {
+      var msg = "";
+      if (need[id] && !val(id)) msg = need[id];
+      else if (id === "email" && !EMAIL.test(val(id))) msg = "That email address doesn't look right.";
+      mark(id, msg);
+      if (msg) bad.push(id);
+    });
+    return bad;
+  }
+
+  // Once a field has been marked, it is checked again as it changes, so the message goes when it's fixed.
+  FIELDS.forEach(function (id) {
+    form.elements[id].addEventListener("input", function () {
+      if (form.elements[id].getAttribute("aria-invalid") === "true") check();
+    });
+  });
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    status.textContent = "";
+    var bad = check();
+    if (bad.length) { form.elements[bad[0]].focus(); return; }
+    var body = { website: form.elements.website.value, wants: [] };
+    FIELDS.forEach(function (id) { body[id] = val(id); });
+    Array.prototype.forEach.call(form.querySelectorAll("input[name=wants]:checked"), function (c) { body.wants.push(c.value); });
+    send.disabled = true;
+    send.textContent = "Sending";
+    fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (out) { return { ok: r.ok, status: r.status, out: out }; }); })
+      .then(function (res) {
+        if (res.ok) {
+          document.getElementById("done-text").textContent = "We'll write to " + body.email + " before anything launches.";
+          form.hidden = true;
+          var done = document.getElementById("done");
+          done.hidden = false;
+          done.focus();
+          return;
+        }
+        if (res.status === 400 && res.out.field && form.elements[res.out.field] && document.getElementById(res.out.field + "-err")) {
+          var m = String(res.out.message || "");
+          mark(res.out.field, /too long/.test(m) ? "That's too long." : res.out.field === "email" ? "That email address doesn't look right." : "Check this field.");
+          form.elements[res.out.field].focus();
+        } else if (res.status === 429) {
+          status.textContent = res.out.message || "Too many sends today. Please try again tomorrow.";
+        } else {
+          status.textContent = "That didn't go through. Please try again, or email brucepmcginley@gmail.com.";
+        }
+      })
+      .catch(function () { status.textContent = "That didn't go through. Check your connection and try again, or email brucepmcginley@gmail.com."; })
+      .then(function () { send.disabled = false; send.textContent = "Send"; });
+  });
+})();
+</script>
+<script defer src="/js/count.js"></script>
+</body>
+</html>

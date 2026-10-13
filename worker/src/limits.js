@@ -196,7 +196,9 @@ export function userBudgetCents(config, env, tier, plan = "free") {
 
 // +1 on a rate bucket unless it is already at its limit. One statement, so parallel calls cannot all
 // read "9 of 10" and all pass. false means the bucket is full and nothing was counted.
-async function bumpUnder(db, user, bucket, limit) {
+// Exported (2026-10-13) for the employer form's per-address count (leads.js), which shares the table.
+// was: async function bumpUnder(db, user, bucket, limit) {
+export async function bumpUnder(db, user, bucket, limit) {
   if (!(limit > 0)) return false;
   if (limit === Infinity) limit = Number.MAX_SAFE_INTEGER;
   const r = await db.prepare(

@@ -249,6 +249,8 @@ def test_lastmod_follows_the_listings_and_hubs_carry_no_one_item_breadcrumb(tmp_
     # The newest listing on the page was first seen 2026-09-22, whatever day the build runs.
     assert "<loc>https://internscout.org/internships/massachusetts/</loc><lastmod>2026-09-22</lastmod>" in sitemap
     assert "<loc>https://internscout.org/install.html</loc></url>" in sitemap
+    # The hand-written employer page (2026-10-13), with no made-up lastmod, like install.html.
+    assert "<loc>https://internscout.org/employers/</loc></url>" in sitemap
     html = {p["path"]: p["html"] for p in pages}
     # The hub carries the Organization and WebSite blocks since 2026-10-02, but still no breadcrumb.
     assert "BreadcrumbList" not in html["/internships/"]      # was: "application/ld+json" not in ...
@@ -684,8 +686,9 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     seo_pages.write(site, pages)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert "<loc>https://internscout.org/about/</loc>" in sitemap and "<loc>https://internscout.org/compare/</loc>" in sitemap
-    # Every page's footer reaches both.
+    # Every page's footer reaches both, and the employer page (2026-10-13).
     assert all('href="/about/"' in h and 'href="/compare/"' in h for h in by_path.values())
+    assert all('<a href="/employers/">For employers</a>' in h.split("<footer>")[1] for h in by_path.values())
 
 
 def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):

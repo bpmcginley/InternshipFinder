@@ -24,6 +24,10 @@ test("pages are counted by kind, never by the path sent", () => {
   assert.equal(pageKind("/digest/index.html"), "digest");
   assert.equal(pageKind("/digest/?utm_source=extension&utm_medium=extension"), "digest");
   assert.equal(pageKind("/digest/anything"), "other");
+  // The employer page (2026-10-13), the same way.
+  assert.equal(pageKind("/employers/"), "employers");
+  assert.equal(pageKind("/employers/index.html"), "employers");
+  assert.equal(pageKind("/employers/anything"), "other");
 });
 
 test("sources match growth/metrics.py, with our own tagged links first", () => {

@@ -1450,7 +1450,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
 {OFFER_TAG if OFFER_MARK in body else ""}
@@ -3423,7 +3423,9 @@ def write(site_dir: str, pages: list[dict]) -> None:
     # The dashboard changes with every data refresh; the other static pages carry no lastmod rather
     # than a made-up one.
     hub = next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None)
-    urls = [("/", hub), ("/install.html", None), ("/privacy", None), ("/terms", None)] + \
+    # /employers/ (2026-10-13) is hand-written in docs/employers/index.html, like install.html.
+    # was: urls = [("/", hub), ("/install.html", None), ("/privacy", None), ("/terms", None)] + \
+    urls = [("/", hub), ("/install.html", None), ("/employers/", None), ("/privacy", None), ("/terms", None)] + \
            [(p["path"], p.get("lastmod")) for p in pages if p.get("index", True)]
     # A noindex page (index False: /digest/ before its form has an address) stays out of the sitemap.
     # was: [(p["path"], p.get("lastmod")) for p in pages]
