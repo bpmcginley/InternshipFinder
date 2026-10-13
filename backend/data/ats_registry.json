@@ -6383,6 +6383,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "vestmark": {
+   "name": "Vestmark",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
+  },
   "vestwell": {
    "name": "Vestwell",
    "quant": false,
@@ -12521,8 +12527,9 @@
   "bdx|wd1|EXTERNAL_CAREER_SITE_USA": {
    "name": "Becton Dickinson",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-13"
   },
   "bdx|wd1|US_EARLY_TALENT_SITE": {
    "name": "Becton Dickinson",
@@ -18187,9 +18194,10 @@
   "trinityhealth|wd1|Jobs": {
    "name": "Trinity Health",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "health"
+   "sector": "health",
+   "last_fail": "2026-10-13"
   },
   "troweprice|wd5|TRowePrice": {
    "name": "T. Rowe Price",
