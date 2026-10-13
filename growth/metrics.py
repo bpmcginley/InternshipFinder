@@ -384,11 +384,13 @@ def page_count() -> int:
         return r.read().decode("utf-8", "replace").count("<loc>")
 
 
-def d1(token: str, sql: str, params: list | None = None) -> None:
+def d1(token: str, sql: str, params: list | None = None) -> dict:
+    """Execute a query and return D1's response, including rows for schema inspection."""
     r = _json(f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT}/d1/database/{D1_DATABASE}/query",
               {"sql": sql, "params": params or []}, token)
     if not r.get("success"):
         raise RuntimeError("D1: " + json.dumps(r.get("errors"))[:300])
+    return r
 
 
 # Every snapshot from the last KEEP_ALL_DAYS, then the day's last one for KEEP_DAYS, then nothing.
