@@ -852,12 +852,14 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
         # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
         aa = (f' <a class="aa" href="/install.html?from={esc(src)}-row">Auto-Apply this</a>'
               if autofills(x) else "")
+        # data-aa (2026-10-13): js/offer.js may offer the extension when this posting is opened.
         rows.append(
             '<li class="job">'
             f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)}{pay_tag}</div>'
-            f'<a class="go" href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
+            # was: f'<a class="go" href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
+            f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
             "</li>")
     return "\n".join(rows)
 
@@ -869,6 +871,19 @@ def autofills(x: dict) -> bool:
         return False
     host = (urlparse(x.get("apply_url") or "").hostname or "").lower()
     return any(host == h or host.endswith("." + h) for h in AUTOFILL_HOSTS)
+
+
+# The Auto-Apply offer (2026-10-13): docs/js/offer.js shows a slim "Add to Chrome" bar in this tab when
+# a student opens a posting whose a.go link carries data-aa (go_aa), on a desktop Chromium browser
+# without the extension, at most once a session and not for 14 days after it is dismissed. page() adds
+# the script only to a page with such a link, so a page with none carries nothing extra.
+OFFER_TAG = '<script defer src="/js/offer.js"></script>'
+OFFER_MARK = '<a class="go" data-aa '
+
+
+def go_aa(x: dict) -> str:
+    """ ' data-aa' for a posting link whose application Auto-Apply fills (autofills), else ''."""
+    return " data-aa" if autofills(x) else ""
 
 
 def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str:
@@ -1208,6 +1223,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 <footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
+{OFFER_TAG if OFFER_MARK in body else ""}
 </body>
 </html>
 """
@@ -1888,7 +1904,7 @@ def pay_rows(top_roles: list[tuple], now: datetime) -> str:
             f'<div class="co">{company_link(x.get("company_name") or "")}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)} · <span class="pay">{esc(rate_words(lo, hi))}</span></div>'
-            f'<a class="go" href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" target="_blank">Open posting</a>'
+            f'<a class="go"{go_aa(x)} href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" target="_blank">Open posting</a>'
             "</li>")
     return "\n".join(rows)
 

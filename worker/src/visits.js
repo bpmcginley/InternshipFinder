@@ -30,8 +30,13 @@ const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.l
 // from the dashboard's review line or the install page (docs/js/count.js). Until then such a click
 // counted as install_click. The extension itself sends nothing: its review card is local only.
 // was: export const EVENTS = new Set([..., "posting_click", "digest_signup"]);
+// "apply_offer_shown" and "apply_offer_click" (added 2026-10-13; docs/js/offer.js): opening a posting
+// Auto-Apply can fill, on a desktop Chromium browser without the extension, shows a slim "Add to Chrome"
+// bar once; these count it appearing and its store link being pressed. That press is an install_click
+// as well (docs/js/count.js counts every store link), so this one is the part of install_click the bar made.
+// was: export const EVENTS = new Set([..., "posting_click", "digest_signup", "review_click"]);
 export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open",
-  "posting_click", "digest_signup", "review_click"]);
+  "posting_click", "digest_signup", "review_click", "apply_offer_shown", "apply_offer_click"]);
 // Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
 // table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
 //   new_account     the Worker saw an account for the first time (an accounts row was made)

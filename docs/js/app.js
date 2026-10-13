@@ -309,7 +309,10 @@
           h("select", { className: "mine", "aria-label": "Your status", value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status))),
         h("td", { className: "c-links" },
-          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener" }, "Open posting") : h("span", { className: "muted" }, "No link"),
+          // was: h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener" }, "Open posting")
+          // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
+          // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
+          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined }, "Open posting") : h("span", { className: "muted" }, "No link"),
           !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", onClick: () => onAuto([r]) }, "Auto-Apply")),
           tryAuto && h("div", null, h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply")),
           h("div", null, h("a", { className: "report", href: IS.reportUrl(r), target: "_blank", rel: "noopener", title: "Wrong tag, dead link or not a student role? Tell us." }, "Report")))),
