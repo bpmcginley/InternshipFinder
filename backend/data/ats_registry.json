@@ -598,9 +598,9 @@
   "egra": {
    "name": "Egra",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-12"
+   "last_fail": "2026-10-13"
   },
   "eigen-labs": {
    "name": "Eigen Labs",
@@ -3108,9 +3108,9 @@
   "breezeairways": {
    "name": "Breeze Airways",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-12"
+   "last_fail": "2026-10-13"
   },
   "brevium": {
    "name": "Brevium",
@@ -4892,6 +4892,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "memx": {
+   "name": "MEMX",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
+  },
   "mercury": {
    "name": "Mercury",
    "quant": false,
@@ -5484,13 +5490,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "rdccareers": {
-   "name": "Realtor.com",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-12"
   },
   "readystate": {
    "name": "Readystate Asset Management",
@@ -8249,6 +8248,12 @@
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
   },
+  "royalontariomuseum": {
+   "name": "Royal Ontario Museum",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
+  },
   "scentair": {
    "name": "ScentAir",
    "quant": false,
@@ -8575,6 +8580,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "nonprofit"
+  },
+  "azul": {
+   "name": "Azul Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
   },
   "belvederetrading": {
    "name": "Belvedere Trading",
@@ -10016,6 +10027,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "fa-erqb-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
+   "name": "ADT",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
   },
   "fa-errt-saasfaprod1.fa.ocs.oraclecloud.com|CX_2001": {
    "name": "SCOR",
@@ -12611,9 +12628,8 @@
   "bluescopenac|wd5|BNACareers": {
    "name": "BlueScope",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-12"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "bmc|wd1|BMC": {
    "name": "Boston Medical Center",
@@ -16770,6 +16786,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "prologis|wd5|Prologis_External_Careers": {
+   "name": "Prologis",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
   },
   "proofpoint|wd5|proofpointcareers": {
    "name": "Proofpoint",
