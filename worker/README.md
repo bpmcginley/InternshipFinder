@@ -264,6 +264,9 @@ row but stop being charged only once you cancel their subscriptions in Stripe, s
   it is the one row to revisit once real per-student spend is in D1. It is what stops one modified
   client from spending the whole global budget through the
   uncapped Deep Dive. Keep each paid row under what the plan brings in after Stripe's cut.
+- Employer interest from the form on /employers/ (`src/leads.js`, added 2026-10-13), newest first:
+  `npx wrangler d1 execute internscout --remote --command "SELECT * FROM employer_leads ORDER BY created DESC"`.
+  How many came in per day: `SELECT day, n FROM event_counts WHERE event = 'employer_interest'`.
 - Token totals and the cache hit rate for a month:
   `npx wrangler d1 execute internscout --remote --command "SELECT * FROM tokens"` (`cached / prompt`).
 - AI calls per minute across everyone: `GLOBAL_RPM`. This is the guard against a busy hour spending

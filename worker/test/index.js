@@ -11,3 +11,4 @@ import "./session.test.js";
 import "./profile.test.js";
 import "./visits.test.js";
 import "./clock.test.js";
+import "./leads.test.js";

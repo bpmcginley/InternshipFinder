@@ -1505,6 +1505,8 @@
           h("a", { href: "internships/at/" }, "Employers hiring now"),
           h("a", { href: "privacy.html" }, "Privacy"),
           h("a", { href: "terms.html" }, "Terms"),
+          // The employer page (2026-10-13; docs/employers/index.html), as in every landing page's footer.
+          h("a", { href: "employers/" }, "For employers"),
           h("a", { href: feedbackUrl, target: "_blank", rel: "noopener" }, "Feedback"),
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
           // was: h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),

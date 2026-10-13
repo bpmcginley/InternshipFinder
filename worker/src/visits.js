@@ -44,7 +44,10 @@ export const EVENTS = new Set(["install_click", "signin_start", "signin", "profi
 //   first_autofill  an account's first Auto-Apply run of the month that Gemini answered
 //   cap_hit         a run refused because the month's allowance was used up; page is the task
 //   paid            a live Stripe checkout that left a plan active; page is the plan
-export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid"]);
+//   employer_interest  the employer form on /employers/ stored a lead (added 2026-10-13; leads.js);
+//                   page is "employers". Not counted for a honeypot catch, a refusal or a bad field.
+// was: export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid"]);
+export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid", "employer_interest"]);
 // utm_source values our own links use (growth/digest.py, growth/outreach.py) and the usual social names.
 const UTM_SOCIAL = /^(linkedin|instagram|facebook|fb|ig|reddit|bluesky|bsky|mastodon|x|twitter|threads|tiktok|youtube|discord)$/;
 // Which social site (added 2026-10-05; the `visit_channels` table). `source` folds every social site
@@ -93,7 +96,8 @@ function tooFast(ip, now) {
 
 // "/internships/massachusetts/" -> "landing"; anything unknown is "other", so a made-up path cannot
 // add rows. Paths are never stored as sent. "/digest/" (the weekly email's page, added 2026-10-06) is
-// "digest" rather than "other", so its visits and its sign-ups can be read apart from /about/ and the rest.
+// "digest" rather than "other", so its visits and its sign-ups can be read apart from /about/ and the rest,
+// and "/employers/" (2026-10-13) is "employers" for the same reason.
 export function pageKind(path) {
   const p = String(path || "/").split(/[?#]/)[0].replace(/\/index\.html$/, "/").replace(/\.html$/, "").replace(/\/+$/, "") || "/";
   if (p === "/") return "dashboard";
@@ -101,6 +105,8 @@ export function pageKind(path) {
   if (p === "/install") return "install";
   if (p === "/privacy" || p === "/terms") return "legal";
   if (p === "/digest") return "digest";
+  // The employer page (2026-10-13), apart from "other" so its visits can be read on their own.
+  if (p === "/employers") return "employers";
   return "other";
 }
 
