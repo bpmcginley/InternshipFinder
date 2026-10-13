@@ -29,8 +29,13 @@ front of it, whether the email is going out is UNKNOWN: the request may have bee
 error. The script says so and tells the operator to look at Buttondown's sent and scheduled emails
 first. It never suggests sending again, which is how subscribers would get two copies.
 
+--check (2026-10-13) only reads: it asks Buttondown for the emails already sent or scheduled, the same
+request a send to everyone makes first, and says whether BUTTONDOWN_API_KEY works. It sends nothing,
+makes no draft, needs no postal address, and never prints the key.
+
 Run from the repo root:
   python growth/digest_send.py [docs] [--send] [--test-to ADDRESS] [--public-archive] [--allow-same-week]
+  python growth/digest_send.py --check
 """
 from __future__ import annotations
 
@@ -231,6 +236,31 @@ def unknown(e: ProviderError) -> bool:
     return isinstance(e, NoAnswer) or (e.status or 0) >= 500
 
 
+def check(key: str, send: bool) -> int:
+    """--check: one read with the key (the same-week check's GET /v1/emails) and what it found.
+    Nothing is sent and no draft is made, so it is safe to run at any time."""
+    if send:
+        print("[digest] --check only reads, so it can't be combined with --send. Nothing was sent.")
+        return EXIT_REFUSED
+    if not key:
+        print(f"[digest] Check failed: {KEY_ENV} is empty.")
+        return EXIT_REFUSED
+    try:
+        earlier = same_week(key, "")
+    except ProviderError as e:
+        print(f"[digest] Check failed: {e}")
+        return EXIT_PROVIDER
+    print(f"[digest] {KEY_ENV} works: Buttondown answered the same-week check (API version {API_VERSION}). "
+          "Nothing was sent.")
+    if earlier:
+        when = earlier.get("publish_date") or earlier.get("creation_date") or "no date"
+        print(f"[digest] A send to everyone would refuse right now: {earlier.get('id')} ({earlier.get('status')}, "
+              f"{when}) went out or is scheduled within six days.")
+    else:
+        print("[digest] No email was sent or scheduled in the last six days.")
+    return 0
+
+
 # ---------------------------------------------------------------- command line
 
 def _plan(test_to: str | None) -> list[str]:
@@ -259,10 +289,14 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--allow-same-week", action="store_true",
                     help="send to every subscriber even though Buttondown already has an email sent or "
                          "scheduled this week (only after checking it in the dashboard)")
+    ap.add_argument("--check", action="store_true",
+                    help="only check that BUTTONDOWN_API_KEY works (one read, nothing sent); not with --send")
     args = ap.parse_args(argv[1:])
 
     key = (os.environ.get(KEY_ENV) or "").strip()
     address = (os.environ.get(ADDRESS_ENV) or "").strip()
+    if args.check:
+        return check(key, args.send)
     test_to = None
     if args.test_to is not None:
         test_to = args.test_to.strip()
