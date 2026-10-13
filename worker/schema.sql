@@ -2,7 +2,9 @@
 -- was: -- Only hashed ids, months, tasks, run ids, counters, states and spend. Never prompts, replies, emails or tokens.
 -- Hashed ids, months, tasks, run ids, counters, states and spend; a fingerprint (sha256) of each sign-in
 -- session token; and, for a student who saves their Deep Dive to their account, that profile encrypted.
--- Never prompts, replies, emails or tokens themselves.
+-- Never prompts, replies, emails or tokens themselves. The one exception is `employer_leads` (2026-10-13):
+-- the contact details a recruiter types into the employer interest form, kept so they can be answered.
+-- was: -- Never prompts, replies, emails or tokens themselves.
 
 CREATE TABLE IF NOT EXISTS usage (
   user_hash TEXT NOT NULL,
@@ -115,6 +117,8 @@ CREATE TABLE IF NOT EXISTS visit_channels (
 -- of forms sent; the address goes from the browser to Buttondown and never reaches the Worker.
 -- Since 2026-10-13 also apply_offer_shown and apply_offer_click (docs/js/offer.js): the "Add to Chrome"
 -- bar shown after opening a posting Auto-Apply fills, and its store link pressed. No schema change.
+-- Since 2026-10-13 also employer_interest (a server step: src/leads.js stored a lead from /employers/),
+-- page "employers". "employers" is also a page kind in visit_counts since then.
 CREATE TABLE IF NOT EXISTS event_counts (
   day TEXT NOT NULL,
   event TEXT NOT NULL,
@@ -245,6 +249,27 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated TEXT NOT NULL,
   bytes INTEGER NOT NULL
 );
+
+-- What employers sent through the interest form on internscout.org/employers/ (added 2026-10-13;
+-- src/leads.js). The one table here that holds names and email addresses: they are a recruiter's own
+-- work contact details, typed in to be contacted about InternScout for employers, and used for nothing
+-- else. `wants` is a comma list of featured, promoted, majors_schools and other. No IP address is kept:
+-- the per-address daily limit counts in `rate` under a salted hash, swept by the daily cron. Rows older
+-- than a year are deleted by the daily cron (leads.js dropOldLeads; docs/privacy.html#employers).
+-- Read with: npx wrangler d1 execute internscout --remote --command "SELECT * FROM employer_leads ORDER BY created DESC"
+CREATE TABLE IF NOT EXISTS employer_leads (
+  id INTEGER PRIMARY KEY,
+  created TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  company TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  hiring_for TEXT NOT NULL DEFAULT '',
+  wants TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS employer_leads_created ON employer_leads (created);
 
 -- Backfills. `npm run deploy` runs this file before every `wrangler deploy`, so both are written to be
 -- repeated: each only ever adds a missing row or moves a value the safe way (a first-seen date

@@ -289,7 +289,7 @@ Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (ma
 One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
 `{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email" }` (path, referring
 host, utm_source, utm_medium; all optional). Answers `204` and adds one to `visit_counts` for the UTC
-day, the page kind (`dashboard`, `landing`, `install`, `legal`, `other`) and the source (`direct`,
+day, the page kind (`dashboard`, `landing`, `install`, `legal`, `digest`, `employers`, `other`) and the source (`direct`,
 `search`, `social`, `email`, `extension`, `print` (a flyer's QR code), `other`, or `internal` for a load from another page of the
 site, which counts as a view but not a visit). Nothing about the visitor is stored.
 A `social` load also adds one to `visit_channels` for the day and the site (added 2026-10-05):
@@ -313,13 +313,29 @@ the dashboard; added 2026-10-04), `apply_offer_shown` and `apply_offer_click` (t
 table (`src/visits.js` `SERVER_EVENTS`, added 2026-10-04), which `/hit` never accepts: `new_account`
 (an account seen for the first time; page `extension` or `dashboard` by `Origin`), `ext_signin`
 (`POST /session` from the extension), `first_autofill` (an account's first answered Auto-Apply run of
-the month), `cap_hit` (a run refused at the monthly allowance; page is the task) and `paid` (a live-mode
-`checkout.session.completed` that left a plan active, once per Stripe event id; page is the plan).
+the month), `cap_hit` (a run refused at the monthly allowance; page is the task), `paid` (a live-mode
+`checkout.session.completed` that left a plan active, once per Stripe event id; page is the plan) and
+`employer_interest` (`POST /employer-interest` stored a lead; page `employers`; added 2026-10-13).
 A load arriving from Google or Microsoft sign-in or from Stripe counts as `internal` (the same visit going on).
 `403` unless `Origin` is the live site. Script-running crawlers (by user agent), more than 30 hits a
 minute from one address (counted in memory only), and anything past 50,000 views in a day are
 answered `204` but not counted. The Worker's own steps are not under that daily cap (2026-10-04), so a
 flood of forged browser steps cannot stop a real sign-in or sale from being counted.
+
+### `POST /employer-interest` (site only, no auth)
+The interest form on `internscout.org/employers/` (added 2026-10-13; `src/leads.js`). Body (JSON, at most
+8,000 bytes):
+`{ "name": "...", "email": "...", "company": "...", "title": "", "hiring_for": "", "wants": ["featured", "promoted", "majors_schools", "other"], "message": "", "website": "" }`.
+`name` (100), `email` (254, must look like an address) and `company` (120) are required; `title` (100),
+`hiring_for` (300) and `message` (2,000) are optional. Lengths are counted after trimming. Unknown
+`wants` values are dropped. `website` is a honeypot the page hides: when it is filled the answer is the
+same `200 { "ok": true }` and nothing is stored. A good send is stored in `employer_leads` and counted as
+the server step `employer_interest` (page `employers`) in `event_counts`; answers `200 { "ok": true }`.
+`400 bad_request` with `"field"` naming the first field at fault; `403` unless `Origin` is the live site
+(a local copy of the site cannot write a lead); `429 rate` (with `retry_after`) after 5 sends from one
+address in a UTC day (counted in `rate` under a salted hash of the address) or 100 from everyone.
+No IP address is stored with a lead. The daily cron deletes leads older than a year.
+Read them: `npx wrangler d1 execute internscout --remote --command "SELECT * FROM employer_leads ORDER BY created DESC"`.
 
 ### `GET /demand` (CI only)
 Needs `Authorization: Bearer <DEMAND_TOKEN>` (a secret). Returns:
