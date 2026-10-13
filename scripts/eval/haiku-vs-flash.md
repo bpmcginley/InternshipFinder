@@ -16,6 +16,10 @@ changed EEO answers from "decline" to a specific race, gender and veteran status
 "will you need sponsorship". If that habit is fixed (see "What switching would need"), haiku-medium is
 worth re-running. On today's evidence it does not qualify.
 
+Update (2026-10-13, later): the fastFill bug in failure 4 is fixed (PR #83, extension 0.5.6), and the
+Crest Industries form was re-run with the fix. The verdict stands. See "Re-run on Crest after the
+fastFill fix" below; the numbers in the rest of this write-up are from the original run.
+
 The rule was fixed before any results were read: a cheaper config qualifies if (1) its objective
 accuracy is no more than 2 points under flash-low's (production) or higher, (2) it has no more sensitive
 errors than flash-low, (3) it has no more invalid tool calls than flash-low, counted both as production
@@ -206,7 +210,7 @@ score. Both are fixed: an ungraded run now fails the free-text check and prints 
    you **under** the age of 18?" ("age of 18"), so fastFill answers it **"Yes"**. Every config but
    flash-low fixed it in step 1. Flash-low's step 1 ended with an `ask_user` about references, so the
    "Yes" stayed in both runs and counts as 2 of its 5 sensitive errors. This should be fixed whatever
-   model runs Auto-Apply.
+   model runs Auto-Apply. **Fixed** in PR #83 (extension 0.5.6); see the re-run below.
 5. **Haiku writes refs with brackets.** In 455 of 532 calls (haiku-low) and 485 of 527 (haiku-medium),
    it copied the snapshot's `[0:6]` as the ref. Today's `execTool` rejects every one of them (below).
 
@@ -318,7 +322,45 @@ All four changes are in `bench_lib.mjs` and `bench_report.mjs` and are tested in
    step on gemini-3.8-flash when Haiku returns `stop_reason: "refusal"`, a 5xx/529 after retries, or a
    reply with no tool call, and log how often that happens.
 7. **Separately, the fastFill bug** (failure 4) in `extension/agent/guard.js`: leave "under 18"
-   questions to the model.
+   questions to the model. Done in PR #83 (extension 0.5.6).
+
+## Re-run on Crest after the fastFill fix (2026-10-13)
+
+`choiceFact` now leaves reverse-worded age questions (under, younger, below, minor, "not yet 18") to
+the model. With that in, `snap` was re-run on all 30 forms, and the one change was on Crest Industries
+(`lever-a4e1fa07`): "Are you under the age of 18?" is no longer pre-filled (262 pre-filled fields
+before, 261 after). Ordinary age questions are still filled ("Are you at least 18 years of age?" = Yes
+on `greenhouse-54097630`). Then `run --only=lever-a4e1fa07 --runs=2` re-ran the first step on Crest
+for all four configs, and `report` rebuilt the tables. The other 29 forms kept their saved runs.
+
+"Are you under the age of 18?" after step 1 (the key says No):
+
+| Config | Original run (1 / 2) | After the fix (1 / 2) |
+|---|---|---|
+| flash-low | **Yes / Yes** (fastFill's, left in place) | No / No |
+| flash-medium | No / No | No / No |
+| haiku-low | No / No | No / No |
+| haiku-medium | No / No | No / No |
+
+Main table with the new Crest runs (all 30 forms; only Crest changed):
+
+| Config | Accuracy (was) | Sensitive errors (was) | Missed required (was) |
+|---|---|---|---|
+| flash-low | 96.0% (93.3%) | 3 (5) | 4 (10) |
+| flash-medium | 96.6% (96.6%) | 5 (5) | 5 (5) |
+| haiku-low | 91.5% (91.0%) | 11 (10) | 16 (16) |
+| haiku-medium | 91.7% (91.7%) | 8 (7) | 20 (20) |
+
+- **flash-low:** the two wrong "Yes" answers are gone. This time its step 1 also filled Crest's
+  address, "previous employee", referral and location questions that the original run skipped, so
+  part of the accuracy gain is ordinary run-to-run variation on one form, not the fix.
+- **Haiku:** Race was changed from the right "Decline to self-identify" to "Hispanic or Latino" in
+  haiku-low runs 1 and 2 and haiku-medium run 2. This is failure 1 again, not the fix.
+- **Decision rule:** still no cheaper config qualifies. Because flash-low improved, two more checks now
+  fail: flash-medium has more sensitive errors (5 vs 3), and haiku-medium's accuracy is 4.3 points
+  under (91.7% vs 96.0%).
+- **Free text:** Crest's new answers have not been judged, so the free-text table still grades the
+  original Crest answers.
 
 ## Spend
 
@@ -326,6 +368,7 @@ All four changes are in `bench_lib.mjs` and `bench_report.mjs` and are tested in
 |---|---|---|---|
 | Earlier agent (key, all runs) | $1.04 | $1.55 (Opus key about $1.41, Haiku runs about $0.14) | $2.59 |
 | This write-up (blind judge, 16 Opus calls) | $0.00 | $0.78 | $0.78 |
-| **Total** | **$1.04** | **$2.33** | **$3.37** of the $15 cap |
+| Crest re-run after the fix (8 step-1 calls) | $0.04 | $0.01 | $0.05 |
+| **Total** | **$1.08** | **$2.34** | **$3.42** of the $15 cap |
 
-No new model runs were needed: every model call reused the saved `bench-runs.json`.
+The original write-up needed no new model runs: every model call reused the saved `bench-runs.json`.
