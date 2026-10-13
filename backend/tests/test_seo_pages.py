@@ -810,9 +810,9 @@ def test_fit_description_cuts_at_a_sentence_and_pads_a_short_one():
     assert len(out) <= 160 and " " not in out[-2:]
     short = "534 open research positions for undergraduates, updated October 5, 2026. Free search, no sign-up."
     out = fit(short)
-    assert out == short + " Every role links to the employer's own posting." and 110 <= len(out) <= 160
+    assert out == short + " Each role links straight to its posting." and 110 <= len(out) <= 160
     # The pad never repeats what the text already says.
-    assert fit("Free, no sign-up. Every role links to the employer's own posting.").endswith("Updated several times a day.")
+    assert fit("Free, no sign-up. Each role links straight to its posting.").endswith("Updated several times a day.")
     assert fit(long)[:40] == fit("   " + long.replace(". ", ".  "))[:40]       # whitespace is normalised
 
 
@@ -1566,6 +1566,14 @@ def test_employer_descriptions_count_right_and_fit_for_zero_one_and_many():
     d = desc("National Information Solutions Cooperative (NISC)", 10, "Summer 2027", places, (25.0, 25.0, 10), day)
     assert "Listed pay $25/hr." in d and "Newest posted Oct 13." in d and "Colorado Springs" not in d
     assert "(NISC)'s" not in d                     # too long a name for a possessive
+    # "own posting" only when no role links to a job site instead.
+    assert "Acme's own posting" in desc("Acme", 2, None, [], None, None)
+    assert "own posting" not in desc("Acme", 2, None, [], None, None, own_links=False)
+    assert seo_pages.own_posting({"apply_url": "https://acme.wd5.myworkdayjobs.com/x/job/1"})
+    assert seo_pages.own_posting({"apply_url": "https://www.tesla.com/careers/search/job/1?source=indeed"})
+    for url in ("https://ca.linkedin.com/jobs/view/1", "https://www.indeed.com/viewjob?jk=1",
+                "https://simplify.jobs/p/1", "https://app.joinhandshake.com/public/jobs/1", ""):
+        assert not seo_pages.own_posting({"apply_url": url}), url
     for name in ("X", "Under Armour", "Blue Cross Blue Shield of Michigan", "A" * 120):
         for n in (0, 1, 5, 2446):
             for pay in (None, (18.0, 28.0, 3)):

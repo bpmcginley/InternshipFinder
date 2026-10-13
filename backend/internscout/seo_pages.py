@@ -553,7 +553,9 @@ _SENTENCE_END = re.compile(r"(?<=[^\s.][.!?])\s+(?=[A-Z0-9$])")
 _ABBREVIATION = re.compile(r"\b[A-Z][a-z]?\.$")
 # What fit_description adds to a short description, in this order, each only when the text does not
 # already say it (the marker). Every one is true of every page.
-DESC_PADS = (("Every role links to the employer's own posting.", "employer's own"),
+# was: ("Every role links to the employer's own posting.", "employer's own"): not true of a page holding
+# one of the few roles that link to a job site (own_posting). 2026-10-13
+DESC_PADS = (("Each role links straight to its posting.", "links straight to"),
              ("Updated several times a day.", "several times a day"),
              ("Free, no sign-up.", "no sign-up"))
 
@@ -680,10 +682,11 @@ def employer_title(name: str, n: int, term: str | None) -> Head:
 
 
 def employer_description(name: str, n: int, term: str | None, named: list[str], pay: tuple | None,
-                         newest: datetime | None, co_ops: int = 0) -> str:
+                         newest: datetime | None, co_ops: int = 0, own_links: bool = True) -> str:
     """The employer page's description: what the employer's own careers page does not show in one
     place. The exact count, the term, up to three places, the listed pay, how recently the newest role
-    was posted, then why InternScout: free, and every role links to the employer's own posting."""
+    was posted, then why InternScout: free, and every role links to the employer's own posting, said
+    only when `own_links` (no role on the page links to a job site instead, own_posting)."""
     own = possessive(name)
     if n <= 0:
         return pack([f"No {name} internships are open right now."],
@@ -694,7 +697,23 @@ def employer_description(name: str, n: int, term: str | None, named: list[str], 
     leads = [head + (f" in {join_words(named[:k])}" if k else "") + "." for k in (3, 2, 1, 0) if k <= len(named)]
     newest_txt = f"Newest posted {newest:%b} {newest.day}." if newest else ""
     return pack(leads, [pay_words(pay), newest_txt, "Free, no sign-up.",
-                        f"Every role links to {own} own posting."], need=len([x for x in (pay, newest) if x]))
+                        f"Every role links to {own} own posting." if own_links else ""],
+                need=len([x for x in (pay, newest) if x]))
+
+
+# Job sites that repost other employers' roles. A few listings (from search results) link to one of
+# these instead of the employer's own posting (13 of about 18,600 on 2026-10-13), so a page says "links
+# to <employer>'s own posting" only when none of its roles does.
+JOB_SITE_HOSTS = ("linkedin.com", "indeed.com", "simplify.jobs", "joinhandshake.com", "bebee.com",
+                  "ziprecruiter.com", "glassdoor.com", "monster.com", "careerbuilder.com", "lensa.com",
+                  "talent.com", "dice.com", "jobright.ai", "wayup.com", "builtin.com")
+
+
+def own_posting(x: dict) -> bool:
+    """Whether a listing's apply link is on the employer's own site or its application system, not a
+    job site that reposts it (JOB_SITE_HOSTS)."""
+    host = (urlparse(x.get("apply_url") or "").hostname or "").lower()
+    return bool(host) and not any(host == h or host.endswith("." + h) for h in JOB_SITE_HOSTS)
 
 
 def hiring_words(items: list[dict], k: int = 3) -> str:
@@ -2573,7 +2592,8 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
         f"- Coverage: {f['open']:,} open roles from {f['employers']:,} employers, in {len(f['fields'])} fields, "
         f"{len(f['states'])} of the 50 US states and {len(f['provinces'])} Canadian provinces and territories. "
         f"{boards_line(f)[0].upper()}{boards_line(f)[1:]}.",
-        "- Updated several times a day. Every listing links to the employer's own posting.",
+        # was: "Every listing links to ..." (a few link to a job site instead: own_posting). 2026-10-13
+        "- Updated several times a day. Almost every listing links to the employer's own posting.",
         "- Not affiliated with UMass Amherst, or with any employer it lists.",
     ]
     main_pages = [link("/", "Dashboard", "search every open listing and rank it for your major, class year and states"),
@@ -3070,7 +3090,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # ({term}) – {n} Open", f"{name} Internships – {n} Open", f"{name} Internships"], and the
         # description "{n} open {name} internships for {term} on one page, in {places}. Listed pay
         # $a–$b/hour. Newest posted {day}. Free, no sign-up." built here.
-        desc = employer_description(name, len(items), term, named, pay, newest, co_ops)
+        desc = employer_description(name, len(items), term, named, pay, newest, co_ops,
+                                    own_links=all(own_posting(x) for x in items))
         add(path, employer_title(name, len(items), term),
             desc,
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
