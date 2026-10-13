@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import sqlite3
 import sys
 import urllib.error
 from datetime import datetime, timedelta, timezone
@@ -159,17 +160,35 @@ def test_new_roles_are_counted_once_per_employer(tmp_path, no_accounts):
     assert [(t, len(v)) for t, v in ranked] == [("data", 5)]
 
 
-def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, monkeypatch):
+@pytest.mark.parametrize("schema", ["new", "legacy", "current"])
+def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, monkeypatch, schema):
     # The analytics page can only reach D1, so the card's bytes go into the draft row.
     import base64
     import metrics
     calls = []
+    db = sqlite3.connect(":memory:")
+    db.row_factory = sqlite3.Row
+    if schema != "new":
+        image_column = ", image_b64 TEXT" if schema == "current" else ""
+        db.execute("CREATE TABLE social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
+                   "text TEXT NOT NULL, image_url TEXT, url TEXT" + image_column +
+                   ", PRIMARY KEY (taken, channel))")
+        db.execute("INSERT INTO social_drafts (taken, channel, text) VALUES ('existing', 'linkedin', 'keep me')")
 
-    def fake_d1(token, sql, params=None):
+    def fake_json(url, body, token):
+        # Exercise real SQL through D1's response shape. A rejected SQL request raises HTTPError
+        # before metrics.d1 can turn a success:false response into RuntimeError.
+        sql, params = body["sql"], body["params"]
         calls.append((sql, params))
-        if sql.startswith("ALTER TABLE"):
-            raise RuntimeError('D1: [{"message": "duplicate column name: image_b64"}]')
-    monkeypatch.setattr(metrics, "d1", fake_d1)
+        try:
+            result = db.execute(sql, params)
+        except sqlite3.OperationalError as e:
+            raise urllib.error.HTTPError(url, 400, "Bad Request", {},
+                                         io.BytesIO(json.dumps({"errors": [{"message": str(e)}]}).encode()))
+        rows = [dict(row) for row in result.fetchall()] if result.description else []
+        return {"success": True, "result": [{"success": True, "results": rows}]}
+
+    monkeypatch.setattr(metrics, "_json", fake_json)
     card = tmp_path / "card.jpg"
     card.write_bytes(b"\xff\xd8jpeg")
     data = {"linkedin_text": "text", "card_url": "https://example.test/c.jpg", "url": "https://internscout.org/"}
@@ -178,6 +197,28 @@ def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, m
     assert base64.b64decode(insert[-1]) == b"\xff\xd8jpeg"
     social.save_drafts(data, "token", str(tmp_path / "missing.jpg"))     # no card: the text still saves
     assert [p for s, p in calls if s.startswith("INSERT")][-1][-1] is None
+    assert sum(s.startswith("ALTER TABLE") for s, _ in calls) == (1 if schema == "legacy" else 0)
+    assert db.execute("SELECT COUNT(*) FROM social_drafts WHERE channel = 'linkedin'").fetchone()[0] >= 1
+    if schema != "new":
+        assert db.execute("SELECT text FROM social_drafts WHERE taken = 'existing'").fetchone()[0] == "keep me"
+    db.close()
+
+
+def test_linkedin_draft_schema_errors_are_not_ignored(monkeypatch):
+    import metrics
+    calls = []
+
+    def refused(url, body, token):
+        calls.append(body["sql"])
+        if body["sql"].startswith("CREATE TABLE"):
+            return {"success": True, "result": [{"success": True, "results": []}]}
+        raise urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b"permission denied"))
+
+    monkeypatch.setattr(metrics, "_json", refused)
+    data = {"linkedin_text": "text", "card_url": "https://example.test/c.jpg", "url": "https://internscout.org/"}
+    with pytest.raises(urllib.error.HTTPError):
+        social.save_drafts(data, "token")
+    assert not any(sql.startswith("INSERT") for sql in calls)
 
 
 # ---------------------------------------------------------------- the weekly email's line (2026-10-06)

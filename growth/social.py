@@ -313,11 +313,12 @@ def save_drafts(data: dict, token: str, card_path: str | None = None) -> None:
     import metrics    # the same D1 helper and database the analytics copy uses
     metrics.d1(token, "CREATE TABLE IF NOT EXISTS social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
                       "text TEXT NOT NULL, image_url TEXT, url TEXT, image_b64 TEXT, PRIMARY KEY (taken, channel))")
-    try:    # tables made before 2026-10-06 have no image column yet
+    # Tables made before 2026-10-06 have no image column. Inspect the schema before migrating:
+    # adding an existing column can fail with HTTPError, before d1's RuntimeError handling runs.
+    schema = metrics.d1(token, "PRAGMA table_info(social_drafts)")
+    columns = {row["name"] for row in schema["result"][0]["results"]}
+    if "image_b64" not in columns:
         metrics.d1(token, "ALTER TABLE social_drafts ADD COLUMN image_b64 TEXT")
-    except RuntimeError as e:
-        if "duplicate column" not in str(e):
-            raise
     image = None
     if card_path and os.path.exists(card_path):
         with open(card_path, "rb") as f:
