@@ -860,6 +860,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "goodlord": {
+   "name": "Goodlord",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
+  },
   "gorgias": {
    "name": "Gorgias",
    "quant": false,
@@ -12816,9 +12822,8 @@
   "caci|wd1|external": {
    "name": "CACI",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-13"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "cadence|wd1|external_careers": {
    "name": "Cadence",
@@ -15543,6 +15548,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "retail_consumer"
+  },
+  "lmcu|wd5|lmcucareersite": {
+   "name": "Lake Michigan Credit Union",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-13"
   },
   "lnw|wd5|lightwonderexternalcareers": {
    "name": "Light & Wonder",
