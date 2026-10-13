@@ -347,6 +347,8 @@ test("choice questions the profile answers outright, and the ones left to the mo
   assert.equal(f("Are you legally authorized to work in the United States?"), "work_authorized");
   assert.equal(f("Will you now or in the future require sponsorship for employment visa status in the U.S.?"), "needs_sponsorship");
   assert.equal(f("Are you at least 18 years of age?"), "over_18");
+  assert.equal(f("Are you 18 or older?"), "over_18");
+  assert.equal(f("Are you over the age of 18?"), "over_18");
   assert.equal(f("Veteran Status"), "veteran");
   assert.equal(f("Disability Status"), "disability");
   assert.equal(f("Are you Hispanic or Latino?"), "hispanic");
@@ -356,6 +358,9 @@ test("choice questions the profile answers outright, and the ones left to the mo
   for (const q of ["Are you able to work in the US without sponsorship?", "Are you authorized to work in Canada?",
     "Are you authorized to work?", "Race/Ethnicity (Hispanic or Latino)", "Sexual orientation",
     "Have you worked for us in the last 18 months?", "Gender pronouns"]) assert.equal(f(q), null, q);
+  // Age asked the other way round: over_18's "Yes" would say an adult is under 18.
+  for (const q of ["Are you under the age of 18?", "Are you under 18 years of age?", "Are you younger than 18 years old?",
+    "Are you a minor (under the age of 18)?", "Are you not yet 18 years of age?"]) assert.equal(f(q), null, q);
 });
 
 test("an option is picked only when exactly one clearly says the answer", () => {

@@ -339,6 +339,9 @@
   const HERE_RE = /(?:country|location) (?:where|in which) (?:this|the) (?:position|role|job) is (?:based|located)|in this country/;
   const ELSEWHERE_RE = /canada|united kingdom|\buk\b|europe|\beu\b|india|australia|germany|france|mexico/;
   const MORE_THAN_ONE_RE = /orientation|transgender|lgbt|pronoun/;
+  // An age question asked the other way round ("Are you UNDER the age of 18?"): over_18's "Yes" would
+  // tell the employer an adult is a minor. Left to the model, which reads the options.
+  const UNDER_AGE_RE = /\bunder\b|\byounger\b|\bbelow\b|\bless than\b|\bminor\b|\bnot (?:yet |at least |over )?(?:the age of )?18\b|n't (?:yet |at least |over )?(?:the age of )?18\b/;
 
   function choiceFact(label, ctx = {}) {
     const t = String(label || "").toLowerCase();
@@ -349,6 +352,7 @@
     if (hits.length === 2 && hits.includes("needs_sponsorship") && hits.includes("work_authorized")) hits = ["needs_sponsorship"];
     if (hits.length !== 1) return null;
     const k = hits[0];
+    if (k === "over_18" && UNDER_AGE_RE.test(t)) return null;
     if (k === "needs_sponsorship" || k === "work_authorized") {
       // Only the plain US question: the profile's yes/no was given for the US.
       // was: ... || !US_RE.test(t)
