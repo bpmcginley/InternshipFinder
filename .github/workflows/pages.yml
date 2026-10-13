@@ -59,7 +59,12 @@ jobs:
         # seo_pages keeps a page that is already live until its listings fall well below the bar for
         # a new one (keep_at), so pages near the line do not vanish and return between deploys. On
         # the first deploy there is none, and every page is judged as new.
-        run: curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
+        # The noindex pages live now (seo_pages HELD_FILE, 2026-10-13) are not in the sitemap, and count as
+        # live for keep_at too. Missing before the first deploy that writes it, which is fine.
+        # was: only the sitemap was saved.
+        run: |
+          curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
+          curl -sfL --max-time 20 https://internscout.org/noindex-pages.txt -o live-noindex.txt || rm -f live-noindex.txt
 
       - name: Build the site and its landing pages
         id: pages
@@ -78,7 +83,8 @@ jobs:
         run: |
           cp -r docs _site
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
-          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)
+          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt)
+          # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)
           # For the notify job: what was live before this deploy, and what this deploy publishes.
           mkdir -p sitemaps
           cp _site/sitemap.xml sitemaps/new.xml

@@ -8,6 +8,8 @@ they are always as fresh as the data and are never committed.
 
 Quality rules, because mass-produced pages that say nothing are exactly what search engines demote:
   * a page exists only when it has at least MIN_OPEN open listings;
+  * a field-in-a-place page listing fewer than INDEX_COMBO is built and linked, but kept out of search
+    (noindex and out of the sitemap) unless Search Console shows people finding it (2026-10-13);
   * every sentence on it is computed from its own listings (counts, employers, pay, terms), never
     filler text, so two pages only read alike when their data is alike;
   * everything that came from a job board is HTML-escaped, and only http(s) links are ever emitted.
@@ -88,6 +90,53 @@ def keep_at(need: int) -> int:
     topic hovering at the line does not vanish and come back between deploys (a search engine that
     finds a URL gone drops it, and takes weeks to trust it again)."""
     return need * 2 // 3
+
+
+# Which field-in-a-place pages search engines are asked to index (2026-10-13). Search Console, 28 days to
+# 2026-10-13: 642 of ~1,554 pages indexed and ~687 "Discovered - currently not indexed", Google's sign that
+# it is rationing its visits to the site. Measured on that day's data, the field-in-a-place pages are the
+# thin end: 596 of them, a tenth with fewer than 15 roles, every role on one also on its field's page and
+# its place's page; 4 of the 181 under 20 roles had a Search Console click, against 16 of the 415 at 20 or
+# more. The employer pages are not thin by their count: the small ones earn impressions as often as the big
+# ones (39-41% of those with 3 to 9 roles were in Search Console's top pages, 17-22% of those with 15 or
+# more), since "<employer> internships" is the search. So a field-in-a-place page listing fewer than
+# INDEX_COMBO roles is "noindex, follow" and left out of sitemap.xml. It is still built, linked from its
+# field and place pages and given its feed, for the students who browse to it; only search engines are told
+# to spend their visits elsewhere. Each deploy decides afresh, so a page that grows is indexed again.
+# INDEX_SLACK: a page already in the live sitemap (indexed last deploy) stays indexed until it falls below
+# INDEX_COMBO - INDEX_SLACK, so one role closing or opening does not flip it in and out of the sitemap.
+# Revert: INDEX_COMBO = 0 indexes every field-in-a-place page again, as before 2026-10-13.
+INDEX_COMBO = 20
+INDEX_SLACK = 2
+# ...and never one that people already find in search: a page Search Console lists with a click, or with
+# SEARCH_KEEP_IMPRESSIONS impressions or more (backend/data/search_console_pages.json, every page in the
+# metrics job's top-200 snapshots kept in D1, as of the date in the file).
+SEARCH_KEEP_IMPRESSIONS = 5
+SEARCH_PAGES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "search_console_pages.json")
+# The noindex pages this deploy built, one path a line, at the site's root: the next deploy reads it back
+# (held_paths) so a page that left the sitemap for noindex still counts as live for keep_at, and is not
+# dropped as if it were new (pages.yml fetches it beside the live sitemap).
+HELD_FILE = "noindex-pages.txt"
+
+
+def earning_paths(path: str = SEARCH_PAGES) -> frozenset[str]:
+    """The pages Search Console shows people finding (SEARCH_KEEP_IMPRESSIONS); empty without the file."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            pages = json.load(f).get("pages") or {}
+    except (OSError, ValueError, AttributeError):
+        return frozenset()
+    return frozenset(p for p, v in pages.items()
+                     if isinstance(v, dict) and (v.get("clicks", 0) > 0
+                                                 or v.get("impressions", 0) >= SEARCH_KEEP_IMPRESSIONS))
+
+
+def combo_indexed(n: int, path: str, live, earning: frozenset[str] = frozenset()) -> bool:
+    """Whether a field-in-a-place page listing n roles is indexed (INDEX_COMBO, INDEX_SLACK)."""
+    return (n >= INDEX_COMBO or path in earning
+            or (path in live and n >= INDEX_COMBO - INDEX_SLACK))
+
+
 # was: 10. Lowered 2026-10-01: Search Console showed "[employer] internships" is how people find the site,
 # and since the employer pages carry the facts box and answers (employer_facts), a page with 5 roles
 # still says something worth reading. 270 more employers qualified that day.
@@ -1341,9 +1390,16 @@ def footer_browse() -> str:
 
 
 def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[str, str]],
-         body: str, updated: str, index: bool = True, feed: bool = False, ld: tuple | list = ()) -> str:
+         body: str, updated: str, index: bool = True, feed: bool = False, ld: tuple | list = (),
+         thin: bool = False) -> str:
     """ld: more JSON-LD objects for the head (added 2026-10-02: the Organization, WebSite and
-    FAQPage blocks of the hub and /about/), each in its own block after the breadcrumb trail."""
+    FAQPage blocks of the hub and /about/), each in its own block after the breadcrumb trail.
+    thin (2026-10-13, INDEX_COMBO): a real page kept out of search. It keeps its canonical link to
+    itself and says "noindex, follow", so a crawler still follows its links to the indexed pages."""
+    robots = (f'<link rel="canonical" href="{esc(SITE + path)}"/>\n<meta name="robots" content="noindex, follow"/>'
+              if thin else f'<link rel="canonical" href="{esc(SITE + path)}"/>' if index
+              else '<meta name="robots" content="noindex"/>')
+    # was, in the head: the canonical link if index, else the noindex meta (no thin pages)
     url = SITE + path
     crumb_html = " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1]) + \
                  (f" › {esc(crumbs[-1][1])}" if crumbs else "")
@@ -1372,7 +1428,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(description)}"/>
-{f'<link rel="canonical" href="{esc(url)}"/>' if index else '<meta name="robots" content="noindex"/>'}
+{robots}
 <meta property="og:title" content="{esc(title)}"/>
 <meta property="og:description" content="{esc(description)}"/>
 <meta property="og:type" content="website"/>
@@ -2741,10 +2797,16 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
 
 # ---------------------------------------------------------------- build
 
-def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset()) -> list[dict]:
+def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
+          held: set[str] | frozenset[str] = frozenset(), earning: frozenset[str] | None = None) -> list[dict]:
     """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
-    whose lastmod the new one never goes below."""
+    whose lastmod the new one never goes below. held: the noindex pages it is serving now
+    (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
+    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex."""
     global BEACON, BASELINE, GENERATED, DIGEST_FORM
+    earning = earning_paths() if earning is None else earning
+    # Served now, indexed or not: what keep_at and fold_at ask. was: path in live (no noindex pages).
+    served = set(live) | set(held)
     BEACON = beacon_from(site_dir)
     DIGEST_FORM = digest_form_action(site_dir)
     d = load(site_dir)
@@ -2772,7 +2834,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             if k in US_STATES:
                 by_state.setdefault(k, []).append(x)
     def enough(n: int, path: str, need: int = MIN_OPEN) -> bool:
-        return n >= need or (path in live and n >= keep_at(need))
+        return n >= need or (path in served and n >= keep_at(need))      # was: path in live
 
     fields = {t: v for t, v in by_field.items() if enough(len(v), f"/internships/{field_slug(t)}/")}
     states = {k: v for k, v in by_state.items() if enough(len(v), f"/internships/{state_slug(k)}/")}
@@ -2780,7 +2842,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         return frozenset(x["id"] for x in items)
 
     def fold_at(path: str) -> float:
-        return SAME_SHARE if path in live else NEAR_SAME
+        return SAME_SHARE if path in served else NEAR_SAME              # was: path in live
 
     def employers_in(items: list[dict]) -> int:
         return len({employer_key(x["company_name"]) for x in items if x.get("company_name")})
@@ -2889,7 +2951,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     # the sign-up form has an address). was: every page was indexed.
     # dated (2026-10-07): the listings a page without a list of its own is about (a tracker's term), which
     # date it and make it a CollectionPage like a listing page, without a feed.
-    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True, dated=None):
+    # thin (2026-10-13, INDEX_COMBO): built and linked, but "noindex, follow" and out of the sitemap.
+    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True, dated=None, thin=False):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
         about = items if items is not None else dated
@@ -2911,8 +2974,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                         "url": SITE + path, "name": h1, "description": desc, "isPartOf": {"@id": SITE_ID},
                         **({"dateModified": lastmod} if lastmod else {})}]
         pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, index=index,
-                                                 feed=items is not None, ld=ld),
-                      "items": items, "h1": h1, "state": state, "lastmod": lastmod, "index": index})
+                                                 feed=items is not None, ld=ld, thin=thin),
+                      "items": items, "h1": h1, "state": state, "lastmod": lastmod, "index": index and not thin,
+                      "thin": thin})
+        # was: ... page(..., ld=ld), ..., "index": index})
 
     # Each listing page's src (2026-10-04, see autoapply_card): seo-field for a field and a field in a
     # state, seo-state for a state, province or city, seo-employer, and seo-hub for the rest.
@@ -3027,7 +3092,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"{name} internships {loc}",
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
             listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k),
-                         src="seo-field", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
+                         src="seo-field", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)],
+            thin=not combo_indexed(len(items), path, live, earning))     # 2026-10-13, INDEX_COMBO
 
     majors_made = []
     for m, tags, items, path in major_rows:
@@ -3275,7 +3341,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         [("/", "InternScout"), (DIGEST_PATH, "Weekly email")], b_, index=bool(DIGEST_FORM))
     global TEXTS, HOME
     HOME = home_browse(pages, by_company, fields, states, trackers, len(new) >= MIN_OPEN, len(majors_made))
-    made = {p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0) for p in pages}
+    # llms.txt names only pages search engines are asked to index (2026-10-13): not /digest/ before it has a
+    # form, nor a thin page. was: every page made.
+    made = {p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0) for p in pages if p["index"]}
     TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)
     return pages
 
@@ -3396,6 +3464,10 @@ def write(site_dir: str, pages: list[dict]) -> None:
     for name, text in TEXTS.items():
         with open(os.path.join(site_dir, name), "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
+    # The thin pages this deploy serves (INDEX_COMBO), for the next deploy's held_paths (2026-10-13).
+    with open(os.path.join(site_dir, HELD_FILE), "w", encoding="utf-8", newline="\n") as f:
+        f.write("# InternScout pages served with noindex, follow (too few roles to ask search engines to index).\n"
+                + "".join(p["path"] + "\n" for p in sorted(pages, key=lambda p: p["path"]) if p.get("thin")))
     # The dashboard's Browse section (home_browse), between its two markers. Only what is between them
     # changes, so writing it twice gives the same file.
     home = os.path.join(site_dir, "index.html")
@@ -3424,9 +3496,21 @@ def live_paths(sitemap: str) -> dict[str, str]:
 SITE_PATH = re.compile("^" + re.escape(SITE))
 
 
+def held_paths(listing: str) -> frozenset[str]:
+    """The noindex pages the site was serving before this build (HELD_FILE); empty if there was none."""
+    try:
+        with open(listing, encoding="utf-8") as f:
+            return frozenset(s for s in (line.strip() for line in f) if s.startswith("/internships/"))
+    except (OSError, UnicodeDecodeError):
+        return frozenset()
+
+
 def main(argv: list[str]) -> None:
+    """python -m internscout.seo_pages SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]]"""
     site_dir = argv[1] if len(argv) > 1 else "docs"
-    pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
+    pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {},
+                  held_paths(argv[3]) if len(argv) > 3 else frozenset())
+    # was: pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
     write(site_dir, pages)
     from . import feeds            # feeds imports this module, so not at the top
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
