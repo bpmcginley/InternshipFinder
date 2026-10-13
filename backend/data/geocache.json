@@ -1594,6 +1594,7 @@
 "ny - brockport|NY":null,
 "ny - buffalo|NY":null,
 "ny - cairo|NY":null,
+"ny - cohoes|NY":null,
 "ny - delmar|NY":null,
 "ny - elmhurst|NY":null,
 "ny - fairport|NY":null,
@@ -1655,6 +1656,7 @@
 "ny - whitehall|NY":null,
 "ny - whitestone|NY":null,
 "ny - wilton|NY":null,
+"ny - wynantskill|NY":null,
 "ny office or remote - us|NY":null,
 "ny office|NY":null,
 "ny-buffalo|NY":null,
@@ -1960,6 +1962,7 @@
 42.162,
 -78.9753
 ],
+"raritan nj|NJ":null,
 "raritan|NJ":[
 40.5671,
 -74.6347
@@ -2388,6 +2391,7 @@
 "usa) pa moon township 04644 wm supercenter|PA":null,
 "usa) pa tarentum 03838 wm supercenter|PA":null,
 "usa) pa woodland 06827 dispatch trucking|PA":null,
+"usa) pa wyncote 05229 wal-mart|PA":null,
 "usa-new jersey-edgewater park|NJ":null,
 "usa-new jersey-middlesex county|NJ":null,
 "usa-new jersey-newark|NJ":null,
@@ -2418,6 +2422,10 @@
 "valatie|NY":[
 42.4134,
 -73.6732
+],
+"vestal|NY":[
+42.0851,
+-76.0538
 ],
 "victor|NY":[
 42.9826,

@@ -12527,9 +12527,8 @@
   "bdx|wd1|EXTERNAL_CAREER_SITE_USA": {
    "name": "Becton Dickinson",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-13"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "bdx|wd1|US_EARLY_TALENT_SITE": {
    "name": "Becton Dickinson",
@@ -18194,10 +18193,9 @@
   "trinityhealth|wd1|Jobs": {
    "name": "Trinity Health",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-10-13"
+   "sector": "health"
   },
   "troweprice|wd5|TRowePrice": {
    "name": "T. Rowe Price",
