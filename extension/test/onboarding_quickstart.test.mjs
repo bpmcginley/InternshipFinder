@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 globalThis.chrome = globalThis.chrome || { runtime: {}, storage: { local: {}, session: {} } };
-const { quickStartReady, finishOnboarding, DIGEST_URL, digestLink } = await import("../onboarding/quickstart.js");
+const { quickStartReady, finishOnboarding, DIGEST_URL, DIGEST_OPEN, digestLink } = await import("../onboarding/quickstart.js");
 const { hasKey } = await import("../lib/store.js");
 
 const student = (over = {}) => ({
@@ -52,7 +52,10 @@ test("the quick-start button needs exactly the AI, a resume and the sign-up emai
 // extension's, to the one page every channel links.
 test("the end of setup offers the weekly email as one plain link to /digest/", () => {
   assert.equal(DIGEST_URL, "https://internscout.org/digest/?utm_source=extension&utm_medium=extension");
-  const html = digestLink();
+  // Hidden while the digest is on hold (DIGEST_OPEN false), so setup shows nothing.
+  assert.equal(DIGEST_OPEN, false);
+  assert.equal(digestLink(), "");
+  const html = digestLink(true);
   assert.equal((html.match(/<a /g) || []).length, 1);
   assert.ok(html.includes(`href="${DIGEST_URL}"`) && html.includes('target="_blank" rel="noopener"'));
   assert.ok(html.includes("Get new internships by email every Monday"));
