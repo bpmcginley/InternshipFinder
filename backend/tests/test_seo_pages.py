@@ -1660,3 +1660,112 @@ def test_no_rewritten_title_or_description_carries_a_dash_or_an_exact_count(tmp_
         assert not any(d in title + desc for d in _DASHES), (path, title, desc)
         n = len(p["items"])
         assert f"{n:,} Open" not in title or seo_pages.count_floor(n) == f"{n:,}+", (path, title)
+
+
+# ---- thin field-in-a-place pages: built and linked, but noindex and out of the sitemap (2026-10-13)
+
+COMBO = "/internships/mechanical-engineering/massachusetts/"
+
+
+def _combo_site(tmp_path, n):
+    """n mechanical roles in Massachusetts: one field page, one state page, one field-in-a-place page."""
+    return _site(tmp_path, {"MA": [_row(i) for i in range(n)]})
+
+
+def _built(site, live=(), held=(), earning=frozenset()):
+    return {p["path"]: p for p in seo_pages.build(site, set(live), frozenset(held), earning)}
+
+
+def test_combo_indexed_thresholds_slack_and_search_traffic():
+    need, slack = seo_pages.INDEX_COMBO, seo_pages.INDEX_SLACK
+    ok = seo_pages.combo_indexed
+    assert need == 20 and slack == 2
+    assert ok(need, COMBO, set()) and not ok(need - 1, COMBO, set())          # a new page needs INDEX_COMBO
+    assert ok(need - slack, COMBO, {COMBO})                                    # an indexed one keeps going
+    assert not ok(need - slack - 1, COMBO, {COMBO})                            # until it falls below the slack
+    assert ok(3, COMBO, set(), frozenset({COMBO}))                             # people find it: never noindex
+
+
+def test_a_thin_field_in_a_place_page_is_built_and_linked_but_kept_out_of_search(tmp_path):
+    site = _combo_site(tmp_path, seo_pages.MIN_COMBO)                  # 15 roles: made, but under INDEX_COMBO
+    built = _built(site)
+    page = built[COMBO]
+    assert page["thin"] and not page["index"]
+    assert f'<link rel="canonical" href="https://internscout.org{COMBO}"/>' in page["html"]
+    assert '<meta name="robots" content="noindex, follow"/>' in page["html"]
+    # Still linked for the students who browse: from its field's page and its state's page.
+    assert f'href="{COMBO}"' in built["/internships/mechanical-engineering/"]["html"]
+    assert f'href="{COMBO}"' in built["/internships/massachusetts/"]["html"]
+    seo_pages.write(site, list(built.values()))
+    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    assert f"<loc>https://internscout.org{COMBO}</loc>" not in sitemap
+    assert "<loc>https://internscout.org/internships/mechanical-engineering/</loc>" in sitemap
+    assert COMBO not in open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
+    from internscout import feeds
+    feeds.write_all(site, list(built.values()))                        # and its feed, for the club channels
+    assert os.path.exists(os.path.join(site, "internships", "mechanical-engineering", "massachusetts", "feed.xml"))
+    assert seo_pages.held_paths(os.path.join(site, seo_pages.HELD_FILE)) == {COMBO}
+
+
+def test_only_field_in_a_place_pages_are_ever_thin(tmp_path):
+    # Five roles at one employer in one state, for one major: every page small, none of them a combo.
+    rows = [_row(i, company_name="Small Co") for i in range(seo_pages.MIN_EMPLOYER)]
+    site = _site(tmp_path, {"MA": rows}, majors=[{"name": "Mechanical Engineering", "tags": ["mechanical"],
+                                                  "level": "undergrad"}])
+    built = _built(site)
+    assert "/internships/at/small-co/" in built and "/internships/massachusetts/" in built
+    assert not [p for p, v in built.items() if v["thin"]]
+    assert all(v["index"] for p, v in built.items() if p != "/digest/")       # /digest/ waits for its form
+
+
+def test_a_page_people_find_in_search_stays_indexed_however_small(tmp_path):
+    site = _combo_site(tmp_path, seo_pages.MIN_COMBO)
+    page = _built(site, earning=frozenset({COMBO}))[COMBO]
+    assert page["index"] and not page["thin"]
+    assert 'content="noindex' not in page["html"]
+
+
+def test_a_page_that_grows_is_indexed_again_and_one_role_does_not_flip_it(tmp_path):
+    need, slack = seo_pages.INDEX_COMBO, seo_pages.INDEX_SLACK
+    assert _built(_combo_site(tmp_path / "a", need))[COMBO]["index"]                       # big enough
+    assert not _built(_combo_site(tmp_path / "b", need - 1))[COMBO]["index"]               # new, one short
+    assert _built(_combo_site(tmp_path / "c", need - 1), live={COMBO})[COMBO]["index"]     # indexed, one closed
+    assert _built(_combo_site(tmp_path / "d", need - slack), live={COMBO})[COMBO]["index"]
+    assert not _built(_combo_site(tmp_path / "e", need - slack - 1), live={COMBO})[COMBO]["index"]
+
+
+def test_a_noindex_page_is_still_live_for_keep_at(tmp_path):
+    # 12 roles: under MIN_COMBO for a new page, over keep_at(MIN_COMBO) for one the site already serves.
+    n = seo_pages.keep_at(seo_pages.MIN_COMBO) + 2
+    assert n < seo_pages.MIN_COMBO
+    assert COMBO not in _built(_combo_site(tmp_path / "new", n))
+    kept = _built(_combo_site(tmp_path / "held", n), held={COMBO})       # served last deploy, noindex
+    assert COMBO in kept and kept[COMBO]["thin"]
+    assert seo_pages.held_paths(str(tmp_path / "missing.txt")) == frozenset()
+
+
+def test_index_combo_zero_indexes_every_page_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "INDEX_COMBO", 0)                    # the one-constant revert
+    built = _built(_combo_site(tmp_path, seo_pages.MIN_COMBO))
+    assert built[COMBO]["index"] and not any(v["thin"] for v in built.values())
+
+
+def test_earning_paths_reads_clicks_and_impressions(tmp_path):
+    f = tmp_path / "gsc.json"
+    keep = seo_pages.SEARCH_KEEP_IMPRESSIONS
+    f.write_text(json.dumps({"as_of": "2026-10-13", "pages": {
+        "/a/": {"clicks": 1, "impressions": 1}, "/b/": {"clicks": 0, "impressions": keep},
+        "/c/": {"clicks": 0, "impressions": keep - 1}}}), encoding="utf-8")
+    assert seo_pages.earning_paths(str(f)) == {"/a/", "/b/"}
+    assert seo_pages.earning_paths(str(tmp_path / "missing.json")) == frozenset()
+    f.write_text("not json", encoding="utf-8")
+    assert seo_pages.earning_paths(str(f)) == frozenset()
+    # The committed snapshot reads, and holds pages people found.
+    assert "/internships/law/massachusetts/" in seo_pages.earning_paths()
+
+
+def test_the_deploy_passes_last_deploys_noindex_list_back_in():
+    wf = open(os.path.join(os.path.dirname(__file__), "..", "..", ".github", "workflows", "pages.yml"),
+              encoding="utf-8").read()
+    assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
+    assert "python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt" in wf
