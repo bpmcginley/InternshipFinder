@@ -76,18 +76,26 @@ export function claudeMessages(messages) {
     .filter((m) => typeof m.content === "string" ? m.content : m.content.length);
 }
 
-async function askClaude(model, step, key, thinking) {
+// Exported for form_bench.mjs (2026-10-09), which also needs each call's id (to answer it on a second
+// step) and the reply as sent (raw, stop). 429 / 529 / 5xx are retried with backoff, as claude.js does.
+// The latency reported is the last attempt's.
+export async function askClaude(model, step, key, thinking) {
   const body = { model, max_tokens: 8000, system: step.system, messages: claudeMessages(step.messages), tools: TOOLS,
     output_config: { effort: thinking === "minimal" ? "low" : thinking || "low" } };   // Gemini's "minimal" has no Claude level
-  const t0 = Date.now();
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(body) });
-  const data = await res.json().catch(() => ({}));
+  let res, data, t0;
+  for (let attempt = 0; ; attempt++) {
+    t0 = Date.now();
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify(body) });
+    data = await res.json().catch(() => ({}));
+    if (!(res.status === 429 || res.status === 529 || res.status >= 500) || attempt >= 4) break;
+    await new Promise((r) => setTimeout(r, (+res.headers.get("retry-after") || 2 * 2 ** attempt) * 1000));
+  }
   if (!res.ok) throw new Error(`${model}: HTTP ${res.status} ${(data.error && data.error.message) || ""}`);
-  if (data.stop_reason === "refusal") throw new Error(`${model}: refused (${(data.stop_details && data.stop_details.category) || "no category"})`);
-  const content = (data.content || []).filter((b) => b.type === "tool_use").map((b) => ({ type: "tool_use", name: b.name, input: b.input || {} }));
+  if (data.stop_reason === "refusal") throw Object.assign(new Error(`${model}: refused (${(data.stop_details && data.stop_details.category) || "no category"})`), { refusal: true, usage: data.usage });
+  const content = (data.content || []).filter((b) => b.type === "tool_use").map((b) => ({ type: "tool_use", id: b.id, name: b.name, input: b.input || {} }));
   const c = claudeCents(model, data.usage);
-  return { content, ms: Date.now() - t0, cents: c, later: c, usage: data.usage };
+  return { content, ms: Date.now() - t0, cents: c, later: c, usage: data.usage, raw: data.content || [], stop: data.stop_reason };
 }
 
 const plain = (s) => String(s ?? "").toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();

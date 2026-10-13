@@ -24,3 +24,9 @@ worker/.dev.vars
 # Model comparison (scripts/eval): recorded Auto-Apply steps hold a real profile - never commit
 scripts/eval/*.json
 scripts/eval/eval-report.md
+# Offline form benchmark (scripts/eval/form_bench.mjs): run logs and the headless-Chrome dependency
+scripts/eval/*.log
+scripts/eval/bench-*.md
+scripts/eval/node_modules/
+!scripts/eval/package.json
+!scripts/eval/package-lock.json

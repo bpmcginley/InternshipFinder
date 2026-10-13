@@ -1,0 +1,8 @@
+{
+  "name": "internscout-eval",
+  "private": true,
+  "description": "Dev-only dependencies for scripts/eval/form_bench.mjs (headless Chrome for the extension's snapshot code). Not part of the extension or the Worker.",
+  "devDependencies": {
+    "puppeteer-core": "25.11.0"
+  }
+}
