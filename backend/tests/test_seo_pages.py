@@ -968,6 +968,43 @@ def test_rows_link_auto_apply_only_on_supported_sites():
     assert "chromewebstore" not in html
 
 
+# ---- The Auto-Apply offer when a posting is opened (2026-10-13; docs/js/offer.js)
+
+def test_posting_links_mark_only_applications_auto_apply_fills():
+    rows = [_ats(0, "workday"), _ats(1, "other"), _ats(2, "successfactors", host="careers.qorvo.com"), _ats(3)]
+    now = seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc)
+    jobs = seo_pages.listing_rows(rows, now).split("</li>")
+    marked = [j for j in jobs if 'class="go" data-aa ' in j]
+    assert len(marked) == 1 and "Mechanical Intern 0" in marked[0]
+    # Every row still opens its posting the same way: same link, same new tab, nothing in between.
+    assert sum('rel="nofollow noopener" target="_blank">Open posting</a>' in j for j in jobs) == 4
+    pay = seo_pages.pay_rows([(_ats(0, "greenhouse"), 20.0, 25.0), (_ats(1, "other"), 20.0, 25.0)], now)
+    assert pay.count('class="go" data-aa ') == 1
+
+
+def test_offer_script_only_on_pages_with_a_posting_it_can_fill(tmp_path):
+    fills = [_row(i, company_name="Big Co", ats="workday", apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}")
+             for i in range(seo_pages.MIN_EMPLOYER)]
+    other = [_row(100 + i, company_name="Small Co", title=f"Lab Intern {i}") for i in range(seo_pages.MIN_EMPLOYER)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": fills + other}))}
+    big, small = pages["/internships/at/big-co/"], pages["/internships/at/small-co/"]
+    assert big.count(seo_pages.OFFER_TAG) == 1 and seo_pages.OFFER_TAG in big.split("</footer>")[1]
+    assert seo_pages.OFFER_TAG not in small and "data-aa" not in small
+    assert "/js/offer.js" not in pages["/pricing/"]
+
+
+def test_offer_script_points_at_the_file_the_site_serves():
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    docs = os.path.join(backend, "..", "docs")
+    src = re.search(r'src="(/js/[a-z]+\.js)"', seo_pages.OFFER_TAG).group(1)
+    assert os.path.isfile(os.path.join(docs, src.lstrip("/")))
+    with open(os.path.join(docs, "js", "offer.js"), encoding="utf-8") as f:
+        js = f.read()
+    # The same store listing, and the same posting links count.js counts as posting_click.
+    assert f'var STORE = "{seo_pages.STORE_URL}";' in js
+    assert 'var POSTING = "a.go[href], a.open-link[href]";' in js
+
+
 def test_employer_page_offers_auto_apply_with_its_own_tag(tmp_path):
     rows = [_row(i, company_name="Big Co", ats="workday", apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}")
             for i in range(seo_pages.MIN_EMPLOYER)]

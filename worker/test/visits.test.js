@@ -247,6 +247,28 @@ test("a click to the store's reviews page is a step the site sends, by page kind
   assert.deepEqual(await rows(w), [], "a step is not a page load");
 });
 
+// Added 2026-10-13: the Auto-Apply offer shown after opening a posting, and its store link pressed
+// (docs/js/offer.js), from the dashboard or a landing page. Counted by page kind like every step.
+test("the Auto-Apply offer's showing and its store link are steps the site sends, by page kind", async () => {
+  const w = await setup();
+  for (const e of ["apply_offer_shown", "apply_offer_click"]) {
+    assert.ok(EVENTS.has(e), e);
+    assert.ok(!SERVER_EVENTS.has(e), e);
+  }
+  await hit(w, { e: "apply_offer_shown", p: "/" });
+  await hit(w, { e: "apply_offer_shown", p: "/internships/ohio/" });
+  await hit(w, { e: "apply_offer_shown", p: "/internships/at/acme/" });
+  await hit(w, { e: "apply_offer_click", p: "/internships/ohio/" });
+  await hit(w, { e: "install_click", p: "/internships/ohio/" });
+  assert.deepEqual(await events(w), [
+    { event: "apply_offer_click", page: "landing", n: 1 },
+    { event: "apply_offer_shown", page: "dashboard", n: 1 },
+    { event: "apply_offer_shown", page: "landing", n: 2 },
+    { event: "install_click", page: "landing", n: 1 },
+  ]);
+  assert.deepEqual(await rows(w), [], "a step is not a page load");
+});
+
 test("a load of the weekly email's page is counted under its own kind", async () => {
   const w = await setup();
   await hit(w, { p: "/digest/", r: "", u: "bluesky", m: "social" });

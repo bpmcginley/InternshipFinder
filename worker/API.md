@@ -307,7 +307,9 @@ With `"e"` it is a step instead of a page load: `{ "e": "signin", "p": "/" }` ad
 `signin`, `profile`, `autoapply`, `checkout`, `invite_open` (a signed-in student opened their invite
 link panel, from the one-time nudge after a first Auto-Apply or profile or from the Account menu; added
 2026-10-02), `posting_click` (a click through to a posting: `a.go` on a landing page, `a.open-link` on
-the dashboard; added 2026-10-04); any other name is ignored. The Worker adds its own steps to the same
+the dashboard; added 2026-10-04), `apply_offer_shown` and `apply_offer_click` (the "Add to Chrome" bar
+`docs/js/offer.js` shows after a posting Auto-Apply fills is opened, and its store link pressed; added
+2026-10-13); any other name is ignored. The Worker adds its own steps to the same
 table (`src/visits.js` `SERVER_EVENTS`, added 2026-10-04), which `/hit` never accepts: `new_account`
 (an account seen for the first time; page `extension` or `dashboard` by `Origin`), `ext_signin`
 (`POST /session` from the extension), `first_autofill` (an account's first answered Auto-Apply run of
