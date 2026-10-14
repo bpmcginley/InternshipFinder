@@ -26,24 +26,32 @@ export function fakeD1() {
       return { success: true, meta: { changes: Number(r.changes) } };
     },
   });
+  async function runBatch(list) {
+    sql.exec("BEGIN");
+    try {
+      const out = [];
+      for (const s of list) out.push(await s.run());
+      sql.exec("COMMIT");
+      return out;
+    } catch (e) {
+      sql.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  // Real D1 runs one batch at a time. Without this queue, two batches started together (the daily cron
+  // runs its jobs in parallel) would interleave inside one SQLite transaction here.
+  let queue = Promise.resolve();
   return {
     prepare: (query) => stmt(query),
-    async batch(list) {
-      sql.exec("BEGIN");
-      try {
-        const out = [];
-        for (const s of list) out.push(await s.run());
-        sql.exec("COMMIT");
-        return out;
-      } catch (e) {
-        sql.exec("ROLLBACK");
-        throw e;
-      }
+    batch(list) {
+      const done = queue.then(() => runBatch(list));
+      queue = done.catch(() => {});
+      return done;
     },
     exec: async (query) => (sql.exec(query), { count: 1 }),
     dump() {
       const out = {};
-      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events", "spend", "tokens", "task_tokens", "forget", "invite_codes", "referrals", "bonus", "accounts", "inviters", "sessions", "profiles", "visit_counts", "visit_channels", "event_counts", "run_hist"]) {
+      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events", "spend", "tokens", "task_tokens", "forget", "invite_codes", "referrals", "bonus", "accounts", "inviters", "sessions", "profiles", "visit_counts", "visit_channels", "event_counts", "run_hist", "placements", "placement_log"]) {
         out[t] = sql.prepare(`SELECT * FROM ${t}`).all().map((r) => ({ ...r }));
       }
       return out;
