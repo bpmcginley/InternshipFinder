@@ -1297,7 +1297,7 @@
       if (!payload.length) return;
       setNote("Adding to the queue…");
       const res = await IS.ext.call({ type: "enqueue", jobs: payload });
-      if (res.error === "setup_required") { setNote("Finish the Deep Dive first. It just opened in a new tab."); return; }
+      if (res.error === "setup_required") { setNote("Set up Auto-Apply first (about 2 minutes). It just opened in a new tab."); return; }
       if (res.error) { setNote("Couldn't queue: " + res.error); return; }
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
       const current = added || skipped ? await IS.ext.call({ type: "get_queue" }) : null;
