@@ -90,8 +90,10 @@ test("terms: an employer section, and the screening line says what a paid listin
     /in the 12 months before the claim, or \$100, whichever is more/,
     /except to the extent the claim is caused by our own fault/, /We will tell you about the claim promptly, you run the defense/,
     /neither of us will settle it without the other's consent/,
-    /Changes to this employer section don't apply to a paid listing already paid for, or a pilot already confirmed/,
-    /If we pause or stop paid listings, or InternScout shuts down, you get the unused days back the same way/,
+    /Changes to these terms, including this section, don't apply to a paid listing already paid for, or a pilot already confirmed; the whole version you accepted governs that run/,
+    /If we pause or stop paid listings for a reason other than your breaking these terms, or InternScout shuts down, you get the unused days back the same way/,
+    /refund the unused days unless it was ended for breaking them/,
+    /we may take part with our own lawyer at our own cost/,
     /This doesn't limit how we show your public listings, as we do for every employer/,
     /the invoice or confirmation wins/,
     /A student's own settings or saved profile can only hide it/]) assert.match(emp, want);
