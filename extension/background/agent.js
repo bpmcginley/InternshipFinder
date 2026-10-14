@@ -237,7 +237,7 @@ export function formatSnapshot(frames, fails = {}) {
     if (!f.elements.length) lines.push("(none)");
     for (const e of f.elements) {
       const ref = `${f.frameId}:${e.ref}`;
-      index[ref] = { kind: e.kind, label: e.label || e.question || "" };
+      index[ref] = { kind: e.kind, label: e.label || e.question || "", url: f.url };
       let s = `[${ref}] ${e.kind}${e.type && e.type !== "text" ? `(${e.type})` : ""}${e.required ? " *" : ""} "${e.label}"`;
       if (e.question) s += ` in "${e.question}"`;
       s += ` = ${JSON.stringify(e.value === undefined ? "" : e.value)}`;
@@ -254,7 +254,7 @@ export function formatSnapshot(frames, fails = {}) {
     lines.push("BUTTONS:");
     for (const b of f.buttons) {
       const ref = `${f.frameId}:${b.ref}`;
-      index[ref] = { kind: "button", label: b.text };
+      index[ref] = { kind: "button", label: b.text, url: f.url };
       if (b.blocked) hasFinal = true;
       lines.push(`[${ref}] "${b.text}"${b.blocked ? " BLOCKED (final submit, human only)" : ""}${b.menu === "open" ? " (menu already open: click one of its items, not this again)" : ""}`);
     }
@@ -547,10 +547,36 @@ export function stopJob(id) {
 // The student's own status (Pause, Take over, Retry, "I submitted it"; index.js control), written with
 // a new gen so a run still in flight knows the job is no longer its own, and with that run's AI call
 // cut off. was: the status alone, which a late AI reply then acted on and wrote over.
+// The page is told too (dom.js halt): a prefill or a dropdown pick already running in the tab stops at
+// its next field, and a late highlight() no longer scrolls the page the student has taken back.
 export async function takeBack(id, patch) {
   stopJob(id);
   const j = await updateJob(id, (x) => ({ ...patch, gen: (x.gen || 0) + 1 }));
+  if (j && j.tabId != null) await haltPage(j.tabId, j.gen);
   return j;
+}
+async function haltPage(tabId, gen) {
+  await inFrames(tabId, (g) => (window.ISDom && window.ISDom.halt ? window.ISDom.halt(g) : false), [gen]);
+}
+
+// A sign-in or sign-up step: a password box, or nothing to fill but an email address (the "enter your
+// email, then Next" first page of Workday, iCIMS and Oracle sign-in). Filling one is not filling the
+// application, and the posting's own Apply or Accept button often comes after it (guard.js runFilled).
+// was: only a page with a password box; an email-only step counted as filled (PR #94 review, P2).
+const EMAIL_RE = /e-?mail/i;
+export function signInStep(frames) {
+  const els = (frames || []).flatMap((f) => (f && f.elements) || []);
+  if (els.some((e) => e.kind === "password")) return true;
+  const asks = els.filter((e) => e.kind !== "checkbox");
+  return asks.length > 0 && asks.every((e) => e.type === "email" || EMAIL_RE.test([e.label, e.question].filter(Boolean).join(" ")));
+}
+
+// The address a stored password belongs to: the frame the password box is in. An ATS form inside an
+// employer's careers page (Greenhouse, iCIMS, Workday embeds) keeps its accounts on its own domain, and
+// accountCreationConfirmed reads that frame's url, so keying the password to the top page meant the
+// sign-up was never confirmed. was: tab.url || ctx.url (PR #94 review, P2).
+export function secretUrl(entry, tabUrl, fallback) {
+  return (entry && entry.url) || tabUrl || fallback || "";
 }
 
 export async function runJob(id) {
@@ -622,6 +648,9 @@ async function loop(id, run) {
   }
   // One Auto-Apply run = one allowance unit on the InternScout Worker; kept across Resume, reset by Retry.
   if (!job.run_id) job = await updateJob(id, { run_id: crypto.randomUUID() });
+  // A Pause or Take over that landed while the checks above were awaited: stop before the paid
+  // tailoring call. was: first checked after tailoring (PR #94 review, P3).
+  if (!(await active())) return;
   if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
     job = await tailorStep(id, job, store, own);
     if (!owns(job, gen)) return; // waiting for the human to approve it, or stopped meanwhile
@@ -694,7 +723,7 @@ async function loop(id, run) {
     // Was: (... && job.tailored.file) || store.files.resume || null
     const resume = (job.tailored && job.tailored.status === "approved" && job.tailored.file && await getTailoredFile(job.id)) || store.files.resume || null;
     if (!(await active())) return;
-    let pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
+    let pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
       .flatMap((r) => r.result || []);
 
     let frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
@@ -729,7 +758,7 @@ async function loop(id, run) {
     // allowance. Re-snapshot afterwards so the model is shown the values that were just typed.
     if (!pre.length && frames.some((f) => f.elements.length)) {
       if (!(await active())) return;
-      pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
+      pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
         .flatMap((r) => r.result || []);
       if (pre.length) frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
@@ -750,7 +779,7 @@ async function loop(id, run) {
     const snap = formatSnapshot(frames, fails);
     snap.tabId = tabId;
     const url = (snap.top && snap.top.url) || job.apply_url;
-    const accountPage = frames.some((f) => (f.elements || []).some((e) => e.kind === "password"));
+    const accountPage = signInStep(frames);
     if (pre.length && !accountPage) await noteFilled();
 
     // A sleeping tab still runs its scripts, just slowly, so its DOM is real and a CAPTCHA or a
@@ -792,7 +821,7 @@ async function loop(id, run) {
 
     if (!msgs.length && globalThis.ISGuard.nothingLeftForAI(frames, pre.length)) {
       await appendLog(job.id, { kind: "note", text: `Filled ${pre.length} field(s) from your profile; no AI was needed.` });
-      const hl = (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled }])).map((r) => r.result);
+      const hl = (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled, gen }])).map((r) => r.result);
       const missing = hl.reduce((n, h) => n + ((h && h.missing) || 0), 0);
       // highlight() re-reads the page after the fills settled, so it is the last word: if it finds a
       // hole the snapshot missed, say so rather than claiming the form is done.
@@ -817,12 +846,14 @@ async function loop(id, run) {
       return;
     }
 
+    // The account the password box belongs to, which is an ATS iframe's own when the form is embedded.
+    const pwFrame = frames.find((f) => (f.elements || []).some((e) => e.kind === "password"));
     const content = [];
     if (pending && pending.results) content.push(...pending.results);
     // was: if (!msgs.length) content.push({ type: "text", text: jobIntro(job) }); the job is in buildSystem now.
     if (pending && pending.note) content.push({ type: "text", text: pending.note });
     if (pre.length) content.push({ type: "text", text: preFilledLine(pre, snap.shown) });
-    content.push({ type: "text", text: `SNAPSHOT\n${accountLine(store, url)}\n${snap.text}` });
+    content.push({ type: "text", text: `SNAPSHOT\n${accountLine(store, (pwFrame && pwFrame.url) || url)}\n${snap.text}` });
     msgs.push({ role: "user", content });
     const prevPending = pending;
     pending = null;
@@ -881,7 +912,7 @@ async function loop(id, run) {
       if (!stopped && !owns(await getJob(id), gen)) stopped = true;
       if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, runFilled, store, job, fails, url, active });
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, runFilled, store, job, fails, url, active, gen });
       if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
@@ -909,7 +940,7 @@ async function loop(id, run) {
     // pending is written either way, since the history just saved ends with this turn; the status only
     // while this run still owns the job.
     if (stop.kind === "ready") {
-      const hl = owns(await getJob(id), gen) ? (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled }])).map((r) => r.result) : [];
+      const hl = owns(await getJob(id), gen) ? (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled, gen }])).map((r) => r.result) : [];
       const missing = hl.reduce((n, h) => n + ((h && h.missing) || 0), 0);
       const dc = [...(stop.double_check || [])];
       if (missing) dc.unshift(`${missing} required field(s) look empty (amber outline).`);
@@ -931,9 +962,10 @@ export const EARLY_READY_PUSHBACK = "No blocked final button is visible yet, so 
 async function execTool(u, ctx) {
   const { name, input = {} } = u;
   const { tabId, index, store, job, fails } = ctx;
-  const checkedAct = async (...args) => {
+  // gen goes with every action, so the page refuses one from a run the student has stopped (dom.js halt).
+  const checkedAct = async (tab, ref, action, payload = {}) => {
     if (ctx.active && !(await ctx.active())) return { ok: false, cancelled: true, error: "The student stopped this run." };
-    return act(...args);
+    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen });
   };
   const needsRef = ["fill", "select", "check", "upload", "click", "fill_secret"].includes(name);
   const t = needsRef ? index[input.ref] : null;
@@ -968,7 +1000,7 @@ async function execTool(u, ctx) {
       // employer can choose different passwords. Reservation is pending, not a signup claim.
       const fresh = await updateStore(async s => {
         if (ctx.active && !(await ctx.active())) return s;
-        acct = accountFor(s, tab.url || ctx.url);
+        acct = accountFor(s, secretUrl(t, tab.url, ctx.url));
         if (acct.isNew && !s.accounts.some(a => a.domain === acct.domain)) {
           const { isNew, ...saved } = acct;
           s.accounts.push({ ...saved, state: "pending" });

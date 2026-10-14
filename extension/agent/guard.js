@@ -5,7 +5,7 @@
   // Versioned like dom.js: an open tab keeps the copy it was given, and an older guard left there by
   // the previous version of the extension must not stay in charge of the submit button.
   // was: if (root.ISGuard) return;
-  const GV = 3;
+  const GV = 4;
   if (root.ISGuard && root.ISGuard.v >= GV) return;
 
   // "Confirm and send" / "I agree and apply" are the same button as "Confirm and submit"; without them
@@ -144,24 +144,50 @@
 
   // d: {text, value, ariaLabel, title, type, automationId, formFilled}
   // formFilled: answers inside the button's own <form> (describe counts them for submit-type buttons).
-  function classify(d) {
+  // why says which rule decided it, so allowClick can tell a consent button refused only for being a
+  // submit button in a form with an answer in it from one whose label or id says it sends.
+  function classifyWhy(d) {
     const labels = [d.text, d.value, d.ariaLabel, d.title].map(norm).filter(Boolean);
     const text = norm(labels.join(" "));
     const forms = labels.flatMap(readings);
-    if (FINAL_RE.test(text) || forms.some((f) => FINAL_RE.test(f))) return "final";
+    if (FINAL_RE.test(text) || forms.some((f) => FINAL_RE.test(f))) return { c: "final", why: "label" };
     // was: !SAFE_RE.test(text). A symbol in front ("> Next") no longer hides the safe word.
-    if (/submit/i.test(d.automationId || "") && !SAFE_RE.test(text) && !SAFE_RE.test(plainLabel(text))) return "final";
+    if (/submit/i.test(d.automationId || "") && !SAFE_RE.test(text) && !SAFE_RE.test(plainLabel(text))) return { c: "final", why: "id" };
     // was: AMBIGUOUS_RE.test(norm(d.text || d.value || d.ariaLabel)): one label, exact words only.
     const safe = (f) => SAFE_RE.test(f) || ACCOUNT_RE.test(f);
     if (forms.some((f) => !safe(f) && (AMBIGUOUS_RE.test(f) || AMBIGUOUS_START_RE.test(f) || AMBIGUOUS_END_RE.test(f) || FOREIGN_SEND_RE.test(f))))
-      return "ambiguous";
+      return { c: "ambiguous", why: "label" };
     if (d.type === "submit") {
       // was: !text only. A symbol-only label ("->") says no more than an empty one.
-      if (!labels.some((l) => plainLabel(l))) return "ambiguous";
-      if (d.formFilled > 0 && !forms.some((f) => safe(f) || NAV_RE.test(f))) return "final";
-      if (!forms.some((f) => safe(f) || NAV_RE.test(f))) return "ambiguous";
+      if (!labels.some((l) => plainLabel(l))) return { c: "ambiguous", why: "empty" };
+      if (d.formFilled > 0 && !forms.some((f) => safe(f) || NAV_RE.test(f))) return { c: "final", why: "form" };
+      if (!forms.some((f) => safe(f) || NAV_RE.test(f))) return { c: "ambiguous", why: "form" };
     }
-    return "ok";
+    return { c: "ok", why: "" };
+  }
+  const classify = (d) => classifyWhy(d).c;
+
+  // A bare consent button: "Accept", "I agree", "I acknowledge", "I agree to the terms". Added
+  // 2026-10-14 (PR #94 review, P2): mid-flow terms and data-consent pages put one of these on a submit
+  // button, and once the run had filled anything it was refused as a possible send button, so the model
+  // called ready_to_submit on the consent page. Anchored and whole: "I agree and apply" or "Accept &
+  // submit" never get here, since FINAL_RE has already called them final.
+  const CONSENT_RE = /^(i\s+)?(accept|agree|consent|acknowledge|understand)(\s+(to\s+)?(the\s+|these\s+|this\s+)?(terms(\s+(and|&)\s+conditions)?|conditions|polic(y|ies)|privacy\s+(policy|notice|statement)|notice|statement|disclosures?|agreement))?$/i;
+  // A consent page holds the box that says "I have read this", and sometimes a typed name and a date.
+  // A page with more answers than that is a form, and its "I agree" may be the one that sends it.
+  const CONSENT_MAX_FILLED = 3;
+  const labelForms = (d) => [d.text, d.value, d.ariaLabel, d.title].map(norm).filter(Boolean).flatMap(readings);
+  const isConsent = (d) => { const f = labelForms(d); return f.length > 0 && f.every((x) => CONSENT_RE.test(x)); };
+
+  // What may be pressed on the review step: the ways back to a page, on to the next one, and the
+  // account buttons. Anything else there, whatever its type, could be the send button: Workday and most
+  // React sites have no <form>, so "Let's make it official" or a <div role=button>Go</div> are plain
+  // buttons. Added 2026-10-14 (PR #94 review, P2). Consent and "OK" are left out on purpose: on the
+  // review step "I agree" or "OK" is the last thing between the answers and the employer.
+  const REVIEW_NAV_RE = /^(save|review|preview|edit|remove|delete|cancel|close|skip|go\s+back|return)\b/i;
+  const NOT_ON_REVIEW_RE = /^(i\s+)?(accept|agree|consent|ok|okay|proceed)\b/i;
+  function reviewNav(d) {
+    return labelForms(d).some((f) => (SAFE_RE.test(f) || ACCOUNT_RE.test(f) || REVIEW_NAV_RE.test(f)) && !NOT_ON_REVIEW_RE.test(f));
   }
 
   // ctx: {filledFields, runFilled, reviewStep}
@@ -170,13 +196,29 @@
   //    text-only review step that counts 0 above is still the end of a filled application
   //  - reviewStep: the page's heading or step indicator says it is the review or confirm step
   // was: refused only when ctx.filledFields > 0.
+  // A refusal carries review: true when only the review-step rule refused it (dom.js highlight
+  // outlines the real send button first).
   function allowClick(d, ctx) {
-    const c = classify(d);
-    if (c === "final") return { allowed: false, reason: "final submit button (reserved for you)" };
-    if (c === "ambiguous" && ctx && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep))
-      return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
-        : "this looks like the final send button for this application" };
+    const { c, why } = classifyWhy(d);
+    ctx = ctx || {};
+    if (c === "final") {
+      // A consent button is "final" here only because it is a submit button whose form holds an answer
+      // (the "I have read this" box). On a short consent page outside the review step, that is the box
+      // the agent just ticked, not an application.
+      if (!(why === "form" && consentOk(d, ctx))) return { allowed: false, reason: "final submit button (reserved for you)" };
+    } else if (c === "ambiguous" && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep)) {
+      // was: refused whatever the label. A consent button is ambiguous only for being a submit
+      // button with no navigation word; "Accept" and "I agree" mid-flow move the application on.
+      if (!(why === "form" && consentOk(d, ctx)))
+        return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
+          : "this looks like the final send button for this application" };
+    }
+    if (ctx.reviewStep && !reviewNav(d))
+      return { allowed: false, review: true, reason: "on the review step, only Back, Edit, Next and sign-in buttons are pressed for you" };
     return { allowed: true };
+  }
+  function consentOk(d, ctx) {
+    return isConsent(d) && !ctx.reviewStep && (ctx.filledFields || 0) <= CONSENT_MAX_FILLED && (d.formFilled || 0) <= CONSENT_MAX_FILLED;
   }
 
   // The stored account password goes into a password box and nowhere else. fill_secret takes a ref
@@ -489,7 +531,7 @@
   // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
   // choiceFact and confidentOption added (2026-09-30) for fastFill's choice questions.
   // v and countFilled added (2026-10-13) with the label readings, runFilled and reviewStep.
-  const api = { v: GV, classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, countFilled, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, reviewStep, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  const api = { v: GV, classify, isConsent, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, countFilled, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, reviewStep, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

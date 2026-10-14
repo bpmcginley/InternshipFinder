@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 18; // also refresh the captured guard when its submit classification changes
+  const V = 19; // also refresh the captured guard when its submit classification changes
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -451,6 +451,20 @@
       deepQueryAll('h1, h2, [role="heading"]').filter(A.visible).map(txt).join("|")].join("~"), 400);
   }
 
+  // The per-frame stop flag (added 2026-10-14, PR #94 review P2). Pause and Take over (background/agent.js
+  // takeBack) call halt() with the job's new gen in every frame of its tab. A call from the run that was
+  // stopped carries the older gen, so it is refused, and a fastFill or pick already under way stops at
+  // its next field instead of changing answers for another two seconds under the student's hands.
+  // Kept on window, not in this closure, so a newer dom.js injected into the same page still sees it.
+  // A call with no gen (an older background, or a test) is never stopped.
+  function halt(gen) {
+    const g = Number(gen);
+    if (Number.isFinite(g) && !(window.__isHaltGen >= g)) window.__isHaltGen = g;
+    return true;
+  }
+  const stale = (gen) => gen != null && window.__isHaltGen != null && Number(gen) < window.__isHaltGen;
+  const STOPPED = () => ({ ok: false, cancelled: true, error: "The student stopped this run." });
+
   let clickSeq = 0;   // the agent's own clicks, for the click block's window in act()
   // opts.runFilled: this run already filled answers on an earlier page (background/agent.js). Kept on
   // the document, where guard.js pageContext reads it; a new page is a new document and is told again.
@@ -497,8 +511,9 @@
     return secret ? { ok: true } : { ok: true, note: "The page reformatted or truncated the value.", value: cut(v, 200) };
   }
 
-  async function pick(rec, value) {
+  async function pick(rec, value, gen) {
     const el = rec.el;
+    if (stale(gen)) return STOPPED();
     switch (rec.kind) {
       case "select": return A.nativeSelect(el, value);
       case "react_select": return A.reactSelectPick(el, value);
@@ -511,6 +526,7 @@
           // Workday search inputs search on Enter (synthetic keys never trigger native form submit)
           el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
           await A.sleep(900);
+          if (stale(gen)) return STOPPED();
           const opts = deepQueryAll('[data-automation-id="promptOption"], [role="option"]').filter(A.visible);
           const pk = A.best(opts, value, (o) => o.textContent);
           if (pk) { A.mouseClick(pk); await A.sleep(300); r = { ok: true, chosen: norm(pk.textContent) }; }
@@ -523,8 +539,9 @@
     }
   }
 
-  async function upload(rec, file) {
+  async function upload(rec, file, gen) {
     let input = rec.el;
+    if (stale(gen)) return STOPPED();
     if (input.tagName === "BUTTON") {
       // Open the attachment pop-up and use the file input that just became reachable.
       const shown = () => deepQueryAll('input[type="file"]').filter((i) => A.visible(i) || A.visible(i.parentElement));
@@ -533,6 +550,7 @@
       const fresh = await A.waitFor(() => shown().filter((i) => !before.has(i)), 2000);
       input = fresh[0] || null;
       if (!input) return { ok: false, error: "The attachment menu did not offer a file upload." };
+      if (stale(gen)) return STOPPED();
       const f = A.b64ToFile(file);
       A.setFileInput(input, f);
       await A.sleep(300);
@@ -550,6 +568,7 @@
   }
 
   async function act(ref, action, p = {}) {
+    if (stale(p.gen)) return STOPPED();
     let rec = refs.get(ref);
     if (!rec || !rec.el.isConnected) {
       collect(); collectButtons(G.pageContext(document));
@@ -583,10 +602,10 @@
         if (!verdict.allowed) return { ok: false, blocked: true, error: "BLOCKED: " + verdict.reason + ". Use fill_secret on the password field itself." };
         el.setAttribute("data-is-secret", "1");
       }
-      if (action === "fill") r = ["select", "react_select", "listbox", "radio_group", "combobox"].includes(rec.kind) ? await pick(rec, p.text) : await fillText(rec, p.text, p.secret);
-      else if (action === "select") r = ["text", "textarea", "rich_text", "password"].includes(rec.kind) ? await fillText(rec, p.option) : await pick(rec, p.option);
+      if (action === "fill") r = ["select", "react_select", "listbox", "radio_group", "combobox"].includes(rec.kind) ? await pick(rec, p.text, p.gen) : await fillText(rec, p.text, p.secret);
+      else if (action === "select") r = ["text", "textarea", "rich_text", "password"].includes(rec.kind) ? await fillText(rec, p.option) : await pick(rec, p.option, p.gen);
       else if (action === "check") r = rec.kind === "radio_group" ? A.radioPick(rec.els, rec.options, p.checked ? "Yes" : "No") : A.setChecked(el, !!p.checked);
-      else if (action === "upload") r = await upload(rec, p.file);
+      else if (action === "upload") r = await upload(rec, p.file, p.gen);
       else return { ok: false, error: "Unknown action " + action };
       if (r.ok) (rec.els || [el]).forEach((x) => x.setAttribute("data-is-filled", "1"));
       await A.sleep(150);
@@ -632,9 +651,13 @@
   }
 
   // file: {name, type, b64} or null. Returns the human-readable list of what it filled.
-  async function fastFill(facts, file) {
+  // opts.gen: the run's job gen; once halt() has seen a newer one, it stops between fields.
+  async function fastFill(facts, file, opts = {}) {
     const done = [];
+    const gen = opts && opts.gen;
+    if (stale(gen)) return done;
     for (const rec of (collect(), refs.values())) {
+      if (stale(gen)) return done;
       if (rec.kind !== "text" || rec.el.value) continue;
       const el = rec.el;
       const hint = [rec.label, el.getAttribute("autocomplete"), el.name, el.id, el.getAttribute("data-automation-id")].filter(Boolean).join(" ").toLowerCase();
@@ -656,6 +679,7 @@
     // questions are all drawn that way, and they were the most common fields the model still filled.
     // Only a list whose options are all there to read; a searchable one (school, city) is the model's.
     for (const rec of refs.values()) {
+      if (stale(gen)) return done;
       // Workday's menu-style dropdowns (listbox) too, since 2026-10-01: the address's State and Country,
       // and the same work-authorization, sponsorship, age and EEO questions as above. Their options only
       // exist once open, so workdayChoose opens one, reads it, and picks only an exact single match.
@@ -697,15 +721,18 @@
         done.push(`${rec.label || key} = ${want}`);
       }
     }
+    if (stale(gen)) return done;
     const slot = file && file.b64 ? loneResumeField() : null;
     if (slot) {
-      const r = await upload(slot, file);
+      const r = await upload(slot, file, gen);
       if (r.ok) { slot.el.setAttribute("data-is-filled", "1"); done.push(`${slot.label || "Resume"} = ${file.name}`); }
     }
     return done;
   }
 
   function highlight(opts = {}) {
+    // was: ran whatever had happened, so a run the student had just taken over still scrolled the page.
+    if (stale(opts && opts.gen)) return { missing: 0, final: false, stopped: true };
     markRun(opts);
     if (!document.getElementById("is-hl-style")) {
       const s = document.createElement("style");
@@ -725,13 +752,21 @@
       if (rec.kind === "radio_group" && rec.required && !rec.els.some((r) => r.checked || r.getAttribute("aria-checked") === "true")) { box(rec.el).classList.add("is-missing"); missing++; }
     }
     const ctx = G.pageContext(document);
-    let final = null;
+    // The red outline goes on the buttons that look like the send button. On the review step every
+    // unfamiliar button is refused too (guard.js allowClick, review: true); those are outlined only when
+    // nothing else is, so a Print or Download button does not take the outline from the real one.
+    const strong = [], weak = [];
     for (const el of deepQueryAll('button, input[type="submit"], [role="button"]')) {
-      if (A.visible(el) && !G.allowClick(G.describe(el), ctx).allowed) { el.classList.add("is-final"); final = final || el; }
+      if (!A.visible(el)) continue;
+      const v = G.allowClick(G.describe(el), ctx);
+      if (!v.allowed) (v.review ? weak : strong).push(el);
     }
+    const marked = strong.length ? strong : weak;
+    marked.forEach((el) => el.classList.add("is-final"));
+    const final = marked[0] || null;
     if (final) try { final.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
     return { missing, final: !!final };
   }
 
-  window.ISDom = { v: V, snapshot, act, fastFill, highlight, mark };
+  window.ISDom = { v: V, snapshot, act, fastFill, highlight, mark, halt };
 })();
