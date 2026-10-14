@@ -595,13 +595,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "egra": {
-   "name": "Egra",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-13"
-  },
   "eigen-labs": {
    "name": "Eigen Labs",
    "quant": false,
@@ -3114,9 +3107,9 @@
   "breezeairways": {
    "name": "Breeze Airways",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-13"
+   "last_fail": "2026-10-14"
   },
   "brevium": {
    "name": "Brevium",
@@ -4200,6 +4193,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "groma": {
+   "name": "Groma",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
   },
   "grvty": {
    "name": "GRVTY",
@@ -7574,6 +7573,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "careers.hrblock.com": {
+   "name": "H&R Block",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "careers.jhuapl.edu": {
    "name": "Johns Hopkins Applied Physics Laboratory",
    "quant": false,
@@ -9263,6 +9268,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "rhombus-systems": {
+   "name": "Rhombus",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "rigetti": {
    "name": "Rigetti",
    "quant": false,
@@ -9292,6 +9303,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "seattleartmuseum": {
+   "name": "Seattle Art Museum",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
   },
   "secureframe": {
    "name": "Secureframe",
@@ -11183,6 +11200,18 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "eurostar": {
+   "name": "Eurostar International",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
+  "ezrecruiting": {
+   "name": "Egon Zehnder",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "fasanara": {
    "name": "Fasanara",
    "quant": false,
@@ -11393,6 +11422,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "super-soccer-stars": {
+   "name": "Super Soccer Stars",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
   },
   "syntiant": {
    "name": "Syntiant",
@@ -13010,6 +13045,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "cbrands|wd5|CBI_External_Careers": {
+   "name": "Constellation Brands",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
   },
   "cccis|wd1|broadbean_external": {
    "name": " CCC Intelligent Solutions",
@@ -15642,6 +15683,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "luriechildrens|wd1|externalportal": {
+   "name": "Ann & Robert H. Lurie Children’s Hospital of Chicago",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "lvvwd|wd1|lvvwdwaterjobs": {
    "name": "Las Vegas Valley Water District",
    "quant": false,
@@ -17805,6 +17852,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "stvinc|wd5|stv": {
+   "name": "STV",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "suncor|wd1|Suncor_External": {
    "name": "Suncor",
    "quant": false,
@@ -18389,6 +18442,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "unitytech|wd1|Unity": {
+   "name": "Unity",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "univision|wd1|External": {
    "name": "TelevisaUnivision",
    "quant": false,
@@ -18688,6 +18747,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "media"
+  },
+  "wasatchproperty|wd1|MarketStarCareers": {
+   "name": "MarketStar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
   },
   "washpost|wd5|washingtonpostcareers": {
    "name": "Washpost",
