@@ -11,7 +11,8 @@ day included, so running hourly keeps the dashboard within the hour at no extra 
   metrics_snapshot  one row per run: the week's top pages, referrers and countries; followers and
                     each recent post's engagement on Bluesky, Instagram and Mastodon; the last run
                     of each GitHub Actions job; Google searches (clicks, impressions, position by
-                    day, top queries and pages, from Search Console); open and new listings, the
+                    day, top queries and pages, from Search Console); the same for Bing, from Bing
+                    Webmaster Tools, with its indexed page count; open and new listings, the
                     page count, and the extension's Chrome Web Store users and rating
 
 Only totals: no visitor, student or account is ever stored. The dashboard reads these rows, and the
@@ -21,7 +22,8 @@ Needs CLOUDFLARE_API_TOKEN with Account Analytics: Read and D1: Edit. Optional: 
 same secret Brand posts uses; the working token it descends from is read from D1 and never refreshed
 here), GITHUB_TOKEN (without it, the public API's hourly allowance still covers a run) and
 GSC_SERVICE_ACCOUNT (a Google service account's JSON key, added to the Search Console property as a
-Restricted user; needs the cryptography package to sign in).
+Restricted user; needs the cryptography package to sign in) and BING_WEBMASTER_KEY (an API key from
+Bing Webmaster Tools, Settings, API access).
 Run from the repo root:  python growth/metrics.py [docs] [--write]
 """
 from __future__ import annotations
@@ -57,6 +59,8 @@ LOW_CTR_MIN_IMPRESSIONS = 50
 LOW_CTR_BELOW = 0.01
 LOW_CTR_KEEP = 25
 GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
+# The site as Bing Webmaster Tools names it (added 2026-10-08 by importing it from Search Console).
+BING_SITE = os.environ.get("BING_SITE") or "https://internscout.org/"
 SITE = "https://internscout.org"
 STORE_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"
 DAYS = 30
@@ -322,12 +326,91 @@ def low_ctr_pages(pages: list[dict]) -> list[dict]:
     return sorted(out, key=lambda p: -p["impressions"])[:LOW_CTR_KEEP]
 
 
+def _bing_get(method: str, key: str) -> list[dict]:
+    """One Bing Webmaster API call. The key travels in the URL, as the API requires, so neither the URL
+    nor the exception that carries it is ever printed: only the method and the HTTP status are."""
+    url = (f"https://ssl.bing.com/webmaster/api.svc/json/{method}?"
+           + urllib.parse.urlencode({"siteUrl": BING_SITE, "apikey": key}))
+    try:
+        return (_json(url) or {}).get("d") or []
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Bing {method}: HTTP {e.code}") from None
+    except urllib.error.URLError:
+        raise RuntimeError(f"Bing {method}: no connection") from None
+
+
+def _bing_day(stamp: str | None) -> str | None:
+    """'/Date(1316156400000-0700)/' -> '2011-09-16', the day in the offset Bing gives."""
+    m = re.match(r"/Date\((-?\d+)([+-]\d{4})?\)/", stamp or "")
+    if not m:
+        return None
+    off = m.group(2) or "+0000"
+    tz = timezone(timedelta(hours=int(off[:3]), minutes=int(off[0] + off[3:])))
+    return datetime.fromtimestamp(int(m.group(1)) / 1000, tz).date().isoformat()
+
+
+def _bing_sum(rows: list[dict], key: str, since: str) -> list[dict]:
+    """Query or page rows (one per key per period, no date filter in the API) summed over the days from
+    `since`, most clicks then most impressions first. position is Bing's average impression position,
+    weighted by impressions like Search Console's; Bing sends -1 when it has none."""
+    acc: dict[str, list] = {}
+    for r in rows:
+        day = _bing_day(r.get("Date"))
+        if not day or day < since or not r.get("Query"):
+            continue
+        a = acc.setdefault(r["Query"], [0, 0, 0.0, 0])
+        imp, pos = r.get("Impressions") or 0, r.get("AvgImpressionPosition")
+        a[0] += r.get("Clicks") or 0
+        a[1] += imp
+        if pos is not None and pos > 0 and imp:
+            a[2] += pos * imp
+            a[3] += imp
+    out = [{key: k, "clicks": c, "impressions": i, "position": round(p / w, 1) if w else None}
+           for k, (c, i, p, w) in acc.items()]
+    return sorted(out, key=lambda r: (-r["clicks"], -r["impressions"], r[key]))
+
+
+def bing(now: datetime) -> dict:
+    """The last 28 days of Bing searches for the site (2026-10-14), in the same shape as search_console
+    where they overlap: clicks and impressions by day and in total, and the top queries and pages. Bing
+    gives no daily position for the site, so the day rows and totals carry none. Plus how many pages
+    Bing says it has indexed (in_index, from its crawl stats; None when it hasn't said).
+    Needs BING_WEBMASTER_KEY, an API key from Bing Webmaster Tools (Settings, API access)."""
+    key = os.environ.get("BING_WEBMASTER_KEY")
+    if not key:
+        raise ValueError("no BING_WEBMASTER_KEY")
+    since = (now.date() - timedelta(days=GSC_DAYS - 1)).isoformat()
+    days = {}
+    for r in _bing_get("GetRankAndTrafficStats", key):
+        day = _bing_day(r.get("Date"))
+        if day and day >= since:
+            d = days.setdefault(day, {"day": day, "clicks": 0, "impressions": 0})
+            d["clicks"] += r.get("Clicks") or 0
+            d["impressions"] += r.get("Impressions") or 0
+    days = sorted(days.values(), key=lambda d: d["day"])
+
+    def totals(rows):
+        c, i = sum(r["clicks"] for r in rows), sum(r["impressions"] for r in rows)
+        return {"clicks": c, "impressions": i, "ctr": round(c / i, 4) if i else None}
+    since7 = (now.date() - timedelta(days=6)).isoformat()
+    queries = _bing_sum(_bing_get("GetQueryStats", key), "query", since)[:GSC_QUERIES]
+    pages = [{**p, "path": urllib.parse.urlparse(p["path"]).path or "/"}
+             for p in _bing_sum(_bing_get("GetPageStats", key), "path", since)[:GSC_PAGES]]
+    crawl = sorted(((_bing_day(r.get("Date")) or "", r) for r in _bing_get("GetCrawlStats", key)), key=lambda t: t[0])
+    in_index = crawl[-1][1].get("InIndex") if crawl else None
+    return {"site": BING_SITE, "days": days, "totals_28d": totals(days),
+            "totals_7d": totals([d for d in days if d["day"] >= since7]), "queries": queries, "pages": pages,
+            "in_index": in_index}
+
+
 def printable(snap: dict) -> dict:
     """The snapshot as the run log shows it. The repository is public, so its Actions logs are too:
-    search queries are counted there, never listed (they go only to the private database)."""
+    search queries are counted there, never listed (they go only to the private database).
+    was: Search Console only; Bing's queries are kept out the same way (2026-10-14)."""
     out = dict(snap)
-    if isinstance(out.get("search_console"), dict):
-        out["search_console"] = {**out["search_console"], "queries": f"{len(out['search_console']['queries'])} queries"}
+    for src in ("search_console", "bing"):
+        if isinstance(out.get(src), dict):
+            out[src] = {**out[src], "queries": f"{len(out[src]['queries'])} queries"}
     return out
 
 
@@ -428,7 +511,7 @@ def main(argv: list[str]) -> int:
         problems.append("visits: no CLOUDFLARE_API_TOKEN")
     for key, fn in (("bluesky", lambda: bluesky(now)), ("instagram", lambda: instagram(token, now)),
                     ("mastodon", lambda: mastodon(now)), ("automation", automation),
-                    ("search_console", lambda: search_console(now)),
+                    ("search_console", lambda: search_console(now)), ("bing", lambda: bing(now)),
                     ("listings", lambda: listings(site_dir)), ("pages", page_count), ("store", store)):
         try:
             snap[key] = fn()

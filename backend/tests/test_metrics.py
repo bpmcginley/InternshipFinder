@@ -246,3 +246,72 @@ def test_the_sign_in_assertion_is_a_valid_rs256_jwt():
     assert json.loads(base64.urlsafe_b64decode(pad(head)))["alg"] == "RS256"
     key.public_key().verify(base64.urlsafe_b64decode(pad(sig)), f"{head}.{claims}".encode(),
                             padding.PKCS1v15(), hashes.SHA256())                          # raises if wrong
+
+
+# ---- Bing Webmaster Tools (2026-10-14)
+def _ms(day: str) -> str:
+    """A day as Bing's JSON writes it, at midnight US Pacific daylight time."""
+    t = datetime.fromisoformat(day + "T00:00:00-07:00")
+    return f"/Date({int(t.timestamp() * 1000)}-0700)/"
+
+
+BING = {
+    "GetRankAndTrafficStats": [{"Date": _ms("2026-08-01"), "Clicks": 50, "Impressions": 500},   # before the 28 days
+                               {"Date": _ms("2026-09-10"), "Clicks": 1, "Impressions": 40},
+                               {"Date": _ms("2026-09-27"), "Clicks": 3, "Impressions": 60}],
+    "GetQueryStats": [{"Date": _ms("2026-09-14"), "Query": "nursing internships", "Clicks": 1, "Impressions": 10, "AvgImpressionPosition": 4},
+                      {"Date": _ms("2026-09-21"), "Query": "nursing internships", "Clicks": 1, "Impressions": 30, "AvgImpressionPosition": 8},
+                      {"Date": _ms("2026-09-21"), "Query": "co-op boston", "Clicks": 0, "Impressions": 5, "AvgImpressionPosition": -1},
+                      {"Date": _ms("2026-07-01"), "Query": "old query", "Clicks": 9, "Impressions": 9, "AvgImpressionPosition": 1}],
+    "GetPageStats": [{"Date": _ms("2026-09-21"), "Query": "https://internscout.org/internships/nursing/", "Clicks": 2, "Impressions": 20, "AvgImpressionPosition": 6}],
+    "GetCrawlStats": [{"Date": _ms("2026-09-27"), "InIndex": 412}, {"Date": _ms("2026-09-20"), "InIndex": 380}],
+}
+
+
+def test_bing_needs_its_key(monkeypatch):
+    monkeypatch.delenv("BING_WEBMASTER_KEY", raising=False)
+    with pytest.raises(ValueError, match="BING_WEBMASTER_KEY"):
+        metrics.bing(NOW)
+
+
+def test_bing_reads_the_last_28_days_queries_pages_and_index_count(monkeypatch):
+    monkeypatch.setenv("BING_WEBMASTER_KEY", "secret-key-123")
+    seen = []
+
+    def fake_json(url, body=None, token=None, timeout=30):
+        seen.append(url)
+        assert "siteUrl=https%3A%2F%2Finternscout.org%2F" in url and "apikey=secret-key-123" in url
+        return {"d": BING[url.split("/json/")[1].split("?")[0]]}
+    monkeypatch.setattr(metrics, "_json", fake_json)
+    got = metrics.bing(NOW)
+    assert [d["day"] for d in got["days"]] == ["2026-09-10", "2026-09-27"]
+    assert got["totals_28d"] == {"clicks": 4, "impressions": 100, "ctr": 0.04}
+    assert got["totals_7d"] == {"clicks": 3, "impressions": 60, "ctr": 0.05}
+    # Summed across weeks; position weighted by impressions, (4*10 + 8*30) / 40; Bing's -1 is "none".
+    assert got["queries"] == [{"query": "nursing internships", "clicks": 2, "impressions": 40, "position": 7.0},
+                              {"query": "co-op boston", "clicks": 0, "impressions": 5, "position": None}]
+    assert got["pages"] == [{"path": "/internships/nursing/", "clicks": 2, "impressions": 20, "position": 6.0}]
+    assert got["in_index"] == 412
+
+
+def test_bing_errors_never_carry_the_key(monkeypatch):
+    monkeypatch.setenv("BING_WEBMASTER_KEY", "secret-key-123")
+
+    def refuse(url, *a, **k):
+        raise metrics.urllib.error.HTTPError(url, 401, "Unauthorized", {}, None)
+    monkeypatch.setattr(metrics, "_json", refuse)
+    with pytest.raises(RuntimeError) as e:
+        metrics.bing(NOW)
+    assert str(e.value) == "Bing GetRankAndTrafficStats: HTTP 401"
+    assert "secret-key-123" not in repr(e.value) and e.value.__cause__ is None
+
+
+def test_bing_dates_read_in_their_own_offset():
+    assert metrics._bing_day("/Date(1316156400000-0700)/") == "2011-09-16"
+    assert metrics._bing_day("/Date(1316156400000)/") == "2011-09-16"
+    assert metrics._bing_day("2011-09-16") is None
+
+
+def test_bing_queries_stay_out_of_the_public_run_log():
+    snap = {"bing": {"queries": [{"query": "a private search"}], "pages": []}}
+    assert metrics.printable(snap)["bing"]["queries"] == "1 queries"
