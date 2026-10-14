@@ -369,3 +369,19 @@ ON CONFLICT(user_hash) DO UPDATE SET first = excluded.first WHERE excluded.first
 INSERT INTO inviters (user_hash, rewarded)
 SELECT referrer, COUNT(*) FROM referrals WHERE referrer != '' AND rewarded = 1 GROUP BY referrer
 ON CONFLICT(user_hash) DO UPDATE SET rewarded = excluded.rewarded WHERE excluded.rewarded > inviters.rewarded;
+
+-- What the site build did with each live paid listing, per UTC day (added 2026-10-14), so refunds for
+-- unused days can be worked out. The pages workflow writes it over the D1 HTTP API after each build
+-- (backend/internscout/placements.py record_runs): `shown` is how many builds that day kept the
+-- placement, `dropped` how many dropped it while it was live, `reason` the latest drop's reason
+-- (placements.py REASONS) and `updated` when a build last wrote the row. Drops for "dates" (not started
+-- yet) and "duplicate" are not recorded. GET /admin/placements reads it as `runs`. Nothing about visitors.
+CREATE TABLE IF NOT EXISTS placement_runs (
+  placement_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  shown INTEGER NOT NULL DEFAULT 0,
+  dropped INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
+  updated TEXT,
+  PRIMARY KEY (placement_id, day)
+);

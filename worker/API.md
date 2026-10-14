@@ -411,7 +411,7 @@ current status does not allow (or a row that changed while it was being saved).
 
 | Route | Body | Does |
 |---|---|---|
-| `GET /admin/placements` | none | `{ placements: [...] }`: every row with its private fields, plus `log`, its last 20 log entries, newest first. |
+| `GET /admin/placements` | none | `{ placements: [...] }`: every row with its private fields, plus `log`, its last 20 log entries, newest first, and (added 2026-10-14) `runs`, `{ days_shown, days_dropped, drops: [{ day, reason }] }`, from `placement_runs`: the UTC days a site build kept the placement, and the days one dropped it while it was live (`dropped > 0`) with the latest reason. The pages workflow writes that table after each build (`backend/internscout/placements.py` `record_runs`, over the D1 HTTP API); drops for `dates` (not started yet) and `duplicate` are not recorded. |
 | `GET /admin/leads` | none | `{ leads: [{ id, created, company, wants }] }`, the 100 newest employer leads, without name, email or message. |
 | `POST /admin/placements` | `{ lead_id?, employer?, listing_id, apply_url, start, end, note?, by }` | Creates a `draft` with an id like `p-2026-11-acme-1`. With `lead_id` the lead must exist, and its company is the employer unless `employer` is given; nothing else is copied from the lead. `apply_url` must be `https://`; `end` must be after `start` and at most 62 days later. |
 | `POST /admin/placements/update` | `{ id, by, start?, end?, listing_id?, apply_url?, employer?, note? }` | In `draft`, `checked` or `paused`: any of those. A new `listing_id` or `apply_url` clears the checks and sends it back to `draft`. While `on`: only a later `end` and `note`. |
