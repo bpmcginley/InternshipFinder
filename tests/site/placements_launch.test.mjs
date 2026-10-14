@@ -85,7 +85,16 @@ test("terms: an employer section, and the screening line says what a paid listin
     /limited to what you paid us for them in the 12 months before the claim/,
     /A student can turn paid listings off, and a student's own saved profile can hide yours/,
     /can include the same person more than once and automated traffic our filters miss/,
-    /You choose whether that is credit toward another paid listing or a refund/]) assert.match(emp, want);
+    /You choose whether that is credit toward another paid listing or a refund/,
+    // Legal review round 2.
+    /in the 12 months before the claim, or \$100, whichever is more/,
+    /except to the extent the claim is caused by our own fault/, /We will tell you about the claim promptly, you run the defense/,
+    /neither of us will settle it without the other's consent/,
+    /Changes to this employer section don't apply to a paid listing already paid for, or a pilot already confirmed/,
+    /If we pause or stop paid listings, or InternScout shuts down, you get the unused days back the same way/,
+    /This doesn't limit how we show your public listings, as we do for every employer/,
+    /the invoice or confirmation wins/,
+    /A student's own settings or saved profile can only hide it/]) assert.match(emp, want);
   assert.doesNotMatch(emp, /we check that[^.]*pay range/, "pay range is the employer's promise, not our check");
   const v = words(visible(TERMS));
   assert.match(v, /We don't screen employers\. Before a paid listing goes live, we check that it is an open role we already list/);
