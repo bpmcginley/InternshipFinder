@@ -322,6 +322,81 @@ test("the review line is due only with the extension set up and applications fil
   assert.match(IS.REVIEWS_URL, /^https:\/\/chromewebstore\.google\.com\/detail\/internscout-auto-apply\/hpnbbpmalfjijnmpoihhjgjolhabjpgi\/reviews$/);
 });
 
+// ---------- search reach and ranking (2026-10-14) ----------
+const row = (id, o = {}) => ({ id, title: "", company_name: "Acme", field_tags: [], regions: [{ loc: "Boston, MA", state: "MA", kind: "new_england" }], status: "open", ...o });
+const find = (IS, q, rows) => { const cq = IS.compileQuery(q, IS.placeWords(rows)); return rows.filter(x => IS.matchScore(x, cq)).map(x => x.id); };
+
+test("no state picked means every state, and a profile without states still drops remote when asked", () => {
+  const IS = loadCore(notFound);
+  assert.equal(IS.viewScope(null, []).all, true);
+  assert.equal(IS.viewScope({ states: [], remote: true }, []).all, true);
+  assert.equal(IS.viewScope({ states: [], remote: false }, []).noRemote, true);
+  assert.deepEqual([...IS.viewScope({ states: ["TX"], remote: false }, []).keys], ["TX"]);
+  assert.deepEqual([...IS.viewScope(null, ["CA"]).keys], ["CA"]);
+  assert.equal(IS.viewScope({ states: ["TX"] }, [IS.ALL_KEY]).all, true);
+});
+
+test("every state loads the Northeast and remote first, a searched place before those, and the rest only when asked", () => {
+  const IS = loadCore(notFound);
+  const index = ["MA", "NY", "remote", "AL", "TX", "CA"];
+  const all = IS.viewScope(null, []);
+  const quiet = IS.loadPlan(all, index, [], false);
+  assert.deepEqual([...quiet.first], ["MA", "NY", "remote"]);
+  assert.deepEqual([...quiet.rest], []);
+  const searched = IS.loadPlan(all, index, IS.queryKeys("nursing alabama"), true);
+  assert.equal(searched.first[0], "AL");
+  assert.deepEqual([...searched.rest].sort(), ["CA", "TX"]);
+  assert.ok(!IS.loadPlan({ ...all, noRemote: true }, index, [], true).first.includes("remote"));
+  assert.deepEqual([...IS.loadPlan(IS.viewScope(null, ["TX"]), index, ["AL"], true).first], ["AL", "TX"]);
+  assert.deepEqual([...IS.queryKeys("nurse -texas")], []);
+});
+
+test("short words match whole words only, so cs no longer finds physics or analytics", () => {
+  const IS = loadCore(notFound);
+  const rows = [row("phys", { title: "Physics Research Intern" }), row("ana", { title: "Analytics Intern" }),
+    row("swe", { title: "Developer Intern", field_tags: ["swe"] }), row("cs", { title: "CS Intern" })];
+  assert.deepEqual(find(IS, "cs", rows).sort(), ["cs", "swe"]);
+});
+
+test("one form of a word finds the others: nurse, nurses and nursing find the same roles", () => {
+  const IS = loadCore(notFound);
+  const rows = [row("a", { title: "Student Nurse Intern" }), row("b", { title: "Nursing Extern" }), row("c", { title: "Nurses Residency" }), row("d", { title: "Finance Intern" })];
+  for (const q of ["nurse", "nursing", "nurses"]) assert.deepEqual(find(IS, q, rows).sort(), ["a", "b", "c"], q);
+  assert.equal(IS.stem("sales"), "sales");
+  assert.equal(IS.stem("engineering"), "engineer");
+});
+
+test("a word in the title ranks above the same word in the field, company or description", () => {
+  const IS = loadCore(notFound);
+  const rows = [row("desc", { title: "Operations Intern", description: "You will help the software team" }),
+    row("co", { title: "Operations Intern", company_name: "Software Co" }),
+    row("title", { title: "Software Engineering Intern" })];
+  const cq = IS.compileQuery("software", IS.placeWords(rows));
+  const order = rows.slice().sort((a, b) => IS.matchScore(b, cq) - IS.matchScore(a, cq)).map(x => x.id);
+  assert.deepEqual(order, ["title", "co", "desc"]);
+  // The word as typed beats a match through its stem only: Marketing before Capital Markets.
+  const m = [row("mk", { title: "Capital Markets Intern" }), row("mt", { title: "Marketing Intern" })];
+  const mq = IS.compileQuery("marketing", IS.placeWords(m));
+  assert.ok(IS.matchScore(m[1], mq) > IS.matchScore(m[0], mq));
+});
+
+test("place names filter by location, and -word excludes", () => {
+  const IS = loadCore(notFound);
+  const tx = { regions: [{ loc: "Austin, TX", state: "TX", kind: "us" }] };
+  const rows = [row("ma", { title: "Nursing Intern" }), row("tx", { title: "Nursing Intern", ...tx }), row("tx2", { title: "Unpaid Nursing Intern", ...tx })];
+  assert.deepEqual(find(IS, "nursing texas", rows).sort(), ["tx", "tx2"]);
+  assert.deepEqual(find(IS, "nursing texas -unpaid", rows), ["tx"]);
+  assert.equal(IS.matchScore(rows[0], IS.compileQuery("", null)), 1);
+});
+
+test("a landing page's fields pick its major for the setup card, and a guess gives none", () => {
+  const IS = loadCore(notFound);
+  const majors = { majors: [{ name: "Mechanical Engineering", tags: ["mechanical", "aerospace"] }, { name: "Mechanical Engineering Technology", tags: ["mechanical"] }, { name: "Nursing", tags: ["nursing", "health"] }] };
+  assert.equal(IS.majorForFields(["mechanical", "aerospace"], majors), "Mechanical Engineering");
+  assert.equal(IS.majorForFields(["nursing"], majors), "Nursing");
+  assert.equal(IS.majorForFields(["chemistry"], majors), null);
+});
+
 test("downloads beyond four wait their turn, and the quiet timer starts only when one begins", async () => {
   // Each file takes 30 ms against a 40 ms limit; eight at once would leave the last ones waiting for
   // a connection in the browser past the limit, so they queue here instead.
