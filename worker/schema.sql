@@ -237,6 +237,18 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_hash);
 
+-- A session the extension made from the dashboard's (POST /session/copy, src/session.js copySession,
+-- 2026-10-14), so the two sign out separately. Both ids are sessions.id (sha256 of a token). A session
+-- is copied at most once, and a copy is never copied, so a stolen session token can make one more at
+-- most. Deleted with the account's sessions (Delete my data), and by the daily cron once neither
+-- session is left.
+CREATE TABLE IF NOT EXISTS session_copies (
+  source TEXT PRIMARY KEY,
+  copy TEXT NOT NULL UNIQUE,
+  user_hash TEXT NOT NULL,
+  created TEXT NOT NULL
+);
+
 -- The Deep Dive saved to the student's account (src/profile.js), on by default and switched off by the
 -- student. `data` is base64(iv(12) || AES-GCM-256 ciphertext) of the profile JSON, under a key derived
 -- from the PROFILE_KEY secret and this row's user_hash, so neither the database alone nor a row moved to

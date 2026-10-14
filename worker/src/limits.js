@@ -2,7 +2,7 @@
 import { HttpError } from "./http.js";
 import { canUpgrade, paymentsInfo } from "./billing.js";
 import { forgetStatements } from "./referral.js";
-import { forgetSessions } from "./session.js";
+import { forgetCopies, forgetSessions } from "./session.js";
 import { forgetProfile } from "./profile.js";
 import { countEvent } from "./visits.js";
 
@@ -534,6 +534,7 @@ export async function deleteUser(db, user, now = new Date()) {
     ...forgetStatements(db, user),
     forgetProfile(db, user),
     forgetSessions(db, user),
+    forgetCopies(db, user),
   ]);
 }
 

@@ -56,7 +56,9 @@
     if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) {
       window.ISCount(/^https:\/\/chromewebstore\.google\.com\/detail\/[^?#]*\/reviews\/?([?#]|$)/.test(a.href) ? "review_click" : "install_click");
     }
-    if (t && t.closest("a.go[href], a.open-link[href]")) window.ISCount("posting_click");
+    // A paid listing's box (li.paid, seo_pages.placement_box) uses the same "go" link, but payment must
+    // never change a count, so its clicks are left out.
+    if (t && t.closest("a.go[href], a.open-link[href]") && !t.closest(".paid")) window.ISCount("posting_click");
   }, true);
   // A sign-up form sent. "submit" fires only once the browser has passed the form's own checks (the
   // email box is required), and the form still posts to Buttondown in its new tab as before.
