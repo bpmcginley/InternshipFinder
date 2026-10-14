@@ -271,18 +271,36 @@
   }
 
   // ---------- data loading (sharded, with the single-file fallback) ----------
+  // timeoutMs is how long a download may go with no bytes at all: before the response, or between two
+  // pieces of the body. A slow file that keeps arriving is never cut off. (was: the limit covered the
+  // whole download, so on slow Wi-Fi CA.json was cancelled on both tries and California never loaded.)
   async function getJSON(url, bust, timeoutMs = 15000) {
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    let timer;
+    let timer, fail;
+    const stalled = new Promise((_, reject) => { fail = reject; });
+    const quiet = () => {
+      clearTimeout(timer);
+      if (timeoutMs) timer = setTimeout(() => { fail(new Error("Download timed out")); if (controller) controller.abort(); }, timeoutMs);
+    };
     const request = async () => {
       const r = await fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) });
+      quiet();
       if (!r.ok) { const e = new Error("HTTP " + r.status + " for " + url); e.status = r.status; throw e; }
-      return r.json();
+      const reader = r.body && typeof r.body.getReader === "function" && typeof TextDecoder !== "undefined" ? r.body.getReader() : null;
+      if (!reader) return r.json();   // no streamed body: the timer then covers the rest of the download
+      const decoder = new TextDecoder(), parts = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        quiet();
+        parts.push(decoder.decode(value, { stream: true }));
+      }
+      parts.push(decoder.decode());
+      return JSON.parse(parts.join(""));
     };
+    quiet();
     try {
-      return await (timeoutMs ? Promise.race([request(), new Promise((_, reject) => {
-        timer = setTimeout(() => { reject(new Error("Download timed out")); if (controller) controller.abort(); }, timeoutMs);
-      })]) : request());
+      return await Promise.race([request(), stalled]);
     } finally { clearTimeout(timer); }
   }
 
@@ -365,9 +383,12 @@
         if (!meta) continue;
         if (descd.has(k)) { jobs.push(descd.get(k).then(ok => { if (!ok) bad.add(k); })); continue; }
         const file = meta.desc || (meta.file || (index._dir + k + ".json")).replace(/\.json$/, ".desc.json");
+        const get = () => getJSON(requestBase + file, requestBust, timeoutMs);
         const pr = Promise.resolve(loaded.get(k)).then(() => {
           if (failed.has(k)) throw new Error("Listings have not loaded");
-          return getJSON(requestBase + file, requestBust, timeoutMs);
+          // The same one quiet retry a listing file gets (was: none, so one dropped connection meant
+          // pressing Try again). A missing sidecar (404) is an answer, not a dropped connection.
+          return get().catch(e => e.status === 404 ? Promise.reject(e) : new Promise(r => setTimeout(r, retryDelayMs)).then(get));
         }).then(m => {
           if (epoch !== generation) return false;
           let n = 0;
