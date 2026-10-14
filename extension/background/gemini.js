@@ -101,6 +101,7 @@ export async function callGemini({ apiKey, model, system, messages, tools, max_t
         body: JSON.stringify(body),
       });
     } catch (e) {
+      if (signal && signal.aborted) throw e;   // Pause / Take over (agent.js stopJob): no retries
       lastErr = e.message;
       await sleep(1500 * 2 ** attempt);
       continue;
