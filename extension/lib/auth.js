@@ -280,7 +280,9 @@ export async function authBridge() {
 //     student accepts it. The record kept is built from the Worker's reply alone; nothing else the page
 //     might say (an email, an expiry, an account) is read at all;
 //   - kept aside in chrome.storage.session (memory only, extension pages only) for ten minutes, and used
-//     only when the student presses the button on an extension page. Nothing signs in by itself.
+//     only when the student presses the button on an extension page. Nothing signs in by itself;
+//   - on the press, the extension trades it for a session of its own (POST /session/copy) and keeps that,
+//     never the dashboard's token itself, so signing out of one leaves the other signed in.
 // The dashboard already holds this token, and could already be handed the extension's (auth:token), so
 // the extension gives nothing away here: the offer only goes from the page to the extension.
 export const OFFER_KEY = "internscout.offer";   // chrome.storage.session: { token, at }
@@ -308,6 +310,18 @@ export async function checkSession(token, fetchImpl = fetch, now = Date.now()) {
   return offeredRecord(token, await res.json().catch(() => null), now);
 }
 
+// POST /session/copy: a new session for the same account, made from `token` (2026-10-14 review). The
+// record of the new session, built from the Worker's reply as offeredRecord does, or null (signed out,
+// already copied once, an older Worker without the route, or no answer).
+export async function copySessionFrom(token, fetchImpl = fetch, now = Date.now()) {
+  if (!offerTokenOk(token)) return null;
+  const res = await fetchImpl(`${WORKER_URL}/session/copy`, { method: "POST", headers: { authorization: `Bearer ${token}` }, signal: quick() }).catch(() => null);
+  if (!res || res.status !== 200) return null;
+  const data = await res.json().catch(() => null);
+  if (!data || data.session === token) return null;
+  return offeredRecord(data.session, data, now);
+}
+
 // The dashboard's offer (index.js has already checked where it came from). True when it was kept aside.
 export async function holdOffer(token, fetchImpl = fetch, now = Date.now()) {
   if (!offerTokenOk(token) || (await getToken())) return false;
@@ -324,15 +338,17 @@ export async function offerWaiting(now = Date.now()) {
   return !!(o && offerTokenOk(o.token) && now - o.at < OFFER_TTL_MS && !(await getToken()));
 }
 
-// The student pressed "Use my dashboard sign-in". The offer is used once, checked with the Worker again
-// (it may have been signed out since), and kept as this extension's session.
+// The student pressed "Use my dashboard sign-in". The offer is used once and traded with the Worker for
+// the extension's own session (it fails if the dashboard has signed out since). The dashboard's token is
+// never kept: was checkSession(o.token) and that token stored, so a sign-out on either side signed both
+// out, the extension mid-batch with no warning.
 export async function acceptOffer(fetchImpl = fetch, now = Date.now()) {
   const o = (await chrome.storage.session.get(OFFER_KEY))[OFFER_KEY];
   await chrome.storage.session.remove(OFFER_KEY);
   if (await getToken()) return { ok: true };   // signed in some other way meanwhile: that sign-in stays
   const gone = { error: "That sign-in from the dashboard can't be used any more. Sign in with Google or Microsoft instead." };
   if (!o || !offerTokenOk(o.token) || now - o.at >= OFFER_TTL_MS) return gone;
-  const rec = await checkSession(o.token, fetchImpl, now);
+  const rec = await copySessionFrom(o.token, fetchImpl, now);
   if (!rec) return gone;
   await chrome.storage.local.set({ [SESSION_KEY]: rec });
   await chrome.storage.session.remove(KEY);

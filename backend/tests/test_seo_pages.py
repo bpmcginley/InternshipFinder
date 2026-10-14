@@ -2020,7 +2020,7 @@ def test_t7_the_box_markup(tmp_path, monkeypatch):
     text = files["internships/at/tie-co/index.html"].decode()
     box = _box(text)
     assert box.startswith('<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">')
-    assert '<p class="paid-h">Paid listing <a href="/privacy.html#paid">Why am I seeing this?</a></p>' in box
+    assert '<p class="paid-h">Paid listing <a href="/privacy.html#paid-listings">Why am I seeing this?</a></p>' in box
     assert '<div class="co"><span class="ad">Ad</span> Tie Co</div>' in box          # "Ad" before the company
     assert '<div class="role">Mechanical Intern 5</div>' in box
     assert '<span class="pay">$28/hr</span>' in box

@@ -3510,7 +3510,7 @@ def placement_box(x: dict, pl: dict, state: str | None = None) -> str:
     if not _DAY_RE.match(end) or not href:
         return ""
     return (f'{PLACEMENT_START}<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">\n'
-            '<p class="paid-h">Paid listing <a href="/privacy.html#paid">Why am I seeing this?</a></p>\n'
+            '<p class="paid-h">Paid listing <a href="/privacy.html#paid-listings">Why am I seeing this?</a></p>\n'
             f'<div class="co"><span class="ad">Ad</span> {esc(x.get("company_name") or "")}</div>\n'
             f'<div class="role">{esc(x.get("title") or "")}</div>\n'
             f'<div class="meta">{row_meta(x, state)}</div>\n'

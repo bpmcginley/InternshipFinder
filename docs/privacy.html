@@ -115,7 +115,9 @@
          posting, its two counts and its two browser settings, added 2026-10-13) -->
     <!-- Still October 13, 2026: the employer interest form (#employers, docs/employers/index.html) was
          added the same day, so the date stands for both changes. -->
-    <p class="meta">Last updated October 13, 2026</p>
+    <!-- was: <p class="meta">Last updated October 13, 2026</p>  (the paid listings section, #paid-listings,
+         and the remembered posting's three-day deletion, added 2026-10-14) -->
+    <p class="meta">Last updated October 14, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
          the whole product "free" without qualification is no longer true. Search still is. -->
     <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
@@ -192,7 +194,7 @@
       <!-- was: ... Delete my data clears it. If the extension ...
            The one-time invite suggestion (docs/js/core.js INVITE_NUDGE_KEY) added 2026-10-02. -->
       <!-- was (2026-10-14): the same item without the remembered posting and the sign-in offer. -->
-      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it. Once the dashboard has suggested inviting a classmate, it also keeps the date, or that you waved it off or opened your link, so the suggestion appears only once; that is never sent to us. If you hide the dashboard's suggestion to review the extension, it keeps that one setting so the suggestion stays hidden; that is never sent to us either. After you open a posting, the site may suggest the Auto-Apply extension once per browser session; your browser keeps that it was shown for the session, and the date if you dismiss it, so it stays away for 14 days. Neither is sent to us. If you press that suggestion's add-to-Chrome link, or a page's "Auto-Apply this" link, your browser also keeps which posting it was (its link, company and title) for up to three days, so the extension can offer to Auto-Apply it once it is set up; the extension removes it when it reads it, and it is not sent to us. If the extension is installed, the dashboard also hands it your profile, and the extension saves that with your Deep Dive (see <a href="#saved">below</a>). If you are signed in on the dashboard but not in the extension, the dashboard also offers the extension that sign-in; the extension checks it with our server and uses it only if you press "Use my dashboard sign-in" in the extension.</li>
+      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it. Once the dashboard has suggested inviting a classmate, it also keeps the date, or that you waved it off or opened your link, so the suggestion appears only once; that is never sent to us. If you hide the dashboard's suggestion to review the extension, it keeps that one setting so the suggestion stays hidden; that is never sent to us either. After you open a posting, the site may suggest the Auto-Apply extension once per browser session; your browser keeps that it was shown for the session, and the date if you dismiss it, so it stays away for 14 days. Neither is sent to us. If you press that suggestion's add-to-Chrome link, or a page's "Auto-Apply this" link, your browser also keeps which posting it was (its link, company and title) so the extension can offer to Auto-Apply it once it is set up. The extension removes it when it reads it. If it hasn't after three days, the site deletes it the next time you open the dashboard or one of its internship pages. It is not sent to us. If the extension is installed, the dashboard also hands it your profile, and the extension saves that with your Deep Dive (see <a href="#saved">below</a>). If you are signed in on the dashboard but not in the extension, the dashboard also offers the extension that sign-in; the extension checks it with our server and uses it only if you press "Use my dashboard sign-in" in the extension. Pressing it gets the extension its own sign-in for the same account from our server, so signing out of the dashboard or the extension leaves the other signed in.</li>
       <li>When you sign in, the dashboard keeps your sign-in in local storage too: a random sign-in code, a short account ID, and your email address, only so it can show which account is signed in. It stays until you sign out, press Delete my data, or the sign-in ends.</li>
       <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
       <li>GitHub hosts the page and may keep normal web server logs under its own policy. The dashboard also loads fonts and code libraries from public servers (such as Google Fonts).</li>
@@ -386,6 +388,8 @@
           <!-- Added 2026-09-26: worker/schema.sql `sessions` and `profiles`. The table is the complete
                list, so both new tables get a row. -->
           <tr><td>For each device you are signed in on: a fingerprint of its sign-in code (never the code itself), your hashed sign-in ID, your allowance tier, whether you used Google or Microsoft, and when the sign-in was made, last used and ends</td><td>So you stay signed in on that device. Deleted when you sign out there, after a year without use, or when you press Delete my data. At most 20 per account.</td></tr>
+          <!-- Added 2026-10-14: worker/schema.sql `session_copies` (POST /session/copy). -->
+          <tr><td>If the extension took over your dashboard sign-in: the fingerprints of both sign-ins and your hashed sign-in ID, with the date</td><td>So one sign-in can be passed on only once. Deleted when you press Delete my data, or once both sign-ins have ended.</td></tr>
           <tr><td>Unless you turn saving off: your Deep Dive profile, encrypted, with when it last changed and its size (what is in it and what is left out: <a href="#saved">see above</a>)</td><td>So your Deep Dive is there on your other devices. Deleted when you turn saving off or press Delete my data.</td></tr>
           <tr><td>Monthly usage counts per AI task (for example, "3 tailored resumes in September"), with a random ID for each run</td><td>To enforce the monthly allowance.</td></tr>
           <tr><td>One number per month: roughly what your AI use has cost us, in cents</td><td>So a single account can't use up the budget that pays for everyone's AI. It is removed when the month ends.</td></tr>
@@ -496,6 +500,18 @@
       <li><strong>Stopping spam:</strong> to stop one place from flooding the form, our server counts how many times it was sent from each network address that day. The count is kept under a scrambled form of the address (a salted hash), never the address itself, and is deleted within two days.</li>
       <li><strong>How long:</strong> up to a year from when you sent it, then it is deleted automatically.</li>
       <li><strong>Deleting it sooner:</strong> write to us at the address under <em>Contact</em> below, from the email you used or naming it, and we'll delete it.</li>
+    </ul>
+
+    <!-- Facts from backend/internscout/placements.py (resolve, MAX_PER_PAGE) and seo_pages.py
+         (placement_box, add_paid_boxes), and docs/js/count.js, which leaves clicks inside li.paid out of
+         posting_click (2026-10-14). The paid box's "Why am I seeing this?" link points here. -->
+    <h2 id="paid-listings">Paid listings</h2>
+    <p>Some internship pages can show one box headed "Paid listing", with "Ad" before the company name. It means an employer paid InternScout to show that role in that spot.</p>
+    <ul>
+      <li><strong>Only roles already listed:</strong> the box always points at a role InternScout already found on the employer's own job site, and the same role is also in the page's normal list. Paying can't add a listing or change one.</li>
+      <li><strong>Nothing else changes:</strong> paying never changes match scores, the order of the list, filters, counts or what Auto-Apply does.</li>
+      <li><strong>At most one per page,</strong> and it goes away on its end date. A box is dropped if the role closes, its deadline passes, its link changes, or it says it is unpaid (unless the employer is a nonprofit or government body).</li>
+      <li><strong>Nothing about you goes to the employer:</strong> "Open posting" goes straight to the employer's own posting, like any other link on the page. We don't count who sees the box or opens it.</li>
     </ul>
 
     <h2 id="delete">Delete your data</h2>

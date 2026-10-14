@@ -337,3 +337,23 @@ test("a landing page's Auto-Apply this link remembers that row's posting, unless
     else assert.deepEqual(JSON.parse(local.map.get("internscout.wanted")), { url: "https://boards.greenhouse.io/acme/jobs/2", company: "Acme", title: "Data Intern", at: T0 });
   }
 });
+
+test("a remembered posting the extension never read is deleted once it is older than three days, or unreadable", () => {
+  const KEY = "internscout.wanted";
+  const keep = (at) => new Map([[KEY, JSON.stringify({ url: "https://x.example/1", company: "Acme", title: "Intern", at })]]);
+  const fresh = keep(T0 - 2 * DAY);
+  load({ local: storage(fresh) });
+  assert.ok(fresh.has(KEY), "two days old: kept");
+  const stale = keep(T0 - 3 * DAY - 1);
+  load({ local: storage(stale) });
+  assert.ok(!stale.has(KEY), "over three days old: deleted");
+  for (const bad of ["not json", JSON.stringify({ url: "https://x.example/1" }), JSON.stringify({ at: "soon" })]) {
+    const m = new Map([[KEY, bad]]);
+    load({ local: storage(m) });
+    assert.ok(!m.has(KEY), `unreadable (${bad}): deleted`);
+  }
+  const other = new Map([["internscout.applyoffer.dismissed", String(T0)]]);
+  load({ local: storage(other) });
+  assert.ok(other.has("internscout.applyoffer.dismissed"), "other keys untouched");
+  assert.doesNotThrow(() => load({ local: blocked }), "blocked storage is fine");
+});

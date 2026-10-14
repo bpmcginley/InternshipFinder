@@ -24,10 +24,12 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
   const bodies = () => sent.map((s) => JSON.parse(s.blob.text));
   // was: const click = (href) => listeners.click({ target: { closest: () => ({ href }) } });
   // `cls` is the link's class: closest() finds it for "a[href]" always, and for a class selector only
-  // when one of the selector's parts names that class.
-  const click = (href, cls) => {
+  // when one of the selector's parts names that class. `box` is the class of an element around the link
+  // (".paid" for a paid listing's box), found by closest(".<box>").
+  const click = (href, cls, box) => {
     const link = { href };
-    const closest = (sel) => (sel === "a[href]" || (cls && sel.split(",").some((s) => s.trim() === `a.${cls}[href]`)) ? link : null);
+    const closest = (sel) => (box && sel === `.${box}`) ? {} :
+      (sel === "a[href]" || (cls && sel.split(",").some((s) => s.trim() === `a.${cls}[href]`)) ? link : null);
     return listeners.click({ target: { closest } });
   };
   // A form sent (2026-10-06): `cls` is the form's class, and matches() is true only for "form.<cls>".
@@ -89,6 +91,14 @@ test("opening a posting from a landing page or the dashboard is a posting_click,
   dash.click("https://jobs.lever.co/acme/1", "open-link");
   dash.click("https://chromewebstore.google.com/detail/x", "nav");
   assert.deepEqual(dash.bodies().filter((b) => b.e).map((b) => b.e), ["posting_click", "install_click"]);
+});
+
+test("opening a posting from a paid listing's box is never a posting_click (payment never changes a count)", () => {
+  const r = load({ path: "/internships/ohio/" });
+  r.click("https://boards.greenhouse.io/acme/jobs/9", "go", "paid");
+  assert.deepEqual(r.bodies().filter((b) => b.e), []);
+  r.click("https://boards.greenhouse.io/acme/jobs/1", "go");
+  assert.deepEqual(r.bodies().filter((b) => b.e), [{ e: "posting_click", p: "/internships/ohio/" }]);
 });
 
 test("sending a weekly email sign-up form is a digest_signup, once per page load, and nothing typed goes", () => {

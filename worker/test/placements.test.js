@@ -219,7 +219,7 @@ test("GET /placements: public, only live rows inside their dates, exact public k
   assert.deepEqual(body.placements.map((p) => p.employer), ["Acme Robotics", "Future Co"]);
   for (const p of body.placements) assert.deepEqual(Object.keys(p).sort(), [...PUBLIC_KEYS].sort());
   assert.deepEqual(body.placements[0], { id: on.id, listing_id: LISTING, apply_url: URL_, employer: "Acme Robotics",
-    start: "2026-09-14", end: "2026-10-14", page_cap: 1 });
+    start: "2026-09-14", end: "2026-10-14", page_cap: 1, unpaid_ok: 0 });
   const text = JSON.stringify(body);
   for (const secret of ["INV-0042", "paid_ref", "note", "lead_id", "checks", "created_by", "updated_by"]) {
     assert.ok(!text.includes(secret), `GET /placements leaks ${secret}`);
@@ -228,6 +228,16 @@ test("GET /placements: public, only live rows inside their dates, exact public k
   // On its end day it is gone from the public read even before the cron runs.
   w.setNow(new Date("2026-10-14T00:00:01Z"));
   assert.deepEqual((await (await w.api("GET", "/placements")).json()).placements, []);
+});
+
+test("GET /placements carries unpaid_ok, so the site build keeps a confirmed unpaid role", async () => {
+  const w = await admin();
+  const p = await w.make({ employer: "Town Library" });
+  assert.equal((await w.call("POST", "/admin/placements/check", { id: p.id, by: "bruce", checks: CHECKS, unpaid_ok: true })).status, 200);
+  assert.equal((await w.call("POST", "/admin/placements/on", { id: p.id, by: "bruce", paid_ref: "INV-0043" })).status, 200);
+  await w.live({ employer: "Acme Robotics" });
+  const body = await (await w.api("GET", "/placements")).json();
+  assert.deepEqual(body.placements.map((x) => [x.employer, x.unpaid_ok]).sort(), [["Acme Robotics", 0], ["Town Library", 1]]);
 });
 
 test("GET /placements with an Origin still works (no admin check) and with ADMIN_TOKEN unset", async () => {

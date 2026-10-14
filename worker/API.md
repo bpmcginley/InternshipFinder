@@ -201,6 +201,19 @@ The same fields as `POST /session` without `session` and `email` (the email is n
 a use of the session (the sliding year). An ID token, an unknown, expired or deleted session, or no token
 is `401 auth`.
 
+### `POST /session/copy` (session token only)
+`Authorization: Bearer iss_…`. A new, separate session for the same account, tier and provider, so a
+client handed a session (the extension taking the dashboard's sign-in, 2026-10-14) gets its own and the
+two sign out separately. Same reply as `POST /session` without `email`:
+```json
+{ "session": "iss_…", "account": "3f2a9c0d1e5b7a64", "provider": "google", "tier": "edu", "expires": "2027-09-26T14:03:11.000Z" }
+```
+A session can be copied once, and a copy can't be copied (`session_copies` in `schema.sql` keeps both
+sessions' sha256 ids and the `user_hash`), so a stolen session token can make one more at most. A second
+copy is `409 copied`; an ID token, an unknown, expired or deleted session, or no token is `401 auth`.
+The new session counts toward the 20 per account. Delete my data removes the copy records; the daily
+cron removes one once neither of its sessions is left.
+
 ### `GET /profile` (auth)
 The Deep Dive saved to the account: `{ "profile": { … } | null, "updated": "<ISO>" | null }`.
 `null`s mean nothing is saved.

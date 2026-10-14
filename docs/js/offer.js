@@ -189,6 +189,17 @@
   // Only while the extension isn't installed; nothing is sent anywhere. The extension checks it all again
   // (extension/background/held.js wantedJob) and forgets it after three days.
   var WANTED_KEY = "internscout.wanted";
+  // The same three days here (held.js WANTED_TTL_MS): if the extension never read it, every page that loads
+  // this file deletes it once it is older than that, or unreadable, as the privacy page says.
+  var WANTED_TTL = 3 * 864e5;
+  try {
+    var kept = localStorage.getItem(WANTED_KEY);
+    if (kept != null) {
+      var at = null;
+      try { at = Number(JSON.parse(kept).at); } catch (e) {}
+      if (!isFinite(at) || at === null || Date.now() - at > WANTED_TTL) localStorage.removeItem(WANTED_KEY);
+    }
+  } catch (e) {}
   function remember(link) {
     try {
       var row = link.closest("tr, li.job");
@@ -207,5 +218,5 @@
     } catch (e) {}
   }, true);
 
-  window.ISOffer = { due: due, POSTING: POSTING, DISMISSED_KEY: DISMISSED_KEY, SHOWN_KEY: SHOWN_KEY, QUIET: QUIET, WANTED_KEY: WANTED_KEY };
+  window.ISOffer = { due: due, POSTING: POSTING, DISMISSED_KEY: DISMISSED_KEY, SHOWN_KEY: SHOWN_KEY, QUIET: QUIET, WANTED_KEY: WANTED_KEY, WANTED_TTL: WANTED_TTL };
 })();

@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { NOW, setup } from "./helpers.js";
 import { userHash } from "../src/auth.js";
 import { MAX_SESSIONS, dropExpiredSessions } from "../src/session.js";
+import { deleteUser } from "../src/limits.js";
 
 const DAY = 86400e3;
 const at = (ms) => new Date(NOW.getTime() + ms);
@@ -192,4 +193,70 @@ test("GET /session says whose a live session is (no email), and refuses anything
     assert.equal(res.status, 401, String(token).slice(0, 8));
     assert.equal((await res.json()).error, "auth");
   }
+});
+
+// The extension's own session from the dashboard's (2026-10-14): the two then sign out separately.
+const copy = (w, token) => w.api("POST", "/session/copy", { token });
+
+test("POST /session/copy makes a separate session for the same account; signing out of either leaves the other", async () => {
+  const w = await setup();
+  const dash = await start(w);
+  const res = await copy(w, dash.session);
+  assert.equal(res.status, 200);
+  const ext = await res.json();
+  assert.match(ext.session, /^iss_[A-Za-z0-9_-]{43}$/);
+  assert.notEqual(ext.session, dash.session);
+  assert.deepEqual({ ...ext, session: undefined }, { session: undefined, account: dash.account, provider: "google", tier: "edu", expires: dash.expires });
+  assert.ok(!("email" in ext), "no email: the Worker never stores one");
+  assert.deepEqual(w.db.dump().session_copies.map((r) => [r.source, r.copy]), [[sha(dash.session), sha(ext.session)]]);
+  // The dashboard signs out: the extension stays signed in, as the same user.
+  await w.api("DELETE", "/session", { token: dash.session });
+  assert.equal((await me(w, dash.session)).status, 401);
+  assert.equal((await me(w, ext.session)).status, 200);
+  // And the other way round.
+  const dash2 = await start(w);
+  const ext2 = await (await copy(w, dash2.session)).json();
+  await w.api("DELETE", "/session", { token: ext2.session });
+  assert.equal((await me(w, dash2.session)).status, 200);
+});
+
+test("POST /session/copy: once per session, never from a copy, and only from a live session token", async () => {
+  const w = await setup();
+  const dash = await start(w);
+  const ext = await (await copy(w, dash.session)).json();
+  for (const token of [dash.session, ext.session]) {
+    const res = await copy(w, token);
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error, "copied");
+  }
+  const id = await w.token();
+  const gone = await start(w);
+  await w.api("DELETE", "/session", { token: gone.session });
+  for (const token of [id, "iss_" + "C".repeat(43), gone.session, undefined]) {
+    const res = await copy(w, token);
+    assert.equal(res.status, 401, String(token).slice(0, 8));
+    assert.equal((await res.json()).error, "auth");
+  }
+  assert.equal(rows(w).length, 2, "only the one copy was made");
+  // Two at once still make one.
+  const d2 = await start(w);
+  const both = await Promise.all([copy(w, d2.session), copy(w, d2.session)]);
+  assert.deepEqual(both.map((r) => r.status).sort(), [200, 409]);
+});
+
+test("copy records go with Delete my data, and with the daily cron once neither session is left", async () => {
+  const w = await setup();
+  const a = await start(w);
+  await copy(w, a.session);
+  const b = await start(w, await w.token({ sub: "someone-else" }));
+  const bx = await (await copy(w, b.session)).json();
+  await w.api("DELETE", "/session", { token: b.session });
+  await dropExpiredSessions(w.db, NOW);
+  assert.equal(w.db.dump().session_copies.length, 2, "one of b's sessions is still there");
+  await w.api("DELETE", "/session", { token: bx.session });
+  await dropExpiredSessions(w.db, NOW);
+  assert.deepEqual(w.db.dump().session_copies.map((r) => r.source), [sha(a.session)]);
+  const user = await userHash("google", { sub: "109876543210" }, { HASH_SALT: "test-salt" });
+  await deleteUser(w.db, user, NOW);
+  assert.deepEqual(w.db.dump().session_copies, []);
 });

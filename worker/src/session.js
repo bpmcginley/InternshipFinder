@@ -29,7 +29,8 @@ const expiresFrom = (now) => new Date(now.getTime() + LIFETIME_MS).toISOString()
 // POST /session, after the ID token has been verified. Returns the new token and its expiry. The new row
 // and the trim to MAX_SESSIONS are one batch; the new row is left out of the trim, so a tie on
 // `last_used` (several sign-ins in the same millisecond) can never push out the one just made.
-export async function createSession(db, { user, tier, provider }, now) {
+// `also(id)` adds statements to the same batch (copySession's record of where the session came from).
+export async function createSession(db, { user, tier, provider }, now, also = () => []) {
   const token = newToken();
   const id = await sha256Hex(token);
   const at = now.toISOString();
@@ -41,8 +42,33 @@ export async function createSession(db, { user, tier, provider }, now) {
       "DELETE FROM sessions WHERE user_hash = ? AND id != ? AND id NOT IN " +
       "(SELECT id FROM sessions WHERE user_hash = ? AND id != ? ORDER BY last_used DESC, created DESC LIMIT ?)",
     ).bind(user, id, user, id, MAX_SESSIONS - 1),
+    ...also(id),
   ]);
   return { token, expires };
+}
+
+const copied = () => new HttpError(409, "copied", "This sign-in has already been passed on once. Sign in with Google or Microsoft instead.");
+
+// POST /session/copy (2026-10-14): a new session for the same account, tier and provider as `token`, so
+// the extension can take over the dashboard's sign-in without sharing it (signing out of one then leaves
+// the other signed in). Only once per session, and never from a copy (session_copies): the trade for
+// letting a session token make a session at all. The INSERT's keys enforce it too, so two calls at once
+// can't both get one.
+export async function copySession(db, token, deps = {}) {
+  const { user, tier, provider } = await sessionUser(db, token, deps);
+  const source = await sha256Hex(token);
+  if (await db.prepare("SELECT 1 FROM session_copies WHERE source = ? OR copy = ?").bind(source, source).first()) throw copied();
+  const now = new Date(deps.now ?? Date.now());
+  try {
+    const made = await createSession(db, { user, tier, provider }, now, (id) => [
+      db.prepare("INSERT INTO session_copies (source, copy, user_hash, created) VALUES (?, ?, ?, ?)")
+        .bind(source, id, user, now.toISOString()),
+    ]);
+    return { session: made.token, account: user.slice(0, 16), provider: provider || null, tier, expires: made.expires };
+  } catch (e) {
+    if (/UNIQUE|constraint/i.test(String(e && e.message))) throw copied();
+    throw e;
+  }
 }
 
 // { user, tier } for a session token. A use moves `last_used` and `expires` forward at most once per UTC
@@ -86,8 +112,10 @@ export async function endSession(db, token) {
 
 // "Delete my data" signs the account out everywhere (limits.js deleteUser).
 export const forgetSessions = (db, user) => db.prepare("DELETE FROM sessions WHERE user_hash = ?").bind(user);
+export const forgetCopies = (db, user) => db.prepare("DELETE FROM session_copies WHERE user_hash = ?").bind(user);
 
-// Daily cron: sessions nobody has used for a year.
+// Daily cron: sessions nobody has used for a year, and copy records neither of whose sessions is left.
 export async function dropExpiredSessions(db, now) {
   await db.prepare("DELETE FROM sessions WHERE expires <= ?").bind(now.toISOString()).run();
+  await db.prepare("DELETE FROM session_copies WHERE source NOT IN (SELECT id FROM sessions) AND copy NOT IN (SELECT id FROM sessions)").run();
 }
