@@ -164,3 +164,81 @@ test("an unknown sort leaves the order alone", () => {
   const list = rows(5);
   assert.deepEqual(ids(IS.sortRows(list.slice(), "nope", () => ({}), null)), ids(list));
 });
+
+// ---------- IS.listRows (2026-10-14, B2 plan section 5, row S5) ----------
+// (core.js runs in its own vm context, so its arrays are spread into this one before deepEqual compares them.)
+// The rows pipeline docs/js/app.js ran inline before it moved to core.js, copied as it was (with `st`
+// spelled out). IS.listRows must give the same rows, in the same order, for every filter and sort.
+function legacyRows(inView, f, { cq, scoreOf, p, elig, blockers, appStates, jobs }) {
+  const st = id => appStates[id] || "none";
+  const ranked = !!(cq && cq.terms.some(t => !t.neg && !t.place));
+  let r, rel = null;
+  if (cq) { rel = new Map(); r = []; for (const x of inView) { const m = IS.matchScore(x, cq); if (m) { rel.set(x, m); r.push(x); } } }
+  else r = inView.slice();
+  if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
+  if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
+  if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
+  else if (f.where === "remote") r = r.filter(IS.isRemote);
+  if (f.stage) r = r.filter(x => (x.stage || []).includes(f.stage));
+  if (f.year) r = r.filter(x => !(x.years && x.years.length) || x.years.includes(f.year));
+  if (f.sector) r = r.filter(x => x.sector === f.sector);
+  if (f.paid === "paid") r = r.filter(x => ["paid", "stipend"].includes(IS.payOf(x)));
+  else if (f.paid === "no_unpaid") r = r.filter(x => IS.payOf(x) !== "unpaid");
+  if (f.hide_citizen) r = r.filter(x => !IS.citizenBlocked(x, p ? p.work_auth : ""));
+  if (f.eligible && elig) r = r.filter(x => !scoreOf(x).mismatch && !blockers(x, elig).length);
+  if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
+  if (f.new_only) r = r.filter(x => x.is_new);
+  if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
+  else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
+  IS.sortRows(r, f.sort, scoreOf, ranked ? rel : null);
+  return r;
+}
+const BASE_F = { q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, sort: "new", hide_citizen: false, paid: "" };
+// A stand-in for app.js blockers(): any row whose description names a citizenship rule, for a visa holder.
+const fakeBlockers = (x, e) => e && e.needs_sponsorship && IS.citizenRule(x) ? ["For U.S. citizens"] : [];
+const FILTER_STATES = all => {
+  const someCo = all.find(x => x.company_name)?.company_name;
+  const someSector = all.find(x => x.sector)?.sector;
+  return [
+    {}, { status: "" }, { status: "closed" }, { fields: ["swe"] }, { fields: ["nursing", "health"] }, { company: [someCo] },
+    { where: "onsite" }, { where: "remote" }, { stage: "coop" }, { year: "junior" }, { sector: someSector },
+    { paid: "paid" }, { paid: "no_unpaid" }, { hide_citizen: true }, { eligible: true }, { new_only: true },
+    { app_state: "applied" }, { app_state: "interested", status: "" }, { app_state: "auto" },
+    { q: "software engineer" }, { q: "nursing" }, { q: "boston" }, { q: "marketing -unpaid", fields: ["business"] },
+    { q: "data", hide_citizen: true, paid: "no_unpaid", eligible: true },
+  ];
+};
+
+test("IS.listRows gives exactly the old inline list for every filter, sort, search and profile (S5)", () => {
+  const all = loadAll();
+  const words = IS.placeWords(all);
+  const appStates = { [all[0].id]: "applied", [all[1].id]: "interested", [all[2].id]: "applied" };
+  const jobs = { [String(all[3].id)]: { status: "queued" } };
+  const ELIG = { cs: { citizenship: "U.S. citizen" }, nursing: { needs_sponsorship: true }, none: null };
+  for (const [name, p] of Object.entries(PROFILES)) {
+    const scoreOf = scorer(p);
+    for (const extra of FILTER_STATES(all)) {
+      for (const sort of ["score", "new", "company", "comp"]) {
+        const f = { ...BASE_F, ...extra, sort };
+        const cq = IS.compileQuery(f.q, f.q.trim() ? words : null);
+        const env = { cq, scoreOf, p, elig: ELIG[name], blockers: fakeBlockers, appStates, jobs };
+        const got = IS.listRows(all, f, env);
+        const want = legacyRows(all, f, env);
+        assert.deepEqual([...ids(got.rows)], [...ids(want)], `profile ${name}, ${JSON.stringify(extra)}, sort ${sort}`);
+        assert.equal(got.ranked, !!(cq && cq.terms.some(t => !t.neg && !t.place)));
+        if (cq) for (const x of got.rows) assert.equal(got.rel.get(x), IS.matchScore(x, cq));
+        else assert.equal(got.rel, null);
+      }
+    }
+  }
+});
+
+test("IS.listRows leaves its input alone and takes exactly three arguments (S5)", () => {
+  const all = loadAll().slice(0, 300);
+  const before = ids(all);
+  const r = IS.listRows(all, { ...BASE_F, sort: "company" }, { cq: null, scoreOf: scorer(null), p: null, elig: null, blockers: fakeBlockers, appStates: {}, jobs: {} });
+  assert.deepEqual(ids(all), before);
+  assert.notEqual(r.rows, all);
+  assert.equal(IS.listRows.length, 3);
+  assert.equal(typeof IS.termFit, "function");
+});
