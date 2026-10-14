@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- What employers sent through the interest form on internscout.org/employers/ (added 2026-10-13;
 -- src/leads.js). The one table here that holds names and email addresses: they are a recruiter's own
 -- work contact details, typed in to be contacted about InternScout for employers, and used for nothing
--- else. `wants` is a comma list of placement_field, placement_place, board, details and other (the form's
+-- else. `wants` is a comma list of placement, board, details and other (the form's
 -- boxes since 2026-10-14); rows from before then may hold featured, promoted or majors_schools, which
 -- are still accepted from a cached page but no longer offered. No IP address is kept:
 -- the per-address daily limit counts in `rate` under a salted hash, swept by the daily cron. Rows older

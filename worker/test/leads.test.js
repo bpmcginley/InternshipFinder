@@ -10,7 +10,7 @@ const SITE = { Origin: "https://internscout.org", "CF-Connecting-IP": "203.0.113
 const GOOD = {
   name: "  Dana   Reyes ", email: "dana.reyes@example.com", company: "Example Robotics",
   title: "University Recruiting Lead", hiring_for: "mechanical and electrical engineering",
-  wants: ["board", "placement_field", "made-up"], message: "Summer 2027 interns.\r\nAbout 20 roles.", website: "",
+  wants: ["board", "placement", "made-up"], message: "Summer 2027 interns.\r\nAbout 20 roles.", website: "",
 };
 const send = (w, body, headers = SITE) => w.api("POST", "/employer-interest", { body, headers });
 const leads = (w) => w.db.prepare("SELECT * FROM employer_leads ORDER BY id").all().then((r) => r.results);
@@ -28,7 +28,7 @@ test("a good send is stored, cleaned, and counted as a step", async () => {
     company: "Example Robotics", title: "University Recruiting Lead",
     hiring_for: "mechanical and electrical engineering",
     // In the form's order, unknown boxes dropped.
-    wants: "placement_field,board", message: "Summer 2027 interns.\nAbout 20 roles.",
+    wants: "placement,board", message: "Summer 2027 interns.\nAbout 20 roles.",
   });
   // No address in the row; the rate count is under a salted hash, never the address itself.
   assert.ok(!JSON.stringify(row).includes("203.0.113.7"));

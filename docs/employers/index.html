@@ -7,8 +7,8 @@
      backend/internscout/seo_pages.py, so it is copied to the site as it is; write() lists it in
      sitemap.xml and page() links it from every landing page's footer. Its shell (header, nav, footer,
      colours) is copied from page() and its CSS, so it looks like /about/ and /pricing/.
-     Its job is a test: would employers pay for a clearly labelled paid listing? Nothing is sold here and
-     no price is named. Every line must fit the placement rule: payment never changes any score, order,
+     Its job is a test: would employers pay for a clearly labelled paid listing? Nothing is sold here yet;
+     the planned price is stated below. Every line must fit the placement rule: payment never changes any score, order,
      filter, count or Auto-Apply behaviour, nothing is targeted at students, and nothing says or implies
      that paying brings more applicants. Adding a board and fixing a listing are free for every employer. The form posts to the Worker (worker/src/leads.js, POST /employer-interest), which keeps the
      lead in D1 for Bruce to read. What is kept and for how long: /privacy#employers. -->
@@ -110,8 +110,10 @@ footer a{color:var(--ink2)}
 <li>It isn't aimed at students by their profile, school, major, class year or anything else about them. It follows only what a student has searched for or picked. Students can hide paid listings.</li>
 <li>We don't promise views, clicks or applicants. You'd get a monthly count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li>
 <li>Your listings, board additions and corrections stay free whether or not you buy a paid listing.</li>
+<li>Planned price: $29 per role for 30 days, or $69 for three role-months. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. If the role closes early, you get the unused days back as credit or a refund.</li>
+<li>The first five employers get a free 30-day pilot for one role.</li>
 </ul>
-<p>There's nothing to buy yet and no price to agree to. This form only tells us you're interested. You can also use it to ask us to add your job board or correct your details, which is free.</p>
+<p>There's nothing to buy yet. This form only tells us you're interested. You can also use it to ask us to add your job board or correct your details, which is free.</p>
 </section>
 
 <form class="lead" id="lead" novalidate aria-labelledby="interest">
@@ -145,8 +147,7 @@ footer a{color:var(--ink2)}
 </div>
 <fieldset>
 <legend>What would you like? <span class="opt">(optional)</span></legend>
-<label class="check"><input type="checkbox" name="wants" value="placement_field"/> A paid listing for one field (for example, mechanical engineering)</label>
-<label class="check"><input type="checkbox" name="wants" value="placement_place"/> A paid listing for a state or city</label>
+<label class="check"><input type="checkbox" name="wants" value="placement"/> A paid listing for one of our open roles</label>
 <label class="check"><input type="checkbox" name="wants" value="board"/> Add our job board (free)</label>
 <label class="check"><input type="checkbox" name="wants" value="details"/> Correct our company's details or listings (free)</label>
 <label class="check"><input type="checkbox" name="wants" value="other"/> Something else (tell us below)</label>
