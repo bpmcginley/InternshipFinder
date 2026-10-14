@@ -755,12 +755,18 @@ def test_pricing_page_states_every_tier_in_numbers_with_a_product_schema(tmp_pat
                  "50 Auto-Apply runs and 20 tailored resumes a month with a school .edu email", "25 runs and 10 resumes with any other email",
                  "100 Auto-Apply runs and 40 tailored resumes a month", "12 runs and 5 resumes with any other email",
                  # One tier is picked out, with the badge, and the anchor sits next to the price.
-                 'class="tier pick" id="supporter"', "Most popular", "Simplify+ and Jobright Turbo run $39.99 a month. This is $4, for students only.",
+                 'class="tier pick" id="supporter"', '<span class="badge">Recommended</span>', "Simplify+ and Jobright Turbo run $39.99 a month. This is $4, for students only.",
                  # The money objections, beside the price, not only in the terms.
                  "No refunds by default.", "The extension never submits.", "Cancel any time.",
                  'href="/?upgrade=supporter"', 'href="/?upgrade=pro"', seo_pages.COMPARE_AS_OF, "not for experienced job seekers"):
         assert text in pricing, text
     assert pricing.count('class="badge"') == 1
+    # No sales data stands behind "Most popular", so the badge says "Recommended" (2026-10-14, D23), and only the
+    # picked tier's button is solid: the other two are secondary.
+    assert "Most popular" not in pricing
+    tiers = pricing.split('<div class="tiers">')[1].split('<p class="anchor">')[0]
+    assert tiers.count('class="cta"') == 1 and tiers.count('class="cta secondary"') == 2
+    assert '<a class="cta" href="/?upgrade=supporter">Get Supporter</a>' in tiers
     blocks = _ld_blocks(pricing)
     assert [b["@type"] for b in blocks] == ["BreadcrumbList", "Organization", "Product"]
     offers = {o["name"]: o for o in blocks[2]["offers"]}
@@ -958,7 +964,8 @@ def test_autoapply_card_counts_only_what_the_extension_fills():
     assert "stops at Submit" in card
     assert f'href="{seo_pages.STORE_URL}?utm_source=seo-employer"' in card
     assert 'href="/install.html?from=seo-employer"' in card
-    assert card.count('class="cta ext-desk"') == 1 and card.count('class="cta ext-touch"') == 1
+    # Secondary buttons (2026-10-14, D22): "Rank these for your major and year" is the page's one solid button.
+    assert card.count('class="cta secondary ext-desk"') == 1 and card.count('class="cta secondary ext-touch"') == 1
     # One kind, and no Workday: the most common one, by name.
     one = seo_pages.autoapply_card([_ats(i, "greenhouse") for i in range(5)], "seo-hub")
     assert "All 5 of these applications are on Greenhouse, a site the free" in one
@@ -976,7 +983,14 @@ def test_rows_link_auto_apply_only_on_supported_sites():
     jobs = html.split("</li>")
     assert sum('class="aa"' in j for j in jobs) == 1
     workday = next(j for j in jobs if "Mechanical Intern 0" in j)
-    assert '<a class="aa" href="/install.html?from=seo-state-row">Auto-Apply this</a>' in workday
+    # It names the listing, so the install flow can carry the posting through (2026-10-14, D21).
+    assert '<a class="aa" href="/install.html?from=seo-state-row&amp;listing=id0">Auto-Apply this</a>' in workday
+    # "Open posting" first, then "Auto-Apply this", on one line.
+    assert '<div class="acts"><a class="go" data-aa ' in workday and workday.index('class="go"') < workday.index('class="aa"')
+    # An id is escaped into the link, never able to break out of it.
+    odd = seo_pages.listing_rows([{**_ats(9, "workday"), "id": 'a&b"c/d'}],
+                                 seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc), src="seo-state")
+    assert "listing=a%26b%22c%2Fd\"" in odd
     # Internal links only: the rows never repeat the store link.
     assert "chromewebstore" not in html
 
@@ -1811,3 +1825,56 @@ def test_page_loads_the_self_hosted_faces_and_the_shared_tokens():
     # Nothing under 12px, and no px font size outside the scale.
     assert not re.search(r"font-size:\s*\d", seo_pages.CSS)
     assert not re.search(r"font:[^;{}]*?\d+(?:\.\d+)?px", seo_pages.CSS)
+
+
+# ---- Landing design (2026-10-14: D21 to D24 of the design review)
+
+def test_landing_rows_match_the_dashboard_rows_and_reach_44px_on_a_phone():
+    css = seo_pages.CSS
+    # Company names in ink on every row, linked or not; underlined only on hover.
+    assert ".co a{color:var(--ink);text-decoration:none}" in css
+    # "Open posting" is a secondary button; "Auto-Apply this" a quiet accent link beside it.
+    assert re.search(r"\.go\{display:inline-flex;[^}]*min-height:var\(--h-ctl\);[^}]*border:1px solid var\(--field-border\)", css)
+    assert re.search(r"\.aa\{[^}]*color:var\(--accent\)", css)
+    # Both are 44px tall on a phone (was: a 22px text link), and touch screens get 44px controls anyway.
+    # (after the .go and .aa rules, so their desktop height doesn't win)
+    phone = css.index("@media (max-width:560px){.go,.aa{min-height:44px}}")
+    assert phone > css.index(".go{display:inline-flex") and phone > css.index(".aa{display:inline-flex")
+    assert "@media (pointer:coarse){:root{--h-ctl:44px" in css
+
+
+def test_one_solid_button_per_landing_page(tmp_path):
+    rows = [_row(i, company_name="Big Co", ats="workday", apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}")
+            for i in range(seo_pages.MIN_EMPLOYER)] + [_row(100 + i) for i in range(6)]
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    checked = 0
+    for path, html in pages.items():
+        main = html.split("<main>")[1].split("</main>")[0]
+        # The card's two buttons are one on screen (ext-desk on a computer, ext-touch on a phone), both secondary.
+        solid = re.findall(r'class="cta(?: ext-desk)?"', main)
+        assert len(solid) <= 1, (path, solid)
+        if "aa-card" in main:
+            checked += 1
+            assert "Rank these for your major and year</a>" in main and len(solid) == 1, path
+    assert checked >= 3
+
+
+def test_one_crumb_draws_no_breadcrumb_line(tmp_path):
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))}
+    hub = pages["/internships/"]
+    assert 'class="crumbs"' not in hub and "› Internships" not in hub
+    ma = pages["/internships/massachusetts/"]
+    assert '<p class="crumbs"><a href="/internships/">Internships</a> › ' in ma
+    assert "<main>\n<h1>" in hub and "main>h1:first-child{margin-top:var(--s6)}" in seo_pages.CSS
+
+
+def test_compare_table_scrolls_by_keyboard_with_a_named_first_column(tmp_path):
+    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))}
+    compare = pages["/compare/"]
+    assert ('<div class="tablewrap" tabindex="0" role="region" aria-label="InternScout, Simplify and Jobright compared">'
+            '<table class="data cmp">') in compare
+    assert '<th scope="col"><span class="vh">Feature</span></th>' in compare
+    assert '<th scope="col"></th>' not in compare
+    # Every scrolling table box on every page can be reached and is named.
+    for path, html in pages.items():
+        assert html.count('<div class="tablewrap"') == html.count('<div class="tablewrap" tabindex="0" role="region" aria-label="'), path
