@@ -12,16 +12,17 @@
 // - flush stamps settings.profile_updated_at with the edit time and PUTs the subset. A 409 means the
 //   account has a newer copy (another device): that copy is applied here instead.
 // - pull (syncNow) runs after every sign-in, at browser startup and when the extension is installed or
-//   updated. The account's copy replaces the local one when it is newer, or when this device hasn't
+//   updated. The account's copy replaces the local one when it is newer, or when this device has never
 //   finished a Deep Dive but the account has one. The local demographic answers are always kept.
 // - settings.profile_synced_hash is the hash of the subset as the account holds it (as far as we know).
 //   Local and account agree when the local subset hashes to it.
 // Signed out, cloud_sync off, or a Worker without profile saving (404, 503 sync_off): nothing happens.
-import { loadStore, updateStore, emptyStore, deepMerge, EMPTY_FACTS } from "./store.js";
+import { loadStore, updateStore, emptyStore, deepMerge, EMPTY_FACTS, DEMOGRAPHIC_KEYS } from "./store.js";
 import { ensureToken, workerFetch } from "./auth.js";
 
 // Keys in profile.facts that never leave the device (the Worker also strips them, as a second line).
-export const DEMOGRAPHIC_KEYS = ["gender", "race", "hispanic", "veteran", "disability", "lgbtq"];
+// was: defined here; lib/store.js needs them too, for confirmedFacts' decline default.
+export { DEMOGRAPHIC_KEYS };
 // profile.extra holds answers the agent learned on application forms ({question text: answer}). An
 // employer's own voluntary self-identification question lands there too, so any entry whose question
 // reads like one of the six stays on the device with them. Erring wide is fine: a dropped entry is only
@@ -90,10 +91,18 @@ export function toServer(sub) {
 export function applyServer(s, serverProfile, updated) {
   const { settings = {}, dashboard_profile = null, ...profile } = serverProfile || {};
   const mine = (s.profile && s.profile.facts) || {};
+  const mySources = (s.profile && s.profile.sources && s.profile.sources.facts) || {};
   const myExtra = (s.profile && s.profile.extra) || {};
   s.profile = deepMerge(emptyStore().profile, profile);
-  // Whatever the account's copy says about these (it should say nothing), this device's answers stand.
-  for (const k of DEMOGRAPHIC_KEYS) s.profile.facts[k] = k in mine ? mine[k] : EMPTY_FACTS[k];
+  // Whatever the account's copy says about these (it should say nothing), this device's answers stand,
+  // with where they came from: an interview's suggestion must stay a suggestion (store.js confirmedFacts).
+  // was: the answers only, so a suggested race or veteran status lost its record and counted as confirmed.
+  s.profile.sources.facts ||= {};
+  for (const k of DEMOGRAPHIC_KEYS) {
+    s.profile.facts[k] = k in mine ? mine[k] : EMPTY_FACTS[k];
+    if (mySources[k]) s.profile.sources.facts[k] = mySources[k];
+    else delete s.profile.sources.facts[k];
+  }
   // The same for learned self-identification answers: the account's copy never has them, so keep ours.
   const extra = withoutDemographicAnswers(s.profile.extra);
   for (const [q, a] of Object.entries(myExtra)) if (DEMOGRAPHIC_QUESTION.test(q)) extra[q] = a;
@@ -113,6 +122,10 @@ export function serverSubset(serverProfile) {
 const EMPTY_HASH = hashOf(syncedSubset(emptyStore()));
 const time = (iso) => Date.parse(iso) || 0;
 
+// A device that has finished a Deep Dive at some point. deep_dive_at is only set by finishing it
+// (onboarding/quickstart.js) or by a restore of a finished one, and nothing clears it.
+const finishedHere = (s) => !!s.settings.onboarded || s.settings.deep_dive_at != null;
+
 // What a pull does with GET /profile's reply { profile, updated }:
 // "restore" (take the account's copy), "push" (send ours), "same" (already equal) or "none".
 export function decide(s, server) {
@@ -123,8 +136,11 @@ export function decide(s, server) {
   const serverDone = !!(sp.settings && sp.settings.onboarded);
   // An unfinished Deep Dive here gives way to a finished one on the account even when it was edited later
   // (a fresh install). Two unfinished ones: the newer wins, so a device part way through keeps its work.
+  // A device that has finished before never gives way to an older copy: its newer edits are pushed.
+  // was: (!s.settings.onboarded && serverDone), which a resume replacement (onboarded=false at the time)
+  // turned into a restore of the old profile, newer local work and all.
   if (localHash === EMPTY_HASH || time(server.updated) > time(s.settings.profile_updated_at)
-      || (!s.settings.onboarded && serverDone)) return "restore";
+      || (!finishedHere(s) && serverDone)) return "restore";
   return "push";
 }
 

@@ -3,7 +3,7 @@
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { hasHostAccess, hostOf } from "../lib/hosts.js";
-import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor } from "../lib/store.js";
+import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, autoApplyReady } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
@@ -522,6 +522,10 @@ export function progressCheck(state, snapText, url, asleep = false) {
 const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter(Boolean)].join(" | ");
 
 // ---------- main loop ----------
+export const RESUME_REVIEW_HELP = "Finish reviewing your resume in the Deep Dive, then press Resume.";
+export const NO_RESUME_HELP = "Add your resume in the Deep Dive, then press Resume.";
+export const NOT_SET_UP_HELP = "Finish the Deep Dive, then press Resume.";
+const notReadyHelp = (store) => (!store.settings.onboarded ? NOT_SET_UP_HELP : store.files.resume ? RESUME_REVIEW_HELP : NO_RESUME_HELP);
 const running = new Set();
 export const isRunning = (id) => running.has(id);
 // Pause, Take over, Resume, Retry, "I submitted it" and Remove all bump job.gen (index.js control,
@@ -588,6 +592,13 @@ async function loop(id, run) {
   // paused, taken over, finished or restarted since. A function patch sees the job as stored.
   const own = (patch) => updateJob(id, (j) => (owns(j, gen) ? (typeof patch === "function" ? patch(j) : patch) : {}));
   let store = await loadStore();
+  // The same gate as queueing (index.js enqueue), checked again here because a job queued earlier, or
+  // resumed, can run after the resume was replaced. Nothing is filled with a profile that isn't ready.
+  // was: checked only when jobs were added.
+  if (!autoApplyReady(store)) {
+    await own({ status: "needs_you", activity: "", question: "", reason: notReadyHelp(store) });
+    return;
+  }
   if (!hasKey(store)) {
     await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Deep Dive → Setup), then Resume.` });
     return;
@@ -665,8 +676,16 @@ async function loop(id, run) {
     if (!(await active())) return;
     await inject(tabId);
     store = await loadStore();
+    // The resume was replaced while this run was going: stop before filling anything more.
+    if (!autoApplyReady(store)) {
+      await own({ status: "needs_you", reason: notReadyHelp(store), question: "", pending, activity: "" });
+      await saveMsgs(id, msgs);
+      return;
+    }
     // job_in_us: for fastFill's "authorized to work in the country where this position is based".
-    const facts = { ...confirmedFacts(store), email: store.settings.signup_email || store.profile.facts.email,
+    // was: email: ... || store.profile.facts.email, which skipped the confirmation check.
+    const ready = confirmedFacts(store);
+    const facts = { ...ready, email: store.settings.signup_email || ready.email,
       job_in_us: globalThis.ISGuard.jobInUS(job.location) };
     // The resume goes in with the contact details when the page has one obvious box for it, on the
     // same rules-first principle: a turn spent telling the model to attach the file it was always

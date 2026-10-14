@@ -1,13 +1,12 @@
 // The Deep Dive's quick start (2026-10-04): sign in, add a resume, and Auto-Apply can be turned on from
 // the Files step. Quick facts, Interview and Voice stay in the Deep Dive as optional extras that make the
 // answers better. Kept out of onboarding.js, which needs a page to run, so the tests can load it.
-import { hasKey } from "../lib/store.js";
+import { hasKey, resumeReviewPending } from "../lib/store.js";
 
 // A replaced resume must finish reading/review before either finish button enables
 // Auto-Apply. Older profiles without a reading marker retain their existing setup.
 // Sign-in itself is checked on the first AI call, as everywhere else.
-export const quickStartReady = (S) => !!(hasKey(S) && S.files.resume && S.settings.signup_email
-  && S.settings.resume_details_ready !== false && !S.settings.resume_import);
+export const quickStartReady = (S) => !!(hasKey(S) && S.files.resume && S.settings.signup_email && !resumeReviewPending(S));
 
 // What finishing the Deep Dive does, from either button (Files' quick start, Review's finish): Auto-Apply
 // is on (background/index.js checks onboarded), the date is kept for the side panel, and the next Deep

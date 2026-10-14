@@ -1,4 +1,4 @@
-import { loadStore, hasKey, isWorker } from "../lib/store.js";
+import { loadStore, hasKey, isWorker, resumeReviewPending } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { takeRestored, restoredMessage } from "../lib/sync.js";
@@ -23,6 +23,13 @@ $("ver").textContent = "v" + chrome.runtime.getManifest().version;
     $("dive").classList.add("primary");
     $("queue").classList.remove("primary");
     return;
+  }
+  // A replaced resume (onboarding.js) pauses Auto-Apply until its details are reviewed; the counts still show.
+  if (resumeReviewPending(s)) {
+    $("note").hidden = false;
+    $("note").textContent = "Auto-Apply is paused until you finish reviewing your new resume in the Deep Dive.";
+    $("dive").classList.add("primary");
+    $("queue").classList.remove("primary");
   }
   const q = (await chrome.storage.local.get("queue")).queue || { jobs: {} };
   const jobs = Object.values(q.jobs);
