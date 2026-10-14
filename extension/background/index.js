@@ -1,8 +1,10 @@
 // Service worker entry: message router, scheduler (max N tabs), notifications, submit detection.
-import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile } from "./queue.js";
+import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile, tailorWaiting, setBatchTailor, studentBusyOn } from "./queue.js";
+import { holdJobs, heldJobs, heldSummary, takeHeld, clearHeld, wantedJob } from "./held.js";
+import { connectOpenTabs } from "./install.js";
 import { runJob, resumeJob, isRunning, stopJob, takeBack, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker, confirmedFacts, resumeReviewPending, DASHBOARD_FACTS } from "../lib/store.js";
-import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
+import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData, holdOffer, offerWaiting, acceptOffer } from "../lib/auth.js";
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
 import { ISEval } from "./evalrec.js";
@@ -32,10 +34,17 @@ async function schedule() {
       const s = await loadStore();
       const max = Math.max(1, Math.min(4, s.settings.max_tabs || 2));
       let active = Object.values(q.jobs).filter((j) => j.status === "working" && isRunning(j.id)).length;
+      // U7: no new tab takes the screen while the student is answering or reviewing a job in the tab in
+      // front. The queue goes on when they leave that tab or that job moves on (listeners below).
+      if (active < max && q.order.some((id) => q.jobs[id] && q.jobs[id].status === "queued")) {
+        const [front] = await chrome.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []);
+        if (front && studentBusyOn(q, front.id)) break;
+      }
       for (const id of q.order) {
         if (active >= max) break;
         const j = q.jobs[id];
-        if (j && j.status === "queued") {
+        // U5: another job queued with this one is waiting on the tailored-resume question.
+        if (j && j.status === "queued" && !tailorWaiting(q, j)) {
           active++;
           await updateJob(id, { status: "working" });
           runJob(id).finally(() => schedule());
@@ -132,6 +141,22 @@ async function control(id, action, answer) {
       await resumeJob(id);
       schedule();
       break;
+    // U5: the same answer for every job queued with this one (queue.js setBatchTailor). Jobs of the batch
+    // already waiting on their own tailored resume get it now; the rest use it when they get there.
+    case "approve_tailored_all":
+    case "skip_tailored_all": {
+      if (!j.tailored || j.tailored.status !== "pending") return { error: "Nothing to review" };
+      const choice = action === "approve_tailored_all" ? "approved" : "skipped";
+      const waiting = j.batch ? await setBatchTailor(j.batch, choice) : [];
+      for (const w of waiting.includes(id) ? waiting : [id, ...waiting]) {
+        const x = await getJob(w);
+        if (!x || !x.tailored || x.tailored.status !== "pending") continue;
+        await updateJob(w, (y) => ({ tailored: { ...y.tailored, status: choice } }));
+        await resumeJob(w);
+      }
+      schedule();
+      break;
+    }
     case "focus":
       await focusJob(j);
       break;
@@ -159,8 +184,10 @@ function cleanProfile(p) {
 }
 
 // ---------- router ----------
+// auth:offer (U8): the dashboard offers its own sign-in; see lib/auth.js holdOffer for why that is safe.
+// held:* and auth:accept_offer are for the extension's own pages only.
 const PAGE_ALLOWED = new Set(["ping", "enqueue", "get_queue", "control", "open_deep_dive", "open_panel", "get_profile_summary",
-  "profile:set", "profile:get", "auth:token", "review_ask"]);
+  "profile:set", "profile:get", "auth:token", "auth:offer", "review_ask"]);
 
 async function handle(m, sender, fromPage) {
   if (!m || typeof m !== "object") return { error: "bad message" };
@@ -177,7 +204,13 @@ async function handle(m, sender, fromPage) {
     case "enqueue": {
       const s = await loadStore();
       // A replaced resume waiting to be reviewed pauses Auto-Apply too (agent.js checks again when a job runs).
-      if (!s.settings.onboarded || !hasKey(s) || resumeReviewPending(s)) { await openDeepDive(); return { error: "setup_required" }; }
+      // U2: the postings picked before setup are kept (held.js), and the setup page offers them once
+      // setup is done. was: { error: "setup_required" } alone, and the jobs were dropped.
+      if (!s.settings.onboarded || !hasKey(s) || resumeReviewPending(s)) {
+        const held = await holdJobs(Array.isArray(m.jobs) ? m.jobs.slice(0, 100) : [], "dashboard").catch(() => 0);
+        await openDeepDive();
+        return { error: "setup_required", held };
+      }
       let jobs = Array.isArray(m.jobs) ? m.jobs.slice(0, 100) : [];
       if (fromPage) jobs = jobs.map(({ tabId, ...j }) => j); // web pages may not point the agent at an existing tab
       const r = await addJobs(jobs);
@@ -228,6 +261,33 @@ async function handle(m, sender, fromPage) {
       // build. The bridge also runs on localhost for development, and any local page could ask there.
       if (fromPage && !trustedDashboard(sender, !chrome.runtime.getManifest().update_url)) return { token: null };
       return authBridge();
+    case "auth:offer":
+      // Only the real dashboard (Chrome says which page sent it; the page can't), and never from a content
+      // script or extension page, which have their own sign-in. Answers only true or false.
+      if (!fromPage || !trustedDashboard(sender, !chrome.runtime.getManifest().update_url)) return { ok: false };
+      return { ok: await holdOffer(typeof m.token === "string" ? m.token : "").catch(() => false) };
+    case "auth:offer_status":
+      return { waiting: await offerWaiting() };
+    case "auth:accept_offer": {
+      // The student pressed "Use my dashboard sign-in" on an extension page.
+      const r = await acceptOffer();
+      if (r.error) return r;
+      const sync = await syncNow().catch(() => null);
+      return { ...(await authStatus()), restored: !!(sync && sync.state === "restored") };
+    }
+    // U2: what was picked before setup (held.js). Only the student's press on the setup page starts them.
+    case "held:get":
+      return { jobs: heldSummary(await heldJobs()) };
+    case "held:start": {
+      const s = await loadStore();
+      if (!s.settings.onboarded || !hasKey(s) || resumeReviewPending(s)) return { error: "setup_required" };
+      const r = await addJobs(await takeHeld());
+      schedule();
+      return r;
+    }
+    case "held:clear":
+      await clearHeld();
+      return { ok: true };
     case "auth:signin": {
       // Runs here, not in the popup: the popup closes when the sign-in window takes focus.
       // No provider given (the side panel's "Sign in & resume"): signIn reuses the last one, else Google.
@@ -316,6 +376,8 @@ onQueueChange((q) => {
     const prev = lastStatus.get(j.id);
     if (prev !== j.status) {
       lastStatus.set(j.id, j.status);
+      // U7: a job the student was busy with moved on, so a job held back from taking the screen may start.
+      if (prev === "needs_you" || prev === "ready_to_submit") schedule();
       if (prev && (j.status === "needs_you" || j.status === "ready_to_submit")) notify(j);
       // An application just finished filling: count it for the review card (lib/review.js). Only a real
       // change seen by this worker counts (prev is set), and each job counts once however often it does.
@@ -346,6 +408,7 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId }) => {
 // but the tab itself. Bringing it to the front is the answer, so resume then rather than making them
 // also press Resume. The short wait lets the page draw a frame before the next snapshot.
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  schedule();   // U7: the student left a job they were busy with, so a held-back job may start now
   const j = await jobForTab(tabId);
   // Matched on the opening sentence, current or earlier wording, so jobs paused before an update count too.
   const first = (r) => String(r || "").split(".")[0];
@@ -361,6 +424,16 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const s = await loadStore(); // also migrates v0.1 storage
+  // U1: the internscout.org tabs open now get the bridge, so the dashboard sees the extension without a
+  // reload; U2: and the posting the offer bar remembered there is kept for after setup. On install only:
+  // after an update the old bridge in those tabs still answers ("reload the page"), and a second one
+  // would race it.
+  if (reason === "install") {
+    connectOpenTabs().then(({ wanted }) => {
+      const jobs = wanted.map((w) => wantedJob(w)).filter(Boolean);
+      if (jobs.length) return holdJobs(jobs, "offer");
+    }).catch(() => {});
+  }
   if (reason === "install" || !s.settings.onboarded) openDeepDive();
   syncNow().catch(() => {});   // an update: fetch or send the Deep Dive saved to the account (lib/sync.js)
 });

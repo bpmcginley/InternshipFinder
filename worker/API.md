@@ -191,6 +191,16 @@ An invalid ID token is `401 auth`, as on every route.
 `Authorization: Bearer iss_…` deletes that session (signs that device out). Always `200 { "ok": true }`:
 an ID token, an unknown or already deleted session, or no header at all is already signed out.
 
+### `GET /session` (session token only)
+`Authorization: Bearer iss_…`. Says whose a live session is, for a client that was handed a session
+token rather than making it (the extension checks the sign-in the dashboard offers it, 2026-10-14):
+```json
+{ "account": "3f2a9c0d1e5b7a64", "provider": "google", "tier": "edu", "expires": "2027-09-26T14:03:11.000Z" }
+```
+The same fields as `POST /session` without `session` and `email` (the email is never stored). Counts as
+a use of the session (the sliding year). An ID token, an unknown, expired or deleted session, or no token
+is `401 auth`.
+
 ### `GET /profile` (auth)
 The Deep Dive saved to the account: `{ "profile": { … } | null, "updated": "<ISO>" | null }`.
 `null`s mean nothing is saved.
@@ -471,3 +481,8 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   - `{type:"auth:token"}` returns `{token, email, account, expires}` (`expires` in ms since the epoch)
     when the extension holds a session, `{token}` for a legacy ID token, or `{token:null}`. The dashboard
     can reuse the extension's sign-in, and accepts both shapes.
+  - `{type:"auth:offer", token}` (2026-10-14) offers the dashboard's own session token to an extension
+    that is signed out. Only from https://internscout.org (or a local copy on an unpacked build); only a
+    session token. The extension checks it with `GET /session` and keeps it aside for a few minutes; it
+    is used only if the student presses "Use my dashboard sign-in" in the extension. Returns `{ok:true}`
+    or `{ok:false}` and nothing else.

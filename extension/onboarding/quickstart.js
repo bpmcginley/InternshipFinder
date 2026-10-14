@@ -1,7 +1,7 @@
 // The Deep Dive's quick start (2026-10-04): sign in, add a resume, and Auto-Apply can be turned on from
 // the Files step. Quick facts, Interview and Voice stay in the Deep Dive as optional extras that make the
 // answers better. Kept out of onboarding.js, which needs a page to run, so the tests can load it.
-import { hasKey, resumeReviewPending, manualDetailsMissing } from "../lib/store.js";
+import { hasKey, isWorker, resumeReviewPending, manualDetailsMissing } from "../lib/store.js";
 
 // A replaced resume must finish reading/review before either finish button enables
 // Auto-Apply. Older profiles without a reading marker retain their existing setup.
@@ -71,3 +71,18 @@ export function revealQuick(box, button, reduceMotion = false) {
   box.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
   button.focus({ preventScroll: true });
 }
+
+// U4 (2026-10-14 UX audit): whether the step bar ticks Setup. On InternScout's AI the student also has to
+// be signed in, because reading the resume and every application need it. `signedIn` is true, false, or
+// null while it is still being checked (not ticked yet). hasKey() is always true on InternScout's AI, so
+// was: !!(hasKey(S) && S.settings.signup_email), which ticked Setup for a student who never signed in.
+export const setupDone = (S, signedIn) => !!(hasKey(S) && S.settings.signup_email && (!isWorker(S.ai) || signedIn === true));
+
+// Whether to ask for sign-in where it is needed (Setup's warning, the Files step's sign-in buttons):
+// only on InternScout's AI and only once the check has said "signed out".
+export const signInNeeded = (S, signedIn) => isWorker(S.ai) && signedIn === false;
+
+// After signing in on the Files step: read the chosen resume straight away when it hasn't been read,
+// isn't being read and has no review waiting.
+export const readAfterSignIn = (S, { extracting = false, pending = false } = {}) =>
+  !!S.files.resume && !extracting && !pending && S.settings.resume_details_ready === false;

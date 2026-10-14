@@ -34,13 +34,15 @@ class El {
 }
 
 function load({ ua = CHROME, touch = false, media = true, attr = false, local = storage(), session = storage(), now = T0, config, queue } = {}) {
-  const doc = { activeElement: null, listeners: {} };
+  const doc = { activeElement: null, listeners: {} }, docL = {};
   const winListeners = {};
   Object.assign(doc, {
     documentElement: new El("html", doc), head: new El("head", doc), body: new El("body", doc),
     createElement: (t) => new El(t, doc),
     createTextNode: (s) => ({ text: String(s), parentNode: null }),
-    addEventListener: (t, f) => { doc.listeners[t] = f; },
+    // Every listener of a type runs, in order (offer.js has two click listeners since 2026-10-14, U2).
+    // was: addEventListener: (t, f) => { doc.listeners[t] = f; },
+    addEventListener: (t, f) => { (docL[t] = docL[t] || []).push(f); doc.listeners[t] = (ev) => docL[t].forEach((g) => g(ev)); },
   });
   if (attr) doc.documentElement.setAttribute("data-internscout", "0.9.0");
   const clock = { now };
@@ -266,4 +268,40 @@ test("the bar uses the shared tokens: the large radius, the pop-up shadow and on
   assert.doesNotMatch(OFFER, /rgba\(20,20,20/, "the old fixed shadow vanished on a dark page");
   assert.match(OFFER, /\.is-offer \.is-offer-go\{[^}]*background:var\(--accent,/);
   assert.match(OFFER, /\.is-offer button\{[^}]*border:0;[^}]*background:transparent;[^}]*color:var\(--accent,/);
+});
+
+// U2 (2026-10-14): the posting a student wanted is remembered for the extension to offer after setup.
+const rowWith = (company, title) => ({ querySelector: (sel) => (sel === ".co" ? { textContent: ` ${company}
+` } : sel === ".role" ? { textContent: title } : null) });
+
+test("pressing the bar's store link remembers the posting it was shown for", () => {
+  const local = storage();
+  const r = load({ local });
+  const link = r.posting();
+  link.href = link.getAttribute("href");   // a real link's href property is the full address
+  const row = rowWith("Acme Corp", "Software  Intern");
+  const own = link.closest;
+  link.closest = (sel) => (sel === "tr, li.job" ? row : own(sel));
+  r.open(link);
+  assert.equal(local.map.get("internscout.wanted"), undefined, "opening the posting alone remembers nothing");
+  const go = r.bar().find((n) => n.tag === "a");
+  go.closest = (sel) => (sel === ".is-offer-go" ? go : null);
+  r.doc.listeners.click({ target: go });
+  assert.deepEqual(JSON.parse(local.map.get("internscout.wanted")),
+    { url: "https://acme.wd1.myworkdayjobs.com/job/1", company: "Acme Corp", title: "Software Intern", at: T0 });
+});
+
+test("a landing page's Auto-Apply this link remembers that row's posting, unless the extension is there", () => {
+  for (const attr of [false, true]) {
+    const local = storage();
+    const r = load({ local, attr });
+    const go = new El("a", r.doc);
+    go.href = "https://boards.greenhouse.io/acme/jobs/2";
+    const job = { querySelector: (sel) => (sel === "a.go[data-aa][href]" ? go : sel === ".co" ? { textContent: "Acme" } : sel === ".role" ? { textContent: "Data Intern" } : null) };
+    go.closest = (sel) => (sel === "tr, li.job" ? job : null);
+    const aa = { closest: (sel) => (sel === "a.aa" ? aa : sel === "li.job" ? job : null) };
+    r.doc.listeners.click({ target: aa, preventDefault() { throw new Error("must not stop the link"); } });
+    if (attr) assert.equal(local.map.get("internscout.wanted"), undefined);
+    else assert.deepEqual(JSON.parse(local.map.get("internscout.wanted")), { url: "https://boards.greenhouse.io/acme/jobs/2", company: "Acme", title: "Data Intern", at: T0 });
+  }
 });

@@ -7,7 +7,7 @@ import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, do
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
-import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile } from "./queue.js";
+import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile, tailorChoice } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
 import { recordStep } from "./evalrec.js";
 // Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
@@ -482,7 +482,17 @@ async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch))
       await appendLog(id, { kind: "tailor", text: "Your resume already fits this posting as written. Using your original." });
       return job;
     }
-    const auto = store.settings.tailor_resume === "auto";
+    // A "for all" answer on another job of the same batch (U5, queue.js setBatchTailor), read fresh because
+    // it may have been given while this one was being tailored: tailored for all counts as auto, and the
+    // original for all means this one goes out as the original too, without asking.
+    // was: const auto = store.settings.tailor_resume === "auto";
+    const choice = tailorChoice(store.settings.tailor_resume, ((await getJob(id)) || job).batch_tailor);
+    if (choice === "original") {
+      job = await updateJob(id, (j) => ({ tailored: { status: "skipped", error: "you chose your original resume for these applications" }, cost_usd: (j.cost_usd || 0) + cost_usd }));
+      await appendLog(id, { kind: "tailor", text: "Using your original resume, as you chose for the applications queued with this one." });
+      return job;
+    }
+    const auto = choice === "auto";
     job = await updateJob(id, (j) => ({ tailored: { ...t, status: auto ? "approved" : "pending" }, cost_usd: (j.cost_usd || 0) + cost_usd }));
     // The queue can refuse the file (no room left in the browser's storage) and hands back
     // tailored.status "failed". This step used to carry on regardless: it logged "used automatically"
@@ -670,7 +680,9 @@ async function loop(id, run) {
   // A Pause or Take over that landed while the checks above were awaited: stop before the paid
   // tailoring call. was: first checked after tailoring (PR #94 review, P3).
   if (!(await active())) return;
-  if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
+  // batch_tailor "skipped": "Use my original for all" on another job of this batch (U5), so nothing is
+  // tailored, and none of the allowance is spent on it.
+  if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && job.batch_tailor !== "skipped" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
     job = await tailorStep(id, job, store, own);
     if (!owns(job, gen)) return; // waiting for the human to approve it, or stopped meanwhile
   }
