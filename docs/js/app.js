@@ -1,7 +1,7 @@
 // InternScout dashboard UI. Plain JS with React.createElement (no build step, no Babel).
 (function () {
   "use strict";
-  const { useState, useEffect, useMemo, useRef, useCallback } = React;
+  const { useState, useEffect, useMemo, useRef, useCallback, useId } = React;
   const h = React.createElement, F = React.Fragment;
   const IS = window.IS, C = IS.C;
   const ADMIN = new URLSearchParams(location.search).get("admin") === "1";
@@ -143,7 +143,7 @@
   // ---------- small components ----------
   function MultiSelect({ placeholder, options, selected, onChange, label, wide }) {
     const [q, setQ] = useState(""); const [open, setOpen] = useState(false); const [act, setAct] = useState(0);
-    const ref = useRef();
+    const ref = useRef(), input = useRef(), drop = useRef(), id = useId();
     useEffect(() => {
       const hd = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
       document.addEventListener("mousedown", hd); return () => document.removeEventListener("mousedown", hd);
@@ -152,23 +152,30 @@
     const avail = options.filter(o => !selected.includes(o.value));
     const ql = q.toLowerCase();
     const filtered = (q ? avail.filter(o => (o.label || o.value).toLowerCase().includes(ql) || o.value.toLowerCase().includes(ql)) : avail).slice(0, 60);
+    const active = Math.max(0, Math.min(act, filtered.length - 1));
+    useEffect(() => {
+      if (open && drop.current) { const option = drop.current.children[active]; if (option) option.scrollIntoView({ block: "nearest" }); }
+    }, [open, active, q, selected.length]);
     const add = v => { onChange([...selected, v]); setQ(""); setAct(0); };
     const rm = v => onChange(selected.filter(x => x !== v));
     const onKey = e => {
-      if (e.key === "Enter" && filtered[act]) { add(filtered[act].value); e.preventDefault(); }
-      else if (e.key === "ArrowDown") { setAct(a => Math.min(a + 1, filtered.length - 1)); setOpen(true); e.preventDefault(); }
-      else if (e.key === "ArrowUp") { setAct(a => Math.max(a - 1, 0)); e.preventDefault(); }
-      else if (e.key === "Escape") setOpen(false);
+      if (e.key === "Enter" && open && filtered[active]) { add(filtered[active].value); e.preventDefault(); }
+      else if (e.key === "ArrowDown") { setAct(open ? Math.min(active + 1, Math.max(0, filtered.length - 1)) : 0); setOpen(true); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { setAct(open ? Math.max(active - 1, 0) : Math.max(0, filtered.length - 1)); setOpen(true); e.preventDefault(); }
+      else if (e.key === "Escape") { setOpen(false); e.preventDefault(); }
       else if (e.key === "Backspace" && !q && selected.length) rm(selected[selected.length - 1]);
     };
-    return h("div", { className: cx("field ms", wide && "wide"), ref },
-      h("div", { className: "box", onClick: () => setOpen(true) },
+    return h("div", { className: cx("field ms", wide && "wide"), ref, onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); } },
+      h("div", { className: "box", onClick: () => { setOpen(true); if (input.current) input.current.focus(); } },
         selected.map(s => { const o = byVal.get(s); return h("span", { key: s, className: "chip" }, (o && (o.chip || o.label)) || s,
           h("button", { type: "button", "aria-label": "Remove " + s, onClick: e => { e.stopPropagation(); rm(s); } }, "×")); }),
-        h("input", { value: q, "aria-label": label || placeholder, placeholder: selected.length ? "" : placeholder,
+        h("input", { ref: input, value: q, role: "combobox", "aria-autocomplete": "list", "aria-expanded": open,
+          "aria-controls": id + "-list", "aria-activedescendant": open && filtered.length ? id + "-option-" + active : undefined,
+          "aria-label": label || placeholder, placeholder: selected.length ? "" : placeholder,
           onChange: e => { setQ(e.target.value); setOpen(true); setAct(0); }, onFocus: () => setOpen(true), onKeyDown: onKey })),
-      open && filtered.length > 0 && h("div", { className: "drop", role: "listbox" },
-        filtered.map((o, i) => h("div", { key: o.value, role: "option", "aria-selected": i === act, className: cx("opt", i === act && "act"),
+      open && h("div", { className: "drop", ref: drop, id: id + "-list", role: "listbox", "aria-label": label || placeholder },
+        !filtered.length && h("div", { className: "opt muted", role: "status" }, "No more matching options"),
+        filtered.map((o, i) => h("div", { key: o.value, id: id + "-option-" + i, role: "option", "aria-selected": false, className: cx("opt", i === active && "act"),
           onMouseDown: e => { e.preventDefault(); add(o.value); }, onMouseEnter: () => setAct(i) },
           h("span", null, o.label || o.value), o.count != null ? h("span", { className: "c" }, o.count) : o.hint ? h("span", { className: "c" }, o.hint) : null))));
   }
@@ -268,7 +275,7 @@
   // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, onAuto, open, onWhy, elig, patterns }) {
   // `canTry` (2026-10-04): a desktop browser without the extension. Such a visitor never saw the word
   // Auto-Apply on a row, so a row it could fill now says so and opens a one-line explainer.
-  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, open, onWhy, elig, patterns }) {
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, elig, patterns }) {
     const [aaOpen, setAaOpen] = useState(false);
     const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
     const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
@@ -302,9 +309,9 @@
           (stages.length > 0 || r.sector) && h("div", { className: "meta" }, [...stages, r.sector && IS.sectorLabel(r.sector)].filter(Boolean).join(" · "))),
         h("td", { className: "c-loc" }, h(Loc, { r, keys }),
           (term || r.duration) && h("div", { className: "meta" }, [term, r.duration].filter(Boolean).join(" · "))),
-        h("td", { className: "c-pay" }, r.salary ? h("span", { className: "num" }, r.salary) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "Not listed")),
+        h("td", { className: "c-pay" }, IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "Not listed")),
         h("td", { className: "c-match" }, h("button", { type: "button", className: "score whybtn " + cls, "aria-expanded": !!open, onClick: () => onWhy(r.id), title: `Match score ${sc.score} of 100. Click for why.` },
-          h("span", { className: "num" }, sc.score), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))),
+          h("span", { className: "match-label", "aria-hidden": true }, "Match"), h("span", { className: "num" }, sc.score), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))),
         h("td", { className: "c-mine" },
           h("select", { className: "mine", "aria-label": "Your status", value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status))),
@@ -313,7 +320,7 @@
           // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
           // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
           r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined }, "Open posting") : h("span", { className: "muted" }, "No link"),
-          !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", onClick: () => onAuto([r]) }, "Auto-Apply")),
+          !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]) }, "Auto-Apply")),
           tryAuto && h("div", null, h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply")),
           h("div", null, h("a", { className: "report", href: IS.reportUrl(r), target: "_blank", rel: "noopener", title: "Wrong tag, dead link or not a student role? Tell us." }, "Report")))),
       // Its own full-width row, like the Why panel, so the nowrap links column doesn't widen the table.
@@ -335,7 +342,7 @@
       return () => clearTimeout(t);
     }, [text]);
     // id: the hero's "Search free" button focuses this box (2026-10-05).
-    return h("input", { id: "q", type: "text", "aria-label": "Search", placeholder: 'Search: nursing boston -unpaid "research assistant"', value: text,
+    return h("input", { id: "q", type: "text", "aria-label": "Search", placeholder: 'Search roles or companies', title: 'Use quotes for a phrase or a minus sign to exclude a word, e.g. nursing -unpaid', value: text,
       onChange: e => setText(e.target.value), onKeyDown: e => { if (e.key === "Enter") { sent.current = text; onChange(text); } } });
   }
 
@@ -470,8 +477,11 @@
     const [dir, setDir] = useState("");
     const setStep = n => { setDir(n > step ? "fwd" : "back"); setStepRaw(n); };
     const [stagesTouched, setStagesTouched] = useState(!!(initial && initial.stages && initial.stages.length));
-    const ref = useRef();
-    useEffect(() => { if (ref.current) ref.current.scrollIntoView({ block: "start", behavior: scrollBehavior() }); }, [step]);
+    const ref = useRef(), stepRef = useRef();
+    useEffect(() => {
+      if (ref.current) ref.current.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+      if (stepRef.current) stepRef.current.focus({ preventScroll: true });
+    }, [step]);
     const set = (k, v) => setD(s => ({ ...s, [k]: v }));
     const toggle = (k, v) => setD(s => ({ ...s, [k]: s[k].includes(v) ? s[k].filter(x => x !== v) : [...s[k], v] }));
 
@@ -518,7 +528,7 @@
     function coverage() {
       const direct = [...mineFields.direct].filter(t => t !== "other");
       if (!direct.length) return h("div", { className: "meta" },
-        "Pick a major or a field and we'll show how many open listings we have for it right now. The same count sits beside each field in the list above.");
+        "Pick a major or a field and we'll show how many open listings we have for it right now. Open the field picker to see counts.");
       // was: if (!byField) return h("div", { className: "meta" }, "Today's listing counts didn't load, so we can't show how deep your field is right now.");
       // stats is null both before IS.loadStats() settles and after it fails (core.js loadStats
       // returns null when every base URL throws), so the old line told a student on a slow
@@ -624,7 +634,7 @@
 
     return h("section", { className: "setup sheet", ref, "aria-label": "My profile" },
       h("div", { className: "setup-head" }, h("h2", null, firstTime ? "Set up InternScout" : "My profile"), dots),
-      h("div", { key: step, className: cx("step-body", dir) }, body),
+      h("div", { key: step, ref: stepRef, tabIndex: -1, role: "group", "aria-label": `Profile step ${step} of 3: ${["About you", "What you want", "Where"][step - 1]}`, className: cx("step-body", dir) }, body),
       h("div", { className: "setup-foot" },
         step > 1 && h("button", { type: "button", className: "btn", onClick: () => setStep(step - 1) }, "Back"),
         step < 3 && h("button", { type: "button", className: "btn primary", onClick: () => setStep(step + 1) }, "Next"),
@@ -718,7 +728,7 @@
 
     // data
     const reload = useCallback(async fromRaw => {
-      setLoading(true);
+      setLoading(true); setErr(null);
       try {
         const r = await store.current.init(fromRaw);
         setIndex(r.index); setLegacy(r.legacy); setErr(null); setReady(n => n + 1); setVer(store.current.version());
@@ -740,8 +750,8 @@
     useEffect(() => {
       if (!ready) return;
       let live = true;
-      setLoading(true);
-      store.current.ensure(keys).then(bad => { if (live) { setVer(store.current.version()); setLoading(false); setFailedKeys(bad || []); } });
+      setLoading(true); setFailedKeys([]);
+      store.current.ensure(keys, () => { if (live) setVer(store.current.version()); }).then(bad => { if (live) { setVer(store.current.version()); setLoading(false); setFailedKeys(bad || []); } });
       return () => { live = false; };
     }, [ready, keysKey, retry]);
 
@@ -751,15 +761,16 @@
     // DESC_AUTO listings. Past that the search covers titles, companies and fields until the student
     // asks for descriptions too.
     const [descAll, setDescAll] = useState(false);
+    const [descFailed, setDescFailed] = useState([]), [descLoading, setDescLoading] = useState(false), [descRetry, setDescRetry] = useState(0);
     const searching = f.q.trim().length >= 2;
     const descOpen = useMemo(() => keys.reduce((a, k) => a + ((index && index.files && index.files[k] && index.files[k].open) || 0), 0), [keys, index]);
     const wantDesc = searching && (descOpen <= DESC_AUTO || descAll);
     useEffect(() => {
       if (!ready || !wantDesc) return;
-      let live = true;
-      store.current.descs(keys).then(() => { if (live) setVer(store.current.version()); });
+      let live = true; setDescLoading(true); setDescFailed([]);
+      store.current.descs(keys).then(bad => { if (live) { setVer(store.current.version()); setDescFailed(bad || []); setDescLoading(false); } });
       return () => { live = false; };
-    }, [ready, wantDesc, keysKey]);
+    }, [ready, wantDesc, keysKey, descRetry, retry]);
 
     // sign-in
     useEffect(() => {
@@ -949,9 +960,9 @@
       setF(x => ({ ...x, states: [], ...initF(s) }));
       setNote(`Profile saved. Ranking for ${s.majors.length ? s.majors.join(", ") : s.fields.length ? s.fields.map(IS.fieldLabel).join(", ") : "all fields"}.`);
       setTimeout(() => setNote(""), 6000);
-      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+      setTimeout(() => { const q = document.getElementById("q"); if (q) { q.focus(); q.scrollIntoView({ block: "center", behavior: scrollBehavior() }); } }, 0);
     }
-    function closeSetup() { if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); }
+    function closeSetup() { if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); setTimeout(() => { const q = document.getElementById("q"); if (q) q.focus(); }, 0); }
     async function deleteData() {
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
@@ -1037,13 +1048,13 @@
         const { rest, places } = splitPlaces(f.q), terms = parseQuery(rest);
         const seen = new Map(); r.forEach(x => new Set(locHay(x).split(/[^a-z]+/)).forEach(t => { if (t.length >= 3 && !NOT_PLACE.has(t)) seen.set(t, (seen.get(t) || 0) + 1); }));
         const words = new Set(); seen.forEach((n, t) => { if (n >= 3) words.add(t); });
-        r = r.filter(x => places.every(pl => IS.regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state)) !== pl.neg) &&
+        r = r.filter(x => places.every(pl => (pl.kind === "remote" ? IS.isRemote(x) : IS.regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state))) !== pl.neg) &&
           terms.every(({ t, neg }) => (words.has(t) ? placeHay(x) : hay(x)).includes(t) !== neg));
       }
       if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
       if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
       if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
-      else if (f.where === "remote") r = r.filter(x => IS.regs(x).some(g => g.kind === "remote") || x.is_remote);
+      else if (f.where === "remote") r = r.filter(IS.isRemote);
       if (f.stage) r = r.filter(x => (x.stage || []).includes(f.stage));
       if (f.year) r = r.filter(x => !(x.years && x.years.length) || x.years.includes(f.year));
       if (f.sector) r = r.filter(x => x.sector === f.sector);
@@ -1063,7 +1074,7 @@
       if (f.sort === "score") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || (S(b).score - S(a).score) || (b.first_seen || "").localeCompare(a.first_seen || ""));
       else if (f.sort === "new") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || newer(a, b));
       else if (f.sort === "company") r.sort((a, b) => a.company_name.localeCompare(b.company_name));
-      else if (f.sort === "comp") r.sort((a, b) => (b.salary ? 1 : 0) - (a.salary ? 1 : 0) || S(b).score - S(a).score);
+      else if (f.sort === "comp") r.sort((a, b) => (IS.realSalary(b) ? 1 : 0) - (IS.realSalary(a) ? 1 : 0) || S(b).score - S(a).score);
       return r;
     }, [inView, f, appStates, jobs, elig, scores, p]);
 
@@ -1081,35 +1092,59 @@
     const canAuto = info.installed;
     // A desktop browser we know has no extension (a phone can't add one), for the rows' Auto-Apply explainer.
     const canTry = info.checked && !info.installed && !info.stale && !touchOnly();
-    const check = useCallback((id, on) => setSel(s => { const n = new Set(s); on ? n.add(id) : n.delete(id); return n; }), []);
+    const selectionRef = useRef(sel); selectionRef.current = sel;
+    const check = useCallback((id, on) => {
+      const n = new Set(selectionRef.current);
+      if (on && !n.has(id) && n.size >= 100) { setNote("Select up to 100 applications at a time. Queue these first, then select more."); return; }
+      on ? n.add(id) : n.delete(id); selectionRef.current = n; setSel(n);
+    }, []);
     const onWhy = useCallback(id => setOpenId(o => o === id ? null : id), []);
-    const selectable = shown.filter(r => r.apply_url && !jobs[String(r.id)]);
-    const allChecked = selectable.length > 0 && selectable.every(r => sel.has(r.id));
+    const selectable = shown.filter(r => r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed"));
+    const allChecked = selectable.length > 0 && selectable.slice(0, 100).every(r => sel.has(r.id));
+    const selectShown = on => {
+      const n = new Set(selectionRef.current); let omitted = 0;
+      selectable.forEach(r => { if (!on) n.delete(r.id); else if (n.has(r.id) || n.size < 100) n.add(r.id); else omitted++; });
+      selectionRef.current = n; setSel(n);
+      if (omitted) setNote(`Selected ${n.size} applications. Queue up to 100 at a time; ${omitted} more shown are unselected.`);
+    };
 
     const autoRef = useRef(null);
+    const autoPending = useRef(false), [queuing, setQueuing] = useState(false);
     const onAutoRow = useCallback(list => autoRef.current && autoRef.current(list), []);
     async function autoApply(list) {
       if (!info.installed) { setNote("Install the InternScout extension first."); return; }
+      if (autoPending.current) return;
+      const { batch, remaining } = IS.applicationBatch(list);
+      if (!batch.length) return;
+      autoPending.current = true; setQueuing(true); setNote("Loading posting details…");
+      try {
       // The agent tailors answers from the posting text, which is not in the list rows.
-      const ks = new Set(); list.forEach(r => IS.shardKeys(r).forEach(k => ks.add(k)));
-      await store.current.descs([...ks]);
-      const payload = list.filter(r => r.apply_url).slice(0, 100).map(r => ({
+      const ks = new Set(), loaded = new Set(store.current.loadedKeys());
+      batch.forEach(r => { if (!r.description) { const k = [...IS.shardKeys(r)].find(k => loaded.has(k)); if (k) ks.add(k); } });
+      const bad = await store.current.descs([...ks]);
+      if (bad.length) { setNote(`Couldn't load posting details for ${bad.join(", ")}. Check your connection and try Auto-Apply again.`); return; }
+      const payload = batch.map(r => ({
         id: r.id, apply_url: r.apply_url, company: r.company_name, title: r.title,
-        location: (r.region_locations || []).join("; ") || r.location_raw || "", description: r.description || "",
+        location: IS.regs(r).map(g => g.loc).filter(Boolean).join("; ") || (r.region_locations || []).join("; ") || r.location_raw || "", description: r.description || "",
       }));
       if (!payload.length) return;
       setNote("Adding to the queue…");
       const res = await IS.ext.call({ type: "enqueue", jobs: payload });
       if (res.error === "setup_required") { setNote("Finish the Deep Dive first. It just opened in a new tab."); return; }
       if (res.error) { setNote("Couldn't queue: " + res.error); return; }
-      setSel(new Set());
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
+      const current = added || skipped ? await IS.ext.call({ type: "get_queue" }) : null;
+      const addedIds = new Set(IS.queuedListingIds(res.added || [], current && current.queue));
+      const handledIds = new Set([...addedIds, ...IS.queuedListingIds(res.skipped || [], current && current.queue)]);
+      setSel(s => new Set([...s].filter(id => !handledIds.has(String(id)))));
       // was: if (added) IS.count("autoapply");
       if (added) { IS.count("autoapply"); offerNudge(); }
-      setNote(`Queued ${plural(added, "application")}${skipped ? ` (${skipped} already queued)` : ""}. Each one is filled in and left for you to submit.`);
-      list.forEach(r => { if (st(r.id) === "none") setAppState(r.id, "interested"); });
+      setNote(`Queued ${plural(added, "application")}${skipped ? ` (${skipped} already queued)` : ""}.${remaining.length ? ` ${remaining.length} more remain selected; queue them in the next batch.` : ""} Each one is filled in and left for you to submit.`);
+      batch.forEach(r => { if (addedIds.has(String(r.id)) && st(r.id) === "none") setAppState(r.id, "interested"); });
       IS.ext.call({ type: "open_panel" });
       setTimeout(() => setNote(""), 9000);
+      } catch (e) { setNote("Couldn't add applications to the queue. Your selections are kept; try again."); }
+      finally { autoPending.current = false; setQueuing(false); }
     }
 
     autoRef.current = autoApply;
@@ -1451,7 +1486,7 @@
         h("button", { type: "button", className: cx("btn morebtn", moreOpen && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
           moreOpen ? "Fewer filters" : "More filters", moreCount > 0 && h("span", { className: "count ok" }, moreCount)),
         h("span", { className: "spacer" }),
-        canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
+        canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size || queuing, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, queuing ? "Adding applications…" : "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
       moreOpen && h("div", { className: "filters extra" },
         h(Sel, { label: "Stage", value: f.stage, onChange: v => upd("stage", v) }, opt("", "Any stage"), IS.STAGES.map(([k, l]) => opt(k, (IS.STAGE_LABEL[k] || l)))),
         h(Sel, { label: "Eligible year", value: f.year, onChange: v => upd("year", v) }, opt("", "Any year"), IS.YEARS.map(([k, l]) => opt(k, "Open to " + l.toLowerCase().replace("master's", "master's").replace("phd", "PhD")))),
@@ -1468,24 +1503,28 @@
         h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
           saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`))))),
       h("div", { className: "filterbar-foot" },
-        h("span", null, loading && !all.length ? "Loading…" : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}`),
+        h("span", { role: "status" }, loading && !all.length ? "Loading…" : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${loading ? " · loading more states…" : ""}`),
         anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
 
       searching && !wantDesc && h("div", { className: "notice" }, `Searching titles, companies and fields in ${keys.length} states. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)"),
+      wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
+      wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
+        h("button", { type: "button", className: "btn quiet", onClick: () => setDescRetry(n => n + 1) }, "Retry descriptions")),
       failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setRetry(n => n + 1) }, "Try again")),
-      err ? h("div", { className: "sheet empty" }, "Couldn't load listings: ", err)
+      err ? h("div", { className: "sheet empty", role: "alert" }, "Couldn't load listings. Check your connection and try again. ",
+        h("button", { type: "button", className: "btn", onClick: () => reload(false) }, "Retry listings"))
         : loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
           : rows.length === 0 ? h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
             : h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" },
               h("thead", null, h("tr", null,
-                canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select all shown", checked: allChecked, disabled: !selectable.length,
-                  onChange: e => { const on = e.target.checked; setSel(s => { const n = new Set(s); selectable.slice(0, 100).forEach(r => on ? n.add(r.id) : n.delete(r.id)); return n; }); } })),
+                canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
+                  onChange: e => selectShown(e.target.checked) })),
                 sortTh("company", "Company and role"), h("th", { scope: "col" }, "Field"), h("th", { scope: "col" }, "Location and term"),
                 sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", { scope: "col" }, "Your status"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")))),
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
+                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
 
       // Below the list and above the footer links, so it never pushes a listing down.

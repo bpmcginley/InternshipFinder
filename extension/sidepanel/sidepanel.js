@@ -221,10 +221,10 @@ async function renderAnswers() {
 
 async function renderAccounts() {
   const s = await loadStore();
-  let h = `<div class="small" style="margin-bottom:8px">Accounts the agent created on job sites. Passwords are stored only in this browser and never sent to the AI.</div>`;
+  let h = `<div class="small" style="margin-bottom:8px">Saved logins for job sites. A pending sign-up still needs to finish on the employer's site. Passwords are stored only in this browser and never sent to the AI.</div>`;
   if (!s.accounts.length) h += `<div class="empty">No accounts yet.</div>`;
   s.accounts.forEach((a, i) => {
-    h += `<div class="card" data-i="${i}"><div class="kv"><span class="co">${esc(a.domain)}</span><button class="b link" data-del>Delete</button></div><div class="small">${esc(a.email)}</div><div class="kv" style="margin-top:4px"><code data-pw>••••••••••••</code><span><button class="b" data-show>Show</button> <button class="b" data-copy>Copy</button></span></div></div>`;
+    h += `<div class="card" data-i="${i}"><div class="kv"><span class="co">${esc(a.domain)}</span><button class="b link" data-del>Delete</button></div><div class="small">${esc(a.email)}</div>${a.state === "pending" ? '<div class="small">Sign-up pending · account creation not yet confirmed</div>' : ''}<div class="kv" style="margin-top:4px"><code data-pw>••••••••••••</code><span><button class="b" data-show>Show</button> <button class="b" data-copy>Copy</button></span></div></div>`;
   });
   main.innerHTML = h;
   main.querySelectorAll("[data-i]").forEach((card) => {

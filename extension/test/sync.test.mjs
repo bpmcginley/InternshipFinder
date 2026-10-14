@@ -68,6 +68,20 @@ test("the synced subset leaves out demographics, logins, keys, passwords, files,
   assert.deepEqual(out.settings, sub.settings);
 });
 
+test("demographic provenance stays local while resume/contact provenance can sync", () => {
+  const local = filled();
+  local.profile.sources = { facts: { first_name: { kind: "resume", value: "Sam" },
+    ...Object.fromEntries(S.DEMOGRAPHIC_KEYS.map(k => [k, { kind: "manual", value: "PRIVATE-" + k }])) } };
+  const subset = S.syncedSubset(local);
+  const body = JSON.stringify(S.toServer(subset));
+  assert.ok(!body.includes("PRIVATE-"));
+  assert.equal(subset.profile.sources.facts.first_name.value, "Sam");
+  assert.equal(local.profile.sources.facts.gender.value, "PRIVATE-gender");
+  const before = S.hashOf(subset);
+  local.profile.sources.facts.gender.value = "CHANGED-PRIVATE";
+  assert.equal(S.hashOf(S.syncedSubset(local)), before);
+});
+
 test("the hash ignores key order, demographics and non-synced data, and sees real edits", () => {
   const a = filled(), h = S.hashOf(S.syncedSubset(a));
   const reordered = { dashboard_profile: a.dashboard_profile, settings: { ...a.settings }, profile: Object.fromEntries(Object.entries(a.profile).reverse()) };

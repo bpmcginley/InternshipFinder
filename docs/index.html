@@ -296,7 +296,7 @@
   .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:14px;height:34px;padding:0 10px;outline:none}
   .field select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer}
   .field select option{background:var(--panel);color:var(--ink)}
-  .field.sel::after{content:"";position:absolute;right:12px;top:13px;width:5px;height:5px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg);pointer-events:none}
+  .field.sel::after,.field.ms::after{content:"";position:absolute;right:12px;top:13px;width:5px;height:5px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg);pointer-events:none}
   .field.search{flex:1 1 260px;min-width:220px}
   .field.search input{width:100%}
   .field.search::before{content:"";width:14px;height:14px;margin-left:10px;flex:none;border:1.6px solid var(--ink3);border-radius:50%;box-shadow:5px 5px 0 -3.5px var(--ink3);transform:scale(.85)}
@@ -308,16 +308,19 @@
   .morebtn .count{margin-left:2px}
   .spacer{flex:1}
 
-  .ms{min-width:160px}
-  .ms .box{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 6px;width:100%;cursor:text}
+  .ms{min-width:160px;border-color:color-mix(in srgb,var(--ink3) 75%,var(--panel))}
+  .ms .box{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 28px 4px 6px;width:100%;cursor:text}
   .ms input{flex:1;min-width:60px;height:24px;border:0;outline:none;background:transparent;color:var(--ink);font-size:13px;padding:0 4px}
+  .ms:focus-within .box{outline:2px solid var(--accent);outline-offset:2px}
+  .step-body:focus{outline:2px solid var(--accent);outline-offset:6px;border-radius:4px}
+  .ms input::placeholder,.field.search input::placeholder{color:var(--ink2);opacity:1}
   .chip{display:inline-flex;gap:2px;align-items:center;background:var(--sunk);border-radius:4px;padding:2px 2px 2px 7px;font-size:12px;color:var(--ink)}
   .chip button{border:0;background:none;color:var(--ink3);cursor:pointer;font:15px/1 var(--sans);padding:0 4px}
   .chip button:hover{color:var(--red)}
   .drop{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:100%;max-height:280px;overflow:auto;background:var(--panel);border:1px solid var(--rule);border-radius:6px;box-shadow:0 12px 32px rgba(20,20,20,.12);padding:4px}
   .opt{display:flex;justify-content:space-between;gap:18px;padding:6px 8px;border-radius:4px;font-size:13px;cursor:pointer;white-space:nowrap}
   .opt.act{background:var(--sunk)}
-  .opt .c{color:var(--ink3);font:11.5px var(--mono)}
+  .opt .c{color:var(--ink2);font:12px var(--mono)}
 
   .sheet{background:var(--panel);border:1px solid var(--rule);border-radius:8px}
   .tablewrap{overflow-x:auto}
@@ -378,6 +381,7 @@
   .report:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .whybtn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
   .whybtn .why-l{font-size:11.5px;color:var(--ink3)}
+  .match-label{display:none}
   .whybtn:hover .why-l{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
   tbody tr.opened td{border-bottom-color:transparent}
   tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:var(--s4) var(--s4) var(--s5)}
@@ -439,6 +443,10 @@
     .top-r{margin-left:0}
     .row2{grid-template-columns:1fr}
     .setup{padding:16px}
+    .filters .field.search{flex:1 1 100%;width:100%}
+    .filters .field.search input,.ms input{font-size:16px}
+    .chip button{min-width:28px;min-height:28px}
+    .opt{min-height:36px;white-space:normal;align-items:center}
     .filters.extra{padding:10px 12px}
     .filters.extra .field.sel,.filters.extra .field.toggle{flex:1 1 44%}
     .filters .field.ms{flex:1 1 44%}
@@ -459,9 +467,14 @@
     table.list .c-pay .muted{display:none}
     table.list .c-match{order:3;flex:1 1 100%;margin-top:4px}
     table.list .c-mine{order:4}
-    table.list .c-links{order:5;display:flex;gap:14px;align-items:baseline}
+    table.list .c-links{order:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     table.list .c-links > div{margin:0}
     table.list .rowbtn,table.list .report{margin-top:0}
+    table.list .whybtn,table.list .open-link{min-height:44px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;display:inline-flex;align-items:center}
+    table.list .whybtn .why-l{font-size:12.5px;color:var(--ink2)}
+    table.list select.mine,table.list .rowbtn{min-height:44px}
+    table.list .rowbtn{padding:0 8px}
+    .match-label{display:inline;font-family:var(--sans);font-size:12.5px;color:var(--ink2)}
     table.list .c-links .report{display:none}
     tbody tr.why td{padding:var(--s4)}
     /* A narrow desktop window (no touch) still gets the row Auto-Apply explainer; the card rule above

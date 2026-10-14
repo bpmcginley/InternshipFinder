@@ -50,7 +50,8 @@ export function syncedSubset(s) {
   const st = (s && s.settings) || {};
   return {
     // was: profile: { ...p, facts: withoutDemographics(p.facts) },
-    profile: { ...p, facts: withoutDemographics(p.facts), extra: withoutDemographicAnswers(p.extra) },
+    profile: { ...p, facts: withoutDemographics(p.facts), extra: withoutDemographicAnswers(p.extra),
+      ...(p.sources ? { sources: { ...p.sources, facts: withoutDemographics(p.sources.facts) } } : {}) },
     settings: { onboarded: !!st.onboarded, deep_dive_at: st.deep_dive_at ?? null },
     dashboard_profile: (s && s.dashboard_profile) ?? null,
   };

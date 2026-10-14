@@ -96,6 +96,8 @@ function watchSubmit(id, tabId) {
 
 // ---------- control actions ----------
 async function control(id, action, answer) {
+  // Stop locally before any storage await lets a pending response or prefill resume.
+  if (["pause", "takeover", "retry", "submitted", "remove"].includes(action)) stopJob(id);
   const j = await getJob(id);
   if (!j) return { error: "No such job" };
   switch (action) {

@@ -32,11 +32,13 @@ test("finishOnboarding turns Auto-Apply on, dates it, retires the run and saves 
   assert.ok(S.settings.onboarded && hasKey(S));
 });
 
-test("the quick-start button needs exactly the AI, a resume and the sign-up email", () => {
+test("quick-start needs AI, resume, email, and no unfinished resume reading/review", () => {
   const cases = [
     [student(), true],
     [student({ files: { resume: null } }), false],
     [student({ settings: { signup_email: "" } }), false],
+    [student({ settings: { signup_email: "sam@example.test", resume_details_ready: false } }), false],
+    [student({ settings: { signup_email: "sam@example.test", resume_import: { plan: [] } } }), false],
     [student({ ai: { provider: "anthropic", apiKey: "" } }), false],
     [student({ ai: { provider: "anthropic", apiKey: "sk-ant-x" } }), true],
     [student({ ai: { provider: "gemini", geminiKey: "AIza" } }), true],
@@ -44,8 +46,16 @@ test("the quick-start button needs exactly the AI, a resume and the sign-up emai
   ];
   for (const [S, want] of cases) {
     assert.equal(quickStartReady(S), want, JSON.stringify(S.ai) + JSON.stringify(S.settings) + !!S.files.resume);
-    assert.equal(quickStartReady(S), !!(hasKey(S) && S.files.resume && S.settings.signup_email));
+    assert.equal(quickStartReady(S), !!(hasKey(S) && S.files.resume && S.settings.signup_email && S.settings.resume_details_ready !== false && !S.settings.resume_import));
   }
+});
+
+test("unfinished resume review cannot mark onboarding finished after a reload", async () => {
+  const S = student({ settings: { signup_email: "sam@example.test", onboarded: false, resume_import: { plan: [] } } });
+  let saves = 0;
+  await assert.rejects(finishOnboarding(S, async () => { saves++; }), /reading and reviewing/);
+  assert.equal(S.settings.onboarded, false);
+  assert.equal(saves, 0);
 });
 
 // The weekly email's link at the end of setup (2026-10-06): optional, plain, and tagged as the

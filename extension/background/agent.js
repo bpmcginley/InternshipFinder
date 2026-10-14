@@ -3,7 +3,7 @@
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { hasHostAccess, hostOf } from "../lib/hosts.js";
-import { loadStore, updateStore, profileForModel, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor } from "../lib/store.js";
+import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
@@ -50,6 +50,7 @@ ACCOUNTS
 FINISHING
 - The final submit button is reserved for the human and is blocked in code. Buttons marked BLOCKED must not be clicked.
 - The final button is not always called Submit. Once the application has answers in it, a button saying Apply, Send, Finish, Done or Confirm on the last page or a review page is the final one: never click it, call ready_to_submit.
+- An empty or unconfirmed factual profile value is UNKNOWN. Ask the student for required eligibility answers; never infer authorization, sponsorship, citizenship, age, or consent from a resume or other facts.
 - When all pages are complete and only final submission remains (review page, or the last page whose main button is Submit), call ready_to_submit with a one-line summary and anything worth double-checking.
 - If stuck (same page three times with no progress, broken widget, site error, page not an application), call pause_for_user and say what the human should do.
 Keep any text outside tool calls to one short line.`;
@@ -438,9 +439,28 @@ export function buildSystem(store, job) {
 
 function accountLine(store, url) {
   const a = accountFor(store, url);
+  if (a.state === "pending") return `ACCOUNT (${a.domain}): saved credentials, but sign-up is not confirmed. Continue sign-up with email ${a.email}; if the site offers Sign in or says the email already exists, try those same saved credentials. Use fill_secret for the password.`;
   return a.isNew
     ? `ACCOUNT (${a.domain}): none saved. If an account is required, create one with email ${a.email}.`
     : `ACCOUNT (${a.domain}): exists. Sign in with email ${a.email}; use fill_secret for the password.`;
+}
+
+export function accountCreationConfirmed(frame) {
+  if (!frame || (frame.errors || []).length || (frame.elements || []).some(e => e.kind === "password")
+      || globalThis.ISGuard.detectGate(frame)) return false;
+  const text = [...(frame.headings || []), frame.text || ""].join(" ");
+  if (/\b(not created|could not|unable to|failed|unsuccessful|error)\b/i.test(text)) return false;
+  return /\b(your account (has been |was )?(successfully )?created|account (has been |was )?successfully created|account created successfully|registration (was |is )?successful)\b/i.test(text);
+}
+
+async function confirmAccounts(store, frames, active) {
+  const domains = new Set(frames.filter(accountCreationConfirmed).map(f => domainOf(f.url)));
+  if (!store.accounts.some(a => a.state === "pending" && domains.has(a.domain))) return;
+  const fresh = await updateStore(async s => {
+    if (!(await active())) return s;
+    for (const a of s.accounts) if (a.state === "pending" && domains.has(a.domain)) a.state = "confirmed";
+  });
+  store.accounts = fresh.accounts;
 }
 
 // ---------- tailored resume ----------
@@ -524,8 +544,8 @@ export function stopJob(id) {
 // a new gen so a run still in flight knows the job is no longer its own, and with that run's AI call
 // cut off. was: the status alone, which a late AI reply then acted on and wrote over.
 export async function takeBack(id, patch) {
-  const j = await updateJob(id, (x) => ({ ...patch, gen: (x.gen || 0) + 1 }));
   stopJob(id);
+  const j = await updateJob(id, (x) => ({ ...patch, gen: (x.gen || 0) + 1 }));
   return j;
 }
 
@@ -559,6 +579,11 @@ async function loop(id, run) {
   let job = await getJob(id);
   if (!job) return;
   const gen = run.gen = job.gen || 0;
+  const active = async () => {
+    if (run.signal.aborted) return false;
+    const current = await getJob(id);
+    return !run.signal.aborted && owns(current, gen);
+  };
   // Every status this run decides goes through here, so none of it lands on a job the student has
   // paused, taken over, finished or restarted since. A function patch sees the job as stored.
   const own = (patch) => updateJob(id, (j) => (owns(j, gen) ? (typeof patch === "function" ? patch(j) : patch) : {}));
@@ -590,6 +615,7 @@ async function loop(id, run) {
     job = await tailorStep(id, job, store, own);
     if (!owns(job, gen)) return; // waiting for the human to approve it, or stopped meanwhile
   }
+  if (!(await active())) return;
   let tabId = await ensureTab(job);
   // was: { tabId, status: "working", ... } written whatever had happened meanwhile, which undid a
   // Pause pressed while the resume was being tailored or the tab was opening.
@@ -636,10 +662,11 @@ async function loop(id, run) {
       return;
     }
     await sleep(800);
+    if (!(await active())) return;
     await inject(tabId);
     store = await loadStore();
     // job_in_us: for fastFill's "authorized to work in the country where this position is based".
-    const facts = { ...store.profile.facts, email: store.settings.signup_email || store.profile.facts.email,
+    const facts = { ...confirmedFacts(store), email: store.settings.signup_email || store.profile.facts.email,
       job_in_us: globalThis.ISGuard.jobInUS(job.location) };
     // The resume goes in with the contact details when the page has one obvious box for it, on the
     // same rules-first principle: a turn spent telling the model to attach the file it was always
@@ -647,6 +674,7 @@ async function loop(id, run) {
     // The job carries the tailored file's name only; its bytes are fetched here (see queue.js).
     // Was: (... && job.tailored.file) || store.files.resume || null
     const resume = (job.tailored && job.tailored.status === "approved" && job.tailored.file && await getTailoredFile(job.id)) || store.files.resume || null;
+    if (!(await active())) return;
     let pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
       .flatMap((r) => r.result || []);
 
@@ -681,6 +709,7 @@ async function loop(id, run) {
     // profile can answer here is a field the model does not have to, and that is the student's
     // allowance. Re-snapshot afterwards so the model is shown the values that were just typed.
     if (!pre.length && frames.some((f) => f.elements.length)) {
+      if (!(await active())) return;
       pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
         .flatMap((r) => r.result || []);
       if (pre.length) frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
@@ -697,6 +726,8 @@ async function loop(id, run) {
       asleep = frames.some((f) => f.frozen);
     }
 
+    if (!(await active())) return;
+    await confirmAccounts(store, frames, active);
     const snap = formatSnapshot(frames, fails);
     snap.tabId = tabId;
     const url = (snap.top && snap.top.url) || job.apply_url;
@@ -831,7 +862,7 @@ async function loop(id, run) {
       if (!stopped && !owns(await getJob(id), gen)) stopped = true;
       if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, runFilled, store, job, fails, url });
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, runFilled, store, job, fails, url, active });
       if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
@@ -881,6 +912,10 @@ export const EARLY_READY_PUSHBACK = "No blocked final button is visible yet, so 
 async function execTool(u, ctx) {
   const { name, input = {} } = u;
   const { tabId, index, store, job, fails } = ctx;
+  const checkedAct = async (...args) => {
+    if (ctx.active && !(await ctx.active())) return { ok: false, cancelled: true, error: "The student stopped this run." };
+    return act(...args);
+  };
   const needsRef = ["fill", "select", "check", "upload", "click", "fill_secret"].includes(name);
   const t = needsRef ? index[input.ref] : null;
   if (needsRef && !t) return { content: `Unknown ref ${input.ref}. Use refs from the latest snapshot.`, isError: true };
@@ -889,33 +924,42 @@ async function execTool(u, ctx) {
   let r;
   switch (name) {
     case "fill":
-      r = await act(tabId, input.ref, "fill", { text: String(input.text ?? "") });
+      r = await checkedAct(tabId, input.ref, "fill", { text: String(input.text ?? "") });
       if (r.ok) await logAnswer(job, t.label, input.text, t.kind);
       break;
     case "select":
-      r = await act(tabId, input.ref, "select", { option: String(input.option ?? "") });
+      r = await checkedAct(tabId, input.ref, "select", { option: String(input.option ?? "") });
       if (r.ok) await logAnswer(job, t.label, r.chosen || input.option, t.kind);
       break;
     case "check":
-      r = await act(tabId, input.ref, "check", { checked: !!input.checked });
+      r = await checkedAct(tabId, input.ref, "check", { checked: !!input.checked });
       break;
     case "upload": {
       // Was: ... && job.tailored.file; the bytes now live off the job (see queue.js).
       const tailored = input.file === "resume" && job.tailored && job.tailored.status === "approved" && job.tailored.file && await getTailoredFile(job.id);
       const file = tailored || store.files[input.file];
       if (!file || !file.b64) return { content: `No ${input.file} file saved. Skip unless required; if required, ask_user.`, isError: true };
-      r = await act(tabId, input.ref, "upload", { file: { name: file.name, type: file.type, b64: file.b64 } });
+      r = await checkedAct(tabId, input.ref, "upload", { file: { name: file.name, type: file.type, b64: file.b64 } });
       break;
     }
     case "fill_secret": {
       const tab = await chrome.tabs.get(tabId);
-      const acct = accountFor(store, tab.url || ctx.url);
-      r = await act(tabId, input.ref, "fill", { text: acct.password, secret: true });
+      let acct;
+      // Reserve one password under the shared lock before two applications on the same
+      // employer can choose different passwords. Reservation is pending, not a signup claim.
+      const fresh = await updateStore(async s => {
+        if (ctx.active && !(await ctx.active())) return s;
+        acct = accountFor(s, tab.url || ctx.url);
+        if (acct.isNew && !s.accounts.some(a => a.domain === acct.domain)) {
+          const { isNew, ...saved } = acct;
+          s.accounts.push({ ...saved, state: "pending" });
+        }
+      });
+      if (!acct) return { content: "The student stopped this run.", isError: true };
+      store.accounts = fresh.accounts;
+      r = await checkedAct(tabId, input.ref, "fill", { text: acct.password, secret: true });
       if (r.ok && acct.isNew) {
-        const { isNew, ...saved } = acct;
-        await updateStore((s) => { if (!s.accounts.some((a) => a.domain === saved.domain)) s.accounts.push(saved); });
-        store.accounts.push(saved);
-        await appendLog(job.id, { kind: "account", text: `Created login for ${saved.domain} (${saved.email})` });
+        await appendLog(job.id, { kind: "account", text: `Password saved for ${acct.domain}; sign-up is not yet confirmed.` });
       }
       delete r.value;
       break;
@@ -928,7 +972,7 @@ async function execTool(u, ctx) {
       chrome.tabs.onCreated.addListener(onNew);
       const before = await pageMark(tabId);
       try {
-        r = await act(tabId, input.ref, "click", { runFilled: !!ctx.runFilled });
+        r = await checkedAct(tabId, input.ref, "click", { runFilled: !!ctx.runFilled });
         if (r.ok) { await sleep(1500); await waitForTab(tabId).catch(() => {}); }
       } finally {
         chrome.tabs.onCreated.removeListener(onNew);

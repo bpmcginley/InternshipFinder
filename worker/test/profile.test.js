@@ -138,6 +138,18 @@ test("without PROFILE_KEY the profile routes answer 503 sync_off, and /config sa
   assert.deepEqual([on.sessions, on.sync], [true, true]);
 });
 
+test("demographic provenance is stripped by the server before encryption", async () => {
+  const w = await sync();
+  const token = await w.token();
+  const profile = { facts: { first_name: "Sam" }, sources: { facts: {
+    first_name: { kind: "resume", value: "Sam" },
+    ...Object.fromEntries(DEMOGRAPHICS.map(k => [k, { kind: "manual", value: "PRIVATE-" + k }])) } } };
+  assert.equal((await put(w, token, profile, iso(0))).status, 200);
+  const back = await get(w, token);
+  assert.ok(!JSON.stringify(back).includes("PRIVATE-"));
+  assert.equal(back.profile.sources.facts.first_name.value, "Sam");
+});
+
 test("the profile routes need a sign-in", async () => {
   const w = await sync();
   for (const method of ["GET", "PUT", "DELETE"]) {
