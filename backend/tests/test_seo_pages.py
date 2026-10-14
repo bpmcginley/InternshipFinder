@@ -5,6 +5,8 @@ import json
 import os
 import re
 
+import pytest
+
 from internscout import seo_pages
 
 
@@ -184,10 +186,10 @@ def test_dashboard_links_open_on_the_page_topic(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(15)] + [_row(15 + i, tags=("aerospace",)) for i in range(3)]},
                  majors=[{"name": "Mechanical Engineering", "tags": ["mechanical", "aerospace", "other"], "level": "undergrad"}])
     pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
-    assert 'href="/?field=mechanical"' in pages["/internships/mechanical-engineering/"]
+    assert 'href="/?field=mechanical&amp;state=all"' in pages["/internships/mechanical-engineering/"]
     assert 'href="/?state=MA"' in pages["/internships/massachusetts/"]
     assert 'href="/?field=mechanical&amp;state=MA"' in pages["/internships/mechanical-engineering/massachusetts/"]
-    assert 'href="/?field=mechanical,aerospace"' in pages["/internships/for/mechanical-engineering-majors/"]
+    assert 'href="/?field=mechanical,aerospace&amp;state=all"' in pages["/internships/for/mechanical-engineering-majors/"]
     # Every listing page offers the extension through the site's own install page, tagged with the kind
     # of page it is on (2026-10-04; was: ?from=landing-page on every page).
     assert 'The free <a href="/install.html?from=seo-state">Auto-Apply extension</a>' in pages["/internships/massachusetts/"]
@@ -360,7 +362,7 @@ def test_new_page_links_to_new_only_and_feeds_every_new_role(tmp_path):
     site = _site(tmp_path, {"MA": rows})
     pages = seo_pages.build(site)
     new = next(p for p in pages if p["path"] == "/internships/new/")
-    assert 'href="/?new=1"' in new["html"] and new["feed_limit"] == seo_pages.NEW_FEED   # was: is None
+    assert 'href="/?state=all&amp;new=1"' in new["html"] and new["feed_limit"] == seo_pages.NEW_FEED   # was: is None
     from internscout import feeds
     seo_pages.write(site, pages)
     feeds.write_all(site, pages)
@@ -392,9 +394,9 @@ def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp
     # The co-op page's opening doesn't claim "from internships to co-ops and research".
     assert "26 open student roles that are co-ops." in pages["/internships/co-op/"]["html"]
     # Each opens the dashboard on the matching filter, and the hub links every one.
-    assert 'href="/?stage=co_op"' in pages["/internships/co-op/"]["html"]
-    assert 'href="/?year=first_year"' in pages["/internships/for-freshmen/"]["html"]
-    assert 'href="/?paid=1"' in pages["/internships/paid/"]["html"]
+    assert 'href="/?state=all&amp;stage=co_op"' in pages["/internships/co-op/"]["html"]
+    assert 'href="/?state=all&amp;year=first_year"' in pages["/internships/for-freshmen/"]["html"]
+    assert 'href="/?state=all&amp;paid=1"' in pages["/internships/paid/"]["html"]
     assert all(f'href="{p}"' in pages["/internships/"]["html"]
                for p in ("/internships/summer-2027/", "/internships/paid/", "/internships/for-sophomores/"))
 
@@ -1772,3 +1774,20 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
               encoding="utf-8").read()
     assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
     assert "python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt" in wf
+
+
+# PR #97 follow-up: a page with no state covers every state, so its dashboard link says so; otherwise
+# a saved profile's states would narrow it.
+@pytest.mark.parametrize("kwargs,href", [
+    ({"fields": ["nursing"]}, "/?field=nursing&amp;state=all"),
+    ({"new": True}, "/?state=all&amp;new=1"),
+    ({"paid": True}, "/?state=all&amp;paid=1"),
+    ({"stage": "co_op"}, "/?state=all&amp;stage=co_op"),
+    ({"year": "sophomore"}, "/?state=all&amp;year=sophomore"),
+    ({}, "/?state=all"),
+    ({"companies": ["Big Co"]}, "/?state=all&amp;company=Big%20Co"),
+    ({"fields": ["nursing"], "state": "MA"}, "/?field=nursing&amp;state=MA"),
+    ({"state": "MA", "companies": ["Big Co"]}, "/?state=MA&amp;company=Big%20Co"),
+])
+def test_nationwide_dashboard_links_send_state_all(kwargs, href):
+    assert seo_pages.dash_link(**kwargs) == href

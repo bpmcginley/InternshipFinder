@@ -43,9 +43,11 @@ def _known_city(part: str) -> str | None:
 # "Cambridge, MA, Arlington, VA" -> split after each state code, but keep "Boston, MA, United States" whole.
 _NEXT_CITY = r"(?=(?!United States|USA?\b|Canada\b|Remote\b|Hybrid\b|On[- ]?site\b)[A-Z][a-z])"
 _AFTER_STATE = re.compile(r"(?<=[\s,][A-Z]{2}),\s*" + _NEXT_CITY)
-# "Seattle, WA, Remote, Boston, MA": the same split one word on, after the work mode or country that
-# stays with its town (was: the suffix kept the whole string as one location, and Boston was lost).
-_AFTER_SUFFIX = re.compile(r"[\s,][A-Z]{2}\s*,\s*(?:Canada|Remote|Hybrid|On[- ]?site)\b(\s*,\s*)" + _NEXT_CITY)
+# "Seattle, WA, Remote, Boston, MA" or "Seattle, WA, USA, Boston, MA": the same split one word on, after
+# the work mode or country that stays with its town (was: the suffix kept the whole string as one
+# location, and Boston was lost).
+_AFTER_SUFFIX = re.compile(
+    r"[\s,][A-Z]{2}\s*,\s*(?:United States|USA?|Canada|Remote|Hybrid|On[- ]?site)\b(\s*,\s*)" + _NEXT_CITY)
 
 
 def _split_cities(loc: str) -> list[str]:
