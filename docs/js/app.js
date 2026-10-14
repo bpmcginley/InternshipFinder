@@ -9,6 +9,7 @@
   const NOCOUNT_KEY = "internscout.nocount";
   const noCount = () => { try { return localStorage.getItem(NOCOUNT_KEY) === "1"; } catch (e) { return false; } };
 
+  const EXT_NOTICE_KEY = "internscout.extnotice.v1";
   const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
   const STATE_LABEL = { none: "Not started", interested: "Interested", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
@@ -125,7 +126,10 @@
   }
 
   // ---------- small components ----------
-  function MultiSelect({ placeholder, options, selected, onChange, label, wide }) {
+  // `count` (D8, 2026-10-14): the filter bar's pickers say how many values are set ("Field · 2"), with the
+  // accent-soft fill, so a filter that is on can be seen at a glance. The setup card's pickers pass none.
+  // was: function MultiSelect({ placeholder, options, selected, onChange, label, wide }) {
+  function MultiSelect({ placeholder, options, selected, onChange, label, wide, count }) {
     const [q, setQ] = useState(""); const [open, setOpen] = useState(false); const [act, setAct] = useState(0);
     const ref = useRef(), input = useRef(), drop = useRef(), id = useId();
     useEffect(() => {
@@ -146,21 +150,26 @@
       if (e.key === "Enter" && open && filtered[active]) { add(filtered[active].value); e.preventDefault(); }
       else if (e.key === "ArrowDown") { setAct(open ? Math.min(active + 1, Math.max(0, filtered.length - 1)) : 0); setOpen(true); e.preventDefault(); }
       else if (e.key === "ArrowUp") { setAct(open ? Math.max(active - 1, 0) : Math.max(0, filtered.length - 1)); setOpen(true); e.preventDefault(); }
-      else if (e.key === "Escape") { setOpen(false); e.preventDefault(); }
+      // was: Escape always handled here. With the list already closed it now goes on to the setup card,
+      // whose Escape closes it (D13).
+      else if (e.key === "Escape" && open) { setOpen(false); e.preventDefault(); }
       // Tab moves on to the next control and closes the list. was: the list stayed open behind it.
       else if (e.key === "Tab") setOpen(false);
       else if (e.key === "Backspace" && !q && selected.length) rm(selected[selected.length - 1]);
     };
-    return h("div", { className: cx("field ms", wide && "wide"), ref, onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); } },
+    const name = label || placeholder, set = count > 0;
+    return h("div", { className: cx("field ms", wide && "wide", set && "set"), ref, onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); } },
       h("div", { className: "box", onClick: () => { setOpen(true); if (input.current) input.current.focus(); } },
+        set && h("span", { className: "ms-count", "aria-hidden": true }, `${name} · ${count}`),
+        // The shared cross icon (D15) in place of the "×" character; the button keeps its spoken name.
         selected.map(s => { const o = byVal.get(s); return h("span", { key: s, className: "chip" }, (o && (o.chip || o.label)) || s,
-          h("button", { type: "button", "aria-label": "Remove " + ((o && o.label) || s), onClick: e => { e.stopPropagation(); rm(s); } }, "×")); }),
+          h("button", { type: "button", "aria-label": "Remove " + ((o && o.label) || s), onClick: e => { e.stopPropagation(); rm(s); } }, h("span", { className: "i i-cross", "aria-hidden": true }))); }),
         // With no options left there is no list: aria-expanded stays false and the "No more matching
         // options" line is a plain status message. was: an empty listbox, which axe reports as critical
         // (aria-required-children: a listbox must own options).
         h("input", { ref: input, value: q, role: "combobox", "aria-autocomplete": "list", "aria-expanded": open && filtered.length > 0,
           "aria-controls": id + "-list", "aria-activedescendant": open && filtered.length ? id + "-option-" + active : undefined,
-          "aria-label": label || placeholder, placeholder: selected.length ? "" : placeholder,
+          "aria-label": set ? `${name}, ${count} picked` : name, placeholder: selected.length ? "" : placeholder,
           onChange: e => { setQ(e.target.value); setOpen(true); setAct(0); }, onFocus: () => setOpen(true), onKeyDown: onKey })),
       open && !filtered.length && h("div", { className: "drop", role: "status" }, h("div", { className: "opt muted" }, "No more matching options")),
       // tabIndex -1: a scrolling box is a Tab stop of its own in Chrome and Firefox, so Tab from the
@@ -209,22 +218,30 @@
     h("select", { "aria-label": label, value, onChange: e => onChange(e.target.value) }, children));
   const opt = (v, l) => h("option", { key: v, value: v }, l);
 
+  // The listing's place, inline, for the row's facts line (D9, 2026-10-14): "Boston, MA +2". was: two
+  // stacked lines in a Location column (the place, then its state or "Remote" under it).
   function Loc({ r, keys }) {
     const all = IS.regs(r), g = all.find(x => keys.has(x.state) || (x.kind === "remote" && keys.has("remote"))) || all[0];
     // was: || "—". A muted word says what is missing; a bare dash only says something is.
-    const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || h("span", { className: "muted" }, "Not listed"));
+    const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || null);
+    if (!first) return h("span", { className: "muted" }, "Location not listed");
     // was: remote, else the state when the first line lacks it. A Canadian place also says the country.
-    const sub = g && g.kind === "remote" ? "Remote"
+    const sub = g && g.kind === "remote" ? (/remote/i.test(first) ? null : "Remote")
       : g && g.kind === "canada" ? (/canada/i.test(first) ? (g.remote || /remote/i.test(first) ? "Remote" : null) : `${g.state && !first.includes(g.state) ? g.state + ", " : ""}Canada`)
       : g && g.state && !first.includes(g.state) ? g.state : null;
     const more = Math.max(0, all.length - 1);
-    return h(F, null,
-      h("div", { title: all.map(x => x.loc).join("; ") }, first, more > 0 && h("span", { className: "muted" }, " +" + more)),
-      sub && h("div", { className: "meta" }, sub));
+    return h("span", { title: all.map(x => x.loc).join("; ") }, first, sub ? (sub === "Remote" ? " (remote)" : ", " + sub) : "",
+      more > 0 && h("span", { className: "muted" }, " +" + more));
   }
 
-  function Why({ r, sc, ctx, elig, patterns }) {
+  // The Why panel (A2 component 6, D13): a region that takes focus when it opens, closes on Escape and hands
+  // focus back to the button that opened it. Its heading is an h3 under the h2 "Listings" (was an h4, a
+  // skipped level). Before a profile there is no score to explain (D10), so the first column offers the
+  // profile instead of six full bars. "Report" lives here only (D11); it was on every row.
+  function Why({ r, sc, ctx, elig, patterns, onClose, onRank }) {
     const W = IS.WEIGHTS, ins = r.insights || {};
+    const box = useRef();
+    useEffect(() => { if (box.current && box.current.focus) box.current.focus({ preventScroll: true }); }, []);
     const has = useMemo(() => {
       if (!elig || !elig.skills_text || !patterns) return null;
       const m = {};
@@ -248,81 +265,111 @@
     // was: has ? (has[s.name] ? "✓ " : "✗ ") : "", s.name
     const icon = (name, said) => h(F, null, h("span", { className: "i i-" + name, "aria-hidden": true }), h("span", { className: "sr" }, said));
     const chip = s => h("span", { key: s.name, className: cx("tag", has && (has[s.name] ? "ok" : "miss")), title: has ? (has[s.name] ? "Found on your profile" : "Not on your profile") : "" }, has ? (has[s.name] ? icon("check", "Have: ") : icon("cross", "Missing: ")) : "", s.name);
-    return h("div", { className: "whyg" },
-      h("div", null, h("h4", null, `Match score ${sc.score} of 100`),
-        Object.entries(IS.PART_LABEL).map(([k, l]) => {
-          const w = W[k], v = sc.parts[k] || 0;
-          return h("div", { className: "part", key: k, title: why[k] || "" }, h("span", null, l), h("span", { className: "bar" }, h("i", { style: { width: (w ? Math.min(100, v / w * 100) : 0) + "%" } })), h("span", { className: "num" }, `${Math.round(v)}/${w}`));
-        }),
-        h("div", { className: "meta", style: { marginTop: 9 } }, why.field, why.fit ? " · " + why.fit : ""),
-        h("div", { className: "meta" }, posted != null ? `Posted ${ago(posted)}` : "Posting date not listed", seen != null ? ` · first seen ${ago(seen)}` : "", r.sector ? ` · ${IS.sectorLabel(r.sector)} sector` : "")),
-      h("div", null, h("h4", null, "Skills asked for", has && req.length ? ` · you have ${met} of ${req.length} required` : ""),
+    const dates = h("div", { className: "meta" }, posted != null ? `Posted ${ago(posted)}` : "Posting date not listed", seen != null ? ` · first seen ${ago(seen)}` : "", r.sector ? ` · ${IS.sectorLabel(r.sector)} sector` : "");
+    // was: h("div", { className: "whyg" }, ...) with h4 headings
+    return h("div", { className: "whyg", ref: box, tabIndex: -1, role: "region", "aria-label": `Why: ${r.company_name}, ${r.title}`,
+      onKeyDown: e => { if (e.key === "Escape") { e.preventDefault(); onClose && onClose(); } } },
+      ctx.p
+        ? h("div", null, h("h3", null, `Match score ${sc.score} of 100`),
+          Object.entries(IS.PART_LABEL).map(([k, l]) => {
+            const w = W[k], v = sc.parts[k] || 0;
+            return h("div", { className: "part", key: k, title: why[k] || "" }, h("span", null, l), h("span", { className: "bar" }, h("i", { style: { width: (w ? Math.min(100, v / w * 100) : 0) + "%" } })), h("span", { className: "num" }, `${Math.round(v)}/${w}`));
+          }),
+          h("div", { className: "meta", style: { marginTop: 9 } }, why.field, why.fit ? " · " + why.fit : ""),
+          dates)
+        : h("div", null, h("h3", null, "No match score yet"),
+          h("p", { className: "meta" }, "With no profile every role scores close to 100, so the number would say nothing. Add your major and class year and each role gets a score for you."),
+          onRank && h("button", { type: "button", className: "btn small", onClick: onRank }, "Rank for my major"),
+          dates),
+      h("div", null, h("h3", null, "Skills asked for", has && req.length ? ` · you have ${met} of ${req.length} required` : ""),
         !skills.length && h("div", { className: "meta" }, r.status === "open" ? "No specific skills named in the description." : "Closed posting, so the description isn't kept."),
         req.length > 0 && h("div", null, req.map(chip)),
         pref.length > 0 && h(F, null, h("div", { className: "meta", style: { margin: "4px 0 5px" } }, "Nice to have"), h("div", null, pref.map(chip)))),
-      h("div", null, h("h4", null, "Eligibility and deadline"),
+      h("div", null, h("h3", null, "Eligibility and deadline"),
         cs.length ? cs.map(([lv, t], i) => h("div", { key: i, className: "flag " + lv }, lv === "bad" ? icon("cross", "Problem: ") : lv === "good" ? icon("check", "Good: ") : lv === "warn" ? icon("alert", "Check: ") : "· ", t))
           : h("div", { className: "meta" }, "No limits or deadline found in the description."),
         h("div", { className: "meta", style: { marginTop: 9 } }, h("a", { href: IS.reportUrl(r), target: "_blank", rel: "noopener" }, "Report a wrong tag or dead link"))));
   }
 
-  // Memoised: ticking one checkbox or typing in the search box used to redraw all 150 rows.
-  // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, onAuto, open, onWhy, elig, patterns }) {
+  // The listing row (A2 component 4, D9 to D11, 2026-10-14). Three short lines instead of five columns:
+  //   1. the company (semibold, ink), then the title;
+  //   2. one grey facts line: field, place, term, then pay (tabular figures, or "Pay not listed");
+  //   3. one grey line of dates and the application site;
+  // then any warning (closed, not for your year, may not be eligible) in red. The actions sit on one line:
+  // "Open posting" (a secondary button) and "Auto-Apply" (quiet), with the status select at the right.
+  // Match shows only once there is a profile (D10); before that the slot says "Rank for my major" and the
+  // panel opens from "Details". "Report" moved into the panel (D11).
+  // was: columns Company and role / Field / Location and term / Pay / Match / Your status / Links, and a
+  // Report link on every row. Memoised: ticking one checkbox or typing used to redraw all 150 rows.
   // `canTry` (2026-10-04): a desktop browser without the extension. Such a visitor never saw the word
   // Auto-Apply on a row, so a row it could fill now says so and opens a one-line explainer.
-  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, elig, patterns }) {
+  // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, elig, patterns }) {
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns }) {
     const [aaOpen, setAaOpen] = useState(false);
+    const whyBtn = useRef();
     const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
     const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
+    const scored = !!ctx.p;
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
-    const meta = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
-    const bl = elig ? blockers(r, elig).filter(t => !/^For /.test(t)) : [];
     const tags = r.field_tags || [];
     const stages = (r.stage || []).filter(s => s !== "internship").map(s => IS.STAGE_LABEL[s] || s);
-    const term = IS.termText(r.term);
-    // Term now sits under the location, so the row has one column fewer.
-    const cols = canAuto ? 8 : 7;
-    // Two field tags is what a row can show without wrapping onto three lines; the rest are a count.
+    const dates = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, ...stages, r.sector && IS.sectorLabel(r.sector),
+      r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
+    const bl = elig ? blockers(r, elig).filter(t => !/^For /.test(t)) : [];
+    const term = [IS.termText(r.term), r.duration].filter(Boolean).join(", ");
+    const cols = canAuto ? 5 : 4;
+    // Two field tags fit on the line; the rest are a count.
     const fieldText = tags.slice(0, 2).map(IS.fieldLabel).join(", ") + (tags.length > 2 ? ` +${tags.length - 2}` : "");
+    const pay = IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : "Pay not listed";
+    const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
+    const closeWhy = () => { onWhy(r.id); setTimeout(() => { if (whyBtn.current && whyBtn.current.focus) whyBtn.current.focus(); }, 0); };
+    const whyKey = e => { if (e.key === "Escape" && open) { e.preventDefault(); onWhy(r.id); } };
     return h(F, null,
       h("tr", { className: cx(checked && "sel", open && "opened", sc.mismatch && "dim") },
-        canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": "Select " + r.company_name, checked,
+        // was: "aria-label": "Select " + r.company_name, the same name on every row from one employer.
+        canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": `Select ${r.company_name}, ${r.title}`, checked,
           disabled: !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
         h("td", { className: "c-co" },
-          // was: h("div", { className: "co" }, r.company_name, r.is_new && h("span", { className: "new" }, "New")),
-          // is_new only means we first saw the row inside the new-listing window; the export keeps
-          // closed rows too, and 886 of the shard rows in the 2026-09-19 export were closed and still
-          // carried is_new. That put a New badge on the same line as the posting's own "Closed" note.
-          // A badge that says New has to mean new and still open.
-          h("div", { className: "co" }, r.company_name, r.is_new && r.status === "open" && h("span", { className: "new" }, "New")),
-          h("div", { className: "role" }, r.title),
-          (meta || r.status === "closed") && h("div", { className: "meta" }, meta, r.status === "closed" && h("span", { className: "closed" }, (meta ? " · " : "") + "Closed")),
+          // A badge that says New has to mean new and still open: is_new alone is only the scan window, and
+          // the export keeps closed rows too.
+          h("div", { className: "li-head" }, h("span", { className: "co" }, r.company_name), r.is_new && r.status === "open" && h("span", { className: "new" }, "New"),
+            h("span", { className: "sr" }, ", "), dot, h("span", { className: "role" }, r.title)),
+          h("div", { className: "meta facts" },
+            tags.length ? h("span", { title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, fieldText) : h("span", { className: "muted" }, "Not tagged"),
+            dot, h(Loc, { r, keys }), term && h(F, null, dot, term), dot, pay),
+          (dates || r.status === "closed") && h("div", { className: "meta" }, dates, r.status === "closed" && h("span", { className: "closed" }, (dates ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
-        h("td", { className: "c-field", title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, tags.length ? fieldText : h("span", { className: "muted" }, "Not tagged"),
-          (stages.length > 0 || r.sector) && h("div", { className: "meta" }, [...stages, r.sector && IS.sectorLabel(r.sector)].filter(Boolean).join(" · "))),
-        h("td", { className: "c-loc" }, h(Loc, { r, keys }),
-          (term || r.duration) && h("div", { className: "meta" }, [term, r.duration].filter(Boolean).join(" · "))),
-        h("td", { className: "c-pay" }, IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : h("span", { className: "muted" }, "Not listed")),
-        h("td", { className: "c-match" }, h("button", { type: "button", className: "score whybtn " + cls, "aria-expanded": !!open, onClick: () => onWhy(r.id), title: `Match score ${sc.score} of 100. Click for why.` },
-          h("span", { className: "match-label", "aria-hidden": true }, "Match"), h("span", { className: "num" }, sc.score), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))),
-        h("td", { className: "c-mine" },
-          h("select", { className: "mine", "aria-label": "Your status", value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
-          job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status))),
+        h("td", { className: "c-match" }, scored
+          // was: no aria-controls, and a name of "98 Why" ("Match" was hidden from it).
+          ? h("button", { type: "button", ref: whyBtn, className: "score whybtn " + cls, "aria-expanded": !!open, "aria-controls": "why-" + r.id,
+            onClick: () => onWhy(r.id), onKeyDown: whyKey, title: `Match score ${sc.score} of 100. Click for why.` },
+            // The name is the visible text plus words for a screen reader: "Match 98 of 100, Why" (D9). was: an
+            // aria-label that left out the visible "Why", which axe reports (label-content-name-mismatch).
+            h("span", { className: "match-label" }, "Match "), h("span", { className: "num" }, sc.score), h("span", { className: "sr" }, " of 100, "), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))
+          : h("div", { className: "unscored" },
+            h("button", { type: "button", className: "rankbtn", onClick: onRank }, "Rank for my major"),
+            h("button", { type: "button", ref: whyBtn, className: "whybtn details", "aria-expanded": !!open, "aria-controls": "why-" + r.id, "aria-label": `Details: ${r.company_name}, ${r.title}`,
+              onClick: () => onWhy(r.id), onKeyDown: whyKey }, open ? "Hide details" : "Details"))),
         h("td", { className: "c-links" },
-          // was: h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener" }, "Open posting")
           // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
           // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
-          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined }, "Open posting") : h("span", { className: "muted" }, "No link"),
-          !job && canAuto && r.apply_url && h("div", null, h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]) }, "Auto-Apply")),
-          tryAuto && h("div", null, h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply")),
-          h("div", null, h("a", { className: "report", href: IS.reportUrl(r), target: "_blank", rel: "noopener", title: "Wrong tag, dead link or not a student role? Tell us." }, "Report")))),
+          // was: an underlined link; a secondary button now (D9), with the shared external-link icon.
+          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined },
+            "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, " (opens in a new tab)")) : h("span", { className: "muted" }, "No link"),
+          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]) }, "Auto-Apply"),
+          tryAuto && h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply")),
+          // was: h("div", null, h("a", { className: "report", ... }, "Report")): in the Why panel only now (D11).
+        h("td", { className: "c-mine" },
+          // was: "aria-label": "Your status" on all 150 selects.
+          h("select", { className: "mine", "aria-label": "Your status for " + r.title, value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
+          job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status)))),
       // Its own full-width row, like the Why panel, so the nowrap links column doesn't widen the table.
       tryAuto && aaOpen && h("tr", { className: "aa-info", id: "aa-" + r.id }, h("td", { colSpan: cols },
         "The free InternScout extension fills this application from your resume. You review it and press Submit yourself. Free monthly allowance. ",
         h("a", { href: installUrl("dashboard-row"), target: "_blank", rel: "noopener" }, "Add it to Chrome"))),
-      open && h("tr", { className: "why" }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns }))));
+      open && h("tr", { className: "why", id: "why-" + r.id }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns, onClose: closeWhy, onRank }))));
   });
 
   // The list is filtered and re-sorted on every change to the search text, so the box keeps its own
@@ -649,7 +696,13 @@
         h("div", { className: "meta" }, "Used only on this page: it hides roles open to U.S. citizens only and flags roles that don't sponsor visas.")),
       signedIn && h("div", { className: "meta" }, "You're signed in, so your chosen states count toward where we scan in more detail."));
 
-    return h("section", { className: "setup sheet", ref, "aria-label": "My profile" },
+    // Escape closes the card (D13, 2026-10-14), as Cancel or "Skip for now" does, and the App puts focus back on
+    // what opened it. A picker with its list open takes the Escape for itself first (it calls preventDefault).
+    // On a phone the footer with Back, Next and Save sticks to the bottom of the screen (index.html .setup-foot):
+    // step 3's Save used to be about 1,350 px below the step's top.
+    // was: h("section", { className: "setup sheet", ref, "aria-label": "My profile" },
+    return h("section", { className: "setup sheet", ref, "aria-label": "My profile",
+      onKeyDown: e => { if (e.key === "Escape" && !e.defaultPrevented) { e.preventDefault(); onClose(); } } },
       h("div", { className: "setup-head" }, h("h2", null, firstTime ? "Set up InternScout" : "My profile"), dots),
       h("div", { key: step, ref: stepRef, tabIndex: -1, role: "group", "aria-label": `Profile step ${step} of 3: ${["About you", "What you want", "Where"][step - 1]}`, className: cx("step-body", dir) }, body),
       h("div", { className: "setup-foot" },
@@ -888,9 +941,11 @@
     const [upgradeAsk, setUpgradeAsk] = useState(() => new URLSearchParams(location.search).get("upgrade") || "");
     // The header's sign-in is one quiet button until pressed (2026-10-05); this is whether it has been.
     const [signInOpen, setSignInOpen] = useState(false);
-    // The plans announcement (2026-10-04): hidden once dismissed for this announcement.
-    const [plansSeen, setPlansSeen] = useState(() => { try { return localStorage.getItem(IS.PLANS_BANNER_KEY) === IS.PLANS_BANNER_ID; } catch (e) { return false; } });
-    const hidePlans = () => { try { localStorage.setItem(IS.PLANS_BANNER_KEY, IS.PLANS_BANNER_ID); } catch (e) { } setPlansSeen(true); };
+    // was: the plans announcement (2026-10-04), shown above the list until dismissed (plansSeen, hidePlans).
+    // Retired on 2026-10-14 (D16, decision 3): the quiet plans line under the counters says the same.
+    // The extension notice under the list has a Hide button (D16); hidden for good in this browser.
+    const [extHidden, setExtHidden] = useState(() => { try { return localStorage.getItem(EXT_NOTICE_KEY) === "hidden"; } catch (e) { return false; } });
+    const hideExt = () => { try { localStorage.setItem(EXT_NOTICE_KEY, "hidden"); } catch (e) { } setExtHidden(true); };
     // The review line (2026-10-07): one quiet sentence for a student whose extension has filled a couple
     // of applications, asking for a Chrome Web Store review. Same words for everyone, nothing offered for
     // it. Hidden for good in this browser by "Hide" or by following it (one setting in local storage), and
@@ -1028,8 +1083,21 @@
       // list, with focus on its heading (2026-10-14).
       setTimeout(() => requestAnimationFrame(() => { const el = document.getElementById("listings"); if (el) { el.scrollIntoView({ block: "start", behavior: scrollBehavior() }); el.focus({ preventScroll: true }); } }), 0);
     }
+    // Focus goes back to what opened the card when it closes (D13, 2026-10-14): the header button, the
+    // first-visit line or a row's "Rank for my major". The search box when that is gone (the first-visit
+    // line is, once skipped). was: always the search box.
+    const setupOpener = useRef(null);
+    const openSetup = useCallback(() => { setupOpener.current = document.activeElement; setSetupOpen(true); }, []);
     // was: if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); ...
-    function closeSetup() { if (!p) { IS.ls.set(SKIP_KEY, true); setSkipped(true); } setSetupOpen(false); setTimeout(() => { const q = document.getElementById("q"); if (q) q.focus(); }, 0); }
+    function closeSetup() {
+      if (!p) { IS.ls.set(SKIP_KEY, true); setSkipped(true); }
+      setSetupOpen(false);
+      setTimeout(() => {
+        const o = setupOpener.current; setupOpener.current = null;
+        const el = o && o.isConnected && o !== document.body ? o : document.getElementById("q");
+        if (el) el.focus();
+      }, 0);
+    }
     async function deleteData() {
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
@@ -1060,6 +1128,8 @@
       + (f.paid !== (defaults.paid || "") ? 1 : 0) + (f.where ? 1 : 0) + (f.status !== "open" ? 1 : 0)
       + (f.hide_citizen !== defaults.hide_citizen ? 1 : 0) + (f.new_only ? 1 : 0) + (f.eligible ? 1 : 0);
     const anyFilter = moreCount > 0 || !!f.q.trim() || f.fields.length > 0 || f.states.length > 0 || f.company.length > 0;
+    // Only a search is set: the count line's button says "Clear search" (D17).
+    const onlySearch = !!f.q.trim() && moreCount === 0 && !f.fields.length && !f.states.length && !f.company.length;
     const clearFilters = () => { setF(s => ({ ...s, q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...defaults })); setLimit(PAGE); };
     const st = id => appStates[id] || "none";
     const keepSaved = list => { setSaved(list); IS.ls.set(SAVED_KEY, list); };
@@ -1168,7 +1238,8 @@
     // Nothing to count yet: the figures show a placeholder, not 0 (was: "0 Open in the Northeast").
     const counting = loading && !all.length;
     const gen = (index && index.generated_at) || (stats && stats.generated_at);
-    const genText = gen ? new Date(gen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "unknown";
+    // was: ... : "unknown", so a slow connection read "Updated unknown." for seconds. Nothing until the date is known (D17).
+    const genText = gen ? new Date(gen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
     const jobCounts = useMemo(() => { const c = {}; Object.values(queue.jobs || {}).forEach(j => { c[j.status] = (c[j.status] || 0) + 1; }); return c; }, [queue]);
 
     const canAuto = info.installed;
@@ -1226,7 +1297,7 @@
       if (!payload.length) return;
       setNote("Adding to the queue…");
       const res = await IS.ext.call({ type: "enqueue", jobs: payload });
-      if (res.error === "setup_required") { setNote("Finish the Deep Dive first. It just opened in a new tab."); return; }
+      if (res.error === "setup_required") { setNote("Set up Auto-Apply first (about 2 minutes). It just opened in a new tab."); return; }
       if (res.error) { setNote("Couldn't queue: " + res.error); return; }
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
       const current = added || skipped ? await IS.ext.call({ type: "get_queue" }) : null;
@@ -1371,14 +1442,17 @@
     // home on this page but the nav's Pricing link. One quiet line under the counters, from the same
     // /config numbers as the announcement (IS.plansBanner, never hardcoded), and nothing at all on a
     // paid plan or before /config answers, exactly as the announcement does.
-    const plansLine = plansSeen && IS.plansBanner(auth.cfg, me);
+    // was: plansSeen && IS.plansBanner(auth.cfg, me): only once the announcement was hidden. The
+    // announcement is retired (D16), so this line is the price's one place on the page.
+    const plansLine = IS.plansBanner(auth.cfg, me);
     // Numbers get thousands separators, "You applied" appears once there is something to count,
     // and the state list is one sentence under the numbers instead of a block floated to the right.
     // A const since 2026-10-05 so it can render before or after the setup card (D2.3).
     // Where the list looks, in words, for the coverage line, the empty list and the live region.
     const placeNames = ks => { const n = ks.map(IS.keyLabel).map(x => x.replace(/ \(([A-Z]{2})\)$/, "")); return n.slice(0, 8).join(", ") + (n.length > 8 ? ` and ${n.length - 8} more` : ""); };
     const scopeKeys = scope.all ? [] : [...new Set([...scope.keys, ...qKeys])];
-    const whereWords = scope.all ? (everything ? "every state" : "the Northeast and remote") : placeNames(scopeKeys);
+    // was: "every state" with remote-only roles left out too; the count line says so now that it carries the place.
+    const whereWords = scope.all ? (everything ? (scope.noRemote ? "every state, less remote-only roles" : "every state") : "the Northeast and remote") : placeNames(scopeKeys);
     const pr = progress.current;
     // "Show every state" with nothing picked loads the rest; with states picked it picks Everywhere.
     const searchAll = () => { if (scope.all) setAllAsked(true); else upd("states", [IS.ALL_KEY]); };
@@ -1395,14 +1469,12 @@
         fig(scope.all ? (stats && stats.new != null ? stats.new : allLoaded ? figures.fresh : null) : figures.fresh, "New this week"),
         !scope.all && fig(nationwide, "Open nationwide"),
         figures.applied > 0 && fig(figures.applied, "You applied")),
-      // was: "Loading/Showing <the states in keys>." in every case.
+      // was: "Showing the Northeast and remote first; a search or filter covers every state. Show every state.
+      // Updated <time>." The place and "Show every state" moved to the count line over the list (D17), where
+      // they sit beside the number they describe; this line keeps the scan time, and nothing until it is
+      // known (was "Updated unknown").
       h("div", { className: "coverage" },
-        scope.all
-          ? (!everything ? "Showing the Northeast and remote first; a search or filter covers every state. "
-            : loading ? `Loading every state (${pr.done} of ${pr.total} files). ` : `Showing every state${scope.noRemote ? " except remote-only roles" : ""}. `)
-          : `${loading ? "Loading" : "Showing"} ${placeNames(scopeKeys)}. `,
-        !everything && h("button", { type: "button", className: "linkbtn", onClick: searchAll }, "Show every state"), !everything && ". ",
-        h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", ".")),
+        genText && h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", ".")),
       plansLine && h("p", { className: "plansline" },
         `Plans: free with any email; ${plansLine.plans.map(pl => `${pl.label} ${pl.price}`).join(" and ")} raise the allowance. `,
         h("a", { href: "pricing/" }, "Prices")));
@@ -1415,7 +1487,7 @@
     }, [p, majors]);
     const setupEl = setupOpen && h(Setup, { key: p ? p.updated : "new:" + JSON.stringify(prefill), initial: p || prefill, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token });
     const setupAskEl = setupAsk && h("div", { className: "notice setup-ask" },
-      h("button", { type: "button", className: "btn primary", onClick: () => setSetupOpen(true) }, prefill && prefill.majors ? `Rank these for ${prefill.majors[0]}` : "Rank these for your major"),
+      h("button", { type: "button", className: "btn primary", onClick: openSetup }, prefill && prefill.majors ? `Rank these for ${prefill.majors[0]}` : "Rank these for your major"),
       h("span", null, "Three short steps. Your profile stays in this browser."),
       h("button", { type: "button", className: "btn quiet", onClick: () => { IS.ls.set(SKIP_KEY, true); setSkipped(true); } }, "Not now"));
     // What narrows the list besides the search and the place, in words, for the empty list.
@@ -1438,12 +1510,18 @@
     const emptyText = loading ? `Nothing yet${asked ? " for " + asked : ""}. Still loading listings (${pr.done} of ${pr.total} files)…`
       : !inView.length ? `No listings in ${whereWords} yet.`
       : `No ${f.status === "open" ? "open " : ""}listings match ${asked || "these filters"} in ${whereWords}${filterWords.length ? `, with ${filterWords.join(", ")}` : ""}.`;
+    // An empty search that hasn't looked in the descriptions offers that first, as the one primary button
+    // (D18, 2026-10-14): it is the action that can turn zero into something. was: it sat only in the notice
+    // above, and the empty state offered "Clear search".
+    const descOffer = searching && !wantDesc;
     const emptyEl = h("div", { className: "sheet empty" },
       h("p", null, emptyText),
       !loading && h("div", { className: "empty-actions" },
-        !everything && h("button", { type: "button", className: "btn primary", onClick: searchAll }, "Search every state"),
+        descOffer && h("button", { type: "button", className: "btn primary", onClick: () => setDescAll(true) }, "Search descriptions too"),
+        !everything && h("button", { type: "button", className: cx("btn", !descOffer && "primary"), onClick: searchAll }, "Search every state"),
         asked && h("button", { type: "button", className: "btn", onClick: () => upd("q", "") }, "Clear search"),
-        filterWords.length > 0 && h("button", { type: "button", className: "btn", onClick: clearFilters }, "Clear filters")));
+        filterWords.length > 0 && h("button", { type: "button", className: "btn", onClick: clearFilters }, "Clear filters")),
+      descOffer && !loading && h("p", { className: "meta" }, "Descriptions are a larger download."));
     // The live region (2026-10-14): the count or the empty message, said once the list has settled for
     // a moment after the student changes something, not on every key or file. was: role=status on the
     // count itself, which changed with each file landing and each pause in typing.
@@ -1456,10 +1534,19 @@
       const t = setTimeout(() => setSpoken(liveText), 900);
       return () => clearTimeout(t);
     }, [liveText]);
-    // On a phone the promotions go under the list (2026-10-14): above it they pushed the first listing
-    // two screens down. A wide screen keeps them where they were.
+    // was: on a phone the promotions went under the list and a wide screen kept them above it. Since D16
+    // (2026-10-14) they sit under the list on every screen: three promotions above it pushed the first
+    // listing to about 794 px on a laptop. Above the list there is at most one standing notice (topNotice).
     const narrow = useNarrow();
+    // The one standing notice above the list, by priority: the setup line, then "one step left" for an
+    // installed extension that isn't set up. Whichever isn't shown there goes under the list.
+    const oneStepEl = info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "),
+      // was: "do the Deep Dive so the agent knows your background. " and "Start the Deep Dive" (D29: the two-minute
+      // setup is called what it is; "Deep Dive" is the optional Interview and Voice steps).
+      "set up Auto-Apply so it knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Set up Auto-Apply (about 2 minutes)"));
+    const topNotice = setupAsk ? setupAskEl : oneStepEl;
     const promoEls = h(F, null,
+      setupAsk && oneStepEl,
       // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
       // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
       // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
@@ -1479,33 +1566,18 @@
       // does comes before what it costs. was: it came after the plans banner and the stale-extension note.
       // Not on a phone or tablet (2026-10-14), which can't add a Chrome extension; the hero's install
       // button stays for them and goes to the install page.
-      info.checked && !info.installed && !info.stale && !touchOnly() && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome"),
+      // A Hide button since D16 (2026-10-14), kept in this browser.
+      info.checked && !info.installed && !info.stale && !touchOnly() && !extHidden && h("div", { className: "notice quietnote ext-notice" },
+        h("button", { type: "button", className: "btn quiet small notice-hide", onClick: hideExt, "aria-label": "Hide this suggestion" }, "Hide"),
+        "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome"),
         // A dated third-party fact beside the store link (2026-10-05 audit): the listing's own rating and
         // count once it has them (CONFIG.storeRating, copied from the store with its date), until then
         // when the store accepted it. Nothing here is made up: the date is the store's approval.
         C.storeRating
           ? `. Rated ${C.storeRating.value} from ${C.storeRating.count} ratings on the Chrome Web Store, as of ${C.storeRating.asOf}.`
           : ". In the Chrome Web Store since September 22, 2026."),
-      // Plans announcement (2026-10-04): every number comes from the Worker's /config (IS.plansBanner).
-      // Signed-in free students get a checkout button for the first plan; everyone else the comparison.
-      // Since 2026-10-05 it also says the one thing the terms say about money that a buyer should hear
-      // first (no refunds by default), and links the pricing page, which is the price's home now.
-      (() => {
-        const pb = !plansSeen && IS.plansBanner(auth.cfg, me);
-        if (!pb) return null;
-        const first = pb.plans[0];
-        return h("div", { className: "notice plans", role: "note" },
-          h("b", null, `New: Auto-Apply plans now start at ${pb.from}. `),
-          `It's free with any email (${pb.free} applications filled a month, or ${pb.edu} with a school .edu email), and `,
-          pb.plans.map((pl, i) => `${pl.label} gives you ${pl.runs} for ${pl.price}`).join(", or "),
-          // was: ". It never submits for you. "
-          ". It never submits for you. No refunds by default: the AI cost is spent when a run happens, so start free and pay only if you hit the cap. ",
-          auth.token && me && me.can_upgrade
-            ? h("button", { type: "button", className: "btn primary", disabled: !!busy, onClick: () => billing("checkout", first.plan) }, `Get ${first.label} · ${first.price}`)
-            : h("a", { href: "pricing/" }, "Plans and prices"),
-          " ", h("a", { href: "compare/" }, "How it compares"),
-          " ", h("a", { href: "#", onClick: prevent(hidePlans), "aria-label": "Hide this announcement" }, "Hide"));
-      })(),
+      // was: the plans announcement ("New: Auto-Apply plans now start at ..."), retired 2026-10-14 (D16,
+      // decision 3). The quiet plans line under the counters (plansLine) carries the prices from /config.
       // What students say (2026-10-05 audit): only words a student actually wrote, with permission, from
       // CONFIG.testimonials in index.html. The list is empty until there are some, and then this renders
       // nothing, so no invented quote can ever appear here.
@@ -1520,7 +1592,8 @@
       reviewLine && !upgradeAsk && h("div", { className: "notice quietnote review-line" },
         "Using Auto-Apply? A short review on the Chrome Web Store helps other students find it. ",
         h("a", { href: IS.REVIEWS_URL, target: "_blank", rel: "noopener", onClick: () => { IS.ext.call({ type: "review_ask", action: "review" }); setTimeout(hideReview, 0); } }, "Leave a review"),
-        " ", h("a", { href: "#", style: { color: "var(--ink3)", fontWeight: 400 }, onClick: prevent(hideReview), "aria-label": "Hide this suggestion" }, "Hide")));
+        // was: a grey "Hide" link at the end of the sentence; the shared notice Hide button now (D12).
+        h("button", { type: "button", className: "btn quiet small notice-hide", onClick: hideReview, "aria-label": "Hide this suggestion" }, "Hide")));
     return h("div", { className: "wrap" },
       // Skip links and a main landmark (2026-10-14): a keyboard took about 750 Tab presses from the search
       // box to "Show more", and there was no landmark or heading to jump to.
@@ -1547,10 +1620,10 @@
           info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_panel" }) }, "Queue",
             jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,
             jobCounts.ready_to_submit ? h("span", { className: "count ok" }, `${jobCounts.ready_to_submit} ready`) : null),
-          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
+          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Set up Auto-Apply (about 2 minutes)"),
           // Hidden while the setup card is already open under it, so a first visit shows one way in.
           // Also hidden while the first-visit line offers the same thing just under the counters.
-          !setupOpen && !setupAsk && h("button", { type: "button", className: "btn", onClick: () => { setSetupOpen(true); } }, p ? "My profile" : "Set up profile"),
+          !setupOpen && !setupAsk && h("button", { type: "button", className: "btn", onClick: openSetup }, p ? "My profile" : "Set up profile"),
           signInBtn,
           (auth.token || ADMIN) && h(AccountMenu, {
             email: who && who.email,
@@ -1599,7 +1672,12 @@
             // the nearest link was the quiet notice under the counters. A plain (not primary) button,
             // so the search stays the first action, and gone once the extension is installed or stale.
             // was: the search button alone.
-            !(info.installed || info.stale) && h("a", { className: "btn", href: installUrl("hero"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome · free")))),
+            // On a phone or tablet, which can't add a Chrome extension, the button says what it can do there and
+            // goes straight to install.html's "send it to my laptop" box (D19, 2026-10-14). was: "Add Auto-Apply
+            // to Chrome · free" everywhere, a dead end on a phone.
+            !(info.installed || info.stale) && (touchOnly()
+              ? h("a", { className: "btn", href: (C.extensionInstallUrl || "install.html") + "#phone" }, "Send Auto-Apply to my laptop")
+              : h("a", { className: "btn", href: installUrl("hero"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome · free"))))),
 
       h("main", { id: "main" },
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
@@ -1610,14 +1688,15 @@
       p && setupEl,
       figuresEl,
       !p && setupEl,
-      setupAskEl,
-      !narrow && promoEls,
+      // was: setupAskEl, (topNotice holds it, below)
+      // was: !narrow && promoEls (D16: under the list on every screen now).
+      topNotice,
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
-      info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
+      // was: info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), ...): topNotice above.
       note && h("div", { className: "notice", role: "status" }, note),
       // Always in the page, so a screen reader hears the message when it appears inside.
       h("div", { role: "status" }, selNote && h("div", { className: "selnote" }, h("span", null, selNote),
-        h("button", { type: "button", "aria-label": "Close this message", onClick: () => { clearTimeout(selTimer.current); setSelNote(""); } }, "×"))),
+        h("button", { type: "button", "aria-label": "Close this message", onClick: () => { clearTimeout(selTimer.current); setSelNote(""); } }, h("span", { className: "i i-cross", "aria-hidden": true })))),
       // The one-time invite nudge (2026-10-02), right under the "Queued" or "Profile saved" note it follows.
       // It steps aside for the out-of-runs notice, which already offers the invite, and for the panel itself.
       nudge && auth.token && inviteOffer && !invite && !outOfRuns && h("div", { className: "notice", role: "status" },
@@ -1670,15 +1749,17 @@
       h("div", { className: "filters", role: "search" },
         h("div", { className: "field search" }, h(SearchBox, { value: f.q, onChange: v => upd("q", v) })),
         f.company.length > 0 && h("button", { type: "button", className: "btn", title: "Show every employer", onClick: () => upd("company", []) },
-          "Employer: " + f.company[0] + " \u00d7"),
-        h(MultiSelect, { placeholder: "Field", options: opts.fields, selected: f.fields, onChange: v => upd("fields", v) }),
+          "Employer: " + f.company[0], h("span", { className: "i i-cross", "aria-hidden": true })),
+        h(MultiSelect, { placeholder: "Field", options: opts.fields, selected: f.fields, count: f.fields.length, onChange: v => upd("fields", v) }),
         // "Everywhere" stands alone: picking it drops the states, and picking a state drops it.
         // was: placeholder: p ? "State (your areas)" : "State"
-        h(MultiSelect, { label: "State", placeholder: scope.all ? "State: everywhere" : "State: your areas", options: opts.states, selected: f.states,
+        // "Everywhere" is no narrowing, so it doesn't count as a set filter.
+        h(MultiSelect, { label: "State", placeholder: scope.all ? "State: everywhere" : "State: your areas", options: opts.states, selected: f.states, count: f.states.filter(k => k !== IS.ALL_KEY).length,
           onChange: v => upd("states", v[v.length - 1] === IS.ALL_KEY ? [IS.ALL_KEY] : v.filter(k => k !== IS.ALL_KEY)) }),
         h(Sel, { label: "Sort", value: f.sort, onChange: v => upd("sort", v) }, opt("score", "Sort: best match"), opt("new", "Sort: newest"), opt("company", "Sort: company A–Z"), opt("comp", "Sort: pay listed")),
-        h("button", { type: "button", className: cx("btn morebtn", moreOpen && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
-          moreOpen ? "Fewer filters" : "More filters", moreCount > 0 && h("span", { className: "count ok" }, moreCount)),
+        // was: the count in a small badge. "More filters · 2" now, the same as Field and State (D8), with the same fill.
+        h("button", { type: "button", className: cx("btn morebtn", (moreOpen || moreCount > 0) && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
+          moreOpen ? "Fewer filters" : "More filters", moreCount > 0 ? ` · ${moreCount}` : ""),
         h("span", { className: "spacer" }),
         canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size || queuing, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, queuing ? "Adding applications…" : "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
       moreOpen && h("div", { className: "filters extra" },
@@ -1696,16 +1777,29 @@
           h("input", { type: "checkbox", checked: f.eligible, onChange: e => upd("eligible", e.target.checked) }), "Hide not eligible"),
         h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
           saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`))))),
+      // The count line (D17, 2026-10-14) says where the list looks, beside the number: "3,126 listings in the
+      // Northeast and remote · Show every state". While files are still arriving the number is a floor ("At least
+      // 5 so far"). The clear button names what it clears. The description search is offered here, in the line,
+      // instead of in a notice of its own above the list (D16).
+      // was: "N listings match · loading more states (x of y)…", then "Clear filters" whenever anything was set.
       h("div", { className: "filterbar-foot" },
         // was: role=status on this span; the live region below says the count once it settles.
-        h("span", null, counting ? "Loading…" : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${loading ? ` · loading more states (${pr.done} of ${pr.total})…` : ""}`),
+        h("span", { className: "countline" }, counting ? "Loading…" : h(F, null,
+          loading ? `At least ${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""} so far` : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}`,
+          ` in ${whereWords}`,
+          loading ? ` · loading ${pr.done} of ${pr.total} files` : "",
+          !everything && h(F, null, " · ", h("button", { type: "button", className: "linkbtn", onClick: searchAll }, "Show every state")))),
         ranked && rows.length > 1 && h("span", { className: "muted" }, "Closest matches to your search first"),
-        anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
+        onlySearch ? h("button", { type: "button", className: "btn quiet", onClick: () => upd("q", "") }, "Clear search")
+          : anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
       h("div", { className: "sr", role: "status", "aria-live": "polite", "aria-atomic": "true" }, spoken),
 
       // was: `Searching titles, companies and fields in ${keys.length} states. `
-      searching && !wantDesc && h("div", { className: "notice" }, `Searching titles, companies, fields and places in ${scope.all ? "every state" : keys.length + " states"}. `,
-        h("button", { type: "button", className: "btn quiet", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)"),
+      // was: a notice above the list: "Searching titles, companies, fields and places in every state. [Search
+      // descriptions too] (a larger download)". One line under the count now (D16), and the empty list offers
+      // the same button as its main one (D18).
+      descOffer && rows.length > 0 && h("div", { className: "descline" }, "Searching titles, companies, fields and places. ",
+        h("button", { type: "button", className: "linkbtn", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)."),
       wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
       wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setDescRetry(n => n + 1) }, "Retry descriptions")),
@@ -1721,22 +1815,24 @@
               h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
-                sortTh("company", "Company and role"), h("th", { scope: "col" }, "Field"), h("th", { scope: "col" }, "Location and term"),
-                sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", { scope: "col" }, "Your status"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")))),
+                // was: Company and role, Field, Location and term, Pay, Match, Your status, Links. Field, place, term
+                // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
+                sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
+                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns }))))),
               h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))))),
 
-      narrow && promoEls,
+      // was: narrow && promoEls
+      promoEls,
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
       // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
       // was: h(Landing, { ..., plans: payPlans, installed: info.installed || !!info.stale }),
       // Under the list since 2026-10-14, so "What InternScout does" no longer pushes the search down.
-      h(Landing, { open: landingOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
+      h(Landing, { open: landingOpen, setOpen: setLandingOpen, onSetup: openSetup, hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
 
       // Below the list and above the footer links, so it never pushes a listing down.
-      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: () => setSetupOpen(true) })),
+      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup })),
 
       h("footer", null,
         // Same facts as before, in two short sentences instead of one long one. The plan prices
