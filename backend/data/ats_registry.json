@@ -2406,6 +2406,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "profoundmedical": {
+   "name": "Profound Medical",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "ruekertmielke": {
    "name": "Ruekert & Mielke",
    "quant": false,
@@ -3456,8 +3462,9 @@
   "cybereason": {
    "name": "Cybereason",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-14"
   },
   "darkwolfsolutions": {
    "name": "Dark Wolf Solutions",
