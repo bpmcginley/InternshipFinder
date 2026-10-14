@@ -28,9 +28,14 @@
   const DAY = IS.DAY;
   const daysAgo = iso => { if (!iso) return null; const t = new Date(iso).getTime(); return isNaN(t) ? null : Math.max(0, Math.floor((Date.now() - t) / DAY)); };
   const ago = n => n === 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
-  const fmtDay = d => new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  // One formatter each, made once: toLocaleDateString builds a new one on every call, and the list
+  // calls these for every row it draws. Same text (toLocaleDateString(undefined, o) is
+  // new Intl.DateTimeFormat(undefined, o).format).
+  const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const SHORT_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+  const fmtDay = d => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? "Invalid Date" : DAY_FMT.format(t); };
   const daysUntil = d => Math.ceil((new Date(d + "T23:59:59").getTime() - Date.now()) / DAY);
-  const shortDate = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
+  const shortDate = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : SHORT_FMT.format(d); };
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const cx = (...a) => a.filter(Boolean).join(" ");
   const prevent = fn => e => { e.preventDefault(); fn(e); };
@@ -142,18 +147,25 @@
       else if (e.key === "ArrowDown") { setAct(open ? Math.min(active + 1, Math.max(0, filtered.length - 1)) : 0); setOpen(true); e.preventDefault(); }
       else if (e.key === "ArrowUp") { setAct(open ? Math.max(active - 1, 0) : Math.max(0, filtered.length - 1)); setOpen(true); e.preventDefault(); }
       else if (e.key === "Escape") { setOpen(false); e.preventDefault(); }
+      // Tab moves on to the next control and closes the list. was: the list stayed open behind it.
+      else if (e.key === "Tab") setOpen(false);
       else if (e.key === "Backspace" && !q && selected.length) rm(selected[selected.length - 1]);
     };
     return h("div", { className: cx("field ms", wide && "wide"), ref, onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); } },
       h("div", { className: "box", onClick: () => { setOpen(true); if (input.current) input.current.focus(); } },
         selected.map(s => { const o = byVal.get(s); return h("span", { key: s, className: "chip" }, (o && (o.chip || o.label)) || s,
           h("button", { type: "button", "aria-label": "Remove " + ((o && o.label) || s), onClick: e => { e.stopPropagation(); rm(s); } }, "×")); }),
-        h("input", { ref: input, value: q, role: "combobox", "aria-autocomplete": "list", "aria-expanded": open,
+        // With no options left there is no list: aria-expanded stays false and the "No more matching
+        // options" line is a plain status message. was: an empty listbox, which axe reports as critical
+        // (aria-required-children: a listbox must own options).
+        h("input", { ref: input, value: q, role: "combobox", "aria-autocomplete": "list", "aria-expanded": open && filtered.length > 0,
           "aria-controls": id + "-list", "aria-activedescendant": open && filtered.length ? id + "-option-" + active : undefined,
           "aria-label": label || placeholder, placeholder: selected.length ? "" : placeholder,
           onChange: e => { setQ(e.target.value); setOpen(true); setAct(0); }, onFocus: () => setOpen(true), onKeyDown: onKey })),
-      open && h("div", { className: "drop", ref: drop, id: id + "-list", role: "listbox", "aria-label": label || placeholder },
-        !filtered.length && h("div", { className: "opt muted", role: "status" }, "No more matching options"),
+      open && !filtered.length && h("div", { className: "drop", role: "status" }, h("div", { className: "opt muted" }, "No more matching options")),
+      // tabIndex -1: a scrolling box is a Tab stop of its own in Chrome and Firefox, so Tab from the
+      // input landed in the list. Arrow keys and Enter on the input still move through it and pick.
+      open && filtered.length > 0 && h("div", { className: "drop", ref: drop, id: id + "-list", role: "listbox", "aria-label": label || placeholder, tabIndex: -1 },
         filtered.map((o, i) => h("div", { key: o.value, id: id + "-option-" + i, role: "option", "aria-selected": false, className: cx("opt", i === active && "act"),
           onMouseDown: e => { e.preventDefault(); add(o.value); }, onMouseEnter: () => setAct(i) },
           h("span", null, o.label || o.value), o.count != null ? h("span", { className: "c" }, o.count) : o.hint ? h("span", { className: "c" }, o.hint) : null))));
@@ -783,21 +795,24 @@
     const progress = useRef({ done: 0, total: 0 });
     useEffect(() => {
       if (!ready) return;
-      let live = true, timer = 0;
+      let live = true, timer = 0, frame = 0;
       const st = store.current, total = [...plan.first, ...plan.rest].filter(k => index && index.files && index.files[k]).length;
       progress.current = { done: 0, total };
       const step = () => { progress.current = { done: Math.min(total, progress.current.done + 1), total }; };
-      // The first files redraw as each lands (the list paints from the first one); the rest at most four
+      // One redraw per animation frame at most: files that land in the same frame share it.
+      // was: setVer for each of the first files as it landed, so two arriving together drew the list twice.
+      const paint = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (live) setVer(st.version()); }); };
+      // The first files redraw as they land (the list paints from the first one); the rest at most four
       // times a second, so 56 files arriving don't redraw the page 56 times.
-      const bump = () => { if (!timer) timer = setTimeout(() => { timer = 0; if (live) setVer(st.version()); }, 250); };
+      const bump = () => { if (!timer) timer = setTimeout(() => { timer = 0; paint(); }, 250); };
       setLoading(true); setFailedKeys([]);
       (async () => {
-        const bad = await st.ensure(plan.first, () => { step(); if (live) setVer(st.version()); });
+        const bad = await st.ensure(plan.first, () => { step(); paint(); });
         for (let i = 0; i < plan.rest.length && live; i += 4) bad.push(...await st.ensure(plan.rest.slice(i, i + 4), () => { step(); bump(); }));
         if (!live) return;
-        clearTimeout(timer); setVer(st.version()); setLoading(false); setFailedKeys(bad || []);
+        clearTimeout(timer); cancelAnimationFrame(frame); frame = 0; setVer(st.version()); setLoading(false); setFailedKeys(bad || []);
       })();
-      return () => { live = false; clearTimeout(timer); };
+      return () => { live = false; clearTimeout(timer); cancelAnimationFrame(frame); };
     }, [ready, planKey, retry]);
 
     // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
@@ -1127,16 +1142,11 @@
       if (f.new_only) r = r.filter(x => x.is_new);
       if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
       else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
-      const S = scoreOf;
-      const R = (a, b) => ranked ? rel.get(b) - rel.get(a) : 0;
-      // Dated postings first, newest first. first_seen is only the scan that found the row, which is
-      // today for nearly everything, so using it for undated rows put every undated posting on top.
-      const newer = (a, b) => (b.posted_at ? 1 : 0) - (a.posted_at ? 1 : 0) || (b.posted_at || "").localeCompare(a.posted_at || "") || (b.first_seen || "").localeCompare(a.first_seen || "");
-      // was: no R(a, b) in these; a search was sorted by date or profile score alone.
-      if (f.sort === "score") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || R(a, b) || (S(b).score - S(a).score) || newer(a, b));
-      else if (f.sort === "new") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || R(a, b) || newer(a, b));
-      else if (f.sort === "company") r.sort((a, b) => a.company_name.localeCompare(b.company_name));
-      else if (f.sort === "comp") r.sort((a, b) => (IS.realSalary(b) ? 1 : 0) - (IS.realSalary(a) ? 1 : 0) || R(a, b) || S(b).score - S(a).score);
+      // The order: newest first means dated postings first, newest first. first_seen is only the scan
+      // that found the row, which is today for nearly everything, so using it for undated rows put every
+      // undated posting on top. A search ranks by how well each role matches it, with the chosen sort as
+      // the tiebreak. was: four comparators here; IS.sortRows works each row's keys out once (core.js).
+      IS.sortRows(r, f.sort, scoreOf, ranked ? rel : null);
       return r;
     }, [inView, cq, f, appStates, jobs, elig, scoreOf, p]);
 
@@ -1161,19 +1171,33 @@
     // A desktop browser we know has no extension (a phone can't add one), for the rows' Auto-Apply explainer.
     const canTry = info.checked && !info.installed && !info.stale && !touchOnly();
     const selectionRef = useRef(sel); selectionRef.current = sel;
+    // The selection limit message. It used to go in the page notes at the top, often thousands of
+    // pixels above the checkbox just clicked, so the click looked like it did nothing. It shows at the
+    // bottom of the screen now, where it can be seen from anywhere in the list, and goes after 8 s.
+    const [selNote, setSelNote] = useState("");
+    const selTimer = useRef(0);
+    const flashSelNote = useCallback(text => {
+      clearTimeout(selTimer.current); setSelNote(text);
+      selTimer.current = setTimeout(() => setSelNote(""), 8000);
+    }, []);
+    useEffect(() => () => clearTimeout(selTimer.current), []);
     const check = useCallback((id, on) => {
       const n = new Set(selectionRef.current);
-      if (on && !n.has(id) && n.size >= 100) { setNote("Select up to 100 applications at a time. Queue these first, then select more."); return; }
+      if (on && !n.has(id) && n.size >= IS.SELECT_MAX) { flashSelNote(`Select up to ${IS.SELECT_MAX} applications at a time. Queue these first, then select more.`); return; }
       on ? n.add(id) : n.delete(id); selectionRef.current = n; setSel(n);
     }, []);
     const onWhy = useCallback(id => setOpenId(o => o === id ? null : id), []);
-    const selectable = shown.filter(r => r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed"));
-    const allChecked = selectable.length > 0 && selectable.slice(0, 100).every(r => sel.has(r.id));
+    // was: rows with no job of their own. A row whose apply link a job already holds is skipped by the
+    // extension too, so the header checkbox no longer picks it.
+    const held = useMemo(() => IS.heldUrls(queue), [queue]);
+    const selectable = shown.filter(r => r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url));
+    // was: selectable.slice(0, 100).every(r => sel.has(r.id)), which could stay unchecked for good (IS.headerChecked).
+    const allChecked = IS.headerChecked(selectable, sel);
     const selectShown = on => {
-      const n = new Set(selectionRef.current); let omitted = 0;
-      selectable.forEach(r => { if (!on) n.delete(r.id); else if (n.has(r.id) || n.size < 100) n.add(r.id); else omitted++; });
+      const { sel: n, omitted } = IS.selectRows(selectionRef.current, selectable, on);
       selectionRef.current = n; setSel(n);
-      if (omitted) setNote(`Selected ${n.size} applications. Queue up to 100 at a time; ${omitted} more shown are unselected.`);
+      if (omitted) flashSelNote(`Selected ${n.size} applications. Queue up to ${IS.SELECT_MAX} at a time; ${omitted} more shown are not selected.`);
+      else setSelNote("");
     };
 
     const autoRef = useRef(null);
@@ -1203,7 +1227,9 @@
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
       const current = added || skipped ? await IS.ext.call({ type: "get_queue" }) : null;
       const addedIds = new Set(IS.queuedListingIds(res.added || [], current && current.queue));
-      const handledIds = new Set([...addedIds, ...IS.queuedListingIds(res.skipped || [], current && current.queue)]);
+      // was: the listing ids of the added and skipped jobs alone, so a listing skipped for sharing its
+      // apply link with another listing's job stayed selected for good.
+      const handledIds = new Set([...addedIds, ...IS.handledListingIds(batch, res, current && current.queue)]);
       setSel(s => new Set([...s].filter(id => !handledIds.has(String(id)))));
       // was: if (added) IS.count("autoapply");
       if (added) { IS.count("autoapply"); offerNudge(); }
@@ -1585,6 +1611,9 @@
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
+      // Always in the page, so a screen reader hears the message when it appears inside.
+      h("div", { role: "status" }, selNote && h("div", { className: "selnote" }, h("span", null, selNote),
+        h("button", { type: "button", "aria-label": "Close this message", onClick: () => { clearTimeout(selTimer.current); setSelNote(""); } }, "×"))),
       // The one-time invite nudge (2026-10-02), right under the "Queued" or "Profile saved" note it follows.
       // It steps aside for the out-of-runs notice, which already offers the invite, and for the panel itself.
       nudge && auth.token && inviteOffer && !invite && !outOfRuns && h("div", { className: "notice", role: "status" },
