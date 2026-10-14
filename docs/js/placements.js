@@ -122,7 +122,8 @@
         h("button", { type: "button", className: "linkbtn quietlink", onClick: onHide }, "Hide paid listings")),
       about && h("div", { className: "paid-about", id: id + "-about" },
         h("p", null, "An employer paid to show this listing here. Paying doesn't change match scores, order or filters. It showed because it fits your search and filters, and it also appears in the results at its usual place. Your saved profile can hide a paid listing that doesn't fit you, but it is never used to pick one, and it stays in your browser."),
-        h("p", null, h("a", { href: "privacy.html#paid" }, "More about paid listings"))),
+        // was: href "privacy.html#paid", which is the paid plans section; the ad disclosure is #paid-listings.
+        h("p", null, h("a", { href: "privacy.html#paid-listings" }, "More about paid listings"))),
       h("div", { className: "paid-body" },
         h("div", { className: "paid-main" },
           h("div", { className: "li-head" }, h("span", { className: "ad" }, "Ad"), " ", h("span", { className: "co" }, x.company_name),

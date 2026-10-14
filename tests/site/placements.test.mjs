@@ -304,8 +304,13 @@ test("T8: headed Paid listing, Ad before the company name, and a sponsored link"
   assert.doesNotMatch(PLACE_SRC.replace(/^\s*\/\/.*$/gm, ""), /Sponsored|Promoted|Featured/);
   // The same words as the landing pages' box (backend/internscout/seo_pages.py placement_box).
   const seo = read("backend/internscout/seo_pages.py");
-  for (const w of ["Paid listing", '"ad">Ad<', "Why am I seeing this?", "Open posting", 'rel="sponsored noopener"', "privacy.html#paid"]) assert.ok(seo.includes(w), w);
-  for (const w of ['"Paid listing"', '"Ad"', '"Why am I seeing this?"', '"Open posting"', '"sponsored noopener"', '"privacy.html#paid"']) assert.ok(PLACE_SRC.includes(w), w);
+  for (const w of ["Paid listing", '"ad">Ad<', "Why am I seeing this?", "Open posting", 'rel="sponsored noopener"']) assert.ok(seo.includes(w), w);
+  for (const w of ['"Paid listing"', '"Ad"', '"Why am I seeing this?"', '"Open posting"', '"sponsored noopener"']) assert.ok(PLACE_SRC.includes(w), w);
+  // Both boxes link to the ad disclosure, #paid-listings, never #paid (the paid plans section).
+  assert.match(seo, /href="\/privacy\.html#paid-listings">Why am I seeing this\?/);
+  assert.deepEqual([...PLACE_SRC.replace(/^\s*\/\/.*$/gm, "").match(/privacy\.html#[a-z-]+/g)], ["privacy.html#paid-listings"]);
+  const privacy = read("docs/privacy.html");
+  assert.match(privacy, /<h2 id="paid-listings">Paid listings<\/h2>/);
 });
 
 test("Why am I seeing this? opens inline, and the Why panel opens inside the box", () => {
