@@ -8,22 +8,31 @@
   host.setAttribute("data-is-overlay", "1");
   host.style.cssText = "position:fixed;left:16px;bottom:16px;z-index:2147483647;";
   const root = host.attachShadow({ mode: "open" });
+  // The colours are extension/lib/theme.css's (and the dashboard's) design tokens, set on the shadow host so
+  // the employer's page can't change them, light and dark (2026-10-14; tests/site/tokens.test.mjs keeps them
+  // equal). was: hex values typed in, with amber #9a6412 and green #1f7a4d under WCAG AA, ink3 #868b92 (3.2:1),
+  // light only. The page's own fonts can't be loaded inside a shadow root, so the faces fall back to the system's.
   root.innerHTML = `<style>
-    .card{font:13px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;background:#fffefb;color:#17191c;border:1px solid #e2ded4;border-top:2px solid #17191c;border-radius:8px;box-shadow:0 10px 30px rgba(20,20,20,.16);width:300px;padding:11px 13px 12px}
+    :host{--paper:#f6f4ef;--panel:#fffefb;--sunk:#efece5;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;--rule2:#ece9e1;--field-border:#80858c;--accent:#1d5c46;--accent-ink:#fff;--accent-hover:#164a38;--accent-soft:#e3eee8;--blue:#2b5aa0;--amber:#8c5a0f;--amber-soft:#f6ecd9;--green:#1d7549;--red:#a8362c;--sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;--fs-1:12px;--fs-2:13px;--fs-3:15px;--r:6px;--r-lg:8px;--shadow-pop:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent)}
+    @media (prefers-color-scheme:dark){:host{--paper:#131416;--panel:#1a1b1e;--sunk:#232427;--ink:#ecebe6;--ink2:#b8b6af;--ink3:#95948e;--rule:#2c2d31;--rule2:#232427;--field-border:#6e7077;--accent:#7cc3a1;--accent-ink:#0f1a15;--accent-hover:#95d2b3;--accent-soft:#1c2a24;--blue:#8fb2e8;--amber:#e0b25e;--amber-soft:#2e2717;--green:#7cc3a1;--red:#e48a80}}
+    .card{font:var(--fs-2)/1.45 var(--sans);background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-top:2px solid var(--ink);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);width:300px;padding:11px 13px 12px}
     .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-    .top b{font:600 15px/1 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
-    .dot{width:7px;height:7px;border-radius:50%;background:#868b92;flex:none}
-    .working .dot{background:#2b5aa0;animation:p 1.2s infinite}.needs_you .dot{background:#9a6412}.ready_to_submit .dot{background:#1f7a4d}.submitted .dot{background:#1f7a4d}.failed .dot{background:#a8362c}
+    .top b{font:600 var(--fs-3)/1 var(--serif)}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--ink3);flex:none}
+    .working .dot{background:var(--blue);animation:p 1.2s infinite}.needs_you .dot{background:var(--amber)}.ready_to_submit .dot{background:var(--green)}.submitted .dot{background:var(--green)}.failed .dot{background:var(--red)}
     @keyframes p{50%{opacity:.35}}
-    b{font-weight:600}.muted{color:#868b92;font-size:12px}.co{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    @media (prefers-reduced-motion:reduce){.working .dot{animation:none}}
+    b{font-weight:600}.muted{color:var(--ink3);font-size:var(--fs-1)}.co{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .msg{margin:6px 0;white-space:pre-wrap}
-    ul{margin:4px 0 6px 16px;padding:0;color:#4b5058}
+    ul{margin:4px 0 6px 16px;padding:0;color:var(--ink2)}
     .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-    button{background:#fffefb;color:#17191c;border:1px solid #e2ded4;border-radius:6px;padding:5px 10px;font-weight:500;font-size:12px;line-height:1.3;font-family:inherit;cursor:pointer}
-    button:hover{border-color:#868b92}
-    button.primary{background:#1d5c46;border-color:#1d5c46;color:#fff}
-    textarea{width:100%;box-sizing:border-box;background:#fff;color:#17191c;border:1px solid #e2ded4;border-radius:6px;padding:6px 8px;font:inherit;min-height:52px;margin-top:6px}
-    .x{margin-left:auto;background:none;border:0;color:#868b92;padding:0 2px}
+    button{background:var(--panel);color:var(--ink);border:1px solid var(--field-border);border-radius:var(--r);min-height:32px;padding:0 10px;font-weight:500;font-size:var(--fs-1);line-height:1.3;font-family:inherit;cursor:pointer}
+    button:hover{border-color:var(--ink3)}
+    button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+    button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+    :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    textarea{width:100%;box-sizing:border-box;background:var(--panel);color:var(--ink);border:1px solid var(--field-border);border-radius:var(--r);padding:6px 8px;font:inherit;min-height:52px;margin-top:6px}
+    .x{margin-left:auto;background:none;border:0;color:var(--ink3);min-height:0;padding:0 2px}
     .min .body{display:none}
   </style><div class="card" id="card"><div class="top"><span class="dot"></span><b>InternScout</b><span class="muted" id="st"></span><button class="x" id="min" title="Minimize">–</button></div><div class="body" id="body"></div></div>`;
   const $ = (s) => root.querySelector(s);

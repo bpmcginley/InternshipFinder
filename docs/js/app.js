@@ -243,7 +243,11 @@
         : "No posting date given, so its age counts as unknown rather than new",
       openness: "", source: "",
     };
-    const chip = s => h("span", { key: s.name, className: cx("tag", has && (has[s.name] ? "ok" : "miss")), title: has ? (has[s.name] ? "Found on your profile" : "Not on your profile") : "" }, has ? (has[s.name] ? "✓ " : "✗ ") : "", s.name);
+    // The shared check and cross icons (index.html .i) in place of the ✓ and ✗ characters (2026-10-14), with
+    // the meaning in words for a screen reader, since the icon itself is silent.
+    // was: has ? (has[s.name] ? "✓ " : "✗ ") : "", s.name
+    const icon = (name, said) => h(F, null, h("span", { className: "i i-" + name, "aria-hidden": true }), h("span", { className: "sr" }, said));
+    const chip = s => h("span", { key: s.name, className: cx("tag", has && (has[s.name] ? "ok" : "miss")), title: has ? (has[s.name] ? "Found on your profile" : "Not on your profile") : "" }, has ? (has[s.name] ? icon("check", "Have: ") : icon("cross", "Missing: ")) : "", s.name);
     return h("div", { className: "whyg" },
       h("div", null, h("h4", null, `Match score ${sc.score} of 100`),
         Object.entries(IS.PART_LABEL).map(([k, l]) => {
@@ -257,7 +261,7 @@
         req.length > 0 && h("div", null, req.map(chip)),
         pref.length > 0 && h(F, null, h("div", { className: "meta", style: { margin: "4px 0 5px" } }, "Nice to have"), h("div", null, pref.map(chip)))),
       h("div", null, h("h4", null, "Eligibility and deadline"),
-        cs.length ? cs.map(([lv, t], i) => h("div", { key: i, className: "flag " + lv }, lv === "bad" ? "✗ " : lv === "good" ? "✓ " : lv === "warn" ? "! " : "· ", t))
+        cs.length ? cs.map(([lv, t], i) => h("div", { key: i, className: "flag " + lv }, lv === "bad" ? icon("cross", "Problem: ") : lv === "good" ? icon("check", "Good: ") : lv === "warn" ? icon("alert", "Check: ") : "· ", t))
           : h("div", { className: "meta" }, "No limits or deadline found in the description."),
         h("div", { className: "meta", style: { marginTop: 9 } }, h("a", { href: IS.reportUrl(r), target: "_blank", rel: "noopener" }, "Report a wrong tag or dead link"))));
   }

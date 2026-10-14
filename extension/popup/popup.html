@@ -3,27 +3,27 @@
 <style>
 body{width:300px}
 .head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 16px 11px;border-bottom:1px solid var(--ink)}
-.mark{font:600 20px/1 var(--serif);letter-spacing:-.3px}
-.ver{color:var(--ink3);font:11px var(--mono)}
+.mark{font:600 var(--fs-6)/1 var(--serif);letter-spacing:-.3px}
+.ver{color:var(--ink3);font:var(--fs-1) var(--sans)}
 .figs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule)}
 .fig{padding:14px 14px 12px}
 .fig+.fig{border-left:1px solid var(--rule)}
-.fig .n{font:600 26px/1 var(--serif);font-variant-numeric:tabular-nums}
-.fig .l{color:var(--ink3);font-size:12px;margin-top:6px}
+.fig .n{font:600 var(--fs-7)/1 var(--serif);font-variant-numeric:tabular-nums}
+.fig .l{color:var(--ink3);font-size:var(--fs-1);margin-top:6px}
 .fig.warn .n{color:var(--amber)} .fig.good .n{color:var(--green)} .fig.zero .n{color:var(--ink3)}
-.note{padding:14px 16px 0;color:var(--ink2);font-size:12.5px}
+.note{padding:14px 16px 0;color:var(--ink2);font-size:var(--fs-2)}
 .actions{padding:14px 16px 16px;display:grid;gap:8px}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 /* Sign-in stacks instead of pairing: the honest labels ("Google (any account)", "Microsoft (personal)")
    run about 146px at 13px and .btn never wraps, so they do not fit the 130px half of a 300px popup. */
 #acct-out .pair{grid-template-columns:1fr}
-.acct{padding:14px 16px 0;display:grid;gap:8px;font-size:12.5px}
+.acct{padding:14px 16px 0;display:grid;gap:8px;font-size:var(--fs-2)}
 .who{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--ink2)}
 .who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .link{background:none;border:0;padding:0;color:var(--accent);font:inherit;cursor:pointer}
 .allow{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-variant-numeric:tabular-nums}
 .muted{color:var(--ink3)} .err{color:var(--red)}
-.foot{border-top:1px solid var(--rule);padding:9px 16px 11px;text-align:center;font-size:12px}
+.foot{border-top:1px solid var(--rule);padding:9px 16px 11px;text-align:center;font-size:var(--fs-1)}
 .foot .link{color:var(--ink3)} .foot .link:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style></head><body>
 <div class="head"><span class="mark">InternScout</span><span class="ver" id="ver"></span></div>

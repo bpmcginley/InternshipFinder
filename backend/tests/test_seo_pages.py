@@ -1791,3 +1791,23 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
 ])
 def test_nationwide_dashboard_links_send_state_all(kwargs, href):
     assert seo_pages.dash_link(**kwargs) == href
+
+
+def test_page_loads_the_self_hosted_faces_and_the_shared_tokens():
+    # 2026-10-14 (A2 design spec): the landing pages named IBM Plex Sans and Source Serif 4 but never loaded
+    # them, so they drew in Georgia and Segoe. page() now preloads the site's own copies (docs/fonts/, served
+    # at /fonts/) and carries the dashboard's whole token block; tests/site/tokens.test.mjs checks the values.
+    out = seo_pages.page("/internships/x/", "T", "D", "H", [("/", "InternScout"), ("/internships/x/", "X")],
+                         "<p>body</p>", "today")
+    head = out[:out.index("</head>")]
+    for f in ("ibm-plex-sans-latin.woff2", "source-serif-4-latin.woff2"):
+        assert f'<link rel="preload" href="/fonts/{f}" as="font" type="font/woff2" crossorigin/>' in head
+        assert f"src:url(/fonts/{f}) format(\"woff2\")" in head
+        assert os.path.exists(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "fonts", f))
+    for token in ("--field-border:#80858c", "--sunk:#efece5", "--red:#a8362c", "--fs-1:12px", "--r-lg:8px",
+                  "--shadow-pop:", "--i-check:"):
+        assert token in head
+    assert "fonts.googleapis.com" not in out
+    # Nothing under 12px, and no px font size outside the scale.
+    assert not re.search(r"font-size:\s*\d", seo_pages.CSS)
+    assert not re.search(r"font:[^;{}]*?\d+(?:\.\d+)?px", seo_pages.CSS)
