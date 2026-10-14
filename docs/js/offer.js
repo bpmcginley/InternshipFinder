@@ -4,6 +4,7 @@
 // its own tab exactly as before: nothing here touches the click, it only reacts to it):
 //   "Applying? Auto-Apply can fill in this application from your resume. You check it and press
 //    Submit yourself."  [Add to Chrome, free]  [Dismiss]
+// While it shows, the page's scroll padding keeps a focused link from sitting under it (WCAG 2.4.11).
 // Loaded by the dashboard (docs/index.html) and by every generated page with such a posting
 // (backend/internscout/seo_pages.py OFFER_TAG). Shown only when all of these hold:
 //   - the link is a posting link, the same ones js/count.js counts as "posting_click" (a.go on the
@@ -64,20 +65,49 @@
     return true;
   }
 
-  // The site's own colour tokens (both the dashboard and the generated pages define them, light and
-  // dark), with the light values as fallbacks. Added to the page only when the bar first shows.
+  // The site's own design tokens (the dashboard, the generated pages and /employers/ all define them, light
+  // and dark), with the light values as fallbacks. Added to the page only when the bar first shows.
+  // Restyled 2026-10-14 (A2 component 7): the large radius and the floating shadow every pop-up uses (it was
+  // a fixed rgba that vanished on a dark page), one primary button and a quiet Dismiss (was a bordered one).
   var CSS = ".is-offer{position:fixed;z-index:60;left:16px;right:16px;bottom:16px;max-width:680px;margin:0 auto;" +
-    "box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px 10px 16px;" +
-    "background:var(--panel,#fffefb);color:var(--ink2,#454a52);border:1px solid var(--ink3,#646a73);border-radius:8px;" +
-    "box-shadow:0 12px 32px rgba(20,20,20,.12);font-size:14px;line-height:1.45}" +
+    "box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 12px 12px 16px;" +
+    "background:var(--panel,#fffefb);color:var(--ink2,#454a52);border:1px solid var(--rule,#e2ded4);border-radius:var(--r-lg,8px);" +
+    "box-shadow:var(--shadow-pop,0 10px 30px rgba(23,25,28,.14));font-size:var(--fs-3,15px);line-height:1.45}" +
     ".is-offer p{margin:0;flex:1 1 280px}.is-offer b{color:var(--ink,#17191c)}" +
-    ".is-offer .is-offer-go{display:inline-block;padding:7px 12px;border-radius:6px;background:var(--accent,#1d5c46);" +
-    "color:var(--paper,#f6f4ef);font-weight:600;text-decoration:none;white-space:nowrap;transition:background-color 140ms ease-out}" +
+    ".is-offer .is-offer-go{display:inline-flex;align-items:center;min-height:var(--h-ctl,36px);padding:0 14px;border-radius:var(--r,6px);" +
+    "background:var(--accent,#1d5c46);color:var(--accent-ink,#fff);font-weight:600;text-decoration:none;white-space:nowrap;transition:background-color 140ms ease-out}" +
     ".is-offer .is-offer-go:hover{background:var(--accent-hover,#164a38)}" +
-    ".is-offer button{padding:6px 10px;border:1px solid var(--rule,#e2ded4);border-radius:6px;background:transparent;" +
-    "color:var(--ink2,#454a52);font:inherit;cursor:pointer;transition:color 140ms ease-out,border-color 140ms ease-out}" +
-    ".is-offer button:hover{color:var(--ink,#17191c);border-color:var(--ink3,#646a73)}" +
-    "@media (prefers-reduced-motion:reduce){.is-offer .is-offer-go,.is-offer button{transition:none}}";
+    ".is-offer button{min-height:var(--h-ctl,36px);padding:0 8px;border:0;border-radius:var(--r,6px);background:transparent;" +
+    "color:var(--accent,#1d5c46);font:inherit;font-weight:500;cursor:pointer}" +
+    ".is-offer button:hover{text-decoration:underline;text-underline-offset:3px}" +
+    ".is-offer :focus-visible{outline:2px solid var(--accent,#1d5c46);outline-offset:2px}" +
+    "@media (prefers-reduced-motion:reduce){.is-offer .is-offer-go{transition:none}}";
+
+  // While the bar shows, nothing that has keyboard focus may sit under it (WCAG 2.4.11, 2026-10-14). The page
+  // gets a bottom scroll padding of the bar's height plus its 16px gap, so the browser scrolls a link reached
+  // with Tab clear of it, and a focus that still lands under the bar (a click, a script) is scrolled up.
+  // The page's own scroll padding is put back when the bar goes.
+  var padWas = null;
+  function barTop() { try { return bar.getBoundingClientRect().top; } catch (e) { return null; } }
+  function pad() {
+    try {
+      var root = document.documentElement, h = Math.ceil(bar.getBoundingClientRect().height) + 24;
+      if (padWas === null) padWas = root.style.scrollPaddingBottom || "";
+      root.style.scrollPaddingBottom = h + "px";
+    } catch (e) {}
+  }
+  function unpad() {
+    try { if (padWas !== null) document.documentElement.style.scrollPaddingBottom = padWas; } catch (e) {}
+    padWas = null;
+  }
+  document.addEventListener("focusin", function (e) {
+    try {
+      var t = e.target;
+      if (!bar || !t || !t.getBoundingClientRect || (bar.contains && bar.contains(t))) return;
+      var top = barTop(), r = t.getBoundingClientRect();
+      if (top !== null && r.bottom > top - 8) window.scrollBy(0, Math.ceil(r.bottom - top + 8));
+    } catch (err) {}
+  });
 
   function el(tag, attrs, text) {
     var n = document.createElement(tag);
@@ -94,6 +124,7 @@
     var had = bar.contains && bar.contains(document.activeElement);
     if (bar.parentNode) bar.parentNode.removeChild(bar);
     bar = null;
+    unpad();
     if (had && from && from.focus) from.focus();
   }
 
@@ -112,6 +143,7 @@
     bar.addEventListener("keydown", function (e) { if (e.key === "Escape") close(Date.now()); });
     bar.appendChild(p); bar.appendChild(go); bar.appendChild(no);
     document.body.appendChild(bar);
+    pad();
     count("apply_offer_shown");
   }
 

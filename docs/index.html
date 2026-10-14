@@ -82,9 +82,12 @@
 <link rel="manifest" href="manifest.webmanifest"/>
 <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)"/>
 <meta name="theme-color" content="#131416" media="(prefers-color-scheme: dark)"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet"/>
+<!-- was: preconnects and a Google Fonts stylesheet for IBM Plex Sans, Plex Mono and Source Serif 4. Since
+     2026-10-14 the two faces are self-hosted (docs/fonts/, Latin subsets from Google Fonts, unmodified, OFL
+     licence files beside them), shared with the landing pages, /employers/ and the extension. There is no
+     mono any more: numbers use the sans with tabular figures. -->
+<link rel="preload" href="fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href="fonts/source-serif-4-latin.woff2" as="font" type="font/woff2" crossorigin/>
 <style>
   /* Fallback faces sized like the web fonts (2026-10-14). Until IBM Plex Sans and Source Serif 4 arrive
      the page draws in Arial and Georgia; Georgia is about 25% wider than Source Serif, so the headline
@@ -92,50 +95,70 @@
      (Lighthouse's largest layout shift on a phone). size-adjust is the measured width ratio (the serif's at
      26px, the headline's size, since its optical sizing narrows it as it grows), and the overrides give
      the web font's line height (Plex 1025 up and 275 down per 1000, Source Serif 1036 and 335), divided by it. */
+  /* Self-hosted faces (2026-10-14), then fallback faces sized like them. Until IBM Plex Sans and Source
+     Serif 4 arrive the page draws in Arial and Georgia; Georgia is about 25% wider than Source Serif, so the
+     headline took an extra line and dropped to fewer when the font swapped in (Lighthouse's largest layout
+     shift on a phone). size-adjust is the measured width ratio, and the overrides give the web font's line
+     height (Plex 1025 up and 275 down per 1000, Source Serif 1036 and 335), divided by it. */
+  @font-face{font-family:"IBM Plex Sans";src:url(fonts/ibm-plex-sans-latin.woff2) format("woff2");font-weight:100 700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:"Source Serif 4";src:url(fonts/source-serif-4-latin.woff2) format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
   @font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:400;size-adjust:100.1%;ascent-override:102.4%;descent-override:27.5%;line-gap-override:0%}
   @font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:500;size-adjust:102.1%;ascent-override:100.4%;descent-override:26.9%;line-gap-override:0%}
   @font-face{font-family:"Plex Fallback";src:local("Arial Bold"),local("Arial-BoldMT"),local("Helvetica Neue Bold"),local("Helvetica Bold"),local("Roboto Bold");font-weight:600 700;size-adjust:97.2%;ascent-override:105.5%;descent-override:28.3%;line-gap-override:0%}
   @font-face{font-family:"Serif Fallback";src:local("Georgia Bold"),local("Georgia-Bold");font-weight:600 700;size-adjust:86%;ascent-override:120.5%;descent-override:39%;line-gap-override:0%}
+  /* THE DESIGN TOKENS (2026-10-14, A2 design spec section 1). This block is the source: the same values are
+     copied into backend/internscout/seo_pages.py (CSS), docs/employers/index.html, extension/lib/theme.css
+     and the colours in extension/agent/overlay.js, and tests/site/tokens.test.mjs fails if any copy drifts.
+     Change a value here and in those four places together.
+     Colour: ink3 is meta text (5.0:1 on paper, 4.6:1 on sunk). rule and rule2 are dividers only, never the
+     edge of a control; field-border is that edge (3.4:1 on paper, 3.7:1 on panel, WCAG 1.4.11). accent-hover
+     is the primary hover, a real colour step instead of filter:brightness(). amber and green are the
+     "Needs you" and "Ready" colours (5.0:1 and 4.8:1 on their soft fills).
+     Type: eight sizes, fs-1 12px to fs-8 34px; nothing in the product is smaller than 12px. Sans for UI and
+     body, serif for headings only.
+     Radii: r-sm chips and checkboxes, r buttons, inputs and cards, r-lg panels, dialogs and the offer bar,
+     r-pill count badges. shadow-pop is for anything that floats (menus, dropdowns, the offer bar) and is
+     tinted from ink, so it still shows in dark mode. ring marks a picked card.
+     Controls: h-ctl buttons, h-ctl-sm small buttons, h-field inputs and selects; all 44px on a touch screen.
+     Icons: six masks (chevron, search, check, cross, alert, external), drawn in currentColor by .i below;
+     i-select is the chevron as a picture in ink3, for a <select>, which can't hold a mask. */
   :root{
-    --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
-    /* ink3 is the small grey text: column headers, dates, counts. It was #868b92, which is 3.2:1
-       on this paper and fails WCAG AA for text under 18px; #646a73 is 5.0:1. */
-    --ink:#17191c; --ink2:#454a52; --ink3:#646a73;
-    --rule:#e2ded4; --rule2:#ece9e1;
-    /* field-border (2026-10-14) outlines the things a student types in or picks from. --rule is 1.2:1
-       against the page, under the 3:1 WCAG 1.4.11 asks of a control's edge; this is 3.4:1 on paper,
-       3.7:1 on panel and 3.2:1 on sunk. --rule stays for dividers. */
-    --field-border:#80858c;
-    --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8;
-    /* accent-hover is the primary button's hover: a real colour step instead of filter:brightness().
-       amber was #9a6412 and green #1f7a4d: 4.26:1 and 4.47:1 on their own tinted badges (.count, the
-       11px Queue counters) and amber 4.23:1 on --sunk (the Why panel's "!" flags), under AA's 4.5:1.
-       These are 5.0:1 and 4.78:1 at the worst pairing. */
-    --accent-hover:#164a38;
-    --blue:#2b5aa0; --amber:#8c5a0f; --amber-soft:#f6ecd9; --green:#1d7549; --red:#a8362c;
-    /* was: "Source Serif 4",Georgia,... and "IBM Plex Sans",system-ui,...; the fallbacks are above. */
+    --paper:#f6f4ef;--panel:#fffefb;--sunk:#efece5;
+    --ink:#17191c;--ink2:#454a52;--ink3:#646a73;
+    --rule:#e2ded4;--rule2:#ece9e1;--field-border:#80858c;
+    --accent:#1d5c46;--accent-ink:#fff;--accent-hover:#164a38;--accent-soft:#e3eee8;
+    --blue:#2b5aa0;--amber:#8c5a0f;--amber-soft:#f6ecd9;--green:#1d7549;--red:#a8362c;
     --serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;
-    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
-    /* One spacing scale for the page's sections, gaps and paddings (was: 14, 18, 20, 26, 28, 30 and
-       40px side by side). Small in-control paddings stay as they were. */
-    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
-    /* Motion only says that something changed state; every use is switched off under
-       prefers-reduced-motion at the bottom of this sheet. */
-    --ease-out:cubic-bezier(.2,.7,.3,1); --t-fast:140ms; --t-move:200ms;
+    --fs-1:12px;--fs-2:13px;--fs-3:15px;--fs-4:16px;--fs-5:18px;--fs-6:22px;--fs-7:28px;--fs-8:34px;--lh:1.5;--lh-head:1.2;
+    --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;
+    --r-sm:4px;--r:6px;--r-lg:8px;--r-pill:999px;
+    --shadow-pop:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent);--ring:0 0 0 1px var(--accent);
+    --h-ctl:36px;--h-ctl-sm:32px;--h-field:40px;
+    --ease-out:cubic-bezier(.2,.7,.3,1);--t-fast:140ms;--t-move:200ms;
+    --i-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    --i-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E");
+    --i-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E");
+    --i-cross:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
+    --i-alert:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5v.01'/%3E%3C/svg%3E");
+    --i-external:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E");
+    --i-select:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23646a73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     color-scheme:light;
   }
   @media (prefers-color-scheme:dark){:root{
-    --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
-    --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e;
-    --rule:#2c2d31; --rule2:#232427;
-    --field-border:#6e7077; /* 3.7:1 on paper, 3.5:1 on panel, 3.1:1 on sunk */
-    --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24; --accent-hover:#95d2b3;
-    --blue:#8fb2e8; --amber:#e0b25e; --amber-soft:#2e2717; --green:#7cc3a1; --red:#e48a80;
+    --paper:#131416;--panel:#1a1b1e;--sunk:#232427;
+    --ink:#ecebe6;--ink2:#b8b6af;--ink3:#95948e;
+    --rule:#2c2d31;--rule2:#232427;--field-border:#6e7077;
+    --accent:#7cc3a1;--accent-ink:#0f1a15;--accent-hover:#95d2b3;--accent-soft:#1c2a24;
+    --blue:#8fb2e8;--amber:#e0b25e;--amber-soft:#2e2717;--green:#7cc3a1;--red:#e48a80;
+    --i-select:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2395948e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     color-scheme:dark;
   }}
+  @media (pointer:coarse){:root{
+    --h-ctl:44px;--h-ctl-sm:44px;--h-field:44px;
+  }}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  body{margin:0;background:var(--paper);color:var(--ink);font:var(--fs-3)/var(--lh) var(--sans);-webkit-font-smoothing:antialiased}
   a{color:inherit}
   button,input,select{font-family:var(--sans)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -149,18 +172,18 @@
   header.top{position:relative;display:flex;align-items:center;gap:var(--s4) var(--s5);flex-wrap:wrap;padding:var(--s5) 0 var(--s4);border-bottom:1px solid var(--ink)}
   /* was: .mark{font:600 30px/1 ...} as the page's h1. Since 2026-10-05 the brand is a link on one line
      with the site nav, and the h1 is the headline in .hero below, which takes the header's full width. */
-  .mark{font:600 26px/1 var(--serif);letter-spacing:-.6px;margin:0;color:inherit;text-decoration:none}
+  .mark{font:600 var(--fs-7)/1 var(--serif);letter-spacing:-.6px;margin:0;color:inherit;text-decoration:none}
   .brand{display:flex;align-items:baseline;gap:var(--s2) var(--s5);flex-wrap:wrap}
   .sitenav{display:flex;gap:4px 14px;flex-wrap:wrap}
-  .sitenav a{color:var(--ink2);font-size:14px;text-decoration:none;transition:color var(--t-fast) ease-out}
+  .sitenav a{color:var(--ink2);font-size:var(--fs-3);text-decoration:none;transition:color var(--t-fast) ease-out}
   .sitenav a:hover{color:var(--ink)}
   .hero{flex-basis:100%;max-width:72ch}
-  .hero h1{font:600 26px/1.2 var(--serif);letter-spacing:-.4px;margin:0;text-wrap:balance}
-  .hero .sub{margin:6px 0 0;font-size:15px}
+  .hero h1{font:600 var(--fs-7)/1.2 var(--serif);letter-spacing:-.4px;margin:0;text-wrap:balance}
+  .hero .sub{margin:6px 0 0;font-size:var(--fs-3)}
   .hero-actions{display:flex;gap:var(--s2);flex-wrap:wrap;margin-top:12px}
   .signin-open{display:inline-flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
-  .signin-note{color:var(--ink3);font-size:12.5px;max-width:34ch;line-height:1.35}
-  .sub{color:var(--ink2);margin-top:8px;font-size:14px}
+  .signin-note{color:var(--ink3);font-size:var(--fs-2);max-width:34ch;line-height:1.35}
+  .sub{color:var(--ink2);margin-top:8px;font-size:var(--fs-3)}
   .sub a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
   .sub a:hover{text-decoration-color:var(--ink)}
   .sub button,.sub a.how{all:unset;cursor:pointer;color:var(--accent);font-weight:500}
@@ -171,24 +194,25 @@
 
   /* Account menu */
   .acct{position:relative}
-  .acct-btn .chev{width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform var(--t-fast) var(--ease-out)}
+  /* was: a 6px square of two borders turned 45 degrees; now the shared chevron icon. */
+  .acct-btn .chev{width:14px;height:14px;background:currentColor;-webkit-mask:var(--i-chevron) center/contain no-repeat;mask:var(--i-chevron) center/contain no-repeat;transition:transform var(--t-fast) var(--ease-out)}
   .acct-btn[aria-expanded="true"]{border-color:var(--ink3);background:var(--sunk)}
-  .acct-btn[aria-expanded="true"] .chev{transform:translateY(1px) rotate(225deg)}
-  .acct-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:min(340px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--rule);border-radius:8px;
-    box-shadow:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent);padding:4px;animation:acct-in var(--t-fast) var(--ease-out)}
+  .acct-btn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+  .acct-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:min(340px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg);
+    box-shadow:var(--shadow-pop);padding:4px;animation:acct-in var(--t-fast) var(--ease-out)}
   @keyframes acct-in{from{opacity:.4;transform:translateY(-4px)}}
   .acct-sec{display:grid;gap:4px;padding:10px 12px}
   .acct-sec + .acct-sec{border-top:1px solid var(--rule)}
   .acct-sec.acct-list{padding:4px 0;gap:0}
-  .acct-k{font:500 11px/1.2 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .acct-k{font:500 var(--fs-1)/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
   .acct-email{font-weight:500;overflow-wrap:anywhere}
-  .acct-plan{color:var(--green);font-size:13px}
-  .acct-line{font-size:13.5px;color:var(--ink)}
-  .acct-line.muted{color:var(--ink2);font-size:13px}
-  .acct-item{appearance:none;border:0;background:none;font:inherit;text-align:left;color:var(--ink);cursor:pointer;display:grid;gap:2px;padding:8px 12px;border-radius:6px;
+  .acct-plan{color:var(--green);font-size:var(--fs-2)}
+  .acct-line{font-size:var(--fs-2);color:var(--ink)}
+  .acct-line.muted{color:var(--ink2);font-size:var(--fs-2)}
+  .acct-item{appearance:none;border:0;background:none;font:inherit;text-align:left;color:var(--ink);cursor:pointer;display:grid;gap:2px;padding:8px 12px;border-radius:var(--r);
     transition:background-color var(--t-fast) ease-out}
-  .acct-item .t{font-weight:500;font-size:14px}
-  .acct-item .d{color:var(--ink2);font-size:12.5px;line-height:1.4}
+  .acct-item .t{font-weight:500;font-size:var(--fs-3)}
+  .acct-item .d{color:var(--ink2);font-size:var(--fs-2);line-height:1.4}
   .acct-item:hover:not(:disabled),.acct-item:focus-visible{background:var(--sunk)}
   .acct-item:disabled{color:var(--ink3);cursor:default}
   @media (max-width:640px){
@@ -200,33 +224,37 @@
     .acct-panel{left:0;right:0;width:auto}
   }
 
-  .btn{font:500 13px/1 var(--sans);height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;
+  /* Buttons (A2 component 1). Primary: accent fill, one per view. Secondary (plain .btn): panel fill and a
+     field-border edge. Quiet: accent text, underlined on hover. 36px tall, small 32px, both 44px on touch.
+     Disabled: ink3 on sunk with the field edge, 4.6:1 (was opacity:.45, 2.9:1). */
+  .btn{font:500 var(--fs-2)/1 var(--sans);height:var(--h-ctl);padding:0 14px;border-radius:var(--r);border:1px solid var(--field-border);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;
     transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}
   .btn:hover:not(:disabled){border-color:var(--ink3)}
   /* A link dressed as a button (the landing's Add Auto-Apply, 2026-10-04) shouldn't keep the link underline. */
   a.btn{text-decoration:none}
   /* Press feedback: the button moves a pixel down while held. */
   .btn:active:not(:disabled){transform:translateY(1px)}
-  .btn:disabled{opacity:.45;cursor:default}
   .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
   .btn.primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
-  .btn.quiet{border-color:transparent;background:transparent;color:var(--ink2);padding:0 8px}
-  .btn.quiet:hover:not(:disabled){color:var(--ink);border-color:transparent}
-  .btn.small{height:28px;padding:0 10px;font-size:12.5px}
+  .btn.quiet{border-color:transparent;background:transparent;color:var(--accent);padding:0 8px}
+  .btn.quiet:hover:not(:disabled){border-color:transparent;text-decoration:underline;text-underline-offset:3px}
+  .btn.small{height:var(--h-ctl-sm);padding:0 10px;font-size:var(--fs-2)}
   .btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
   .btn.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
   .btn.danger:hover:not(:disabled){border-color:var(--red)}
-  .count{font:500 11px/1 var(--mono);background:var(--amber-soft);color:var(--amber);padding:4px 6px;border-radius:4px}
+  .btn:disabled,.btn.primary:disabled,.btn.danger:disabled,.btn.on:disabled{color:var(--ink3);background:var(--sunk);border-color:var(--field-border);cursor:default}
+  .btn.quiet:disabled{color:var(--ink3);background:transparent;border-color:transparent;cursor:default}
+  .count{font:500 var(--fs-1)/1 var(--sans);font-variant-numeric:tabular-nums;background:var(--amber-soft);color:var(--amber);padding:4px 6px;border-radius:var(--r-sm)}
   .count.ok{background:var(--accent-soft);color:var(--green)}
-  .busy{color:var(--ink3);font:12px var(--mono);margin-right:4px}
+  .busy{color:var(--ink3);font:var(--fs-1) var(--sans);margin-right:4px}
 
   /* landing: one hero column and one "how it works" column. The old third column repeated the
      three setup steps that the setup card itself shows. */
   .landing{display:grid;grid-template-columns:minmax(280px,1.3fr) minmax(280px,1fr);gap:var(--s5) var(--s7);padding:var(--s6) 0 var(--s5);border-bottom:1px solid var(--rule)}
-  .landing h2{font:600 28px/1.2 var(--serif);letter-spacing:-.4px;margin:0 0 12px;max-width:22ch}
-  .landing h3{font:600 14px var(--sans);margin:0 0 8px}
-  .landing p{color:var(--ink2);margin:0 0 10px;font-size:15px;max-width:58ch}
-  .landing .fine{color:var(--ink3);font-size:13px}
+  .landing h2{font:600 var(--fs-7)/1.2 var(--serif);letter-spacing:-.4px;margin:0 0 12px;max-width:22ch}
+  .landing h3{font:600 var(--fs-3) var(--sans);margin:0 0 8px}
+  .landing p{color:var(--ink2);margin:0 0 10px;font-size:var(--fs-3);max-width:58ch}
+  .landing .fine{color:var(--ink3);font-size:var(--fs-2)}
   .landing ul{margin:0;padding-left:18px;color:var(--ink2)}
   .landing li{margin:5px 0}
   .landing-actions{display:flex;gap:var(--s2);flex-wrap:wrap;margin-top:var(--s4)}
@@ -234,16 +262,16 @@
   /* profile setup */
   .setup{margin:var(--s4) 0 0;padding:var(--s5)}
   .setup-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
-  .setup-head h2{font:600 22px/1.2 var(--serif);margin:0}
-  .setup h3{font:600 15px var(--sans);margin:10px 0 12px}
+  .setup-head h2{font:600 var(--fs-6)/1.2 var(--serif);margin:0}
+  .setup h3{font:600 var(--fs-3) var(--sans);margin:10px 0 12px}
   /* A note between two fields (the coverage count, "No states picked") sat flush against the label
      under it; it gets the same space a field has. */
   .step-body > .meta{margin-bottom:var(--s4)}
   .steps{display:flex;gap:6px}
-  .dot{width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font:500 11.5px var(--mono);border:1px solid var(--rule);color:var(--ink3)}
+  .dot{width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font:500 var(--fs-1) var(--sans);border:1px solid var(--rule);color:var(--ink3)}
   .dot.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
   .dot.done{border-color:var(--accent);color:var(--accent)}
-  .lbl{display:block;font-weight:500;font-size:13px;margin:0 0 14px}
+  .lbl{display:block;font-weight:500;font-size:var(--fs-2);margin:0 0 14px}
   .lbl > .field,.lbl > .row2{margin-top:6px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .row2.tight{gap:6px;margin-top:6px}
@@ -251,14 +279,14 @@
   .ms.wide{width:100%}
   .setup .field.sel select{width:100%}
   fieldset{border:0;margin:0 0 14px;padding:0}
-  legend{font-weight:500;font-size:13px;padding:0;margin-bottom:6px}
+  legend{font-weight:500;font-size:var(--fs-2);padding:0;margin-bottom:6px}
   .checks{display:flex;flex-wrap:wrap;gap:6px 18px}
-  .check{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--ink2);cursor:pointer}
+  .check{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-2);color:var(--ink2);cursor:pointer}
   .check input{margin:0}
-  .check .c,.stategrid .c{color:var(--ink3);font:11px var(--mono);margin-left:4px}
+  .check .c,.stategrid .c{color:var(--ink3);font:var(--fs-1) var(--sans);margin-left:4px}
   .check.remote{margin:4px 0 10px}
   .shortcuts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-  .stategrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 12px;margin-bottom:10px;max-height:340px;overflow:auto;padding:6px 8px;border:1px solid var(--rule2);border-radius:6px}
+  .stategrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 12px;margin-bottom:10px;max-height:340px;overflow:auto;padding:6px 8px;border:1px solid var(--rule2);border-radius:var(--r)}
   .stategrid .check{padding:3px 2px}
   .stategrid .check.on{color:var(--ink)}
   .setup-foot{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;margin-top:var(--s4);padding-top:var(--s4);border-top:1px solid var(--rule2)}
@@ -270,98 +298,104 @@
      under them on anything narrower than about 1100px, leaving a hole. */
   .figures{padding:var(--s5) 0;border-bottom:1px solid var(--rule)}
   .figrow{display:flex;gap:var(--s4) var(--s6);flex-wrap:wrap}
-  .fig .n{font:600 34px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
-  .fig .l{color:var(--ink3);font-size:13px;margin-top:6px}
-  .coverage{color:var(--ink2);font-size:13.5px;margin-top:var(--s3);line-height:1.6}
+  .fig .n{font:600 var(--fs-8)/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:-.6px}
+  .fig .l{color:var(--ink3);font-size:var(--fs-2);margin-top:6px}
+  .coverage{color:var(--ink2);font-size:var(--fs-2);margin-top:var(--s3);line-height:1.6}
   .updated{color:var(--ink3)}
   /* The plans line (2026-10-05): where the price lives once the announcement is hidden. */
-  .plansline{color:var(--ink3);font-size:13px;margin:var(--s2) 0 0;line-height:1.6}
+  .plansline{color:var(--ink3);font-size:var(--fs-2);margin:var(--s2) 0 0;line-height:1.6}
   .plansline a{color:var(--accent);font-weight:500}
 
   /* was: a 3px accent bar down the left edge. Now one even border, tinted toward the accent. */
-  .notice{margin:var(--s4) 0 0;padding:var(--s3) var(--s4);background:var(--panel);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--rule));border-radius:6px;color:var(--ink2)}
+  /* One notice style (A2 component 5, 2026-10-14): accent-soft fill, 15px, ink2 text (7.2:1). The looks it
+     replaces (this one, .quietnote at 13px and .setup-ask) keep their class names, so the lanes that move
+     notices around don't have to rename anything. .notice-hide is its Hide button, top right.
+     was: panel fill with an accent-tinted border. */
+  .notice{margin:var(--s4) 0 0;padding:var(--s3) var(--s4);background:var(--accent-soft);border:1px solid transparent;border-radius:var(--r);color:var(--ink2);font-size:var(--fs-3)}
+  .notice-hide{float:right;margin:-4px -6px 0 var(--s3)}
   .notice b{color:var(--ink)}
   .notice a{color:var(--accent);font-weight:500}
-  .notice.quietnote{border-color:var(--rule);font-size:13px}
   /* The selection limit message (app.js selNote): at the bottom of the screen, in view wherever the
      checkbox that was clicked sits in the list. */
   .selnote{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;
     display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s3) var(--s3) var(--s4);background:var(--panel);color:var(--ink);
-    border:1px solid color-mix(in srgb,var(--accent) 35%,var(--rule));border-radius:6px;box-shadow:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent);font-size:14px}
-  .selnote button{appearance:none;border:0;background:none;color:var(--ink2);font:inherit;font-size:18px;line-height:1;cursor:pointer;min-width:32px;min-height:32px;border-radius:4px}
+    border:1px solid color-mix(in srgb,var(--accent) 35%,var(--rule));border-radius:var(--r-lg);box-shadow:var(--shadow-pop);font-size:var(--fs-3)}
+  .selnote button{appearance:none;border:0;background:none;color:var(--ink2);font:inherit;font-size:var(--fs-5);line-height:1;cursor:pointer;min-width:32px;min-height:32px;border-radius:var(--r-sm)}
   .selnote button:hover{color:var(--ink)}
   /* What students say (2026-10-05): shown only when CONFIG.testimonials has real quotes. */
-  .said{margin:var(--s4) 0 0;padding:var(--s4) var(--s4) var(--s2);background:var(--panel);border:1px solid var(--rule);border-radius:6px}
-  .said h2{font:600 16px/1.3 var(--serif);margin:0 0 8px}
+  .said{margin:var(--s4) 0 0;padding:var(--s4) var(--s4) var(--s2);background:var(--panel);border:1px solid var(--rule);border-radius:var(--r)}
+  .said h2{font:600 var(--fs-4)/1.3 var(--serif);margin:0 0 8px}
   .said ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--s3) var(--s5)}
-  .said blockquote{margin:0;color:var(--ink);font-size:14.5px}
-  .said .who{color:var(--ink3);font-size:13px;margin:4px 0 8px}
+  .said blockquote{margin:0;color:var(--ink);font-size:var(--fs-3)}
+  .said .who{color:var(--ink3);font-size:var(--fs-2);margin:4px 0 8px}
   /* The invite panel: the student's link, selectable, beside a Share or Copy button. */
   .invite-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
-  .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--field-border);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
+  .invite-row input{flex:1 1 260px;min-width:0;height:var(--h-field);padding:0 10px;border:1px solid var(--field-border);border-radius:var(--r);background:var(--paper);color:var(--ink);font:var(--fs-2) var(--sans)}
   /* The weekly email sign-up under the list: the profile's fields as checkboxes, then one row of
      label, email box and button. Quiet on purpose, so it never competes with the listings. */
   .digest fieldset{margin:10px 0 0}
-  .digest legend{font-weight:500;font-size:13px;color:var(--ink)}
+  .digest legend{font-weight:500;font-size:var(--fs-2);color:var(--ink)}
   .digest-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
   .digest-row label{font-weight:500;color:var(--ink)}
-  .digest-row input[type=email]{flex:1 1 220px;min-width:0;max-width:340px;height:34px;padding:0 10px;border:1px solid var(--field-border);border-radius:6px;background:var(--paper);color:var(--ink);font-size:14px}
+  .digest-row input[type=email]{flex:1 1 220px;min-width:0;max-width:340px;height:var(--h-field);padding:0 10px;border:1px solid var(--field-border);border-radius:var(--r);background:var(--paper);color:var(--ink);font-size:var(--fs-3)}
 
   /* filters: search, field, state and sort on the first row, everything else behind "More filters".
      Thirteen equal-looking dropdowns in one wrapping row was the single hardest thing to read on
      the page. */
   .filters{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;padding:var(--s4) 0 0}
-  .filters.extra{padding:var(--s3) var(--s4);margin-top:var(--s3);background:var(--sunk);border-radius:8px;gap:var(--s2)}
+  .filters.extra{padding:var(--s3) var(--s4);margin-top:var(--s3);background:var(--sunk);border-radius:var(--r-lg);gap:var(--s2)}
   .filters.extra .field{background:var(--panel)}
-  .filterbar-foot{display:flex;gap:var(--s2) var(--s4);flex-wrap:wrap;align-items:center;padding:var(--s3) 0 var(--s4);font-size:13px;color:var(--ink2)}
-  .filterbar-foot .btn.quiet{padding:0 6px;height:28px;font-size:13px}
+  .filterbar-foot{display:flex;gap:var(--s2) var(--s4);flex-wrap:wrap;align-items:center;padding:var(--s3) 0 var(--s4);font-size:var(--fs-2);color:var(--ink2)}
+  .filterbar-foot .btn.quiet{padding:0 6px;height:var(--h-ctl-sm);font-size:var(--fs-2)}
   /* was: border:1px solid var(--rule) */
-  .field{position:relative;display:flex;align-items:center;min-height:36px;background:var(--panel);border:1px solid var(--field-border);border-radius:6px;
+  .field{position:relative;display:flex;align-items:center;min-height:var(--h-field);background:var(--panel);border:1px solid var(--field-border);border-radius:var(--r);
     transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}
   .field:hover{border-color:var(--ink3)}
   /* The inputs inside a .field drop their own outline, so the box itself shows focus, in the same
      accent as the :focus-visible ring everywhere else. */
-  .field:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-  .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:14px;height:34px;padding:0 10px;outline:none}
+  .field:focus-within{border-color:var(--accent);box-shadow:var(--ring)}
+  .field input[type=text],.field select{border:0;background:transparent;color:var(--ink);font-size:var(--fs-3);height:calc(var(--h-field) - 2px);padding:0 10px;outline:none}
   .field select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer}
   .field select option{background:var(--panel);color:var(--ink)}
-  .field.sel::after,.field.ms::after{content:"";position:absolute;right:12px;top:13px;width:5px;height:5px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg);pointer-events:none}
+  /* One chevron (the shared icon) for every picker; was two borders turned 45 degrees. */
+  .field.sel::after,.field.ms::after{content:"";position:absolute;right:9px;top:50%;width:14px;height:14px;margin-top:-7px;background:var(--ink3);-webkit-mask:var(--i-chevron) center/contain no-repeat;mask:var(--i-chevron) center/contain no-repeat;pointer-events:none}
   .field.search{flex:1 1 260px;min-width:220px}
   .field.search input{width:100%}
-  .field.search::before{content:"";width:14px;height:14px;margin-left:10px;flex:none;border:1.6px solid var(--ink3);border-radius:50%;box-shadow:5px 5px 0 -3.5px var(--ink3);transform:scale(.85)}
+  /* was: a circle and a box-shadow stub, which drew as a plain ring at 1x. */
+  .field.search::before{content:"";width:16px;height:16px;margin-left:10px;flex:none;background:var(--ink3);-webkit-mask:var(--i-search) center/contain no-repeat;mask:var(--i-search) center/contain no-repeat}
   .field.search input{padding-left:6px}
   /* on/off filters look like switches, not like another dropdown */
-  .field.toggle{gap:8px;padding:0 12px 0 10px;cursor:pointer;color:var(--ink2);font-size:13.5px;border-radius:18px}
+  .field.toggle{gap:8px;padding:0 12px 0 10px;cursor:pointer;color:var(--ink2);font-size:var(--fs-2);border-radius:var(--r-pill)}
   .field.toggle:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
-  .morebtn{height:36px;border-radius:6px;gap:6px}
+  .morebtn{height:var(--h-field);border-radius:var(--r);gap:6px}
   .morebtn .count{margin-left:2px}
   .spacer{flex:1}
 
   /* was: border-color:color-mix(in srgb,var(--ink3) 75%,var(--panel)); .field's --field-border now */
   .ms{min-width:160px}
   .ms .box{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 28px 4px 6px;width:100%;cursor:text}
-  .ms input{flex:1;min-width:60px;height:24px;border:0;outline:none;background:transparent;color:var(--ink);font-size:13px;padding:0 4px}
+  .ms input{flex:1;min-width:60px;height:24px;border:0;outline:none;background:transparent;color:var(--ink);font-size:var(--fs-2);padding:0 4px}
   .ms:focus-within .box{outline:2px solid var(--accent);outline-offset:2px}
-  .step-body:focus{outline:2px solid var(--accent);outline-offset:6px;border-radius:4px}
+  .step-body:focus{outline:2px solid var(--accent);outline-offset:6px;border-radius:var(--r-sm)}
   .ms input::placeholder,.field.search input::placeholder{color:var(--ink2);opacity:1}
-  .chip{display:inline-flex;gap:2px;align-items:center;background:var(--sunk);border-radius:4px;padding:2px 2px 2px 7px;font-size:12px;color:var(--ink)}
-  .chip button{border:0;background:none;color:var(--ink3);cursor:pointer;font:15px/1 var(--sans);padding:0 4px}
+  .chip{display:inline-flex;gap:2px;align-items:center;background:var(--sunk);border-radius:var(--r-sm);padding:2px 2px 2px 7px;font-size:var(--fs-1);color:var(--ink)}
+  .chip button{border:0;background:none;color:var(--ink3);cursor:pointer;font:var(--fs-3)/1 var(--sans);padding:0 4px}
   .chip button:hover{color:var(--red)}
-  .drop{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:100%;max-height:280px;overflow:auto;background:var(--panel);border:1px solid var(--rule);border-radius:6px;box-shadow:0 12px 32px rgba(20,20,20,.12);padding:4px}
-  .opt{display:flex;justify-content:space-between;gap:18px;padding:6px 8px;border-radius:4px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .drop{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:100%;max-height:280px;overflow:auto;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);padding:4px}
+  .opt{display:flex;justify-content:space-between;gap:18px;padding:6px 8px;border-radius:var(--r-sm);font-size:var(--fs-2);cursor:pointer;white-space:nowrap}
   .opt.act{background:var(--sunk)}
-  .opt .c{color:var(--ink2);font:12px var(--mono)}
+  .opt .c{color:var(--ink2);font:var(--fs-1) var(--sans)}
 
-  .sheet{background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+  .sheet{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
   .tablewrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse}
-  thead th{background:var(--panel);text-align:left;font:500 12.5px var(--sans);color:var(--ink3);padding:var(--s3);border-bottom:1px solid var(--rule);white-space:nowrap}
+  thead th{background:var(--panel);text-align:left;font:500 var(--fs-2) var(--sans);color:var(--ink3);padding:var(--s3);border-bottom:1px solid var(--rule);white-space:nowrap}
   thead th.sort{cursor:pointer;user-select:none}
   thead th.sort:hover,thead th.on{color:var(--ink)}
   /* all:inherit also copied the th's own padding and bottom border onto the button, so the sortable
      headings sat a second padding's width right of their column, over a stray underline. */
   thead th.sort button{all:inherit;padding:0;border:0;cursor:pointer;display:inline}
-  thead th.sort button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
+  thead th.sort button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
   thead th.on::after{content:" \2193"}
   tbody td{padding:12px 12px;border-bottom:1px solid var(--rule2);vertical-align:top}
   tbody td:first-child,thead th:first-child{padding-left:16px}
@@ -381,67 +415,74 @@
   .c-links{white-space:nowrap}
   .co{font-weight:600}
   .role{color:var(--ink2);margin-top:1px}
-  .meta{color:var(--ink3);font-size:12.5px;margin-top:3px}
-  .new{color:var(--accent);font:600 11.5px var(--sans);margin-left:8px}
+  .meta{color:var(--ink3);font-size:var(--fs-2);margin-top:3px}
+  .new{color:var(--accent);font:600 var(--fs-1) var(--sans);margin-left:8px}
   .closed{color:var(--red)}
-  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+  /* Pay and scores: the sans with tabular figures (was Plex Mono). */
+  .num{font-family:var(--sans);font-variant-numeric:tabular-nums;font-size:var(--fs-2)}
   .muted{color:var(--ink3)}
   .score{display:inline-flex;align-items:center;gap:8px}
-  .score .bar{width:34px;height:4px;background:var(--rule2);border-radius:2px;overflow:hidden}
+  .score .bar{width:34px;height:4px;background:var(--rule2);border-radius:var(--r-sm);overflow:hidden}
   .score .bar i{display:block;height:100%;background:var(--ink3)}
   .score.hi .bar i{background:var(--green)} .score.mid .bar i{background:var(--amber)}
-  select.mine{font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--field-border);border-radius:5px;height:28px;padding:0 4px;cursor:pointer}
-  .st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:7px;color:var(--ink2);white-space:nowrap;cursor:default}
-  .st::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink3)}
-  .st.working::before{background:var(--blue)}
-  .st.needs_you{color:var(--amber)} .st.needs_you::before{background:var(--amber)}
-  .st.ready_to_submit,.st.submitted{color:var(--green)} .st.ready_to_submit::before,.st.submitted::before{background:var(--green)}
-  .st.failed{color:var(--red)} .st.failed::before{background:var(--red)}
+  /* The row's status select: the filters' chevron instead of the native arrow (i-select is the same icon as a picture). */
+  select.mine{font-size:var(--fs-2);color:var(--ink);background:var(--panel) var(--i-select) right 6px center/14px no-repeat;border:1px solid var(--field-border);border-radius:var(--r);height:var(--h-ctl-sm);padding:0 24px 0 6px;cursor:pointer;appearance:none;-webkit-appearance:none}
+  /* Status chips (A2 component 5, 2026-10-14): 12px, a soft fill and an icon, so the state never rests on
+     colour alone. Needs you: amber and alert; Ready and Applied: green and check; Failed: red and cross;
+     anything else (queued, working): ink2 on sunk with a dot. was: a coloured dot and coloured text. */
+  .st{display:inline-flex;vertical-align:middle;align-items:center;gap:4px;font:500 var(--fs-1)/1.4 var(--sans);margin-top:7px;padding:1px 8px 1px 6px;border-radius:var(--r-sm);background:var(--sunk);color:var(--ink2);white-space:nowrap;cursor:default}
+  .st::before{content:"";width:6px;height:6px;margin:0 3px;border-radius:50%;background:currentColor;flex:none}
+  .st.needs_you{color:var(--amber);background:var(--amber-soft)}
+  .st.ready_to_submit,.st.submitted{color:var(--green);background:var(--accent-soft)}
+  .st.failed{color:var(--red)}
+  .st.needs_you::before,.st.ready_to_submit::before,.st.submitted::before,.st.failed::before{width:12px;height:12px;margin:0;border-radius:0;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+  .st.needs_you::before{--i:var(--i-alert)} .st.ready_to_submit::before,.st.submitted::before{--i:var(--i-check)} .st.failed::before{--i:var(--i-cross)}
   .open-link{font-weight:500;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px;white-space:nowrap}
   .open-link:hover{text-decoration-color:var(--ink)}
-  .rowbtn{margin-top:7px;font:500 12.5px var(--sans);color:var(--accent);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
+  .rowbtn{margin-top:7px;font:500 var(--fs-2) var(--sans);color:var(--accent);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
   .rowbtn:hover{text-decoration:underline;text-underline-offset:3px}
   /* The row Auto-Apply shown before the extension is installed (2026-10-04): quieter than the real one,
      and it opens a one-line explainer row instead of queueing anything. */
   .rowbtn.try{color:var(--ink2);font-weight:400}
   .rowbtn.try:hover,.rowbtn.try[aria-expanded=true]{color:var(--accent)}
-  tbody tr.aa-info td,tbody tr.aa-info:hover td{background:var(--sunk);font-size:13px;color:var(--ink2);padding:var(--s2) var(--s4)}
+  tbody tr.aa-info td,tbody tr.aa-info:hover td{background:var(--sunk);font-size:var(--fs-2);color:var(--ink2);padding:var(--s2) var(--s4)}
   tr.aa-info a{color:var(--accent);font-weight:500}
-  .report{display:inline-block;margin-top:7px;font-size:12px;color:var(--ink3);text-decoration:none}
+  .report{display:inline-block;margin-top:7px;font-size:var(--fs-1);color:var(--ink3);text-decoration:none}
   .report:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .whybtn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
-  .whybtn .why-l{font-size:11.5px;color:var(--ink3)}
+  .whybtn .why-l{font-size:var(--fs-1);color:var(--ink3)}
   .match-label{display:none}
   .whybtn:hover .why-l{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
   tbody tr.opened td{border-bottom-color:transparent}
   tbody tr.why td,tbody tr.why:hover td{background:var(--sunk);padding:var(--s4) var(--s4) var(--s5)}
   .whyg{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.5fr) minmax(220px,1fr);gap:var(--s6)}
-  .whyg h4{margin:0 0 9px;font:600 12.5px var(--sans);color:var(--ink)}
+  .whyg h4{margin:0 0 9px;font:600 var(--fs-2) var(--sans);color:var(--ink)}
   .whyg a{color:var(--accent)}
-  .part{display:grid;grid-template-columns:118px 1fr 42px;gap:8px;align-items:center;font-size:12.5px;color:var(--ink2);margin:4px 0}
-  .part .bar{height:4px;background:var(--rule);border-radius:2px;overflow:hidden}
+  .part{display:grid;grid-template-columns:118px 1fr 42px;gap:8px;align-items:center;font-size:var(--fs-2);color:var(--ink2);margin:4px 0}
+  .part .bar{height:4px;background:var(--rule);border-radius:var(--r-sm);overflow:hidden}
   .part .bar i{display:block;height:100%;background:var(--accent)}
-  .part .num{text-align:right;font-size:11.5px}
-  .tag{display:inline-block;font-size:12px;padding:2px 7px;border-radius:4px;margin:0 4px 5px 0;background:var(--panel);border:1px solid var(--rule);color:var(--ink2)}
+  .part .num{text-align:right;font-size:var(--fs-1)}
+  .tag{display:inline-block;font-size:var(--fs-1);padding:2px 7px;border-radius:var(--r-sm);margin:0 4px 5px 0;background:var(--panel);border:1px solid var(--rule);color:var(--ink2)}
   .tag.ok{border-color:color-mix(in srgb,var(--green) 45%,transparent);color:var(--green)}
   .tag.miss{border-color:color-mix(in srgb,var(--red) 40%,transparent);color:var(--red)}
-  .flag{font-size:12.5px;margin:3px 0;color:var(--ink2)}
+  .flag{font-size:var(--fs-2);margin:3px 0;color:var(--ink2)}
+  .flag .i,.tag .i{margin-right:4px}
   .flag.bad{color:var(--red)} .flag.warn{color:var(--amber)} .flag.good{color:var(--green)}
   .more{display:flex;justify-content:center;padding:var(--s4);border-top:1px solid var(--rule2)}
-  footer{color:var(--ink3);font-size:13px;padding:var(--s4) 0 var(--s7);max-width:78ch}
+  footer{color:var(--ink3);font-size:var(--fs-2);padding:var(--s4) 0 var(--s7);max-width:78ch}
   footer .links{display:flex;gap:4px 16px;flex-wrap:wrap;align-items:center;margin-top:8px}
   footer .links a{color:var(--ink2);text-decoration:none}
   footer .links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   /* The crawlable "Browse" section under the dashboard (2026-10-07): outside #root, so React never
      replaces it and a crawler that runs no script sees every link. Quiet, like the footer. */
-  .browse{border-top:1px solid var(--rule);padding:var(--s5) 0 var(--s7);color:var(--ink3);font-size:13.5px}
-  .browse h2{font:600 18px/1.3 var(--serif);color:var(--ink);margin:0 0 var(--s3)}
-  .browse h3{font-size:13px;font-weight:600;color:var(--ink2);margin:var(--s4) 0 var(--s2);text-transform:uppercase;letter-spacing:.04em}
+  .browse{border-top:1px solid var(--rule);padding:var(--s5) 0 var(--s7);color:var(--ink3);font-size:var(--fs-2)}
+  .browse h2{font:600 var(--fs-5)/1.3 var(--serif);color:var(--ink);margin:0 0 var(--s3)}
+  .browse h3{font-size:var(--fs-2);font-weight:600;color:var(--ink2);margin:var(--s4) 0 var(--s2);text-transform:uppercase;letter-spacing:.04em}
   .browse ul{list-style:none;margin:0;padding:0;columns:4 180px;column-gap:var(--s5)}
   .browse li{padding:2px 0;break-inside:avoid}
   .browse a{color:var(--ink2);text-decoration:none}
   .browse a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
-  .browse .n{color:var(--ink3);font-size:12px;margin-left:4px}
+  .browse .n{color:var(--ink3);font-size:var(--fs-1);margin-left:4px}
   .browse p{margin:var(--s2) 0 0}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
   /* The empty list says what was searched and offers the way out (2026-10-14). */
@@ -451,15 +492,24 @@
   .linkbtn{all:unset;cursor:pointer;color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:3px}
   .linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
   /* The first-visit line offering the setup card (2026-10-14), in place of the card itself. */
-  .setup-ask{display:flex;gap:var(--s2) var(--s3);align-items:center;flex-wrap:wrap;padding:var(--s2) var(--s3);font-size:13.5px}
+  .setup-ask{display:flex;gap:var(--s2) var(--s3);align-items:center;flex-wrap:wrap;padding:var(--s2) var(--s3)}
   @media (max-width:760px){.setup-ask span{order:3;flex-basis:100%}}
   /* Skip links: out of sight until a keyboard reaches them. */
-  .skip{position:absolute;left:var(--s4);top:-80px;z-index:60;padding:8px 12px;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:6px;font-weight:500;text-decoration:none}
+  .skip{position:absolute;left:var(--s4);top:-80px;z-index:60;padding:8px 12px;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:var(--r);font-weight:500;text-decoration:none}
   .skip:focus{top:var(--s2)}
   .skip.inline:not(:focus){width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;padding:0;border:0}
   .skip.inline:focus{position:static;display:inline-block;margin:0 0 var(--s2)}
   #listings{scroll-margin-top:var(--s2)}
   #listings:focus,#about:focus,#list-end:focus{outline:none}
+  /* The shared icon set (D15): <span class="i i-check" aria-hidden="true"></span> draws the check in
+     currentColor at 1em. Six icons: chevron, search, check, cross, alert, external. */
+  .i{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.125em;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+  .i-chevron{--i:var(--i-chevron)}.i-search{--i:var(--i-search)}.i-check{--i:var(--i-check)}.i-cross{--i:var(--i-cross)}.i-alert{--i:var(--i-alert)}.i-external{--i:var(--i-external)}
+  /* Form errors (A2 component 2): a red edge on the field, and the message under it (.field-err) tied to the
+     field with aria-describedby. Disabled fields read like disabled buttons. */
+  input[aria-invalid=true],select[aria-invalid=true],textarea[aria-invalid=true],.field:has([aria-invalid=true]){border-color:var(--red)}
+  .field-err{color:var(--red);font-size:var(--fs-2);margin:var(--s1) 0 0}
+  input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-color:var(--sunk);cursor:default}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   noscript p{max-width:640px;margin:40px auto;padding:0 20px;color:var(--ink2)}
   /* Motion, each tied to a change of state and never to scrolling. Content is visible at rest: these
@@ -489,12 +539,12 @@
        loading; without it the list under it moved (2026-10-14). */
     .coverage{min-height:calc(3 * 1.6em)}
     .figrow{gap:var(--s4) var(--s5)}
-    .fig .n{font-size:28px}
+    .fig .n{font-size:var(--fs-7)}
     .top-r{margin-left:0}
     .row2{grid-template-columns:1fr}
     .setup{padding:16px}
     .filters .field.search{flex:1 1 100%;width:100%}
-    .filters .field.search input,.ms input{font-size:16px}
+    .filters .field.search input,.ms input{font-size:var(--fs-4)}
     .chip button{min-width:28px;min-height:28px}
     .opt{min-height:36px;white-space:normal;align-items:center}
     .filters.extra{padding:10px 12px}
@@ -511,7 +561,7 @@
     table.list tbody td{display:block;border:0;padding:0;width:auto;min-width:0}
     table.list .c-co{flex:1 1 100%;order:0}
     table.list .c-chk{order:1;margin-left:auto;width:auto}
-    table.list .c-field,table.list .c-loc,table.list .c-pay{order:2;font-size:13.5px;color:var(--ink2)}
+    table.list .c-field,table.list .c-loc,table.list .c-pay{order:2;font-size:var(--fs-2);color:var(--ink2)}
     table.list .c-field .meta,table.list .c-loc .meta,table.list .c-loc > div{display:inline;margin:0}
     table.list .c-loc .meta::before,table.list .c-field .meta::before{content:" · "}
     table.list .c-pay .muted{display:none}
@@ -520,11 +570,11 @@
     table.list .c-links{order:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     table.list .c-links > div{margin:0}
     table.list .rowbtn,table.list .report{margin-top:0}
-    table.list .whybtn,table.list .open-link{min-height:44px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;display:inline-flex;align-items:center}
-    table.list .whybtn .why-l{font-size:12.5px;color:var(--ink2)}
+    table.list .whybtn,table.list .open-link{min-height:44px;padding:0 10px;border:1px solid var(--field-border);border-radius:var(--r);display:inline-flex;align-items:center}
+    table.list .whybtn .why-l{font-size:var(--fs-2);color:var(--ink2)}
     table.list select.mine,table.list .rowbtn{min-height:44px}
     table.list .rowbtn{padding:0 8px}
-    .match-label{display:inline;font-family:var(--sans);font-size:12.5px;color:var(--ink2)}
+    .match-label{display:inline;font-family:var(--sans);font-size:var(--fs-2);color:var(--ink2)}
     table.list .c-links .report{display:none}
     tbody tr.why td{padding:var(--s4)}
     /* A narrow desktop window (no touch) still gets the row Auto-Apply explainer; the card rule above

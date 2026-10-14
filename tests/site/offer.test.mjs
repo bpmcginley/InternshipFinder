@@ -18,7 +18,8 @@ const blocked = { getItem() { throw new Error("SecurityError"); }, setItem() { t
 
 // A small DOM: enough for what offer.js builds (elements, attributes, text, listeners, focus).
 class El {
-  constructor(tag, doc) { this.tag = tag; this.doc = doc; this.attrs = {}; this.children = []; this.listeners = {}; this.parentNode = null; this.textContent = ""; }
+  constructor(tag, doc) { this.tag = tag; this.doc = doc; this.attrs = {}; this.children = []; this.listeners = {}; this.parentNode = null; this.textContent = ""; this.style = {}; this.rect = { top: 0, bottom: 0, height: 0 }; }
+  getBoundingClientRect() { return this.rect; }
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   hasAttribute(k) { return k in this.attrs; }
@@ -46,7 +47,8 @@ function load({ ua = CHROME, touch = false, media = true, attr = false, local = 
   const FakeDate = class extends Date { static now() { return clock.now; } };
   const ctx = {
     document: doc, navigator: ua ? { userAgentData: ua } : {}, localStorage: local, sessionStorage: session,
-    addEventListener: (t, f) => { winListeners[t] = f; }, Date: FakeDate, Number, String, JSON,
+    addEventListener: (t, f) => { winListeners[t] = f; }, Date: FakeDate, Number, String, JSON, Math,
+    scrolled: [], scrollBy(x, y) { ctx.scrolled.push(y); },
   };
   if (media) ctx.matchMedia = (q) => ({ matches: touch && q === "(pointer:coarse) and (hover:none)" });
   if (config) ctx.CONFIG = config;
@@ -233,4 +235,35 @@ test("the dashboard loads it and marks the posting links it can fill", () => {
   const count = readFileSync(new URL("../../docs/js/count.js", import.meta.url), "utf8");
   assert.ok(count.includes('t.closest("a.go[href], a.open-link[href]")'));
   assert.ok(OFFER.includes('var POSTING = "a.go[href], a.open-link[href]";'));
+});
+
+// WCAG 2.4.11 (2026-10-14): while the bar shows, a focused link never sits under it.
+test("while the bar shows, the page's scroll padding clears it, and a focus under it is scrolled up", () => {
+  const r = load();
+  r.doc.documentElement.style.scrollPaddingBottom = "10px";
+  r.doc.body.appendChild = function (c) { c.parentNode = this; this.children.push(c); c.rect = { top: 820, bottom: 884, height: 64 }; return c; };
+  r.open();
+  assert.equal(r.doc.documentElement.style.scrollPaddingBottom, "88px", "the bar's height plus its 16px gap and a little room");
+  // A link under the bar takes focus (a click or a script): the page scrolls it clear.
+  const link = r.posting();
+  link.rect = { top: 840, bottom: 860, height: 20 };
+  r.doc.listeners.focusin({ target: link });
+  assert.deepEqual(r.ctx.scrolled, [48]);
+  // A link above the bar is left alone, and so is the bar's own button.
+  const up = r.posting();
+  up.rect = { top: 100, bottom: 120, height: 20 };
+  r.doc.listeners.focusin({ target: up });
+  r.doc.listeners.focusin({ target: r.bar().find((n) => n.tag === "button") });
+  assert.deepEqual(r.ctx.scrolled, [48]);
+  // Gone with the bar: the page's own padding comes back.
+  r.bar().find((n) => n.tag === "button").fire("click");
+  assert.equal(r.doc.documentElement.style.scrollPaddingBottom, "10px");
+});
+
+test("the bar uses the shared tokens: the large radius, the pop-up shadow and one primary button", () => {
+  assert.match(OFFER, /border-radius:var\(--r-lg,8px\)/);
+  assert.match(OFFER, /box-shadow:var\(--shadow-pop,/);
+  assert.doesNotMatch(OFFER, /rgba\(20,20,20/, "the old fixed shadow vanished on a dark page");
+  assert.match(OFFER, /\.is-offer \.is-offer-go\{[^}]*background:var\(--accent,/);
+  assert.match(OFFER, /\.is-offer button\{[^}]*border:0;[^}]*background:transparent;[^}]*color:var\(--accent,/);
 });
