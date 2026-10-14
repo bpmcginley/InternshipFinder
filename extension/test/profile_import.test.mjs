@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { emptyStore, upgradeStore, accountFor, confirmedFacts, profileForModel } from "../lib/store.js";
-import { confirmProfileValue, applyInterviewFacts, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "../onboarding/profile.js";
+import { emptyStore, upgradeStore, accountFor, confirmedFacts, profileForModel, factSuggestions, EMPTY_FACTS, DEMOGRAPHIC_KEYS, RESUME_FACTS, DASHBOARD_FACTS } from "../lib/store.js";
+import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "../onboarding/profile.js";
 
 const extracted = (facts = {}, over = {}) => ({ facts, education: [], experience: [], projects: [], links: [],
   skills: { technical: [], tools: [], soft: [] }, ...over });
@@ -19,6 +19,73 @@ test("AI interview summaries cannot confirm eligibility or reuse confirmation fo
   assert.equal(s.profile.facts.over_18, "", "malformed AI output is ignored");
   confirmProfileValue(s.profile, "facts", "work_authorized");
   assert.equal(confirmedFacts(s).work_authorized, "No");
+});
+
+// PR #94 review, P1 #1: only 11 keys were held back, so an interview's race, veteran status,
+// citizenship or clearance reached fastFill and the model. Every key is checked here, and any source
+// other than the student's own (or a reviewed resume / the dashboard for their own keys) is held back.
+const unknownOrDecline = (k) => (DEMOGRAPHIC_KEYS.includes(k) ? EMPTY_FACTS[k] : "");
+test("every fact an interview suggests stays out of confirmedFacts and the model until confirmed", () => {
+  const s = emptyStore();
+  const keys = Object.keys(EMPTY_FACTS);
+  applyInterviewFacts(s.profile, Object.fromEntries(keys.map((k) => [k, `INTERVIEW-${k}`])));
+  const ready = confirmedFacts(s), model = profileForModel(s);
+  for (const k of keys) {
+    assert.equal(s.profile.facts[k], `INTERVIEW-${k}`, `${k} is kept as a suggestion`);
+    assert.equal(ready[k], unknownOrDecline(k), `${k} is not used`);
+    assert.equal(model.facts[k], unknownOrDecline(k), `${k} is not sent to the model`);
+  }
+  assert.ok(!JSON.stringify(model).includes("INTERVIEW-"));
+  assert.equal(model.signup_email, "", "an interview email is not the sign-up email either");
+  assert.deepEqual(factSuggestions(s.profile).map((x) => x.key).sort(), [...keys].sort());
+  for (const k of DEMOGRAPHIC_KEYS) assert.match(ready[k], /decline|don't wish/i, k);
+});
+
+test("any source other than the student's own is held back for every key", () => {
+  for (const source of ["interview", "ai", "import", undefined]) {
+    const s = emptyStore();
+    for (const k of Object.keys(EMPTY_FACTS)) {
+      s.profile.facts[k] = `X-${k}`;
+      s.profile.sources.facts[k] = { source, value: `X-${k}` };
+    }
+    const ready = confirmedFacts(s);
+    for (const k of Object.keys(EMPTY_FACTS)) assert.equal(ready[k], unknownOrDecline(k), `${source}: ${k}`);
+  }
+  // A reviewed resume counts for the contact details it fills in, the dashboard for major and class year,
+  // and nothing else.
+  const s = emptyStore();
+  for (const k of Object.keys(EMPTY_FACTS)) {
+    s.profile.facts[k] = `R-${k}`;
+    s.profile.sources.facts[k] = { source: "resume", value: `R-${k}` };
+  }
+  for (const k of DASHBOARD_FACTS) s.profile.sources.facts[k] = { source: "dashboard", value: `R-${k}` };
+  const ready = confirmedFacts(s);
+  for (const k of Object.keys(EMPTY_FACTS)) {
+    const ok = RESUME_FACTS.includes(k) || DASHBOARD_FACTS.includes(k);
+    assert.equal(ready[k], ok ? `R-${k}` : unknownOrDecline(k), k);
+  }
+});
+
+test("Quick facts: a suggestion is used once taken, and turning it down brings back the earlier answer", () => {
+  const s = emptyStore();
+  s.profile.facts.citizenship = "U.S. citizen";
+  confirmProfileValue(s.profile, "facts", "citizenship");
+  applyInterviewFacts(s.profile, { citizenship: "F-1 student visa", race: "Asian", clearance_eligible: "Yes" });
+  assert.equal(confirmedFacts(s).citizenship, "", "a suggestion that disagrees makes the answer unknown until the student decides");
+  assert.deepEqual(factSuggestions(s.profile).find((x) => x.key === "citizenship"),
+    { key: "citizenship", value: "F-1 student visa", source: "interview", kept: "U.S. citizen" });
+  dismissSuggestion(s.profile, "citizenship");
+  assert.equal(confirmedFacts(s).citizenship, "U.S. citizen");
+  dismissSuggestion(s.profile, "race");
+  assert.equal(s.profile.facts.race, "Decline to self-identify");
+  assert.equal(confirmedFacts(s).race, "Decline to self-identify");
+  confirmProfileValue(s.profile, "facts", "clearance_eligible");   // "Use this answer"
+  assert.equal(confirmedFacts(s).clearance_eligible, "Yes");
+  assert.deepEqual(factSuggestions(s.profile), []);
+  // The same value again changes nothing; a confirmed answer stays confirmed.
+  applyInterviewFacts(s.profile, { clearance_eligible: "Yes", citizenship: "U.S. citizen" });
+  assert.equal(confirmedFacts(s).clearance_eligible, "Yes");
+  assert.equal(confirmedFacts(s).citizenship, "U.S. citizen");
 });
 
 test("new profiles leave factual eligibility/preferences unknown while retaining voluntary decline choices", () => {

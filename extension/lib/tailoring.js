@@ -1,5 +1,6 @@
 // Pure checks for a tailored resume: the model may only reword/reorder what the profile already says.
 // Anything that fails a check falls back to the original text.
+import { confirmedFacts } from "./store.js";
 
 const nums = (s) => String(s || "").match(/\d+(?:[.,]\d+)*/g) || [];
 export const hasNewNumbers = (text, source) => { const ok = new Set(nums(source)); return nums(text).some((n) => !ok.has(n)); };
@@ -37,7 +38,9 @@ function reorderList(orig, picked) {
 
 // out: {summary, experience:[{i, bullets:[{from, text}]}], projects:[{i, description}], skills:{...}}
 export function applyTailoring(store, out) {
-  const p = store.profile, f = p.facts, diff = [];
+  // The header's name and contact details: confirmed ones only, as on forms (store.js confirmedFacts).
+  // was: p.facts, so a phone number an interview suggested could be printed on the resume.
+  const p = store.profile, f = confirmedFacts(store), diff = [];
   out = out && typeof out === "object" ? out : {};
   const expBy = new Map((Array.isArray(out.experience) ? out.experience : []).map((e) => [Number(e && e.i), e]));
   const experience = p.experience.map((e, i) => {

@@ -1,11 +1,11 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
-import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, confirmedFacts } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, confirmedFacts, factFallback, factSuggestions, resumeReviewPending } from "../lib/store.js";
 import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/auth.js";
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
 import { quickStartReady, finishOnboarding, digestLink } from "./quickstart.js";
-import { confirmProfileValue, applyInterviewFacts, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
+import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -376,13 +376,16 @@ function files() {
     ${navButtons("setup", "facts")}`;
   const err = (e) => { $("#ferr").textContent = e.message || String(e); };
   main.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => main.querySelector(`[data-slot=${b.dataset.pick}]`).click()));
+  // A new or removed resume pauses Auto-Apply through resume_details_ready (store.js resumeReviewPending)
+  // until the new one is read and reviewed. was: also onboarded = false here, in the remove handler and in
+  // extract(), which lib/sync.js read as a device that never finished and restored the account's older copy.
   main.querySelectorAll("[data-slot]").forEach((inp) => inp.addEventListener("change", async () => {
-    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); if (inp.dataset.slot === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; S.settings.onboarded = false; } await save(true); files(); wireNav(); } catch (e) { err(e); return; }
+    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); if (inp.dataset.slot === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); } catch (e) { err(e); return; }
     // A new resume is read straight away (2026-10-04) rather than waiting for "Read my resume", which
     // students skipped: the profile stayed empty and every application had to ask the model for it.
     if (inp.dataset.slot === "resume" && hasKey(S)) extract($("#extract"), $("#exout")).catch(err);
   }));
-  main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; if (b.dataset.clear === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; S.settings.onboarded = false; } await save(true); files(); wireNav(); }));
+  main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; if (b.dataset.clear === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); }));
   main.querySelectorAll("[data-rms]").forEach((b) => b.addEventListener("click", async () => { S.files.samples.splice(+b.dataset.rms, 1); await save(true); files(); wireNav(); }));
   $("#addsamples").addEventListener("click", () => $("#samples").click());
   $("#samples").addEventListener("change", async (e) => {
@@ -431,8 +434,16 @@ function drawResumeReview() {
 function drawQuick(msg = "") {
   const box = $("#quick");
   if (!box) return;
-  box.hidden = !quickStartReady(S) || extracting || !!pendingResumeImport;
+  // Finished before, and a replaced resume is still being read or reviewed: say Auto-Apply is paused.
+  const paused = !!S.settings.onboarded && resumeReviewPending(S);
+  box.hidden = !paused && (!quickStartReady(S) || extracting || !!pendingResumeImport);
   if (box.hidden) return;
+  if (paused) {
+    box.innerHTML = `<p class="small" style="margin:0"><b>Auto-Apply is paused.</b> ${S.files.resume
+      ? "Read your new resume and save its details above. Auto-Apply starts again when you do."
+      : "Add your resume above, then read it and save its details. Auto-Apply starts again when you do."}</p>`;
+    return;
+  }
   box.innerHTML = S.settings.onboarded
     ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
        ${digestLink()}
@@ -461,7 +472,6 @@ async function extract(btn, out) {
   extracting = true;
   pendingResumeImport = null;
   S.settings.resume_details_ready = false;
-  S.settings.onboarded = false;
   drawQuick();
   drawResumeReview();
   // files() redraws itself (another file added meanwhile), so write to whatever is on the page now.
@@ -550,11 +560,24 @@ const FACTS = [
 function facts() {
   const f = S.profile.facts;
   const ready = confirmedFacts(S);
-  const unconfirmed = CONFIRMATION_FACTS.some((key) => f[key] && !ready[key]);
-  const field = ([k, label, opts]) => opts
-    ? `<label class="f"><span>${esc(label)}</span><select data-fact="${k}">${[...new Set([...opts, f[k]])].map((o) => `<option ${o === f[k] ? "selected" : ""} value="${esc(o)}">${esc(o || "Not answered — ask me if needed")}</option>`).join("")}</select></label>`
-    : `<label class="f"><span>${esc(label)}</span><input type="text" data-fact="${k}" value="${esc(f[k])}"></label>`;
+  // Values the interview suggested (onboarding/profile.js applyInterviewFacts). Each field shows the answer
+  // Auto-Apply uses now, with the suggestion under it to take or turn down. was: the suggested value sat in
+  // the field as if it were the student's own answer, and was used.
+  const suggested = new Map(factSuggestions(S.profile).map((x) => [x.key, x]));
+  const shown = (k) => (suggested.has(k) ? factFallback(k) : f[k]);
+  const unconfirmed = CONFIRMATION_FACTS.some((key) => !suggested.has(key) && f[key] && !ready[key]);
+  const hint = (k) => {
+    const x = suggested.get(k);
+    if (!x) return "";
+    const from = x.source === "interview" ? "Suggested from your interview" : "Suggested";
+    return `<div class="small suggest" style="margin:-6px 0 12px">${from}, not used until you confirm: <b>${esc(x.value)}</b>${x.kept ? ` (your earlier answer: ${esc(x.kept)})` : ""}
+      <div class="row" style="margin-top:4px"><button class="btn small" data-use="${k}">Use this answer</button><button class="btn small" data-dismiss="${k}">${x.kept ? "Keep my earlier answer" : "Dismiss"}</button></div></div>`;
+  };
+  const field = ([k, label, opts]) => `<div>${opts
+    ? `<label class="f"><span>${esc(label)}</span><select data-fact="${k}">${[...new Set([...opts, shown(k)])].map((o) => `<option ${o === shown(k) ? "selected" : ""} value="${esc(o)}">${esc(o || "Not answered — ask me if needed")}</option>`).join("")}</select></label>`
+    : `<label class="f"><span>${esc(label)}</span><input type="text" data-fact="${k}" value="${esc(shown(k))}"></label>`}${hint(k)}</div>`;
   main.innerHTML = `<h2>Quick facts</h2><p class="lead">The questions nearly every application asks. Answer once; the agent reuses them everywhere.</p>
+    ${suggested.size ? `<div class="banner">Your interview suggested some answers below. Auto-Apply won't use them until you press Use this answer or pick an answer yourself.</div>` : ""}
     ${unconfirmed ? '<div class="banner">Your saved eligibility and availability answers need confirmation before Auto-Apply can use them. Review them below, then press Confirm answers shown. Unanswered questions stay unknown.</div>' : ""}
     ${FACTS.map(([t, note, list]) => `<div class="card"><h3>${t}</h3>${note ? `<p class="small muted" style="margin-top:0">${note}</p>` : ""}<div class="grid">${list.map(field).join("")}</div></div>`).join("")}
     <div class="card"><h3>Education</h3>${S.profile.education.length
@@ -562,9 +585,21 @@ function facts() {
       : `<span class="muted small">Nothing yet. Read your resume in Files, or add it in Review.</span>`}</div>
     <div class="card"><button class="btn primary" id="confirm-facts">Confirm answers shown</button> <span id="facts-confirmed" role="status" class="small"></span></div>
     ${navButtons("files", "interview")}`;
-  main.querySelectorAll("[data-fact]").forEach((el) => el.addEventListener("input", () => { f[el.dataset.fact] = el.value; confirmProfileValue(S.profile, "facts", el.dataset.fact); save(); }));
+  // A field the student changes is their own answer, suggestion or not.
+  main.querySelectorAll("[data-fact]").forEach((el) => el.addEventListener("input", () => {
+    f[el.dataset.fact] = el.value; confirmProfileValue(S.profile, "facts", el.dataset.fact); save();
+    if (suggested.has(el.dataset.fact)) { suggested.delete(el.dataset.fact); el.closest("div").querySelector(".suggest")?.remove(); }
+  }));
+  const decide = (attr, fn) => main.querySelectorAll(`[${attr}]`).forEach((b) => b.addEventListener("click", async () => {
+    fn(b.getAttribute(attr));
+    await save(true);
+    facts(); wireNav();
+  }));
+  decide("data-use", (k) => confirmProfileValue(S.profile, "facts", k));
+  decide("data-dismiss", (k) => dismissSuggestion(S.profile, k));
   $("#confirm-facts").onclick = async () => {
-    for (const key of CONFIRMATION_FACTS) confirmProfileValue(S.profile, "facts", key);
+    // Suggestions are left as they are: the field shows the answer in use, not the suggested value.
+    for (const key of CONFIRMATION_FACTS) if (!suggested.has(key)) confirmProfileValue(S.profile, "facts", key);
     await save(true);
     $("#facts-confirmed").textContent = "Confirmed. Unanswered questions will still be asked when needed.";
   };

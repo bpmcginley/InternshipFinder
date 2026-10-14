@@ -63,7 +63,7 @@ globalThis.fetch = async (url, opts) => {
 
 const { emptyStore } = await import("../lib/store.js");
 const { addJobs, updateJob, getJob, loadMsgs } = await import("../background/queue.js");
-const { runJob, resumeJob, takeBack, stopJob, accountCreationConfirmed, EARLY_READY_PUSHBACK } = await import("../background/agent.js");
+const { runJob, resumeJob, takeBack, stopJob, accountCreationConfirmed, EARLY_READY_PUSHBACK, RESUME_REVIEW_HELP } = await import("../background/agent.js");
 
 const store = emptyStore();
 store.ai = { provider: "anthropic", apiKey: "test-key", geminiKey: "", model: "claude-sonnet-5" };
@@ -197,6 +197,68 @@ test("cancellation during the final ownership read prevents prefill even before 
     assert.equal(calls, 0);
   } finally {
     chrome.storage.local.get = get; chrome.scripting.executeScript = execute; window.ISDom.fastFill = fastFill;
+  }
+});
+
+// PR #94 review: the resume-review gate was checked only when jobs were added (index.js enqueue). A job
+// queued before the resume was replaced, or resumed after, has to stop here without filling anything.
+test("a queued job whose resume is still being reviewed ends Needs you and fills nothing", async () => {
+  const id = await newJob();
+  const create = chrome.tabs.create, fastFill = window.ISDom.fastFill;
+  let tabs = 0;
+  chrome.tabs.create = async (o) => { tabs++; return create(o); };
+  window.ISDom.fastFill = async () => { actions.push("automatic prefill"); return ["Race = Asian"]; };
+  data.store.files.resume = { name: "new.pdf", type: "application/pdf", b64: "eA==", size: 1 };
+  data.store.settings.resume_details_ready = false;
+  replies = [FILL_CLICK_READY, FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    let j = await getJob(id);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, RESUME_REVIEW_HELP);
+    assert.match(j.reason, /Finish reviewing your resume in the Deep Dive/);
+    assert.deepEqual(actions, [], "no prefill, no fill, no click");
+    assert.equal(calls, 0, "no AI call");
+    assert.equal(tabs, 0, "no tab opened");
+    // Resume from the side panel before the review is saved: still stopped.
+    await resumeJob(id);
+    await updateJob(id, { status: "working" });
+    await runJob(id);
+    j = await getJob(id);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, RESUME_REVIEW_HELP);
+    assert.deepEqual(actions, []);
+    // A pending review choice pauses it the same way.
+    data.store.settings.resume_details_ready = true;
+    data.store.settings.resume_import = { plan: [] };
+    await resumeJob(id);
+    await updateJob(id, { status: "working" });
+    await runJob(id);
+    assert.equal((await getJob(id)).reason, RESUME_REVIEW_HELP);
+    assert.equal(calls, 0);
+  } finally {
+    chrome.tabs.create = create; window.ISDom.fastFill = fastFill;
+    data.store.settings.resume_details_ready = true;
+    data.store.settings.resume_import = null;
+    data.store.files.resume = null;
+  }
+});
+
+test("a resume replaced while a job is running stops it before the next page is filled", async () => {
+  const id = await newJob();
+  data.store.files.resume = { name: "new.pdf", type: "application/pdf", b64: "eA==", size: 1 };
+  replies = [[use("t1", "fill", { ref: "0:e1", text: "Because." })], FILL_CLICK_READY];
+  onAct = async () => { onAct = null; data.store.settings.resume_details_ready = false; };
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.deepEqual(actions, ["fill e1"], "the step already under way finishes; nothing after it");
+    assert.equal(calls, 1);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, RESUME_REVIEW_HELP);
+  } finally {
+    data.store.settings.resume_details_ready = true;
+    data.store.files.resume = null;
   }
 });
 
