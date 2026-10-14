@@ -3,7 +3,7 @@
 import { CONFIG } from "./config.js";
 import { HttpError, json, sameSecret } from "./http.js";
 import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "./auth.js";
-import { createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
+import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
 import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
@@ -179,6 +179,15 @@ async function route(request, env, ctx, d) {
       const token = bearerOf(request);
       if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
       return json(await sessionInfo(db, token, { now: now.getTime(), later: (p) => later(ctx, p) }));
+    }
+
+    // A separate session for the same account, from a session token (2026-10-14): the extension takes over
+    // the dashboard's sign-in with it, so signing out of one leaves the other signed in. Once per session,
+    // never from a copy (session.js copySession). Same reply as POST /session, without the email.
+    case "POST /session/copy": {
+      const token = bearerOf(request);
+      if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
+      return json(await copySession(db, token, { now: now.getTime() }));
     }
 
     case "DELETE /session": {

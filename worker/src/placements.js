@@ -49,7 +49,8 @@ const CONTROL = /[\u0000-\u001F\u007F]/g;
 const LIMITS = { employer: 120, apply_url: 2000, note: 500, paid_ref: 64, reason: 200 };
 
 // The fields GET /placements returns, and nothing else. Never paid_ref, note, lead_id, checks or *_by.
-export const PUBLIC_KEYS = ["id", "listing_id", "apply_url", "employer", "start", "end", "page_cap"];
+// unpaid_ok is public because the site build keeps an unpaid role only when it is set (placements.py).
+export const PUBLIC_KEYS = ["id", "listing_id", "apply_url", "employer", "start", "end", "page_cap", "unpaid_ok"];
 
 const bad = (field, message) => new HttpError(400, "bad_request", message, { field });
 const conflict = (message) => new HttpError(409, "conflict", message);
@@ -159,14 +160,14 @@ async function save(db, before, changes, action, who, reason, now) {
 export async function livePlacements(db, now) {
   const today = dayOf(now);
   const { results } = await db.prepare(
-    "SELECT id, listing_id, apply_url, employer, start_day, end_day, page_cap FROM placements " +
+    "SELECT id, listing_id, apply_url, employer, start_day, end_day, page_cap, unpaid_ok FROM placements " +
     "WHERE status = 'on' AND end_day > ? AND start_day <= ? ORDER BY start_day, id",
   ).bind(today, addDays(today, 1)).all();
   return {
     day: today,
     placements: results.map((r) => ({
       id: r.id, listing_id: r.listing_id, apply_url: r.apply_url, employer: r.employer,
-      start: r.start_day, end: r.end_day, page_cap: Math.min(r.page_cap, PAGE_CAP),
+      start: r.start_day, end: r.end_day, page_cap: Math.min(r.page_cap, PAGE_CAP), unpaid_ok: r.unpaid_ok ? 1 : 0,
     })),
   };
 }

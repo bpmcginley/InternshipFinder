@@ -73,15 +73,28 @@ test("an offer is kept aside only when the Worker says it is live and the extens
   assert.equal(local[auth.SESSION_KEY].email, "me@umass.edu", "the existing sign-in is untouched");
 });
 
-test("accepting checks with the Worker again, keeps the Worker's record, and works once", async () => {
+const OWN = "iss_" + "c".repeat(43);
+const COPY = { ...REPLY, session: OWN };
+
+test("copySessionFrom asks POST /session/copy and keeps only the new session", async () => {
+  const ok = worker(200, COPY);
+  assert.deepEqual(await auth.copySessionFrom(TOKEN, ok, NOW), { token: OWN, account: REPLY.account, email: "", provider: "google", tier: "edu", expires: REPLY.expires });
+  assert.deepEqual(ok.calls, [{ url: `${WORKER_URL}/session/copy`, method: "POST", auth: `Bearer ${TOKEN}` }]);
+  for (const status of [401, 404, 409, 500]) assert.equal(await auth.copySessionFrom(TOKEN, worker(status, COPY), NOW), null, String(status));
+  assert.equal(await auth.copySessionFrom(TOKEN, worker(200, { ...REPLY, session: TOKEN }), NOW), null, "the same token back is not a copy");
+  assert.equal(await auth.copySessionFrom(TOKEN, worker(200, { ...REPLY, session: "nope" }), NOW), null);
+  assert.equal(await auth.copySessionFrom(TOKEN, async () => { throw new Error("offline"); }, NOW), null);
+});
+
+test("accepting trades the offer for the extension's own session, keeps the Worker's record, and works once", async () => {
   clear();
   const now = Date.now();
   await auth.holdOffer(TOKEN, worker(), now);
-  const w = worker();
+  const w = worker(200, COPY);
   assert.deepEqual(await auth.acceptOffer(w, now + 1000), { ok: true });
-  assert.equal(w.calls.length, 1, "asked again at the moment of use");
-  assert.deepEqual(local[auth.SESSION_KEY], { token: TOKEN, account: REPLY.account, email: "", provider: "google", tier: "edu", expires: REPLY.expires });
-  assert.equal(await auth.getToken(), TOKEN);
+  assert.deepEqual(w.calls.map((c) => [c.method, c.url]), [["POST", `${WORKER_URL}/session/copy`]], "traded at the moment of use");
+  assert.deepEqual(local[auth.SESSION_KEY], { token: OWN, account: REPLY.account, email: "", provider: "google", tier: "edu", expires: REPLY.expires });
+  assert.equal(await auth.getToken(), OWN, "never the dashboard's token");
   assert.equal(session[auth.OFFER_KEY], undefined, "used up");
   // Signed out on the dashboard between the offer and the press: refused, nothing kept.
   clear();
