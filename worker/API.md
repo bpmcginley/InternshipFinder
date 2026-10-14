@@ -350,6 +350,55 @@ Only users active in the last 90 days count. The ingest workflow reads this with
 `INTERNSCOUT_DEMAND_URL` + `INTERNSCOUT_DEMAND_TOKEN` and passes the state codes to the backend as
 `INTERNSCOUT_WANTED_STATES`.
 
+## Placements (paid listings; off until `ADMIN_TOKEN` is set)
+
+Added 2026-10-14 (`src/placements.js`). The record of which listing an employer paid to show in a
+separate, labelled box, and on which days. Payment never changes any score, order, filter, count or
+Auto-Apply behaviour: a placement only names a listing by its pipeline id (`listing_id`, 16 lowercase
+hex characters) and nothing is ever added to a listing. There is no payment code here. Bruce invoices
+from his own Stripe dashboard and records `"pilot"` or the invoice number as `paid_ref` when he
+switches a placement on. Days are UTC `YYYY-MM-DD`; `start` is the first day shown and `end` the first
+day it no longer shows.
+
+A placement moves through `draft` → `checked` (every sponsor check recorded) → `on` ⇄ `paused`, and ends
+as `ended` (by hand, or by the daily cron once `end` has come, with `ended_reason: "dates"`) or
+`refused`. Every change writes one `placement_log` row with the row as JSON before and after.
+
+### `GET /placements` (public, for the site build)
+No auth. Returns the placements that are `on`, whose `end` is after today and whose `start` is today or
+tomorrow at the latest (so an evening build carries one that starts at midnight):
+```json
+{ "day": "2026-11-03", "placements": [ { "id": "p-2026-11-acme-1", "listing_id": "3f9c0a1b2c3d4e5f",
+  "apply_url": "https://...", "employer": "Acme", "start": "2026-11-01", "end": "2026-12-01", "page_cap": 1 } ] }
+```
+Exactly those keys: never `paid_ref`, `note`, `lead_id`, `checks` or who changed what.
+`Cache-Control: public, max-age=300`. The site build reads it once per deploy; visitors never call it.
+
+### Admin routes (Bruce's terminal only)
+`worker/scripts/placement.mjs` wraps them. Every admin route:
+- answers `404 not_found` while the `ADMIN_TOKEN` secret is unset, as if it did not exist;
+- answers `403 forbidden` to any request that carries an `Origin` header, even with the right token,
+  so no web page can call it (CORS never applies);
+- answers `401 auth` without `Authorization: Bearer <ADMIN_TOKEN>` (compared in constant time).
+
+POST bodies are JSON objects of at most 4,000 bytes. Every change takes `by`, a short label such as
+`"bruce"` (letters, digits, `-` and `_`; never an email). The id goes in the body because the router
+matches exact paths. Changes answer `200 { "placement": { ...the full row } }`; `400 bad_request` with
+`"field"` for a bad value, `404` for an unknown placement or lead, and `409 conflict` for a step the
+current status does not allow (or a row that changed while it was being saved).
+
+| Route | Body | Does |
+|---|---|---|
+| `GET /admin/placements` | none | `{ placements: [...] }`: every row with its private fields, plus `log`, its last 20 log entries, newest first. |
+| `GET /admin/leads` | none | `{ leads: [{ id, created, company, wants }] }`, the 100 newest employer leads, without name, email or message. |
+| `POST /admin/placements` | `{ lead_id?, employer?, listing_id, apply_url, start, end, note?, by }` | Creates a `draft` with an id like `p-2026-11-acme-1`. With `lead_id` the lead must exist, and its company is the employer unless `employer` is given; nothing else is copied from the lead. `apply_url` must be `https://`; `end` must be after `start` and at most 62 days later. |
+| `POST /admin/placements/update` | `{ id, by, start?, end?, listing_id?, apply_url?, employer?, note? }` | In `draft`, `checked` or `paused`: any of those. A new `listing_id` or `apply_url` clears the checks and sends it back to `draft`. While `on`: only a later `end` and `note`. |
+| `POST /admin/placements/check` | `{ id, by, checks: [...], unpaid_ok? }` | From `draft` or `checked`. Records the sponsor checks and the day. Becomes `checked` only if every check is present, otherwise `draft`. Checks: `role_on_employer_site`, `email_domain`, `pay_range_where_required`, `paid_or_public_body`, `min_age_if_hs`, `not_hazardous_for_minors`, `no_fee_no_early_data`, `no_targeting_asked`. `unpaid_ok: true` only for a nonprofit or government role Bruce confirmed. |
+| `POST /admin/placements/on` | `{ id, by, paid_ref }` | From `checked` or `paused` only, with a non-empty `paid_ref` (`"pilot"` or the invoice number), and only while `end` is still ahead. |
+| `POST /admin/placements/pause` | `{ id, by, reason }` | `on` to `paused`. |
+| `POST /admin/placements/end` | `{ id, by, reason }` | Any status not yet `ended` or `refused` to `ended`. `reason` is one of `dates`, `role_closed`, `listing_gone`, `removed`, `refunded`. The emergency stop. |
+| `POST /admin/placements/refuse` | `{ id, by, reason }` | `draft` or `checked` to `refused`. |
+
 ## Paid plans (optional, off by default)
 
 Every route below returns `404 not_found` unless `PAYMENTS_ENABLED` is `"1"` **and** `STRIPE_SECRET_KEY`
@@ -390,6 +439,9 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   - `GEMINI_API_KEY`
   - `HASH_SALT`
   - `DEMAND_TOKEN`
+  - `ADMIN_TOKEN`: any long random string. Turns on the placement admin routes (404 while unset). Its
+    own secret, not `DEMAND_TOKEN`, because that one is also stored in GitHub's CI secrets. Kept on
+    Bruce's machine as `INTERNSCOUT_ADMIN_TOKEN` for `scripts/placement.mjs`, and nowhere else.
   - `PROFILE_KEY`: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts saved Deep Dives.
     Unset, the `/profile` routes answer `503 sync_off`. Replacing it makes every saved copy unreadable
     (each is replaced on that student's next save), so set it once and keep it.
@@ -408,7 +460,8 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   `plans`, `stripe_events`, `invite_codes`, `referrals`, `bonus`, `accounts`, `inviters`, `sessions`, `profiles`,
   `task_tokens`, `visit_counts`, `visit_channels` (social visits by site; added 2026-10-05), `event_counts`
   and `run_hist` (calls per run, by month, task and bucket, kept by the daily cron when it drops a past
-  month's `runs`; added 2026-10-04). The schema is in `worker/schema.sql`.
+  month's `runs`; added 2026-10-04), `employer_leads`, and `placements` and `placement_log` (paid listings
+  and their change history; added 2026-10-14). The schema is in `worker/schema.sql`.
 
 ## Dashboard ↔ extension bridge
 - The existing bridge (`extension/bridge/bridge.js`) relays `{__internscout:"req", id, msg}`. The background worker handles it by `msg.type`.

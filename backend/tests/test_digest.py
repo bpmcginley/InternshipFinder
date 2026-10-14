@@ -250,3 +250,171 @@ def test_one_employer_fills_at_most_two_places_in_a_field():
     rows = [{"company_name": "Big Co", "id": f"b{i}"} for i in range(6)] + [{"company_name": "Small Co", "id": "s1"}]
     picked = digest.varied(rows)
     assert [x["id"] for x in picked] == ["b0", "b1", "s1", "b2", "b3"]   # 2 + the other employer, then topped up
+
+
+# ---------------------------------------------------------------- paid listings (placements)
+# B2 plan PR 10: at most one labelled paid listing, inside its field's section, never in the subject or
+# preheader, with no tracking on its link, and only when DIGEST_PLACEMENTS=1 and the placement still
+# resolves against this week's open listings. Payment never changes a count, a section or an order.
+
+ACME = "https://jobs.example.com/20"
+
+
+def _placement(**over):
+    p = {"id": "p-2026-09-acme-1", "listing_id": "id20", "apply_url": ACME, "employer": "Acme Robotics",
+         "start": "2026-09-01", "end": "2026-10-01"}
+    p.update(over)
+    return p
+
+
+def _placement_site(tmp_path, placements, extra_rows=(), placed_row=None):
+    """Four new mechanical roles, four new civil roles, and one older open mechanical role at Acme
+    Robotics (not new this week, so in no section on its own) for the placement to point at."""
+    rows = [_row(i) for i in range(4)]
+    rows += [_row(i, tags=("civil",), title=f"Civil Intern {i}") for i in range(4, 8)]
+    rows.append(placed_row or _row(20, company_name="Acme Robotics", title="Robotics Intern",
+                                   first_seen="2026-08-01T00:00:00"))
+    rows += list(extra_rows)
+    site = _site(tmp_path, {"MA": rows})
+    if placements is not None:
+        (tmp_path / "data" / "placements.json").write_text(
+            json.dumps({"day": "2026-09-23", "placements": placements}), encoding="utf-8")
+    return site
+
+
+def _emails(d, **kw):
+    return digest.render_html(d, **kw), digest.render_text(d, **kw)
+
+
+def test_placements_are_off_unless_the_switch_is_on(tmp_path, monkeypatch):
+    site = _placement_site(tmp_path, [_placement()])
+    monkeypatch.delenv("DIGEST_PLACEMENTS", raising=False)
+    off = digest.build(site)
+    assert off["placements"] == []
+    for page in _emails(off):
+        assert "Paid listing" not in page and "Acme Robotics" not in page
+    for value in ("0", "true", "yes", ""):
+        monkeypatch.setenv("DIGEST_PLACEMENTS", value)
+        assert digest.build(site) == off
+
+
+def test_with_no_placements_file_the_email_is_unchanged(tmp_path, monkeypatch):
+    site = _placement_site(tmp_path, None)
+    monkeypatch.delenv("DIGEST_PLACEMENTS", raising=False)
+    off = digest.build(site)
+    monkeypatch.setenv("DIGEST_PLACEMENTS", "1")
+    on = digest.build(site)
+    assert on == off and _emails(on) == _emails(off)
+    for bad in ("not json", "[]", '{"placements": "x"}', '{"placements": [1, null]}'):
+        (tmp_path / "data" / "placements.json").write_text(bad, encoding="utf-8")
+        assert digest.build(site) == off
+
+
+def test_one_labelled_item_inside_its_field_and_nothing_else_changes(tmp_path, monkeypatch):
+    site = _placement_site(tmp_path, [_placement()])
+    monkeypatch.delenv("DIGEST_PLACEMENTS", raising=False)
+    off = digest.build(site)
+    monkeypatch.setenv("DIGEST_PLACEMENTS", "1")
+    on = digest.build(site)
+    # The rule: payment changes no count, section, role, order, subject or preheader.
+    rest = lambda d: {k: v for k, v in d.items() if k != "placements"}  # noqa: E731
+    assert rest(on) == rest(off)
+    assert [p["id"] for p in on["placements"]] == ["p-2026-09-acme-1"]
+    html_on, text_on = _emails(on)
+    html_off, text_off = _emails(off)
+    for page in (html_on, text_on):
+        assert page.count("Paid listing") == 1 and page.count("Acme Robotics") == 1
+    assert "Acme" not in on["subject"] and "Acme" not in on["preheader"] and "Paid" not in on["preheader"]
+    assert "Acme" not in html_on.split("<h1", 1)[0]          # not in the <title> or the hidden preheader
+    assert "Acme" not in text_on.split("\n", 1)[0]
+    # "Ad" comes right before the company name.
+    assert re.search(r">Ad</span>Acme Robotics<", html_on)
+    assert "* Ad: Acme Robotics" in text_on
+    # Inside the Mechanical section, after its third role, before its "See all" link; not in Civil.
+    mech = next(s for s in on["sections"] if s["tag"] == "mechanical")
+    civil = next(s for s in on["sections"] if s["tag"] == "civil")
+    for page, head in ((html_on, ">{}</h2>"), (text_on, "\n{}: ")):
+        part = page.split(head.format(mech["title"]), 1)[1].split("See all", 1)[0]
+        assert "Paid listing" in part
+        assert part.split("Paid listing", 1)[0].count("jobs.example.com/") == 3
+        assert "Paid listing" not in page.split(head.format(civil["title"]), 1)[1].split("See all", 1)[0]
+    # The link is the posting itself: no tracking parameters and no redirect, marked as sponsored.
+    assert [h for h in _hrefs(html_on) if h.startswith(ACME)] == [ACME]
+    assert f'<a href="{ACME}" rel="sponsored noopener"' in html_on
+    item = text_on.split("Paid listing", 1)[1].split("See all", 1)[0]
+    assert f"  {ACME}\n" in item and "utm_" not in item
+    # Taking the item out gives back the email without it.
+    assert html_on.replace(digest._placement_html(on["placements"][0]["role"]), "") == html_off
+    # Never "Sponsored", "Promoted" or "Featured" in what the reader sees.
+    for word in ("Sponsored", "Promoted", "Featured"):
+        assert word not in html_on and word not in text_on
+
+
+def test_at_most_one_placement_per_email_and_the_choice_is_stable(tmp_path, monkeypatch):
+    monkeypatch.setenv("DIGEST_PLACEMENTS", "1")
+    civil = _row(21, tags=("civil",), company_name="Bridge Works", title="Bridges Intern",
+                 first_seen="2026-08-01T00:00:00")
+    site = _placement_site(tmp_path, [_placement(), _placement(id="p-2", listing_id="id21",
+                                                               apply_url="https://jobs.example.com/21")],
+                           extra_rows=[civil])
+    d = digest.build(site)
+    assert len(d["placements"]) == 2
+    for page in _emails(d):
+        assert page.count("Paid listing") == 1
+        assert ("Acme Robotics" in page) != ("Bridge Works" in page)
+    assert _emails(digest.build(site)) == _emails(d)
+
+
+def test_a_subscriber_sees_a_placement_only_in_a_field_their_email_covers(tmp_path, monkeypatch):
+    monkeypatch.setenv("DIGEST_PLACEMENTS", "1")
+    d = digest.build(_placement_site(tmp_path, [_placement()]))
+    for page in _emails(d, fields=["civil"]):
+        assert "Paid listing" not in page and "Acme" not in page
+    for page in _emails(d, fields=["mechanical"]):
+        assert page.count("Paid listing") == 1
+
+
+def test_a_placement_shows_only_while_it_resolves_against_current_listings(tmp_path, monkeypatch):
+    monkeypatch.setenv("DIGEST_PLACEMENTS", "1")
+    acme = dict(company_name="Acme Robotics", title="Robotics Intern", first_seen="2026-08-01T00:00:00")
+    cases = [
+        ("kept", _placement(), {}, True),
+        ("trailing slash", _placement(apply_url=ACME + "/"), {}, True),
+        ("listing gone", _placement(listing_id="nope"), {}, False),
+        ("matched by URL only", _placement(listing_id="id99"), {}, False),
+        ("url changed", _placement(apply_url="https://jobs.example.com/other"), {}, False),
+        ("closed", _placement(), {"status": "closed"}, False),
+        ("not started", _placement(start="2026-09-24"), {}, False),
+        ("ended", _placement(end="2026-09-23"), {}, False),
+        ("no dates", _placement(start=None), {}, False),
+        ("no id", _placement(id=""), {}, False),
+        ("deadline passed", _placement(), {"insights": {"deadline": "2026-09-22"}}, False),
+        ("deadline today", _placement(), {"insights": {"deadline": "2026-09-23"}}, True),
+        ("unpaid", _placement(), {"insights": {"pay": "unpaid"}}, False),
+        ("unpaid by restriction", _placement(), {"restrictions": ["unpaid"]}, False),
+        ("unpaid allowed", _placement(unpaid_ok=1), {"insights": {"pay": "unpaid"}}, True),
+        ("citizen only", _placement(), {"restrictions": ["us_citizen_only"]}, False),
+        ("citizenship rule", _placement(), {"insights": {"citizenship": "citizen"}}, False),
+        ("field with no section", _placement(), {"field_tags": ["nursing"]}, False),
+    ]
+    for i, (name, pl, over, shown) in enumerate(cases):
+        sub = tmp_path / str(i)
+        sub.mkdir()
+        site = _placement_site(sub, [pl], placed_row=_row(20, **dict(acme, **over)))
+        page = digest.render_html(digest.build(site))
+        assert ("Paid listing" in page) is shown, name
+
+
+def test_the_command_reads_a_placements_file_only_with_the_switch(tmp_path, monkeypatch):
+    (tmp_path / "site").mkdir()
+    site = _placement_site(tmp_path / "site", None)
+    elsewhere = tmp_path / "built-placements.json"
+    elsewhere.write_text(json.dumps({"placements": [_placement()]}), encoding="utf-8")
+    out = tmp_path / "preview"
+    monkeypatch.delenv("DIGEST_PLACEMENTS", raising=False)
+    assert digest.main(["digest.py", site, "--out", str(out), "--placements", str(elsewhere)]) == 0
+    assert "Paid listing" not in (out / "digest.html").read_text(encoding="utf-8")
+    monkeypatch.setenv("DIGEST_PLACEMENTS", "1")
+    assert digest.main(["digest.py", site, "--out", str(out), "--placements", str(elsewhere)]) == 0
+    assert (out / "digest.html").read_text(encoding="utf-8").count("Paid listing") == 1
+    assert (out / "digest.txt").read_text(encoding="utf-8").count("Paid listing") == 1
