@@ -268,6 +268,77 @@ export async function authBridge() {
   return bridgeReply(await getSession(), await getToken());
 }
 
+// ---------- the dashboard's sign-in (U8, 2026-10-14) ----------
+// A student who signed in on the dashboard had to sign in again in the extension. Now the dashboard can
+// offer the extension its own session ("auth:offer"), and the student can take it with one press of
+// "Use my dashboard sign-in" in the extension. The page is not trusted for any of this:
+//   - index.js only accepts the offer from https://internscout.org (trustedDashboard: Chrome says which
+//     page sent it, the page can't), or a local copy of the site on an unpacked build;
+//   - only a token shaped like a Worker session, and only while the extension is signed out, so an offer
+//     can never replace or change an existing sign-in;
+//   - the Worker is asked about the token (GET /session) before it is kept aside, and again when the
+//     student accepts it. The record kept is built from the Worker's reply alone; nothing else the page
+//     might say (an email, an expiry, an account) is read at all;
+//   - kept aside in chrome.storage.session (memory only, extension pages only) for ten minutes, and used
+//     only when the student presses the button on an extension page. Nothing signs in by itself.
+// The dashboard already holds this token, and could already be handed the extension's (auth:token), so
+// the extension gives nothing away here: the offer only goes from the page to the extension.
+export const OFFER_KEY = "internscout.offer";   // chrome.storage.session: { token, at }
+export const OFFER_TTL_MS = 10 * 60 * 1000;
+const SESSION_SHAPE = /^iss_[A-Za-z0-9_-]{43}$/;   // worker/src/session.js TOKEN
+export const offerTokenOk = (t) => typeof t === "string" && SESSION_SHAPE.test(t);
+
+// GET /session's 200 reply for `token` → the session record kept in chrome.storage.local, or null.
+// No email: the Worker doesn't keep one, and the page's word for it isn't taken.
+export function offeredRecord(token, data, now = Date.now()) {
+  if (!offerTokenOk(token) || !data || typeof data !== "object") return null;
+  if (typeof data.account !== "string" || !/^[0-9a-f]{16}$/.test(data.account)) return null;
+  const exp = Date.parse(data.expires);
+  if (!Number.isFinite(exp) || exp <= now) return null;
+  return { token, account: data.account, email: "", provider: ["google", "microsoft"].includes(data.provider) ? data.provider : null,
+    tier: ["edu", "general"].includes(data.tier) ? data.tier : null, expires: new Date(exp).toISOString() };
+}
+
+// Asks the Worker whether `token` is a live session. The record, or null (not one, signed out, an older
+// Worker without GET /session, or no answer).
+export async function checkSession(token, fetchImpl = fetch, now = Date.now()) {
+  if (!offerTokenOk(token)) return null;
+  const res = await fetchImpl(`${WORKER_URL}/session`, { headers: { authorization: `Bearer ${token}` }, signal: quick() }).catch(() => null);
+  if (!res || res.status !== 200) return null;
+  return offeredRecord(token, await res.json().catch(() => null), now);
+}
+
+// The dashboard's offer (index.js has already checked where it came from). True when it was kept aside.
+export async function holdOffer(token, fetchImpl = fetch, now = Date.now()) {
+  if (!offerTokenOk(token) || (await getToken())) return false;
+  const was = (await chrome.storage.session.get(OFFER_KEY))[OFFER_KEY];
+  if (was && was.token === token && now - was.at < OFFER_TTL_MS) return true;   // the same offer again
+  if (!(await checkSession(token, fetchImpl, now))) return false;
+  await chrome.storage.session.set({ [OFFER_KEY]: { token, at: now } });
+  return true;
+}
+
+// Whether "Use my dashboard sign-in" can be shown: an offer is waiting and the extension is signed out.
+export async function offerWaiting(now = Date.now()) {
+  const o = (await chrome.storage.session.get(OFFER_KEY))[OFFER_KEY];
+  return !!(o && offerTokenOk(o.token) && now - o.at < OFFER_TTL_MS && !(await getToken()));
+}
+
+// The student pressed "Use my dashboard sign-in". The offer is used once, checked with the Worker again
+// (it may have been signed out since), and kept as this extension's session.
+export async function acceptOffer(fetchImpl = fetch, now = Date.now()) {
+  const o = (await chrome.storage.session.get(OFFER_KEY))[OFFER_KEY];
+  await chrome.storage.session.remove(OFFER_KEY);
+  if (await getToken()) return { ok: true };   // signed in some other way meanwhile: that sign-in stays
+  const gone = { error: "That sign-in from the dashboard can't be used any more. Sign in with Google or Microsoft instead." };
+  if (!o || !offerTokenOk(o.token) || now - o.at >= OFFER_TTL_MS) return gone;
+  const rec = await checkSession(o.token, fetchImpl, now);
+  if (!rec) return gone;
+  await chrome.storage.local.set({ [SESSION_KEY]: rec });
+  await chrome.storage.session.remove(KEY);
+  return { ok: true };
+}
+
 // GET /me: this month's allowance. Returns null when signed out or unreachable.
 export async function getMe(token) {
   token = token || (await getToken());

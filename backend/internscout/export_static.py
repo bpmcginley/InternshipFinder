@@ -179,7 +179,7 @@ def merged_stages(stored: list[str] | None, title: str) -> list[str]:
     Palantir posting is "Growth" and of another "Cohort 0", and only the feed says intern.
 
     A title no student can hold loses every stage whatever the feed said. The 6c0d9df export
-    published 13 SkillBridge placements - active-duty service members only - because the feed
+    published 13 SkillBridge postings - active-duty service members only - because the feed
     called them internships, and the title rule that rejects them never got the last word.
     """
     if never_student(title):

@@ -1767,6 +1767,10 @@
 ],
 "pa - allentown|PA":null,
 "pa - allison park|PA":null,
+"pa - altoona|PA":[
+40.3641,
+-78.4321
+],
 "pa - audubon|PA":null,
 "pa - bangor|PA":null,
 "pa - bensalem|PA":null,
@@ -1781,6 +1785,7 @@
 "pa - bryn mawr|PA":null,
 "pa - butler|PA":null,
 "pa - carbondale|PA":null,
+"pa - chambersburg|PA":null,
 "pa - clarks summit|PA":null,
 "pa - collegeville|PA":null,
 "pa - coopersburg|PA":null,
@@ -1791,6 +1796,7 @@
 "pa - east stroudsburg|PA":null,
 "pa - easton|PA":null,
 "pa - elizabethville|PA":null,
+"pa - enola|PA":null,
 "pa - ephrata|PA":[
 40.1883,
 -76.1712
@@ -1812,6 +1818,7 @@
 "pa - hazle township|PA":null,
 "pa - honesdale|PA":null,
 "pa - hummelstown|PA":null,
+"pa - indiana|PA":null,
 "pa - jersey shore|PA":null,
 "pa - johnstown|PA":null,
 "pa - kennett square|PA":null,

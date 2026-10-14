@@ -1879,3 +1879,238 @@ def test_compare_table_scrolls_by_keyboard_with_a_named_first_column(tmp_path):
     # Every scrolling table box on every page can be reached and is named.
     for path, html in pages.items():
         assert html.count('<div class="tablewrap"') == html.count('<div class="tablewrap" tabindex="0" role="region" aria-label="'), path
+
+
+# ---------------------------------------------------------------- paid listings (placements), T7
+# B2 plan section 6 (2026-10-14). A box is added after build() has made every list, fold, index, sitemap
+# and feed decision, so once the <!--paid-->...<!--/paid--> span is taken out every page is the page
+# without placements, and every other file is the same bytes. Payment changes no score, order, filter,
+# count or Auto-Apply behaviour. "Paid listing" heading, "Ad" before the company; never "Sponsored",
+# "Promoted" or "Featured".
+
+PL_TAGS = ("mechanical", "civil", "electrical", "aerospace")
+WORKDAY = "https://acme.wd1.myworkdayjobs.com/careers/job/Boston/R5"
+
+
+def _placement_rows():
+    rows = [_row(i, tags=PL_TAGS, company_name="Tie Co" if i < 12 else f"Co {i % 7}",
+                 posted_at="2026-09-20T00:00:00", first_seen="2026-09-21T00:00:00") for i in range(60)]
+    rows[5].update(ats="workday", apply_url=WORKDAY, salary="$28/hr")     # Auto-Apply fills this one
+    return rows
+
+
+def _placement_site(tmp_path, name="site"):
+    rows = _placement_rows()
+    # Nursing roles too, so the major below lists more than the mechanical page and is not folded into it.
+    nursing = [_row(100 + i, tags=("nursing",), title=f"Nursing Intern {i}", company_name=f"Care {i}",
+                    posted_at="2026-09-20T00:00:00", first_seen="2026-09-21T00:00:00") for i in range(12)]
+    return _site(tmp_path / name, {"MA": rows + nursing, "NY": rows[:30], "CT": rows[:30], "remote": rows[30:]},
+                 majors=[{"name": "Engineering", "tags": list(PL_TAGS), "level": "undergrad"},
+                         {"name": "Biomedical Engineering", "tags": ["mechanical", "nursing"], "level": "undergrad"}])
+
+
+def _pl(**over):
+    p = {"id": "p-2026-09-tie-1", "listing_id": "id5", "apply_url": WORKDAY, "employer": "Tie Co",
+         "start": "2026-09-01", "end": "2026-10-01", "page_cap": 1}
+    p.update(over)
+    return p
+
+
+TWO = [_pl(), _pl(id="p-2026-09-co5-1", listing_id="id40", apply_url="https://jobs.example.com/40",
+                  employer="Co 5")]
+
+
+def _files(site):
+    out = {}
+    for folder, _, names in os.walk(site):
+        for n in names:
+            path = os.path.join(folder, n)
+            with open(path, "rb") as fh:
+                out[os.path.relpath(path, site).replace(os.sep, "/")] = fh.read()
+    return out
+
+
+def _main_into(tmp_path, name, placements=None, raw=None):
+    """Run seo_pages.main into a fresh copy of the fixture site; every file it holds, as bytes."""
+    site = _placement_site(tmp_path, name)
+    argv = ["seo_pages", site]
+    if placements is not None or raw is not None:
+        f = tmp_path / f"{name}-placements.json"
+        f.write_text(raw if raw is not None else json.dumps({"day": "2026-09-23", "placements": placements}),
+                     encoding="utf-8")
+        argv += ["--placements", str(f)]
+    seo_pages.main(argv)
+    return _files(site)
+
+
+def _box_pages(files):
+    return {k: v.decode() for k, v in files.items() if k.endswith("index.html") and b"<!--paid-->" in v}
+
+
+def _box(text):
+    return text.split("<!--paid-->", 1)[1].split("<!--/paid-->", 1)[0]
+
+
+def test_t7_pages_are_byte_identical_once_the_box_is_taken_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    without = _main_into(tmp_path, "none")
+    empty = _main_into(tmp_path, "empty", [])
+    with_ = _main_into(tmp_path, "two", TWO)
+    # An empty placements file changes nothing but writing an empty data/placements.json.
+    assert json.loads(empty.pop("data/placements.json")) == {"day": "2026-09-23", "placements": []}
+    assert empty == without
+    written = json.loads(with_.pop("data/placements.json"))
+    assert [p["id"] for p in written["placements"]] == ["p-2026-09-tie-1", "p-2026-09-co5-1"]
+    assert with_.keys() == without.keys()
+    boxed = _box_pages(with_)
+    assert len(boxed) > 10
+    for path in without:
+        if path in boxed:
+            assert seo_pages.strip_placements(boxed[path]).encode() == without[path], path
+        else:
+            # The sitemap, noindex-pages.txt, robots.txt, the llms files, every feed.xml and every page
+            # without a box: the same bytes.
+            assert with_[path] == without[path], path
+    assert "sitemap.xml" in without and "noindex-pages.txt" in without
+    assert any(p.endswith("feed.xml") for p in without)
+
+
+def test_t7_page_records_other_than_html_are_untouched(tmp_path):
+    from internscout import placements
+    pages = seo_pages.build(_placement_site(tmp_path))
+    kept, _ = placements.resolve(TWO, {x["id"]: x for x in seo_pages.LISTINGS}, "2026-09-23")
+    assert len(kept) == 2
+    after = seo_pages.add_paid_boxes(pages, kept, "2026-09-23")
+    assert len(after) == len(pages) and any(a["html"] != b["html"] for a, b in zip(pages, after))
+    for a, b in zip(pages, after):
+        assert {k: v for k, v in a.items() if k != "html"} == {k: v for k, v in b.items() if k != "html"}
+        assert seo_pages.strip_placements(b["html"]) == a["html"]
+        assert a["items"] is b["items"]          # the very same list, not a copy that could differ
+
+
+def test_t7_where_a_box_may_go(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    files = _main_into(tmp_path, "two", TWO)
+    pages = seo_pages.build(_placement_site(tmp_path, "again"))
+    boxed = _box_pages(files)
+    kinds = set()
+    for p in pages:
+        key = p["path"].lstrip("/") + "index.html"
+        ids = {x["id"] for x in p.get("items") or []}
+        if key not in boxed:
+            # A listing page that has one of the two listings and may carry a box always gets one.
+            assert not (p["kind"] in seo_pages.PLACEMENT_KINDS and {"id5", "id40"} & ids), p["path"]
+            continue
+        kinds.add(p["kind"])
+        assert p["kind"] in seo_pages.PLACEMENT_KINDS, p["path"]
+        text = boxed[key]
+        assert text.count("<!--paid-->") == 1 and text.count("<!--/paid-->") == 1, p["path"]    # one per page
+        box = _box(text)
+        # The box shows a placement whose listing is in this page's own list.
+        assert ("Tie Co" in box and "id5" in ids) or ("Co 5" in box and "id40" in ids), p["path"]
+    assert {"field", "state", "combo", "major", "employer"} <= kinds
+    # Never on the hub, /internships/new/, the start-term and other kind pages, or a page without a list.
+    assert "internships/index.html" not in boxed and "internships/new/index.html" not in boxed
+    assert any(p["path"] == "/internships/new/" for p in pages)
+
+
+def test_t7_the_box_markup(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    files = _main_into(tmp_path, "one", [_pl()])
+    text = files["internships/at/tie-co/index.html"].decode()
+    box = _box(text)
+    assert box.startswith('<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">')
+    assert '<p class="paid-h">Paid listing <a href="/privacy.html#paid">Why am I seeing this?</a></p>' in box
+    assert '<div class="co"><span class="ad">Ad</span> Tie Co</div>' in box          # "Ad" before the company
+    assert '<div class="role">Mechanical Intern 5</div>' in box
+    assert '<span class="pay">$28/hr</span>' in box
+    assert f'<a class="go" href="{WORKDAY}" rel="sponsored noopener" target="_blank">Open posting</a>' in box
+    assert "data-aa" not in box and "nofollow" not in box and 'href="/internships/' not in box
+    assert box.endswith('</li><script>if(new Date().toISOString().slice(0,10)>="2026-10-01")'
+                        'document.currentScript.previousElementSibling.remove()</script>')
+    # The listing's own row is still in the list at its usual place, with its Auto-Apply offer.
+    assert text.count(f'href="{WORKDAY}"') == 2 and f'<a class="go" data-aa href="{WORKDAY}"' in text
+    for word in ("Sponsored", "Promoted", "Featured"):
+        assert word not in box
+    # After the third row of the list.
+    ul = text.split('<ul class="jobs">', 1)[1].split("</ul>", 1)[0]
+    assert ul.split("<!--paid-->", 1)[0].count("</li>") == 3
+
+
+def test_t7_a_short_list_gets_the_box_after_its_last_row():
+    page = '<main><ul class="jobs"><li class="job">a</li>\n<li class="job">b</li></ul><p>after</p></main>'
+    p = {"path": "/internships/x/", "html": page, "kind": "field", "state": None,
+         "items": [{"id": "id1", "company_name": "A Co", "title": "T", "apply_url": "https://jobs.example.com/1",
+                    "regions": [], "term": None}]}
+    pl = {"id": "p-1", "listing_id": "id1", "apply_url": "https://jobs.example.com/1", "start": "2026-09-01",
+          "end": "2026-10-01"}
+    out = seo_pages.add_paid_boxes([p], [pl], "2026-09-23")[0]["html"]
+    assert out.index("<!--paid-->") == page.index("</ul>")
+    # No list, or a page that may not carry a box: none.
+    assert seo_pages.add_paid_boxes([dict(p, html="<main></main>")], [pl], "2026-09-23")[0]["html"] == "<main></main>"
+    assert seo_pages.add_paid_boxes([dict(p, kind=None)], [pl], "2026-09-23")[0]["html"] == page
+    assert seo_pages.add_paid_boxes([dict(p, items=None)], [pl], "2026-09-23")[0]["html"] == page
+    # An end day that is not a day would write a broken script, so no box.
+    assert seo_pages.add_paid_boxes([p], [dict(pl, end="soon")], "2026-09-23")[0]["html"] == page
+
+
+def test_t7_rotation_is_set_by_the_path_and_the_day_never_the_order_given():
+    rows = [{"id": f"id{i}", "company_name": f"Co {i}", "title": "T", "apply_url": f"https://jobs.example.com/{i}",
+             "regions": [], "term": None} for i in range(3)]
+    page = '<ul class="jobs"><li class="job">a</li></ul>'
+    pls = [{"id": f"p-{i}", "listing_id": f"id{i}", "apply_url": f"https://jobs.example.com/{i}",
+            "start": "2026-09-01", "end": "2026-10-01"} for i in range(3)]
+    chosen = set()
+    for n in range(40):
+        p = {"path": f"/internships/f{n}/", "html": page, "items": rows, "kind": "field", "state": None}
+        a = seo_pages.add_paid_boxes([p], pls, "2026-09-23")[0]["html"]
+        b = seo_pages.add_paid_boxes([p], list(reversed(pls)), "2026-09-23")[0]["html"]
+        assert a == b and a.count("<!--paid-->") == 1
+        chosen.add(next(i for i in range(3) if f"Co {i}" in a))
+    assert chosen == {0, 1, 2}                 # each has a chance; nothing in the record weighs it
+
+
+def test_t7_two_builds_with_placements_are_identical(tmp_path):
+    import shutil
+    import subprocess
+    import sys
+    base = _placement_site(tmp_path, "base")
+    f = tmp_path / "placements.json"
+    f.write_text(json.dumps({"placements": [dict(p, start="2000-01-01", end="2999-01-01") for p in TWO]}),
+                 encoding="utf-8")
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    builds = []
+    for seed in (1, 2):
+        site = str(tmp_path / f"b{seed}")
+        shutil.copytree(base, site)
+        subprocess.run([sys.executable, "-m", "internscout.seo_pages", site, "--placements", str(f)], cwd=backend,
+                       check=True, capture_output=True, env=dict(os.environ, PYTHONHASHSEED=str(seed)))
+        builds.append(_files(site))
+    assert any(b"<!--paid-->" in v for v in builds[0].values())
+    assert builds[0].keys() == builds[1].keys()
+    assert [p for p in builds[0] if builds[1][p] != builds[0][p]] == []
+
+
+def test_main_drops_bad_placements_with_a_warning_and_survives_a_bad_file(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    files = _main_into(tmp_path, "mixed", [_pl(), _pl(id="p-gone", listing_id="nope", apply_url="https://x.example/1"),
+                                            _pl(id="p-late", start="2026-10-01", end="2026-11-01")])
+    out = capsys.readouterr().out
+    assert "::warning::placement p-gone dropped: listing_gone (listing nope)" in out
+    assert "::warning::placement p-late dropped: dates" in out
+    assert [p["id"] for p in json.loads(files["data/placements.json"])["placements"]] == ["p-2026-09-tie-1"]
+    for i, raw in enumerate(("not json", "[]", '{"placements": "x"}')):
+        files = _main_into(tmp_path, f"bad{i}", raw=raw)
+        assert json.loads(files["data/placements.json"]) == {"day": "2026-09-23", "placements": []}
+        assert not _box_pages(files)
+    # Without --placements nothing is written: a local build into docs/ leaves no new file behind.
+    assert "data/placements.json" not in _main_into(tmp_path, "plain")
+
+
+def test_the_deploy_fetches_placements_only_from_the_repo_variable():
+    wf = open(os.path.join(os.path.dirname(__file__), "..", "..", ".github", "workflows", "pages.yml"),
+              encoding="utf-8").read()
+    assert "PLACEMENTS_URL: ${{ vars.INTERNSCOUT_PLACEMENTS_URL }}" in wf
+    assert "secrets.INTERNSCOUT_PLACEMENTS_URL" not in wf
+    assert """echo '{"placements":[]}' > placements.json""" in wf
+    assert "--placements ../placements.json" in wf

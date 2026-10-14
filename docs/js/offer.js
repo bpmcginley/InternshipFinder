@@ -182,5 +182,30 @@
     } catch (e) {}
   });
 
-  window.ISOffer = { due: due, POSTING: POSTING, DISMISSED_KEY: DISMISSED_KEY, SHOWN_KEY: SHOWN_KEY, QUIET: QUIET };
+  // Remembering the posting (2026-10-14, U2). When the bar's store link is pressed, or a landing page's
+  // "Auto-Apply this" link, the posting it was about is kept in this browser's localStorage as
+  // {url, company, title, at}. Once installed, the extension reads it from the internscout.org tabs that are
+  // open (extension/background/install.js), removes it, and offers to Auto-Apply that posting after setup.
+  // Only while the extension isn't installed; nothing is sent anywhere. The extension checks it all again
+  // (extension/background/held.js wantedJob) and forgets it after three days.
+  var WANTED_KEY = "internscout.wanted";
+  function remember(link) {
+    try {
+      var row = link.closest("tr, li.job");
+      var text = function (sel) { var n = row && row.querySelector(sel); return n ? n.textContent.replace(/\s+/g, " ").trim().slice(0, 160) : ""; };
+      localStorage.setItem(WANTED_KEY, JSON.stringify({ url: link.href, company: text(".co"), title: text(".role"), at: Date.now() }));
+    } catch (e) {}
+  }
+  document.addEventListener("click", function (ev) {
+    try {
+      var t = ev.target && ev.target.closest ? ev.target : null;
+      if (!t || installed()) return;
+      if (from && t.closest(".is-offer-go")) { remember(from); return; }
+      var aa = t.closest("a.aa"), job = aa && aa.closest("li.job");
+      var go = job && job.querySelector("a.go[data-aa][href]");
+      if (go) remember(go);
+    } catch (e) {}
+  }, true);
+
+  window.ISOffer = { due: due, POSTING: POSTING, DISMISSED_KEY: DISMISSED_KEY, SHOWN_KEY: SHOWN_KEY, QUIET: QUIET, WANTED_KEY: WANTED_KEY };
 })();

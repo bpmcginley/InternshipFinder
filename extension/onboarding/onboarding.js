@@ -1,11 +1,12 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
 import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, ELIGIBILITY_FACTS, confirmedFacts, factFallback, factSuggestions, resumeReviewPending, unconfirmedOldFacts, workAuthMismatch, manualDetailsMissing } from "../lib/store.js";
-import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/auth.js";
+import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS, OFFER_KEY, SESSION_KEY } from "../lib/auth.js";
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
-import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, manualPathOpen, pausedMessage, shouldRevealQuick, revealQuick } from "./quickstart.js";
-import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, bulkConfirmKeys, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
+import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, manualPathOpen, pausedMessage, shouldRevealQuick, revealQuick, setupDone, signInNeeded, readAfterSignIn } from "./quickstart.js";
+import { heldLine } from "../background/held.js";
+import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, bulkConfirmKeys, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue, setSetupEmail, repairSetupEmail } from "./profile.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -25,6 +26,9 @@ let rerun = !!S.settings.onboarded;   // was: const. A restore from the account 
 let step = new URLSearchParams(location.search).get("step") || (rerun ? "review" : "setup");
 let seenRestore = await restoredAt();   // the last restore this page has loaded
 let restoredNote = "";                  // shown above the current step until the student moves on
+// Signed in to InternScout's AI: true, false, or null until the background has said (refreshSignIn).
+// dashOffer: the dashboard has offered its own sign-in and the Worker has said it is live (U8).
+let signedIn = null, dashOffer = false;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (sel) => main.querySelector(sel);
 
@@ -100,7 +104,8 @@ function docBlock(f, title) {
 function doneFor(id) {
   const p = S.profile;
   return {
-    setup: !!(hasKey(S) && S.settings.signup_email),
+    // was: !!(hasKey(S) && S.settings.signup_email), ticked without sign-in (U4, quickstart.js setupDone).
+    setup: setupDone(S, signedIn),
     files: !!S.files.resume,
     facts: !!(p.facts.first_name && p.facts.email && p.facts.available_start),
     interview: p.stories.length >= 3,
@@ -116,8 +121,8 @@ function navButtons(prev, next, nextLabel = "Next") {
 function wireNav() {
   main.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 }
-function render() {
-  const epoch = ++renderEpoch;
+// The step bar alone, so a sign-in can tick Setup without redrawing the step. was: part of render().
+function drawSteps() {
   const tab = ([id, t]) => `<button data-step="${id}" ${id === step ? 'aria-current="step"' : ""} class="${id === step ? "on" : ""} ${doneFor(id) ? "done" : ""}">${t}</button>`;
   // was: stepsEl.innerHTML = STEPS.map(tab).join("");
   const opt = STEPS.filter(([id]) => OPTIONAL_STEPS.includes(id));
@@ -125,6 +130,10 @@ function render() {
     + `<div class="optgrp"><span class="optlabel">Optional: better answers</span><div class="steps">${opt.map(tab).join("")}</div></div>`
     + STEPS.filter(([id]) => id === "review").map(tab).join("");
   stepsEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.step)));
+}
+function render() {
+  const epoch = ++renderEpoch;
+  drawSteps();
   if (step === "interview") interview(epoch);
   else ({ setup, files, facts, voice, review })[step]();
   if (restoredNote) main.insertAdjacentHTML("afterbegin", `<div class="banner">${esc(restoredNote)}</div>`);
@@ -212,7 +221,8 @@ function setup(advOpen = false) {
     </div>
     </details>
     <div id="need" class="small warn"></div>
-    ${navButtons(null, "files")}`;
+    ${navButtons(null, "files", "Next: add your resume")}`;
+  drawNeed();
   $("#provider").value = isWorker(S.ai) ? "internscout" : isGemini(S.ai) ? "gemini" : "anthropic";
   if (isWorker(S.ai)) fillAccount();
   const syncMode = () => { if ($("#mode")) { $("#mode").value = modeOf(S); $("#modeblurb").textContent = PRESETS[modeOf(S)].blurb; } };
@@ -231,7 +241,8 @@ function setup(advOpen = false) {
   if ($("#key")) bind("#key", (v) => { if (isGemini(S.ai)) S.ai.geminiKey = v.trim(); else S.ai.apiKey = v.trim(); });
   if ($("#mode")) bind("#mode", (v) => { S.settings.ai_mode = v; S.ai.model = modelFor(S, "agent"); syncMode(); });
   bind("#tailor", (v) => { S.settings.tailor_resume = v; });
-  bind("#email", (v) => { S.settings.signup_email = v.trim(); if (!S.profile.facts.email) { S.profile.facts.email = v.trim(); confirmProfileValue(S.profile, "facts", "email"); } });
+  // was: { S.settings.signup_email = v.trim(); if (!S.profile.facts.email) { ...first keystroke only } } (U3).
+  bind("#email", (v) => { setSetupEmail(S, v); });
   bind("#pwmode", (v) => { S.settings.password_mode = v; syncMaster(); });
   bind("#master", (v) => { S.settings.master_password = v; });
   bind("#tabs", (v) => { S.settings.max_tabs = +v; });
@@ -253,21 +264,20 @@ async function fillAccount(msg) {
   const a = await chrome.runtime.sendMessage({ type: "auth:me" }).catch((e) => ({ error: e.message }));
   if (!$("#acct")) return; // moved to another step meanwhile
   const note = msg ? `<p class="small err" style="margin:8px 0 0">${esc(msg)}</p>` : "";
+  signedIn = !!(a && !a.error && a.signedIn);
+  if (signedIn) dashOffer = false;
+  drawSteps();
+  drawNeed();
   if (!a || a.error || !a.signedIn) {
     // was: "Sign in with Google (UMass email)", which read as a button only UMass students could use.
     // "Larger", not "twice": the Worker gives a non-.edu account half the allowance rounded down
     // (GENERAL_ALLOWANCE_PCT), so 25 Auto-Apply runs against 12, not exactly double.
     box.innerHTML = `
       <p class="small" style="margin:0 0 10px">Sign in to use the AI. Any Google account or personal Microsoft account works. School Microsoft accounts (like @umass.edu Outlook) need IT approval, so sign in with Google using your school email.</p>
-      <div class="row"><button class="btn primary" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
+      ${signInRow()}
       <p class="small muted" style="margin:6px 0 0">A school .edu email gives a larger free monthly allowance.</p>
       ${note || (a && a.error ? `<p class="small err" style="margin:8px 0 0">${esc(a.error)}</p>` : "")}`;
-    box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
-      box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
-      busy($("#signin-msg"), "Waiting for the sign-in window…");
-      const r = await chrome.runtime.sendMessage({ type: "auth:signin", provider: b.dataset.signin }).catch((e) => ({ error: e.message }));
-      fillAccount(r && r.error ? r.error : "");
-    }));
+    wireSignIn(box, (err) => fillAccount(err));
     return;
   }
   const lines = allowanceLines(a.me, MAIN_TASKS);
@@ -325,6 +335,74 @@ async function fillAccount(msg) {
   });
 }
 
+// The sign-in buttons, on Setup and on the Files step (U4). "Use my dashboard sign-in" comes first when
+// the dashboard has offered its sign-in and the Worker said it is live (U8, lib/auth.js holdOffer).
+// was: Google and Microsoft only, on Setup only.
+function signInRow() {
+  return `<div class="row">${dashOffer ? `<button class="btn primary" data-signin="dashboard">Use my dashboard sign-in</button>` : ""}`
+    + `<button class="btn${dashOffer ? "" : " primary"}" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span class="small signin-msg"></span></div>`
+    + (dashOffer ? `<p class="small muted" style="margin:6px 0 0">You're signed in on the InternScout dashboard in this browser. Use that sign-in here too, or sign in again.</p>` : "");
+}
+// `done(error)` runs after the attempt, with "" when it worked.
+function wireSignIn(box, done) {
+  box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
+    box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
+    const dash = b.dataset.signin === "dashboard";
+    busy(box.querySelector(".signin-msg"), dash ? "Checking that sign-in…" : "Waiting for the sign-in window…");
+    const r = await chrome.runtime.sendMessage(dash ? { type: "auth:accept_offer" } : { type: "auth:signin", provider: b.dataset.signin }).catch((e) => ({ error: e.message }));
+    if (dash) dashOffer = false;   // used once, whichever way it went
+    if (r && !r.error && r.signedIn) signedIn = true;
+    drawSteps();
+    done(r && r.error ? r.error : "");
+  }));
+}
+
+// Setup's one-line warning while signed out (U4).
+function drawNeed() {
+  const el = $("#need");
+  if (el) el.textContent = signInNeeded(S, signedIn) ? "You aren't signed in yet. Reading your resume and Auto-Apply both need it, so sign in above first." : "";
+}
+
+// Asks the background whether this browser is signed in and whether the dashboard offered its sign-in,
+// then updates what depends on it. Runs once on load; a sign-in on this page updates `signedIn` itself.
+async function refreshSignIn() {
+  const [a, o] = await Promise.all([
+    chrome.runtime.sendMessage({ type: "auth:status" }).catch(() => null),
+    chrome.runtime.sendMessage({ type: "auth:offer_status" }).catch(() => null),
+  ]);
+  signedIn = !!(a && a.signedIn);
+  dashOffer = !signedIn && !!(o && o.waiting);
+  drawSteps();
+  drawNeed();
+  if (step === "setup" && $("#acct")) fillAccount();
+  drawFilesSignIn();
+}
+
+// The dashboard's offer usually arrives just after this page opens (the install opens this page and
+// connects the dashboard tab at the same moment), and a sign-in in the popup or side panel changes the
+// session too, so either one updates the buttons and the step bar here.
+chrome.storage.onChanged.addListener((ch, area) => {
+  if ((area === "session" && ch[OFFER_KEY]) || (area === "local" && ch[SESSION_KEY])) refreshSignIn();
+});
+
+// The Files step's sign-in (U4): the resume can't be read while signed out on InternScout's AI, so the
+// "Read my files" card asks for sign-in itself, and reads a chosen resume straight after.
+// was: the automatic read failed with "Sign in ... in the InternScout popup or Setup", and the student had to
+// go back to Setup and then press "Read my resume" again.
+function drawFilesSignIn(msg = "") {
+  const box = $("#files-signin");
+  if (!box) return;
+  box.hidden = !signInNeeded(S, signedIn);
+  if (box.hidden) { box.innerHTML = ""; return; }
+  box.innerHTML = `<p class="small" style="margin:12px 0 8px"><b>Sign in to read your resume.</b> Any Google account or personal Microsoft account works.</p>${signInRow()}`
+    + (msg ? `<p class="small err" style="margin:8px 0 0">${esc(msg)}</p>` : "");
+  wireSignIn(box, (err) => {
+    if (err || !signedIn) { drawFilesSignIn(err || ""); return; }
+    drawFilesSignIn();
+    if (readAfterSignIn(S, { extracting, pending: !!pendingResumeImport })) extract($("#extract"), $("#exout")).catch((e) => { const f = $("#ferr"); if (f) f.textContent = e.message || String(e); });
+  });
+}
+
 async function fillSpending() {
   const u = await loadUsage(), sp = await spend();
   if (!$("#prices")) return;
@@ -369,6 +447,7 @@ function files() {
     </div>
     <div class="card"><h3>Read my files</h3>
       <p class="small muted" style="margin-top:0">${isWorker(S.ai) ? "InternScout's AI" : isGemini(S.ai) ? "Gemini" : "Claude"} reads your resume${S.files.cv ? " and CV" : ""} and fills in your education, experience, projects, skills and contact info. You can edit all of it in Review.</p>
+      <div id="files-signin" hidden></div>
       <div class="row"><button class="btn primary" id="extract" ${S.files.resume && !extracting ? "" : "disabled"}>Read my resume</button><span id="exout" class="small">${extracting ? `<span class="spin"></span>Reading your resume… (about 30 seconds)` : S.settings.extracted_from ? `<span class="ok">Last read: ${esc(S.settings.extracted_from)}</span>` : ""}</span></div>
     </div>
     <div class="card" id="resume-review" hidden></div>
@@ -384,7 +463,8 @@ function files() {
     try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); if (inp.dataset.slot === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); } catch (e) { err(e); return; }
     // A new resume is read straight away (2026-10-04) rather than waiting for "Read my resume", which
     // students skipped: the profile stayed empty and every application had to ask the model for it.
-    if (inp.dataset.slot === "resume" && hasKey(S)) extract($("#extract"), $("#exout")).catch(err);
+    // Not while signed out on InternScout's AI (U4): the card asks for sign-in and reads it straight after.
+    if (inp.dataset.slot === "resume" && hasKey(S) && !signInNeeded(S, signedIn)) extract($("#extract"), $("#exout")).catch(err);
   }));
   main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; if (b.dataset.clear === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); }));
   main.querySelectorAll("[data-rms]").forEach((b) => b.addEventListener("click", async () => { S.files.samples.splice(+b.dataset.rms, 1); await save(true); files(); wireNav(); }));
@@ -401,6 +481,7 @@ function files() {
   $("#extract").addEventListener("click", () => extract($("#extract"), $("#exout")).catch(err));
   drawQuick();
   drawResumeReview();
+  drawFilesSignIn();
 }
 
 function drawResumeReview() {
@@ -463,6 +544,7 @@ function drawQuick(msg = "") {
   box.innerHTML = S.settings.onboarded
     ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
        ${digestLink()}
+       <div id="held" hidden></div>
        <p class="small muted" style="margin:6px 0 0">Quick facts, Interview and Voice are optional. They make the answers on your applications better, and you can do them any time.</p>`
     : `<h3>Ready to apply</h3>
        <p class="small muted" style="margin-top:0">Your resume and your email for applications are in, which is all Auto-Apply needs. Quick facts, Interview and Voice are optional: they make the answers better, and you can do them later.</p>
@@ -472,6 +554,33 @@ function drawQuick(msg = "") {
     $("#quickgo").disabled = true;
     await finishAndRender();
     drawQuick("Saved. Auto-Apply is on.");
+  });
+  if (S.settings.onboarded) drawHeld();
+}
+
+// U2: the postings the student picked before setup (background/held.js), offered once setup is done.
+// Nothing starts until they press the button.
+async function drawHeld() {
+  const box = $("#held");
+  if (!box) return;
+  const r = await chrome.runtime.sendMessage({ type: "held:get" }).catch(() => null);
+  const jobs = (r && r.jobs) || [];
+  if (!box.isConnected || !jobs.length) { box.hidden = true; return; }
+  const one = jobs.length === 1;
+  box.hidden = false;
+  box.innerHTML = `<p class="small" style="margin:10px 0 6px">${esc(heldLine(jobs))}</p>
+    <div class="row"><button class="btn primary small" id="heldgo">${one ? "Auto-Apply it now" : `Auto-Apply all ${jobs.length} now`}</button><button class="btn small" id="heldno">Not now</button><span class="small" id="heldmsg"></span></div>`;
+  $("#heldgo").addEventListener("click", async () => {
+    box.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    const x = await chrome.runtime.sendMessage({ type: "held:start" }).catch((e) => ({ error: e.message }));
+    if (!x || x.error) { $("#heldmsg").innerHTML = `<span class="err">${esc(x && x.error === "setup_required" ? "Finish setup first, then try again." : "Couldn't add them to the queue. Try again.")}</span>`; box.querySelectorAll("button").forEach((b) => { b.disabled = false; }); return; }
+    const n = (x.added || []).length;
+    box.innerHTML = `<p class="small ok" style="margin:10px 0 0">${n ? `Added ${n === 1 ? "1 application" : `${n} applications`} to your queue. Each one is filled in and left for you to check and submit.` : "Those are already in your queue."}</p>`;
+    chrome.runtime.sendMessage({ type: "open_panel" }).catch(() => {});
+  });
+  $("#heldno").addEventListener("click", async () => {
+    await chrome.runtime.sendMessage({ type: "held:clear" }).catch(() => {});
+    box.hidden = true;
   });
 }
 
@@ -827,7 +936,7 @@ function review() {
     <details class="adv"><summary>Edit raw data</summary>
     ${JSON_SECTIONS.map(([k, t]) => `<div class="card"><h3>${t}</h3><textarea class="code" data-json="${k}">${esc(JSON.stringify(p[k], null, 2))}</textarea><div class="small" data-jerr="${k}"></div></div>`).join("")}
     </details>
-    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save changes" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Files to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div></div>
+    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save changes" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Files to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div><div id="held" hidden></div></div>
     ${navButtons("voice", null)}`;
   main.querySelectorAll("[data-goal]").forEach((el) => el.addEventListener("input", () => { p.goals[el.dataset.goal] = el.value; save(); }));
   main.querySelectorAll("[data-json]").forEach((el) => el.addEventListener("input", () => {
@@ -845,10 +954,15 @@ function review() {
     await finishAndRender();
     // The weekly email's link under it (2026-10-06), as on the Files step's finish (drawQuick).
     $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}`;
+    drawHeld();
   });
+  if (S.settings.onboarded) drawHeld();
 }
 
+// The Setup email saved as its first letter by 0.5.6 and earlier (U3): put the whole address back.
+if (repairSetupEmail(S)) { pendingResumeImport = pendingResumeReview(S); save(true); }
 // A restore that happened before this page opened (signed in from the popup on a new computer).
 await showRestore();
 if (restoredNote && S.settings.onboarded && !new URLSearchParams(location.search).get("step")) step = "review";
 render();
+refreshSignIn();

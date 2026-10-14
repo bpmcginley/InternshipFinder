@@ -61,13 +61,80 @@ export function publicJob(j) {
   return { ...rest, tailored: t || null, waiting: !!(pending && pending.waitId) };
 }
 export function publicQueue(q) {
-  return { order: q.order, jobs: Object.fromEntries(Object.entries(q.jobs).map(([k, v]) => [k, publicJob(v)])) };
+  // was: publicJob(v) alone. tailor_wait and batch_left (U5) are worked out from the whole queue.
+  return { order: q.order, jobs: Object.fromEntries(Object.entries(q.jobs).map(([k, v]) => [k, {
+    ...publicJob(v), tailor_wait: tailorWaiting(q, v), batch_left: batchLeft(q, v) }])) };
+}
+
+// ---------- tailored resumes in a batch (U5, 2026-10-14 UX audit) ----------
+// With "Tailor it, and let me approve each one" (the default), every job used to tailor its resume and
+// then stop on "Review the tailored resume" before its tab even opened, and stopped jobs don't count
+// against the tab limit, so a batch of 10 became 10 "Needs you" cards before one form was filled.
+// Now the jobs queued together (one Auto-Apply press, `batch`) ask once: while one of them waits on that
+// question, the others stay queued (tailor_wait) instead of tailoring and stopping too. The card offers
+// "for all" answers (batch_tailor on every job of the batch): tailored for all, or the original for all.
+// Answering only for that one job ("Use tailored", "Use my original") keeps asking job by job, as before.
+// The student still checks every application and presses Submit themselves.
+const pendingTailor = (k) => k.status === "needs_you" && !!k.tailored && k.tailored.status === "pending";
+
+// A queued job that waits because another job of its batch is waiting on the tailored-resume question.
+export function tailorWaiting(q, j) {
+  if (!j || j.status !== "queued" || !j.batch || j.batch_tailor) return false;
+  return Object.values(q.jobs).some((k) => k.id !== j.id && k.batch === j.batch && pendingTailor(k));
+}
+
+// How many other jobs of this job's batch a "for all" answer would still decide: ones waiting on their own
+// tailored resume, and unfinished ones that haven't been tailored yet. One already filling with its resume
+// chosen isn't counted.
+export function batchLeft(q, j) {
+  if (!j || !j.batch) return 0;
+  return Object.values(q.jobs).filter((k) => k.id !== j.id && k.batch === j.batch
+    && (pendingTailor(k) || (["queued", "needs_you"].includes(k.status) && !k.tailored))).length;
+}
+
+// The "for all" answer: every job of the batch remembers it; returns the ids of jobs of the batch whose
+// tailored resume was waiting, so the caller can answer and resume them too.
+export function setBatchTailor(batch, choice) {
+  return withLock(async () => {
+    const q = await read();
+    const waiting = [];
+    if (!batch || !["approved", "skipped"].includes(choice)) return waiting;
+    for (const j of Object.values(q.jobs)) {
+      if (j.batch !== batch) continue;
+      j.batch_tailor = choice;
+      j.updated = Date.now();
+      if (pendingTailor(j)) waiting.push(j.id);
+    }
+    await write(q);
+    return waiting;
+  });
+}
+
+// What happens to a tailored resume once it is made (agent.js tailorStep): "auto" (used without asking),
+// "original" (the student's own file goes out) or "review" (the job asks). `mode` is the setting
+// (off | review | auto); `batch` is a "for all" answer from the same batch, which wins over "review".
+export function tailorChoice(mode, batch) {
+  if (batch === "skipped") return "original";
+  if (mode === "auto" || batch === "approved") return "auto";
+  return "review";
+}
+
+// ---------- not taking the screen (U7, 2026-10-14 UX audit) ----------
+// A new application tab has to open in front (agent.js ensureTab says why), and it used to do that
+// whenever a job started, even while the student was answering a question in another job's tab or
+// checking it before pressing Submit. Now a job waits to start while the tab in front is a job that is
+// waiting on the student; background/index.js schedule() asks this before starting one.
+export function studentBusyOn(q, activeTabId) {
+  if (activeTabId == null) return null;
+  return Object.values(q.jobs).find((j) => j.tabId === activeTabId && ["needs_you", "ready_to_submit"].includes(j.status)) || null;
 }
 
 export function addJobs(list) {
   return withLock(async () => {
     const q = await read();
     const added = [], skipped = [];
+    // One Auto-Apply press is one batch (U5): the jobs it adds ask the tailored-resume question once.
+    const batch = "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     for (const l of list) {
       if (!l || !/^https?:\/\//i.test(String(l.apply_url || ""))) continue;
       const dup = Object.values(q.jobs).find((j) => ((l.id != null && j.listingId === l.id) || j.apply_url === l.apply_url) && !["failed"].includes(j.status));
@@ -77,7 +144,7 @@ export function addJobs(list) {
         id, listingId: l.id ?? null, company: l.company || "", title: l.title || "", location: l.location || "",
         apply_url: l.apply_url, description: String(l.description || "").slice(0, 6000),
         status: "queued", reason: "", question: "", activity: "", summary: "", double_check: [],
-        tabId: l.tabId ?? null, steps: 0, log: [], created: Date.now(), updated: Date.now(),
+        tabId: l.tabId ?? null, steps: 0, log: [], created: Date.now(), updated: Date.now(), batch,
       };
       q.order.push(id);
       added.push(id);
