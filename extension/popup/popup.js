@@ -1,8 +1,9 @@
-import { loadStore, hasKey, isWorker, resumeReviewPending } from "../lib/store.js";
+import { loadStore, isWorker } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
 import { takeRestored, restoredMessage } from "../lib/sync.js";
 import { STORE_REVIEWS_URL } from "../lib/review.js";
+import { entryState } from "../lib/entry.js";
 
 const DASHBOARD = "https://internscout.org/";
 const $ = (id) => document.getElementById(id);
@@ -14,20 +15,24 @@ $("ver").textContent = "v" + chrome.runtime.getManifest().version;
   const r = await takeRestored();
   if (r) {
     $("restored").hidden = false;
-    $("restored").textContent = restoredMessage(r) + (s.files.resume ? "" : " Your files stay on each device, so add your resume in the Deep Dive.");
+    $("restored").textContent = restoredMessage(r) + (s.files.resume ? "" : " Your files stay on each device, so add your resume in setup.");
   }
-  if (!s.settings.onboarded || !hasKey(s)) {
+  const e = entryState(s);
+  $("foot").hidden = !e.showReview;
+  $("dive").textContent = e.label;
+  if (e.stage === "setup") {
+    // was: "Finish the Deep Dive to turn on Auto-Apply." and a "Start Deep Dive" half-width button.
     $("note").hidden = false;
-    $("note").textContent = "Finish the Deep Dive to turn on Auto-Apply.";
-    $("dive").textContent = "Start Deep Dive";
-    $("dive").classList.add("primary");
+    $("note").textContent = e.note;
+    $("setup").hidden = false;
+    $("dive").hidden = true;
     $("queue").classList.remove("primary");
     return;
   }
   // A replaced resume (onboarding.js) pauses Auto-Apply until its details are reviewed; the counts still show.
-  if (resumeReviewPending(s)) {
+  if (e.stage === "paused") {
     $("note").hidden = false;
-    $("note").textContent = "Auto-Apply is paused until you finish reviewing your new resume in the Deep Dive.";
+    $("note").textContent = e.note;
     $("dive").classList.add("primary");
     $("queue").classList.remove("primary");
   }
@@ -105,7 +110,9 @@ $("review").addEventListener("click", async () => {
   window.close();
 });
 
-$("dive").addEventListener("click", async () => {
+const openSetup = async () => {
   await chrome.runtime.sendMessage({ type: "open_deep_dive" });
   window.close();
-});
+};
+$("dive").addEventListener("click", openSetup);
+$("setup").addEventListener("click", openSetup);

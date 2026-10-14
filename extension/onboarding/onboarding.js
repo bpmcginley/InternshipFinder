@@ -4,7 +4,7 @@ import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/au
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
-import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, manualPathOpen, pausedMessage } from "./quickstart.js";
+import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, manualPathOpen, pausedMessage, shouldRevealQuick, revealQuick } from "./quickstart.js";
 import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, bulkConfirmKeys, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
 
 const main = document.getElementById("main");
@@ -108,9 +108,10 @@ function doneFor(id) {
     review: !!S.settings.onboarded,
   }[id];
 }
-function go(id) { save(true); step = id; restoredNote = ""; render(); scrollTo(0, 0); if (id !== "interview") focusStepHeading(main); }
+let quickWasReady = null;   // the "Ready to apply" card on this visit to Files (drawQuick)
+function go(id) { save(true); step = id; quickWasReady = null; restoredNote = ""; render(); scrollTo(0, 0); if (id !== "interview") focusStepHeading(main); }
 function navButtons(prev, next, nextLabel = "Next") {
-  return `<div class="nav"><div>${prev ? `<button class="btn" data-go="${prev}">← Back</button>` : ""}</div><div>${next ? `<button class="btn blue" data-go="${next}">${nextLabel} →</button>` : ""}</div></div>`;
+  return `<div class="nav"><div>${prev ? `<button class="btn" data-go="${prev}">← Back</button>` : ""}</div><div>${next ? `<button class="btn primary" data-go="${next}">${nextLabel} →</button>` : ""}</div></div>`;
 }
 function wireNav() {
   main.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
@@ -161,7 +162,7 @@ chrome.storage.onChanged.addListener(async (ch, area) => {
 // was: AI provider, Tailored resumes, AI spending and Job-site accounts (email, passwords, tabs) as open cards.
 function setup(advOpen = false) {
   main.innerHTML = `
-    ${rerun ? `<div class="banner">You've done the Deep Dive before. Everything you entered is kept, so just update what changed.</div>` : ""}
+    ${rerun ? `<div class="banner">You've set this up before. Everything you entered is kept, so just update what changed.</div>` : ""}
     <h2>Setup</h2><p class="lead">${isWorker(S.ai)
       ? "Auto-Apply uses InternScout's free AI: sign in with Google or Microsoft and there's nothing else to set up. Your passwords stay in this browser."
       : "Auto-Apply uses your own AI API key. The key and your passwords stay in this browser."}</p>
@@ -258,7 +259,7 @@ async function fillAccount(msg) {
     // (GENERAL_ALLOWANCE_PCT), so 25 Auto-Apply runs against 12, not exactly double.
     box.innerHTML = `
       <p class="small" style="margin:0 0 10px">Sign in to use the AI. Any Google account or personal Microsoft account works. School Microsoft accounts (like @umass.edu Outlook) need IT approval, so sign in with Google using your school email.</p>
-      <div class="row"><button class="btn blue" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
+      <div class="row"><button class="btn primary" data-signin="google">Sign in with Google</button><button class="btn" data-signin="microsoft">Sign in with Microsoft</button><span id="signin-msg" class="small"></span></div>
       <p class="small muted" style="margin:6px 0 0">A school .edu email gives a larger free monthly allowance.</p>
       ${note || (a && a.error ? `<p class="small err" style="margin:8px 0 0">${esc(a.error)}</p>` : "")}`;
     box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
@@ -427,7 +428,8 @@ function drawResumeReview() {
     await save(true);
     pendingResumeImport = null;
     files(); wireNav();
-    focusStepHeading(main);
+    // The "Ready to apply" card may have just taken focus (drawQuick); otherwise the heading takes it.
+    if (document.activeElement?.id !== "quickgo") focusStepHeading(main);
   };
 }
 
@@ -442,6 +444,8 @@ function drawQuick(msg = "") {
   const manual = manualPathOpen(S, { extracting, pending: !!pendingResumeImport });
   const paused = (!!S.settings.onboarded && resumeReviewPending(S)) || manual || manualDetailsMissing(S).length > 0;
   box.hidden = !paused && (!quickStartReady(S) || extracting || !!pendingResumeImport);
+  const was = quickWasReady;
+  quickWasReady = !box.hidden && !paused && !S.settings.onboarded;
   if (box.hidden) return;
   if (paused) {
     box.innerHTML = `<p class="small" style="margin:0"><b>Auto-Apply is paused.</b> ${esc(pausedMessage(S))}</p>`
@@ -463,6 +467,7 @@ function drawQuick(msg = "") {
     : `<h3>Ready to apply</h3>
        <p class="small muted" style="margin-top:0">Your resume and your email for applications are in, which is all Auto-Apply needs. Quick facts, Interview and Voice are optional: they make the answers better, and you can do them later.</p>
        <div class="row"><button class="btn primary" id="quickgo">Turn on Auto-Apply now</button></div>`;
+  if (shouldRevealQuick(was, quickWasReady)) revealQuick(box, $("#quickgo"), matchMedia("(prefers-reduced-motion: reduce)").matches);
   if ($("#quickgo")) $("#quickgo").addEventListener("click", async () => {
     $("#quickgo").disabled = true;
     await finishAndRender();
@@ -672,11 +677,11 @@ How to interview:
 async function interview(epoch) {
   let msgs = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
   if (epoch !== renderEpoch || step !== "interview") return;
-  main.innerHTML = `<h2>Interview</h2><p class="lead">A 10–15 minute conversation about your experiences and goals. Short, honest answers are perfect. Stop any time; what you've said is saved.</p>
+  main.innerHTML = `<h2>Interview</h2><p class="lead">The optional Deep Dive, part 1: a 10 to 15 minute conversation about your experiences and goals. Short, honest answers are perfect. Stop any time; what you've said is saved.</p>
     <div class="card"><div class="chat" id="chat"></div>
       <textarea id="say" placeholder="Type your answer… (Ctrl+Enter to send)"></textarea>
       <div class="row" style="margin-top:8px;justify-content:space-between">
-        <div class="row"><button class="btn blue" id="send">Send</button><span id="cstat" class="small muted"></span></div>
+        <div class="row"><button class="btn primary" id="send">Send</button><span id="cstat" class="small muted"></span></div>
         <div class="row"><button class="btn small" id="restart">Start over</button><button class="btn primary" id="finish">Finish & save stories</button></div></div>
     </div>
     ${S.profile.stories.length ? `<div class="card"><h3>Saved stories (${S.profile.stories.length})</h3>${S.profile.stories.map((s) => `<div class="story"><b>${esc(s.theme)}</b><div class="small muted">${esc(s.situation)}</div></div>`).join("")}</div>` : ""}
@@ -776,7 +781,7 @@ const VOICE_FIELDS = [
 function voice() {
   const v = S.profile.voice;
   const n = S.files.samples.length + (S.files.cover_letter ? 1 : 0);
-  main.innerHTML = `<h2>Your voice</h2><p class="lead">So generated answers sound like you and not like a template.</p>
+  main.innerHTML = `<h2>Your voice</h2><p class="lead">The optional Deep Dive, part 2: so generated answers sound like you and not like a template.</p>
     <div class="card"><div class="row"><button class="btn primary" id="analyze">Analyze my writing</button><span id="vstat" class="small muted">Uses ${n} writing sample${n === 1 ? "" : "s"} plus your interview answers.</span></div></div>
     <div class="card">${VOICE_FIELDS.map(([k, t]) => `<label class="f"><span>${t}</span><textarea data-voice="${k}" ${k === "sample" ? 'style="min-height:120px"' : 'style="min-height:54px"'}>${esc(v[k])}</textarea></label>`).join("")}</div>
     ${navButtons("interview", "review")}`;
@@ -822,7 +827,7 @@ function review() {
     <details class="adv"><summary>Edit raw data</summary>
     ${JSON_SECTIONS.map(([k, t]) => `<div class="card"><h3>${t}</h3><textarea class="code" data-json="${k}">${esc(JSON.stringify(p[k], null, 2))}</textarea><div class="small" data-jerr="${k}"></div></div>`).join("")}
     </details>
-    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save Deep Dive" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Files to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div></div>
+    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save changes" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Files to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div></div>
     ${navButtons("voice", null)}`;
   main.querySelectorAll("[data-goal]").forEach((el) => el.addEventListener("input", () => { p.goals[el.dataset.goal] = el.value; save(); }));
   main.querySelectorAll("[data-json]").forEach((el) => el.addEventListener("input", () => {

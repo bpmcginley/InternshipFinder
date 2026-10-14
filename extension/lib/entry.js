@@ -1,0 +1,23 @@
+// What the popup and the side panel offer for setup, in one place so the two say the same thing (D27, D29,
+// 2026-10-14 design review). The setup that matters takes about two minutes (sign in, add a resume), so
+// the entry button says that. "Deep Dive" is kept for the optional Interview and Voice steps only; it used
+// to name every entry point ("Start Deep Dive"), which sounded long and optional.
+// The "Leave a review" link and the button to reopen setup stay hidden until setup is finished: asking
+// for a review before first use, or offering to "redo" something never done, made no sense.
+import { hasKey, resumeReviewPending } from "./store.js";
+
+export const SETUP_LABEL = "Set up Auto-Apply (about 2 minutes)";
+export const EDIT_LABEL = "Edit setup";
+export const REVIEW_RESUME_LABEL = "Review my resume";
+
+// stage: "setup" (not finished), "paused" (a replaced resume waits for review), "ready".
+export function entryState(s) {
+  const onboarded = !!(s && s.settings && s.settings.onboarded);
+  if (!onboarded || !hasKey(s)) {
+    return { stage: "setup", label: SETUP_LABEL, note: "Set up Auto-Apply to start applying. It takes about 2 minutes: sign in and add your resume.", showReview: onboarded, showEdit: false };
+  }
+  if (resumeReviewPending(s)) {
+    return { stage: "paused", label: REVIEW_RESUME_LABEL, note: "Auto-Apply is paused until you finish reviewing your new resume.", showReview: true, showEdit: true };
+  }
+  return { stage: "ready", label: EDIT_LABEL, note: "", showReview: true, showEdit: true };
+}

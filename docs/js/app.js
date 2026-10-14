@@ -1620,7 +1620,7 @@
           info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_panel" }) }, "Queue",
             jobCounts.needs_you ? h("span", { className: "count" }, `${jobCounts.needs_you} need you`) : null,
             jobCounts.ready_to_submit ? h("span", { className: "count ok" }, `${jobCounts.ready_to_submit} ready`) : null),
-          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Set up Auto-Apply (about 2 minutes)"),
+          info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Edit setup" : "Set up Auto-Apply (about 2 minutes)"),
           // Hidden while the setup card is already open under it, so a first visit shows one way in.
           // Also hidden while the first-visit line offers the same thing just under the counters.
           !setupOpen && !setupAsk && h("button", { type: "button", className: "btn", onClick: openSetup }, p ? "My profile" : "Set up profile"),

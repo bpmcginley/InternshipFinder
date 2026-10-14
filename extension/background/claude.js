@@ -28,7 +28,7 @@ export async function callAI({ ai, model, kind, task, run_id, ...opts }) {
 }
 
 export async function callClaude({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {
-  if (!apiKey) throw new Error("No Anthropic API key. Open Deep Dive → Setup.");
+  if (!apiKey) throw new Error("No Anthropic API key. Open Auto-Apply setup → Setup.");
   const body = { model, max_tokens, messages };
   if (system) body.system = system;
   if (tools) body.tools = tools;

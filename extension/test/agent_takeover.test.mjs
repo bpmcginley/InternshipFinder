@@ -216,7 +216,7 @@ test("a queued job whose resume is still being reviewed ends Needs you and fills
     let j = await getJob(id);
     assert.equal(j.status, "needs_you");
     assert.equal(j.reason, RESUME_REVIEW_HELP);
-    assert.match(j.reason, /Finish reviewing your resume in the Deep Dive/);
+    assert.match(j.reason, /Finish reviewing your resume in Auto-Apply setup/);
     assert.deepEqual(actions, [], "no prefill, no fill, no click");
     assert.equal(calls, 0, "no AI call");
     assert.equal(tabs, 0, "no tab opened");

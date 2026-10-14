@@ -59,3 +59,15 @@ export const DIGEST_OPEN = false;
 export const digestLink = (open = DIGEST_OPEN) => !open ? "" :
   // A block span, not a <p>: Review puts it inside its #rstat <span>, where a <p> isn't allowed.
   `<span class="small" style="display:block;margin:6px 0 0"><a href="${DIGEST_URL}" target="_blank" rel="noopener">Get new internships by email every Monday ↗</a></span>`;
+
+// The "Ready to apply" card on the Files step (D28, 2026-10-14 design review). It appears under the
+// resume slots after a read or a save, often below the fold, and students missed it. When it turns
+// ready while the student is on the page (not when they arrive on Files with it already there, which
+// keeps the step heading's focus), it is scrolled into view and its button takes focus.
+// `was` is the card's last state on this visit to the step: null before the first draw.
+export const shouldRevealQuick = (was, now) => was === false && now === true;
+export function revealQuick(box, button, reduceMotion = false) {
+  if (!box || !button) return;
+  box.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+  button.focus({ preventScroll: true });
+}

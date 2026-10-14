@@ -528,9 +528,9 @@ export function progressCheck(state, snapText, url, asleep = false) {
 const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter(Boolean)].join(" | ");
 
 // ---------- main loop ----------
-export const RESUME_REVIEW_HELP = "Finish reviewing your resume in the Deep Dive, then press Resume.";
-export const NO_RESUME_HELP = "Add your resume in the Deep Dive, then press Resume.";
-export const NOT_SET_UP_HELP = "Finish the Deep Dive, then press Resume.";
+export const RESUME_REVIEW_HELP = "Finish reviewing your resume in Auto-Apply setup, then press Resume.";
+export const NO_RESUME_HELP = "Add your resume in Auto-Apply setup, then press Resume.";
+export const NOT_SET_UP_HELP = "Set up Auto-Apply (about 2 minutes), then press Resume.";
 // The student chose "I'll enter my details myself" and some of those details are still empty
 // (store.js manualDetailsMissing). Same wording as the Deep Dive's banner (onboarding/quickstart.js
 // pausedMessage). was: "Finish reviewing your resume", which sent them to a review there was none of.
@@ -645,7 +645,7 @@ async function loop(id, run) {
     return;
   }
   if (!hasKey(store)) {
-    await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Deep Dive → Setup), then Resume.` });
+    await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
     return;
   }
   if (isWorker(store.ai) && !(await ensureToken())) {
@@ -707,7 +707,7 @@ async function loop(id, run) {
     }
     const sp = await spend();
     if (sp.over && !isWorker(store.ai)) {
-      await own({ status: "needs_you", reason: `Monthly AI budget reached (${money(sp.month_usd)} of ${money(sp.budget)}). Raise it in Deep Dive → Setup, then Resume.`, pending, activity: "" });
+      await own({ status: "needs_you", reason: `Monthly AI budget reached (${money(sp.month_usd)} of ${money(sp.budget)}). Raise it in Auto-Apply setup → Setup, then Resume.`, pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
     }
@@ -825,7 +825,7 @@ async function loop(id, run) {
     if (!msgs.length && (postingGone(job, snap, frames) || pageGone(frames))) {
       await appendLog(job.id, { kind: "gate", text: "Paused: this is not the posting you picked." });
       await own({ status: "needs_you", pending, activity: "", question: "",
-        reason: `The link for "${job.title}" opened somewhere else — the employer has most likely closed the posting. Look at the tab: if the job is gone, remove this one; if you find it, open it yourself and press Resume.` });
+        reason: `The link for "${job.title}" opened somewhere else, so the employer has most likely closed the posting. Look at the tab: if the job is gone, remove this one; if you find it, open it yourself and press Resume.` });
       await saveMsgs(id, msgs);
       return;
     }
@@ -833,7 +833,7 @@ async function loop(id, run) {
     if (!msgs.length && deadPage(frames)) {
       await appendLog(job.id, { kind: "gate", text: "Paused: nothing loaded on this page." });
       await own({ status: "needs_you", pending, activity: "", question: "",
-        reason: "Nothing loaded on that page — no application, no Apply button. The link is probably dead, or the site is not letting us in. Have a look in the tab: if you get to a form, press Resume." });
+        reason: "Nothing loaded on that page: no application and no Apply button. The link is probably dead, or the site is not letting us in. Have a look in the tab: if you get to a form, press Resume." });
       await saveMsgs(id, msgs);
       return;
     }

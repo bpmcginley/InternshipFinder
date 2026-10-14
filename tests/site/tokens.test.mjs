@@ -174,7 +174,9 @@ test("controls: buttons and fields take their height and edge from the tokens", 
   // Every text field in the extension pages has the 3:1 edge (was --rule, 1.33:1).
   assert.doesNotMatch(PAGES.onboarding, /select,textarea\{[^}]*border:1px solid var\(--rule\)/);
   assert.doesNotMatch(PAGES.sidepanel, /textarea,input\{[^}]*border:1px solid var\(--rule\)/);
-  assert.match(PAGES.sidepanel, /button\.b\{[^}]*min-height:var\(--h-ctl-sm\)/, "side panel buttons 32px, was about 26px");
+  // Side panel buttons are theme.css .btn.small, 32px (was its own button.b, about 26px; D25 removed it).
+  assert.match(SHEETS.extension, /\.btn\.small\{min-height:var\(--h-ctl-sm\)/);
+  assert.doesNotMatch(PAGES.sidepanel, /button\.b\{/, "side panel buttons 32px, was about 26px");
 });
 
 test("one icon set of six, shared by the site and the extension", () => {
