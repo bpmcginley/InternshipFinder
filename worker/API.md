@@ -325,10 +325,14 @@ flood of forged browser steps cannot stop a real sign-in or sale from being coun
 ### `POST /employer-interest` (site only, no auth)
 The interest form on `internscout.org/employers/` (added 2026-10-13; `src/leads.js`). Body (JSON, at most
 8,000 bytes):
-`{ "name": "...", "email": "...", "company": "...", "title": "", "hiring_for": "", "wants": ["featured", "promoted", "majors_schools", "other"], "message": "", "website": "" }`.
+`{ "name": "...", "email": "...", "company": "...", "title": "", "hiring_for": "", "wants": ["placement_field", "placement_place", "board", "details", "other"], "message": "", "website": "" }`.
 `name` (100), `email` (254, must look like an address) and `company` (120) are required; `title` (100),
-`hiring_for` (300) and `message` (2,000) are optional. Lengths are counted after trimming. Unknown
-`wants` values are dropped. `website` is a honeypot the page hides: when it is filled the answer is the
+`hiring_for` (300) and `message` (2,000) are optional. Lengths are counted after trimming. `wants`
+holds the form's boxes: `placement_field` and `placement_place` (a paid listing for a field, or for a
+state or city), `board` and `details` (free: add a job board, correct a company's details) and `other`.
+The first form's `featured`, `promoted` and `majors_schools` (until 2026-10-14) are still accepted, so a
+cached page still sends, but are no longer offered. Unknown `wants` values are dropped. The stored value
+is a comma list in the order above, old values first. `website` is a honeypot the page hides: when it is filled the answer is the
 same `200 { "ok": true }` and nothing is stored. A good send is stored in `employer_leads` and counted as
 the server step `employer_interest` (page `employers`) in `event_counts`; answers `200 { "ok": true }`.
 `400 bad_request` with `"field"` naming the first field at fault; `403` unless `Origin` is the live site
