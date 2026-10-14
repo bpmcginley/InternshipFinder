@@ -5,7 +5,7 @@
   // Versioned like dom.js: an open tab keeps the copy it was given, and an older guard left there by
   // the previous version of the extension must not stay in charge of the submit button.
   // was: if (root.ISGuard) return;
-  const GV = 3;
+  const GV = 4;
   if (root.ISGuard && root.ISGuard.v >= GV) return;
 
   // "Confirm and send" / "I agree and apply" are the same button as "Confirm and submit"; without them
@@ -164,18 +164,43 @@
     return "ok";
   }
 
+  // A bare consent button: "Accept", "I agree", "I acknowledge", "I agree to the terms". Added
+  // 2026-10-14 (PR #94 review, P2). allowClick refuses one exactly as before: on a filled page it may
+  // be the button that sends the application, and agreeing to terms is the student's to do anyway.
+  // What changes is what the run says about it: a page whose only blocked buttons are these is not
+  // "ready to submit" but a page asking the student to agree to something (background/agent.js).
+  // Anchored and whole: "I agree and apply" or "Accept & submit" are not consent buttons but send buttons.
+  const CONSENT_RE = /^(i\s+)?(accept|agree|consent|acknowledge|understand)(\s+(to\s+)?(the\s+|these\s+|this\s+)?(terms(\s+(and|&)\s+conditions)?|conditions|polic(y|ies)|privacy\s+(policy|notice|statement)|notice|statement|disclosures?|agreement))?$/i;
+  const labelForms = (d) => [d.text, d.value, d.ariaLabel, d.title].map(norm).filter(Boolean).flatMap(readings);
+  const isConsent = (d) => { const f = labelForms(d); return f.length > 0 && f.every((x) => CONSENT_RE.test(x)) && !/submit/i.test(d.automationId || ""); };
+
+  // What may be pressed on the review step: the ways back to a page, on to the next one, and the
+  // account buttons. Anything else there, whatever its type, could be the send button: Workday and most
+  // React sites have no <form>, so "Let's make it official" or a <div role=button>Go</div> are plain
+  // buttons. Added 2026-10-14 (PR #94 review, P2). Consent and "OK" are left out on purpose: on the
+  // review step "I agree" or "OK" is the last thing between the answers and the employer.
+  const REVIEW_NAV_RE = /^(save|review|preview|edit|remove|delete|cancel|close|skip|go\s+back|return)\b/i;
+  const NOT_ON_REVIEW_RE = /^(i\s+)?(accept|agree|consent|ok|okay|proceed)\b/i;
+  function reviewNav(d) {
+    return labelForms(d).some((f) => (SAFE_RE.test(f) || ACCOUNT_RE.test(f) || REVIEW_NAV_RE.test(f)) && !NOT_ON_REVIEW_RE.test(f));
+  }
+
   // ctx: {filledFields, runFilled, reviewStep}
   //  - filledFields: answers on this page right now
   //  - runFilled: this run has already filled answers on an earlier page (background/agent.js), so a
   //    text-only review step that counts 0 above is still the end of a filled application
   //  - reviewStep: the page's heading or step indicator says it is the review or confirm step
   // was: refused only when ctx.filledFields > 0.
+  // A refusal carries review: true when only the review-step rule refused it (dom.js highlight
+  // outlines the real send button first).
   function allowClick(d, ctx) {
     const c = classify(d);
     if (c === "final") return { allowed: false, reason: "final submit button (reserved for you)" };
     if (c === "ambiguous" && ctx && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep))
       return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
         : "this looks like the final send button for this application" };
+    if (ctx && ctx.reviewStep && !reviewNav(d))
+      return { allowed: false, review: true, reason: "on the review step, only Back, Edit, Next and sign-in buttons are pressed for you" };
     return { allowed: true };
   }
 
@@ -489,7 +514,7 @@
   // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
   // choiceFact and confidentOption added (2026-09-30) for fastFill's choice questions.
   // v and countFilled added (2026-10-13) with the label readings, runFilled and reviewStep.
-  const api = { v: GV, classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, countFilled, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, reviewStep, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  const api = { v: GV, classify, isConsent, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, countFilled, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, reviewStep, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -290,3 +290,193 @@ test("the early ready_to_submit pushback never names Apply", () => {
   assert.doesNotMatch(EARLY_READY_PUSHBACK, /apply/i);
   assert.doesNotMatch(EARLY_READY_PUSHBACK, /\b(submit|send|finish|done|confirm)\b/i);
 });
+
+// ---- PR #94 review, P2 and P3 (2026-10-14) ----
+const agentMod = await import("../background/agent.js");
+
+test("Take over tells every frame of the tab to stop, with the job's new gen (dom.js halt)", async () => {
+  const id = await newJob();
+  await updateJob(id, { tabId: 7 });
+  const before = (await getJob(id)).gen || 0;
+  const halted = [];
+  window.ISDom.halt = (g) => { halted.push(g); return true; };
+  try {
+    await takeBack(id, TOOK_OVER);
+    assert.deepEqual(halted, [before + 1]);
+  } finally { delete window.ISDom.halt; }
+});
+
+test("every action, prefill and highlight carries the run's gen, so the page can refuse a stopped run", async () => {
+  const id = await newJob();
+  const gen = (await getJob(id)).gen || 0;
+  const seen = [];
+  const { act, fastFill, highlight, snapshot } = window.ISDom;
+  // A blocked final button in view, so ready_to_submit is taken at once and highlight runs.
+  window.ISDom.snapshot = () => ({ ...snapshot(), buttons: [{ ref: "b1", text: "Next" }, { ref: "b2", text: "Submit", blocked: true }] });
+  window.ISDom.act = async (ref, a, p) => { seen.push(["act", p && p.gen]); return act(ref, a, p); };
+  window.ISDom.fastFill = async (f, file, o) => { seen.push(["fastFill", o && o.gen]); return []; };
+  window.ISDom.highlight = (o) => { seen.push(["highlight", o && o.gen]); return highlight(o); };
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    for (const name of ["act", "fastFill", "highlight"]) {
+      const hits = seen.filter(([n]) => n === name);
+      assert.ok(hits.length, name + " was called");
+      assert.ok(hits.every(([, g]) => g === gen), name + " carried gen " + gen);
+    }
+  } finally { Object.assign(window.ISDom, { act, fastFill, highlight, snapshot }); }
+});
+
+test("an email-only sign-in step is not counted as filling the application; a real answer is", () => {
+  const { signInStep } = agentMod;
+  assert.equal(signInStep([{ elements: [{ kind: "text", type: "email", label: "Email address", value: "a@b.c" }] }]), true);
+  assert.equal(signInStep([{ elements: [{ kind: "text", label: "E-mail", value: "a@b.c" }, { kind: "checkbox", label: "Remember me" }] }]), true);
+  assert.equal(signInStep([{ elements: [{ kind: "password", label: "Password" }] }]), true);
+  assert.equal(signInStep([{ elements: [{ kind: "text", type: "email", label: "Email" }, { kind: "text", label: "Phone" }] }]), false);
+  assert.equal(signInStep([{ elements: [] }]), false);
+});
+
+test("a prefill that typed only the email on a sign-in step leaves run_filled off", async () => {
+  const snapshot = window.ISDom.snapshot, fastFill = window.ISDom.fastFill;
+  const run = async (elements, pre) => {
+    const id = await newJob();
+    window.ISDom.snapshot = () => ({ ...snapshot(), elements, buttons: [{ ref: "b1", text: "Next" }] });
+    window.ISDom.fastFill = async () => pre;
+    replies = [[use("p", "pause_for_user", { reason: "fixture" })]];
+    await runJob(id);
+    return !!(await getJob(id)).run_filled;
+  };
+  try {
+    assert.equal(await run([{ ref: "e1", kind: "text", type: "email", label: "Email", value: "fixture@example.test" }], ["Email = fixture@example.test"]), false);
+    assert.equal(await run([{ ref: "e1", kind: "text", label: "Phone", value: "555" }], ["Phone = 555"]), true);
+  } finally { window.ISDom.snapshot = snapshot; window.ISDom.fastFill = fastFill; }
+});
+
+test("a password typed into an ATS iframe is saved and confirmed under the iframe's domain, not the top page's", async () => {
+  const id = await newJob();
+  data.store.accounts = [];
+  data.store.settings.signup_email = "fixture@example.test";
+  const execute = chrome.scripting.executeScript, snapshot = window.ISDom.snapshot;
+  let frame = 0, signedUp = false;
+  chrome.scripting.executeScript = async ({ func, args, files, target }) => {
+    if (files) return [];
+    const out = [];
+    for (const fid of target.allFrames ? [0, 3] : target.frameIds || [0]) { frame = fid; out.push({ frameId: fid, result: await func(...(args || [])) }); }
+    return out;
+  };
+  window.ISDom.snapshot = () => (frame === 0 ? snapshot() : {
+    url: "https://acme.icims.example/jobs/1/login", title: "", step: "", errors: [], captcha: false, text: "", filledFields: 0, busy: false, frozen: false, buttons: [],
+    headings: signedUp ? ["Your account was successfully created"] : ["Create an account"],
+    elements: signedUp ? [] : [{ ref: "p1", kind: "password", label: "Password", value: "" }],
+  });
+  onAct = async (a) => { if (a === "fill") signedUp = true; };
+  replies = [[use("s", "fill_secret", { ref: "3:p1" })], [use("p", "pause_for_user", { reason: "fixture" })]];
+  try {
+    await runJob(id);
+    assert.equal(data.store.accounts.length, 1);
+    assert.equal(data.store.accounts[0].domain, "acme.icims.example", "keyed to the frame the password box is in");
+    assert.equal(data.store.accounts[0].state, "confirmed", "and confirmed there once the frame says so");
+  } finally {
+    chrome.scripting.executeScript = execute; window.ISDom.snapshot = snapshot;
+    data.store.accounts = [];
+  }
+});
+
+test("secretUrl prefers the ref's frame, then the tab, then the job's url", () => {
+  const { secretUrl } = agentMod;
+  assert.equal(secretUrl({ url: "https://a.icims.example/x" }, "https://top.example/", "https://job.example/"), "https://a.icims.example/x");
+  assert.equal(secretUrl({}, "https://top.example/", "https://job.example/"), "https://top.example/");
+  assert.equal(secretUrl(null, "", "https://job.example/"), "https://job.example/");
+});
+
+test("a Pause that lands before the first check stops the run before the paid resume tailoring", async () => {
+  const id = await newJob();
+  await updateJob(id, { description: "We are looking for a data intern to help analyze product usage. ".repeat(6) });
+  const s = data.store;
+  const saved = { tailor: s.settings.tailor_resume, exp: s.profile.experience };
+  s.settings.tailor_resume = "auto";
+  s.profile.experience = [{ company: "Fixture Co", title: "Analyst intern", bullets: ["Built a dashboard"] }];
+  const contains = chrome.permissions.contains;
+  chrome.permissions.contains = async () => { await takeBack(id, { status: "needs_you", reason: "Paused. Press Resume to continue.", activity: "" }); return true; };
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    assert.equal(calls, 0, "no tailoring call and no agent call");
+    assert.deepEqual(actions, []);
+    assert.equal((await getJob(id)).reason, "Paused. Press Resume to continue.");
+  } finally {
+    chrome.permissions.contains = contains;
+    s.settings.tailor_resume = saved.tailor; s.profile.experience = saved.exp;
+  }
+});
+
+// ---- PR #99 revision (2026-10-14): consent-only pages pause instead of "Ready to submit" ----
+const frameOf = (buttons, extra = {}) => ({ frameId: 0, url: "https://boards.greenhouse.io/acme/jobs/1", title: "", headings: [], step: "", errors: [], captcha: false, elements: [], buttons, text: "", ...extra });
+
+test("formatSnapshot: consentOnly only when every blocked button is a bare consent button and it is not the review step", () => {
+  const { formatSnapshot } = agentMod;
+  const agree = { ref: "b2", text: "I agree", blocked: true, consent: true };
+  assert.equal(formatSnapshot([frameOf([{ ref: "b1", text: "Back" }, agree])]).consentOnly, true);
+  assert.match(formatSnapshot([frameOf([agree])]).text, /asks the student to agree/);
+  assert.equal(formatSnapshot([frameOf([agree, { ref: "b3", text: "Submit", blocked: true }])]).consentOnly, false, "a real send button beside it");
+  assert.equal(formatSnapshot([frameOf([agree], { reviewStep: true })]).consentOnly, false, "on the review step it may be the send button");
+  assert.equal(formatSnapshot([frameOf([{ ref: "b1", text: "Next" }])]).consentOnly, false, "nothing blocked");
+});
+
+test("ready_to_submit on a page held back only by I agree pauses the job for the student instead", async () => {
+  const id = await newJob();
+  const snapshot = window.ISDom.snapshot;
+  window.ISDom.snapshot = () => ({ ...snapshot(), buttons: [{ ref: "b1", text: "Back" }, { ref: "b2", text: "I agree", blocked: true, consent: true }] });
+  replies = [[use("r1", "ready_to_submit", { summary: "Done" })]];
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, agentMod.CONSENT_HELP);
+    assert.match(j.reason, /asks you to agree to something/);
+    assert.deepEqual(actions, [], "the agent pressed nothing");
+  } finally { window.ISDom.snapshot = snapshot; }
+});
+
+test("a real blocked send button still ends Ready to submit", async () => {
+  const id = await newJob();
+  const snapshot = window.ISDom.snapshot;
+  window.ISDom.snapshot = () => ({ ...snapshot(), buttons: [{ ref: "b2", text: "Submit application", blocked: true }] });
+  replies = [[use("r1", "ready_to_submit", { summary: "Done" })]];
+  try {
+    await runJob(id);
+    assert.equal((await getJob(id)).status, "ready_to_submit");
+  } finally { window.ISDom.snapshot = snapshot; }
+});
+
+test("a prefilled page held back only by Accept pauses without an AI call instead of Ready to submit", async () => {
+  const id = await newJob();
+  const snapshot = window.ISDom.snapshot, fastFill = window.ISDom.fastFill;
+  window.ISDom.snapshot = () => ({ ...snapshot(), elements: [{ ref: "e1", kind: "text", label: "Phone", value: "555" }],
+    buttons: [{ ref: "b2", text: "Accept", blocked: true, consent: true }] });
+  window.ISDom.fastFill = async () => ["Phone = 555"];
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.equal(calls, 0);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, agentMod.CONSENT_HELP);
+  } finally { window.ISDom.snapshot = snapshot; window.ISDom.fastFill = fastFill; }
+});
+
+test("a job paused for missing manual details says to add them in Quick facts", async () => {
+  const id = await newJob();
+  const s = data.store, facts = { ...s.profile.facts };
+  s.settings.resume_details_manual = true;
+  s.profile.facts.first_name = ""; s.profile.facts.last_name = ""; s.profile.facts.email = "";
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, "Add your first name, last name and email in Quick facts, then press Resume.");
+    assert.doesNotMatch(j.reason, /reviewing your resume/);
+    assert.equal(calls, 0);
+  } finally { s.settings.resume_details_manual = false; s.profile.facts = facts; }
+});
