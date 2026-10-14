@@ -7,14 +7,16 @@
      backend/internscout/seo_pages.py, so it is copied to the site as it is; write() lists it in
      sitemap.xml and page() links it from every landing page's footer. Its shell (header, nav, footer,
      colours) is copied from page() and its CSS, so it looks like /about/ and /pricing/.
-     Its job is a test: would employers pay to feature internships? Nothing is sold here and no price is
-     named. The form posts to the Worker (worker/src/leads.js, POST /employer-interest), which keeps the
+     Its job is a test: would employers pay for a clearly labelled paid listing? Nothing is sold here yet;
+     the planned price is stated below. Every line must fit the placement rule: payment never changes any score, order,
+     filter, count or Auto-Apply behaviour, nothing is targeted at students, and nothing says or implies
+     that paying brings more applicants. Adding a board and fixing a listing are free for every employer. The form posts to the Worker (worker/src/leads.js, POST /employer-interest), which keeps the
      lead in D1 for Bruce to read. What is kept and for how long: /privacy#employers. -->
-<title>For Employers: Reach Students in Every Major | InternScout</title>
-<meta name="description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours, and tell us if you'd want featured roles."/>
+<title>For Employers: How Listings Work | InternScout</title>
+<meta name="description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours for free, and ask about a paid listing."/>
 <link rel="canonical" href="https://internscout.org/employers/"/>
-<meta property="og:title" content="For Employers: Reach Students in Every Major | InternScout"/>
-<meta property="og:description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours, and tell us if you'd want featured roles."/>
+<meta property="og:title" content="For Employers: How Listings Work | InternScout"/>
+<meta property="og:description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours for free, and ask about a paid listing."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://internscout.org/employers/"/>
 <meta property="og:image" content="https://internscout.org/og-preview.png"/>
@@ -24,7 +26,7 @@
 <!-- The same two blocks a generated page carries: its breadcrumb trail and the Organization, here by
      its @id (the full Organization is on / and /about/). -->
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"InternScout","item":"https://internscout.org/"},{"@type":"ListItem","position":2,"name":"For employers","item":"https://internscout.org/employers/"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://internscout.org/employers/#webpage","url":"https://internscout.org/employers/","name":"InternScout for employers","description":"How internships get listed on InternScout, how to add or correct a listing, and a form to say you would want featured listings.","inLanguage":"en-US","isPartOf":{"@id":"https://internscout.org/#website"},"publisher":{"@id":"https://internscout.org/#organization"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://internscout.org/employers/#webpage","url":"https://internscout.org/employers/","name":"InternScout for employers","description":"How internships get listed on InternScout, how to add or correct a listing for free, and a form to ask about a paid listing.","inLanguage":"en-US","isPartOf":{"@id":"https://internscout.org/#website"},"publisher":{"@id":"https://internscout.org/#organization"}}</script>
 <style>
 :root{--paper:#f6f4ef;--panel:#fffefb;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;
 --accent:#1d5c46;--accent-soft:#e3eee8;--accent-hover:#164a38;--err:#a3321f;color-scheme:light}
@@ -78,7 +80,7 @@ footer a{color:var(--ink2)}
 <header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
 <main>
 <p class="crumbs"><a href="/">InternScout</a> › For employers</p>
-<h1>Reach students in every major</h1>
+<h1>Your internships on InternScout</h1>
 <!-- The number: "14,000+" as written (docs/data/stats.json said 14,653 open on 2026-10-13), and the
      script at the bottom puts the current count, rounded down to the thousand, in its place. -->
 <p class="lede">InternScout is a free internship search for college students in the US and Canada. It lists <span id="open-count">14,000+</span> open internships, co-ops and research roles in every major, collected several times a day from employers' own job boards. Students search it for free, with no account.</p>
@@ -89,7 +91,8 @@ footer a{color:var(--ink2)}
 <p>Each listing links to the posting on your own careers site, so students apply through your system. InternScout takes no applications and doesn't stand between you and an applicant. To check, search for your company on the <a href="/">dashboard</a> or in the list of <a href="/internships/at/">employers hiring now</a>.</p>
 
 <h2>Add a missing board, or fix or remove a listing</h2>
-<p>If your internships aren't showing up, send us the address of your careers page or job board and we'll look at adding it. If a listing is wrong, has closed, or shouldn't be there, send its link and we'll correct or remove it.</p>
+<p>If your internships aren't showing up, send us the address of your careers page or job board and we'll look at adding it. If a listing is wrong, has closed, or shouldn't be there, send its link and we'll correct or remove it. That includes the company name, location, pay or dates on a listing.</p>
+<p>All of this is free for every employer, whether or not you ever pay for anything. Adding your job board doesn't depend on payment and is never part of what we sell.</p>
 <p>Email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>, or use the <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">feedback form</a>. InternScout is run by one student, so expect a reply within a few days.</p>
 
 <h2>What students use it for</h2>
@@ -99,8 +102,18 @@ footer a{color:var(--ink2)}
 <li>Filling in applications with the optional, free <a href="/install.html">Auto-Apply</a> Chrome extension. It never submits: the student reviews every answer and presses Submit.</li>
 </ul>
 
-<h2 id="interest">Featured listings: would you want them?</h2>
-<p>We're planning featured listings and promoted roles. If you'd want to reach students in every major, tell us and we'll get in touch before anything launches. There's nothing to buy yet and no price to agree to. This form only tells us you're interested.</p>
+<h2 id="interest">Paid listings: would you want one?</h2>
+<p>We're planning one paid option: a paid listing. It would show one of your open roles in a separate box headed "Paid listing", with "Ad" before your company name. Here's how it would work, so you know before you ask:</p>
+<ul class="plain">
+<li>It shows only when a student has searched for something the role matches or picked its field, and on our pages for its field or location. There's at most one paid listing on a page.</li>
+<li>Paying never changes where any listing ranks, how it's scored, which filters it passes or how many results a student sees. Your role also stays in its usual place in the results. Auto-Apply works the same for every listing, paid or not.</li>
+<li>It isn't aimed at students by their profile, school, major, class year or anything else about them. It follows only what a student has searched for or picked. Students can hide paid listings.</li>
+<li>We don't promise views, clicks or applicants. You'd get a monthly count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li>
+<li>Your listings, board additions and corrections stay free whether or not you buy a paid listing.</li>
+<li>Planned price: $29 per role for 30 days, or $69 for three role-months. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. If the role closes early, you get the unused days back as credit or a refund.</li>
+<li>The first five employers get a free 30-day pilot for one role.</li>
+</ul>
+<p>There's nothing to buy yet. This form only tells us you're interested. You can also use it to ask us to add your job board or correct your details, which is free.</p>
 </section>
 
 <form class="lead" id="lead" novalidate aria-labelledby="interest">
@@ -133,10 +146,10 @@ footer a{color:var(--ink2)}
 </div>
 </div>
 <fieldset>
-<legend>What would you want? <span class="opt">(optional)</span></legend>
-<label class="check"><input type="checkbox" name="wants" value="featured"/> Featured listings</label>
-<label class="check"><input type="checkbox" name="wants" value="promoted"/> Promoted roles in search results</label>
-<label class="check"><input type="checkbox" name="wants" value="majors_schools"/> Reaching specific majors or schools</label>
+<legend>What would you like? <span class="opt">(optional)</span></legend>
+<label class="check"><input type="checkbox" name="wants" value="placement"/> A paid listing for one of our open roles</label>
+<label class="check"><input type="checkbox" name="wants" value="board"/> Add our job board (free)</label>
+<label class="check"><input type="checkbox" name="wants" value="details"/> Correct our company's details or listings (free)</label>
 <label class="check"><input type="checkbox" name="wants" value="other"/> Something else (tell us below)</label>
 </fieldset>
 <div class="f">
@@ -154,7 +167,7 @@ footer a{color:var(--ink2)}
 </form>
 <div class="done" id="done" tabindex="-1" hidden>
 <h2>Thanks, we got it</h2>
-<p id="done-text">We'll get in touch before anything launches.</p>
+<p id="done-text">We'll get in touch within a few days.</p>
 </div>
 </main>
 <footer><strong>Built by one student, made for all students.</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/internships/at/">Employers hiring now</a> · <a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" aria-current="page">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
@@ -223,7 +236,7 @@ footer a{color:var(--ink2)}
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (out) { return { ok: r.ok, status: r.status, out: out }; }); })
       .then(function (res) {
         if (res.ok) {
-          document.getElementById("done-text").textContent = "We'll write to " + body.email + " before anything launches.";
+          document.getElementById("done-text").textContent = "We'll write to " + body.email + " within a few days.";
           form.hidden = true;
           var done = document.getElementById("done");
           done.hidden = false;

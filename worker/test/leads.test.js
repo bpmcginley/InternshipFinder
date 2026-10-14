@@ -2,14 +2,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NOW, setup } from "./helpers.js";
-import { ALL_PER_DAY, LIMITS, PER_ADDRESS_PER_DAY, cleanLead, dropOldLeads } from "../src/leads.js";
+import { readFileSync } from "node:fs";
+import { ALL_PER_DAY, LIMITS, PER_ADDRESS_PER_DAY, WANTS, WANTS_NOW, WANTS_OLD, cleanLead, dropOldLeads } from "../src/leads.js";
 import { cleanup } from "../src/limits.js";
 
 const SITE = { Origin: "https://internscout.org", "CF-Connecting-IP": "203.0.113.7" };
 const GOOD = {
   name: "  Dana   Reyes ", email: "dana.reyes@example.com", company: "Example Robotics",
   title: "University Recruiting Lead", hiring_for: "mechanical and electrical engineering",
-  wants: ["promoted", "featured", "made-up"], message: "Summer 2027 interns.\r\nAbout 20 roles.", website: "",
+  wants: ["board", "placement", "made-up"], message: "Summer 2027 interns.\r\nAbout 20 roles.", website: "",
 };
 const send = (w, body, headers = SITE) => w.api("POST", "/employer-interest", { body, headers });
 const leads = (w) => w.db.prepare("SELECT * FROM employer_leads ORDER BY id").all().then((r) => r.results);
@@ -27,12 +28,33 @@ test("a good send is stored, cleaned, and counted as a step", async () => {
     company: "Example Robotics", title: "University Recruiting Lead",
     hiring_for: "mechanical and electrical engineering",
     // In the form's order, unknown boxes dropped.
-    wants: "featured,promoted", message: "Summer 2027 interns.\nAbout 20 roles.",
+    wants: "placement,board", message: "Summer 2027 interns.\nAbout 20 roles.",
   });
   // No address in the row; the rate count is under a salted hash, never the address itself.
   assert.ok(!JSON.stringify(row).includes("203.0.113.7"));
   assert.ok(!JSON.stringify(w.db.dump().rate).includes("203.0.113.7"));
   assert.deepEqual(events(w), [{ day: "2026-09-14", event: "employer_interest", page: "employers", n: 1 }]);
+});
+
+test("the first form's boxes are still accepted from a cached page, and stored before the new ones", async () => {
+  const w = await setup();
+  assert.equal((await send(w, { ...GOOD, wants: ["other", "promoted", "details", "featured", "majors_schools"] })).status, 200);
+  const [row] = await leads(w);
+  assert.equal(row.wants, "featured,promoted,majors_schools,details,other");
+  assert.deepEqual(WANTS, [...WANTS_OLD, ...WANTS_NOW]);
+});
+
+test("the employers page offers exactly the current boxes, and none of the old ones", () => {
+  const html = readFileSync(new URL("../../docs/employers/index.html", import.meta.url), "utf8");
+  const boxes = [...html.matchAll(/name="wants" value="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(boxes, WANTS_NOW);
+  // The placement rule: nothing promises rank, targeting or applicants, and the label words are never used.
+  const text = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+  for (const banned of [/promoted/i, /sponsored/i, /featured/i, /reach students/i, /specific majors/i, /more applicants/i, /—/]) {
+    assert.doesNotMatch(text, banned);
+  }
+  assert.match(text, /free for every employer, whether or not you ever pay/);
+  assert.match(text, /Paying never changes where any listing ranks/);
 });
 
 test("only the optional fields may be left out", async () => {
@@ -62,7 +84,7 @@ test("each field is checked and the answer names it", async () => {
     [{ ...GOOD, hiring_for: "h".repeat(LIMITS.hiring_for + 1) }, "hiring_for"],
     [{ ...GOOD, message: "m".repeat(LIMITS.message + 1) }, "message"],
     [{ ...GOOD, name: 42 }, "name"],
-    [{ ...GOOD, wants: "featured" }, "wants"],
+    [{ ...GOOD, wants: "board" }, "wants"],
   ];
   for (const [body, field] of cases) {
     const res = await send(w, body);
