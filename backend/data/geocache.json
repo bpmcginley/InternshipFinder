@@ -254,6 +254,10 @@
 42.651,
 -73.921
 ],
+"albion|NY":[
+43.2463,
+-78.1937
+],
 "aliquippa|PA":[
 40.6102,
 -80.2677
@@ -413,6 +417,10 @@
 40.1229,
 -74.8645
 ],
+"brockport|NY":[
+43.2137,
+-77.9392
+],
 "brookfield place fka 3 world financial center|NY":null,
 "brookfield place|NY":null,
 "brooklawn|NJ":[
@@ -526,6 +534,7 @@
 -75.3557
 ],
 "cheswick (emd)|PA":null,
+"cheswick (emd|PA":null,
 "chicago|NY":null,
 "chittenango|NY":[
 43.0459,
@@ -627,6 +636,10 @@
 42.1435,
 -77.0543
 ],
+"corry|PA":[
+41.9203,
+-79.6403
+],
 "cranberry township|PA":[
 40.7099,
 -80.1061
@@ -699,6 +712,7 @@
 -74.416
 ],
 "east farmingdale (tr)|NY":null,
+"east farmingdale (tr|NY":null,
 "east northport|NY":[
 40.8768,
 -73.3246
@@ -909,6 +923,10 @@
 -78.9636
 ],
 "greater buffalo|NY":null,
+"greece|NY":[
+43.2582,
+-77.697
+],
 "greencastle|PA":[
 39.7904,
 -77.7278
@@ -956,6 +974,10 @@
 -76.9833
 ],
 "happaugue|NY":null,
+"harborcreek|PA":[
+42.1664,
+-79.9527
+],
 "harriman|NY":[
 41.3084,
 -74.1446
@@ -1169,6 +1191,10 @@
 40.7959,
 -74.3149
 ],
+"lockport|NY":[
+43.1687,
+-78.6966
+],
 "london|NY":[
 43.2053,
 -75.5877
@@ -1227,6 +1253,10 @@
 "mcconnellsburg|PA":[
 39.9326,
 -77.9989
+],
+"mcelhattan|PA":[
+41.1598,
+-77.3614
 ],
 "mcguire afb|NJ":null,
 "mckean county|PA":null,
@@ -2475,6 +2505,10 @@
 -73.681
 ],
 "watertown-fort drum|NY":null,
+"watkins glen|NY":[
+42.3811,
+-76.8706
+],
 "wayne pa|PA":null,
 "waynesburg|PA":[
 39.8956,
@@ -2584,6 +2618,10 @@
 "woodcliff|NJ":[
 40.3816,
 -74.2233
+],
+"woodland|PA":[
+40.9984,
+-78.3414
 ],
 "work at home - pennsylvania|PA":null,
 "wynnewood|PA":[

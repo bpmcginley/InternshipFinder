@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { emptyStore, upgradeStore, accountFor, confirmedFacts, profileForModel, factSuggestions, EMPTY_FACTS, DEMOGRAPHIC_KEYS, RESUME_FACTS, DASHBOARD_FACTS } from "../lib/store.js";
-import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "../onboarding/profile.js";
+import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "../onboarding/profile.js";
 
 const extracted = (facts = {}, over = {}) => ({ facts, education: [], experience: [], projects: [], links: [],
   skills: { technical: [], tools: [], soft: [] }, ...over });
@@ -159,8 +159,22 @@ test("an extraction that matches a confirmed value does not erase its manual pro
   assert.ok(planResumeImport(p, extracted({ phone: "other-number" })).find((e) => e.key === "phone").conflict);
 });
 
-test("incomplete extraction cannot silently clear saved sections", () => {
-  assert.throws(() => planResumeImport(emptyStore().profile, { facts: {}, experience: [] }), /incomplete/);
+// PR #94 review P2: a reply missing a section used to throw, with no way past it. Missing parts are now
+// "not read": left as they are, never cleared. Only a reply with nothing usable at all is refused.
+test("incomplete extraction cannot silently clear saved sections, and can still be saved", () => {
+  const p = emptyStore().profile;
+  applyResumeImport(p, planResumeImport(p, extracted({ phone: "555" }, { experience: [{ title: "Job" }], projects: [{ name: "P" }] })));
+  const plan = planResumeImport(p, { facts: {}, experience: [] });
+  assert.deepEqual(plan.map((e) => e.id), ["sections:experience"], "only what the reply contains is planned");
+  applyResumeImport(p, plan);
+  assert.deepEqual(p.experience, [], "a section the resume lists as empty is cleared");
+  assert.equal(p.projects[0].name, "P", "a section the reply left out is kept");
+  assert.equal(p.facts.phone, "555", "a contact field the reply left out is kept");
+  // Malformed parts are treated as missing; skills missing a list gets an empty one.
+  const odd = planResumeImport(p, { facts: { phone: 7, email: "a@b.c" }, skills: { technical: ["Go"] }, projects: "x" });
+  assert.deepEqual(odd.map((e) => e.id), ["facts:email", "sections:skills"]);
+  assert.deepEqual(odd.find((e) => e.key === "skills").next, { technical: ["Go"], tools: [], soft: [] });
+  for (const bad of [null, [], {}, { facts: [] }, { experience: "x" }]) assert.throws(() => planResumeImport(p, bad), /Nothing could be read/);
 });
 
 test("pending resume choices survive closing/reopening onboarding without retaining another file copy", () => {

@@ -1,6 +1,6 @@
 // Import only resume-derived values automatically. Explicit edits and older profiles
 // without provenance need review when a resume disagrees with them.
-import { RESUME_FACTS, factConfirmed, factFallback } from "../lib/store.js";
+import { RESUME_FACTS, CONFIRMATION_FACTS, ELIGIBILITY_FACTS, factConfirmed, factFallback } from "../lib/store.js";
 
 const clone = (v) => structuredClone(v);
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -44,23 +44,59 @@ export function dismissSuggestion(profile, key) {
   confirmProfileValue(profile, "facts", key);
 }
 
-export function planResumeImport(profile, extracted) {
-  if (!extracted?.facts || typeof extracted.facts !== "object" || Array.isArray(extracted.facts)
-    || SECTIONS.some((k) => k === "skills" ? !extracted[k] || typeof extracted[k] !== "object" || Array.isArray(extracted[k]) : !Array.isArray(extracted[k]))) {
-    throw new Error("The resume details were incomplete. Read your resume again before saving them.");
+// What the AI returned, with anything it left out filled in as "not read" (undefined), so a reply that
+// misses a section can still be saved. A missing section or contact field is left as it is, never
+// cleared; only a value the resume gives (including "" or []) replaces anything.
+// was: any missing or malformed section threw "The resume details were incomplete", and with no other
+// way to finish reading a resume, Auto-Apply could not be turned on at all.
+export function normalizeExtracted(extracted) {
+  const x = extracted && typeof extracted === "object" && !Array.isArray(extracted) ? extracted : {};
+  const facts = x.facts && typeof x.facts === "object" && !Array.isArray(x.facts) ? x.facts : {};
+  const out = { facts: {} };
+  for (const key of CONTACT) if (typeof facts[key] === "string") out.facts[key] = facts[key];
+  for (const key of SECTIONS) {
+    const v = x[key];
+    if (key === "skills") {
+      if (v && typeof v === "object" && !Array.isArray(v)) out.skills = { technical: [], tools: [], soft: [], ...v };
+    } else if (Array.isArray(v)) out[key] = v;
   }
+  if (!Object.keys(out.facts).length && SECTIONS.every((k) => !(k in out))) {
+    throw new Error("Nothing could be read from your resume. Read it again, or enter your details yourself.");
+  }
+  return out;
+}
+
+// `options.legacyResume`: the profile was filled from a resume before sources were recorded
+// (settings.extracted_from is set). A field with no record there most likely came from that resume, so
+// where the new resume differs, its box is ticked already (`preselect`): the student sees the change and
+// can untick it if they had typed the value themselves.
+// was: such fields counted as the student's own, so the first re-import kept old contact details and
+// removed jobs unless every box was ticked by hand.
+// What Quick facts' "Confirm answers shown" confirms: the answers that need confirming, except ones with
+// an interview suggestion waiting (`skip`) and old work authorization, sponsorship and age answers, which
+// each have their own Confirm button. was: all of CONFIRMATION_FACTS, so one click confirmed
+// "authorized: Yes, sponsorship: No, 18+: Yes" that an older version had filled in for everyone.
+export const bulkConfirmKeys = (profile, skip = new Set()) => CONFIRMATION_FACTS.filter((key) => !skip.has(key)
+  && !(ELIGIBILITY_FACTS.includes(key) && profile.facts?.[key] && !profile.sources?.facts?.[key]));
+
+export function planResumeImport(profile, extracted, { legacyResume = false } = {}) {
+  const x = normalizeExtracted(extracted);
   const entries = [];
   const add = (kind, key, next) => {
     const before = kind === "facts" ? profile.facts[key] : profile[key];
     const origin = profile.sources?.[kind]?.[key];
     const derived = origin?.source === "resume" && equal(origin.value, before);
-    entries.push({ id: `${kind}:${key}`, kind, key, before: clone(before), next: clone(next),
-      conflict: !equal(before, next) && (!empty(before) || origin?.source === "manual") && !derived });
+    const conflict = !equal(before, next) && (!empty(before) || origin?.source === "manual") && !derived;
+    entries.push({ id: `${kind}:${key}`, kind, key, before: clone(before), next: clone(next), conflict,
+      ...(conflict && legacyResume && !origin ? { preselect: true } : {}) });
   };
-  for (const key of CONTACT) add("facts", key, typeof extracted.facts[key] === "string" ? extracted.facts[key] : "");
-  for (const key of SECTIONS) add("sections", key, extracted[key]);
+  for (const key of CONTACT) if (key in x.facts) add("facts", key, x.facts[key]);
+  for (const key of SECTIONS) if (key in x) add("sections", key, x[key]);
   return entries;
 }
+
+// The boxes ticked when the review opens (onboarding.js drawResumeReview).
+export const preselectedImports = (plan) => plan.filter((e) => e.conflict && e.preselect).map((e) => e.id);
 
 export function applyResumeImport(profile, plan, accepted = []) {
   const chosen = new Set(accepted);

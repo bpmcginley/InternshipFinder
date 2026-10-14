@@ -53,7 +53,7 @@ test("quick-start needs AI, resume, email, and no unfinished resume reading/revi
 test("unfinished resume review cannot mark onboarding finished after a reload", async () => {
   const S = student({ settings: { signup_email: "sam@example.test", onboarded: false, resume_import: { plan: [] } } });
   let saves = 0;
-  await assert.rejects(finishOnboarding(S, async () => { saves++; }), /reading and reviewing/);
+  await assert.rejects(finishOnboarding(S, async () => { saves++; }), /Review the resume updates above/);
   assert.equal(S.settings.onboarded, false);
   assert.equal(saves, 0);
 });
