@@ -321,3 +321,21 @@ test("the review line is due only with the extension set up and applications fil
   assert.equal(IS.REVIEW_LINE_KEY, "internscout.review_line");
   assert.match(IS.REVIEWS_URL, /^https:\/\/chromewebstore\.google\.com\/detail\/internscout-auto-apply\/hpnbbpmalfjijnmpoihhjgjolhabjpgi\/reviews$/);
 });
+
+test("downloads beyond four wait their turn, and the quiet timer starts only when one begins", async () => {
+  // Each file takes 30 ms against a 40 ms limit; eight at once would leave the last ones waiting for
+  // a connection in the browser past the limit, so they queue here instead.
+  const keys = ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"];
+  const index = { files: Object.fromEntries(keys.map(k => [k, { file: `listings/${k}.json` }])) };
+  let running = 0, most = 0;
+  const IS = loadCore(url => {
+    if (url.endsWith("index.json")) return ok(index);
+    running++; most = Math.max(most, running);
+    const id = url.replace(/.*\/(\w+)\.json.*/, "$1");
+    return new Promise(resolve => setTimeout(() => { running--; resolve({ ok: true, status: 200, json: async () => [{ id }] }); }, 30));
+  });
+  const store = IS.createStore({ timeoutMs: 40, retryDelayMs: 0 }); await store.init();
+  assert.deepEqual([...await store.ensure(keys)], []);
+  assert.equal(most, 4);
+  assert.equal(store.all().length, keys.length);
+});

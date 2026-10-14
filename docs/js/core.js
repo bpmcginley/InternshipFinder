@@ -274,7 +274,19 @@
   // timeoutMs is how long a download may go with no bytes at all: before the response, or between two
   // pieces of the body. A slow file that keeps arriving is never cut off. (was: the limit covered the
   // whole download, so on slow Wi-Fi CA.json was cancelled on both tries and California never loaded.)
+  // At most this many downloads run at once, below the browser's six connections per host, so the
+  // quiet timer never runs while a request is only queued in the browser behind other files (at
+  // 50 KB/s the 9th and 10th state files waited more than 15 s for a connection and were retried).
+  const MAX_DOWNLOADS = 4;
+  let downloads = 0;
+  const queued = [];
   async function getJSON(url, bust, timeoutMs = 15000) {
+    if (downloads >= MAX_DOWNLOADS) await new Promise(r => queued.push(r));   // handed a slot directly
+    else downloads++;
+    try { return await download(url, bust, timeoutMs); }
+    finally { if (queued.length) queued.shift()(); else downloads--; }
+  }
+  async function download(url, bust, timeoutMs) {
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     let timer, fail;
     const stalled = new Promise((_, reject) => { fail = reject; });
