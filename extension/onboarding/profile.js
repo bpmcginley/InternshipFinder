@@ -154,3 +154,36 @@ export function formatResumeValue(value) {
   }).join("\n");
   return String(value);
 }
+
+// Setup's "Email for applications" box, one keystroke at a time (onboarding.js setup()). The profile's
+// email follows the box while it is empty or still the box's earlier value, so it ends up as the whole
+// address. An email the student gave elsewhere (Quick facts, a resume read) is left alone.
+// was: if (!facts.email) { facts.email = v; ... }, which set it on the first keystroke only, so it kept
+// the first letter ("j"), marked as the student's own answer, and the first resume read asked about it.
+export function setSetupEmail(S, value) {
+  const v = String(value ?? "").trim();
+  const was = S.settings.signup_email || "";
+  S.settings.signup_email = v;
+  if (!S.profile.facts.email || S.profile.facts.email === was) {
+    S.profile.facts.email = v;
+    confirmProfileValue(S.profile, "facts", "email");
+  }
+  return S;
+}
+
+// A profile that already has that first letter (saved by 0.5.6 or earlier): the profile email is a short
+// start of the sign-up email with no "@", set by hand. It becomes the whole address, and a resume review
+// waiting on it compares against the whole address instead. Returns true when anything changed.
+export function repairSetupEmail(S) {
+  const f = S.profile && S.profile.facts, signup = (S.settings && S.settings.signup_email) || "";
+  const bad = f && f.email;
+  if (!bad || bad.includes("@") || bad.length >= signup.length || !signup.startsWith(bad)) return false;
+  if (S.profile.sources?.facts?.email?.source !== "manual") return false;
+  f.email = signup;
+  confirmProfileValue(S.profile, "facts", "email");
+  const plan = S.settings.resume_import && S.settings.resume_import.plan;
+  for (const e of Array.isArray(plan) ? plan : []) {
+    if (e.kind === "facts" && e.key === "email" && e.before === bad) { e.before = signup; e.conflict = !equal(signup, e.next); }
+  }
+  return true;
+}

@@ -13,7 +13,8 @@ test("the dashboard's setup button, notice and queue note say Set up Auto-Apply"
   // Once set up it says "Edit setup", as the extension's popup and side panel do (lib/entry.js).
   assert.match(app, /info\.onboarded \? "Edit setup" : "Set up Auto-Apply \(about 2 minutes\)"/);
   assert.match(app, /"set up Auto-Apply so it knows your background\. ", h\("a", .*"Set up Auto-Apply \(about 2 minutes\)"\)/);
-  assert.match(app, /setNote\("Set up Auto-Apply first \(about 2 minutes\)\. It just opened in a new tab\."\)/);
+  // was: ... in a new tab\."\)/. Since U2 (2026-10-14) a sentence about the kept postings may follow.
+  assert.match(app, /setNote\("Set up Auto-Apply first \(about 2 minutes\)\. It just opened in a new tab\." \+ \(res\.held/);
   assert.doesNotMatch(app, /Start Deep Dive|Start the Deep Dive|do the Deep Dive|Finish the Deep Dive/);
 });
 

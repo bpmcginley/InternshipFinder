@@ -901,6 +901,17 @@
       if (!info.installed || auth.token) return;
       askExtension();
     }, [info.installed]);
+    // The other way round (U8, 2026-10-14): signed in here but not in the extension, so offer the
+    // extension this sign-in, once per page load. The extension checks it with the Worker and only uses it
+    // if the student presses "Use my dashboard sign-in" there (extension/lib/auth.js holdOffer). Only the
+    // dashboard's own session code, never one the extension gave this page.
+    const offeredAuth = useRef(false);
+    useEffect(() => {
+      if (offeredAuth.current || !info.installed || info.signed_in !== false) return;
+      if (auth.source !== "page" || !/^iss_/.test(auth.token || "")) return;
+      offeredAuth.current = true;
+      IS.ext.call({ type: "auth:offer", token: auth.token }, 10000);
+    }, [info.installed, info.signed_in, auth.token, auth.source]);
     useEffect(() => { if (auth.token && p) IS.postDemand(auth.token, p); }, [auth.token, p]);
     // was: const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
     const who = auth.token ? auth.who : null;
@@ -1297,7 +1308,9 @@
       if (!payload.length) return;
       setNote("Adding to the queue…");
       const res = await IS.ext.call({ type: "enqueue", jobs: payload });
-      if (res.error === "setup_required") { setNote("Set up Auto-Apply first (about 2 minutes). It just opened in a new tab."); return; }
+      // res.held (U2, 2026-10-14): an extension that keeps the picked postings until setup is done says how many.
+      // was: always "Set up Auto-Apply first (about 2 minutes). It just opened in a new tab."
+      if (res.error === "setup_required") { setNote("Set up Auto-Apply first (about 2 minutes). It just opened in a new tab." + (res.held ? ` ${res.held === 1 ? "The posting" : `The ${res.held} postings`} you picked will be waiting there, ready to start when you finish.` : "")); return; }
       if (res.error) { setNote("Couldn't queue: " + res.error); return; }
       const added = (res.added || []).length, skipped = (res.skipped || []).length;
       const current = added || skipped ? await IS.ext.call({ type: "get_queue" }) : null;

@@ -3,7 +3,7 @@
 import { CONFIG } from "./config.js";
 import { HttpError, json, sameSecret } from "./http.js";
 import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "./auth.js";
-import { createSession, dropExpiredSessions, endSession, isSessionToken } from "./session.js";
+import { createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
 import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
@@ -170,6 +170,15 @@ async function route(request, env, ctx, d) {
       // The email is echoed for the client to show ("Signed in as ..."); it is not stored.
       const email = claims.email || claims.preferred_username || null;
       return json({ session, account: user.slice(0, 16), email, provider, tier, expires });
+    }
+
+    // Is this session token live, and whose is it (2026-10-14, U8)? Only a session token: an ID token is
+    // 401, since it already says all this about itself. Used by the extension to check the sign-in the
+    // dashboard offers it. Answers { account, provider, tier, expires }; no email (not stored).
+    case "GET /session": {
+      const token = bearerOf(request);
+      if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
+      return json(await sessionInfo(db, token, { now: now.getTime(), later: (p) => later(ctx, p) }));
     }
 
     case "DELETE /session": {

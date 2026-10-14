@@ -51,18 +51,30 @@ export async function sessionUser(db, token, { now = Date.now(), later } = {}) {
   if (!db) throw new HttpError(500, "server", "Server is missing its database");
   if (!TOKEN.test(String(token))) throw expired();
   const id = await sha256Hex(token);
-  const row = await db.prepare("SELECT user_hash, tier, last_used, expires FROM sessions WHERE id = ?").bind(id).first();
+  // was: SELECT user_hash, tier, last_used, expires. provider is read too, for GET /session (sessionInfo).
+  const row = await db.prepare("SELECT user_hash, tier, provider, last_used, expires FROM sessions WHERE id = ?").bind(id).first();
   if (!row || !(Date.parse(row.expires) > now)) throw expired();
   const at = new Date(now);
   const today = at.toISOString().slice(0, 10);
+  let expires = row.expires;
   if (String(row.last_used).slice(0, 10) < today) {
+    expires = expiresFrom(at);
     // The WHERE repeats the day check, so parallel requests on a new day still write once.
     const refresh = db.prepare("UPDATE sessions SET last_used = ?, expires = ? WHERE id = ? AND substr(last_used, 1, 10) < ?")
       .bind(at.toISOString(), expiresFrom(at), id, today).run();
     if (later) later(refresh);
     else await refresh;
   }
-  return { user: row.user_hash, tier: row.tier };
+  // provider and expires are for sessionInfo; every other route reads only user and tier.
+  return { user: row.user_hash, tier: row.tier, provider: row.provider || null, expires };
+}
+
+// GET /session (2026-10-14, U8): what a session token is, so the extension can check a token the
+// dashboard offers it with the Worker before keeping it, instead of trusting what the page says about it.
+// The same fields as POST /session's reply except the email, which the Worker never stores.
+export async function sessionInfo(db, token, deps = {}) {
+  const { user, tier, provider, expires } = await sessionUser(db, token, deps);
+  return { account: user.slice(0, 16), provider, tier, expires };
 }
 
 // DELETE /session: signing out removes this one session. Anything else (an ID token, an unknown or

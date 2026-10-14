@@ -171,3 +171,25 @@ test("at most 20 sessions per account: the 21st pushes out the least recently us
   }
   assert.equal(rows(w).length, MAX_SESSIONS + 1);
 });
+
+// U8 (2026-10-14): the extension checks a session the dashboard offers it before keeping it.
+test("GET /session says whose a live session is (no email), and refuses anything else", async () => {
+  const w = await setup();
+  const s = await start(w);
+  let res = await w.api("GET", "/session", { token: s.session });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { account: s.account, provider: "google", tier: "edu", expires: s.expires });
+  // A use on a later day slides the year forward, and the reply says so.
+  const later = new Date("2026-09-20T08:00:00Z");
+  w.setNow(later);
+  res = await w.api("GET", "/session", { token: s.session });
+  assert.equal((await res.json()).expires, new Date(later.getTime() + 365 * DAY).toISOString());
+  // An ID token, an unknown session, a signed-out session and no token are all 401 auth.
+  const id = await w.token();
+  await w.api("DELETE", "/session", { token: s.session });
+  for (const token of [id, "iss_" + "C".repeat(43), s.session, undefined]) {
+    res = await w.api("GET", "/session", { token });
+    assert.equal(res.status, 401, String(token).slice(0, 8));
+    assert.equal((await res.json()).error, "auth");
+  }
+});
