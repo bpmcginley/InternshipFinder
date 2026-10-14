@@ -2,7 +2,11 @@
 // final "submit" button: that click is reserved for the human. Enforced in code, not left to
 // the model. Pure core (node-testable) + small DOM helpers. Loaded in MAIN and ISOLATED worlds.
 (function (root) {
-  if (root.ISGuard) return;
+  // Versioned like dom.js: an open tab keeps the copy it was given, and an older guard left there by
+  // the previous version of the extension must not stay in charge of the submit button.
+  // was: if (root.ISGuard) return;
+  const GV = 2;
+  if (root.ISGuard && root.ISGuard.v >= GV) return;
 
   // "Confirm and send" / "I agree and apply" are the same button as "Confirm and submit"; without them
   // the label has no word FINAL_RE knows and it falls through to AMBIGUOUS_RE, which is anchored and so
@@ -15,9 +19,45 @@
   // unanchored, any label merely *containing* a safe word -- "Agree & Continue" on the last page of a
   // Workday flow whose button id is submitApplication -- was rescued to "ok" and clickable. A label that
   // starts with the safe word ("Next: Work experience", "Create Account") is still a navigation button.
-  const SAFE_RE = /^\s*(save\s+(and|&)\s+continue|next|continue|back|previous|add(\s+another)?|upload|sign\s*(in|up)|create\s+(an\s+)?account|log\s*in|register|verify|search|autofill|apply\s+manually|use\s+my\s+last\s+application)\b/i;
+  // "Send code" and "Resend" (added 2026-10-13) ask a sign-in page for a code; they send nothing of the student's.
+  const SAFE_RE = /^\s*(save\s+(and|&)\s+continue|next|continue|back|previous|add(\s+another)?|upload|sign\s*(in|up)|create\s+(an\s+)?account|log\s*in|register|verify|search|autofill|apply\s+manually|use\s+my\s+last\s+application|resend|send\s+(me\s+)?(a\s+|the\s+)?(new\s+)?(verification\s+|security\s+|sign[-\s]?in\s+|one[-\s]?time\s+|login\s+)?(code|link|otp|pin))\b/i;
 
   function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
+
+  // ---- what a button says, once the decoration is gone ----
+  // AMBIGUOUS_RE alone only knew the bare words, so "Apply now ->", "Apply for this internship",
+  // "Finish & Apply", "Done ✓" and "Enviar" all read as harmless, and the agent's own click sent a
+  // filled application in headless Chrome (product review, 2026-10-13). Each label (text, value,
+  // aria-label, title) is now read on its own, as written and with symbols and icon words taken out,
+  // and the most cautious reading wins.
+  // Material icon ligatures render as words in innerText: arrow_forward, chevron_right, navigate_next.
+  const ICON_LIGATURE_RE = /\b[a-z]+(?:_[a-z]+)+\b/gi;
+  // Plain-word ligatures, only at either end of a longer label ("Apply now east", "send Apply").
+  const EDGE_ICON_RE = /^(?:east|west|send|check|done|launch|arrow)\s+(?=\S)|\s+(?:east|west|send|check|done|launch|arrow)$/i;
+  const plainLabel = (s) => norm(String(s || "").replace(/[‘’]/g, "'").replace(ICON_LIGATURE_RE, " ").replace(/[^\p{L}\p{N}'&]+/gu, " "));
+  function readings(s) {
+    const raw = norm(s);
+    if (!raw) return [];
+    const plain = plainLabel(raw);
+    return [...new Set([raw, plain, norm(plain.replace(EDGE_ICON_RE, ""))].filter(Boolean))];
+  }
+  // A label that starts or ends with one of these is the send button on some sites and harmless on
+  // others ("Apply" on a job page opens the form; "Apply now" under a filled form sends it).
+  const AMBIGUOUS_START_RE = /^(apply|send|finish|finali[sz]e|complete|confirm|done|submit|i'?m\s+done|i\s+am\s+done|all\s+done)\b/i;
+  const AMBIGUOUS_END_RE = /\b(apply|send|finish|done|confirm|complete)$/i;
+  // The same word in the languages career sites most often switch to. Anywhere in the label, since
+  // "Bewerbung absenden" puts the verb last. JS \b is ASCII only, hence the lookarounds.
+  const FOREIGN_SEND_RE = /(?<!\p{L})(enviar|env[ií]a|envoyer|soumettre|postuler|candidater|absenden|senden|einreichen|bewerben|inviare|invia|candidati|candidatar(?:se)?|candidatura|postular(?:se)?|solicitar|verzenden|versturen|indienen|solliciteren|wy[sś]lij|aplikuj|odeslat|skicka|ans[oö]k)(?!\p{L})|送信|提交|応募|申请|申請|제출|지원하기/iu;
+  // Account and code buttons are the agent's to press even when they start with "Complete" or "Done".
+  const ACCOUNT_RE = /\b(sign\s*(up|in)|log\s*in|register|registration|account|password|verification|code)\b|^(confirm|verify)\s+(your\s+)?e-?mail\b/i;
+  // A submit-type button inside the form that holds the answers is that form's send button unless it
+  // plainly says it goes somewhere else. Wider than SAFE_RE, which also rescues submit-id'd buttons.
+  const NAV_RE = /^(save|proceed|review|preview|start|begin|get\s+started|go\s+to|edit|remove|delete|cancel|close|skip|ok|okay|(i\s+)?(accept|agree)\s+(and|&)\s+(continue|proceed|next))\b/i;
+  // The read-only last step of a multi-page application: nothing to fill, so filledFields is 0, and
+  // its button says Apply, Finish, Confirm, Send or Done. Read from headings and the step indicator,
+  // matched whole: a job description's "Summary" or "Review our benefits" sits right above its Apply.
+  const REVIEW_STEP_RE = /^((current\s+)?step\s*\d+(\s*of\s*\d+)?\s*)?(review(\s+(and|&)\s+submit|\s+(your|my)\s+(application|answers|information|details)|\s+application)?|confirm(ation)?|confirm\s+(your\s+)?(application|answers|details|information)|application\s+(review|summary)|summary\s+of\s+(your\s+)?application|check\s+your\s+(answers|application|details|information)|verify\s+your\s+(application|answers|details|information))$/i;
+  const reviewStep = (texts) => (texts || []).some((t) => REVIEW_STEP_RE.test(plainLabel(t)));
 
   // ---- gates the human has to clear themselves ----
   // A code sent to the student's inbox is theirs to read: the agent cannot reach it, and guessing
@@ -102,22 +142,39 @@
     return blocked;
   }
 
-  // d: {text, value, ariaLabel, title, type, automationId}
+  // d: {text, value, ariaLabel, title, type, automationId, formFilled}
+  // formFilled: answers inside the button's own <form> (describe counts them for submit-type buttons).
   function classify(d) {
-    const text = norm([d.text, d.value, d.ariaLabel, d.title].filter(Boolean).join(" "));
-    if (FINAL_RE.test(text)) return "final";
-    if (/submit/i.test(d.automationId || "") && !SAFE_RE.test(text)) return "final";
-    if (AMBIGUOUS_RE.test(norm(d.text || d.value || d.ariaLabel))) return "ambiguous";
-    if (!text && d.type === "submit") return "ambiguous";   // unlabeled submit-type button
+    const labels = [d.text, d.value, d.ariaLabel, d.title].map(norm).filter(Boolean);
+    const text = norm(labels.join(" "));
+    const forms = labels.flatMap(readings);
+    if (FINAL_RE.test(text) || forms.some((f) => FINAL_RE.test(f))) return "final";
+    // was: !SAFE_RE.test(text). A symbol in front ("> Next") no longer hides the safe word.
+    if (/submit/i.test(d.automationId || "") && !SAFE_RE.test(text) && !SAFE_RE.test(plainLabel(text))) return "final";
+    // was: AMBIGUOUS_RE.test(norm(d.text || d.value || d.ariaLabel)): one label, exact words only.
+    const safe = (f) => SAFE_RE.test(f) || ACCOUNT_RE.test(f);
+    if (forms.some((f) => !safe(f) && (AMBIGUOUS_RE.test(f) || AMBIGUOUS_START_RE.test(f) || AMBIGUOUS_END_RE.test(f) || FOREIGN_SEND_RE.test(f))))
+      return "ambiguous";
+    if (d.type === "submit") {
+      // was: !text only. A symbol-only label ("->") says no more than an empty one.
+      if (!labels.some((l) => plainLabel(l))) return "ambiguous";
+      if (d.formFilled > 0 && !forms.some((f) => safe(f) || NAV_RE.test(f))) return "final";
+    }
     return "ok";
   }
 
-  // ctx: {filledFields}
+  // ctx: {filledFields, runFilled, reviewStep}
+  //  - filledFields: answers on this page right now
+  //  - runFilled: this run has already filled answers on an earlier page (background/agent.js), so a
+  //    text-only review step that counts 0 above is still the end of a filled application
+  //  - reviewStep: the page's heading or step indicator says it is the review or confirm step
+  // was: refused only when ctx.filledFields > 0.
   function allowClick(d, ctx) {
     const c = classify(d);
     if (c === "final") return { allowed: false, reason: "final submit button (reserved for you)" };
-    if (c === "ambiguous" && (ctx && ctx.filledFields > 0))
-      return { allowed: false, reason: "this looks like the final send button on a filled form" };
+    if (c === "ambiguous" && ctx && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep))
+      return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
+        : "this looks like the final send button for this application" };
     return { allowed: true };
   }
 
@@ -136,13 +193,16 @@
     const tag = (el.tagName || "").toLowerCase();
     let type = (el.getAttribute && el.getAttribute("type")) || "";
     if (tag === "button" && !type && el.form) type = "submit";
+    type = type.toLowerCase();
     return {
       text: norm(el.innerText || el.textContent).slice(0, 160),
       value: tag === "input" ? el.value : "",
       ariaLabel: el.getAttribute ? el.getAttribute("aria-label") : "",
       title: el.getAttribute ? el.getAttribute("title") : "",
-      type: type.toLowerCase(),
+      type,
       automationId: el.getAttribute ? [el.getAttribute("data-automation-id"), el.id, el.getAttribute("name")].filter(Boolean).join(" ") : "",
+      // Added 2026-10-13: a submit button whose own form holds answers is that form's send button.
+      formFilled: type === "submit" && el.form ? countFilled(el.form) : 0,
     };
   }
 
@@ -193,9 +253,10 @@
     return acts.length > 0 && acts.every((t) => SIGNUP_BTN_RE.test(t)) && !form.querySelector('input[type="file"], textarea');
   }
 
-  function pageContext(doc) {
+  // was: inside pageContext(doc). Also counted per form now, for describe's formFilled.
+  function countFilled(root) {
     let filled = 0;
-    deepQueryAll("input, textarea, select", doc).forEach((el) => {
+    deepQueryAll("input, textarea, select", root).forEach((el) => {
       const t = (el.type || "").toLowerCase();
       if (["hidden", "submit", "button", "search", "image", "reset", "range", "color"].includes(t)) return;
       if (/search/i.test(el.name || el.id || "")) return;
@@ -213,7 +274,16 @@
       if (el.tagName === "SELECT") { if (el.selectedIndex > 0) filled++; return; }
       if (norm(el.value)) filled++;
     });
-    return { filledFields: filled };
+    return filled;
+  }
+
+  // runFilled is set on the document by dom.js when the background says this run has filled answers
+  // on an earlier page; a new page is a new document, so dom.js sets it again on every snapshot.
+  function pageContext(doc) {
+    const shown = (n) => n && (!n.getClientRects || n.getClientRects().length);
+    const heads = deepQueryAll('h1, h2, h3, [role="heading"], [aria-current="step"], [data-automation-id="progressBarActiveStep"], [class*="step"][class*="active"]', doc)
+      .filter(shown).map((n) => norm(n.innerText || n.textContent).slice(0, 120));
+    return { filledFields: countFilled(doc), runFilled: !!doc.__isRunFilled, reviewStep: reviewStep(heads) };
   }
 
   function clickTarget(el) {
@@ -417,7 +487,8 @@
 
   // was: { classify, nothingLeftForAI, isResumeBox, allowClick, describe, ... } - allowSecret added.
   // choiceFact and confidentOption added (2026-09-30) for fastFill's choice questions.
-  const api = { classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
+  // v and countFilled added (2026-10-13) with the label readings, runFilled and reviewStep.
+  const api = { v: GV, classify, nothingLeftForAI, isResumeBox, allowClick, allowSecret, describe, pageContext, clickTarget, isFinalElement, installClickBlock, removeClickBlock, countFilled, detectGate, notApplication, consentGiveaway, choiceFact, confidentOption, reviewStep, jobInUS, addressFact, stateName, isUS, FINAL_RE, AMBIGUOUS_RE, CONSENT_OK_RE };
   root.ISGuard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
