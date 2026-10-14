@@ -17748,6 +17748,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "spscommerce|wd108|SPS": {
+   "name": "SPS Commerce",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-14"
+  },
   "ssctech|wd1.myworkdaysite.com|SSCTechnologies": {
    "name": "SS&C",
    "quant": false,
