@@ -291,6 +291,41 @@
         h("div", { className: "meta", style: { marginTop: 9 } }, h("a", { href: IS.reportUrl(r), target: "_blank", rel: "noopener" }, "Report a wrong tag or dead link"))));
   }
 
+  // The grey facts line of a listing (D9): field, place, term, then pay (tabular figures, or "Pay not
+  // listed"). Shared by Row and the paid box (js/placements.js, 2026-10-14), so the two can never describe
+  // one role differently. was: built inside Row.
+  function factsLine(r, keys) {
+    const tags = r.field_tags || [];
+    // Two field tags fit on the line; the rest are a count.
+    const fieldText = tags.slice(0, 2).map(IS.fieldLabel).join(", ") + (tags.length > 2 ? ` +${tags.length - 2}` : "");
+    const term = [IS.termText(r.term), r.duration].filter(Boolean).join(", ");
+    const pay = IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : "Pay not listed";
+    const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
+    return h("div", { className: "meta facts" },
+      tags.length ? h("span", { title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, fieldText) : h("span", { className: "muted" }, "Not tagged"),
+      dot, h(Loc, { r, keys }), term && h(F, null, dot, term), dot, pay);
+  }
+
+  // The Match control (D9, D10): with a profile, the score button that opens the Why panel (panelId);
+  // before one, "Rank for my major" and "Details". Shared by Row and the paid box (2026-10-14), which pass
+  // the same scoreOf result, so a paid listing shows exactly the score its own row shows. was: inside Row.
+  function matchControl({ r, sc, scored, open, onToggle, onRank, btnRef, onKeyDown, panelId }) {
+    const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
+    const who = `${r.company_name}, ${r.title}`;
+    return scored
+      // was: no aria-controls, and a name of "98 Why" ("Match" was hidden from it).
+      ? h("button", { type: "button", ref: btnRef, className: "score whybtn " + cls, "aria-expanded": !!open, "aria-controls": panelId,
+        onClick: onToggle, onKeyDown, title: `Match score ${sc.score} of 100. Click for why.` },
+        // The name is the visible text plus words for a screen reader: "Match 98 of 100, Why" (D9). was: an
+        // aria-label that left out the visible "Why", which axe reports (label-content-name-mismatch).
+        // U12: and the row it is for, after the visible words: "Match 98 of 100, Why: Acme, Data Intern".
+        h("span", { className: "match-label" }, "Match "), h("span", { className: "num" }, sc.score), h("span", { className: "sr" }, " of 100, "), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"), h("span", { className: "sr" }, ": " + who))
+      : h("div", { className: "unscored" },
+        h("button", { type: "button", className: "rankbtn", onClick: onRank }, "Rank for my major"),
+        h("button", { type: "button", ref: btnRef, className: "whybtn details", "aria-expanded": !!open, "aria-controls": panelId, "aria-label": `Details: ${r.company_name}, ${r.title}`,
+          onClick: onToggle, onKeyDown }, open ? "Hide details" : "Details"));
+  }
+
   // The listing row (A2 component 4, D9 to D11, 2026-10-14). Three short lines instead of five columns:
   //   1. the company (semibold, ink), then the title;
   //   2. one grey facts line: field, place, term, then pay (tabular figures, or "Pay not listed");
@@ -322,20 +357,14 @@
     // than falling back to the top of the page.
     const answer = applied => { onAnswer(r.id, applied); setTimeout(() => { if (statusSel.current && statusSel.current.focus) statusSel.current.focus(); }, 0); };
     const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
-    const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
     const scored = !!ctx.p;
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
-    const tags = r.field_tags || [];
     const stages = (r.stage || []).filter(s => s !== "internship").map(s => IS.STAGE_LABEL[s] || s);
     const dates = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, ...stages, r.sector && IS.sectorLabel(r.sector),
       r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
     const bl = elig ? blockers(r, elig).filter(t => !/^For /.test(t)) : [];
-    const term = [IS.termText(r.term), r.duration].filter(Boolean).join(", ");
     const cols = canAuto ? 5 : 4;
-    // Two field tags fit on the line; the rest are a count.
-    const fieldText = tags.slice(0, 2).map(IS.fieldLabel).join(", ") + (tags.length > 2 ? ` +${tags.length - 2}` : "");
-    const pay = IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : "Pay not listed";
     const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
     const closeWhy = () => { onWhy(r.id); setTimeout(() => { if (whyBtn.current && whyBtn.current.focus) whyBtn.current.focus(); }, 0); };
     const whyKey = e => { if (e.key === "Escape" && open) { e.preventDefault(); onWhy(r.id); } };
@@ -349,24 +378,14 @@
           // the export keeps closed rows too.
           h("div", { className: "li-head" }, h("span", { className: "co" }, r.company_name), r.is_new && r.status === "open" && h("span", { className: "new" }, "New"),
             h("span", { className: "sr" }, ", "), dot, h("span", { className: "role" }, r.title)),
-          h("div", { className: "meta facts" },
-            tags.length ? h("span", { title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, fieldText) : h("span", { className: "muted" }, "Not tagged"),
-            dot, h(Loc, { r, keys }), term && h(F, null, dot, term), dot, pay),
+          // was: the facts line built here; factsLine (above) since 2026-10-14, shared with the paid box.
+          factsLine(r, keys),
           (dates || r.status === "closed") && h("div", { className: "meta" }, dates, r.status === "closed" && h("span", { className: "closed" }, (dates ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
-        h("td", { className: "c-match" }, scored
-          // was: no aria-controls, and a name of "98 Why" ("Match" was hidden from it).
-          ? h("button", { type: "button", ref: whyBtn, className: "score whybtn " + cls, "aria-expanded": !!open, "aria-controls": "why-" + r.id,
-            onClick: () => onWhy(r.id), onKeyDown: whyKey, title: `Match score ${sc.score} of 100. Click for why.` },
-            // The name is the visible text plus words for a screen reader: "Match 98 of 100, Why" (D9). was: an
-            // aria-label that left out the visible "Why", which axe reports (label-content-name-mismatch).
-            // U12: and the row it is for, after the visible words: "Match 98 of 100, Why: Acme, Data Intern".
-            h("span", { className: "match-label" }, "Match "), h("span", { className: "num" }, sc.score), h("span", { className: "sr" }, " of 100, "), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"), h("span", { className: "sr" }, ": " + who))
-          : h("div", { className: "unscored" },
-            h("button", { type: "button", className: "rankbtn", onClick: onRank }, "Rank for my major"),
-            h("button", { type: "button", ref: whyBtn, className: "whybtn details", "aria-expanded": !!open, "aria-controls": "why-" + r.id, "aria-label": `Details: ${r.company_name}, ${r.title}`,
-              onClick: () => onWhy(r.id), onKeyDown: whyKey }, open ? "Hide details" : "Details"))),
+        // was: the score button (or Rank for my major and Details) built here; matchControl (above) since
+        // 2026-10-14, shared with the paid box so both show the one score from the same scoreOf.
+        h("td", { className: "c-match" }, matchControl({ r, sc, scored, open, onToggle: () => onWhy(r.id), onRank, btnRef: whyBtn, onKeyDown: whyKey, panelId: "why-" + r.id })),
         h("td", { className: "c-links" },
           // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
           // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
@@ -412,6 +431,24 @@
     // id: the hero's "Search free" button focuses this box (2026-10-05).
     return h("input", { id: "q", type: "text", "aria-label": "Search", placeholder: 'Search roles or companies', title: 'Use quotes for a phrase or a minus sign to exclude a word, e.g. nursing -unpaid', value: text,
       onChange: e => setText(e.target.value), onKeyDown: e => { if (e.key === "Enter") { sent.current = text; onChange(text); } } });
+  }
+
+  // The list itself (2026-10-14): the table of `shown`, the "End of the N listings shown" line and "Show N
+  // more", plus the paid listing's box when there is one: above the table on a wide screen, and as its own
+  // full-width row after the third card on a phone (after the last, with fewer). The box is never a Row, so
+  // every count here, the header checkbox and the Auto-Apply selection come from `shown` alone, the same
+  // with or without it (tests/site/placements.test.mjs). was: the same markup inline in App.
+  function ListTable({ shown, rows, head, renderRow, box, phone, onMore }) {
+    const at = Math.min(3, shown.length) - 1;
+    return h(F, null,
+      !phone && box,
+      h("a", { className: "skip inline", href: "#list-end" }, "Skip past the listings"),
+      h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" }, head,
+        h("tbody", null, shown.flatMap((r, i) => phone && box && i === at
+          ? [renderRow(r), h("tr", { key: "placement", className: "paid-row" }, h("td", { colSpan: 5 }, box))]
+          : [renderRow(r)]))))),
+      h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
+      rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: onMore }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`)));
   }
 
   // Whether the window is phone-width (the same 760px as the card layout in index.html).
@@ -1238,34 +1275,37 @@
     const cq = useMemo(() => IS.compileQuery(f.q, words), [f.q, words]);
     // With words to rank by, the list comes in order of how well each role matches them (title, then
     // field, company, place and skills, then description), with the chosen sort as the tiebreak.
-    const ranked = !!(cq && cq.terms.some(t => !t.neg && !t.place));
-    const rows = useMemo(() => {
-      let r, rel = null;
-      if (cq) { rel = new Map(); r = []; for (const x of inView) { const m = IS.matchScore(x, cq); if (m) { rel.set(x, m); r.push(x); } } }
-      else r = inView.slice();
-      if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
-      if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
-      if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
-      else if (f.where === "remote") r = r.filter(IS.isRemote);
-      if (f.stage) r = r.filter(x => (x.stage || []).includes(f.stage));
-      if (f.year) r = r.filter(x => !(x.years && x.years.length) || x.years.includes(f.year));
-      if (f.sector) r = r.filter(x => x.sector === f.sector);
-      if (f.paid === "paid") r = r.filter(x => ["paid", "stipend"].includes(IS.payOf(x)));
-      else if (f.paid === "no_unpaid") r = r.filter(x => IS.payOf(x) !== "unpaid");
-      if (f.hide_citizen) r = r.filter(x => !IS.citizenBlocked(x, p ? p.work_auth : ""));
-      if (f.eligible && elig) r = r.filter(x => !scoreOf(x).mismatch && !blockers(x, elig).length);
-      // Looking at your own applications: a posting that has since closed still belongs in the list.
-      if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
-      if (f.new_only) r = r.filter(x => x.is_new);
-      if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
-      else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
-      // The order: newest first means dated postings first, newest first. first_seen is only the scan
-      // that found the row, which is today for nearly everything, so using it for undated rows put every
-      // undated posting on top. A search ranks by how well each role matches it, with the chosen sort as
-      // the tiebreak. was: four comparators here; IS.sortRows works each row's keys out once (core.js).
-      IS.sortRows(r, f.sort, scoreOf, ranked ? rel : null);
-      return r;
-    }, [inView, cq, f, appStates, jobs, elig, scoreOf, p]);
+    // The list (2026-10-14, B2 plan section 5): IS.listRows (core.js) applies the search, every filter and the
+    // sort, and hands back each row's relevance too. was: the same code inline here, as one useMemo returning
+    // rows, with `ranked` worked out just above it. It moved so tests can prove what may and may not change it.
+    const listed = useMemo(() => IS.listRows(inView, f, { cq, scoreOf, p, elig, blockers, appStates, jobs }), [inView, cq, f, appStates, jobs, elig, scoreOf, p]);
+    const rows = listed.rows, ranked = listed.ranked;
+
+    // Paid listings (2026-10-14, B2 plan section 5; js/placements.js). Everything above (the list, its order,
+    // every score and count) is finished before this runs, and nothing here writes to it: ISPlace.pick only
+    // reads the rows and names at most one of them for a separate box headed "Paid listing". That listing
+    // stays in the list at its own place. The box needs a search or a Field filter (the context gate), waits
+    // until the files have settled, and is off while "Your progress" is set. `exclude` is the saved profile's
+    // only part: it can hide a paid listing that doesn't fit (class year, citizenship, eligibility, season),
+    // never pick one. "Show paid listings" (More filters) is a display setting, not a filter: it is not in
+    // `f`, so it never counts as a filter, never goes in a saved search or the address, and never touches
+    // `rows`. With no placements.json, or CONFIG.placements === false, none of this shows.
+    const PL = window.ISPlace;
+    const [placements, setPlacements] = useState([]);
+    useEffect(() => { if (PL) PL.load().then(list => setPlacements(list || [])); }, []);
+    const [placeHidden, setPlaceHiddenRaw] = useState(() => !!(PL && IS.ls.get(PL.HIDE_KEY, false)));
+    // Kept for the session in React state even when the browser blocks storage.
+    const setPlaceHidden = on => { setPlaceHiddenRaw(on); if (PL) { if (on) IS.ls.set(PL.HIDE_KEY, true); else IS.ls.del(PL.HIDE_KEY); } };
+    const exclude = useCallback(x => !!(scoreOf(x).mismatch
+      || IS.citizenBlocked(x, p ? p.work_auth : "")
+      || (elig && blockers(x, elig).length > 0)
+      || (p && p.terms && p.terms.length && IS.termFit(x, p.terms) < .8)), [scoreOf, p, elig]);
+    // The last pick, kept while it still fits, so the box doesn't swap as files land or filters change.
+    const placedRef = useRef(null);
+    const placed = useMemo(() => PL ? PL.pick({ placements, rows, rel: listed.rel, ranked, fieldsSet: f.fields.length > 0, appState: f.app_state,
+      loading, day: new Date().toISOString().slice(0, 10), exclude, hidden: placeHidden, prev: placedRef.current, rand: Math.random }) : null,
+    [placements, listed, loading, placeHidden, exclude, f.fields.length, f.app_state]);
+    if (placed) placedRef.current = placed;
 
     const shown = rows.slice(0, limit);
     // Every file loaded: the list itself is the whole country.
@@ -1611,6 +1651,17 @@
     // (2026-10-14) they sit under the list on every screen: three promotions above it pushed the first
     // listing to about 794 px on a laptop. Above the list there is at most one standing notice (topNotice).
     const narrow = useNarrow();
+    // The paid listing's box (js/placements.js PaidBox), from the organic row's own helpers: factsLine,
+    // matchControl and Why, with the same scoreOf result. Hiding it says so in the live region and puts focus
+    // on the list's heading, since the button that was pressed goes away.
+    const hidePlacements = () => {
+      setPlaceHidden(true); setSpoken("Paid listings hidden. You can show them again under More filters.");
+      setTimeout(() => { const el = document.getElementById("listings"); if (el && el.focus) el.focus(); }, 0);
+    };
+    const placeBox = placed && PL ? h(PL.PaidBox, { key: placed.pl.id, x: placed.x, phone: narrow, facts: factsLine(placed.x, keySet),
+      renderMatch: (open, toggle, panelId) => matchControl({ r: placed.x, sc: scoreOf(placed.x), scored: !!ctx.p, open, onToggle: toggle, onRank: openSetup, panelId }),
+      renderWhy: close => h(Why, { r: placed.x, sc: scoreOf(placed.x), ctx, elig, patterns: stats && stats.skill_patterns, onClose: close, onRank: openSetup }),
+      onHide: hidePlacements }) : null;
     // The one standing notice above the list, by priority: the setup line, then "one step left" for an
     // installed extension that isn't set up. Whichever isn't shown there goes under the list.
     const oneStepEl = info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "),
@@ -1848,6 +1899,9 @@
         h("label", { className: "field toggle" }, h("input", { type: "checkbox", checked: f.new_only, onChange: e => upd("new_only", e.target.checked) }), "New only"),
         elig && h("label", { className: "field toggle", title: "Hide postings whose description rules you out (class year, grad year, citizenship, degree, sponsorship, passed deadline)" },
           h("input", { type: "checkbox", checked: f.eligible, onChange: e => upd("eligible", e.target.checked) }), "Hide not eligible"),
+        // Only once there are paid listings to show (2026-10-14). Not a filter: see placeHidden above.
+        placements.length > 0 && h("label", { className: "field toggle", title: "A paid listing shows in its own box, labelled Ad, and also in the list at its usual place" },
+          h("input", { type: "checkbox", checked: !placeHidden, onChange: e => setPlaceHidden(!e.target.checked) }), "Show paid listings"),
         h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
           saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`))))),
       // The count line (D17, 2026-10-14) says where the list looks, beside the number: "3,126 listings in the
@@ -1883,19 +1937,17 @@
         : loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
           // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
           : rows.length === 0 ? emptyEl
-            : h(F, null, h("a", { className: "skip inline", href: "#list-end" }, "Skip past the listings"),
-              h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" },
-              h("thead", null, h("tr", null,
+            // was: the skip link, the table, "End of the N listings shown" and "Show N more" inline here (ListTable now).
+            : h(ListTable, { shown, rows, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE),
+              head: h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
                 // was: Company and role, Field, Location and term, Pay, Match, Your status, Links. Field, place, term
                 // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
                 sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
-              h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
+              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns,
-                ask: askId === r.id, onOpen, onAnswer }))))),
-              h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
-              rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))))),
+                ask: askId === r.id, onOpen, onAnswer }) })),
 
       // was: narrow && promoEls
       promoEls,

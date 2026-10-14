@@ -503,6 +503,23 @@
   .flag .i,.tag .i{margin-right:4px}
   .flag.bad{color:var(--red)} .flag.warn{color:var(--amber)} .flag.good{color:var(--green)}
   .more{display:flex;justify-content:center;padding:var(--s4);border-top:1px solid var(--rule2)}
+  /* A paid listing (2026-10-14, B2 plan section 5; js/placements.js): its own bordered box, above the list on a
+     wide screen and after the third card on a phone, headed "Paid listing", with a bordered "Ad" before the
+     company name (the landing pages' .ad badge). Sunk, not panel, so it never reads as the list's first row.
+     Its text is ink, ink2 and ink3 on sunk, 4.5:1 or more light and dark (tests/site/placements.test.mjs). */
+  .paid{margin:0 0 var(--s3);padding:var(--s3) var(--s4) var(--s4);background:var(--sunk);border:1px solid var(--rule);border-radius:var(--r-lg)}
+  .paid-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--s1) var(--s4);margin-bottom:var(--s2)}
+  .paid-h{margin:0 auto 0 0;font:600 var(--fs-2)/1.4 var(--sans);color:var(--ink2)}
+  .paid-top .linkbtn{color:var(--ink2);font-weight:400;font-size:var(--fs-2);padding:2px 0}
+  .paid-about{margin:0 0 var(--s3);font-size:var(--fs-2);color:var(--ink2);max-width:78ch}
+  .paid-about p{margin:0 0 var(--s1)}
+  .paid-about a{color:var(--accent)}
+  .paid-body{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s3) var(--s5)}
+  .paid-main{flex:1 1 320px;min-width:0}
+  .paid-acts{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3)}
+  .ad{display:inline-block;margin-right:var(--s1);padding:0 6px;border:1px solid var(--ink3);border-radius:var(--r-sm);font:600 var(--fs-1)/18px var(--sans);color:var(--ink2);vertical-align:1px}
+  .paid-why{margin-top:var(--s3);padding-top:var(--s4);border-top:1px solid var(--rule)}
+  @media (pointer:coarse){.paid-top .linkbtn{display:inline-flex;align-items:center;min-height:var(--h-ctl-sm)}}
   footer{color:var(--ink3);font-size:var(--fs-2);padding:var(--s4) 0 var(--s7);max-width:78ch}
   /* 24px between footer links (D20, WCAG 2.5.8): was 4px between rows and 16px across. */
   footer .links{display:flex;gap:var(--s2) var(--s5);flex-wrap:wrap;align-items:center;margin-top:8px}
@@ -616,6 +633,11 @@
     /* A narrow desktop window (no touch) still gets the row Auto-Apply explainer; the card rule above
        zeroes every td's padding, so give it back like the Why panel's (2026-10-04). */
     tbody tr.aa-info td,tbody tr.ask td{padding:var(--s2) var(--s4)}
+    /* The paid listing's own row after the third card (2026-10-14): the box, full width, on the page colour. */
+    table.list tr.paid-row{display:block;padding:var(--s2) var(--s3);background:var(--paper)}
+    table.list tr.paid-row:hover td{background:none}
+    .paid.phone{margin:0;padding:var(--s3)}
+    .paid.phone .paid-main{flex-basis:100%}
     .whyg{gap:var(--s4)}
   }
 </style>
@@ -637,6 +659,9 @@
     repo: "bpmcginley/InternshipFinder",
     workflow: "ingest.yml",
     dataUrl: "./data/",
+    // Paid listings (js/placements.js): false skips fetching data/placements.json, so no paid box shows
+    // anywhere on the dashboard. The site build's INTERNSCOUT_PLACEMENTS_URL variable is the other switch.
+    placements: true,
     rawDataFallback: "https://raw.githubusercontent.com/bpmcginley/InternshipFinder/main/docs/data/",
     // was: // Sign-in stays hidden while this is an *.example.workers.dev placeholder.
     // The placeholder guard is still in js/core.js - workerOn() returns false for any
@@ -716,6 +741,9 @@
 <script defer crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
 <script defer crossorigin="anonymous" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script defer src="js/core.js"></script>
+<!-- Paid listings (2026-10-14): between core.js and app.js, which reads window.ISPlace. Nothing in it
+     touches the list, its order or its scores; with no data/placements.json it shows nothing. -->
+<script defer src="js/placements.js"></script>
 <script defer src="js/app.js"></script>
 <!-- The Auto-Apply offer when a posting it can fill is opened (2026-10-13). Plain JS, no React; the
      generated pages load the same file (backend/internscout/seo_pages.py OFFER_TAG). -->

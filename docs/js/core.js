@@ -442,6 +442,47 @@
     return list;
   }
 
+  // The dashboard's list (2026-10-14, B2 plan section 5): every search word, filter and the chosen sort,
+  // applied to the rows in view. Moved here from app.js unchanged, so it can be tested on its own
+  // (tests/site/core.test.mjs checks it against the old inline code). It reads only its three arguments:
+  //   inView: the loaded rows the scope covers; f: the filters (app.js `f`);
+  //   env: { cq, scoreOf, p, elig, blockers, appStates, jobs }: the compiled search (or null), the
+  //   memoised IS.score, the saved profile, the eligibility profile, app.js blockers(), the student's own
+  //   marks and the Auto-Apply jobs by listing id.
+  // Returns { rows, rel, ranked }: the list in order; each row's search relevance (a Map, or null with no
+  // search); and whether the search has words to rank by.
+  // was (app.js): const ranked = ...; const rows = useMemo(() => { ... IS.sortRows(...); return r; }, [...]);
+  function listRows(inView, f, env) {
+    const { cq, scoreOf, p, elig, blockers, appStates, jobs } = env;
+    const st = id => appStates[id] || "none";
+    const ranked = !!(cq && cq.terms.some(t => !t.neg && !t.place));
+    let r, rel = null;
+    if (cq) { rel = new Map(); r = []; for (const x of inView) { const m = matchScore(x, cq); if (m) { rel.set(x, m); r.push(x); } } }
+    else r = inView.slice();
+    if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
+    if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
+    if (f.where === "onsite") r = r.filter(x => regs(x).some(g => g.kind !== "remote"));
+    else if (f.where === "remote") r = r.filter(isRemote);
+    if (f.stage) r = r.filter(x => (x.stage || []).includes(f.stage));
+    if (f.year) r = r.filter(x => !(x.years && x.years.length) || x.years.includes(f.year));
+    if (f.sector) r = r.filter(x => x.sector === f.sector);
+    if (f.paid === "paid") r = r.filter(x => ["paid", "stipend"].includes(payOf(x)));
+    else if (f.paid === "no_unpaid") r = r.filter(x => payOf(x) !== "unpaid");
+    if (f.hide_citizen) r = r.filter(x => !citizenBlocked(x, p ? p.work_auth : ""));
+    if (f.eligible && elig) r = r.filter(x => !scoreOf(x).mismatch && !blockers(x, elig).length);
+    // Looking at your own applications: a posting that has since closed still belongs in the list.
+    if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
+    if (f.new_only) r = r.filter(x => x.is_new);
+    if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
+    else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
+    // The order: newest first means dated postings first, newest first. first_seen is only the scan
+    // that found the row, which is today for nearly everything, so using it for undated rows put every
+    // undated posting on top. A search ranks by how well each role matches it, with the chosen sort as
+    // the tiebreak.
+    sortRows(r, f.sort, scoreOf, ranked ? rel : null);
+    return { rows: r, rel, ranked };
+  }
+
   // ---------- eligibility helpers ----------
   const restr = x => x.restrictions || [];
   const citizenRule = x => restr(x).includes("us_citizen_only") ? "citizen" : ((x.insights || {}).citizenship || null);
@@ -1183,11 +1224,13 @@
     emptyProfile, loadProfile, saveProfile, profileKeys, demandStates, ALL_KEY, viewScope, FIRST_KEYS, loadPlan,
     FILTER_PARAMS, filtersFromUrl, filterParams, filterSearch,
     parseQuery, splitPlaces, queryKeys, placeWords, stem, compileQuery, matchScore, majorForFields,
-    regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, handledListingIds, heldUrls, SELECT_MAX, headerChecked, selectRows, sortRows, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
+    regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, handledListingIds, heldUrls, SELECT_MAX, headerChecked, selectRows, sortRows, listRows, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
     // was: WEIGHTS, PART_LABEL, profileFields, score,
     // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the
     // student's own tag, not the biggest one in the Set profileFields returns.
     WEIGHTS, PART_LABEL, profileFields, primaryField, score,
+    // termFit (2026-10-14): the dashboard's season check that can only hide a listing from its own box.
+    termFit,
     createStore, loadMajors, majorsNote, loadStats,
     ext, bridgeProfile, fromBridgeProfile,
     // was: workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, ...
