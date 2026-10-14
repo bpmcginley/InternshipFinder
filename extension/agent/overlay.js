@@ -13,7 +13,7 @@
   // equal). was: hex values typed in, with amber #9a6412 and green #1f7a4d under WCAG AA, ink3 #868b92 (3.2:1),
   // light only. The page's own fonts can't be loaded inside a shadow root, so the faces fall back to the system's.
   root.innerHTML = `<style>
-    :host{--paper:#f6f4ef;--panel:#fffefb;--sunk:#efece5;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;--rule2:#ece9e1;--field-border:#80858c;--accent:#1d5c46;--accent-ink:#fff;--accent-hover:#164a38;--accent-soft:#e3eee8;--blue:#2b5aa0;--amber:#8c5a0f;--amber-soft:#f6ecd9;--green:#1d7549;--red:#a8362c;--sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;--fs-1:12px;--fs-2:13px;--fs-3:15px;--r:6px;--r-lg:8px;--shadow-pop:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent)}
+    :host{--paper:#f6f4ef;--panel:#fffefb;--sunk:#efece5;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;--rule2:#ece9e1;--field-border:#80858c;--accent:#1d5c46;--accent-ink:#fff;--accent-hover:#164a38;--accent-soft:#e3eee8;--blue:#2b5aa0;--amber:#8c5a0f;--amber-soft:#f6ecd9;--green:#1d7549;--red:#a8362c;--sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;--fs-1:12px;--fs-2:13px;--fs-3:15px;--r-sm:4px;--r:6px;--r-lg:8px;--shadow-pop:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent)}
     @media (prefers-color-scheme:dark){:host{--paper:#131416;--panel:#1a1b1e;--sunk:#232427;--ink:#ecebe6;--ink2:#b8b6af;--ink3:#95948e;--rule:#2c2d31;--rule2:#232427;--field-border:#6e7077;--accent:#7cc3a1;--accent-ink:#0f1a15;--accent-hover:#95d2b3;--accent-soft:#1c2a24;--blue:#8fb2e8;--amber:#e0b25e;--amber-soft:#2e2717;--green:#7cc3a1;--red:#e48a80}}
     .card{font:var(--fs-2)/1.45 var(--sans);background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-top:2px solid var(--ink);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);width:300px;padding:11px 13px 12px}
     .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -22,7 +22,10 @@
     .working .dot{background:var(--blue);animation:p 1.2s infinite}.needs_you .dot{background:var(--amber)}.ready_to_submit .dot{background:var(--green)}.submitted .dot{background:var(--green)}.failed .dot{background:var(--red)}
     @keyframes p{50%{opacity:.35}}
     @media (prefers-reduced-motion:reduce){.working .dot{animation:none}}
-    b{font-weight:600}.muted{color:var(--ink3);font-size:var(--fs-1)}.co{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    b{font-weight:600}.muted{color:var(--ink3);font-size:var(--fs-1)}
+    .co{color:var(--ink2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.co b{color:var(--ink)}
+    .st{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:var(--fs-1);font-weight:500;color:var(--ink2);white-space:nowrap;background:var(--sunk);padding:2px 8px 2px 6px;border-radius:var(--r-sm)}
+    .needs_you .st{color:var(--amber);background:var(--amber-soft)}.ready_to_submit .st,.submitted .st{color:var(--green);background:var(--accent-soft)}.failed .st{color:var(--red)}
     .msg{margin:6px 0;white-space:pre-wrap}
     ul{margin:4px 0 6px 16px;padding:0;color:var(--ink2)}
     .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
@@ -30,11 +33,13 @@
     button:hover{border-color:var(--ink3)}
     button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
     button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+    button.quiet{background:transparent;border-color:transparent;color:var(--accent);padding:0 6px}
+    button.quiet:hover{border-color:transparent;text-decoration:underline;text-underline-offset:3px}
     :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     textarea{width:100%;box-sizing:border-box;background:var(--panel);color:var(--ink);border:1px solid var(--field-border);border-radius:var(--r);padding:6px 8px;font:inherit;min-height:52px;margin-top:6px}
     .x{margin-left:auto;background:none;border:0;color:var(--ink3);min-height:0;padding:0 2px}
     .min .body{display:none}
-  </style><div class="card" id="card"><div class="top"><span class="dot"></span><b>InternScout</b><span class="muted" id="st"></span><button class="x" id="min" title="Minimize">–</button></div><div class="body" id="body"></div></div>`;
+  </style><div class="card" id="card"><div class="top"><span class="dot"></span><b>InternScout</b><button class="x" id="min" title="Minimize" aria-label="Minimize">–</button></div><div class="body" id="body"></div></div>`;
   const $ = (s) => root.querySelector(s);
   let job = null, lastHtml = "";
 
@@ -48,8 +53,7 @@
   function stale() {
     if (!host.isConnected) return;
     $("#card").className = "card failed";
-    $("#st").textContent = "· Reload this page";
-    $("#body").innerHTML = `<div class="msg">InternScout was updated or reloaded, so this card lost its connection. Reload this page, then use the side panel to resume.</div>`;
+    $("#body").innerHTML = `<div><span class="st">Reload this page</span></div><div class="msg">InternScout was updated or reloaded, so this card lost its connection. Reload this page, then use the side panel to resume.</div>`;
   }
   function msg(m, cb) {
     if (!alive()) { stale(); return; }
@@ -63,8 +67,9 @@
     if (!j) { host.remove(); return; }
     if (!host.isConnected) (document.body || document.documentElement).appendChild(host);
     $("#card").className = "card " + j.status + ($("#card").classList.contains("min") ? " min" : "");
-    $("#st").textContent = "· " + (LABEL[j.status] || j.status);
-    let h = `<div class="co muted">${esc(j.company)} · ${esc(j.title)}</div>`;
+    // Company and title on the first line, then the status chip, then one row of actions (A2 component 8,
+    // D25). was: the status beside "InternScout" and the company and title in small grey text.
+    let h = `<div class="co"><b>${esc(j.company)}</b> · ${esc(j.title)}</div><div><span class="st">${esc(LABEL[j.status] || j.status)}</span></div>`;
     if (j.status === "working") {
       h += `<div class="msg">${esc(j.activity || "Reading the page…")}</div><div class="row"><button id="pause">Pause</button><button id="take">Take over</button></div>`;
     } else if (j.status === "needs_you") {
@@ -74,7 +79,11 @@
       h += `<div class="msg"><b>Review, then press Submit yourself.</b> Green = filled by the agent, amber = still empty, red = the submit button.</div>`;
       if (j.summary) h += `<div class="muted">${esc(j.summary)}</div>`;
       if (j.double_check && j.double_check.length) h += `<ul>${j.double_check.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>`;
-      h += `<div class="row"><button id="more">Keep going</button><button id="done">I submitted it</button></div>`;
+      // "I submitted it" first and as the main button; "Check the form again" last and quiet. was: "Keep going"
+      // first, which read like "go on and submit" at the moment the student is about to; it starts another
+      // pass over the form (control "resume"). The side panel adds "Review and submit" between them
+      // (sidepanel/card.js); here the student is already on the form.
+      h += `<div class="row"><button class="primary" id="done">I submitted it</button><button class="quiet" id="more">Check the form again</button></div>`;
     } else if (j.status === "submitted") {
       h += `<div class="msg">Submitted ✓ Marked as applied on your dashboard.</div>`;
     } else if (j.status === "failed") {

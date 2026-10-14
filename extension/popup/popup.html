@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="utf-8">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>InternScout</title>
 <link rel="stylesheet" href="../lib/theme.css">
 <style>
 body{width:300px}
@@ -46,10 +46,13 @@ body{width:300px}
   <div class="muted" id="tier" hidden></div>
 </div>
 <div class="actions">
+  <!-- Before setup: one main button that says what it is and how long it takes (lib/entry.js). was: "Start Deep Dive" in the half-width slot below. -->
+  <button class="btn primary" id="setup" hidden>Set up Auto-Apply (about 2 minutes)</button>
   <button class="btn primary" id="queue">Open queue</button>
-  <div class="pair"><button class="btn" id="dash">Dashboard</button><button class="btn" id="dive">Deep Dive</button></div>
+  <div class="pair"><button class="btn" id="dash">Dashboard</button><button class="btn" id="dive">Edit setup</button></div>
 </div>
-<!-- Always here, for anyone who wants to leave a review without being asked (lib/review.js). -->
-<div class="foot"><button class="link" id="review">Leave a review</button></div>
+<!-- For anyone who wants to leave a review without being asked (lib/review.js), once setup is done
+     (lib/entry.js). was: always here, even before the student had used anything. -->
+<div class="foot" id="foot" hidden><button class="link" id="review">Leave a review</button></div>
 <script type="module" src="popup.js"></script>
 </body></html>

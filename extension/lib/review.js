@@ -21,7 +21,7 @@ export const STORE_REVIEWS_URL = "https://chromewebstore.google.com/detail/inter
 export const FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
 // Filled applications after which the card appears. Two asks at most, ever.
 export const MILESTONES = [2, 10];
-const MAX_IDS = 500;   // job ids already counted, so "Keep going" or a retry doesn't count a job twice
+const MAX_IDS = 500;   // job ids already counted, so "Check the form again" or a retry doesn't count a job twice
 
 // Statuses that mean the agent finished filling: ready_to_submit is the success moment, and a job
 // marked submitted got there too.

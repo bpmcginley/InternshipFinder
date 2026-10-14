@@ -28,14 +28,12 @@ body{margin:0;background:var(--paper);color:var(--ink);font:var(--fs-2)/var(--lh
 .btn:hover:not(:disabled){border-color:var(--ink3)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
-/* .btn.blue was an ink-black fill, a second "main" colour beside the green primary. It now looks like
-   primary until the extension lane changes the markup to .btn.primary (onboarding.js Next, sign-in, Send). */
-.btn.blue{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.blue:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
+/* .btn.blue (an ink-black fill, a second "main" colour beside the green primary) is gone: onboarding.js
+   Next, Sign in with Google and Send use .btn.primary (D25). */
 .btn.quiet{background:transparent;border-color:transparent;color:var(--accent);padding:0 8px}
 .btn.quiet:hover:not(:disabled){border-color:transparent;text-decoration:underline;text-underline-offset:3px}
 .btn.small{min-height:var(--h-ctl-sm);padding:0 10px;font-size:var(--fs-2)}
-.btn:disabled,.btn.primary:disabled,.btn.blue:disabled{color:var(--ink3);background:var(--sunk);border-color:var(--field-border);cursor:default}
+.btn:disabled,.btn.primary:disabled{color:var(--ink3);background:var(--sunk);border-color:var(--field-border);cursor:default}
 .btn.quiet:disabled{background:transparent;border-color:transparent}
 /* Text inputs and selects (A2 component 2): 40px, a field-border edge (3:1), the shared chevron on a
    select instead of the native arrow, a red edge when invalid with the message (.field-err) tied to the

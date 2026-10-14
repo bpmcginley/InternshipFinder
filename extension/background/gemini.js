@@ -88,7 +88,7 @@ export function buildGeminiBody({ system, messages, tools, max_tokens = 4096, th
 }
 
 export async function callGemini({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {
-  if (!apiKey) throw new Error("No Gemini API key. Open Deep Dive → Setup.");
+  if (!apiKey) throw new Error("No Gemini API key. Open Auto-Apply setup → Setup.");
   const body = buildGeminiBody({ system, messages, tools, max_tokens, thinking });
   let lastErr = "";
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -136,8 +136,8 @@ export function buildWorkerRequest({ task, run_id, ...opts }) {
   return { task, ...(run_id ? { run_id } : {}), request: buildGeminiBody(opts) };
 }
 
-const SIGN_IN_HINT = "Sign in with Google or Microsoft in the InternScout popup or Deep Dive → Setup";
-const OWN_KEY_HINT = "or add your own key under Deep Dive → Setup → Advanced";
+const SIGN_IN_HINT = "Sign in with Google or Microsoft in the InternScout popup or Auto-Apply setup → Setup";
+const OWN_KEY_HINT = "or add your own key under Auto-Apply setup → Setup → Advanced";
 
 // Turns a Worker error reply into an Error with .code and a message a student can act on.
 export function workerError(status, data = {}) {
@@ -164,7 +164,7 @@ export function workerError(status, data = {}) {
   } else if (code === "rate") msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
   // Not this student's own limit: everyone's calls together hit the server's per-minute ceiling. Say so,
   // or they read it as a punishment and cut back for no reason.
-  else if (code === "busy") msg = `InternScout is busy right now — too many students using AI this minute. It should clear in ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}.`;
+  else if (code === "busy") msg = `InternScout is busy right now: too many students are using AI this minute. It should clear in ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}.`;
   else if (code === "paused") msg = `InternScout AI is paused for everyone until the monthly budget resets. Search still works; to keep applying, ${OWN_KEY_HINT.replace(/^or /, "")}.`;
   else if (code === "upstream") msg = "The AI service had a problem. Try again shortly.";
   else msg = `InternScout rejected the request (${status}${data.message ? `: ${data.message}` : ""}).`;
