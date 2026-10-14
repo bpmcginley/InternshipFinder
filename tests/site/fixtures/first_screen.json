@@ -1,0 +1,282 @@
+{
+ "rows": [
+  {
+   "id": "a",
+   "company_name": "Co a",
+   "title": "Intern a",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": "2026-10-10",
+   "first_seen": "2026-10-14T10:00:00+00:00",
+   "regions": [
+    {
+     "loc": "MA place",
+     "state": "MA",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "b",
+   "company_name": "Co b",
+   "title": "Intern b",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": "2026-10-12",
+   "first_seen": "2026-10-14T10:00:00+00:00",
+   "regions": [
+    {
+     "loc": "NY place",
+     "state": "NY",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "c",
+   "company_name": "Co c",
+   "title": "Intern c",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": "2026-10-13",
+   "first_seen": "2026-10-14T10:00:00+00:00",
+   "regions": [
+    {
+     "loc": "CA place",
+     "state": "CA",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "d",
+   "company_name": "Co d",
+   "title": "Intern d",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": "2026-10-11",
+   "first_seen": "2026-10-14T10:00:00+00:00",
+   "regions": [
+    {
+     "loc": "None place",
+     "state": null,
+     "kind": "remote"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "e",
+   "company_name": "Co e",
+   "title": "Intern e",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": null,
+   "first_seen": "2026-10-14T11:00:00+00:00",
+   "regions": [
+    {
+     "loc": "NJ place",
+     "state": "NJ",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "f",
+   "company_name": "Co f",
+   "title": "Intern f",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": "2026-10-12",
+   "first_seen": "2026-10-13T09:00:00+00:00",
+   "regions": [
+    {
+     "loc": "CT place",
+     "state": "CT",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "g",
+   "company_name": "Co g",
+   "title": "Intern g",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "closed",
+   "posted_at": "2026-10-13",
+   "first_seen": "2026-10-14T10:00:00+00:00",
+   "regions": [
+    {
+     "loc": "VT place",
+     "state": "VT",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "h",
+   "company_name": "Co h",
+   "title": "Intern h",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": null,
+   "first_seen": "2026-10-12T11:00:00+00:00",
+   "regions": [
+    {
+     "loc": "ME place",
+     "state": "ME",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  },
+  {
+   "id": "i",
+   "company_name": "Co i",
+   "title": "Intern i",
+   "field_tags": [
+    "health"
+   ],
+   "stage": [
+    "internship"
+   ],
+   "status": "open",
+   "posted_at": "2026-09-30",
+   "first_seen": "2026-10-14T10:00:00+00:00",
+   "regions": [
+    {
+     "loc": "RI place",
+     "state": "RI",
+     "kind": "us"
+    }
+   ],
+   "description": "long text",
+   "region_locations": [
+    "x"
+   ],
+   "score_parts": {
+    "source": 1,
+    "other": 2
+   }
+  }
+ ],
+ "n": 5,
+ "expected": [
+  "b",
+  "f",
+  "d",
+  "a",
+  "i"
+ ],
+ "expected_all": [
+  "b",
+  "f",
+  "d",
+  "a",
+  "i",
+  "e",
+  "h"
+ ]
+}

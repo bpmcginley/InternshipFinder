@@ -581,7 +581,10 @@
       if (timeoutMs) timer = setTimeout(() => { fail(new Error("Download timed out")); if (controller) controller.abort(); }, timeoutMs);
     };
     const request = async () => {
-      const r = await fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) });
+      // A request the page head already started for this address (index.html, window.__early), used once.
+      const early = !bust && window.__early && window.__early[url];
+      if (early) delete window.__early[url];
+      const r = await (early || fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) }));
       quiet();
       if (!r.ok) { const e = new Error("HTTP " + r.status + " for " + url); e.status = r.status; throw e; }
       const reader = r.body && typeof r.body.getReader === "function" && typeof TextDecoder !== "undefined" ? r.body.getReader() : null;
@@ -669,6 +672,24 @@
       return [...new Set(keys)].filter(k => failed.has(k));
     }
 
+    // The first screen (2026-10-14, P2): data/first.json, the top rows of a first visit's list (no
+    // profile, newest first, the Northeast and remote), written by the export with the state files
+    // (backend/internscout/export_static.py first_screen). One small request, so the list can paint
+    // before the 550 KB of state files arrive. The rows are copies of rows in those files, and add()
+    // keeps the first copy of an id, so nothing changes when the files land. Fetched once per
+    // init; a missing or failed file is no loss, the state files carry every row anyway.
+    let primed = null;
+    function primer() {
+      if (legacy || !index || !index.first || !index.first.file || !index.first.rows) return Promise.resolve(false);
+      if (primed && primed.epoch === generation) return primed.pr;
+      const epoch = generation;
+      const pr = getJSON(base + index.first.file, bust, Math.min(timeoutMs, 5000))
+        .then(d => { if (epoch !== generation || !Array.isArray(d)) return false; add(d); return true; })
+        .catch(() => false);
+      primed = { epoch, pr };
+      return pr;
+    }
+
     // Descriptions live beside each shard (<file> -> <file>.desc.json, {id: text}) so the list
     // loads without them; they are fetched only for search and Auto-Apply. Older exports carry
     // them inline on the row, and then the sidecar simply doesn't exist.
@@ -708,7 +729,7 @@
     }
 
     return {
-      init, ensure, descs,
+      init, ensure, descs, primer,
       all: () => [...byId.values()],
       version: () => version,
       index: () => index,
