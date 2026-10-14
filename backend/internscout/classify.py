@@ -569,7 +569,7 @@ def years_of(title: str, insights: dict | None = None) -> list[str]:
     ys: set[str] = set()
     if re.search(r"\bph\.?\s?d\b|\bdoctoral\b", t, re.I) or ins.get("degree_only") == "phd":
         ys.add("phd")
-    if (re.search(r"\bmasters?\b|\bmba\b|\bmpp\b|\bmph\b|graduate (student|intern|co-?op)|(?<!, )\bms\b(?!\s*office)", t, re.I)
+    if (re.search(r"\bmasters?\b|\bmba\b|\bmpp\b|\bmph\b|graduate (student|intern|co-?op)|(?<!, )\bm\.?s\.?(?!\w|\s*office)", t, re.I)
             or ins.get("degree_only") == "masters"):
         ys.add("masters")
     standing = set()
@@ -584,7 +584,7 @@ def years_of(title: str, insights: dict | None = None) -> list[str]:
             standing.add(s)
     if standing:
         ys |= standing
-    elif re.search(r"undergrad|\bug\b|bachelor", t, re.I):
+    elif re.search(r"undergrad|\bug\b|bachelor|\bb\.?[sa]\.?(?!\w)", t, re.I):
         ys.update(_UNDERGRAD)
     return [y for y in YEARS if y in ys]
 

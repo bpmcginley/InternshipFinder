@@ -63,7 +63,7 @@ globalThis.fetch = async (url, opts) => {
 
 const { emptyStore } = await import("../lib/store.js");
 const { addJobs, updateJob, getJob, loadMsgs } = await import("../background/queue.js");
-const { runJob, resumeJob, takeBack, EARLY_READY_PUSHBACK } = await import("../background/agent.js");
+const { runJob, resumeJob, takeBack, stopJob, accountCreationConfirmed, EARLY_READY_PUSHBACK } = await import("../background/agent.js");
 
 const store = emptyStore();
 store.ai = { provider: "anthropic", apiKey: "test-key", geminiKey: "", model: "claude-sonnet-5" };
@@ -155,6 +155,73 @@ test("Pause then Resume while a reply is in flight starts one fresh run instead 
   assert.deepEqual(actions, [], "the first run's reply was dropped");
   assert.equal(j.status, "needs_you");
   assert.equal(j.reason, "Pick a start date yourself.");
+});
+
+test("Take over during a page wait prevents later automatic prefill", async () => {
+  const id = await newJob();
+  let paused = false;
+  const getTab = chrome.tabs.get, fastFill = window.ISDom.fastFill;
+  chrome.tabs.get = async (tabId) => {
+    if (!paused) { paused = true; await takeBack(id, TOOK_OVER); }
+    return getTab(tabId);
+  };
+  window.ISDom.fastFill = async () => { actions.push("automatic prefill"); return ["Phone = test value"]; };
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    assert.deepEqual(actions, []);
+    assert.equal((await getJob(id)).reason, TOOK_OVER.reason);
+  } finally { chrome.tabs.get = getTab; window.ISDom.fastFill = fastFill; }
+});
+
+test("cancellation during the final ownership read prevents prefill even before storage status changes", async () => {
+  const id = await newJob();
+  const get = chrome.storage.local.get, execute = chrome.scripting.executeScript, fastFill = window.ISDom.fastFill;
+  let armed = false, cancelled = false;
+  chrome.scripting.executeScript = async (options) => {
+    const result = await execute(options);
+    if (options.files?.includes("agent/dom.js")) armed = true;
+    return result;
+  };
+  chrome.storage.local.get = async (key) => {
+    const stale = await get(key);
+    if (armed && key === "queue" && !cancelled) { cancelled = true; stopJob(id); }
+    return stale;
+  };
+  window.ISDom.fastFill = async () => { actions.push("automatic prefill"); return ["Phone = test value"]; };
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    assert.equal(cancelled, true);
+    assert.deepEqual(actions, []);
+    assert.equal(calls, 0);
+  } finally {
+    chrome.storage.local.get = get; chrome.scripting.executeScript = execute; window.ISDom.fastFill = fastFill;
+  }
+});
+
+test("typing a generated password keeps signup pending instead of claiming an existing account", async () => {
+  const id = await newJob();
+  data.store.accounts = [];
+  data.store.settings.signup_email = "fixture@example.test";
+  const snapshot = window.ISDom.snapshot;
+  window.ISDom.snapshot = () => ({ ...snapshot(), elements: [{ ref: "e1", kind: "password", label: "Password", value: "" }] });
+  replies = [[use("secret", "fill_secret", { ref: "0:e1" }), use("pause", "pause_for_user", { reason: "Fixture sign-up unfinished" })]];
+  try {
+    await runJob(id);
+    assert.equal(data.store.accounts.length, 1);
+    assert.equal(data.store.accounts[0].state, "pending");
+    assert.ok(data.store.accounts[0].password.length >= 18);
+  } finally { window.ISDom.snapshot = snapshot; }
+});
+
+test("signup confirmation requires explicit success without an error or verification gate", () => {
+  const frame = { headings: ["Your account was successfully created"], elements: [], errors: [], text: "" };
+  assert.equal(accountCreationConfirmed(frame), true);
+  assert.equal(accountCreationConfirmed({ ...frame, errors: ["Invalid email"] }), false);
+  assert.equal(accountCreationConfirmed({ ...frame, elements: [{ kind: "password" }] }), false);
+  assert.equal(accountCreationConfirmed({ ...frame, headings: ["Verify your email"] }), false);
+  assert.equal(accountCreationConfirmed({ ...frame, headings: ["Your account was not created"] }), false);
 });
 
 test("the early ready_to_submit pushback never names Apply", () => {

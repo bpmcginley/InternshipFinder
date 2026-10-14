@@ -4,9 +4,9 @@ import { callGemini, callWorker, taskFor } from "./gemini.js";
 import { recordUsage } from "../lib/usage.js";
 import { WORKER_URL } from "../lib/config.js";
 import { ensureToken, refreshAfter401 } from "../lib/auth.js";
+import { abortableSleep as sleep, throwIfAborted } from "./abort.js";
 
 const URL = "https://api.anthropic.com/v1/messages";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // provider "internscout": the InternScout Worker with the Google/Microsoft sign-in token. Not billed to the student,
 // so nothing is added to the local spend meter. task defaults from kind (see taskFor); run_id groups the
@@ -35,6 +35,7 @@ export async function callClaude({ apiKey, model, system, messages, tools, max_t
   if (thinking && !/haiku/.test(model)) body.thinking = thinking;
   let lastErr = "";
   for (let attempt = 0; attempt < 5; attempt++) {
+    throwIfAborted(signal);
     let res;
     try {
       res = await fetch(URL, {
@@ -49,18 +50,23 @@ export async function callClaude({ apiKey, model, system, messages, tools, max_t
         body: JSON.stringify(body),
       });
     } catch (e) {
-      if (signal && signal.aborted) throw e;   // Pause / Take over (agent.js stopJob): no retries
+      if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = e.message;
-      await sleep(1500 * 2 ** attempt);
+      await sleep(1500 * 2 ** attempt, signal);
       continue;
     }
+    throwIfAborted(signal);
     if (res.status === 429 || res.status === 529 || res.status >= 500) {
       lastErr = `${res.status}`;
       const ra = +res.headers.get("retry-after");
-      await sleep(ra ? ra * 1000 : 1500 * 2 ** attempt);
+      await sleep(ra ? ra * 1000 : 1500 * 2 ** attempt, signal);
       continue;
     }
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch((e) => {
+      if (signal?.aborted || e.name === "AbortError") throw e;
+      return {};
+    });
+    throwIfAborted(signal);
     if (!res.ok) throw new Error(`Claude API ${res.status}: ${(data.error && data.error.message) || "request failed"}`);
     return data;
   }

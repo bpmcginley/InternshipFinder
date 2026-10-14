@@ -175,13 +175,17 @@ def extract(text: str | None, today: date | None = None) -> dict:
     if years:
         out["grad_years"] = sorted(years)
 
-    standing = {s.lower().rstrip("s") for s in re.findall(
-        r"\b(?:rising|current(?:ly)? an?|incoming)\s+(freshm[ae]n|sophomores?|juniors?|seniors?)\b", text, re.I)}
-    standing |= {s.lower().rstrip("s") for s in re.findall(
-        r"\b(sophomores?|juniors?|seniors?)(?:\s+(?:or|and)\s+(?:sophomores?|juniors?|seniors?))?\s+(?:year|standing|students?|undergraduates?)\b", text, re.I)}
-    standing |= {s.lower() for s in re.findall(
-        r"\b(?:sophomore|junior|senior)s?\s+or\s+(sophomore|junior|senior)s?\s+(?:year|standing|students?)", text, re.I)}
-    standing = {"freshman" if s.startswith("freshm") else s for s in standing}
+    # Read every year in a qualifying clause, rather than capturing only the first
+    # alternative in "junior and senior students" or a comma-separated list.
+    year_word = r"freshm[ae]n|first[- ]years?|sophomores?|juniors?|seniors?"
+    year_list = rf"(?:{year_word})(?:\s*(?:,?\s*(?:or|and)|[,/])\s*(?:{year_word}))*"
+    clauses = re.findall(
+        rf"\b({year_list})\s+(?:year|standing|students?|undergraduates?)\b", text, re.I)
+    clauses += re.findall(
+        rf"\b(?:rising|current(?:ly)?(?: an?)?|incoming)\s+({year_list})\b", text, re.I)
+    standing = {s.lower().rstrip("s") for clause in clauses
+                for s in re.findall(rf"\b(?:{year_word})\b", clause, re.I)}
+    standing = {"freshman" if s.startswith(("freshm", "first")) else s for s in standing}
     if standing:
         out["class_standing"] = sorted(standing)
 

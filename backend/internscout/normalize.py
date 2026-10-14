@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
+from urllib.parse import unquote
 from .classify import classify, stage_of, SECTOR_FIELDS, employer_research_field
 from .region import evaluate_locations
 
@@ -343,7 +344,10 @@ def normalize(raw: dict) -> dict | None:
     #   was: ps, py_ = parse_term_from_text(f"{title} {description}")
     desc = raw.get("description", "") or ""
     ts, ty = parse_term_from_text(title)
-    us, uy = parse_term_from_text(raw.get("apply_url") or raw.get("url") or "")
+    # ATS paths contain posting dates and requisition numbers. Only an explicit
+    # season/year pair in the URL may override the description's actual term.
+    url_words = re.sub(r"[-_/+]+", " ", unquote(raw.get("apply_url") or raw.get("url") or ""))
+    us, uy = parse_term_pair(url_words)
     ds, dy = parse_term_pair(desc)
     ls, _ = parse_term_from_text(desc)
     ps = ts or us or ds or ls

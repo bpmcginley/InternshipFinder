@@ -59,7 +59,7 @@ def test_eeo_boilerplate_is_not_a_restriction():
 def test_phd_only_and_standing():
     assert extract("Open to PhD students in machine learning.")["degree_only"] == "phd"
     assert "degree_only" not in extract("Open to undergraduate and PhD students.")
-    assert extract("For rising juniors or seniors.")["class_standing"] == ["junior"]
+    assert extract("For rising juniors or seniors.")["class_standing"] == ["junior", "senior"]
     assert extract("Open to sophomore or junior students")["class_standing"] == ["junior", "sophomore"]
 
 

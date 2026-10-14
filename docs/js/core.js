@@ -148,6 +148,16 @@
   // A Canadian role is usually open only to people allowed to work in Canada, which a US student
   // generally is not without a permit. The card says so rather than leave it to the posting.
   const inCanadaOnly = x => { const r = regs(x); return r.length > 0 && r.every(g => g.kind === "canada"); };
+  const isRemote = x => !!x.is_remote || regs(x).some(g => g.kind === "remote" || g.remote || REMOTE_RE.test(g.loc || ""));
+  const realSalary = x => {
+    const s = String(x.salary || "").trim(), nums = (s.match(/\d[\d,]*(?:\.\d+)?/g) || []).map(n => Number(n.replace(/,/g, "")));
+    return s && (!nums.length || (nums[0] !== 0 && nums.some(n => n !== 0))) ? s : "";
+  };
+  const applicationBatch = (list, max = 100) => {
+    const unique = [...new Map(list.filter(x => x.apply_url).map(x => [String(x.id), x])).values()];
+    return { batch: unique.slice(0, max), remaining: unique.slice(max) };
+  };
+  const queuedListingIds = (ids, queue) => ids.map(id => queue && queue.jobs && queue.jobs[id]).filter(j => j && j.listingId != null).map(j => String(j.listingId));
 
   // ---------- eligibility helpers ----------
   const restr = x => x.restrictions || [];
@@ -155,7 +165,7 @@
   const noSponsorship = x => restr(x).includes("no_sponsorship") || !!(x.insights || {}).no_sponsorship;
   const payOf = x => {
     const r = restr(x).find(t => t === "paid" || t === "unpaid" || t === "stipend");
-    return r || (x.insights || {}).pay || (x.salary ? "paid" : null);
+    return r || (x.insights || {}).pay || (realSalary(x) ? "paid" : null);
   };
   // Hidden for this student because of citizenship rules. With no work authorization given, hide any citizen rule.
   function citizenBlocked(x, workAuth) {
@@ -261,19 +271,29 @@
   }
 
   // ---------- data loading (sharded, with the single-file fallback) ----------
-  async function getJSON(url, bust) {
-    const r = await fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache" });
-    if (!r.ok) throw new Error("HTTP " + r.status + " for " + url);
-    return r.json();
+  async function getJSON(url, bust, timeoutMs = 15000) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    let timer;
+    const request = async () => {
+      const r = await fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) });
+      if (!r.ok) { const e = new Error("HTTP " + r.status + " for " + url); e.status = r.status; throw e; }
+      return r.json();
+    };
+    try {
+      return await (timeoutMs ? Promise.race([request(), new Promise((_, reject) => {
+        timer = setTimeout(() => { reject(new Error("Download timed out")); if (controller) controller.abort(); }, timeoutMs);
+      })]) : request());
+    } finally { clearTimeout(timer); }
   }
 
-  function createStore() {
+  function createStore({ timeoutMs = 15000, retryDelayMs = 1200 } = {}) {
     let base = C.dataUrl || "./data/";
     let index = null, legacy = false, bust = false;
     const loaded = new Map();   // key -> Promise
     const descd = new Map();    // key -> Promise (description sidecars)
     const byId = new Map();
     let version = 0;
+    let generation = 0;
 
     // apply_url ends up in an href and in the Auto-Apply queue, so anything that is not plain http(s)
     // (javascript:, data:) is dropped here, once, before any of the page sees it.
@@ -289,19 +309,19 @@
     async function init(fromRaw) {
       bust = !!fromRaw;
       base = fromRaw ? C.rawDataFallback : (C.dataUrl || "./data/");
-      loaded.clear(); descd.clear(); byId.clear(); index = null; legacy = false; version++;
+      generation++; loaded.clear(); descd.clear(); failed.clear(); byId.clear(); index = null; legacy = false; version++;
       const bases = fromRaw ? [C.rawDataFallback] : [C.dataUrl || "./data/", C.rawDataFallback].filter(Boolean);
       for (const b of bases) {
         for (const path of ["listings/index.json", "index.json"]) {
           try {
-            const idx = await getJSON(b + path, bust);
+            const idx = await getJSON(b + path, bust, Math.min(timeoutMs, 5000));
             if (idx && idx.files) { index = idx; base = b; index._dir = path.includes("/") ? "listings/" : ""; return { index, legacy: false }; }
           } catch (e) { /* try next */ }
         }
       }
       // no shards: the old single file
       for (const b of bases) {
-        try { const all = await getJSON(b + "listings.json", bust); base = b; legacy = true; add(all); return { index: null, legacy: true }; }
+        try { const all = await getJSON(b + "listings.json", bust, Math.min(timeoutMs, 5000)); base = b; legacy = true; add(all); return { index: null, legacy: true }; }
         catch (e) { var last = e; }
       }
       throw last || new Error("No listing data found");
@@ -310,23 +330,24 @@
     // Resolves to the keys that could not be loaded, so the page can say so instead of showing
     // "no listings" for a state whose file simply failed to download.
     const failed = new Set();
-    async function ensure(keys) {
+    async function ensure(keys, onProgress = () => {}) {
       if (legacy || !index) return [];
       const jobs = [];
+      const epoch = generation, requestBase = base, requestBust = bust;
       for (const k of new Set(keys)) {
         const meta = index.files[k];
         if (!meta) continue;
         // Already asked for: wait for it as well. Skipping a shard still in flight painted the list
         // without its rows when states were changed quickly.
-        if (loaded.has(k)) { jobs.push(loaded.get(k)); continue; }
+        if (loaded.has(k)) { jobs.push(loaded.get(k).then(onProgress)); continue; }
         const file = meta.file || (index._dir + k + ".json");
-        const get = () => getJSON(base + file, bust);
+        const get = () => getJSON(requestBase + file, requestBust, timeoutMs);
         // One quiet retry: a dropped connection is the usual reason a shard fails.
-        const pr = get().catch(() => new Promise(r => setTimeout(r, 1200)).then(get))
-          .then(d => { failed.delete(k); add(d); })
-          .catch(e => { loaded.delete(k); failed.add(k); console.warn("InternScout: couldn't load", file, e); });
+        const pr = get().catch(() => new Promise(r => setTimeout(r, retryDelayMs)).then(get))
+          .then(d => { if (epoch === generation) { failed.delete(k); add(d); } })
+          .catch(e => { if (epoch === generation) { loaded.delete(k); failed.add(k); console.warn("InternScout: couldn't load", file, e); } });
         loaded.set(k, pr);
-        jobs.push(pr);
+        jobs.push(pr.then(onProgress));
       }
       await Promise.all(jobs);
       return [...new Set(keys)].filter(k => failed.has(k));
@@ -336,24 +357,35 @@
     // loads without them; they are fetched only for search and Auto-Apply. Older exports carry
     // them inline on the row, and then the sidecar simply doesn't exist.
     async function descs(keys) {
-      if (legacy || !index) return;
+      if (legacy || !index) return [];
       const jobs = [];
+      const bad = new Set(), epoch = generation, requestBase = base, requestBust = bust;
       for (const k of new Set(keys)) {
         const meta = index.files[k];
-        if (!meta || descd.has(k)) continue;
+        if (!meta) continue;
+        if (descd.has(k)) { jobs.push(descd.get(k).then(ok => { if (!ok) bad.add(k); })); continue; }
         const file = meta.desc || (meta.file || (index._dir + k + ".json")).replace(/\.json$/, ".desc.json");
-        const pr = Promise.resolve(loaded.get(k)).then(() => getJSON(base + file, bust)).then(m => {
+        const pr = Promise.resolve(loaded.get(k)).then(() => {
+          if (failed.has(k)) throw new Error("Listings have not loaded");
+          return getJSON(requestBase + file, requestBust, timeoutMs);
+        }).then(m => {
+          if (epoch !== generation) return false;
           let n = 0;
           for (const id in m) {
             const x = byId.get(id) || byId.get(Number(id));
             if (x && !x.description && m[id]) { x.description = m[id]; delete x._hay; n++; }
           }
           if (n) version++;
-        }).catch(() => { /* no sidecar: descriptions are inline, or this shard has none */ });
+          return true;
+        }).catch(e => {
+          if (epoch === generation) descd.delete(k);
+          return !meta.desc && e.status === 404; // Legacy exports may keep descriptions inline.
+        });
         descd.set(k, pr);
-        jobs.push(pr);
+        jobs.push(pr.then(ok => { if (!ok) bad.add(k); }));
       }
       await Promise.all(jobs);
+      return [...bad];
     }
 
     return {
@@ -794,7 +826,7 @@
     C, DAY, US_STATES, CA_PROVINCES, CANADA_KEYS, isCanadaKey, inCanadaOnly, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
     fieldLabel, keyLabel, termText, ls, ss,
     emptyProfile, loadProfile, saveProfile, profileKeys, demandStates,
-    regs, shardKeys, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
+    regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
     // was: WEIGHTS, PART_LABEL, profileFields, score,
     // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the
     // student's own tag, not the biggest one in the Set profileFields returns.

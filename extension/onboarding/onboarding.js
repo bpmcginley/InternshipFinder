@@ -1,10 +1,11 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
-import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, confirmedFacts } from "../lib/store.js";
 import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/auth.js";
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
 import { quickStartReady, finishOnboarding, digestLink } from "./quickstart.js";
+import { confirmProfileValue, applyInterviewFacts, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -16,6 +17,10 @@ const STEPS = [
 // labelled as optional in the step bar. doneFor() still counts them, so the side panel still suggests them.
 const OPTIONAL_STEPS = ["facts", "interview", "voice"];
 let S = await loadStore();
+let savedSnapshot = structuredClone(S);
+let saveChain = Promise.resolve();
+let pendingResumeImport = pendingResumeReview(S);
+let renderEpoch = 0;
 let rerun = !!S.settings.onboarded;   // was: const. A restore from the account (below) makes this a rerun.
 let step = new URLSearchParams(location.search).get("step") || (rerun ? "review" : "setup");
 let seenRestore = await restoredAt();   // the last restore this page has loaded
@@ -30,15 +35,22 @@ const $ = (sel) => main.querySelector(sel);
 let saveTimer = null;
 function save(now) {
   clearTimeout(saveTimer);
-  const run = () => updateStore(async (fresh) => {
-    if ((await restoredAt()) !== seenRestore) return;
-    fresh.profile = { ...S.profile, extra: { ...fresh.profile.extra, ...S.profile.extra } };
-    fresh.files = S.files; fresh.ai = S.ai;
-    // was: fresh.settings = S.settings. The sync bookkeeping and the account switch belong to the background.
-    const keep = Object.fromEntries(BACKGROUND_SETTINGS.map((k) => [k, fresh.settings[k]]));
-    fresh.settings = { ...S.settings, ...keep };
-    Object.assign(S.settings, keep);
-  });
+  const run = () => {
+    const snapshot = structuredClone(S), revision = seenRestore;
+    const write = async () => {
+      let applied = false;
+      await updateStore(async (fresh) => {
+        if ((await restoredAt()) !== revision) return;
+        for (const key of ["profile", "files", "ai"]) mergeProfileEdits(fresh[key], savedSnapshot[key], snapshot[key]);
+        const editable = (settings) => Object.fromEntries(Object.entries(settings).filter(([k]) => !BACKGROUND_SETTINGS.includes(k)));
+        mergeProfileEdits(fresh.settings, editable(savedSnapshot.settings), editable(snapshot.settings));
+        applied = true;
+      });
+      if (applied) savedSnapshot = snapshot;
+    };
+    saveChain = saveChain.then(write, write);
+    return saveChain;
+  };
   if (now) return run();
   saveTimer = setTimeout(run, 300);
 }
@@ -96,7 +108,7 @@ function doneFor(id) {
     review: !!S.settings.onboarded,
   }[id];
 }
-function go(id) { save(true); step = id; restoredNote = ""; render(); scrollTo(0, 0); }
+function go(id) { save(true); step = id; restoredNote = ""; render(); scrollTo(0, 0); if (id !== "interview") focusStepHeading(main); }
 function navButtons(prev, next, nextLabel = "Next") {
   return `<div class="nav"><div>${prev ? `<button class="btn" data-go="${prev}">← Back</button>` : ""}</div><div>${next ? `<button class="btn blue" data-go="${next}">${nextLabel} →</button>` : ""}</div></div>`;
 }
@@ -104,14 +116,16 @@ function wireNav() {
   main.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 }
 function render() {
-  const tab = ([id, t]) => `<button data-step="${id}" class="${id === step ? "on" : ""} ${doneFor(id) ? "done" : ""}">${t}</button>`;
+  const epoch = ++renderEpoch;
+  const tab = ([id, t]) => `<button data-step="${id}" ${id === step ? 'aria-current="step"' : ""} class="${id === step ? "on" : ""} ${doneFor(id) ? "done" : ""}">${t}</button>`;
   // was: stepsEl.innerHTML = STEPS.map(tab).join("");
   const opt = STEPS.filter(([id]) => OPTIONAL_STEPS.includes(id));
   stepsEl.innerHTML = STEPS.filter(([id]) => id === "setup" || id === "files").map(tab).join("")
     + `<div class="optgrp"><span class="optlabel">Optional: better answers</span><div class="steps">${opt.map(tab).join("")}</div></div>`
     + STEPS.filter(([id]) => id === "review").map(tab).join("");
   stepsEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.step)));
-  ({ setup, files, facts, interview, voice, review })[step]();
+  if (step === "interview") interview(epoch);
+  else ({ setup, files, facts, voice, review })[step]();
   if (restoredNote) main.insertAdjacentHTML("afterbegin", `<div class="banner">${esc(restoredNote)}</div>`);
   wireNav();
 }
@@ -130,11 +144,14 @@ chrome.storage.onChanged.addListener(async (ch, area) => {
   if (!r || r.at === seenRestore) return;
   clearTimeout(saveTimer);
   S = await loadStore();
+  savedSnapshot = structuredClone(S);
+  pendingResumeImport = pendingResumeReview(S);
   rerun = !!S.settings.onboarded;
   if (!(await showRestore())) return;
   if (rerun) step = "review";
   render();
   scrollTo(0, 0);
+  focusStepHeading(main);
 });
 
 // ---------- 1. setup ----------
@@ -213,7 +230,7 @@ function setup(advOpen = false) {
   if ($("#key")) bind("#key", (v) => { if (isGemini(S.ai)) S.ai.geminiKey = v.trim(); else S.ai.apiKey = v.trim(); });
   if ($("#mode")) bind("#mode", (v) => { S.settings.ai_mode = v; S.ai.model = modelFor(S, "agent"); syncMode(); });
   bind("#tailor", (v) => { S.settings.tailor_resume = v; });
-  bind("#email", (v) => { S.settings.signup_email = v.trim(); if (!S.profile.facts.email) S.profile.facts.email = v.trim(); });
+  bind("#email", (v) => { S.settings.signup_email = v.trim(); if (!S.profile.facts.email) { S.profile.facts.email = v.trim(); confirmProfileValue(S.profile, "facts", "email"); } });
   bind("#pwmode", (v) => { S.settings.password_mode = v; syncMaster(); });
   bind("#master", (v) => { S.settings.master_password = v; });
   bind("#tabs", (v) => { S.settings.max_tabs = +v; });
@@ -353,18 +370,19 @@ function files() {
       <p class="small muted" style="margin-top:0">${isWorker(S.ai) ? "InternScout's AI" : isGemini(S.ai) ? "Gemini" : "Claude"} reads your resume${S.files.cv ? " and CV" : ""} and fills in your education, experience, projects, skills and contact info. You can edit all of it in Review.</p>
       <div class="row"><button class="btn primary" id="extract" ${S.files.resume && !extracting ? "" : "disabled"}>Read my resume</button><span id="exout" class="small">${extracting ? `<span class="spin"></span>Reading your resume… (about 30 seconds)` : S.settings.extracted_from ? `<span class="ok">Last read: ${esc(S.settings.extracted_from)}</span>` : ""}</span></div>
     </div>
+    <div class="card" id="resume-review" hidden></div>
     <div class="card" id="quick" hidden></div>
     <div id="ferr" class="err small"></div>
     ${navButtons("setup", "facts")}`;
   const err = (e) => { $("#ferr").textContent = e.message || String(e); };
   main.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => main.querySelector(`[data-slot=${b.dataset.pick}]`).click()));
   main.querySelectorAll("[data-slot]").forEach((inp) => inp.addEventListener("change", async () => {
-    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); await save(true); files(); wireNav(); } catch (e) { err(e); return; }
+    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); if (inp.dataset.slot === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; S.settings.onboarded = false; } await save(true); files(); wireNav(); } catch (e) { err(e); return; }
     // A new resume is read straight away (2026-10-04) rather than waiting for "Read my resume", which
     // students skipped: the profile stayed empty and every application had to ask the model for it.
     if (inp.dataset.slot === "resume" && hasKey(S)) extract($("#extract"), $("#exout")).catch(err);
   }));
-  main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; await save(true); files(); wireNav(); }));
+  main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; if (b.dataset.clear === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; S.settings.onboarded = false; } await save(true); files(); wireNav(); }));
   main.querySelectorAll("[data-rms]").forEach((b) => b.addEventListener("click", async () => { S.files.samples.splice(+b.dataset.rms, 1); await save(true); files(); wireNav(); }));
   $("#addsamples").addEventListener("click", () => $("#samples").click());
   $("#samples").addEventListener("change", async (e) => {
@@ -378,6 +396,33 @@ function files() {
   });
   $("#extract").addEventListener("click", () => extract($("#extract"), $("#exout")).catch(err));
   drawQuick();
+  drawResumeReview();
+}
+
+function drawResumeReview() {
+  const box = $("#resume-review");
+  if (!box) return;
+  box.hidden = !pendingResumeImport;
+  if (!pendingResumeImport) return;
+  const pending = pendingResumeImport;
+  const names = { first_name: "First name", last_name: "Last name", email: "Email", phone: "Phone", city: "City", state: "State", zip: "ZIP", linkedin: "LinkedIn", github: "GitHub", website: "Website", education: "Education", experience: "Experience", projects: "Projects", links: "Links", skills: "Skills" };
+  const show = formatResumeValue;
+  box.innerHTML = `<h3>Review resume updates</h3><p class="small">These details differ from values you entered or previously saved. Your current values are kept unless you choose an update. Other resume details will update when you save.</p>`
+    + pending.plan.filter((e) => e.conflict).map((e) => `<details style="margin-bottom:12px"><summary>${esc(names[e.key] || e.key)}</summary><div class="grid"><div><b>Current</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(show(e.before))}</pre></div><div><b>New resume</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(show(e.next))}</pre></div></div><label><input type="checkbox" data-import="${esc(e.id)}"> Use the new resume value for ${esc(names[e.key] || e.key)}</label></details>`).join("")
+    + '<button class="btn primary" id="save-resume-details">Save resume details</button>';
+  $("#save-resume-details").onclick = async () => {
+    if (pending !== pendingResumeImport || S.files.resume?.b64 !== pending.file.b64) return;
+    const selected = [...box.querySelectorAll("[data-import]:checked")].map((el) => el.dataset.import);
+    applyResumeImport(S.profile, pending.plan, selected);
+    S.settings.resume_import = null;
+    S.settings.resume_details_ready = true;
+    S.settings.extracted_from = pending.file.name;
+    if (!S.settings.signup_email && S.profile.facts.email) S.settings.signup_email = S.profile.facts.email;
+    await save(true);
+    pendingResumeImport = null;
+    files(); wireNav();
+    focusStepHeading(main);
+  };
 }
 
 // "Turn on Auto-Apply now" on the Files step, once the AI, a resume and the sign-up email are there:
@@ -386,7 +431,7 @@ function files() {
 function drawQuick(msg = "") {
   const box = $("#quick");
   if (!box) return;
-  box.hidden = !quickStartReady(S);
+  box.hidden = !quickStartReady(S) || extracting || !!pendingResumeImport;
   if (box.hidden) return;
   box.innerHTML = S.settings.onboarded
     ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
@@ -414,6 +459,11 @@ let extracting = false;
 async function extract(btn, out) {
   if (extracting) return;
   extracting = true;
+  pendingResumeImport = null;
+  S.settings.resume_details_ready = false;
+  S.settings.onboarded = false;
+  drawQuick();
+  drawResumeReview();
   // files() redraws itself (another file added meanwhile), so write to whatever is on the page now.
   const live = (el, sel) => (el && el.isConnected ? el : $(sel));
   if (btn) btn.disabled = true;
@@ -422,6 +472,7 @@ async function extract(btn, out) {
   // and "Last read" names the file that was read, not whichever one is chosen when the answer comes back.
   const file = S.files.resume;
   try {
+    await save(true);
     const content = [docBlock(file, "Resume"), docBlock(S.files.cv, "CV")].filter(Boolean);
     if (!content.length) throw new Error("Couldn't read the resume file. Try a PDF.");
     content.push({ type: "text", text: `Extract this applicant's details as JSON only, no commentary. Use "" or [] when unknown; never guess.
@@ -434,17 +485,28 @@ async function extract(btn, out) {
 Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.` });
     const r = await ai({ model: M().deep, max_tokens: 12000, thinking: { type: "adaptive" }, messages: [{ role: "user", content }] });
     const x = jsonOf(r);
-    const p = S.profile;
-    for (const [k, v] of Object.entries(x.facts || {})) if (v && !p.facts[k]) p.facts[k] = v;
-    // The resume is the source of truth for these lists; replace them when a (new) resume is read.
-    for (const k of ["education", "experience", "projects", "links"]) if (Array.isArray(x[k]) && x[k].length) p[k] = x[k];
-    if (x.skills) p.skills = { technical: x.skills.technical || [], tools: x.skills.tools || [], soft: x.skills.soft || [] };
+    if (S.files.resume?.b64 !== file.b64 || S.files.resume?.name !== file.name) return;
+    const p = S.profile, plan = planResumeImport(p, x);
+    if (plan.some((e) => e.conflict)) {
+      pendingResumeImport = { file, plan };
+      S.settings.resume_import = { plan };
+      await save(true);
+      const o = live(out, "#exout");
+      if (o) o.textContent = "Review the resume updates below before saving.";
+      drawResumeReview();
+      return;
+    }
+    applyResumeImport(p, plan);
+    S.settings.resume_import = null;
+    S.settings.resume_details_ready = true;
     if (!S.settings.signup_email && p.facts.email) S.settings.signup_email = p.facts.email;
     S.settings.extracted_from = file.name;   // was: S.files.resume.name
     await save(true);
     const o = live(out, "#exout");
     if (o) o.innerHTML = `<span class="ok">Found ${p.education.length} school(s), ${p.experience.length} role(s), ${p.projects.length} project(s).</span>`;
   } catch (e) {
+    pendingResumeImport = pendingResumeReview(S);
+    drawResumeReview();
     const o = live(out, "#exout");
     if (o) o.innerHTML = `<span class="err">${esc(e.message)}</span>`;
   } finally {
@@ -458,7 +520,7 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
 }
 
 // ---------- 3. facts ----------
-const YN = ["Yes", "No"];
+const YN = ["", "Yes", "No"];
 const FACTS = [
   ["Contact", "", [
     ["first_name", "First name"], ["last_name", "Last name"], ["preferred_name", "Preferred name"], ["pronouns", "Pronouns"],
@@ -487,16 +549,25 @@ const FACTS = [
 ];
 function facts() {
   const f = S.profile.facts;
+  const ready = confirmedFacts(S);
+  const unconfirmed = CONFIRMATION_FACTS.some((key) => f[key] && !ready[key]);
   const field = ([k, label, opts]) => opts
-    ? `<label class="f"><span>${esc(label)}</span><select data-fact="${k}">${[...new Set([...opts, f[k]])].map((o) => `<option ${o === f[k] ? "selected" : ""} value="${esc(o)}">${esc(o || "—")}</option>`).join("")}</select></label>`
+    ? `<label class="f"><span>${esc(label)}</span><select data-fact="${k}">${[...new Set([...opts, f[k]])].map((o) => `<option ${o === f[k] ? "selected" : ""} value="${esc(o)}">${esc(o || "Not answered — ask me if needed")}</option>`).join("")}</select></label>`
     : `<label class="f"><span>${esc(label)}</span><input type="text" data-fact="${k}" value="${esc(f[k])}"></label>`;
   main.innerHTML = `<h2>Quick facts</h2><p class="lead">The questions nearly every application asks. Answer once; the agent reuses them everywhere.</p>
+    ${unconfirmed ? '<div class="banner">Your saved eligibility and availability answers need confirmation before Auto-Apply can use them. Review them below, then press Confirm answers shown. Unanswered questions stay unknown.</div>' : ""}
     ${FACTS.map(([t, note, list]) => `<div class="card"><h3>${t}</h3>${note ? `<p class="small muted" style="margin-top:0">${note}</p>` : ""}<div class="grid">${list.map(field).join("")}</div></div>`).join("")}
     <div class="card"><h3>Education</h3>${S.profile.education.length
       ? S.profile.education.map((e) => `<div>${esc(e.school)} · ${esc([e.degree, e.major].filter(Boolean).join(", "))} · ${esc(e.grad_term || e.end)}${e.gpa ? ` · GPA ${esc(e.gpa)}` : ""}</div>`).join("")
       : `<span class="muted small">Nothing yet. Read your resume in Files, or add it in Review.</span>`}</div>
+    <div class="card"><button class="btn primary" id="confirm-facts">Confirm answers shown</button> <span id="facts-confirmed" role="status" class="small"></span></div>
     ${navButtons("files", "interview")}`;
-  main.querySelectorAll("[data-fact]").forEach((el) => el.addEventListener("input", () => { f[el.dataset.fact] = el.value; save(); }));
+  main.querySelectorAll("[data-fact]").forEach((el) => el.addEventListener("input", () => { f[el.dataset.fact] = el.value; confirmProfileValue(S.profile, "facts", el.dataset.fact); save(); }));
+  $("#confirm-facts").onclick = async () => {
+    for (const key of CONFIRMATION_FACTS) confirmProfileValue(S.profile, "facts", key);
+    await save(true);
+    $("#facts-confirmed").textContent = "Confirmed. Unanswered questions will still be asked when needed.";
+  };
 }
 
 // ---------- 4. interview ----------
@@ -533,8 +604,9 @@ How to interview:
 - When every topic is covered (or the student asks to stop), thank them in one sentence and end your message with [[DONE]].`;
 }
 
-async function interview() {
+async function interview(epoch) {
   let msgs = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
+  if (epoch !== renderEpoch || step !== "interview") return;
   main.innerHTML = `<h2>Interview</h2><p class="lead">A 10–15 minute conversation about your experiences and goals. Short, honest answers are perfect. Stop any time; what you've said is saved.</p>
     <div class="card"><div class="chat" id="chat"></div>
       <textarea id="say" placeholder="Type your answer… (Ctrl+Enter to send)"></textarea>
@@ -544,14 +616,16 @@ async function interview() {
     </div>
     ${S.profile.stories.length ? `<div class="card"><h3>Saved stories (${S.profile.stories.length})</h3>${S.profile.stories.map((s) => `<div class="story"><b>${esc(s.theme)}</b><div class="small muted">${esc(s.situation)}</div></div>`).join("")}</div>` : ""}
     ${navButtons("facts", "voice")}`;
-  const chat = $("#chat"), say = $("#say"), stat = $("#cstat");
+  wireNav();
+  focusStepHeading(main);
+  const chat = $("#chat"), say = $("#say"), stat = $("#cstat"), sendBtn = $("#send"), finishBtn = $("#finish");
   const draw = () => {
     chat.innerHTML = msgs.slice(1).map((m) => `<div class="msg ${m.role === "user" ? "u" : "a"}">${esc(String(m.content).replace("[[DONE]]", "").trim())}</div>`).join("");
     chat.scrollTop = chat.scrollHeight;
   };
   const persist = () => chrome.storage.local.set({ [CHAT_KEY]: msgs });
   const turn = async () => {
-    $("#send").disabled = true;
+    sendBtn.disabled = true;
     busy(stat, "Thinking…");
     try {
       const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(), messages: msgs });
@@ -561,7 +635,7 @@ async function interview() {
       stat.textContent = /\[\[DONE\]\]/.test(textOf(r)) ? "All topics covered. Press Finish & save." : "";
     } catch (e) {
       stat.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-    } finally { $("#send").disabled = false; say.focus(); }
+    } finally { sendBtn.disabled = false; if (say.isConnected && step === "interview") say.focus(); }
   };
   const send = async () => {
     const t = say.value.trim();
@@ -578,11 +652,11 @@ async function interview() {
     if (msgs.length > 2 && !confirm("Clear this conversation? Stories you already saved are kept.")) return;
     msgs = [];
     await persist();
-    interview().then(wireNav);
+    go("interview");
   });
   $("#finish").addEventListener("click", async () => {
     if (msgs.length < 3) { stat.textContent = "Answer a few questions first."; return; }
-    $("#finish").disabled = true;
+    finishBtn.disabled = true;
     busy(stat, "Turning the conversation into stories… (about a minute)");
     try {
       await distill(msgs);
@@ -590,7 +664,7 @@ async function interview() {
       setTimeout(() => go("voice"), 900);
     } catch (e) {
       stat.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-      $("#finish").disabled = false;
+      finishBtn.disabled = false;
     }
   });
   if (!msgs.length) {
@@ -625,7 +699,7 @@ Return JSON only:
   const x = jsonOf(r);
   if (Array.isArray(x.stories)) S.profile.stories = x.stories;
   for (const [k, v] of Object.entries(x.goals || {})) if (v) S.profile.goals[k] = v;
-  for (const [k, v] of Object.entries(x.facts || {})) if (v && k in S.profile.facts) S.profile.facts[k] = v;
+  applyInterviewFacts(S.profile, x.facts);
   await save(true);
 }
 
@@ -683,7 +757,7 @@ function review() {
     <details class="adv"><summary>Edit raw data</summary>
     ${JSON_SECTIONS.map(([k, t]) => `<div class="card"><h3>${t}</h3><textarea class="code" data-json="${k}">${esc(JSON.stringify(p[k], null, 2))}</textarea><div class="small" data-jerr="${k}"></div></div>`).join("")}
     </details>
-    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${hasKey(S) && S.files.resume ? "" : "disabled"}>${rerun ? "Save Deep Dive" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${hasKey(S) && S.files.resume ? "" : "Needs an API key and a resume first."}</span></div></div>
+    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save Deep Dive" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Return to Files to finish reading and reviewing your resume." : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div></div>
     ${navButtons("voice", null)}`;
   main.querySelectorAll("[data-goal]").forEach((el) => el.addEventListener("input", () => { p.goals[el.dataset.goal] = el.value; save(); }));
   main.querySelectorAll("[data-json]").forEach((el) => el.addEventListener("input", () => {
@@ -692,6 +766,7 @@ function review() {
       const v = JSON.parse(el.value);
       if (Array.isArray(p[k]) !== Array.isArray(v)) throw new Error(Array.isArray(p[k]) ? "Must be a [list]" : "Must be an {object}");
       p[k] = v;
+      confirmProfileValue(p, "sections", k);
       msg.textContent = "";
       save();
     } catch (e) { msg.innerHTML = `<span class="err">Not saved: ${esc(e.message)}</span>`; }

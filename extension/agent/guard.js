@@ -5,7 +5,7 @@
   // Versioned like dom.js: an open tab keeps the copy it was given, and an older guard left there by
   // the previous version of the extension must not stay in charge of the submit button.
   // was: if (root.ISGuard) return;
-  const GV = 2;
+  const GV = 3;
   if (root.ISGuard && root.ISGuard.v >= GV) return;
 
   // "Confirm and send" / "I agree and apply" are the same button as "Confirm and submit"; without them
@@ -159,6 +159,7 @@
       // was: !text only. A symbol-only label ("->") says no more than an empty one.
       if (!labels.some((l) => plainLabel(l))) return "ambiguous";
       if (d.formFilled > 0 && !forms.some((f) => safe(f) || NAV_RE.test(f))) return "final";
+      if (!forms.some((f) => safe(f) || NAV_RE.test(f))) return "ambiguous";
     }
     return "ok";
   }

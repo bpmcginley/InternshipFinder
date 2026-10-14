@@ -15,6 +15,7 @@ function loadCore(fetchImpl) {
     CONFIG: { dataUrl: "./data/", rawDataFallback: "https://raw.example/data/" },
     fetch: fetchImpl, localStorage: store(), sessionStorage: store(),
     addEventListener() {}, postMessage() {}, setTimeout, clearTimeout,
+    AbortController,
     location: { origin: "https://internscout.org", pathname: "/", search: "", hash: "" },
     document: { documentElement: { dataset: {} } },
     console,
@@ -39,14 +40,124 @@ test("step 1 says the majors are loading, not that they failed, until the fetch 
   assert.equal(IS.majorsNote(MAJORS, false), null);
 });
 
+const shardIndex = { files: { MA: { file: "listings/MA.json", desc: "listings/MA.desc.json" }, CT: { file: "listings/CT.json", desc: "listings/CT.desc.json" } } };
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+test("concurrent description consumers both wait for posting context", async () => {
+  let release;
+  const IS = loadCore(url => url.endsWith("index.json") ? ok(shardIndex) : url.endsWith(".desc.json")
+    ? new Promise(resolve => { release = () => resolve({ ok: true, json: async () => ({ a: "Required Python" }) }); })
+    : ok([{ id: "a" }]));
+  const store = IS.createStore(); await store.init(); await store.ensure(["MA"]);
+  const first = store.descs(["MA"]); await tick();
+  let settled = false; const second = store.descs(["MA"]).then(() => { settled = true; });
+  await tick(); assert.equal(settled, false);
+  release(); await Promise.all([first, second]);
+  assert.equal(store.all()[0].description, "Required Python");
+});
+
+test("a failed description download reports incompleteness and can recover without reloading", async () => {
+  let attempts = 0;
+  const IS = loadCore(url => url.endsWith("index.json") ? ok(shardIndex) : url.endsWith(".desc.json")
+    ? ++attempts === 1 ? Promise.reject(new Error("offline")) : ok({ a: "Required SQL" }) : ok([{ id: "a" }]));
+  const store = IS.createStore(); await store.init(); await store.ensure(["MA"]);
+  assert.deepEqual([...await store.descs(["MA"])], ["MA"]);
+  assert.deepEqual([...await store.descs(["MA"])], []);
+  assert.equal(attempts, 2); assert.equal(store.all()[0].description, "Required SQL");
+});
+
+test("healthy states publish results while a stalled shard times out, then retry recovers", async () => {
+  let recover = false; const signals = []; const published = [];
+  const IS = loadCore((url, options) => {
+    if (url.endsWith("index.json")) return ok(shardIndex);
+    if (url.endsWith("MA.json")) return ok([{ id: "ma" }]);
+    if (recover) return ok([{ id: "ct" }]);
+    signals.push(options.signal); return new Promise(() => {});
+  });
+  const store = IS.createStore({ timeoutMs: 15, retryDelayMs: 0 }); await store.init();
+  const request = store.ensure(["MA", "CT"], () => published.push(store.all().map(x => x.id)));
+  await tick(); assert.deepEqual([...published[0]], ["ma"], "successful rows appear before all downloads finish");
+  assert.deepEqual([...await request], ["CT"]); assert.equal(signals.length, 2);
+  assert.ok(signals.every(signal => signal.aborted), "timed-out requests are aborted");
+  recover = true; assert.deepEqual([...await store.ensure(["CT"])], []);
+  assert.deepEqual([...store.all()].map(x => x.id).sort(), ["ct", "ma"]);
+});
+
+test("a reload discards late listing and description responses from the previous data generation", async () => {
+  let releaseListing, releaseDescription, old = true;
+  const IS = loadCore(url => {
+    if (url.endsWith("index.json")) return ok(shardIndex);
+    if (url.endsWith("CT.json") && old) return new Promise(resolve => { releaseListing = () => resolve({ ok: true, json: async () => [{ id: "old-ct" }] }); });
+    if (url.endsWith(".desc.json") && old) return new Promise(resolve => { releaseDescription = () => resolve({ ok: true, json: async () => ({ a: "Old description" }) }); });
+    return ok([{ id: "a" }]);
+  });
+  const store = IS.createStore(); await store.init(); await store.ensure(["MA"]);
+  const listing = store.ensure(["CT"]), description = store.descs(["MA"]); await tick();
+  old = false; await store.init(); await store.ensure(["MA"]);
+  releaseListing(); releaseDescription(); await Promise.all([listing, description]);
+  assert.deepEqual([...store.all()].map(x => x.id), ["a"]); assert.equal(store.all()[0].description, undefined);
+});
+
+test("description download timeout is retryable and missing legacy sidecars remain compatible", async () => {
+  let stalled = true;
+  const IS = loadCore(url => url.endsWith("index.json") ? ok(shardIndex) : url.endsWith(".desc.json")
+    ? stalled ? new Promise(() => {}) : ok({ a: "Recovered" }) : ok([{ id: "a" }]));
+  const store = IS.createStore({ timeoutMs: 10 }); await store.init(); await store.ensure(["MA"]);
+  assert.deepEqual([...await store.descs(["MA"])], ["MA"]);
+  stalled = false; assert.deepEqual([...await store.descs(["MA"])], []);
+  const legacyIS = loadCore(url => url.endsWith("index.json") ? ok({ files: { MA: { file: "MA.json" } } }) : url.endsWith(".desc.json") ? notFound() : ok([{ id: "a", description: "Inline context" }]));
+  const legacy = legacyIS.createStore(); await legacy.init(); await legacy.ensure(["MA"]);
+  assert.deepEqual([...await legacy.descs(["MA"])], []); assert.equal(legacy.all()[0].description, "Inline context");
+});
+
+test("regional and Canadian remote roles use the same remote predicate as nationwide roles", () => {
+  const IS = loadCore(notFound);
+  assert.equal(IS.isRemote({ is_remote: true, regions: [{ kind: "new_england", state: "MA", loc: "Massachusetts, Virtual Address" }] }), true);
+  assert.equal(IS.isRemote({ regions: [{ kind: "canada", state: "ON", loc: "Remote - Ontario" }] }), true);
+  assert.equal(IS.isRemote({ regions: [{ kind: "remote", state: "Remote", loc: "USA" }] }), true);
+  assert.equal(IS.isRemote({ regions: [{ kind: "us", state: "TX", loc: "Austin, TX" }] }), false);
+});
+
+test("placeholder salaries cannot masquerade as disclosed pay, while independent paid status survives", () => {
+  const IS = loadCore(notFound);
+  for (const salary of ["$0.00 /Yr", "$0.00 - $0.00 Per Hour", "$0.00 - $999.99 Hour"]) {
+    assert.equal(IS.realSalary({ salary }), ""); assert.equal(IS.payOf({ salary }), null);
+    assert.equal(IS.payOf({ salary, insights: { pay: "paid" } }), "paid");
+  }
+  assert.equal(IS.realSalary({ salary: "$20 - $30 /hour" }), "$20 - $30 /hour");
+  assert.equal(IS.payOf({ salary: "$20 /hour" }), "paid");
+});
+
+test("application batches keep overflow explicit and statuses resolve only from confirmed job IDs", () => {
+  const IS = loadCore(notFound);
+  const listings = Array.from({ length: 150 }, (_, id) => ({ id, apply_url: `https://example.com/${id}` }));
+  const { batch, remaining } = IS.applicationBatch([...listings, listings[0], { id: 151 }]);
+  assert.equal(batch.length, 100); assert.equal(remaining.length, 50); assert.equal(remaining[0].id, 100);
+  assert.deepEqual([...IS.queuedListingIds(["job-added", "missing"], { jobs: {
+    "job-added": { listingId: 7 }, "job-skipped": { listingId: 8 }, "job-unrequested": { listingId: 100 }
+  } })], ["7"]);
+});
+
 test("loadMajors stays pending while majors.json is still downloading", async () => {
   // The race: the page held null while this promise was pending and showed the failure text.
-  const IS = loadCore(() => new Promise(() => {}));
+  let release;
+  const IS = loadCore(() => new Promise(resolve => { release = resolve; }));
+  const loading = IS.loadMajors();
   const outcome = await Promise.race([
-    IS.loadMajors().then(() => "settled"),
+    loading.then(() => "settled"),
     new Promise(r => setTimeout(() => r("pending"), 50)),
   ]);
   assert.equal(outcome, "pending");
+  release(await ok(MAJORS)); await loading;
+});
+
+test("initial data-source stalls are bounded and the same store can retry successfully", async () => {
+  let recover = false; const signals = [];
+  const IS = loadCore((url, options) => { if (recover) return ok(shardIndex); signals.push(options.signal); return new Promise(() => {}); });
+  const store = IS.createStore({ timeoutMs: 5 });
+  await assert.rejects(store.init(), /timed out/);
+  assert.ok(signals.length > 1); assert.ok(signals.every(signal => signal.aborted));
+  recover = true; assert.equal((await store.init()).legacy, false);
 });
 
 test("loadMajors resolves null only after every source has failed", async () => {

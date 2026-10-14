@@ -49,15 +49,28 @@ export const EMPTY_FACTS = {
   first_name: "", last_name: "", preferred_name: "", pronouns: "", email: "", phone: "",
   address: "", city: "", state: "", zip: "", country: "United States",
   linkedin: "", github: "", website: "",
-  work_authorized: "Yes", needs_sponsorship: "No", citizenship: "", clearance_eligible: "",
-  willing_to_relocate: "Yes", available_start: "", available_end: "", earliest_start: "",
-  hours_per_week: "40", salary_expectation: "", how_heard: "Online job board",
-  worked_here_before: "No", languages: "English", willing_to_travel: "Yes",
-  over_18: "Yes", background_check: "Yes", drug_test: "Yes", non_compete: "No",
+  work_authorized: "", needs_sponsorship: "", citizenship: "", clearance_eligible: "",
+  willing_to_relocate: "", available_start: "", available_end: "", earliest_start: "",
+  hours_per_week: "", salary_expectation: "", how_heard: "Online job board",
+  worked_here_before: "", languages: "", willing_to_travel: "",
+  over_18: "", background_check: "", drug_test: "", non_compete: "",
   gender: "Decline to self-identify", race: "Decline to self-identify", hispanic: "Decline to self-identify",
   veteran: "I don't wish to answer", disability: "I don't wish to answer", lgbtq: "Decline to self-identify",
   majors: "", class_year: "", grad_term: "", // from the dashboard profile (bridge profile:set); majors comma-joined
 };
+
+// Older profiles have no way to distinguish default Yes/No answers from deliberate
+// ones. Keep their displayed values, but require a recorded confirmation before use.
+export const CONFIRMATION_FACTS = ["work_authorized", "needs_sponsorship", "over_18", "willing_to_relocate",
+  "willing_to_travel", "background_check", "drug_test", "non_compete", "worked_here_before", "hours_per_week", "languages"];
+export function confirmedFacts(s) {
+  const facts = { ...s.profile.facts };
+  for (const key of CONFIRMATION_FACTS) {
+    const record = s.profile.sources?.facts?.[key];
+    if (record?.source !== "manual" || record.value !== facts[key]) facts[key] = "";
+  }
+  return facts;
+}
 
 export const STORE_VERSION = 3;
 
@@ -75,6 +88,7 @@ export function emptyStore() {
       goals: { career: "", why_field: "", interests: "", strengths: "", growth_areas: "", why_internship: "" },
       voice: { summary: "", tone: "", sentence_style: "", vocabulary: "", avoid: "", sample: "" },
       extra: {},       // answers to ask_user questions: {question_text: answer}
+      sources: { facts: {}, sections: {} }, // origin and last imported value; never sent to the model
     },
     files: { resume: null, cv: null, transcript: null, cover_letter: null, samples: [] }, // {name, type, b64, size, text?}
     ai: { provider: "internscout", apiKey: "", geminiKey: "", model: GEMINI_MODELS.agent },
@@ -147,7 +161,19 @@ export function upgradeStore(stored) {
 // and on every step of the agent, to use one key of a few kilobytes. The review measured 3.6 MB
 // read for a 1.6 KB store. Only the store and the three keys a first-version install had are asked for.
 const STORE_KEYS = ["store", "internscout", "ai", "files"];
-export async function loadStore() {
+// Extension pages and the service worker share an origin, so Web Locks serialize the
+// complete read/modify/write across contexts, including first-load migration.
+let localWrites = Promise.resolve();
+function withStoreLock(fn) {
+  if (globalThis.navigator?.locks?.request) return navigator.locks.request("internscout-store", fn);
+  // Chrome 114+ supplies Web Locks in extension pages and workers. Fail closed if a
+  // browser does not: an in-memory queue cannot protect other extension contexts.
+  if (globalThis.chrome?.runtime?.id) return Promise.reject(new Error("Update your browser to safely save profile changes."));
+  const next = localWrites.then(fn, fn); // non-browser test harnesses
+  localWrites = next.catch(() => {});
+  return next;
+}
+async function loadStoreUnlocked() {
   const raw = await chrome.storage.local.get(STORE_KEYS);
   if (raw.store && raw.store.version === STORE_VERSION) return deepMerge(emptyStore(), raw.store);
   if (raw.store && raw.store.version === 2) {
@@ -161,38 +187,25 @@ export async function loadStore() {
   return s;
 }
 
+export function loadStore() { return withStoreLock(loadStoreUnlocked); }
+
 export async function saveStore(s) {
-  await chrome.storage.local.set({ store: s });
-  return s;
+  return withStoreLock(async () => { await chrome.storage.local.set({ store: s }); return s; });
 }
 
-// Read, change and write back the whole store as one step. Two at once used to lose one of the
-// changes: a site login saved by one job and a learned answer saved by another, at the same moment,
-// left the login out, and the student had an employer account nobody knew the password to. A Web
-// Lock is shared by the service worker and every extension page (the Deep Dive, the side panel), so
-// their writes queue too; the promise chain is for anywhere without navigator.locks. fn must not
-// call updateStore itself, or it waits on its own lock.
-// was: an unlocked load, fn, save.
-const STORE_LOCK = "internscout-store";
-let storeChain = Promise.resolve();
-function withStoreLock(task) {
-  const locks = typeof navigator !== "undefined" && navigator.locks;
-  if (locks && locks.request) return locks.request(STORE_LOCK, task);
-  const p = storeChain.then(task, task);
-  storeChain = p.catch(() => {});
-  return p;
-}
-export function updateStore(fn) {
+export async function updateStore(fn) {
   return withStoreLock(async () => {
-    const s = await loadStore();
+    const s = await loadStoreUnlocked();
     const out = (await fn(s)) || s;
-    return saveStore(out);
+    await chrome.storage.local.set({ store: out });
+    return out;
   });
 }
 
 // Profile as sent to the model: no files, no passwords, no API key.
 export function profileForModel(s) {
-  const { facts, education, experience, projects, skills, links, stories, goals, voice, extra } = s.profile;
+  const { education, experience, projects, skills, links, stories, goals, voice, extra } = s.profile;
+  const facts = confirmedFacts(s);
   return { facts, education, experience, projects, skills, links, stories, goals, voice, extra,
     signup_email: s.settings.signup_email || facts.email,
     files_available: Object.entries(s.files).filter(([k, v]) => k !== "samples" && v && v.b64).map(([k]) => k) };
@@ -217,7 +230,7 @@ export function accountFor(s, url) {
   const domain = domainOf(url);
   // Workday tenants share accounts per tenant host; everything else per registrable host.
   const found = s.accounts.find((a) => a.domain === domain);
-  if (found) return { ...found, isNew: false };
+  if (found) return { ...found, isNew: found.state === "pending" };
   const password = s.settings.password_mode === "master" && s.settings.master_password ? s.settings.master_password : genPassword();
   return { domain, email: s.settings.signup_email || s.profile.facts.email, password, created: Date.now(), isNew: true };
 }

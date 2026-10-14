@@ -498,6 +498,15 @@ test("a work question naming no country is about the job's country, so it is ans
   assert.equal(G.choiceFact("Can you work without sponsorship?", { jobInUS: true }), null);
 });
 
+test("unfamiliar submit labels cannot send a text-only review form", () => {
+  const G = globalThis.ISGuard;
+  for (const text of ["Go", "Let's make it official"]) {
+    const button = { text, type: "submit", formFilled: 0, automationId: "final-action" };
+    assert.equal(G.allowClick(button, { filledFields: 0, runFilled: true, reviewStep: true }).allowed, false);
+    assert.equal(G.allowClick(button, { filledFields: 0 }).allowed, true, "an empty initial form remains usable");
+  }
+});
+
 test("Workday's address dropdowns: State and Country are the profile's, a phone code is not", () => {
   const G = globalThis.ISGuard;
   assert.equal(G.addressFact("State*"), "state");

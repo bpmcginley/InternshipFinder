@@ -2,8 +2,8 @@
 // (text / document / tool_use / tool_result blocks), so the agent and Deep Dive stay provider-agnostic.
 // The key never leaves the extension except to generativelanguage.googleapis.com. In InternScout mode the same
 // body goes to the Worker (no key in the extension) and the reply is parsed the same way.
+import { abortableSleep as sleep, throwIfAborted } from "./abort.js";
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const THINKING_RESERVE = 8192; // Gemini counts thinking tokens against maxOutputTokens
 
 const textOfSystem = (system) => (Array.isArray(system) ? system.map((b) => b.text).join("\n\n") : String(system || ""));
@@ -92,6 +92,7 @@ export async function callGemini({ apiKey, model, system, messages, tools, max_t
   const body = buildGeminiBody({ system, messages, tools, max_tokens, thinking });
   let lastErr = "";
   for (let attempt = 0; attempt < 5; attempt++) {
+    throwIfAborted(signal);
     let res;
     try {
       res = await fetch(`${BASE}${encodeURIComponent(model)}:generateContent`, {
@@ -101,17 +102,22 @@ export async function callGemini({ apiKey, model, system, messages, tools, max_t
         body: JSON.stringify(body),
       });
     } catch (e) {
-      if (signal && signal.aborted) throw e;   // Pause / Take over (agent.js stopJob): no retries
+      if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = e.message;
-      await sleep(1500 * 2 ** attempt);
+      await sleep(1500 * 2 ** attempt, signal);
       continue;
     }
+    throwIfAborted(signal);
     if (res.status === 429 || res.status >= 500) {
       lastErr = `${res.status}`;
-      await sleep(2000 * 2 ** attempt);
+      await sleep(2000 * 2 ** attempt, signal);
       continue;
     }
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch((e) => {
+      if (signal?.aborted || e.name === "AbortError") throw e;
+      return {};
+    });
+    throwIfAborted(signal);
     if (!res.ok) throw new Error(`Gemini API ${res.status}: ${(data.error && data.error.message) || "request failed"}`);
     return fromResponse(data);
   }
@@ -246,6 +252,7 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
   const body = JSON.stringify(buildWorkerRequest({ task, run_id, ...opts }));
   let refreshed = false, lastErr = null;
   for (let attempt = 0; attempt < 4; attempt++) {
+    throwIfAborted(signal);
     let res;
     try {
       res = await fetchImpl(`${url}/ai?stream=1`, {
@@ -255,29 +262,35 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
         body,
       });
     } catch (e) {
-      if (signal && signal.aborted) throw e;
+      if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = workerError(502, { error: "upstream" });
-      await sleepImpl(1500 * 2 ** attempt);
+      await sleepImpl(1500 * 2 ** attempt, signal);
       continue;
     }
+    throwIfAborted(signal);
     if (res.ok && isSSE(res)) {
       let whole;
       try {
         whole = stitchChunks(await readSSE(res));
       } catch (e) {
-        if (signal && signal.aborted) throw e;
+        if (signal?.aborted || e.name === "AbortError") throw e;
         whole = null;
       }
       // A stream that stopped before Gemini said it was finished is a dropped connection, not an
       // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
       if (!whole || (!whole.complete && !whole.promptFeedback)) {
         lastErr = workerError(502, { error: "upstream" });
-        await sleepImpl(1500 * 2 ** attempt);
+        await sleepImpl(1500 * 2 ** attempt, signal);
         continue;
       }
+      throwIfAborted(signal);
       return fromResponse(whole);
     }
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch((e) => {
+      if (signal?.aborted || e.name === "AbortError") throw e;
+      return {};
+    });
+    throwIfAborted(signal);
     if (res.ok) return fromResponse(data);
     const err = workerError(res.status, data);
     if (err.code === "auth" && !refreshed && refreshToken) {
@@ -292,7 +305,7 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
     if ((err.code === "rate" && (err.retry_after || 0) <= 30) || (err.code === "busy" && (err.retry_after || 0) <= 60)
         || err.code === "upstream") {
       lastErr = err;
-      await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt);
+      await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt, signal);
       continue;
     }
     throw err;

@@ -99,6 +99,11 @@ export async function putProfile(db, env, user, body, now = Date.now()) {
   if (profile.facts && typeof profile.facts === "object") {
     for (const k of DEMOGRAPHICS) delete profile.facts[k];
   }
+  // Resume/manual provenance can contain the same values as facts. Keep the local-only
+  // demographic promise even if a client sends their provenance records accidentally.
+  if (profile.sources?.facts && typeof profile.sources.facts === "object") {
+    for (const k of DEMOGRAPHICS) delete profile.sources.facts[k];
+  }
   const text = JSON.stringify(profile);
   const stale = (stored) => {
     const ok = stored && !stored.broken;

@@ -41,7 +41,8 @@ def _known_city(part: str) -> str | None:
 
 
 # "Cambridge, MA, Arlington, VA" -> split after each state code, but keep "Boston, MA, United States" whole.
-_AFTER_STATE = re.compile(r"(?<=[\s,][A-Z]{2}),\s*(?=(?!United States|USA?\b)[A-Z][a-z])")
+_AFTER_STATE = re.compile(
+    r"(?<=[\s,][A-Z]{2}),\s*(?=(?!United States|USA?\b|Canada\b|Remote\b|Hybrid\b|On[- ]?site\b)[A-Z][a-z])")
 
 
 def _split_cities(loc: str) -> list[str]:
@@ -121,9 +122,11 @@ def classify_location(loc: str) -> dict | None:
     """{kind: new_england|nyc_metro|us|remote|canada, state, lat, lng, distance, in_city} or None.
     A Canadian location's state is its province code (None when it names only the country), and it
     carries the metro it is in, when it is in one of geo.CA_METROS'."""
+    raw_loc = loc
+    loc = pretty_location(loc)
     prov = canada_of(loc) if loc else None
     if prov is not None:
-        remote = bool(REMOTE_RE.search(loc))
+        remote = bool(REMOTE_RE.search(raw_loc))
         hit = ca_metro(loc, prov) if not remote else None
         return {"kind": "canada", "state": prov or None, "lat": hit and hit[0], "lng": hit and hit[1],
                 "distance": None, "in_city": False, "remote": remote, "metro": hit and hit[2]}
@@ -134,7 +137,7 @@ def classify_location(loc: str) -> dict | None:
     if hit:
         lat, lng, st = hit
     st = st or _state(loc)
-    remote = bool(REMOTE_RE.search(loc))
+    remote = bool(REMOTE_RE.search(raw_loc))
     nyc = haversine_miles(*REGION.nyc_center, lat, lng) if lat is not None else None
     if st in REGION.states:
         kind = "new_england"
