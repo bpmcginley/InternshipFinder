@@ -2,8 +2,17 @@
 // a week from the site, and almost none of them ever see the extension. So when a student opens a
 // posting the extension can fill, a slim bar appears at the bottom of THIS tab (the posting opens in
 // its own tab exactly as before: nothing here touches the click, it only reacts to it):
-//   "Applying? Auto-Apply can fill in this application from your resume. You check it and press
-//    Submit yourself."  [Add to Chrome, free]  [Dismiss]
+//   "Back from Acme? Next time, Auto-Apply can fill in an application like this one from your resume.
+//    You check it and press Submit yourself."  [Add to Chrome, free]  [Dismiss]
+//   "When you add it, Chrome will say it can "Read and change your data on a number of websites" and
+//    "Read your browsing history". That is how it fills in job application sites and finds the
+//    application tab."
+// Worded for when it is seen (U6, 2026-10-14): the posting opens in the foreground, so the student
+// reads this on coming back, often after applying by hand. was: "Applying? Auto-Apply can fill in this
+// application from your resume. ...", which no longer fit by then. The second line prepares them for
+// Chrome's permission dialog (extension/manifest.json: tabs and webNavigation, and 19 job sites), a
+// common place to back out. The company is the row's own (.co in the dashboard row or the landing
+// page's li.job); without one it says "Back from the posting?".
 // While it shows, the page's scroll padding keeps a focused link from sitting under it (WCAG 2.4.11).
 // Loaded by the dashboard (docs/index.html) and by every generated page with such a posting
 // (backend/internscout/seo_pages.py OFFER_TAG). Shown only when all of these hold:
@@ -74,6 +83,7 @@
     "background:var(--panel,#fffefb);color:var(--ink2,#454a52);border:1px solid var(--rule,#e2ded4);border-radius:var(--r-lg,8px);" +
     "box-shadow:var(--shadow-pop,0 10px 30px rgba(23,25,28,.14));font-size:var(--fs-3,15px);line-height:1.45}" +
     ".is-offer p{margin:0;flex:1 1 280px}.is-offer b{color:var(--ink,#17191c)}" +
+    ".is-offer .is-offer-perm{display:block;margin-top:4px;font-size:var(--fs-2,13px);color:var(--ink3,#646a73)}" +
     ".is-offer .is-offer-go{display:inline-flex;align-items:center;min-height:var(--h-ctl,36px);padding:0 14px;border-radius:var(--r,6px);" +
     "background:var(--accent,#1d5c46);color:var(--accent-ink,#fff);font-weight:600;text-decoration:none;white-space:nowrap;transition:background-color 140ms ease-out}" +
     ".is-offer .is-offer-go:hover{background:var(--accent-hover,#164a38)}" +
@@ -128,14 +138,27 @@
     if (had && from && from.focus) from.focus();
   }
 
+  // The company named on the posting's own row, or "" when there is none to read.
+  function companyOf(link) {
+    try {
+      var row = link.closest && link.closest("tr, li.job");
+      var co = row && row.querySelector && row.querySelector(".co");
+      var first = co && co.firstChild;
+      var name = String((first && first.textContent) || "").replace(/\s+/g, " ").trim();
+      return name.length > 0 && name.length <= 80 ? name : "";
+    } catch (e) { return ""; }
+  }
+
   function show(link, now) {
     from = link;
     try { sessionStorage.setItem(SHOWN_KEY, "1"); } catch (e) {}
     if (!styled) { styled = true; document.head.appendChild(el("style", {}, CSS)); }
     bar = el("div", { "class": "is-offer", role: "status" });
     var p = el("p", {});
-    p.appendChild(el("b", {}, "Applying? "));
-    p.appendChild(document.createTextNode("Auto-Apply can fill in this application from your resume. You check it and press Submit yourself."));
+    var co = companyOf(link);
+    p.appendChild(el("b", {}, co ? "Back from " + co + "? " : "Back from the posting? "));
+    p.appendChild(document.createTextNode("Next time, Auto-Apply can fill in an application like this one from your resume. You check it and press Submit yourself."));
+    p.appendChild(el("span", { "class": "is-offer-perm" }, "When you add it, Chrome will say it can \u201cRead and change your data on a number of websites\u201d and \u201cRead your browsing history\u201d. That is how it fills in job application sites and finds the application tab."));
     var go = el("a", { "class": "is-offer-go", href: storeUrl(), target: "_blank", rel: "noopener" }, "Add to Chrome, free");
     var no = el("button", { type: "button" }, "Dismiss");
     go.addEventListener("click", function () { count("apply_offer_click"); close(Date.now()); });

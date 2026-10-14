@@ -87,7 +87,10 @@ test("opening a posting Auto-Apply fills, in desktop Chrome without the extensio
   assert.ok(b, "the bar is on the page");
   assert.equal(b.getAttribute("role"), "status");
   assert.equal(b.text.replace(/\s+/g, " ").trim(),
-    "Applying? Auto-Apply can fill in this application from your resume. You check it and press Submit yourself.Add to Chrome, freeDismiss");
+    // was: "Applying? Auto-Apply can fill in this application ..." (U6: worded for coming back to the tab).
+    "Back from the posting? Next time, Auto-Apply can fill in an application like this one from your resume. You check it and press Submit yourself." +
+    "When you add it, Chrome will say it can “Read and change your data on a number of websites” and “Read your browsing history”. " +
+    "That is how it fills in job application sites and finds the application tab.Add to Chrome, freeDismiss");
   const go = b.find((n) => n.tag === "a");
   assert.equal(go.getAttribute("href"), STORE + "?utm_source=apply-offer");
   assert.equal(go.getAttribute("target"), "_blank");
@@ -268,6 +271,35 @@ test("the bar uses the shared tokens: the large radius, the pop-up shadow and on
   assert.doesNotMatch(OFFER, /rgba\(20,20,20/, "the old fixed shadow vanished on a dark page");
   assert.match(OFFER, /\.is-offer \.is-offer-go\{[^}]*background:var\(--accent,/);
   assert.match(OFFER, /\.is-offer button\{[^}]*border:0;[^}]*background:transparent;[^}]*color:var\(--accent,/);
+});
+
+// ---------- U6 (2026-10-14): worded for coming back to the tab, and ready for Chrome's dialog ----------
+test("the bar names the company on the posting's own row, on the dashboard and on a landing page", () => {
+  for (const [rowTag, nameNode] of [["tr", "span"], ["li", "a"]]) {
+    const r = load();
+    const row = r.doc.createElement(rowTag);
+    const co = r.doc.createElement(nameNode);
+    co.setAttribute("class", "co");
+    // The first child is the name; a landing page's "New" badge comes after it inside .co.
+    const name = { textContent: "  Acme\n Robotics " };
+    co.firstChild = name;
+    row.querySelector = (sel) => (sel === ".co" ? co : null);
+    const link = r.posting();
+    const own = link.closest;
+    link.closest = (sel) => (sel === "tr, li.job" ? row : own(sel));
+    r.open(link);
+    assert.match(r.bar().text, /^Back from Acme Robotics\? Next time, Auto-Apply can fill in an application like this one/);
+  }
+});
+
+test("without a readable company it says Back from the posting, and it always prepares for Chrome's permission dialog", () => {
+  const r = load();
+  r.open();
+  const t = r.bar().text;
+  assert.match(t, /^Back from the posting\?/);
+  assert.match(t, /Read and change your data on a number of websites/);
+  assert.match(t, /Read your browsing history/);
+  assert.doesNotMatch(t, /Applying\?|this application from/);
 });
 
 // U2 (2026-10-14): the posting a student wanted is remembered for the extension to offer after setup.

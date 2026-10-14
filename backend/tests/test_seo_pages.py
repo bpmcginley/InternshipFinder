@@ -905,9 +905,10 @@ def test_the_install_page_answers_first_and_is_dated():
     main = html.split("<main>")[1]
     first = re.sub(r"<[^>]+>", "", re.search(r"<p[^>]*>(.*?)</p>", main, re.S).group(1))
     assert first.startswith("To install the InternScout Auto-Apply extension") and 40 <= len(first.split()) <= 60
-    assert '<time datetime="2026-09-15">' in main and '<time datetime="2026-10-07">' in main
+    # was: 2026-10-07; the steps were rewritten to follow what happens after install on 2026-10-14 (U6).
+    assert '<time datetime="2026-09-15">' in main and '<time datetime="2026-10-14">' in main
     howto = next(b for b in _ld_blocks(html.replace("\n", "")) if b["@type"] == "HowTo")
-    assert howto["datePublished"] == "2026-09-15" and howto["dateModified"] == "2026-10-07"  # was: "2026-10-05" (review links, 2026-10-07)
+    assert howto["datePublished"] == "2026-09-15" and howto["dateModified"] == "2026-10-14"  # was: "2026-10-05", then "2026-10-07" (review links)
     assert [s["position"] for s in howto["step"]] == [1, 2, 3] and "author" not in howto
     assert howto["publisher"]["@id"] == seo_pages.ORG_ID
     desc = _head(html, r'<meta name="description" content="(.*?)"/>')

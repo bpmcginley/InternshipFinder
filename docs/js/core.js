@@ -156,6 +156,70 @@
   // With every state in scope, these files load first, so the first rows paint as fast as they did
   // when they were all the page loaded; the rest follow once a search or filter needs them.
   const FIRST_KEYS = [...BASELINE, "remote"];
+
+  // ---------- the dashboard's filters in its address (U10, 2026-10-14) ----------
+  // The filters are mirrored in the URL, so a copied link opens on the same list, and a page the browser
+  // reloads on Back (when it can't keep it in its back-forward cache) comes back as it was left. The
+  // names are the ones the landing pages already link with (field, state, company, new, stage, year,
+  // paid), plus q, sort, sector, where, status, progress, eligible and citizen. Only what differs from the
+  // student's own defaults is written, so the plain address stays plain and opens the same list as before.
+  // Every value read is checked against what the dashboard can show; anything else is ignored.
+  const FILTER_PARAMS = ["q", "field", "state", "company", "new", "stage", "year", "paid", "sector", "where", "status", "progress", "eligible", "citizen", "sort"];
+  const SORTS = ["score", "new", "company", "comp"];
+  const PROGRESS = ["none", "interested", "applied", "interviewing", "rejected", "offer", "auto"];
+  function filtersFromUrl(search) {
+    // was (in app.js fromLink): field, state, company, new, stage, year and paid=1 only.
+    const q = new URLSearchParams(search || ""), list = (k, ok, max = 6) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, max);
+    // ?company= comes from an employer's page (every spelling its listings use) and matches names exactly;
+    // ?state=all is the State picker's "Everywhere", from the pages that cover every state.
+    const f = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada|all)$/, 80),
+      company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
+    if (q.get("new") === "1") f.new_only = true;
+    const stage = q.get("stage"), year = q.get("year"), paid = q.get("paid"), text = q.get("q"), sort = q.get("sort"), sector = q.get("sector"),
+      where = q.get("where"), status = q.get("status"), progress = q.get("progress"), citizen = q.get("citizen");
+    if (stage && STAGES.some(([k]) => k === stage)) f.stage = stage;
+    if (year && YEARS.some(([k]) => k === year)) f.year = year;
+    if (paid === "1") f.paid = "paid"; else if (paid === "no_unpaid") f.paid = "no_unpaid"; else if (paid === "any") f.paid = "";
+    if (text && text.trim()) f.q = text.slice(0, 200);
+    if (SORTS.includes(sort)) f.sort = sort;
+    if (sector && /^[a-z_]{2,40}$/.test(sector)) f.sector = sector;
+    if (where === "onsite" || where === "remote") f.where = where;
+    if (status === "closed") f.status = "closed"; else if (status === "any") f.status = "";
+    if (PROGRESS.includes(progress)) f.app_state = progress;
+    if (q.get("eligible") === "1") f.eligible = true;
+    if (citizen === "hide") f.hide_citizen = true; else if (citizen === "show") f.hide_citizen = false;
+    return f;
+  }
+  // [name, value] pairs for the filters in `f` that differ from `d` (the defaults: no search, nothing
+  // picked, open postings, and the sort, pay and citizen settings the student's profile implies).
+  function filterParams(f, d) {
+    const out = [], text = String(f.q || "").trim();
+    if (text) out.push(["q", text]);
+    if (f.fields && f.fields.length) out.push(["field", f.fields.join(",")]);
+    if (f.states && f.states.length) out.push(["state", f.states.join(",")]);
+    (f.company || []).forEach(c => out.push(["company", c]));
+    if (f.new_only) out.push(["new", "1"]);
+    if (f.stage) out.push(["stage", f.stage]);
+    if (f.year) out.push(["year", f.year]);
+    if ((f.paid || "") !== (d.paid || "")) out.push(["paid", f.paid === "paid" ? "1" : f.paid || "any"]);
+    if (f.sector) out.push(["sector", f.sector]);
+    if (f.where) out.push(["where", f.where]);
+    if (f.status !== "open") out.push(["status", f.status || "any"]);
+    if (f.app_state) out.push(["progress", f.app_state]);
+    if (f.eligible) out.push(["eligible", "1"]);
+    if (!!f.hide_citizen !== !!d.hide_citizen) out.push(["citizen", f.hide_citizen ? "hide" : "show"]);
+    if (f.sort && f.sort !== d.sort) out.push(["sort", f.sort]);
+    return out;
+  }
+  // The address's query with the filter names replaced by `f`; other names (admin, utm_source...) are kept
+  // in their place. Commas stay commas, as the landing pages write them.
+  function filterSearch(search, f, d) {
+    const q = new URLSearchParams(search || "");
+    FILTER_PARAMS.forEach(k => q.delete(k));
+    const mine = filterParams(f, d).map(([k, v]) => k + "=" + encodeURIComponent(v).replace(/%2C/gi, ",")).join("&");
+    const s = [q.toString(), mine].filter(Boolean).join("&");
+    return s ? "?" + s : "";
+  }
   // The files to load, in order: `first` (a place named in the search, then the first files or the
   // scoped ones) and `rest` (the remaining states, only once `everything` is asked for).
   function loadPlan(scope, indexKeys, queryKeys, everything) {
@@ -1096,6 +1160,7 @@
     C, DAY, US_STATES, CA_PROVINCES, CANADA_KEYS, isCanadaKey, inCanadaOnly, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
     fieldLabel, keyLabel, termText, ls, ss,
     emptyProfile, loadProfile, saveProfile, profileKeys, demandStates, ALL_KEY, viewScope, FIRST_KEYS, loadPlan,
+    FILTER_PARAMS, filtersFromUrl, filterParams, filterSearch,
     parseQuery, splitPlaces, queryKeys, placeWords, stem, compileQuery, matchScore, majorForFields,
     regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, handledListingIds, heldUrls, SELECT_MAX, headerChecked, selectRows, sortRows, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
     // was: WEIGHTS, PART_LABEL, profileFields, score,
