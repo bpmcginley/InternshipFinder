@@ -1,4 +1,4 @@
-import { loadStore, updateStore, hasKey, resumeReviewPending } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, resumeReviewPending, factCheckNote } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { requestHostAccess, hostOf } from "../lib/hosts.js";
 import { loadReview, shouldShow, cardCopy, STORE_REVIEWS_URL, FEEDBACK_URL, KEY as REVIEW_KEY } from "../lib/review.js";
@@ -131,7 +131,10 @@ async function renderQueue() {
   const s = await loadStore();
   let h = "";
   if (!s.settings.onboarded || !hasKey(s)) h += `<div class="card needs_you"><div class="msg">Finish the Deep Dive before using Auto-Apply.</div><div class="row"><button class="b primary" id="dive">Start Deep Dive</button></div></div>`;
-  else if (resumeReviewPending(s)) h += `<div class="card needs_you"><div class="msg">Auto-Apply is paused until you finish reviewing your new resume in the Deep Dive.</div><div class="row"><button class="b primary" id="dive">Open Deep Dive</button></div></div>`;
+  else if (resumeReviewPending(s)) h += `<div class="card needs_you"><div class="msg">Auto-Apply is paused until your resume details are saved in the Deep Dive.</div><div class="row"><button class="b primary" id="dive">Open Deep Dive</button></div></div>`;
+  // Old eligibility answers nobody confirmed, or a disagreement with the dashboard (store.js factCheckNote).
+  // Auto-Apply still runs; those answers are left blank and asked about when a form needs them.
+  else if (factCheckNote(s)) h += `<div class="card needs_you"><div class="msg">${factCheckNote(s)}</div><div class="row"><button class="b primary" id="facts">Open Quick facts</button></div></div>`;
   if (!jobs.length) h += `<div class="empty">No applications queued.<br>Pick internships on the dashboard and press <b>Auto-Apply</b>.<br><br><a href="https://internscout.org/" target="_blank" style="color:var(--blue)">Open dashboard ↗</a></div>`;
   // The review card (lib/review.js) goes right under the applications that are ready, which is what it
   // is about, and before anything still waiting. shouldShow() keeps it away while a form is being filled.
@@ -194,6 +197,7 @@ async function renderQueue() {
   const dive = () => send({ type: "open_deep_dive" });
   main.querySelector("#dive")?.addEventListener("click", dive);
   main.querySelector("#dive2").addEventListener("click", dive);
+  main.querySelector("#facts")?.addEventListener("click", () => send({ type: "open_deep_dive", step: "facts" }));
   main.querySelector("#addurl").addEventListener("submit", async (e) => {
     e.preventDefault();
     const url = main.querySelector("#url").value.trim();
@@ -257,7 +261,7 @@ function render() {
 // The queue tab also redraws when the Deep Dive becomes finished or unfinished, which a restore from the
 // student's account does (lib/sync.js), so "Finish the Deep Dive" doesn't linger after one. And when a
 // replaced resume's review starts or ends. was: onboarded only.
-const doneOf = (v) => !!(v && v.settings && v.settings.onboarded && !resumeReviewPending(v));
+const doneOf = (v) => !!(v && v.settings && v.settings.onboarded && !resumeReviewPending(v)) && !(v.profile && factCheckNote(v));
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== "local") return;
   const flipped = ch.store && doneOf(ch.store.oldValue) !== doneOf(ch.store.newValue);

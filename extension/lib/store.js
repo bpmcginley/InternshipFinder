@@ -51,7 +51,8 @@ export const EMPTY_FACTS = {
   linkedin: "", github: "", website: "",
   work_authorized: "", needs_sponsorship: "", citizenship: "", clearance_eligible: "",
   willing_to_relocate: "", available_start: "", available_end: "", earliest_start: "",
-  hours_per_week: "", salary_expectation: "", how_heard: "Online job board",
+  // was: how_heard: "Online job board", an answer nobody gave. Blank now; the agent asks when a form needs it.
+  hours_per_week: "", salary_expectation: "", how_heard: "",
   worked_here_before: "", languages: "", willing_to_travel: "",
   over_18: "", background_check: "", drug_test: "", non_compete: "",
   gender: "Decline to self-identify", race: "Decline to self-identify", hispanic: "Decline to self-identify",
@@ -62,7 +63,18 @@ export const EMPTY_FACTS = {
 // Older profiles have no way to distinguish default Yes/No answers from deliberate
 // ones. Keep their displayed values, but require a recorded confirmation before use.
 export const CONFIRMATION_FACTS = ["work_authorized", "needs_sponsorship", "over_18", "willing_to_relocate",
-  "willing_to_travel", "background_check", "drug_test", "non_compete", "worked_here_before", "hours_per_week", "languages"];
+  "willing_to_travel", "background_check", "drug_test", "non_compete", "worked_here_before", "hours_per_week", "languages", "how_heard"];
+// What every new profile was given before 2026-10 (PR #94), whether or not the student agreed with it. An
+// older profile that still has one of these, with no record of the student choosing it, is flagged on
+// Quick facts as an answer they may never have picked.
+export const LEGACY_DEFAULTS = {
+  work_authorized: "Yes", needs_sponsorship: "No", over_18: "Yes", willing_to_relocate: "Yes", willing_to_travel: "Yes",
+  background_check: "Yes", drug_test: "Yes", non_compete: "No", worked_here_before: "No", hours_per_week: "40",
+  languages: "English", how_heard: "Online job board",
+};
+// Work authorization, sponsorship and age: each is its own choice on Quick facts, never part of
+// "Confirm answers shown", since a wrong one can make an application untrue.
+export const ELIGIBILITY_FACTS = ["work_authorized", "needs_sponsorship", "over_18"];
 // The voluntary self-identification answers. They never leave the device (lib/sync.js), and an answer
 // nobody confirmed falls back to the decline default in EMPTY_FACTS.
 export const DEMOGRAPHIC_KEYS = ["gender", "race", "hispanic", "veteran", "disability", "lgbtq"];
@@ -93,6 +105,42 @@ export function confirmedFacts(s) {
   for (const key of Object.keys(facts)) if (!factConfirmed(s.profile, key)) facts[key] = factFallback(key);
   return facts;
 }
+// Older answers with no record of the student choosing them (CONFIRMATION_FACTS), which Auto-Apply leaves
+// blank until confirmed. `legacy` marks the ones that still match the old default for everyone.
+export function unconfirmedOldFacts(profile) {
+  return CONFIRMATION_FACTS.filter((key) => profile.facts?.[key] && !profile.sources?.facts?.[key])
+    .map((key) => ({ key, value: profile.facts[key], legacy: profile.facts[key] === LEGACY_DEFAULTS[key] }));
+}
+
+// The dashboard's "Work authorization" choice (docs/js/core.js WORK_AUTH) against the Deep Dive's answers.
+// Returns a sentence for the student when they disagree, else "". Only clear contradictions count:
+// "canada", "other" and no choice say nothing about U.S. work.
+export function workAuthMismatch(s) {
+  const auth = s.dashboard_profile?.work_auth || "", f = s.profile?.facts || {};
+  const yes = (v) => /^y/i.test(v || ""), no = (v) => /^n/i.test(v || "");
+  const usStatus = /citizen|permanent/i.test(f.citizenship || "") && !/visa|other/i.test(f.citizenship || "");
+  if (auth === "citizen" || auth === "permanent") {
+    const said = auth === "citizen" ? "a U.S. citizen" : "a U.S. permanent resident";
+    if (yes(f.needs_sponsorship)) return `On the dashboard you said you are ${said}, but here you answered that you need visa sponsorship. Check which is right.`;
+    if (no(f.work_authorized)) return `On the dashboard you said you are ${said}, but here you answered that you are not authorized to work in the US. Check which is right.`;
+    if (/visa/i.test(f.citizenship || "")) return `On the dashboard you said you are ${said}, but your citizenship here is "${f.citizenship}". Check which is right.`;
+  }
+  if (auth === "visa") {
+    if (no(f.needs_sponsorship)) return "On the dashboard you said you are on a student visa and will need sponsorship, but here you answered that you don't need sponsorship. Check which is right.";
+    if (usStatus) return `On the dashboard you said you are on a student visa, but your citizenship here is "${f.citizenship}". Check which is right.`;
+  }
+  return "";
+}
+
+// The side panel's note (sidepanel.js): eligibility answers Auto-Apply can't use yet, or a disagreement
+// with the dashboard. Empty when there is nothing to check.
+export function factCheckNote(s) {
+  if (workAuthMismatch(s)) return "Your work authorization answers here and on the dashboard disagree. Check them in Quick facts.";
+  const old = unconfirmedOldFacts(s.profile).filter((x) => ELIGIBILITY_FACTS.includes(x.key));
+  if (old.length) return "Some saved answers, like work authorization, were never confirmed. Auto-Apply leaves them blank until you confirm them in Quick facts.";
+  return "";
+}
+
 // Suggested values waiting on Quick facts: [{key, value, source, kept}], kept being the student's earlier
 // answer when there was one (onboarding/profile.js applyInterviewFacts).
 export function factSuggestions(profile) {
@@ -104,7 +152,13 @@ export function factSuggestions(profile) {
 // A replaced or removed resume pauses Auto-Apply until the new one is read and its details reviewed
 // (onboarding.js). Kept apart from `onboarded`, which only ever goes from false to true: lib/sync.js
 // treats an unfinished device as one that gives way to the account's copy.
-export const resumeReviewPending = (s) => s.settings.resume_details_ready === false || !!s.settings.resume_import;
+// A student who chose "I'll enter my details myself" (onboarding.js) after a resume read failed or was
+// skipped: Auto-Apply stays paused until the contact details a resume would have given are filled in.
+export const MANUAL_DETAILS = ["first_name", "last_name", "email"];
+export const manualDetailsMissing = (s) => (s.settings.resume_details_manual
+  ? MANUAL_DETAILS.filter((k) => !String(s.profile?.facts?.[k] || "").trim()) : []);
+export const resumeReviewPending = (s) => s.settings.resume_details_ready === false || !!s.settings.resume_import
+  || manualDetailsMissing(s).length > 0;
 // Auto-Apply may fill forms: the Deep Dive is finished and no resume is waiting to be reviewed.
 export const autoApplyReady = (s) => !!s.settings.onboarded && !resumeReviewPending(s);
 
