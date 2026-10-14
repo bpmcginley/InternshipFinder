@@ -15,7 +15,7 @@ function loadCore(fetchImpl) {
     CONFIG: { dataUrl: "./data/", rawDataFallback: "https://raw.example/data/" },
     fetch: fetchImpl, localStorage: store(), sessionStorage: store(),
     addEventListener() {}, postMessage() {}, setTimeout, clearTimeout,
-    AbortController,
+    AbortController, TextDecoder,
     location: { origin: "https://internscout.org", pathname: "/", search: "", hash: "" },
     document: { documentElement: { dataset: {} } },
     console,
@@ -57,13 +57,73 @@ test("concurrent description consumers both wait for posting context", async () 
 });
 
 test("a failed description download reports incompleteness and can recover without reloading", async () => {
+  // was: one failure was enough; descriptions now get the listing files' quiet retry, so it takes two.
   let attempts = 0;
   const IS = loadCore(url => url.endsWith("index.json") ? ok(shardIndex) : url.endsWith(".desc.json")
-    ? ++attempts === 1 ? Promise.reject(new Error("offline")) : ok({ a: "Required SQL" }) : ok([{ id: "a" }]));
-  const store = IS.createStore(); await store.init(); await store.ensure(["MA"]);
+    ? ++attempts <= 2 ? Promise.reject(new Error("offline")) : ok({ a: "Required SQL" }) : ok([{ id: "a" }]));
+  const store = IS.createStore({ retryDelayMs: 0 }); await store.init(); await store.ensure(["MA"]);
   assert.deepEqual([...await store.descs(["MA"])], ["MA"]);
   assert.deepEqual([...await store.descs(["MA"])], []);
+  assert.equal(attempts, 3); assert.equal(store.all()[0].description, "Required SQL");
+});
+
+test("a description file gets one quiet retry, like a listing file", async () => {
+  let attempts = 0;
+  const IS = loadCore(url => url.endsWith("index.json") ? ok(shardIndex) : url.endsWith(".desc.json")
+    ? ++attempts === 1 ? Promise.reject(new Error("connection reset")) : ok({ a: "Required SQL" }) : ok([{ id: "a" }]));
+  const store = IS.createStore({ retryDelayMs: 0 }); await store.init(); await store.ensure(["MA"]);
+  assert.deepEqual([...await store.descs(["MA"])], []);
   assert.equal(attempts, 2); assert.equal(store.all()[0].description, "Required SQL");
+});
+
+// A response whose body arrives in pieces, every `everyMs`, and stops after `stallAfter` pieces.
+function streamed(body, signal, { pieces = 12, everyMs = 15, stallAfter = Infinity } = {}) {
+  const bytes = new TextEncoder().encode(JSON.stringify(body));
+  const size = Math.ceil(bytes.length / pieces);
+  let i = 0;
+  const read = () => new Promise((resolve, reject) => {
+    if (signal) signal.addEventListener("abort", () => reject(new Error("aborted")));
+    if (i >= stallAfter) return;
+    setTimeout(() => {
+      const at = i++ * size;
+      resolve(at >= bytes.length ? { done: true, value: undefined } : { done: false, value: bytes.slice(at, at + size) });
+    }, everyMs);
+  });
+  const json = async () => {
+    const got = [];
+    for (let r = await read(); !r.done; r = await read()) got.push(...r.value);
+    return JSON.parse(new TextDecoder().decode(new Uint8Array(got)));
+  };
+  return Promise.resolve({ ok: true, status: 200, body: { getReader: () => ({ read }) }, json });
+}
+
+test("a slow file that keeps arriving is not cancelled, however long it takes", async () => {
+  // About 13 pieces 15 ms apart: four times the 50 ms limit in all, but never 50 ms without a byte.
+  const rows = Array.from({ length: 40 }, (_, i) => ({ id: "ca" + i, title: "Intern, Montréal et São Paulo" }));
+  const IS = loadCore((url, options) => url.endsWith("index.json") ? ok(shardIndex)
+    : url.endsWith("MA.json") ? streamed(rows, options.signal) : notFound());
+  const store = IS.createStore({ timeoutMs: 50, retryDelayMs: 0 }); await store.init();
+  const started = Date.now();
+  assert.deepEqual([...await store.ensure(["MA"])], []);
+  assert.ok(Date.now() - started > 100, "the download took longer than the limit");
+  assert.equal(store.all().length, 40);
+  assert.equal(store.all()[0].title, "Intern, Montréal et São Paulo", "multi-byte text split across pieces survives");
+});
+
+test("a file that stops arriving part-way is cancelled after the quiet limit, and the rest still load", async () => {
+  const signals = [];
+  const IS = loadCore((url, options) => {
+    if (url.endsWith("index.json")) return ok(shardIndex);
+    if (url.endsWith("MA.json")) return ok([{ id: "ma" }]);
+    signals.push(options.signal);
+    return streamed([{ id: "ct" }], options.signal, { pieces: 4, everyMs: 5, stallAfter: 1 });
+  });
+  const store = IS.createStore({ timeoutMs: 40, retryDelayMs: 0 }); await store.init();
+  const started = Date.now();
+  assert.deepEqual([...await store.ensure(["MA", "CT"])], ["CT"]);
+  assert.ok(Date.now() - started < 1000, "a stalled body does not hang the page");
+  assert.equal(signals.length, 2, "one quiet retry"); assert.ok(signals.every(s => s.aborted));
+  assert.deepEqual([...store.all()].map(x => x.id), ["ma"]);
 });
 
 test("healthy states publish results while a stalled shard times out, then retry recovers", async () => {
@@ -102,7 +162,7 @@ test("description download timeout is retryable and missing legacy sidecars rema
   let stalled = true;
   const IS = loadCore(url => url.endsWith("index.json") ? ok(shardIndex) : url.endsWith(".desc.json")
     ? stalled ? new Promise(() => {}) : ok({ a: "Recovered" }) : ok([{ id: "a" }]));
-  const store = IS.createStore({ timeoutMs: 10 }); await store.init(); await store.ensure(["MA"]);
+  const store = IS.createStore({ timeoutMs: 10, retryDelayMs: 0 }); await store.init(); await store.ensure(["MA"]);
   assert.deepEqual([...await store.descs(["MA"])], ["MA"]);
   stalled = false; assert.deepEqual([...await store.descs(["MA"])], []);
   const legacyIS = loadCore(url => url.endsWith("index.json") ? ok({ files: { MA: { file: "MA.json" } } }) : url.endsWith(".desc.json") ? notFound() : ok([{ id: "a", description: "Inline context" }]));
@@ -260,4 +320,22 @@ test("the review line is due only with the extension set up and applications fil
   assert.equal(IS.reviewLineDue({ ...on, review_line: true }, { jobs: {} }), true, "a cleared queue: the extension's count still says so");
   assert.equal(IS.REVIEW_LINE_KEY, "internscout.review_line");
   assert.match(IS.REVIEWS_URL, /^https:\/\/chromewebstore\.google\.com\/detail\/internscout-auto-apply\/hpnbbpmalfjijnmpoihhjgjolhabjpgi\/reviews$/);
+});
+
+test("downloads beyond four wait their turn, and the quiet timer starts only when one begins", async () => {
+  // Each file takes 30 ms against a 40 ms limit; eight at once would leave the last ones waiting for
+  // a connection in the browser past the limit, so they queue here instead.
+  const keys = ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"];
+  const index = { files: Object.fromEntries(keys.map(k => [k, { file: `listings/${k}.json` }])) };
+  let running = 0, most = 0;
+  const IS = loadCore(url => {
+    if (url.endsWith("index.json")) return ok(index);
+    running++; most = Math.max(most, running);
+    const id = url.replace(/.*\/(\w+)\.json.*/, "$1");
+    return new Promise(resolve => setTimeout(() => { running--; resolve({ ok: true, status: 200, json: async () => [{ id }] }); }, 30));
+  });
+  const store = IS.createStore({ timeoutMs: 40, retryDelayMs: 0 }); await store.init();
+  assert.deepEqual([...await store.ensure(keys)], []);
+  assert.equal(most, 4);
+  assert.equal(store.all().length, keys.length);
 });

@@ -41,12 +41,18 @@ def _known_city(part: str) -> str | None:
 
 
 # "Cambridge, MA, Arlington, VA" -> split after each state code, but keep "Boston, MA, United States" whole.
-_AFTER_STATE = re.compile(
-    r"(?<=[\s,][A-Z]{2}),\s*(?=(?!United States|USA?\b|Canada\b|Remote\b|Hybrid\b|On[- ]?site\b)[A-Z][a-z])")
+_NEXT_CITY = r"(?=(?!United States|USA?\b|Canada\b|Remote\b|Hybrid\b|On[- ]?site\b)[A-Z][a-z])"
+_AFTER_STATE = re.compile(r"(?<=[\s,][A-Z]{2}),\s*" + _NEXT_CITY)
+# "Seattle, WA, Remote, Boston, MA": the same split one word on, after the work mode or country that
+# stays with its town (was: the suffix kept the whole string as one location, and Boston was lost).
+_AFTER_SUFFIX = re.compile(r"[\s,][A-Z]{2}\s*,\s*(?:Canada|Remote|Hybrid|On[- ]?site)\b(\s*,\s*)" + _NEXT_CITY)
 
 
 def _split_cities(loc: str) -> list[str]:
     """'New York, Chicago' -> ['New York', 'Chicago']; 'Brooklyn, New York' and 'Boston, MA' stay whole."""
+    cut = _AFTER_SUFFIX.search(loc)
+    if cut:
+        return _split_cities(loc[:cut.start(1)].strip()) + _split_cities(loc[cut.end(1):].strip())
     pieces = _AFTER_STATE.split(loc)
     if len(pieces) > 1:
         return [q for p in pieces for q in _split_cities(p.strip())]
@@ -107,6 +113,7 @@ def _state(loc: str) -> str | None:
 def maybe_in_region(loc: str) -> bool:
     """Cheap, network-free check fetchers use before a per-job detail call. True for US-remote,
     an unknown state, or a wanted state (the baseline plus states students picked)."""
+    loc = _without_mode(loc)
     prov = canada_of(loc) if loc else None
     if prov is not None:
         # was: prov in CA_DETAIL_PROVINCES. A province students picked (the ingest's wanted states,
@@ -118,12 +125,24 @@ def maybe_in_region(loc: str) -> bool:
     return st is None or st in wanted_states()
 
 
+# A work mode after the place: "Vienna, VA, Remote", "Berlin, CT, Hybrid", "Milan, IL, Onsite".
+_MODE_SUFFIX = re.compile(r"\s*,\s*(?:remote|hybrid|on[- ]?site|in[- ]office)\s*$", re.I)
+
+
+def _without_mode(loc: str) -> str:
+    """The place without a trailing work mode, which classify_location reads from the raw string. The
+    namesake rule in geo lets "Vienna, VA" through only with the state last, so with the mode left on
+    (was: kept whole since PR #94) the town read as the foreign city and the location had no region."""
+    bare = _MODE_SUFFIX.sub("", loc or "")
+    return bare if bare.strip() else loc
+
+
 def classify_location(loc: str) -> dict | None:
     """{kind: new_england|nyc_metro|us|remote|canada, state, lat, lng, distance, in_city} or None.
     A Canadian location's state is its province code (None when it names only the country), and it
     carries the metro it is in, when it is in one of geo.CA_METROS'."""
     raw_loc = loc
-    loc = pretty_location(loc)
+    loc = pretty_location(_without_mode(loc))
     prov = canada_of(loc) if loc else None
     if prov is not None:
         remote = bool(REMOTE_RE.search(raw_loc))
