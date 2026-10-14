@@ -409,3 +409,74 @@ test("a Pause that lands before the first check stops the run before the paid re
     s.settings.tailor_resume = saved.tailor; s.profile.experience = saved.exp;
   }
 });
+
+// ---- PR #99 revision (2026-10-14): consent-only pages pause instead of "Ready to submit" ----
+const frameOf = (buttons, extra = {}) => ({ frameId: 0, url: "https://boards.greenhouse.io/acme/jobs/1", title: "", headings: [], step: "", errors: [], captcha: false, elements: [], buttons, text: "", ...extra });
+
+test("formatSnapshot: consentOnly only when every blocked button is a bare consent button and it is not the review step", () => {
+  const { formatSnapshot } = agentMod;
+  const agree = { ref: "b2", text: "I agree", blocked: true, consent: true };
+  assert.equal(formatSnapshot([frameOf([{ ref: "b1", text: "Back" }, agree])]).consentOnly, true);
+  assert.match(formatSnapshot([frameOf([agree])]).text, /asks the student to agree/);
+  assert.equal(formatSnapshot([frameOf([agree, { ref: "b3", text: "Submit", blocked: true }])]).consentOnly, false, "a real send button beside it");
+  assert.equal(formatSnapshot([frameOf([agree], { reviewStep: true })]).consentOnly, false, "on the review step it may be the send button");
+  assert.equal(formatSnapshot([frameOf([{ ref: "b1", text: "Next" }])]).consentOnly, false, "nothing blocked");
+});
+
+test("ready_to_submit on a page held back only by I agree pauses the job for the student instead", async () => {
+  const id = await newJob();
+  const snapshot = window.ISDom.snapshot;
+  window.ISDom.snapshot = () => ({ ...snapshot(), buttons: [{ ref: "b1", text: "Back" }, { ref: "b2", text: "I agree", blocked: true, consent: true }] });
+  replies = [[use("r1", "ready_to_submit", { summary: "Done" })]];
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, agentMod.CONSENT_HELP);
+    assert.match(j.reason, /asks you to agree to something/);
+    assert.deepEqual(actions, [], "the agent pressed nothing");
+  } finally { window.ISDom.snapshot = snapshot; }
+});
+
+test("a real blocked send button still ends Ready to submit", async () => {
+  const id = await newJob();
+  const snapshot = window.ISDom.snapshot;
+  window.ISDom.snapshot = () => ({ ...snapshot(), buttons: [{ ref: "b2", text: "Submit application", blocked: true }] });
+  replies = [[use("r1", "ready_to_submit", { summary: "Done" })]];
+  try {
+    await runJob(id);
+    assert.equal((await getJob(id)).status, "ready_to_submit");
+  } finally { window.ISDom.snapshot = snapshot; }
+});
+
+test("a prefilled page held back only by Accept pauses without an AI call instead of Ready to submit", async () => {
+  const id = await newJob();
+  const snapshot = window.ISDom.snapshot, fastFill = window.ISDom.fastFill;
+  window.ISDom.snapshot = () => ({ ...snapshot(), elements: [{ ref: "e1", kind: "text", label: "Phone", value: "555" }],
+    buttons: [{ ref: "b2", text: "Accept", blocked: true, consent: true }] });
+  window.ISDom.fastFill = async () => ["Phone = 555"];
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.equal(calls, 0);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, agentMod.CONSENT_HELP);
+  } finally { window.ISDom.snapshot = snapshot; window.ISDom.fastFill = fastFill; }
+});
+
+test("a job paused for missing manual details says to add them in Quick facts", async () => {
+  const id = await newJob();
+  const s = data.store, facts = { ...s.profile.facts };
+  s.settings.resume_details_manual = true;
+  s.profile.facts.first_name = ""; s.profile.facts.last_name = ""; s.profile.facts.email = "";
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    const j = await getJob(id);
+    assert.equal(j.status, "needs_you");
+    assert.equal(j.reason, "Add your first name, last name and email in Quick facts, then press Resume.");
+    assert.doesNotMatch(j.reason, /reviewing your resume/);
+    assert.equal(calls, 0);
+  } finally { s.settings.resume_details_manual = false; s.profile.facts = facts; }
+});

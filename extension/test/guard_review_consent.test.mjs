@@ -38,34 +38,41 @@ test("send-like buttons stay refused on the review step, and the refusal there i
   assert.equal(G.allowClick(btn("Print"), REVIEW).review, true, "an unfamiliar button is the weak kind");
 });
 
-test("Accept and I agree move a consent page on once the run has filled earlier pages", () => {
+// Bruce's decision on PR #99: the agent never presses a consent button on a filled page. The old rules
+// stay as they were; agent.js pauses on a consent-only page instead (agent_takeover.test.mjs).
+test("a bare Accept or I agree on a filled page is still refused, and is recognised as a consent button", () => {
   const mid = { filledFields: 1, runFilled: true, reviewStep: false };
   for (const t of ["Accept", "I Agree", "I accept", "Agree", "I acknowledge", "I agree to the terms", "Accept terms and conditions", "I consent"]) {
-    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 0 }), mid).allowed, true, t + " (submit, form empty)");
-    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 1 }), mid).allowed, true, t + " (submit, the consent box ticked)");
-    assert.equal(G.allowClick(btn(t), mid).allowed, true, t + " (plain button)");
+    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 0 }), mid).allowed, false, t + " (submit, run filled earlier)");
+    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 1 }), mid).allowed, false, t + " (submit, its form holds an answer)");
     assert.equal(G.isConsent(btn(t)), true, t);
   }
 });
 
+test("a short page whose send button is a bare I agree is refused", () => {
+  // Two answers on the page, both in the button's form, no review heading.
+  const short = { filledFields: 2, runFilled: false, reviewStep: false };
+  assert.equal(G.allowClick(btn("I agree", { type: "submit", formFilled: 2 }), short).allowed, false);
+  assert.equal(G.allowClick(btn("Accept", { type: "submit", formFilled: 1 }), { filledFields: 1 }).allowed, false);
+});
+
 test("consent buttons never become a way round the final Submit", () => {
   const mid = { filledFields: 1, runFilled: true, reviewStep: false };
-  // Labels that send the application are final whatever word they start with.
+  // Labels that send the application are final whatever word they start with, and are not consent buttons.
   for (const t of ["I agree and apply", "Agree & Submit", "Accept and submit", "I agree and submit my application"]) {
     assert.equal(G.allowClick(btn(t, { type: "submit" }), mid).allowed, false, t);
     assert.equal(G.allowClick(btn(t), mid).allowed, false, t + " (plain button)");
+    assert.equal(G.isConsent(btn(t)), false, t);
   }
   // On the review step, refused.
   for (const t of ["Accept", "I Agree"]) {
     assert.equal(G.allowClick(btn(t, { type: "submit" }), REVIEW).allowed, false, t + " on the review step");
     assert.equal(G.allowClick(btn(t), REVIEW).allowed, false, t + " (plain) on the review step");
   }
-  // In a form that holds a whole application, "I agree" may be the send button.
   const full = { filledFields: 9, runFilled: true, reviewStep: false };
   assert.equal(G.allowClick(btn("I agree", { type: "submit", formFilled: 9 }), full).allowed, false);
-  assert.equal(G.allowClick(btn("Accept", { type: "submit", formFilled: 0 }), full).allowed, false, "a full page, even with the button outside the form");
-  // A Workday-style id that says submit still wins.
+  // A Workday-style id that says submit is the send button, not a consent button.
   assert.equal(G.allowClick(btn("I Agree", { automationId: "submitApplication" }), mid).allowed, false);
-  // A consent word in front of something else is not a bare consent button.
+  assert.equal(G.isConsent(btn("I Agree", { automationId: "submitApplication" })), false);
   assert.equal(G.isConsent(btn("Accept offer and send")), false);
 });

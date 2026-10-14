@@ -3,7 +3,7 @@
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { hasHostAccess, hostOf } from "../lib/hosts.js";
-import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, autoApplyReady } from "../lib/store.js";
+import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
@@ -221,10 +221,12 @@ export function formatSnapshot(frames, fails = {}) {
   // Labels of fields this snapshot already shows with a value; see preFilledLine.
   const shown = new Set();
   let hasFinal = false;
+  // Every blocked button seen, for consentOnly below.
+  const blocked = [];
   // A frame whose heading or step indicator says review / confirm (guard.js pageContext).
   const reviewStep = frames.some((f) => f.reviewStep);
   const top = frames.find((f) => f.frameId === 0) || frames[0];
-  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown, reviewStep };
+  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown, reviewStep, consentOnly: false };
   lines.push(`URL: ${top.url}`, `TITLE: ${top.title}`);
   for (const f of frames) {
     if (f.frameId !== 0 && !f.elements.length && !f.buttons.length) continue;
@@ -255,12 +257,16 @@ export function formatSnapshot(frames, fails = {}) {
     for (const b of f.buttons) {
       const ref = `${f.frameId}:${b.ref}`;
       index[ref] = { kind: "button", label: b.text, url: f.url };
-      if (b.blocked) hasFinal = true;
-      lines.push(`[${ref}] "${b.text}"${b.blocked ? " BLOCKED (final submit, human only)" : ""}${b.menu === "open" ? " (menu already open: click one of its items, not this again)" : ""}`);
+      if (b.blocked) { hasFinal = true; blocked.push(b); }
+      lines.push(`[${ref}] "${b.text}"${b.blocked ? (b.consent ? " BLOCKED (asks the student to agree; human only)" : " BLOCKED (final submit, human only)") : ""}${b.menu === "open" ? " (menu already open: click one of its items, not this again)" : ""}`);
     }
     if (f.text) lines.push(`PAGE TEXT: ${f.text}`);
   }
-  return { text: lines.join("\n"), index, top, hasFinal, shown, reviewStep };
+  // The only buttons held back are bare Accept / I agree buttons (guard.js isConsent), and the page does
+  // not say it is the review step: a page asking the student to agree to something, not a finished
+  // application. The run pauses there rather than saying "Ready to submit" (PR #99, 2026-10-14).
+  const consentOnly = !reviewStep && blocked.length > 0 && blocked.every((b) => b.consent);
+  return { text: lines.join("\n"), index, top, hasFinal, shown, reviewStep, consentOnly };
 }
 
 // fastFill reports "Label = value" for each field it filled, and the snapshot right after it shows the
@@ -525,7 +531,20 @@ const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter
 export const RESUME_REVIEW_HELP = "Finish reviewing your resume in the Deep Dive, then press Resume.";
 export const NO_RESUME_HELP = "Add your resume in the Deep Dive, then press Resume.";
 export const NOT_SET_UP_HELP = "Finish the Deep Dive, then press Resume.";
-const notReadyHelp = (store) => (!store.settings.onboarded ? NOT_SET_UP_HELP : store.files.resume ? RESUME_REVIEW_HELP : NO_RESUME_HELP);
+// The student chose "I'll enter my details myself" and some of those details are still empty
+// (store.js manualDetailsMissing). Same wording as the Deep Dive's banner (onboarding/quickstart.js
+// pausedMessage). was: "Finish reviewing your resume", which sent them to a review there was none of.
+const DETAIL_NAMES = { first_name: "first name", last_name: "last name", email: "email" };
+const andList = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+export const manualDetailsHelp = (missing) => `Add your ${andList(missing.map((k) => DETAIL_NAMES[k] || k))} in Quick facts, then press Resume.`;
+const notReadyHelp = (store) => {
+  if (!store.settings.onboarded) return NOT_SET_UP_HELP;
+  const missing = store.settings.resume_import ? [] : manualDetailsMissing(store);
+  if (missing.length) return manualDetailsHelp(missing);
+  return store.files.resume ? RESUME_REVIEW_HELP : NO_RESUME_HELP;
+};
+// A page whose only held-back buttons are Accept or I agree (formatSnapshot consentOnly).
+export const CONSENT_HELP = "This page asks you to agree to something. Read it, press the button yourself, then press Resume.";
 const running = new Set();
 export const isRunning = (id) => running.has(id);
 // Pause, Take over, Resume, Retry, "I submitted it" and Remove all bump job.gen (index.js control,
@@ -820,6 +839,13 @@ async function loop(id, run) {
     }
 
     if (!msgs.length && globalThis.ISGuard.nothingLeftForAI(frames, pre.length)) {
+      // The blocked button is only an Accept or I agree: not ready to submit, but the student's to agree to.
+      if (snap.consentOnly) {
+        await appendLog(job.id, { kind: "gate", text: "Paused: this page asks you to agree to something." });
+        await own({ status: "needs_you", reason: CONSENT_HELP, question: "", pending, activity: "" });
+        await saveMsgs(id, msgs);
+        return;
+      }
       await appendLog(job.id, { kind: "note", text: `Filled ${pre.length} field(s) from your profile; no AI was needed.` });
       const hl = (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled, gen }])).map((r) => r.result);
       const missing = hl.reduce((n, h) => n + ((h && h.missing) || 0), 0);
@@ -912,7 +938,7 @@ async function loop(id, run) {
       if (!stopped && !owns(await getJob(id), gen)) stopped = true;
       if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, runFilled, store, job, fails, url, active, gen });
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen });
       if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
@@ -1047,6 +1073,10 @@ async function execTool(u, ctx) {
     case "pause_for_user":
       return { stop: true, kind: "pause", reason: input.reason };
     case "ready_to_submit":
+      // A page held back only by an Accept or I agree is not a finished application: the student reads
+      // it and agrees themselves, then Resume carries on. Checked first, so neither the pushback below
+      // nor a second call can turn it into "Ready to submit".
+      if (ctx.consentOnly) return { stop: true, kind: "pause", reason: CONSENT_HELP };
       // Guard against stopping early: with no blocked final button in view, push back once. Not on a
       // page that says it is the review step, where stopping is exactly right.
       // was: "...Click Apply / Next / Save and Continue to reach the last page...". On a read-only review

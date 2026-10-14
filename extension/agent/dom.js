@@ -399,7 +399,12 @@
       // An "Apply now" dropdown toggle (SuccessFactors) reads the same as its first item; clicking it
       // again just closes the menu, so say when it is already open.
       if (el.getAttribute("aria-expanded") === "true" && (el.hasAttribute("aria-haspopup") || /dropdown-toggle/.test(String(el.className)))) b.menu = "open";
-      if (!G.allowClick(G.describe(el), ctx).allowed) b.blocked = true;
+      if (!G.allowClick(G.describe(el), ctx).allowed) {
+        b.blocked = true;
+        // A bare Accept or I agree (guard.js isConsent): background/agent.js does not call a page whose
+        // only blocked buttons are these ready to submit, but asks the student to agree themselves.
+        if (G.isConsent && G.isConsent(G.describe(el))) b.consent = true;
+      }
       out.push(b);
     }
     return out;

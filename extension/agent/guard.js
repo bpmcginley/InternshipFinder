@@ -144,40 +144,35 @@
 
   // d: {text, value, ariaLabel, title, type, automationId, formFilled}
   // formFilled: answers inside the button's own <form> (describe counts them for submit-type buttons).
-  // why says which rule decided it, so allowClick can tell a consent button refused only for being a
-  // submit button in a form with an answer in it from one whose label or id says it sends.
-  function classifyWhy(d) {
+  function classify(d) {
     const labels = [d.text, d.value, d.ariaLabel, d.title].map(norm).filter(Boolean);
     const text = norm(labels.join(" "));
     const forms = labels.flatMap(readings);
-    if (FINAL_RE.test(text) || forms.some((f) => FINAL_RE.test(f))) return { c: "final", why: "label" };
+    if (FINAL_RE.test(text) || forms.some((f) => FINAL_RE.test(f))) return "final";
     // was: !SAFE_RE.test(text). A symbol in front ("> Next") no longer hides the safe word.
-    if (/submit/i.test(d.automationId || "") && !SAFE_RE.test(text) && !SAFE_RE.test(plainLabel(text))) return { c: "final", why: "id" };
+    if (/submit/i.test(d.automationId || "") && !SAFE_RE.test(text) && !SAFE_RE.test(plainLabel(text))) return "final";
     // was: AMBIGUOUS_RE.test(norm(d.text || d.value || d.ariaLabel)): one label, exact words only.
     const safe = (f) => SAFE_RE.test(f) || ACCOUNT_RE.test(f);
     if (forms.some((f) => !safe(f) && (AMBIGUOUS_RE.test(f) || AMBIGUOUS_START_RE.test(f) || AMBIGUOUS_END_RE.test(f) || FOREIGN_SEND_RE.test(f))))
-      return { c: "ambiguous", why: "label" };
+      return "ambiguous";
     if (d.type === "submit") {
       // was: !text only. A symbol-only label ("->") says no more than an empty one.
-      if (!labels.some((l) => plainLabel(l))) return { c: "ambiguous", why: "empty" };
-      if (d.formFilled > 0 && !forms.some((f) => safe(f) || NAV_RE.test(f))) return { c: "final", why: "form" };
-      if (!forms.some((f) => safe(f) || NAV_RE.test(f))) return { c: "ambiguous", why: "form" };
+      if (!labels.some((l) => plainLabel(l))) return "ambiguous";
+      if (d.formFilled > 0 && !forms.some((f) => safe(f) || NAV_RE.test(f))) return "final";
+      if (!forms.some((f) => safe(f) || NAV_RE.test(f))) return "ambiguous";
     }
-    return { c: "ok", why: "" };
+    return "ok";
   }
-  const classify = (d) => classifyWhy(d).c;
 
   // A bare consent button: "Accept", "I agree", "I acknowledge", "I agree to the terms". Added
-  // 2026-10-14 (PR #94 review, P2): mid-flow terms and data-consent pages put one of these on a submit
-  // button, and once the run had filled anything it was refused as a possible send button, so the model
-  // called ready_to_submit on the consent page. Anchored and whole: "I agree and apply" or "Accept &
-  // submit" never get here, since FINAL_RE has already called them final.
+  // 2026-10-14 (PR #94 review, P2). allowClick refuses one exactly as before: on a filled page it may
+  // be the button that sends the application, and agreeing to terms is the student's to do anyway.
+  // What changes is what the run says about it: a page whose only blocked buttons are these is not
+  // "ready to submit" but a page asking the student to agree to something (background/agent.js).
+  // Anchored and whole: "I agree and apply" or "Accept & submit" are not consent buttons but send buttons.
   const CONSENT_RE = /^(i\s+)?(accept|agree|consent|acknowledge|understand)(\s+(to\s+)?(the\s+|these\s+|this\s+)?(terms(\s+(and|&)\s+conditions)?|conditions|polic(y|ies)|privacy\s+(policy|notice|statement)|notice|statement|disclosures?|agreement))?$/i;
-  // A consent page holds the box that says "I have read this", and sometimes a typed name and a date.
-  // A page with more answers than that is a form, and its "I agree" may be the one that sends it.
-  const CONSENT_MAX_FILLED = 3;
   const labelForms = (d) => [d.text, d.value, d.ariaLabel, d.title].map(norm).filter(Boolean).flatMap(readings);
-  const isConsent = (d) => { const f = labelForms(d); return f.length > 0 && f.every((x) => CONSENT_RE.test(x)); };
+  const isConsent = (d) => { const f = labelForms(d); return f.length > 0 && f.every((x) => CONSENT_RE.test(x)) && !/submit/i.test(d.automationId || ""); };
 
   // What may be pressed on the review step: the ways back to a page, on to the next one, and the
   // account buttons. Anything else there, whatever its type, could be the send button: Workday and most
@@ -199,26 +194,14 @@
   // A refusal carries review: true when only the review-step rule refused it (dom.js highlight
   // outlines the real send button first).
   function allowClick(d, ctx) {
-    const { c, why } = classifyWhy(d);
-    ctx = ctx || {};
-    if (c === "final") {
-      // A consent button is "final" here only because it is a submit button whose form holds an answer
-      // (the "I have read this" box). On a short consent page outside the review step, that is the box
-      // the agent just ticked, not an application.
-      if (!(why === "form" && consentOk(d, ctx))) return { allowed: false, reason: "final submit button (reserved for you)" };
-    } else if (c === "ambiguous" && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep)) {
-      // was: refused whatever the label. A consent button is ambiguous only for being a submit
-      // button with no navigation word; "Accept" and "I agree" mid-flow move the application on.
-      if (!(why === "form" && consentOk(d, ctx)))
-        return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
-          : "this looks like the final send button for this application" };
-    }
-    if (ctx.reviewStep && !reviewNav(d))
+    const c = classify(d);
+    if (c === "final") return { allowed: false, reason: "final submit button (reserved for you)" };
+    if (c === "ambiguous" && ctx && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep))
+      return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
+        : "this looks like the final send button for this application" };
+    if (ctx && ctx.reviewStep && !reviewNav(d))
       return { allowed: false, review: true, reason: "on the review step, only Back, Edit, Next and sign-in buttons are pressed for you" };
     return { allowed: true };
-  }
-  function consentOk(d, ctx) {
-    return isConsent(d) && !ctx.reviewStep && (ctx.filledFields || 0) <= CONSENT_MAX_FILLED && (d.formFilled || 0) <= CONSENT_MAX_FILLED;
   }
 
   // The stored account password goes into a password box and nowhere else. fill_secret takes a ref
