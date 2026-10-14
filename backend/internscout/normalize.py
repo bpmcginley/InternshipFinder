@@ -60,6 +60,37 @@ def lone_description_year(text: str, today: datetime | None = None):
     return None
 
 
+# The part of an apply URL that names the job. Workday writes the site before the title,
+# ".../job/Spring-Texas-United-States-of-America/Finance-Intern_UNI4241-1", and reading the whole
+# path gave 53 listings in Spring, TX and Spring House, PA the season "Spring". The requisition id
+# after the title's underscore ("_R-0000172603", "_2026-0013035") is not a year either, and a path
+# segment that is only digits is an id or a date folder ("/careers/2026/09/").
+_WORKDAY = re.compile(r"myworkday(?:jobs|site)\.com/.*?/job/(?:[^/?#]+/)?([^/?#]+)", re.I)
+_REQUISITION = re.compile(r"_[A-Za-z]{0,6}[-_]?\d[\w-]*$")
+_HEX_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f-]{20,}|[0-9a-f]{16,}", re.I)   # Lever's UUIDs, tracking ids
+
+
+def url_job_words(url: str) -> str:
+    """The words of an apply URL's job part: path and query, without the host, the Workday site
+    segment, requisition ids or numeric segments. "" when there is no URL."""
+    url = unquote(url or "")
+    wd = _WORKDAY.search(url)
+    if wd:
+        parts = [_REQUISITION.sub("", wd.group(1))]
+    else:
+        rest = re.sub(r"^[a-z]+://[^/?#]*", "", url, flags=re.I)
+        parts = [p for p in re.split(r"[/?&#=]", rest) if p and not p.isdigit() and not _HEX_ID.fullmatch(p)]
+    words = re.sub(r"[-_+.,]+", " ", " ".join(parts))
+    return re.sub(r"(?<=\d)(?=[A-Za-z])", " ", words)   # "Fall-2026Winter-2027" -> "2026 Winter"
+
+
+def lone_url_year(words: str, today: datetime | None = None):
+    """A year alone in the URL's job words, only when it is this year or next (a slug's "2023"
+    is an old posting's leftover more often than the term)."""
+    now = (today or datetime.now(timezone.utc)).year
+    return next((int(y) for y in _YEAR_RE.findall(words or "") if now <= int(y) <= now + 1), None)
+
+
 _SALARY_RE = re.compile(
     r'\$\s?\d[\d,]*(?:\.\d+)?\s?[kK]?'
     r'(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?'
@@ -346,14 +377,17 @@ def normalize(raw: dict) -> dict | None:
     ts, ty = parse_term_from_text(title)
     # ATS paths contain posting dates and requisition numbers. Only an explicit
     # season/year pair in the URL may override the description's actual term.
-    url_words = re.sub(r"[-_/+]+", " ", unquote(raw.get("apply_url") or raw.get("url") or ""))
+    url_words = url_job_words(raw.get("apply_url") or raw.get("url") or "")
     us, uy = parse_term_pair(url_words)
     ds, dy = parse_term_pair(desc)
     ls, _ = parse_term_from_text(desc)
-    ps = ts or us or ds or ls
+    # A season or a year the URL names on its own comes last, after the title and the description
+    # (was: dropped with PR #94, so a listing whose slug alone said "Summer" had no season).
+    uls, _ = parse_term_from_text(url_words)
+    ps = ts or us or ds or ls or uls
     if ds and ps != ds:
         dy = None
-    py_ = ty or uy or dy or lone_description_year(desc)
+    py_ = ty or uy or dy or lone_description_year(desc) or lone_url_year(url_words)
     season = ps or season or raw.get("season")
     year = py_ or year or raw.get("year")
     # A season on its own is worth keeping - "Summer" on a card is true, and the dashboard scores a
