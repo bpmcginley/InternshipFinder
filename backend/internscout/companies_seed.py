@@ -196,7 +196,8 @@ GREENHOUSE += [
     {'name': 'ACLU', 'ats_token': 'aclu', 'is_quant_target': False, 'sector': 'nonprofit'},
     {'name': 'Doctors Without Borders USA', 'ats_token': 'msfcareers', 'is_quant_target': False, 'sector': 'nonprofit'},
     {'name': 'Human Rights Watch', 'ats_token': 'humanrightswatch', 'is_quant_target': False, 'sector': 'nonprofit'},
-    {'name': 'Robin Hood', 'ats_token': 'robinhood', 'is_quant_target': False, 'sector': 'nonprofit'},
+    # was: {'name': 'Robin Hood', 'ats_token': 'robinhood', ...}: that Greenhouse token is Robinhood, the trading
+    # app (GREENHOUSE above), not the Robin Hood anti-poverty nonprofit, so the app's roles were tagged nonprofit.
     {'name': 'Southern Poverty Law Center', 'ats_token': 'southernpovertylawcenter', 'is_quant_target': False, 'sector': 'nonprofit'},
     {'name': 'Hasbro', 'ats_token': 'hasbro', 'is_quant_target': False, 'sector': 'retail_consumer'},
     {'name': 'Unilever', 'ats_token': 'unilever', 'is_quant_target': False, 'sector': 'retail_consumer'},

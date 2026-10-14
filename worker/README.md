@@ -43,7 +43,7 @@ Workers Logs stay off for the same reason.
 
 | File | What it does |
 |---|---|
-| `src/index.js` | Routes, CORS, daily cleanup cron |
+| `src/index.js` | Routes, CORS, daily cleanup cron (which also ends placements on their end day) |
 | `src/auth.js` | ID token checks (JWKS, `iss`, `aud`, `exp`), `edu`/`general` tier, user hash; hands `iss_` bearers to `session.js` |
 | `src/session.js` | "Stay signed in": `POST`/`DELETE /session`, session bearers, the sliding year, 20 per account |
 | `src/profile.js` | The saved Deep Dive: `GET`/`PUT`/`DELETE /profile`, AES-GCM at rest, the stale rule |
@@ -53,6 +53,8 @@ Workers Logs stay off for the same reason.
 | `src/demand.js` | `POST /demand` and CI-only `GET /demand` |
 | `src/billing.js` | Optional paid plans: Stripe Checkout, the billing portal, webhook checks |
 | `src/referral.js` | Referral credits: invite codes, `GET /invite`, `POST /invite/claim`, extra units |
+| `src/placements.js` | Paid listings: public `GET /placements`, the admin routes, the daily auto-end |
+| `scripts/placement.mjs` | Bruce's command line for the placement admin routes (token from the environment) |
 | `src/config.js` | Models, per-task allowances, prices, rate limits. Edit here, then deploy |
 | `wrangler.toml` | Public vars (client IDs, origins, budget) and the D1 binding |
 
@@ -84,6 +86,8 @@ Claude never handles keys. Run these yourself:
    - `npx wrangler secret put GEMINI_API_KEY` (a paid-tier key, so Google doesn't train on prompts)
    - `npx wrangler secret put HASH_SALT` (any long random string; changing it resets everyone's usage)
    - `npx wrangler secret put DEMAND_TOKEN` (any long random string; CI uses it to read state counts)
+   - `npx wrangler secret put ADMIN_TOKEN` (any long random string; only for paid listings, see "Paid
+     listings" below. Until it is set, the admin routes answer 404)
    - `npx wrangler secret put PROFILE_KEY` (exactly 32 random bytes, base64: paste the output of
      `openssl rand -base64 32`, or of
      `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). It encrypts the
@@ -234,6 +238,48 @@ plain checkout sessions, where you owe the tax yourself.
 
 To switch them off again, set `PAYMENTS_ENABLED = "0"` and deploy. Existing subscribers keep their plan
 row but stop being charged only once you cancel their subscriptions in Stripe, so cancel there too.
+
+## Paid listings ("placements"; off until you set ADMIN_TOKEN)
+
+Added 2026-10-14 (`src/placements.js`, API.md "Placements"). The tables `placements` and
+`placement_log` record which listing an employer paid to show in a separate, labelled box, on which
+days, and every change to that record. Payment never changes any score, order, filter, count or
+Auto-Apply behaviour: a placement only points at a listing the normal pipeline already produced. No
+payment code: you invoice from your own Stripe dashboard and record `pilot` or the invoice number when
+you switch a placement on. No student data is in either table, and no recruiter name or email.
+
+**Turn it on (once, on your own machine; Claude does neither step):**
+
+1. `npx wrangler secret put ADMIN_TOKEN` (any long random string; it prompts for the value)
+2. `npm run deploy` (applies `schema.sql`, which creates the two tables, then deploys)
+
+Then check the tables exist, because the schema step sometimes only prints a permission list:
+
+```
+npx wrangler d1 execute internscout --remote --command "SELECT name FROM sqlite_master WHERE name LIKE 'placement%'"
+```
+
+It should list `placements`, `placements_live`, `placement_log` and `placement_log_placement`. If not,
+run `npm run deploy` again.
+
+**Day to day:** `scripts/placement.mjs` (no install). Put the same token in your shell's environment as
+`INTERNSCOUT_ADMIN_TOKEN` (for example in PowerShell, `$env:INTERNSCOUT_ADMIN_TOKEN = Read-Host`, then
+paste). The script never prints it and never takes it as an argument. What it prints leaves out
+`paid_ref`.
+
+```
+node scripts/placement.mjs leads                      # recent leads: id, company, what they asked about
+node scripts/placement.mjs create --lead 12 --listing 3f9c0a1b2c3d4e5f --url https://... --start 2026-11-01 --end 2026-12-01 --by bruce
+node scripts/placement.mjs check p-2026-11-acme-1 --checks role_on_employer_site,email_domain,... --by bruce
+node scripts/placement.mjs on p-2026-11-acme-1 --ref pilot --by bruce
+node scripts/placement.mjs end p-2026-11-acme-1 --reason removed --by bruce
+node scripts/placement.mjs list
+```
+
+`node scripts/placement.mjs help` lists every command and the eight sponsor checks. The admin routes
+refuse any request from a browser, so they work only from a terminal. The daily cron ends a placement
+on its end day. Read the tables directly with
+`npx wrangler d1 execute internscout --remote --command "SELECT * FROM placements ORDER BY start_day DESC"`.
 
 ## Changing limits
 

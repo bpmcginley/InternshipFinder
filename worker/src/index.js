@@ -1,7 +1,7 @@
 // InternScout API Worker: sign-in check and sessions, the Gemini proxy with caps, area demand and the
 // saved Deep Dive. Contract: API.md.
 import { CONFIG } from "./config.js";
-import { HttpError, json } from "./http.js";
+import { HttpError, json, sameSecret } from "./http.js";
 import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "./auth.js";
 import { createSession, dropExpiredSessions, endSession, isSessionToken } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
@@ -12,6 +12,8 @@ import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./de
 import { countEvent, countHit } from "./visits.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
+import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
+  livePlacements, pausePlacement, refusePlacement, requireAdmin, switchOn, updatePlacement } from "./placements.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -80,15 +82,8 @@ async function readJson(request, maxBytes, optional = false) {
   }
 }
 
-// Constant-time compare of two secrets via their hashes
-async function sameSecret(a, b) {
-  const enc = new TextEncoder();
-  const [x, y] = await Promise.all([a, b].map((s) => crypto.subtle.digest("SHA-256", enc.encode(s))));
-  const u = new Uint8Array(x), v = new Uint8Array(y);
-  let diff = 0;
-  for (let i = 0; i < u.length; i++) diff |= u[i] ^ v[i];
-  return diff === 0;
-}
+// sameSecret (the constant-time compare GET /demand uses) lives in http.js since 2026-10-14, so the
+// placement admin routes share it.
 
 const allowanceTable = (config, fn) =>
   Object.fromEntries(Object.entries(config.TASKS).map(([task, c]) => [task, fn(task, c)]));
@@ -323,6 +318,40 @@ async function route(request, env, ctx, d) {
       return json(await takeLead(db, request, env, body, now, (p) => later(ctx, p)));
     }
 
+    // Paid listings (placements.js, added 2026-10-14). The public read is for the site build, once per
+    // deploy; visitors never call it. Payment never changes a score, order, filter or count.
+    case "GET /placements": {
+      return json(await livePlacements(db, now), 200, { "Cache-Control": "public, max-age=300" });
+    }
+
+    // Bruce's terminal only (scripts/placement.mjs): 404 until ADMIN_TOKEN is set, 403 from a browser,
+    // 401 without the token. The id goes in the body because the router matches exact paths.
+    case "GET /admin/placements": {
+      await requireAdmin(request, env);
+      return json(await listPlacements(db));
+    }
+
+    case "GET /admin/leads": {
+      await requireAdmin(request, env);
+      return json(await listLeads(db));
+    }
+
+    case "POST /admin/placements":
+    case "POST /admin/placements/update":
+    case "POST /admin/placements/check":
+    case "POST /admin/placements/on":
+    case "POST /admin/placements/pause":
+    case "POST /admin/placements/end":
+    case "POST /admin/placements/refuse": {
+      await requireAdmin(request, env);
+      const { body } = await readJson(request, MAX_ADMIN_BYTES);
+      if (Array.isArray(body)) throw new HttpError(400, "bad_request", "Body must be a JSON object");
+      const act = { "/admin/placements": createPlacement, "/admin/placements/update": updatePlacement,
+        "/admin/placements/check": checkPlacement, "/admin/placements/on": switchOn, "/admin/placements/pause": pausePlacement,
+        "/admin/placements/end": endPlacement, "/admin/placements/refuse": refusePlacement }[path];
+      return json({ placement: await act(db, body, now) });
+    }
+
     case "GET /demand": {
       const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
       if (!env.DEMAND_TOKEN || !token || !(await sameSecret(token, env.DEMAND_TOKEN))) {
@@ -364,7 +393,10 @@ export default {
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
     // dropOldLeads (2026-10-13): employer form leads older than a year (leads.js LEAD_DAYS).
+    // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
+    //   dropOldLeads(env.DB, now)]));
+    // endExpiredPlacements (2026-10-14): placements whose end day has come (placements.js).
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
-      dropOldLeads(env.DB, now)]));
+      dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now)]));
   },
 };
