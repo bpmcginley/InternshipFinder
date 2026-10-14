@@ -66,6 +66,21 @@ jobs:
           curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
           curl -sfL --max-time 20 https://internscout.org/noindex-pages.txt -o live-noindex.txt || rm -f live-noindex.txt
 
+      - name: Fetch the paid listings that are on
+        # Paid listings (backend/internscout/placements.py, 2026-10-14). Off unless the repo variable
+        # INTERNSCOUT_PLACEMENTS_URL is set (a variable, not a secret: the Worker's GET /placements is
+        # public and holds only public facts). Unset, or if the Worker does not answer, the build gets an
+        # empty list and adds no box. The build checks every placement against the listings the normal
+        # pipeline exported and prints a ::warning:: for each one it drops.
+        env:
+          PLACEMENTS_URL: ${{ vars.INTERNSCOUT_PLACEMENTS_URL }}
+        run: |
+          if [ -n "$PLACEMENTS_URL" ]; then
+            curl -sfL --max-time 20 "$PLACEMENTS_URL" -o placements.json || echo '{"placements":[]}' > placements.json
+          else
+            echo '{"placements":[]}' > placements.json
+          fi
+
       - name: Build the site and its landing pages
         id: pages
         # seo_pages uses only the standard library, so nothing is installed.
@@ -83,7 +98,8 @@ jobs:
         run: |
           cp -r docs _site
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
-          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt)
+          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json)
+          # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)
           # For the notify job: what was live before this deploy, and what this deploy publishes.
           mkdir -p sitemaps

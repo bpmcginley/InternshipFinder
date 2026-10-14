@@ -40,6 +40,7 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 from internscout import seo_pages as sp  # noqa: E402
+from internscout import placements  # noqa: E402
 
 # was: MIN_NEW = 3. It moved to seo_pages (2026-10-06) with the "new" rule below, so the sign-up
 # forms on the landing pages quote a field's number only when the email would give it a section.
@@ -193,17 +194,6 @@ def placements_on() -> bool:
     return os.environ.get(PLACEMENTS_ENV, "").strip() == "1"
 
 
-def _same_url(a, b) -> bool:
-    a, b = str(a or "").strip().rstrip("/"), str(b or "").strip().rstrip("/")
-    return bool(a) and a == b
-
-
-def _unpaid(x: dict) -> bool:
-    """The listing says the role is unpaid, read as the dashboard's payOf reads it."""
-    r = next((t for t in x.get("restrictions") or [] if t in ("paid", "unpaid", "stipend")), None)
-    return (r or (x.get("insights") or {}).get("pay")) == "unpaid"
-
-
 def _citizen_only(x: dict) -> bool:
     """A citizenship rule of any kind. The dashboard hides such a paid listing from a student who has
     not said they can meet it (citizenBlocked with no work authorization), and an email reader has not."""
@@ -213,39 +203,28 @@ def _citizen_only(x: dict) -> bool:
 
 def read_placements(path: str) -> list:
     """The placements list from the site build's file, or [] when it is missing or malformed."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            raw = json.load(f)
-    except (OSError, ValueError):
-        return []
-    items = raw.get("placements") if isinstance(raw, dict) else None
-    return [p for p in items if isinstance(p, dict)] if isinstance(items, list) else []
+    return placements.read(path)
 
 
 def resolve_placements(raw: list, listings: list[dict], day: str) -> list[dict]:
-    """The placements that still hold on day (YYYY-MM-DD), each with the listing it points at. One is
-    kept only when its listing is among the open listings seo_pages.load kept, its apply URL is the
-    listing's own (a trailing slash aside), day is within its dates (start inclusive, end exclusive),
-    the deadline has not passed, the role is not marked unpaid (unless the record carries unpaid_ok)
-    and it has no citizenship rule. It is never matched by URL alone: a placement that no longer names
-    its listing shows nothing."""
+    """The placements that still hold on day (YYYY-MM-DD), each with the listing it points at.
+    placements.resolve() makes the site's checks: the listing is among the open listings seo_pages.load
+    kept, its apply URL is the listing's own (a trailing slash aside), day is within its dates (start
+    inclusive, end exclusive), the deadline has not passed and the role is not marked unpaid (unless the
+    record carries unpaid_ok). The email adds one of its own: no citizenship rule. It is never matched by
+    URL alone (by_url=False): the site build already wrote the resolved listing id into the file, so a
+    placement that no longer names its listing shows nothing.
+    was: its own copy of those checks, until placements.resolve() landed (B2 plan PR 3)."""
     by_id = {str(x["id"]): x for x in listings}
+    ok, _ = placements.resolve(raw, by_id, day, by_url=False)
     kept = []
-    for p in raw:
-        x = by_id.get(str(p.get("listing_id") or ""))
-        start, end = str(p.get("start") or ""), str(p.get("end") or "")
-        if not x or not p.get("id") or not (start and end and start <= day < end):
-            continue
-        if x.get("status") != "open" or not _same_url(p.get("apply_url"), x.get("apply_url")):
-            continue
-        deadline = str((x.get("insights") or {}).get("deadline") or "")
-        if deadline and deadline[:10] < day:
-            continue
-        if (_unpaid(x) and not p.get("unpaid_ok")) or _citizen_only(x):
+    for p in ok:
+        x = by_id[p["listing_id"]]
+        if _citizen_only(x):
             continue
         tags = sorted(set(x.get("field_tags") or []) - sp.SKIP_FIELDS)
         if tags and _link(x.get("apply_url")):
-            kept.append({"id": str(p["id"]), "tags": tags, "role": role(x)})
+            kept.append({"id": p["id"], "tags": tags, "role": role(x)})
     return kept
 
 

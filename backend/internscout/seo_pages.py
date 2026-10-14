@@ -1061,15 +1061,7 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
         # was: ordered = newest_first(items) if state else near_home_first(items)
         #      for x in ordered[:PER_PAGE]:
         new = fresh(x, now, BASELINE)
-        stage = ", ".join(s.replace("_", "-") for s in (x.get("stage") or []) if s != "internship")
-        meta = [esc(place(x, state))]
-        if x.get("term"):
-            meta.append(esc(str(x["term"])))
-        if stage:
-            meta.append(esc(stage))
-        pay = esc(pay_text(x))       # was: esc(str(x["salary"])) if x.get("salary") else ("Paid" if is_paid(x) else "")
         new_tag = ' <span class="new">New</span>' if new else ""
-        pay_tag = f' · <span class="pay">{pay}</span>' if pay else ""
         href = esc(safe_url(x["apply_url"]))
         # On a site Auto-Apply fills, a quiet second link to the install page (2026-10-04). Internal,
         # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
@@ -1082,13 +1074,27 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
             '<li class="job">'
             f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
-            f'<div class="meta">{" · ".join(meta)}{pay_tag}</div>'
+            f'<div class="meta">{row_meta(x, state)}</div>'
             # The two actions sit on one line in .acts (2026-10-14, D21): "Open posting" a secondary button,
             # "Auto-Apply this" a quiet link after it, as on the dashboard's rows.
             # was: f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
             f'<div class="acts"><a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}</div>'
             "</li>")
     return "\n".join(rows)
+
+
+def row_meta(x: dict, state: str | None = None) -> str:
+    """A row's grey line, HTML: place, term, stage and pay. The same for a listing row and a paid
+    listing's box (placement_box), so the two can never describe one role differently."""
+    stage = ", ".join(s.replace("_", "-") for s in (x.get("stage") or []) if s != "internship")
+    meta = [esc(place(x, state))]
+    if x.get("term"):
+        meta.append(esc(str(x["term"])))
+    if stage:
+        meta.append(esc(stage))
+    pay = esc(pay_text(x))       # was: esc(str(x["salary"])) if x.get("salary") else ("Paid" if is_paid(x) else "")
+    pay_tag = f' · <span class="pay">{pay}</span>' if pay else ""
+    return " · ".join(meta) + pay_tag
 
 
 def autofills(x: dict) -> bool:
@@ -1273,8 +1279,15 @@ border-radius:var(--r);background:var(--paper);color:var(--ink);font:inherit}
 .i-chevron{--i:var(--i-chevron)}.i-search{--i:var(--i-search)}.i-check{--i:var(--i-check)}.i-cross{--i:var(--i-cross)}.i-alert{--i:var(--i-alert)}.i-external{--i:var(--i-external)}
 input[aria-invalid=true],textarea[aria-invalid=true],select[aria-invalid=true]{border-color:var(--red)}.field-err{color:var(--red);font-size:var(--fs-2);margin:var(--s1) 0 0}
 input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-color:var(--sunk);cursor:default}
+.paid{display:grid;grid-template-columns:1fr auto;gap:2px 16px;margin:var(--s3) 0;padding:var(--s3) var(--s4);background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
+.paid-h{grid-column:1/-1;margin:0 0 var(--s1);font-size:var(--fs-2);font-weight:600;color:var(--ink2)}.paid-h a{margin-left:var(--s2);font-weight:400;color:var(--ink3)}
+.ad{display:inline-block;margin-right:var(--s1);padding:0 6px;border:1px solid var(--ink3);border-radius:var(--r-sm);font-size:var(--fs-1);font-weight:600;line-height:18px;color:var(--ink2);vertical-align:1px}
+.paid .go{grid-column:2;grid-row:2/span 3;align-self:center}@media (max-width:560px){.paid{grid-template-columns:1fr}.paid .go{grid-column:1;grid-row:auto;justify-self:start;margin-top:var(--s2)}}
 """
-# The last four lines (2026-10-14) are the shared icon set (.i), form errors and disabled fields, as on the
+# The last four lines (2026-10-14, B2 plan section 6) are a paid listing's box (placement_box): a panel among the
+# rows, headed "Paid listing", with a bordered "Ad" badge before the company name and "Open posting" where a
+# row has it. The badge and heading use ink2 and ink3 on the panel, 4.5:1 or more in light and dark.
+# The four lines before those (2026-10-14) are the shared icon set (.i), form errors and disabled fields, as on the
 # dashboard. .cta.secondary and .cta.quiet are the secondary and quiet buttons (A2 component 1), for the
 # landing lane to use where a page has more than one call to action.
 # The seven lines before those (2026-10-06) are the weekly email's sign-up form (signup_form): a panel like the
@@ -2863,6 +2876,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     d = load(site_dir)
     BASELINE = d["baseline"]
     listings = d["listings"]
+    LISTINGS[:] = listings          # for main(): placements resolve against these (2026-10-14)
     now = _when(d["generated_at"]) or datetime.now(timezone.utc)
     GENERATED = now
     # The weekly email's numbers for the sign-up forms (2026-10-06): this week's new roles counted as the
@@ -3003,7 +3017,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     # dated (2026-10-07): the listings a page without a list of its own is about (a tracker's term), which
     # date it and make it a CollectionPage like a listing page, without a feed.
     # thin (2026-10-13, INDEX_COMBO): built and linked, but "noindex, follow" and out of the sitemap.
-    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True, dated=None, thin=False):
+    # kind (2026-10-14): field, state (a province, city and Remote too), combo (a field in a place), major or
+    # employer, for the listing pages a paid listing's box may go on (PLACEMENT_KINDS); None for the rest.
+    def add(path, title, desc, h1, crumbs, body, items=None, state=None, ld=(), index=True, dated=None, thin=False,
+            kind=None):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
         about = items if items is not None else dated
@@ -3027,7 +3044,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         pages.append({"path": path, "html": page(path, title, desc, h1, crumbs, body, updated, index=index,
                                                  feed=items is not None, ld=ld, thin=thin),
                       "items": items, "h1": h1, "state": state, "lastmod": lastmod, "index": index and not thin,
-                      "thin": thin})
+                      "thin": thin, "kind": kind})
         # was: ... page(..., ld=ld), ..., "index": index})
 
     # Each listing page's src (2026-10-04, see autoapply_card): seo-field for a field and a field in a
@@ -3075,7 +3092,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                                 items, updated),
             f"{name} internships", [root, (path, name)],
             listing_body(items, f"in {lower_name(name)}", "", now, related, dash=dash_link([t]), fits=fits.get(path),
-                         src="seo-field", faq=faq_section(qa), signup=signup_form(pitch, t)), items, ld=[faq_ld(qa)])
+                         src="seo-field", faq=faq_section(qa), signup=signup_form(pitch, t)), items, ld=[faq_ld(qa)],
+            kind="field")
 
     for k, items in sorted(states.items()):
         where = US_STATES[k]
@@ -3109,7 +3127,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                                 "that are remote" if k == "remote" else loc, items, updated),
             f"Internships {'you can do remotely' if k == 'remote' else in_place(k)}", crumbs,
             listing_body(items, "", f" {loc}", now, related, state=k, dash=dash_link(state=k),
-                         src="seo-state", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)])
+                         src="seo-state", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)], kind="state")
 
     for (t, k), items in sorted(combos.items()):
         name, where = field_title(t), US_STATES[k]
@@ -3144,7 +3162,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
             listing_body(items, f"in {lower_name(name)}", f" {loc}", now, related, state=k, dash=dash_link([t], k),
                          src="seo-field", faq=faq_section(qa)), items, k, ld=[faq_ld(qa)],
-            thin=not combo_indexed(len(items), path, live, earning))     # 2026-10-13, INDEX_COMBO
+            thin=not combo_indexed(len(items), path, live, earning), kind="combo")     # 2026-10-13, INDEX_COMBO
 
     majors_made = []
     for m, tags, items, path in major_rows:
@@ -3162,7 +3180,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"Internships for {name} majors",
             [root, ("/internships/for/", "By major"), (path, name)],
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
-                         fits=[n for n in fits[path] if n != name], src="seo-hub"), items)
+                         fits=[n for n in fits[path] if n != name], src="seo-hub"), items, kind="major")
 
     # Each employer's main fields, for "Similar employers": others that hire in the same fields.
     company_fields = {nm: top(Counter(t for x in its for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
@@ -3230,7 +3248,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
             listing_body(items, f"at {name}", "", now, related,
                          dash=dash_link(state=where, companies=spellings[name]), here=path, extra=facts,
-                         src="seo-employer"), items)
+                         src="seo-employer"), items, kind="employer")
 
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
     # already uses is skipped, like a field slug that names a state.
@@ -3462,6 +3480,106 @@ def not_found(updated: str) -> str:
                 "Page not found", [], body, updated, index=False)
 
 
+# ---------------------------------------------------------------- paid listings (placements)
+# B2 plan section 6 (2026-10-14). A post-pass: add_paid_boxes runs after build(), so every list, fold,
+# index, noindex, sitemap, feed, lastmod and JSON-LD decision is made before a box exists, and each page
+# is byte-identical to the build without placements once its <!--paid-->...<!--/paid--> span is taken out
+# (tests/test_seo_pages.py, T7). The rule: payment never changes a score, an order, a filter, a count or
+# what Auto-Apply does. The code says "placement"; "paid" is the pay filter (paid=True above), and appears
+# only in the label and the markup the plan fixes.
+
+LISTINGS: list[dict] = []          # the listings the last build() kept (load), for main()
+
+# The page kinds a box may go on: they have a field, a place or an employer for it to fit. Not the hub,
+# /internships/new/, the start-term and other kind pages, the trackers, or any page without a list.
+PLACEMENT_KINDS = frozenset({"field", "state", "combo", "major", "employer"})
+PLACEMENT_START, PLACEMENT_END = "<!--paid-->", "<!--/paid-->"
+PLACEMENT_AFTER = 3                 # rows above the box; after the last one on a shorter list
+PLACEMENTS_FILE = "placements.json"     # in <site_dir>/data, for the dashboard and the weekly email
+_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def placement_box(x: dict, pl: dict, state: str | None = None) -> str:
+    """One paid listing's box, between the markers, as B2 6.2 fixes it: "Paid listing", then "Ad" before
+    the company name; the row's own title and grey line (row_meta); a posting link marked
+    rel="sponsored noopener" with no data-aa (so the Auto-Apply offer never fires for it) and no company
+    link; data-nosnippet to keep it out of search snippets. The inline script takes the box out once its
+    end date (exclusive) has come, even if no deploy has run since."""
+    end = str(pl.get("end") or "")
+    href = esc(safe_url(x.get("apply_url")) or "")
+    if not _DAY_RE.match(end) or not href:
+        return ""
+    return (f'{PLACEMENT_START}<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">\n'
+            '<p class="paid-h">Paid listing <a href="/privacy.html#paid">Why am I seeing this?</a></p>\n'
+            f'<div class="co"><span class="ad">Ad</span> {esc(x.get("company_name") or "")}</div>\n'
+            f'<div class="role">{esc(x.get("title") or "")}</div>\n'
+            f'<div class="meta">{row_meta(x, state)}</div>\n'
+            f'<a class="go" href="{href}" rel="sponsored noopener" target="_blank">Open posting</a>\n'
+            f'</li><script>if(new Date().toISOString().slice(0,10)>="{end}")'
+            f'document.currentScript.previousElementSibling.remove()</script>{PLACEMENT_END}')
+
+
+def strip_placements(text: str) -> str:
+    """text with every paid box (marker to marker) taken out."""
+    return re.sub(re.escape(PLACEMENT_START) + ".*?" + re.escape(PLACEMENT_END), "", text, flags=re.S)
+
+
+def _after_row(text: str) -> int:
+    """Where a box goes in a page: after row PLACEMENT_AFTER of its list, or after its last row; -1
+    when the page has no list or the list no rows."""
+    start = text.find('<ul class="jobs">')
+    if start < 0:
+        return -1
+    end = text.find("</ul>", start)
+    at, n = start, 0
+    while n < PLACEMENT_AFTER:
+        nxt = text.find("</li>", at, end)
+        if nxt < 0:
+            break
+        at, n = nxt + len("</li>"), n + 1
+    return at if n else -1
+
+
+def add_paid_boxes(pages: list[dict], kept: list[dict], today: str) -> list[dict]:
+    """pages with at most one paid listing's box each (MAX_PER_PAGE), on the listing pages
+    (PLACEMENT_KINDS) whose own items include its listing. kept: placements.resolve's. When two or more
+    fit one page, a hash of the path and the day picks one, so two builds on the same day are the same
+    and price never matters. Only "html" changes; a page with no box is the same dict."""
+    from .placements import MAX_PER_PAGE
+    if not kept or MAX_PER_PAGE < 1:
+        return pages
+    out = []
+    for p in pages:
+        if p.get("kind") not in PLACEMENT_KINDS or not p.get("items"):
+            out.append(p)
+            continue
+        here = {str(x.get("id")): x for x in p["items"]}
+        fits = sorted((pl for pl in kept if pl["listing_id"] in here), key=lambda pl: pl["id"])
+        at = _after_row(p["html"]) if fits else -1
+        if at < 0:
+            out.append(p)
+            continue
+        pl = fits[int(hashlib.sha256((p["path"] + today).encode()).hexdigest(), 16) % len(fits)]
+        box = placement_box(here[pl["listing_id"]], pl, p.get("state"))
+        out.append(dict(p, html=p["html"][:at] + box + p["html"][at:]) if box else p)
+    return out
+
+
+def write_placements(site_dir: str, kept: list[dict], today: str) -> None:
+    """<site_dir>/data/placements.json: the placements kept today, public fields only."""
+    from .placements import public
+    folder = os.path.join(site_dir, "data")
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, PLACEMENTS_FILE), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"day": today, "placements": public(kept)}, f, ensure_ascii=False, separators=(",", ":"))
+        f.write("\n")
+
+
+def today_utc() -> str:
+    """Today's UTC day. A placement's dates are UTC days, start inclusive and end exclusive."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
 def write(site_dir: str, pages: list[dict]) -> None:
     for p in pages:
         folder = os.path.join(site_dir, p["path"].strip("/").replace("/", os.sep))
@@ -3557,17 +3675,40 @@ def held_paths(listing: str) -> frozenset[str]:
 
 
 def main(argv: list[str]) -> None:
-    """python -m internscout.seo_pages SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]]"""
+    """python -m internscout.seo_pages SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
+
+    --placements PATH (2026-10-14): the Worker's GET /placements answer, which the pages workflow
+    fetches only when the repo variable INTERNSCOUT_PLACEMENTS_URL is set and otherwise writes as
+    {"placements":[]}. With it, the build writes <site_dir>/data/placements.json (an empty list when the
+    file is missing or malformed), prints a ::warning:: for each placement it drops, and adds the boxes.
+    Without it, nothing about placements is written or changed."""
+    argv = list(argv)
+    placements_path = None
+    if "--placements" in argv:
+        i = argv.index("--placements")
+        placements_path = argv[i + 1] if i + 1 < len(argv) else ""
+        del argv[i:i + 2]
     site_dir = argv[1] if len(argv) > 1 else "docs"
     pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {},
                   held_paths(argv[3]) if len(argv) > 3 else frozenset())
     # was: pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
+    built = pages                  # as build() made them, before any paid box, for the feeds
+    if placements_path is not None:
+        from . import placements
+        today = today_utc()
+        kept, dropped = placements.resolve(placements.read(placements_path),
+                                           {str(x["id"]): x for x in LISTINGS}, today)
+        for line in placements.warnings(kept, dropped):
+            print(line)
+        write_placements(site_dir, kept, today)
+        pages = add_paid_boxes(pages, kept, today)
+        print(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
     write(site_dir, pages)
     from . import feeds            # feeds imports this module, so not at the top
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
     # `python -m internscout.seo_pages` this module is __main__, and the internscout.seo_pages that
     # feeds imports is a second copy whose build() never ran, so its GENERATED is None.
-    feeds.write_all(site_dir, pages, GENERATED)     # was: feeds.write_all(site_dir, pages)
+    feeds.write_all(site_dir, built, GENERATED)     # was: feeds.write_all(site_dir, pages)
     print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
 
 
