@@ -48,11 +48,14 @@ async function schedule() {
 }
 
 // ---------- helpers ----------
-async function openDeepDive() {
+// `step`: open on that Deep Dive step (the side panel's "Open Quick facts"). An open Deep Dive tab is only
+// brought forward, so nothing half-typed there is lost.
+const DEEP_DIVE_STEPS = ["facts"];
+async function openDeepDive(step) {
   const url = chrome.runtime.getURL(ONBOARDING);
   const [t] = await chrome.tabs.query({ url: url + "*" });
   if (t) { await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); }
-  else await chrome.tabs.create({ url });
+  else await chrome.tabs.create({ url: DEEP_DIVE_STEPS.includes(step) ? `${url}?step=${step}` : url });
 }
 
 async function openPanel(sender) {
@@ -271,7 +274,7 @@ async function handle(m, sender, fromPage) {
     case "review_ask":
       return { ok: true, state: await answerReview(String(m.action || "")) };
     case "open_deep_dive":
-      await openDeepDive();
+      await openDeepDive(m.step);
       return { ok: true };
     case "open_panel":
       return openPanel(sender);

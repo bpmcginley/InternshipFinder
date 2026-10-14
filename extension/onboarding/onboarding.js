@@ -1,11 +1,11 @@
 // Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
-import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, confirmedFacts, factFallback, factSuggestions, resumeReviewPending } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, ELIGIBILITY_FACTS, confirmedFacts, factFallback, factSuggestions, resumeReviewPending, unconfirmedOldFacts, workAuthMismatch, manualDetailsMissing } from "../lib/store.js";
 import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS } from "../lib/auth.js";
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
-import { quickStartReady, finishOnboarding, digestLink } from "./quickstart.js";
-import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
+import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, manualPathOpen, pausedMessage } from "./quickstart.js";
+import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, bulkConfirmKeys, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "./profile.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -410,8 +410,10 @@ function drawResumeReview() {
   const pending = pendingResumeImport;
   const names = { first_name: "First name", last_name: "Last name", email: "Email", phone: "Phone", city: "City", state: "State", zip: "ZIP", linkedin: "LinkedIn", github: "GitHub", website: "Website", education: "Education", experience: "Experience", projects: "Projects", links: "Links", skills: "Skills" };
   const show = formatResumeValue;
+  const ticked = new Set(preselectedImports(pending.plan));
   box.innerHTML = `<h3>Review resume updates</h3><p class="small">These details differ from values you entered or previously saved. Your current values are kept unless you choose an update. Other resume details will update when you save.</p>`
-    + pending.plan.filter((e) => e.conflict).map((e) => `<details style="margin-bottom:12px"><summary>${esc(names[e.key] || e.key)}</summary><div class="grid"><div><b>Current</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(show(e.before))}</pre></div><div><b>New resume</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(show(e.next))}</pre></div></div><label><input type="checkbox" data-import="${esc(e.id)}"> Use the new resume value for ${esc(names[e.key] || e.key)}</label></details>`).join("")
+    + (ticked.size ? `<p class="small">Ticked boxes are details that most likely came from your earlier resume, so the new resume replaces them. Untick any you typed in yourself.</p>` : "")
+    + pending.plan.filter((e) => e.conflict).map((e) => `<details style="margin-bottom:12px" ${ticked.has(e.id) ? "open" : ""}><summary>${esc(names[e.key] || e.key)}</summary><div class="grid"><div><b>Current</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(show(e.before))}</pre></div><div><b>New resume</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(show(e.next))}</pre></div></div><label><input type="checkbox" data-import="${esc(e.id)}" ${ticked.has(e.id) ? "checked" : ""}> Use the new resume value for ${esc(names[e.key] || e.key)}</label></details>`).join("")
     + '<button class="btn primary" id="save-resume-details">Save resume details</button>';
   $("#save-resume-details").onclick = async () => {
     if (pending !== pendingResumeImport || S.files.resume?.b64 !== pending.file.b64) return;
@@ -419,6 +421,7 @@ function drawResumeReview() {
     applyResumeImport(S.profile, pending.plan, selected);
     S.settings.resume_import = null;
     S.settings.resume_details_ready = true;
+    S.settings.resume_details_manual = false;
     S.settings.extracted_from = pending.file.name;
     if (!S.settings.signup_email && S.profile.facts.email) S.settings.signup_email = S.profile.facts.email;
     await save(true);
@@ -434,14 +437,23 @@ function drawResumeReview() {
 function drawQuick(msg = "") {
   const box = $("#quick");
   if (!box) return;
-  // Finished before, and a replaced resume is still being read or reviewed: say Auto-Apply is paused.
-  const paused = !!S.settings.onboarded && resumeReviewPending(S);
+  // A resume that couldn't be read (or wasn't), or details still missing after choosing to enter them:
+  // say Auto-Apply is paused and why, and offer the way past that doesn't need the AI.
+  const manual = manualPathOpen(S, { extracting, pending: !!pendingResumeImport });
+  const paused = (!!S.settings.onboarded && resumeReviewPending(S)) || manual || manualDetailsMissing(S).length > 0;
   box.hidden = !paused && (!quickStartReady(S) || extracting || !!pendingResumeImport);
   if (box.hidden) return;
   if (paused) {
-    box.innerHTML = `<p class="small" style="margin:0"><b>Auto-Apply is paused.</b> ${S.files.resume
-      ? "Read your new resume and save its details above. Auto-Apply starts again when you do."
-      : "Add your resume above, then read it and save its details. Auto-Apply starts again when you do."}</p>`;
+    box.innerHTML = `<p class="small" style="margin:0"><b>Auto-Apply is paused.</b> ${esc(pausedMessage(S))}</p>`
+      + (manual ? `<div class="row" style="margin-top:8px"><button class="btn small" id="manualgo">I'll enter my details myself</button></div>` : "")
+      + (manualDetailsMissing(S).length ? `<div class="row" style="margin-top:8px"><button class="btn small" id="factsgo">Go to Quick facts</button></div>` : "");
+    $("#manualgo")?.addEventListener("click", async () => {
+      enterDetailsManually(S);
+      pendingResumeImport = null;
+      await save(true);
+      go("facts");
+    });
+    $("#factsgo")?.addEventListener("click", () => go("facts"));
     return;
   }
   box.innerHTML = S.settings.onboarded
@@ -496,7 +508,7 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
     const r = await ai({ model: M().deep, max_tokens: 12000, thinking: { type: "adaptive" }, messages: [{ role: "user", content }] });
     const x = jsonOf(r);
     if (S.files.resume?.b64 !== file.b64 || S.files.resume?.name !== file.name) return;
-    const p = S.profile, plan = planResumeImport(p, x);
+    const p = S.profile, plan = planResumeImport(p, x, { legacyResume: !!S.settings.extracted_from });
     if (plan.some((e) => e.conflict)) {
       pendingResumeImport = { file, plan };
       S.settings.resume_import = { plan };
@@ -509,6 +521,7 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
     applyResumeImport(p, plan);
     S.settings.resume_import = null;
     S.settings.resume_details_ready = true;
+    S.settings.resume_details_manual = false;
     if (!S.settings.signup_email && p.facts.email) S.settings.signup_email = p.facts.email;
     S.settings.extracted_from = file.name;   // was: S.files.resume.name
     await save(true);
@@ -566,19 +579,33 @@ function facts() {
   const suggested = new Map(factSuggestions(S.profile).map((x) => [x.key, x]));
   const shown = (k) => (suggested.has(k) ? factFallback(k) : f[k]);
   const unconfirmed = CONFIRMATION_FACTS.some((key) => !suggested.has(key) && f[key] && !ready[key]);
+  // Older answers nobody confirmed (store.js unconfirmedOldFacts). The ones still equal to the old default
+  // for everyone are flagged, and work authorization, sponsorship and age each get their own button:
+  // "Confirm answers shown" leaves those three alone. was: one button confirmed all eleven old defaults.
+  const old = new Map(unconfirmedOldFacts(S.profile).filter((x) => !suggested.has(x.key)).map((x) => [x.key, x]));
+  const mismatch = workAuthMismatch(S);
+  const missingManual = manualDetailsMissing(S);
   const hint = (k) => {
     const x = suggested.get(k);
+    const o = old.get(k);
+    if (!x && o) {
+      const flag = o.legacy ? "Old default. Earlier versions of InternScout filled this in for everyone, so you may never have picked it." : "Saved before answers needed confirming.";
+      return `<div class="small suggest" style="margin:-6px 0 12px">${esc(flag)} Not used until you confirm it.
+        ${ELIGIBILITY_FACTS.includes(k) ? `<div class="row" style="margin-top:4px"><button class="btn small" data-confirm="${k}">Confirm: ${esc(o.value)}</button></div>` : ""}</div>`;
+    }
     if (!x) return "";
     const from = x.source === "interview" ? "Suggested from your interview" : "Suggested";
     return `<div class="small suggest" style="margin:-6px 0 12px">${from}, not used until you confirm: <b>${esc(x.value)}</b>${x.kept ? ` (your earlier answer: ${esc(x.kept)})` : ""}
       <div class="row" style="margin-top:4px"><button class="btn small" data-use="${k}">Use this answer</button><button class="btn small" data-dismiss="${k}">${x.kept ? "Keep my earlier answer" : "Dismiss"}</button></div></div>`;
   };
   const field = ([k, label, opts]) => `<div>${opts
-    ? `<label class="f"><span>${esc(label)}</span><select data-fact="${k}">${[...new Set([...opts, shown(k)])].map((o) => `<option ${o === shown(k) ? "selected" : ""} value="${esc(o)}">${esc(o || "Not answered — ask me if needed")}</option>`).join("")}</select></label>`
+    ? `<label class="f"><span>${esc(label)}</span><select data-fact="${k}">${[...new Set([...opts, shown(k)])].map((o) => `<option ${o === shown(k) ? "selected" : ""} value="${esc(o)}">${esc(o || "Not answered (ask me if needed)")}</option>`).join("")}</select></label>`
     : `<label class="f"><span>${esc(label)}</span><input type="text" data-fact="${k}" value="${esc(shown(k))}"></label>`}${hint(k)}</div>`;
   main.innerHTML = `<h2>Quick facts</h2><p class="lead">The questions nearly every application asks. Answer once; the agent reuses them everywhere.</p>
     ${suggested.size ? `<div class="banner">Your interview suggested some answers below. Auto-Apply won't use them until you press Use this answer or pick an answer yourself.</div>` : ""}
-    ${unconfirmed ? '<div class="banner">Your saved eligibility and availability answers need confirmation before Auto-Apply can use them. Review them below, then press Confirm answers shown. Unanswered questions stay unknown.</div>' : ""}
+    ${missingManual.length ? `<div class="banner">Auto-Apply is paused until your first name, last name and email are filled in below.</div>` : ""}
+    ${mismatch ? `<div class="banner">${esc(mismatch)}</div>` : ""}
+    ${unconfirmed ? `<div class="banner">Some saved answers need confirmation before Auto-Apply can use them. Check the flagged ones below. Work authorization, sponsorship and 18 or older each need their own Confirm button; Confirm answers shown covers the rest. Unanswered questions stay unknown.</div>` : ""}
     ${FACTS.map(([t, note, list]) => `<div class="card"><h3>${t}</h3>${note ? `<p class="small muted" style="margin-top:0">${note}</p>` : ""}<div class="grid">${list.map(field).join("")}</div></div>`).join("")}
     <div class="card"><h3>Education</h3>${S.profile.education.length
       ? S.profile.education.map((e) => `<div>${esc(e.school)} · ${esc([e.degree, e.major].filter(Boolean).join(", "))} · ${esc(e.grad_term || e.end)}${e.gpa ? ` · GPA ${esc(e.gpa)}` : ""}</div>`).join("")
@@ -588,7 +615,7 @@ function facts() {
   // A field the student changes is their own answer, suggestion or not.
   main.querySelectorAll("[data-fact]").forEach((el) => el.addEventListener("input", () => {
     f[el.dataset.fact] = el.value; confirmProfileValue(S.profile, "facts", el.dataset.fact); save();
-    if (suggested.has(el.dataset.fact)) { suggested.delete(el.dataset.fact); el.closest("div").querySelector(".suggest")?.remove(); }
+    if (suggested.has(el.dataset.fact) || old.has(el.dataset.fact)) { suggested.delete(el.dataset.fact); old.delete(el.dataset.fact); el.closest("div").querySelector(".suggest")?.remove(); }
   }));
   const decide = (attr, fn) => main.querySelectorAll(`[${attr}]`).forEach((b) => b.addEventListener("click", async () => {
     fn(b.getAttribute(attr));
@@ -596,12 +623,15 @@ function facts() {
     facts(); wireNav();
   }));
   decide("data-use", (k) => confirmProfileValue(S.profile, "facts", k));
+  decide("data-confirm", (k) => confirmProfileValue(S.profile, "facts", k));
   decide("data-dismiss", (k) => dismissSuggestion(S.profile, k));
   $("#confirm-facts").onclick = async () => {
     // Suggestions are left as they are: the field shows the answer in use, not the suggested value.
-    for (const key of CONFIRMATION_FACTS) if (!suggested.has(key)) confirmProfileValue(S.profile, "facts", key);
+    for (const key of bulkConfirmKeys(S.profile, new Set(suggested.keys()))) confirmProfileValue(S.profile, "facts", key);
     await save(true);
-    $("#facts-confirmed").textContent = "Confirmed. Unanswered questions will still be asked when needed.";
+    facts(); wireNav();
+    const waiting = ELIGIBILITY_FACTS.some((k) => old.has(k));
+    $("#facts-confirmed").textContent = "Confirmed. Unanswered questions will still be asked when needed." + (waiting ? " Work authorization, sponsorship and 18 or older still need their own Confirm button." : "");
   };
 }
 
@@ -792,7 +822,7 @@ function review() {
     <details class="adv"><summary>Edit raw data</summary>
     ${JSON_SECTIONS.map(([k, t]) => `<div class="card"><h3>${t}</h3><textarea class="code" data-json="${k}">${esc(JSON.stringify(p[k], null, 2))}</textarea><div class="small" data-jerr="${k}"></div></div>`).join("")}
     </details>
-    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save Deep Dive" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Return to Files to finish reading and reviewing your resume." : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div></div>
+    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save Deep Dive" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Files to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div></div>
     ${navButtons("voice", null)}`;
   main.querySelectorAll("[data-goal]").forEach((el) => el.addEventListener("input", () => { p.goals[el.dataset.goal] = el.value; save(); }));
   main.querySelectorAll("[data-json]").forEach((el) => el.addEventListener("input", () => {
