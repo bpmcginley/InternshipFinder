@@ -164,3 +164,46 @@ def test_lone_url_year_is_this_year_or_next():
     assert lone_url_year(url_job_words("https://x.com/jobs/intern-2028"), today) is None
     assert lone_url_year(url_job_words("https://x.com/careers/2026/09/intern"), today) is None
     assert lone_url_year(url_job_words("https://jobs.lever.co/x/2026abcd-1234-4321-aaaa-123456789abc"), today) is None
+
+
+# PR #94 review, listing parsing: phrases that named a class year without limiting to it.
+@pytest.mark.parametrize("text,expected", [
+    # staff, not students
+    ("You will present to current senior leadership.", None),
+    ("Work alongside incoming junior analysts.", None),
+    # a role that serves students
+    ("Ambassadors are student mentors who can help first-year students settle in.", None),
+    ("You will facilitate workshops and sessions dedicated to first-year students.", None),
+    # completed a year: the years after it
+    ("All applicants must have completed their Freshman year of college.", ["junior", "senior", "sophomore"]),
+    ("Must have completed junior year of a bachelor's program.", ["senior"]),
+    ("Completed Sophomore year of college.", ["junior", "senior"]),
+    ("Must have completed their first year.", ["junior", "senior", "sophomore"]),
+    ("Completed junior-level coursework.", None),
+    # at least / or higher: that year and up
+    ("Priority goes to students that are at least current sophomores.", ["junior", "senior", "sophomore"]),
+    ("Must have at least a sophomore standing.", ["junior", "senior", "sophomore"]),
+    ("Junior or higher in an engineering major.", ["junior", "senior"]),
+    ("Rising sophomore or higher.", ["junior", "senior", "sophomore"]),
+    ("Have reached junior standing or higher.", ["junior", "senior"]),
+    ("A technical discipline with a preference for a standing of a sophomore or higher.", None),
+    # still read as before
+    ("Must be an incoming Junior or Senior level student.", ["junior", "senior"]),
+    ("Open to current juniors.", ["junior"]),
+    ("Open to first-year and sophomore students", ["freshman", "sophomore"]),
+    ("Must be a rising sophomore, junior, or senior.", ["junior", "senior", "sophomore"]),
+])
+def test_class_year_mentions_that_are_not_a_single_year_limit(text, expected):
+    assert extract(text).get("class_standing") == expected
+
+
+@pytest.mark.parametrize("loc,states", [
+    ("Seattle, WA, Remote, Boston, MA", ["WA", "MA"]),
+    ("Seattle, WA, Hybrid, Boston, MA, Hybrid, Austin, TX", ["WA", "MA", "TX"]),
+    ("Toronto, ON, Canada, Austin, TX", ["ON", "TX"]),
+    ("Seattle, WA, USA, Boston, MA", ["WA", "MA"]),
+    ("Seattle, WA, United States, Boston, MA, United States", ["WA", "MA"]),
+    ("Boston, MA, United States", ["MA"]),
+])
+def test_a_suffix_mid_location_keeps_the_next_city(loc, states):
+    assert [r["state"] for r in evaluate_locations([loc])["regions"]] == states

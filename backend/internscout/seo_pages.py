@@ -1473,17 +1473,17 @@ def dash_link(fields=(), state: str | None = None, companies=(), new: bool = Fal
     paid roles (docs/js/app.js reads ?field=, ?state=a,b, ?company=, ?new=1, ?stage=, ?year= and
     ?paid=1; its canonical link keeps these one page to search engines). An employer goes as an exact
     name, not a search: searching "Intel" also finds "intelligence", and "Texas Instruments" reads as
-    a place."""
+    a place. A page with no state covers every state, so it sends state=all (the State picker's
+    "Everywhere"; was: no state, and a saved profile's states then narrowed a nationwide page)."""
     q = [f"field={quote(','.join(fields), safe=',')}"] if fields else []
-    if state:
-        q.append(f"state={quote(_dash_state(state), safe=',')}")
+    q.append(f"state={quote(_dash_state(state), safe=',')}" if state else "state=all")
     q += [f"company={quote(c)}" for c in companies]
     if new:
         q.append("new=1")
     q += [f"{k}={quote(v)}" for k, v in (("stage", stage), ("year", year)) if v]
     if paid:
         q.append("paid=1")
-    return "/?" + "&amp;".join(q) if q else "/"
+    return "/?" + "&amp;".join(q)
 
 
 def fits_line(majors: list[str]) -> str:

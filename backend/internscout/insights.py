@@ -159,6 +159,75 @@ def _parse_date(s: str, today: date) -> str | None:
     return out.isoformat()
 
 
+# Class years. Read every year in a qualifying clause, rather than capturing only
+# the first alternative in "junior and senior students" or a comma-separated list.
+_YEAR_WORD = r"freshm[ae]n|first[- ]years?|sophomores?|juniors?|seniors?"
+_YEAR_LIST = rf"(?:{_YEAR_WORD})(?:\s*(?:,?\s*(?:or|and)|[,/])\s*(?:{_YEAR_WORD}))*"
+_RANKS = ["freshman", "sophomore", "junior", "senior"]
+_YEAR_CLAUSE = re.compile(rf"\b({_YEAR_LIST})\s+(?:year|standing|students?|undergraduates?)\b", re.I)
+# "current senior leadership" or "incoming junior analyst" is about staff, not students.
+_STAFF_NOUN = (r"leaders?|leadership|management|managers?|executives?|staff|engineers?|developers?|"
+               r"scientists?|analysts?|associates?|directors?|vice|vps?|officers?|partners?|consultants?|"
+               r"roles?|positions?|team|members?|software|data|product|research|designers?|"
+               r"accountants?|counsel|attorneys?|architects?|technicians?|specialists?|coordinators?")
+_YEAR_STATUS = re.compile(rf"\b(?:rising|current(?:ly)?(?: an?)?|incoming)\s+({_YEAR_LIST})\b", re.I)
+_STAFF_AFTER = re.compile(rf"\s+(?:{_STAFF_NOUN})\b", re.I)
+# "at least current sophomores", "sophomores or above", "junior standing or higher": that year and up.
+_YEAR_AT_LEAST = re.compile(
+    rf"\bat\s+least\s+(?:an?\s+)?(?:(?:current(?:ly)?|rising|incoming)\s+)?(?:an?\s+)?({_YEAR_LIST})\b"
+    rf"|\b({_YEAR_LIST})(?:\s+(?:year|standing|students?|undergraduates?))?\s+(?:or|and)\s+(?:above|higher|beyond|up|older|later)\b",
+    re.I)
+# "must have completed their Freshman year": the years after it. Only a whole year counts;
+# "completed junior-level coursework" says nothing certain about standing.
+_DONE = r"\b(?:completed|finished|complete|finish)\s+(?:at\s+least\s+)?(?:(?:their|your|his\s+or\s+her|one's|the|a)\s+)?"
+_YEAR_COMPLETED = re.compile(
+    rf"{_DONE}({_YEAR_LIST})\s+year\b|{_DONE}(first[- ]year)\b(?![- ]level)", re.I)
+# A role that serves students ("mentors who help first-year students") is not an eligibility limit.
+_SERVES = re.compile(
+    r"\b(?:mentor(?:s|ing)?|tutor(?:s|ing)?|advis(?:e|es|ing|ors?)|coach(?:es|ing)?|teach(?:es|ing)?|"
+    r"orient(?:s|ing)?|welcom(?:e|es|ing)|facilitat(?:e|es|ing)|counsel(?:s|ing)?|help(?:s|ing)?|"
+    r"assist(?:s|ing)?|support(?:s|ing)?|serv(?:e|es|ing)|connect(?:s|ing)?\s+with|work(?:s|ing)?\s+with|"
+    r"dedicated\s+to)\b[^.;!?\n]{0,40}$", re.I)
+
+
+def _years_in(clause: str) -> set[str]:
+    out = set()
+    for s in re.findall(rf"\b(?:{_YEAR_WORD})\b", clause, re.I):
+        s = s.lower().rstrip("s")
+        out.add("freshman" if s.startswith(("freshm", "first")) else s)
+    return out
+
+
+def class_standing(text: str) -> list[str]:
+    """Class years a listing is limited to, read from its description."""
+    standing: set[str] = set()
+    covered: list[tuple[int, int]] = []
+    for m in _YEAR_COMPLETED.finditer(text):
+        lowest = min(_RANKS.index(y) for y in _years_in(m.group(1) or m.group(2)))
+        standing.update(_RANKS[lowest + 1:])
+        covered.append(m.span())
+    for m in _YEAR_AT_LEAST.finditer(text):
+        if any(a < m.end() and m.start() < b for a, b in covered):
+            continue
+        covered.append(m.span())
+        # "a preference for a standing of a sophomore or higher" is a wish, not a limit: no year is
+        # read from it, so a freshman still sees the role.
+        if re.search(r"prefer", text[max(0, m.start() - 50):m.start()], re.I):
+            continue
+        lowest = min(_RANKS.index(y) for y in _years_in(m.group(1) or m.group(2)))
+        standing.update(_RANKS[lowest:])
+    for rx in (_YEAR_CLAUSE, _YEAR_STATUS):
+        for m in rx.finditer(text):
+            if any(a < m.end() and m.start() < b for a, b in covered):
+                continue
+            if rx is _YEAR_CLAUSE and _SERVES.search(text[max(0, m.start() - 80):m.start()]):
+                continue
+            if rx is _YEAR_STATUS and _STAFF_AFTER.match(text, m.end()):
+                continue
+            standing.update(_years_in(m.group(1)))
+    return sorted(standing)
+
+
 def extract(text: str | None, today: date | None = None) -> dict:
     """Everything worth showing next to a listing; empty keys are left out."""
     text = text or ""
@@ -175,19 +244,9 @@ def extract(text: str | None, today: date | None = None) -> dict:
     if years:
         out["grad_years"] = sorted(years)
 
-    # Read every year in a qualifying clause, rather than capturing only the first
-    # alternative in "junior and senior students" or a comma-separated list.
-    year_word = r"freshm[ae]n|first[- ]years?|sophomores?|juniors?|seniors?"
-    year_list = rf"(?:{year_word})(?:\s*(?:,?\s*(?:or|and)|[,/])\s*(?:{year_word}))*"
-    clauses = re.findall(
-        rf"\b({year_list})\s+(?:year|standing|students?|undergraduates?)\b", text, re.I)
-    clauses += re.findall(
-        rf"\b(?:rising|current(?:ly)?(?: an?)?|incoming)\s+({year_list})\b", text, re.I)
-    standing = {s.lower().rstrip("s") for clause in clauses
-                for s in re.findall(rf"\b(?:{year_word})\b", clause, re.I)}
-    standing = {"freshman" if s.startswith(("freshm", "first")) else s for s in standing}
+    standing = class_standing(text)
     if standing:
-        out["class_standing"] = sorted(standing)
+        out["class_standing"] = standing
 
     for m in re.finditer(r"u\.?\s?s\.?\s+citizen(?:ship)?|united states citizen(?:ship)?|citizens? of the united states|\bus persons?\b|u\.s\. persons?|\bitar\b|export control", text, re.I):
         if _near_eeo(text, m.start()):
