@@ -15,7 +15,7 @@ function loadCore(fetchImpl) {
     CONFIG: { dataUrl: "./data/", rawDataFallback: "https://raw.example/data/" },
     fetch: fetchImpl, localStorage: store(), sessionStorage: store(),
     addEventListener() {}, postMessage() {}, setTimeout, clearTimeout,
-    AbortController, TextDecoder,
+    AbortController, TextDecoder, URLSearchParams,
     location: { origin: "https://internscout.org", pathname: "/", search: "", hash: "" },
     document: { documentElement: { dataset: {} } },
     console,
@@ -413,4 +413,57 @@ test("downloads beyond four wait their turn, and the quiet timer starts only whe
   assert.deepEqual([...await store.ensure(keys)], []);
   assert.equal(most, 4);
   assert.equal(store.all().length, keys.length);
+});
+
+// ---------- U10 (2026-10-14): the dashboard's filters in its address ----------
+const BLANK = { q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false };
+const NO_PROFILE = { sort: "new", hide_citizen: false, paid: "" };
+
+test("the landing pages' links still set the same filters", () => {
+  const IS = loadCore(notFound);
+  const f = IS.filtersFromUrl("?field=nursing,health&state=MA,remote&company=Acme&company=Acme%2C%20Inc&new=1&stage=co_op&year=junior&paid=1");
+  assert.deepEqual(JSON.parse(JSON.stringify(f)), { fields: ["nursing", "health"], states: ["MA", "remote"], company: ["Acme", "Acme, Inc"], new_only: true, stage: "co_op", year: "junior", paid: "paid" });
+  assert.deepEqual(JSON.parse(JSON.stringify(IS.filtersFromUrl("?state=all"))).states, ["all"]);
+});
+
+test("unknown or malformed values are ignored", () => {
+  const IS = loadCore(notFound);
+  const f = JSON.parse(JSON.stringify(IS.filtersFromUrl("?field=<b>&state=Massachusetts&stage=x&year=y&sort=evil&where=moon&status=gone&progress=hacked&sector=A%20B&paid=2&citizen=maybe&eligible=yes&q=%20%20")));
+  assert.deepEqual(f, { fields: [], states: [], company: [] });
+});
+
+test("with nothing changed the address stays plain, and other names are kept", () => {
+  const IS = loadCore(notFound);
+  assert.equal(IS.filterSearch("", { ...BLANK, ...NO_PROFILE }, NO_PROFILE), "");
+  assert.equal(IS.filterSearch("?admin=1", { ...BLANK, ...NO_PROFILE }, NO_PROFILE), "?admin=1");
+  // A profile's own defaults are not written either.
+  const prof = { sort: "score", hide_citizen: true, paid: "no_unpaid" };
+  assert.equal(IS.filterSearch("?field=swe&admin=1", { ...BLANK, ...prof }, prof), "?admin=1");
+});
+
+test("every filter goes into the address and comes back the same", () => {
+  const IS = loadCore(notFound);
+  const prof = { sort: "score", hide_citizen: true, paid: "no_unpaid" };
+  const f = { ...BLANK, q: "data \"machine learning\" -unpaid", fields: ["swe", "data"], states: ["MA", "NY", "remote"], company: ["Acme, Inc", "Beta & Co"],
+    new_only: true, stage: "research", year: "senior", paid: "", sector: "health", where: "remote", status: "", app_state: "applied", eligible: true, hide_citizen: false, sort: "comp" };
+  const search = IS.filterSearch("?utm_source=x", f, prof);
+  assert.match(search, /^\?utm_source=x&q=/);
+  assert.match(search, /&field=swe,data&state=MA,NY,remote&/, "commas stay commas, as the landing pages write them");
+  const back = { ...BLANK, ...prof, ...IS.filtersFromUrl(search) };
+  assert.deepEqual(JSON.parse(JSON.stringify(back)), JSON.parse(JSON.stringify(f)));
+  // And the other way round from the profile's defaults: Paid only, closed postings, citizen-only hidden.
+  const g = { ...BLANK, ...NO_PROFILE, paid: "paid", status: "closed", hide_citizen: true, sort: "score" };
+  const s2 = IS.filterSearch("", g, NO_PROFILE);
+  assert.equal(s2, "?paid=1&status=closed&citizen=hide&sort=score");
+  assert.deepEqual(JSON.parse(JSON.stringify({ ...BLANK, ...NO_PROFILE, ...IS.filtersFromUrl(s2) })), JSON.parse(JSON.stringify(g)));
+});
+
+test("the dashboard reads its filters from the address and writes them back with replaceState", () => {
+  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /const fromLink = \(\) => IS\.filtersFromUrl\(location\.search\);/);
+  assert.match(app, /IS\.filterSearch\(location\.search, f, initF\(p\)\);\s*if \(search !== location\.search\) history\.replaceState\(/);
+  assert.doesNotMatch(app, /history\.pushState/);
+  // The analytics beacon's single-page mode would count each replaceState as a page view.
+  const index = readFileSync(new URL("../../docs/index.html", import.meta.url), "utf8");
+  assert.match(index, /data-cf-beacon='\{"token": "[0-9a-f]+", "spa": false\}'/);
 });

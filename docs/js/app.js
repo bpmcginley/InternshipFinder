@@ -304,9 +304,23 @@
   // `canTry` (2026-10-04): a desktop browser without the extension. Such a visitor never saw the word
   // Auto-Apply on a row, so a row it could fill now says so and opens a one-line explainer.
   // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, elig, patterns }) {
-  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns }) {
+  // `ask`, `onOpen`, `onAnswer` (U9, 2026-10-14): "Did you apply to <Company>?" on this row once the
+  // student comes back from its posting (App's askId). Only while the status is still Not started or
+  // Interested and no Auto-Apply job holds the row; the answer is the row's status, kept in local storage
+  // like every status (LS_KEY), and nothing else is stored.
+  // `needsAccess` (U11): with the extension installed, a row whose application is not on a site Auto-Apply
+  // already has access to (SUPPORTED_ATS) says, quietly, that it will ask for that site first.
+  // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns }) {
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer }) {
     const [aaOpen, setAaOpen] = useState(false);
-    const whyBtn = useRef();
+    const whyBtn = useRef(), statusSel = useRef();
+    const asking = !!ask && (state === "none" || state === "interested") && !job;
+    const needsAccess = canAuto && !!r.apply_url && !SUPPORTED_ATS.has(r.ats);
+    // Who the row is, for the names of its repeated controls (U12): "Open posting, Acme, Data Intern".
+    const who = `${r.company_name}, ${r.title}`;
+    // The line goes once answered; focus moves to the row's status, which now shows the answer, rather
+    // than falling back to the top of the page.
+    const answer = applied => { onAnswer(r.id, applied); setTimeout(() => { if (statusSel.current && statusSel.current.focus) statusSel.current.focus(); }, 0); };
     const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
     const cls = sc.score >= 80 ? "hi" : sc.score >= 60 ? "mid" : "lo";
     const scored = !!ctx.p;
@@ -347,7 +361,8 @@
             onClick: () => onWhy(r.id), onKeyDown: whyKey, title: `Match score ${sc.score} of 100. Click for why.` },
             // The name is the visible text plus words for a screen reader: "Match 98 of 100, Why" (D9). was: an
             // aria-label that left out the visible "Why", which axe reports (label-content-name-mismatch).
-            h("span", { className: "match-label" }, "Match "), h("span", { className: "num" }, sc.score), h("span", { className: "sr" }, " of 100, "), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"))
+            // U12: and the row it is for, after the visible words: "Match 98 of 100, Why: Acme, Data Intern".
+            h("span", { className: "match-label" }, "Match "), h("span", { className: "num" }, sc.score), h("span", { className: "sr" }, " of 100, "), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"), h("span", { className: "sr" }, ": " + who))
           : h("div", { className: "unscored" },
             h("button", { type: "button", className: "rankbtn", onClick: onRank }, "Rank for my major"),
             h("button", { type: "button", ref: whyBtn, className: "whybtn details", "aria-expanded": !!open, "aria-controls": "why-" + r.id, "aria-label": `Details: ${r.company_name}, ${r.title}`,
@@ -356,15 +371,26 @@
           // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
           // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
           // was: an underlined link; a secondary button now (D9), with the shared external-link icon.
-          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined },
-            "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, " (opens in a new tab)")) : h("span", { className: "muted" }, "No link"),
-          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]) }, "Auto-Apply"),
-          tryAuto && h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply")),
+          // was: named "Open posting (opens in a new tab)" and "Auto-Apply" on every row; the row is in the name now (U12).
+          // onOpen (U9): remembered so the page can ask "Did you apply?" when the student comes back.
+          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined, onClick: () => onOpen(r) },
+            "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, `, ${who} (opens in a new tab)`)) : h("span", { className: "muted" }, "No link"),
+          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
+            "Auto-Apply", h("span", { className: "sr" }, ": " + who)),
+          !job && needsAccess && h("span", { className: "aa-note", id: "acc-" + r.id, title: "This application is on the employer's own site. The first time, Auto-Apply asks you to allow that one site." }, "asks for site access"),
+          tryAuto && h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply", h("span", { className: "sr" }, ": " + who))),
           // was: h("div", null, h("a", { className: "report", ... }, "Report")): in the Why panel only now (D11).
         h("td", { className: "c-mine" },
-          // was: "aria-label": "Your status" on all 150 selects.
-          h("select", { className: "mine", "aria-label": "Your status for " + r.title, value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
+          // was: "aria-label": "Your status" on all 150 selects, then "Your status for " + r.title (two employers'
+          // "Software Engineering Intern" rows read the same).
+          h("select", { className: "mine", ref: statusSel, "aria-label": `Your status for ${r.title} at ${r.company_name}`, value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status)))),
+      // "Did you apply?" (U9): its own full-width row under the listing, like the Why panel.
+      asking && h("tr", { className: "ask", id: "ask-" + r.id }, h("td", { colSpan: cols },
+        h("div", { className: "ask-line", role: "group", "aria-label": "Did you apply to " + r.company_name + "?" },
+          h("span", null, "Did you apply to ", h("b", null, r.company_name), "?"),
+          h("button", { type: "button", className: "btn small", onClick: () => answer(true) }, "Mark applied"),
+          h("button", { type: "button", className: "btn quiet small", onClick: () => answer(false) }, "Not yet")))),
       // Its own full-width row, like the Why panel, so the nowrap links column doesn't widen the table.
       tryAuto && aaOpen && h("tr", { className: "aa-info", id: "aa-" + r.id }, h("td", { colSpan: cols },
         "The free InternScout extension fills this application from your resume. You review it and press Submit yourself. Free monthly allowance. ",
@@ -742,24 +768,11 @@
     const [landingOpen, setLandingOpen] = useState(() => !IS.ls.get(LANDING_KEY, false));
     const initF = prof => ({ sort: prof ? "score" : "new", hide_citizen: !!(prof && prof.work_auth && prof.work_auth !== "citizen"), paid: prof && prof.paid_only ? "no_unpaid" : "" });
     // The landing pages under internships/ link here with ?field=a,b&state=MA, so the list opens on what the
-    // student was reading. Only well-formed tags and state keys are taken; an unknown one matches nothing.
-    const fromLink = () => {
-      // was: .slice(0, 6) for every list, so an employer page with roles in 48 places opened on 44.
-      const q = new URLSearchParams(location.search), list = (k, ok, max = 6) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, max);
-      // ?company= comes from an employer's page (every spelling its listings use) and matches names
-      // exactly; ?new=1 from the New this week page. Both are plain values, never markup.
-      // ?state=all (2026-10-14) is the State picker's "Everywhere", from the pages that cover every state.
-      const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada|all)$/, 80),
-        company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
-      if (q.get("new") === "1") link.new_only = true;
-      // ?stage=, ?year= and ?paid=1 come from the co-op, research, class-year and paid pages, and
-      // set the same Stage, Eligible year and Pay filters a student can pick by hand.
-      const stage = q.get("stage"), year = q.get("year");
-      if (stage && IS.STAGES.some(([k]) => k === stage)) link.stage = stage;
-      if (year && IS.YEARS.some(([k]) => k === year)) link.year = year;
-      if (q.get("paid") === "1") link.paid = "paid";
-      return link;
-    };
+    // student was reading; since U10 (2026-10-14) the dashboard writes its own filters to the address with
+    // the same names, so a copied link or a reload opens the same list. IS.filtersFromUrl (core.js) takes
+    // only well-formed values; an unknown tag or state matches nothing.
+    // was: const fromLink = () => { ... field, state, company, new, stage, year and paid=1 ... };
+    const fromLink = () => IS.filtersFromUrl(location.search);
     // The landing link, read once: its fields also prefill the setup card's Major (prefill below).
     const [link] = useState(fromLink);
     const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...link }));
@@ -790,18 +803,18 @@
     const { info, queue, profile: extProfile } = useExtension();
 
     useEffect(() => { IS.ls.set(LANDING_KEY, true); }, []);
-    // Taken into the filters above, so drop them from the address: a reload after changing filters
-    // should not bring the landing page's back.
+    // was: the landing page's filters were dropped from the address once read ("a reload after changing
+    // filters should not bring the landing page's back"). The address now follows the filters instead
+    // (the effect after the Stripe ones below), so a reload brings back the current ones.
     useEffect(() => {
       const q = new URLSearchParams(location.search);
-      const LINK_KEYS = ["field", "state", "company", "new", "stage", "year", "paid", "ref"];
-      if (!LINK_KEYS.some(k => q.has(k))) return;
+      if (!q.has("ref")) return;
       // A classmate's invite (?ref=) waits in this browser until the student signs in (see the claim
       // effect below). Only a code shaped like the Worker's is kept.
       const ref = q.get("ref");
       if (ref && IS.INVITE_CODE.test(ref)) { IS.ls.set(IS.INVITE_KEY, ref); setInvited(ref); }
-      LINK_KEYS.forEach(k => q.delete(k));
-      history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
+      q.delete("ref");
+      history.replaceState(history.state, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     }, []);
 
     // data
@@ -971,6 +984,17 @@
       if (auth.token) check(4);
     }, [auth.token]);
 
+    // The filters in the address (U10, 2026-10-14; IS.filterSearch in core.js): only what differs from the
+    // defaults, so with nothing set the address is plain. replaceState, not pushState: changing a filter
+    // doesn't add a Back step, and Back from another page (or a reload) returns to the list as it was left.
+    // Defined after the Stripe effects above, which clear the address on their first run.
+    useEffect(() => {
+      try {
+        const search = IS.filterSearch(location.search, f, initF(p));
+        if (search !== location.search) history.replaceState(history.state, "", location.pathname + search + location.hash);
+      } catch (e) { }
+    }, [f, p]);
+
     // was: // Claim a waiting invite once the student is signed in and the Worker offers invites (its /config
     // was: // says what one is worth). Refusals are final, so the code is dropped, except "use a school
     // was: // account": signing in again with one can still claim it. Unreachable: try again next load.
@@ -1117,6 +1141,8 @@
         + (info.installed ? " The extension keeps its own copy of your profile and files: removing it at chrome://extensions deletes that copy." : ""));
     }
 
+    // The statuses as of the last render, for listeners added once (the "Did you apply?" check below).
+    const appStatesRef = useRef(appStates); appStatesRef.current = appStates;
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
     // "More filters" remembers whether it was open; the count is how many of the controls inside it
@@ -1534,6 +1560,34 @@
       const t = setTimeout(() => setSpoken(liveText), 900);
       return () => clearTimeout(t);
     }, [liveText]);
+    // "Did you apply?" (U9, 2026-10-14). The posting opens in a new tab, so the moment this page knows about
+    // is the click on "Open posting"; when the student comes back to this tab (the page was hidden, then
+    // shown again), the row asks once: "Did you apply to Acme? Mark applied / Not yet". Mark applied sets
+    // the row's status to Applied, kept in this browser like every status; Not yet doesn't ask about that
+    // posting again on this page load. Nothing else is stored. The live region says it once, since the line
+    // appears while the student is away. Only one row asks at a time: the last posting opened.
+    const [askId, setAskId] = useState(null);
+    const opened = useRef(null), notYet = useRef(new Set());
+    const onOpen = useCallback(r => { opened.current = { id: r.id, company: r.company_name, left: false }; }, []);
+    const onAnswer = useCallback((id, applied) => {
+      if (applied) setAppState(id, "applied"); else notYet.current.add(id);
+      setAskId(null);
+    }, [setAppState]);
+    useEffect(() => {
+      const onVis = () => {
+        const o = opened.current;
+        if (!o) return;
+        if (document.visibilityState === "hidden") { o.left = true; return; }
+        if (!o.left) return;
+        opened.current = null;
+        const s = appStatesRef.current[o.id] || "none";
+        if (notYet.current.has(o.id) || (s !== "none" && s !== "interested")) return;
+        setAskId(o.id);
+        setSpoken(`Did you apply to ${o.company}? You can mark it under that listing.`);
+      };
+      document.addEventListener("visibilitychange", onVis);
+      return () => document.removeEventListener("visibilitychange", onVis);
+    }, []);
     // was: on a phone the promotions went under the list and a wide screen kept them above it. Since D16
     // (2026-10-14) they sit under the list on every screen: three promotions above it pushed the first
     // listing to about 794 px on a laptop. Above the list there is at most one standing notice (topNotice).
@@ -1819,7 +1873,8 @@
                 // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
                 sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
               h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns }))))),
+                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns,
+                ask: askId === r.id, onOpen, onAnswer }))))),
               h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
               rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))))),
 

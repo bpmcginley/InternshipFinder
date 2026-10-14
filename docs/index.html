@@ -465,6 +465,11 @@
   .rowbtn.try:hover,.rowbtn.try[aria-expanded=true]{color:var(--accent)}
   tbody tr.aa-info td,tbody tr.aa-info:hover td{background:var(--sunk);font-size:var(--fs-2);color:var(--ink2);padding:var(--s2) var(--s4)}
   tr.aa-info a{color:var(--accent);font-weight:500}
+  /* "Did you apply?" under a row the student just came back from (U9), and the quiet "asks for site
+     access" after Auto-Apply on rows outside the sites it already has (U11). */
+  tbody tr.ask td,tbody tr.ask:hover td{background:var(--accent-soft);padding:var(--s2) var(--s4)}
+  .ask-line{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s3);font-size:var(--fs-2);color:var(--ink)}
+  .aa-note{font-size:var(--fs-1);color:var(--ink3);white-space:nowrap;margin-left:2px}
   /* was: .report, a Report link on every row. It is in the Why panel only now (D11). */
   .whybtn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit}
   /* Before a profile (D10): no score, a quiet "Rank for my major" and a "Details" button for the panel. */
@@ -589,7 +594,7 @@
     table.list thead{display:none}
     table.list,table.list tbody{display:block;width:100%}
     table.list tr{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s1) var(--s3);padding:var(--s3) var(--s4);border-bottom:1px solid var(--rule)}
-    table.list tr.why,table.list tr.aa-info{display:block;padding:0}
+    table.list tr.why,table.list tr.aa-info,table.list tr.ask{display:block;padding:0}
     table.list tbody td{display:block;border:0;padding:0;width:auto;min-width:0}
     /* The card (D9): the listing's three lines, the checkbox at the top right, then one line of actions:
        Open posting, Auto-Apply, Match (or Rank for my major and Details) and the status. */
@@ -610,7 +615,7 @@
     tbody tr.why td{padding:var(--s4)}
     /* A narrow desktop window (no touch) still gets the row Auto-Apply explainer; the card rule above
        zeroes every td's padding, so give it back like the Why panel's (2026-10-04). */
-    tbody tr.aa-info td{padding:var(--s2) var(--s4)}
+    tbody tr.aa-info td,tbody tr.ask td{padding:var(--s2) var(--s4)}
     .whyg{gap:var(--s4)}
   }
 </style>
@@ -726,8 +731,11 @@
 <!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
      and nothing that identifies a visitor; see privacy.html. The token is public by design.
      js/count.js (2026-09-30) is the exact counter, since Cloudflare samples. The landing pages copy
-     both tags from here (backend/internscout/seo_pages.py beacon_from). -->
+     both tags from here (backend/internscout/seo_pages.py beacon_from).
+     "spa": false (2026-10-14, U10): the dashboard now keeps its filters in the address with
+     history.replaceState, and the beacon's default single-page-app mode would count every filter change
+     as another page view (and send the search text with it). With it off, a page load is one view. -->
 <script defer src="/js/count.js"></script>
-<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce", "spa": false}'></script>
 </body>
 </html>

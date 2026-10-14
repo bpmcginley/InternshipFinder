@@ -163,7 +163,8 @@ test("with a profile the Match button names its score and the panel it opens (D9
   const btn = nodes(tree, n => n.props.className && /score whybtn/.test(n.props.className))[0];
   // The name comes from the visible text plus screen-reader words, so it always contains what is shown.
   assert.equal(btn.props["aria-label"], undefined);
-  assert.match(text(btn), /^Match 98 of 100, Why$/);
+  // U12: and the row it is for, so 150 of them don't all read the same.
+  assert.match(text(btn), /^Match 98 of 100, Why: Acme, Data Intern$/);
   assert.equal(btn.props["aria-controls"], "why-7");
   assert.equal(nodes(tree, n => n.props.className === "rankbtn").length, 0);
 });
@@ -188,4 +189,83 @@ test("phones get a laptop install button that goes to install.html#phone (D19), 
   assert.match(install, /<aside class="phonebar" id="phone">/);
   assert.match(app, /"#phone" \}, "Send Auto-Apply to my laptop"\)/);
   assert.match(index, /footer \.links\{display:flex;gap:var\(--s2\) var\(--s5\)/);
+});
+
+// ---------- dashboard UX rows (U9, U11, U12, 2026-10-14) ----------
+test("Open posting is remembered, and back on the page the row asks once: Mark applied or Not yet (U9)", async () => {
+  const harness = uiHarness(); const opened = [], answers = [];
+  const props = rowProps({ onOpen: r => opened.push(r.id), onAnswer: (id, applied) => answers.push([id, applied]) });
+  let tree = harness.render(harness.components.Row, props);
+  nodes(tree, n => n.props.className === "open-link")[0].props.onClick({});
+  assert.deepEqual(opened, [7]);
+  assert.equal(nodes(tree, n => n.props.className === "ask").length, 0, "nothing until the page says the student came back");
+  tree = harness.render(harness.components.Row, { ...props, ask: true });
+  const line = nodes(tree, n => n.props.className === "ask")[0];
+  assert.equal(line.props.id, "ask-7");
+  assert.equal(text(line).replace(/Mark applied.*/, ""), "Did you apply to Acme?");
+  nodes(line, n => n.type === "button" && text(n) === "Mark applied")[0].props.onClick();
+  nodes(line, n => n.type === "button" && text(n) === "Not yet")[0].props.onClick();
+  assert.deepEqual(answers, [[7, true], [7, false]]);
+  // Focus goes to the row's status, which now shows the answer.
+  await new Promise(r => setTimeout(r, 5));
+  assert.ok(harness.events.some(([e, label]) => e === "focus" && label === "Your status for Data Intern at Acme"));
+  // Not asked once the status says more than Interested, or while Auto-Apply holds the row.
+  for (const extra of [{ state: "applied" }, { state: "interviewing" }, { job: { status: "working" } }])
+    assert.equal(nodes(harness.render(harness.components.Row, { ...props, ask: true, ...extra }), n => n.props.className === "ask").length, 0);
+  assert.equal(nodes(harness.render(harness.components.Row, { ...props, ask: true, state: "interested" }), n => n.props.className === "ask").length, 1);
+});
+
+test("the dashboard asks only after the tab was hidden and shown again, and keeps the answer as the row's status (U9)", () => {
+  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /if \(document\.visibilityState === "hidden"\) \{ o\.left = true; return; \}\s*if \(!o\.left\) return;/);
+  assert.match(app, /if \(applied\) setAppState\(id, "applied"\); else notYet\.current\.add\(id\);/);
+  assert.match(app, /ask: askId === r\.id, onOpen, onAnswer/);
+});
+
+test("with the extension, rows outside the sites it can already fill say it asks for site access (U11)", () => {
+  const harness = uiHarness();
+  const other = { ...ROW, ats: "other", apply_url: "https://careers.acme.com/1" };
+  let tree = harness.render(harness.components.Row, rowProps({ r: other, canAuto: true }));
+  const note = nodes(tree, n => n.props.className === "aa-note")[0];
+  assert.equal(text(note), "asks for site access");
+  const btn = nodes(tree, n => n.props.className === "rowbtn")[0];
+  assert.equal(btn.props["aria-describedby"], note.props.id);
+  // Not on a supported site, and not without the extension.
+  tree = harness.render(harness.components.Row, rowProps({ canAuto: true }));
+  assert.equal(nodes(tree, n => n.props.className === "aa-note").length, 0);
+  assert.equal(nodes(tree, n => n.props.className === "rowbtn")[0].props["aria-describedby"], undefined);
+  tree = harness.render(harness.components.Row, rowProps({ r: other, canAuto: false }));
+  assert.equal(nodes(tree, n => n.props.className === "aa-note").length, 0);
+});
+
+test("a row's repeated controls carry the company and title in their names (U12)", () => {
+  const harness = uiHarness();
+  let tree = harness.render(harness.components.Row, rowProps({ canAuto: true }));
+  assert.equal(text(nodes(tree, n => n.props.className === "open-link")[0]), "Open posting, Acme, Data Intern (opens in a new tab)");
+  assert.equal(text(nodes(tree, n => n.props.className === "rowbtn")[0]), "Auto-Apply: Acme, Data Intern");
+  assert.equal(nodes(tree, n => n.type === "select")[0].props["aria-label"], "Your status for Data Intern at Acme");
+  assert.equal(nodes(tree, n => n.type === "input")[0].props["aria-label"], "Select Acme, Data Intern");
+  tree = harness.render(harness.components.Row, rowProps({ canTry: true }));
+  assert.equal(text(nodes(tree, n => n.props.className === "rowbtn try")[0]), "Auto-Apply: Acme, Data Intern");
+});
+
+test("install.html and privacy.html headings don't skip a level (U12), and install's steps follow what happens (U6)", () => {
+  const strip = s => s.replace(/<!--[\s\S]*?-->/g, "");
+  for (const page of ["install.html", "privacy.html"]) {
+    const html = strip(readFileSync(new URL("../../docs/" + page, import.meta.url), "utf8"));
+    const levels = [...html.matchAll(/<h([1-6])\b/g)].map(m => Number(m[1]));
+    assert.equal(levels[0], 1, page);
+    levels.forEach((l, i) => { if (i) assert.ok(l <= levels[i - 1] + 1, `${page}: h${levels[i - 1]} then h${l}`); });
+    // The phone banner's h2 is hidden on a laptop, so the page must not lean on it.
+    const noPhone = html.replace(/<aside class="phonebar"[\s\S]*?<\/aside>/, "");
+    const after = [...noPhone.matchAll(/<h([1-6])\b/g)].map(m => Number(m[1]));
+    assert.ok(after[1] <= 2, page + ": the heading after the h1 is an h2 without the phone banner too");
+  }
+  const install = strip(readFileSync(new URL("../../docs/install.html", import.meta.url), "utf8"));
+  const steps = [...install.match(/<ol class="steps">[\s\S]*?<\/ol>/)[0].matchAll(/<h2>([^<]+)<\/h2>/g)].map(m => m[1]);
+  assert.deepEqual(steps, ["Add it from the Chrome Web Store", "Set up Auto-Apply", "Pin it to your toolbar (optional)"]);
+  assert.match(install, /<strong>Read and change your data on a number of websites<\/strong> and <strong>Read your browsing history<\/strong>/);
+  const howto = JSON.parse(install.match(/<script type="application\/ld\+json">\s*(\{"@context":"https:\/\/schema.org","@type":"HowTo"[\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(howto.step.map(s => s.name), steps);
+  assert.doesNotMatch(install, /Click the InternScout icon and choose/);
 });

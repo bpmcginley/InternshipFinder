@@ -69,6 +69,7 @@
   .box{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:6px 18px;margin:22px 0}
   .box.warn{border-color:color-mix(in srgb,var(--amber) 45%,var(--rule))}
   .box h3{margin-top:12px}
+  .box h2{font:inherit;font-size:16px;font-weight:700;margin:12px 0 4px;padding:0;border:0}
   .table{overflow-x:auto;margin:12px 0}
   table{border-collapse:collapse;width:100%;font-size:15px}
   th,td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--rule)}
@@ -121,7 +122,8 @@
     <p class="lede">InternScout is an internship search tool made by a UMass Amherst student. Searching is free and needs no sign-in; AI features have a free monthly allowance, and optional paid plans raise it. This page explains what data it uses, where that data goes, and how to delete it.</p>
 
     <div class="box">
-      <h3>The short version</h3>
+      <!-- An h2 since 2026-10-14 (U12): an h3 straight after the h1 (axe heading-order). Drawn as before. -->
+      <h2>The short version</h2>
       <ul>
         <li>Searching needs no account.</li>
         <!-- This bullet said files "stay" on the device, which extension/background/tailor.js line 185
