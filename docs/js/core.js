@@ -315,6 +315,68 @@
     return { batch: unique.slice(0, max), remaining: unique.slice(max) };
   };
   const queuedListingIds = (ids, queue) => ids.map(id => queue && queue.jobs && queue.jobs[id]).filter(j => j && j.listingId != null).map(j => String(j.listingId));
+  // The rows of a batch the extension took care of: added, or skipped because a job already holds the
+  // same listing or the same apply link (extension/background/queue.js addJobs). 85 apply links are
+  // shared by two or more listings; matching on the listing id alone left the second one selected for
+  // good. Answers listing ids as strings.
+  function handledListingIds(batch, res, queue) {
+    const jobs = (queue && queue.jobs) || {};
+    const held = [...((res && res.added) || []), ...((res && res.skipped) || [])].map(id => jobs[id]).filter(Boolean);
+    const ids = new Set(held.filter(j => j.listingId != null).map(j => String(j.listingId)));
+    const urls = new Set(held.map(j => j.apply_url).filter(Boolean));
+    return batch.filter(r => ids.has(String(r.id)) || (r.apply_url && urls.has(r.apply_url))).map(r => String(r.id));
+  }
+  // Apply links held by a queued, running or finished job. The extension skips a listing with one of
+  // these, so the header checkbox leaves it alone.
+  const heldUrls = queue => new Set(Object.values((queue && queue.jobs) || {}).filter(j => j && j.apply_url && j.status !== "failed").map(j => j.apply_url));
+
+  // ---------- selecting rows for Auto-Apply ----------
+  const SELECT_MAX = 100;
+  // The header checkbox. Checked when it has nothing left to add: every shown row that can be picked is
+  // picked, or the selection is full and holds some of them. was: checked only when the first 100
+  // shown were all picked, which stayed false once a row picked further down filled the selection, so
+  // a click could never clear it.
+  const headerChecked = (selectable, sel, max = SELECT_MAX) => selectable.length > 0
+    && (selectable.every(r => sel.has(r.id)) || (sel.size >= max && selectable.some(r => sel.has(r.id))));
+  // A header click: add the shown rows up to the limit, or take them all off.
+  function selectRows(sel, selectable, on, max = SELECT_MAX) {
+    const n = new Set(sel); let omitted = 0;
+    selectable.forEach(r => { if (!on) n.delete(r.id); else if (n.has(r.id) || n.size < max) n.add(r.id); else omitted++; });
+    return { sel: n, omitted };
+  }
+
+  // ---------- list order ----------
+  // The list's sort, with each row's keys worked out once instead of in every comparison. On a slowed
+  // CPU the old comparators (two score lookups and up to two localeCompare calls each, hundreds of
+  // thousands of calls for 28,000 rows) took most of the time spent as each state's file landed.
+  // The order is the same as before (tests/site/core.test.mjs checks it against the old comparators
+  // on the real data):
+  //  - the same expressions on the same values, and Array.prototype.sort is stable;
+  //  - posted_at and first_seen are ISO 8601 text, where localeCompare and plain comparison agree;
+  //  - company names go through one Intl.Collator, which is what localeCompare uses with no arguments.
+  // Sorts `list` in place and returns it, like Array.prototype.sort.
+  let collator = null;
+  const textCmp = (a, b) => (collator || (collator = new Intl.Collator())).compare(a, b);
+  const codeCmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function sortRows(list, sort, scoreOf, rel) {
+    if (!["score", "new", "company", "comp"].includes(sort)) return list;
+    const d = list.map(x => {
+      const s = sort === "company" ? null : scoreOf(x);
+      return {
+        x, mm: s && s.mismatch, sc: s && s.score, rel: rel ? rel.get(x) : 0,
+        dated: x.posted_at ? 1 : 0, pa: x.posted_at || "", fs: x.first_seen || "",
+        pay: sort === "comp" && realSalary(x) ? 1 : 0, co: x.company_name,
+      };
+    });
+    const R = (a, b) => rel ? b.rel - a.rel : 0;
+    const newer = (a, b) => (b.dated - a.dated) || codeCmp(b.pa, a.pa) || codeCmp(b.fs, a.fs);
+    if (sort === "score") d.sort((a, b) => (a.mm - b.mm) || R(a, b) || (b.sc - a.sc) || newer(a, b));
+    else if (sort === "new") d.sort((a, b) => (a.mm - b.mm) || R(a, b) || newer(a, b));
+    else if (sort === "company") d.sort((a, b) => textCmp(a.co, b.co));
+    else d.sort((a, b) => (b.pay - a.pay) || R(a, b) || b.sc - a.sc);
+    for (let i = 0; i < d.length; i++) list[i] = d[i].x;
+    return list;
+  }
 
   // ---------- eligibility helpers ----------
   const restr = x => x.restrictions || [];
@@ -1035,7 +1097,7 @@
     fieldLabel, keyLabel, termText, ls, ss,
     emptyProfile, loadProfile, saveProfile, profileKeys, demandStates, ALL_KEY, viewScope, FIRST_KEYS, loadPlan,
     parseQuery, splitPlaces, queryKeys, placeWords, stem, compileQuery, matchScore, majorForFields,
-    regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
+    regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, handledListingIds, heldUrls, SELECT_MAX, headerChecked, selectRows, sortRows, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
     // was: WEIGHTS, PART_LABEL, profileFields, score,
     // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the
     // student's own tag, not the biggest one in the Set profileFields returns.

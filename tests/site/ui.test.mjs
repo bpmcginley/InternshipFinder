@@ -71,3 +71,43 @@ test("profile steps move focus to the newly labelled group, including Back", () 
   nodes(tree, n => n.type === "button" && n.children.includes("Back"))[0].props.onClick(); render();
   assert.equal(harness.events.filter(([event]) => event === "focus").at(-1)[1], "Profile step 1 of 3: About you");
 });
+
+test("Tab from a picker closes its list, the list is not a Tab stop, and arrows and Enter still pick", () => {
+  const harness = uiHarness(), chosen = [];
+  const props = { placeholder: "Field", options: [{ value: "a", label: "Alpha" }, { value: "b", label: "Beta" }], selected: [], onChange: v => chosen.push([...v]) };
+  const render = () => harness.render(harness.components.MultiSelect, props);
+  let tree = render(), input = nodes(tree, n => n.type === "input")[0];
+  input.props.onFocus(); tree = render();
+  const list = nodes(tree, n => n.props.role === "listbox")[0];
+  // A scrolling box is focusable by default in Chrome and Firefox; was: Tab landed in it.
+  assert.equal(list.props.tabIndex, -1);
+  key(nodes(tree, n => n.type === "input")[0], "Tab"); tree = render();
+  input = nodes(tree, n => n.type === "input")[0];
+  assert.equal(input.props["aria-expanded"], false);
+  assert.equal(nodes(tree, n => n.props.role === "listbox").length, 0);
+  // Keyboard selection is unchanged.
+  key(input, "ArrowDown"); tree = render(); key(nodes(tree, n => n.type === "input")[0], "ArrowDown"); tree = render();
+  key(nodes(tree, n => n.type === "input")[0], "Enter");
+  assert.deepEqual(chosen, [["b"]]);
+});
+
+test("a picker with no matches has no empty listbox and says so in a status line", () => {
+  const harness = uiHarness();
+  const props = { placeholder: "Field", options: [{ value: "a", label: "Alpha" }], selected: [], onChange() {} };
+  const render = () => harness.render(harness.components.MultiSelect, props);
+  let tree = render(); const input = nodes(tree, n => n.type === "input")[0];
+  input.props.onChange({ target: { value: "zzzz" } }); tree = render();
+  // was: role=listbox with no options inside, a critical axe violation (aria-required-children).
+  assert.equal(nodes(tree, n => n.props.role === "listbox").length, 0);
+  assert.equal(nodes(tree, n => n.props.role === "option").length, 0);
+  const status = nodes(tree, n => n.props.role === "status")[0];
+  assert.ok(status, "the empty state is a status message");
+  assert.equal(status.children[0].children[0], "No more matching options");
+  const now = nodes(tree, n => n.type === "input")[0];
+  assert.equal(now.props["aria-expanded"], false);
+  assert.equal(now.props["aria-activedescendant"], undefined);
+  // Every option is back when the text is cleared.
+  now.props.onChange({ target: { value: "" } }); tree = render();
+  assert.equal(nodes(tree, n => n.props.role === "option").length, 1);
+  assert.equal(nodes(tree, n => n.type === "input")[0].props["aria-expanded"], true);
+});
