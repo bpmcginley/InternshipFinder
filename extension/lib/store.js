@@ -63,14 +63,50 @@ export const EMPTY_FACTS = {
 // ones. Keep their displayed values, but require a recorded confirmation before use.
 export const CONFIRMATION_FACTS = ["work_authorized", "needs_sponsorship", "over_18", "willing_to_relocate",
   "willing_to_travel", "background_check", "drug_test", "non_compete", "worked_here_before", "hours_per_week", "languages"];
+// The voluntary self-identification answers. They never leave the device (lib/sync.js), and an answer
+// nobody confirmed falls back to the decline default in EMPTY_FACTS.
+export const DEMOGRAPHIC_KEYS = ["gender", "race", "hispanic", "veteran", "disability", "lgbtq"];
+// The facts a resume import fills in (onboarding/profile.js), which the student reviews there, and the
+// ones the dashboard sends (background/index.js profile:set), which the student picked there.
+export const RESUME_FACTS = ["first_name", "last_name", "email", "phone", "city", "state", "zip", "linkedin", "github", "website"];
+export const DASHBOARD_FACTS = ["majors", "class_year", "grad_term"];
+const TRUSTED_SOURCES = { manual: null, resume: RESUME_FACTS, dashboard: DASHBOARD_FACTS };
+
+// Whether Auto-Apply and the model may use a fact: the student entered or confirmed it, or it came from a
+// reviewed resume or the dashboard and is unchanged since. Anything else, such as an interview summary,
+// is a suggestion until it is confirmed on Quick facts. A fact with no record predates provenance and
+// counts, except the 11 above.
+// was: only CONFIRMATION_FACTS were checked, so an interview's race, veteran status, citizenship or
+// clearance went straight to fastFill and the model.
+export function factConfirmed(profile, key) {
+  const record = profile.sources?.facts?.[key];
+  if (!record) return !CONFIRMATION_FACTS.includes(key);
+  if (!Object.hasOwn(TRUSTED_SOURCES, record.source)) return false;
+  const keys = TRUSTED_SOURCES[record.source];
+  return (!keys || keys.includes(key)) && record.value === profile.facts[key];
+}
+// What is used instead of an unconfirmed fact: unknown (the agent asks when it must), or decline for
+// the six. Not an earlier answer the suggestion disagrees with: which one is right is the student's call.
+export const factFallback = (key) => (DEMOGRAPHIC_KEYS.includes(key) ? EMPTY_FACTS[key] : "");
 export function confirmedFacts(s) {
   const facts = { ...s.profile.facts };
-  for (const key of CONFIRMATION_FACTS) {
-    const record = s.profile.sources?.facts?.[key];
-    if (record?.source !== "manual" || record.value !== facts[key]) facts[key] = "";
-  }
+  for (const key of Object.keys(facts)) if (!factConfirmed(s.profile, key)) facts[key] = factFallback(key);
   return facts;
 }
+// Suggested values waiting on Quick facts: [{key, value, source, kept}], kept being the student's earlier
+// answer when there was one (onboarding/profile.js applyInterviewFacts).
+export function factSuggestions(profile) {
+  return Object.keys(profile.facts || {}).filter((key) => profile.sources?.facts?.[key] && !factConfirmed(profile, key)
+    && !Object.hasOwn(TRUSTED_SOURCES, profile.sources.facts[key].source) && profile.facts[key])
+    .map((key) => ({ key, value: profile.facts[key], source: profile.sources.facts[key].source, kept: profile.sources.facts[key].kept || "" }));
+}
+
+// A replaced or removed resume pauses Auto-Apply until the new one is read and its details reviewed
+// (onboarding.js). Kept apart from `onboarded`, which only ever goes from false to true: lib/sync.js
+// treats an unfinished device as one that gives way to the account's copy.
+export const resumeReviewPending = (s) => s.settings.resume_details_ready === false || !!s.settings.resume_import;
+// Auto-Apply may fill forms: the Deep Dive is finished and no resume is waiting to be reviewed.
+export const autoApplyReady = (s) => !!s.settings.onboarded && !resumeReviewPending(s);
 
 export const STORE_VERSION = 3;
 

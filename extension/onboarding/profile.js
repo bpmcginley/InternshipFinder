@@ -1,9 +1,11 @@
 // Import only resume-derived values automatically. Explicit edits and older profiles
 // without provenance need review when a resume disagrees with them.
+import { RESUME_FACTS, factConfirmed, factFallback } from "../lib/store.js";
+
 const clone = (v) => structuredClone(v);
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const SECTIONS = ["education", "experience", "projects", "links", "skills"];
-const CONTACT = ["first_name", "last_name", "email", "phone", "city", "state", "zip", "linkedin", "github", "website"];
+const CONTACT = RESUME_FACTS;   // was: the same list, here
 const empty = (v) => !v || (Array.isArray(v) && !v.length) || (typeof v === "object" && Object.values(v).every(empty));
 
 export function confirmProfileValue(profile, kind, key) {
@@ -13,18 +15,33 @@ export function confirmProfileValue(profile, kind, key) {
   profile.sources[kind][key] = { source: "manual", value: clone(value) };
 }
 
-// An AI summary is a suggestion, even when its prompt asks for literal student facts.
-// Keep an existing confirmation only when the suggested value is unchanged.
+// An AI summary is a suggestion, even when its prompt asks for literal student facts. A value that is
+// already in use and the same is left alone; anything new waits on Quick facts (lib/store.js
+// confirmedFacts) and is not used meanwhile. The answer it would replace is kept beside it, so turning
+// the suggestion down there brings that answer back.
+// was: only the 11 CONFIRMATION_FACTS were held back; race, veteran status, citizenship and the rest
+// were used as soon as the interview summary named them.
 export function applyInterviewFacts(profile, facts) {
   profile.sources ||= { facts: {}, sections: {} };
   profile.sources.facts ||= {};
   for (const [key, value] of Object.entries(facts || {})) {
     if (typeof value !== "string" || !value || !Object.hasOwn(profile.facts, key)) continue;
-    const origin = profile.sources.facts[key];
-    const confirmed = origin?.source === "manual" && equal(origin.value, value) && equal(profile.facts[key], value);
+    const ok = factConfirmed(profile, key);
+    if (ok && equal(profile.facts[key], value)) continue;
+    const kept = ok ? profile.facts[key] : profile.sources.facts[key]?.kept;
     profile.facts[key] = value;
-    if (!confirmed) profile.sources.facts[key] = { source: "interview", value: clone(value) };
+    const real = typeof kept === "string" && kept && kept !== factFallback(key);   // not just the decline default
+    profile.sources.facts[key] = { source: "interview", value: clone(value), ...(real ? { kept } : {}) };
   }
+}
+
+// Quick facts: the student turns a suggestion down, and their earlier answer (or unknown, or decline for
+// the self-identification six) is their answer again. Taking one is confirmProfileValue: the suggested
+// value is already in facts.
+export function dismissSuggestion(profile, key) {
+  const kept = profile.sources?.facts?.[key]?.kept;
+  profile.facts[key] = typeof kept === "string" && kept ? kept : factFallback(key);
+  confirmProfileValue(profile, "facts", key);
 }
 
 export function planResumeImport(profile, extracted) {

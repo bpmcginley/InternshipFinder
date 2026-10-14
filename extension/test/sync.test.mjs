@@ -49,7 +49,7 @@ function reset(s, { signedIn = true } = {}) {
   if (s) LOCAL.store = JSON.parse(JSON.stringify(s));
   if (signedIn) LOCAL["internscout.session"] = { ...SESSION_REC };
 }
-const T1 = "2026-09-20T10:00:00.000Z", T2 = "2026-09-24T10:00:00.000Z";
+const T1 = "2026-09-20T10:00:00.000Z", T2 = "2026-09-24T10:00:00.000Z", T3 = "2026-09-28T10:00:00.000Z";
 
 test("the synced subset leaves out demographics, logins, keys, passwords, files, answers and the sign-up email", () => {
   const sub = S.syncedSubset(filled());
@@ -129,6 +129,58 @@ test("which copy wins: newer wins; a finished account copy beats an unfinished d
   assert.equal(S.decide(partial, server(otherPartial, T1)), "push");     // both unfinished: the newer one stays
   assert.equal(S.decide(filled(), { profile: null, updated: null }), "push");
   assert.equal(S.decide(emptyStore(), { profile: null, updated: null }), "none");
+});
+
+test("a resume replacement on a finished device: newer local edits are pushed, never restored over", async () => {
+  const { autoApplyReady } = await import("../lib/store.js");
+  const server = (s, updated) => ({ profile: S.toServer(S.syncedSubset(s)), updated });
+  // The account holds the Deep Dive with the old resume's details (PR #94 review, P1 #2).
+  const old = filled(); old.profile.experience = [{ title: "Old job" }];
+  // This device finished the same Deep Dive, then the student replaced the resume (onboarding.js): the
+  // new details are read in and still waiting for review, and the edit is newer than the account's copy.
+  const local = filled({ updated: T1 }); local.profile.experience = [{ title: "Old job" }];
+  local.settings.profile_synced_hash = S.hashOf(S.syncedSubset(local));
+  Object.assign(local.settings, { resume_details_ready: false, resume_import: { plan: [] }, profile_updated_at: T2 });
+  local.profile.experience = [{ title: "New job" }];
+  assert.equal(local.settings.onboarded, true, "a replacement no longer unfinishes the Deep Dive");
+  assert.equal(autoApplyReady(local), false, "Auto-Apply is paused by its own flag instead");
+  assert.equal(S.decide(local, server(old, T1)), "push");
+  // A store a PR #94 build left with onboarded=false still counts as finished: deep_dive_at says it was.
+  const unfinished = structuredClone(local); unfinished.settings.onboarded = false;
+  assert.equal(S.decide(unfinished, server(old, T1)), "push");
+  // Through a real pull: the newer local copy goes up and nothing comes back down.
+  reset(local);
+  let put = null;
+  routes = { "GET /profile": () => [200, server(old, T1)], "PUT /profile": (body) => { put = body; return [200, { updated: T2 }]; } };
+  assert.equal((await S.syncNow()).state, "pushed");
+  const after = await loadStore();
+  assert.deepEqual(after.profile.experience, [{ title: "New job" }]);
+  assert.deepEqual(put.profile.experience, [{ title: "New job" }]);
+  assert.equal(after.settings.resume_details_ready, false);
+  assert.equal(autoApplyReady(after), false, "still paused until the review is saved");
+  // A copy that really is newer (another computer) still wins, and the pause here stays on.
+  const elsewhere = filled(); elsewhere.profile.goals.career = "Edited on the laptop";
+  const restored = structuredClone(local);
+  assert.equal(S.decide(restored, server(elsewhere, T3)), "restore");
+  S.applyServer(restored, server(elsewhere, T3).profile, T3);
+  assert.equal(restored.settings.onboarded, true);
+  assert.equal(autoApplyReady(restored), false);
+});
+
+test("a restore keeps where this device's self-identification answers came from", async () => {
+  const { confirmedFacts } = await import("../lib/store.js");
+  const { applyInterviewFacts } = await import("../onboarding/profile.js");
+  const local = filled();
+  Object.assign(local.profile.facts, { race: "Decline to self-identify", veteran: "I don't wish to answer" });
+  applyInterviewFacts(local.profile, { race: "Asian", veteran: "I am a protected veteran" });
+  const server = S.toServer(S.syncedSubset(filled()));
+  assert.ok(!JSON.stringify(server).includes("protected veteran"));
+  S.applyServer(local, server, T2);
+  assert.equal(local.profile.facts.race, "Asian", "the suggestion is still there to review");
+  assert.equal(local.profile.sources.facts.race.source, "interview");
+  // was: the record was dropped, and an unrecorded answer counts as the student's own.
+  assert.equal(confirmedFacts(local).race, "Decline to self-identify");
+  assert.equal(confirmedFacts(local).veteran, "I don't wish to answer");
 });
 
 test("only real local edits are noticed", () => {

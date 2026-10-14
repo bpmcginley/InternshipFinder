@@ -1,7 +1,7 @@
 // Service worker entry: message router, scheduler (max N tabs), notifications, submit detection.
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile } from "./queue.js";
 import { runJob, resumeJob, isRunning, stopJob, takeBack, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
-import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
+import { loadStore, updateStore, hasKey, isWorker, confirmedFacts, resumeReviewPending, DASHBOARD_FACTS } from "../lib/store.js";
 import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
@@ -173,7 +173,8 @@ async function handle(m, sender, fromPage) {
     }
     case "enqueue": {
       const s = await loadStore();
-      if (!s.settings.onboarded || !hasKey(s)) { await openDeepDive(); return { error: "setup_required" }; }
+      // A replaced resume waiting to be reviewed pauses Auto-Apply too (agent.js checks again when a job runs).
+      if (!s.settings.onboarded || !hasKey(s) || resumeReviewPending(s)) { await openDeepDive(); return { error: "setup_required" }; }
       let jobs = Array.isArray(m.jobs) ? m.jobs.slice(0, 100) : [];
       if (fromPage) jobs = jobs.map(({ tabId, ...j }) => j); // web pages may not point the agent at an existing tab
       const r = await addJobs(jobs);
@@ -184,7 +185,7 @@ async function handle(m, sender, fromPage) {
       return { queue: publicQueue(await getQueue()) };
     case "get_profile_summary": {
       // Only what the dashboard needs to say "you have this skill" / "you may not be eligible".
-      const s = await loadStore(), p = s.profile, edu = p.education[0] || {};
+      const s = await loadStore(), p = s.profile, edu = p.education[0] || {}, f = confirmedFacts(s);
       const text = [
         [...p.skills.technical, ...p.skills.tools, ...p.skills.soft].join(", "),
         ...p.experience.map((e) => [e.title, ...(e.bullets || [])].join(". ")),
@@ -194,7 +195,8 @@ async function handle(m, sender, fromPage) {
       ].join("\n");
       const year = String(edu.end || edu.grad_term || "").match(/20\d\d/);
       return { skills_text: text.slice(0, 30000), grad_year: year ? +year[0] : null, gpa: parseFloat(edu.gpa) || null,
-        citizenship: p.facts.citizenship || "", needs_sponsorship: /^y/i.test(p.facts.needs_sponsorship || ""), degree: edu.degree || "" };
+        // Confirmed answers only, as on application forms. was: p.facts, interview suggestions included.
+        citizenship: f.citizenship || "", needs_sponsorship: /^y/i.test(f.needs_sponsorship || ""), degree: edu.degree || "" };
     }
     case "profile:set": {
       const p = cleanProfile(m.profile);
@@ -202,6 +204,10 @@ async function handle(m, sender, fromPage) {
       await updateStore((s) => {
         s.dashboard_profile = p;
         Object.assign(s.profile.facts, { majors: p.majors.join(", "), class_year: p.class_year, grad_term: p.grad_term });
+        // The student picked these on the dashboard, so they count as confirmed (store.js factConfirmed).
+        s.profile.sources ||= { facts: {}, sections: {} };
+        s.profile.sources.facts ||= {};
+        for (const k of DASHBOARD_FACTS) s.profile.sources.facts[k] = { source: "dashboard", value: s.profile.facts[k] };
       });
       return { ok: true };
     }
