@@ -3676,14 +3676,24 @@ def held_paths(listing: str) -> frozenset[str]:
 
 def main(argv: list[str]) -> None:
     """python -m internscout.seo_pages SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
+    [--placements-report PATH]
 
     --placements PATH (2026-10-14): the Worker's GET /placements answer, which the pages workflow
     fetches only when the repo variable INTERNSCOUT_PLACEMENTS_URL is set and otherwise writes as
     {"placements":[]}. With it, the build writes <site_dir>/data/placements.json (an empty list when the
     file is missing or malformed), prints a ::warning:: for each placement it drops, and adds the boxes.
-    Without it, nothing about placements is written or changed."""
+    Without it, nothing about placements is written or changed.
+
+    --placements-report PATH (2026-10-14), with --placements: also writes PATH, the build's report for
+    placements.record_runs (placements.report: the UTC day, the ids kept and the ids dropped with their
+    reasons). The pages workflow writes it outside the site, so it is never published."""
     argv = list(argv)
     placements_path = None
+    report_path = None
+    if "--placements-report" in argv:
+        i = argv.index("--placements-report")
+        report_path = argv[i + 1] if i + 1 < len(argv) else ""
+        del argv[i:i + 2]
     if "--placements" in argv:
         i = argv.index("--placements")
         placements_path = argv[i + 1] if i + 1 < len(argv) else ""
@@ -3701,6 +3711,14 @@ def main(argv: list[str]) -> None:
         for line in placements.warnings(kept, dropped):
             print(line)
         write_placements(site_dir, kept, today)
+        if report_path:
+            # Only a record for refunds: a report that cannot be written never stops the build.
+            try:
+                with open(report_path, "w", encoding="utf-8", newline="\n") as f:
+                    json.dump(placements.report(kept, dropped, today), f, separators=(",", ":"))
+                    f.write("\n")
+            except OSError:
+                print("::warning::placements report not written")
         pages = add_paid_boxes(pages, kept, today)
         print(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
     write(site_dir, pages)
