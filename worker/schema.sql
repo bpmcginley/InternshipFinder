@@ -253,7 +253,9 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- What employers sent through the interest form on internscout.org/employers/ (added 2026-10-13;
 -- src/leads.js). The one table here that holds names and email addresses: they are a recruiter's own
 -- work contact details, typed in to be contacted about InternScout for employers, and used for nothing
--- else. `wants` is a comma list of featured, promoted, majors_schools and other. No IP address is kept:
+-- else. `wants` is a comma list of placement, board, details and other (the form's
+-- boxes since 2026-10-14); rows from before then may hold featured, promoted or majors_schools, which
+-- are still accepted from a cached page but no longer offered. No IP address is kept:
 -- the per-address daily limit counts in `rate` under a salted hash, swept by the daily cron. Rows older
 -- than a year are deleted by the daily cron (leads.js dropOldLeads; docs/privacy.html#employers).
 -- Read with: npx wrangler d1 execute internscout --remote --command "SELECT * FROM employer_leads ORDER BY created DESC"
@@ -270,6 +272,59 @@ CREATE TABLE IF NOT EXISTS employer_leads (
 );
 
 CREATE INDEX IF NOT EXISTS employer_leads_created ON employer_leads (created);
+
+-- Paid listings (added 2026-10-14; src/placements.js). One row per placement Bruce agreed with an
+-- employer: which listing, which days, and its status. It names a listing by the id the pipeline gives
+-- it (backend normalize.listing_id) and never adds anything to the listing, so no score, order, filter or
+-- count can read it. No student data, and no recruiter name or email: `lead_id` points back to the
+-- employer_leads row it started from, which keeps its own one-year deletion (so it is not a foreign key:
+-- a placement record has to outlive its lead for accounts and refunds). `paid_ref` ("pilot" or Bruce's
+-- invoice number) and `note` are private: GET /placements never returns them. There is no price column;
+-- the amount is on Bruce's own invoice and `paid_ref` only finds it.
+-- Dates are UTC days, start inclusive and end exclusive. A placement shows only while status = 'on'
+-- and start_day <= today < end_day; the daily cron sets status 'ended' once end_day has passed.
+-- page_cap is held at 1 by its CHECK: raising it needs a migration PR, on purpose.
+-- Read with: npx wrangler d1 execute internscout --remote --command "SELECT * FROM placements ORDER BY start_day DESC"
+CREATE TABLE IF NOT EXISTS placements (
+  id TEXT PRIMARY KEY,                       -- "p-2026-11-acme-1": public, in /data/placements.json
+  lead_id INTEGER,                           -- employer_leads.id, or NULL (by email); not a foreign key
+  employer TEXT NOT NULL,                    -- as the listing names it; public
+  listing_id TEXT NOT NULL CHECK (length(listing_id) = 16 AND listing_id NOT GLOB '*[^0-9a-f]*'),
+  apply_url TEXT NOT NULL CHECK (apply_url LIKE 'https://%'),
+  start_day TEXT NOT NULL CHECK (start_day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  end_day TEXT NOT NULL CHECK (end_day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND end_day > start_day),
+  page_cap INTEGER NOT NULL DEFAULT 1 CHECK (page_cap = 1),   -- placement boxes per page; 1 at launch
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'checked', 'on', 'paused', 'ended', 'refused')),
+  checks TEXT NOT NULL DEFAULT '',           -- comma list of sponsor checks done (src/placements.js CHECKS)
+  checked_day TEXT,                          -- when they were done
+  unpaid_ok INTEGER NOT NULL DEFAULT 0 CHECK (unpaid_ok IN (0, 1)),  -- 1 only for a nonprofit or government role Bruce confirmed
+  paid_ref TEXT NOT NULL DEFAULT '',         -- private: "pilot" or an invoice number; never public
+  note TEXT NOT NULL DEFAULT '',             -- private
+  ended_reason TEXT NOT NULL DEFAULT '',     -- dates, role_closed, listing_gone, removed, refunded
+  created TEXT NOT NULL,
+  created_by TEXT NOT NULL,                  -- a short label Bruce passes ("bruce"), never an email
+  updated TEXT NOT NULL,
+  updated_by TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS placements_live ON placements (status, end_day);
+
+-- Every change to a placement, written in the same batch as the change itself, so the history can be
+-- read back ("who switched this on, when, and what did it say before"). `before` and `after` are the
+-- row as JSON; `reason` is what Bruce gave for a pause, end or refusal. Kept as long as the placement row.
+CREATE TABLE IF NOT EXISTS placement_log (
+  id INTEGER PRIMARY KEY,
+  placement TEXT NOT NULL,
+  at TEXT NOT NULL,
+  by TEXT NOT NULL,
+  action TEXT NOT NULL,                      -- create, update, check, on, pause, end, refuse, cron_end
+  reason TEXT NOT NULL DEFAULT '',
+  before TEXT,
+  after TEXT
+);
+
+CREATE INDEX IF NOT EXISTS placement_log_placement ON placement_log (placement, at);
 
 -- Backfills. `npm run deploy` runs this file before every `wrangler deploy`, so both are written to be
 -- repeated: each only ever adds a missing row or moves a value the safe way (a first-seen date

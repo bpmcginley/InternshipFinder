@@ -1,6 +1,7 @@
 // Employer interest (added 2026-10-13): the form on internscout.org/employers/ asks whether a company
-// would want featured listings or promoted roles, before any such thing is built. This stores what was
-// sent so Bruce can read it and write back. Nothing is sold here and no price is taken.
+// would want a clearly labelled paid listing, before any such thing is built, and takes free requests
+// to add a job board or correct a company's details. This stores what was sent so Bruce can read it and
+// write back. Nothing is sold here and no price is taken.
 //
 // Kept: what the person typed (name, work email, company and the optional fields), when, and nothing
 // else. No IP address goes in the row. To stop a script from filling the table, sends are counted per
@@ -17,7 +18,14 @@ export const MAX_LEAD_BYTES = 8_000;
 // Per field, in characters after trimming. The form's maxlength attributes say the same.
 export const LIMITS = { name: 100, email: 254, company: 120, title: 100, hiring_for: 300, message: 2000 };
 // The checkboxes on the form. Anything else is dropped rather than refused, so a stale page still sends.
-export const WANTS = ["featured", "promoted", "majors_schools", "other"];
+// The form's boxes since 2026-10-14: placement (a paid listing for one open role; it shows wherever the
+// role already matches a student's search, so there is nothing to target), board and details (free: add a job board, correct a company's details) and
+// other. featured, promoted and majors_schools were the first form's boxes. They are no longer offered,
+// because promoted roles and reaching chosen majors or schools are things a placement never does, but
+// they are still accepted so a page cached from before the change still sends, and stored rows read the same.
+export const WANTS_NOW = ["placement", "board", "details", "other"];
+export const WANTS_OLD = ["featured", "promoted", "majors_schools"];
+export const WANTS = [...WANTS_OLD, ...WANTS_NOW];
 export const PER_ADDRESS_PER_DAY = 5;
 // Across everyone. Real interest will be a handful a week; this only bounds a flood from many addresses.
 export const ALL_PER_DAY = 100;

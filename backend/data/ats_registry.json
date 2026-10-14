@@ -2564,10 +2564,12 @@
    "sector": "nonprofit"
   },
   "acluinternships": {
-   "name": "ACLU Kentucky",
+   "name": "ACLU",
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+,
+   "sector": "nonprofit"
   },
   "acumen": {
    "name": "Acumen",
@@ -5592,8 +5594,7 @@
    "name": "Robinhood",
    "quant": false,
    "fails": 0,
-   "added": "2026-09-13",
-   "sector": "nonprofit"
+   "added": "2026-09-13"
   },
   "roblox": {
    "name": "Roblox",

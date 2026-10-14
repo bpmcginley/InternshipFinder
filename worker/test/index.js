@@ -12,3 +12,5 @@ import "./profile.test.js";
 import "./visits.test.js";
 import "./clock.test.js";
 import "./leads.test.js";
+import "./placements.test.js";
+import "./placement-script.test.js";
