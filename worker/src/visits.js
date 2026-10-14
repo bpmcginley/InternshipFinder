@@ -83,8 +83,9 @@ export const DAY_CAP = 50_000;            // views counted per day; past it, a f
 
 // Paid listings (S9, added 2026-10-14; docs/js/count.js). A box shown or its posting opened, per placement.
 // The id must look like one the Worker makes, and the row is only added for a placement that is on today
-// (countPlacementHit), so a made-up id adds nothing. Under its own daily cap, so forged hits can neither
-// crowd out the visit counts nor run up this table.
+// (countPlacementHit), so a made-up id adds nothing. Under its own daily cap per placement, so forged hits
+// can neither crowd out the visit counts nor run up this table, and a flood on one employer's listing
+// can't stop the others being counted. was: one cap shared by every placement (legal review 2026-10-14).
 export const PLACEMENT_EVENTS = new Set(["shown", "open"]);
 const PLACEMENT_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const PLACEMENT_PAGES = new Set(["dashboard", "landing"]);
@@ -155,7 +156,7 @@ async function countPlacementHit(db, day, placement, event, page) {
   const res = await db.prepare(
     "INSERT INTO placement_counts (day, placement, page, event, n) SELECT ?1, ?2, ?3, ?4, 1 " +
     "WHERE EXISTS (SELECT 1 FROM placements WHERE id = ?2 AND status = 'on' AND start_day <= ?1 AND end_day > ?1) " +
-    "AND (SELECT COALESCE(SUM(n), 0) FROM placement_counts WHERE day = ?1) < ?5 " +
+    "AND (SELECT COALESCE(SUM(n), 0) FROM placement_counts WHERE day = ?1 AND placement = ?2) < ?5 " +
     "ON CONFLICT(day, placement, page, event) DO UPDATE SET n = n + 1",
   ).bind(day, placement, page, event, PLACEMENT_DAY_CAP).run();
   return res.meta.changes > 0;

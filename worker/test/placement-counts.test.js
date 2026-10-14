@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CHECKS, COUNT_DAYS, REPORT_MIN, roundedCount, rollupPlacementCounts } from "../src/placements.js";
-import { PLACEMENT_EVENTS } from "../src/visits.js";
+import { PLACEMENT_DAY_CAP, PLACEMENT_EVENTS } from "../src/visits.js";
 import { setup } from "./helpers.js";
 
 const ADMIN = "admin-test-token";
@@ -73,6 +73,25 @@ test("POST /hit adds nothing for a made-up, draft, paused, ended or future place
   w.setNow(new Date("2026-10-14T08:00:00Z"));
   await w.hit({ s: live.id, e: "shown", p: "/" });
   assert.deepEqual(w.counts(), []);
+});
+
+test("the daily cap is per placement: a flood on one employer's listing doesn't stop another being counted", async () => {
+  // Legal review 2026-10-14: was one cap summed over every placement for the day.
+  const w = await world();
+  const a = await w.make({ employer: "Flooded Co" });
+  const b = await w.make({ employer: "Other Co" });
+  await w.db.prepare("INSERT INTO placement_counts (day, placement, page, event, n) VALUES (?, ?, 'dashboard', 'shown', ?)")
+    .bind("2026-09-14", a.id, PLACEMENT_DAY_CAP).run();
+  await w.hit({ s: a.id, e: "shown", p: "/" });
+  await w.hit({ s: a.id, e: "open", p: "/" });
+  await w.hit({ s: b.id, e: "shown", p: "/" });
+  await w.hit({ s: b.id, e: "open", p: "/" });
+  assert.deepEqual(w.counts().filter((r) => r.placement === a.id).map((r) => [r.event, r.n]), [["shown", PLACEMENT_DAY_CAP]]);
+  assert.deepEqual(w.counts().filter((r) => r.placement === b.id).map((r) => [r.event, r.n]), [["open", 1], ["shown", 1]]);
+  // The next day the flooded one counts again.
+  w.setNow(new Date("2026-09-15T08:00:00Z"));
+  await w.hit({ s: a.id, e: "shown", p: "/" });
+  assert.equal(w.counts().find((r) => r.placement === a.id && r.day === "2026-09-15").n, 1);
 });
 
 test("the report: ended months only, rounded down to 10, fewer than 10 below that, no split unless every cell is 10+", async () => {

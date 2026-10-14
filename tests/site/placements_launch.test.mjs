@@ -74,10 +74,27 @@ test("terms: an employer section, and the screening line says what a paid listin
   for (const want of [/headed "Paid listing", with "Ad" before your company name/, /at most one paid listing on a page/,
     /doesn't change where any of your listings, or anyone else's, rank, how they are scored, which filters they pass/,
     /isn't aimed at students by profile, school, major, age or any other trait/, /Paying never adds a listing/,
-    /We don't promise views, clicks or applicants/, /rounded down to the nearest 10/, /unused days back as credit or a refund/,
-    /stay free whether or not you buy a paid listing/]) assert.match(emp, want);
+    /We don't promise views, clicks or applicants/, /rounded down to the nearest 10/,
+    /stay free whether or not you buy a paid listing/,
+    // Legal review 2026-10-14: acceptance, B2B clauses, hiding, count caveat, who picks credit or refund.
+    /when you pay our invoice or, for a free pilot, when you confirm its start date with us in writing/,
+    /Your promises\. You promise that the role and its posting are real, accurate and lawful, including the laws on pay transparency/,
+    /wages and hours, child labor \(no hazardous work for anyone under 18/, /non-discrimination/,
+    /Your name\. You let us show your company's name/,
+    /Claims about your posting\. You will defend InternScout/,
+    /limited to what you paid us for them in the 12 months before the claim/,
+    /A student can turn paid listings off, and a student's own saved profile can hide yours/,
+    /can include the same person more than once and automated traffic our filters miss/,
+    /You choose whether that is credit toward another paid listing or a refund/]) assert.match(emp, want);
+  assert.doesNotMatch(emp, /we check that[^.]*pay range/, "pay range is the employer's promise, not our check");
   const v = words(visible(TERMS));
-  assert.match(v, /We don't screen employers, except that a paid listing has to be a real, open role/);
+  assert.match(v, /We don't screen employers\. Before a paid listing goes live, we check that it is an open role we already list/);
+  assert.match(v, /we can't guarantee that every posting is legitimate/);
+  assert.doesNotMatch(v, /except that a paid listing has to be a real, open role/);
+  assert.match(v, /An employer that buys a paid listing agrees to them/);
+  const priv = words(visible(PRIVACY));
+  assert.match(priv, /it paid, or it is trying paid listings in a free pilot/);
+  assert.doesNotMatch(priv, /It means an employer paid InternScout/);
   assert.match(v, /A paid listing is an ad, not a recommendation/);
 });
 
