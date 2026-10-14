@@ -179,7 +179,7 @@ test("GET /session says whose a live session is (no email), and refuses anything
   const s = await start(w);
   let res = await w.api("GET", "/session", { token: s.session });
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { account: s.account, provider: "google", tier: "edu", expires: s.expires });
+  assert.deepEqual(await res.json(), { account: s.account, provider: "google", tier: "edu", expires: s.expires, copyable: true });
   // A use on a later day slides the year forward, and the reply says so.
   const later = new Date("2026-09-20T08:00:00Z");
   w.setNow(later);
@@ -238,6 +238,8 @@ test("POST /session/copy: once per session, never from a copy, and only from a l
     assert.equal((await res.json()).error, "auth");
   }
   assert.equal(rows(w).length, 2, "only the one copy was made");
+  // GET /session says so, for both, so the extension stops offering a sign-in that can't be passed on.
+  for (const token of [dash.session, ext.session]) assert.equal((await (await w.api("GET", "/session", { token })).json()).copyable, false);
   // Two at once still make one.
   const d2 = await start(w);
   const both = await Promise.all([copy(w, d2.session), copy(w, d2.session)]);

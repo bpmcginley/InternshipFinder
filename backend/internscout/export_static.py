@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 import os
+import re
+from urllib.parse import parse_qs, urlsplit
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -362,6 +364,48 @@ def mark_new(listings: list[dict], today=None) -> None:
                        and (not x.get("posted_at") or _seen_within(x["posted_at"], today, 2 * NEW_DAYS)))
 
 
+# Hosts whose first path segment names the employer's board: boards.greenhouse.io/point72,
+# jobs.lever.co/sambatv, jobs.ashbyhq.com/brainco, a Workday tenant's /<site>/. Everywhere else the
+# host itself is the board (careers-nrdc.icims.com, eaton.eightfold.ai, an employer's own site).
+# Workable is left out: one board's links come both as /mindex/j/... and as /j/....
+_PATH_BOARD_HOSTS = {"greenhouse.io", "jobs.lever.co", "jobs.ashbyhq.com", "jobs.jobvite.com",
+                     "ats.rippling.com", "jobs.smartrecruiters.com"}
+# Workday's locale prefix (/en-US/, /fr-CA/). Only the two-part form: two-letter sites exist (KLA's /UR/, /JJ/).
+_LOCALE = re.compile(r"^[a-z]{2}-[a-z]{2}$", re.I)
+
+
+def board_of(x: dict) -> tuple:
+    """Which board a listing came from: (ats, company, board read from its apply URL).
+
+    was (until 2026-10-14): (ats, company name), so an employer with two boards on one ATS (AIG's
+    two Workday sites, Astera Labs) counted as one, and when one of them failed while the other
+    answered, the failed board's listings could drop (release checks for 0.5.7). The company stays
+    in the key, so a board is never merged with another employer's, only told apart from the same
+    employer's other boards. URL spellings of the same board are folded together (boards. and
+    job-boards.greenhouse.io and its embed form, Workday's wd1/wd5 hosts and locale prefix), since a
+    board read as new would look like the old one collapsed and its rows would come back twice.
+    """
+    try:
+        u = urlsplit(x.get("apply_url") or "")
+    except ValueError:
+        return (x.get("ats"), x.get("company_name"), "")
+    host = (u.hostname or "").lower()
+    segs = [p for p in u.path.split("/") if p]
+    if host.endswith(".myworkdayjobs.com"):
+        host = host.split(".")[0] + ".myworkdayjobs.com"
+        if segs and _LOCALE.match(segs[0]):
+            segs = segs[1:]
+        token = segs[0].lower() if segs else ""
+    elif host in ("boards.greenhouse.io", "job-boards.greenhouse.io"):
+        host = "greenhouse.io"
+        token = ((parse_qs(u.query).get("for") or [""])[0] if segs[:1] == ["embed"] else (segs[0] if segs else "")).lower()
+    elif host in _PATH_BOARD_HOSTS:
+        token = segs[0].lower() if segs else ""
+    else:
+        token = ""
+    return (x.get("ats"), x.get("company_name"), f"{host}/{token}")
+
+
 def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
     """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
 
@@ -387,10 +431,7 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
 
-    def board(x):
-        return (x.get("ats"), x.get("company_name"))
-
-    now_open = Counter(board(x) for x in listings if x.get("status") == "open")
+    now_open = Counter(board_of(x) for x in listings if x.get("status") == "open")
     was_open: dict[tuple, list[dict]] = defaultdict(list)
     for it in prev:
         if it.get("status") == "open" and it.get("ats") and it.get("company_name"):
@@ -402,7 +443,7 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
             stage = merged_stages(it.get("stage"), it.get("title") or "")
             if not stage:
                 continue
-            was_open[board(it)].append({**it, "stage": stage})
+            was_open[board_of(it)].append({**it, "stage": stage})
 
     held = 0
     for key, rows in was_open.items():

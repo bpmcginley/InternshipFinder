@@ -301,13 +301,17 @@ export function offeredRecord(token, data, now = Date.now()) {
     tier: ["edu", "general"].includes(data.tier) ? data.tier : null, expires: new Date(exp).toISOString() };
 }
 
-// Asks the Worker whether `token` is a live session. The record, or null (not one, signed out, an older
-// Worker without GET /session, or no answer).
+// Asks the Worker whether `token` is a live session that can still be passed on. The record, or null (not
+// one, signed out, already copied once, an older Worker without GET /session, or no answer). A Worker
+// from before copyable (2026-10-14 review) sends none, which counts as yes.
+// was: live sessions only, so a dashboard sign-in already used once kept being offered and always failed.
 export async function checkSession(token, fetchImpl = fetch, now = Date.now()) {
   if (!offerTokenOk(token)) return null;
   const res = await fetchImpl(`${WORKER_URL}/session`, { headers: { authorization: `Bearer ${token}` }, signal: quick() }).catch(() => null);
   if (!res || res.status !== 200) return null;
-  return offeredRecord(token, await res.json().catch(() => null), now);
+  const data = await res.json().catch(() => null);
+  if (data && data.copyable === false) return null;
+  return offeredRecord(token, data, now);
 }
 
 // POST /session/copy: a new session for the same account, made from `token` (2026-10-14 review). The
