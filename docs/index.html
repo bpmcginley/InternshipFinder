@@ -86,12 +86,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet"/>
 <style>
+  /* Fallback faces sized like the web fonts (2026-10-14). Until IBM Plex Sans and Source Serif 4 arrive
+     the page draws in Arial and Georgia; Georgia is about 25% wider than Source Serif, so the headline
+     took an extra line and dropped to fewer when the font swapped in, moving everything under it
+     (Lighthouse's largest layout shift on a phone). size-adjust is the measured width ratio (the serif's at
+     26px, the headline's size, since its optical sizing narrows it as it grows), and the overrides give
+     the web font's line height (Plex 1025 up and 275 down per 1000, Source Serif 1036 and 335), divided by it. */
+  @font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:400;size-adjust:100.1%;ascent-override:102.4%;descent-override:27.5%;line-gap-override:0%}
+  @font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:500;size-adjust:102.1%;ascent-override:100.4%;descent-override:26.9%;line-gap-override:0%}
+  @font-face{font-family:"Plex Fallback";src:local("Arial Bold"),local("Arial-BoldMT"),local("Helvetica Neue Bold"),local("Helvetica Bold"),local("Roboto Bold");font-weight:600 700;size-adjust:97.2%;ascent-override:105.5%;descent-override:28.3%;line-gap-override:0%}
+  @font-face{font-family:"Serif Fallback";src:local("Georgia Bold"),local("Georgia-Bold");font-weight:600 700;size-adjust:86%;ascent-override:120.5%;descent-override:39%;line-gap-override:0%}
   :root{
     --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
     /* ink3 is the small grey text: column headers, dates, counts. It was #868b92, which is 3.2:1
        on this paper and fails WCAG AA for text under 18px; #646a73 is 5.0:1. */
     --ink:#17191c; --ink2:#454a52; --ink3:#646a73;
     --rule:#e2ded4; --rule2:#ece9e1;
+    /* field-border (2026-10-14) outlines the things a student types in or picks from. --rule is 1.2:1
+       against the page, under the 3:1 WCAG 1.4.11 asks of a control's edge; this is 3.4:1 on paper,
+       3.7:1 on panel and 3.2:1 on sunk. --rule stays for dividers. */
+    --field-border:#80858c;
     --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8;
     /* accent-hover is the primary button's hover: a real colour step instead of filter:brightness().
        amber was #9a6412 and green #1f7a4d: 4.26:1 and 4.47:1 on their own tinted badges (.count, the
@@ -99,8 +113,9 @@
        These are 5.0:1 and 4.78:1 at the worst pairing. */
     --accent-hover:#164a38;
     --blue:#2b5aa0; --amber:#8c5a0f; --amber-soft:#f6ecd9; --green:#1d7549; --red:#a8362c;
-    --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
-    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    /* was: "Source Serif 4",Georgia,... and "IBM Plex Sans",system-ui,...; the fallbacks are above. */
+    --serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;
+    --sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
     /* One spacing scale for the page's sections, gaps and paddings (was: 14, 18, 20, 26, 28, 30 and
        40px side by side). Small in-control paddings stay as they were. */
@@ -114,6 +129,7 @@
     --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
     --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e;
     --rule:#2c2d31; --rule2:#232427;
+    --field-border:#6e7077; /* 3.7:1 on paper, 3.5:1 on panel, 3.1:1 on sunk */
     --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24; --accent-hover:#95d2b3;
     --blue:#8fb2e8; --amber:#e0b25e; --amber-soft:#2e2717; --green:#7cc3a1; --red:#e48a80;
     color-scheme:dark;
@@ -124,6 +140,9 @@
   button,input,select{font-family:var(--sans)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .wrap{max-width:1320px;margin:0 auto;padding:0 28px}
+  /* At least a screen tall from the first paint (2026-10-14), so the browse section under it starts below
+     the fold and React filling it in doesn't push anything a student can see (it was a 0.22 layout shift). */
+  #root{min-height:100vh}
 
   /* was: align-items:flex-end, with every control in .top-r. The header now holds the everyday
      actions only; account details are in the Account menu (.acct below). */
@@ -144,7 +163,9 @@
   .sub{color:var(--ink2);margin-top:8px;font-size:14px}
   .sub a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
   .sub a:hover{text-decoration-color:var(--ink)}
-  .sub button{all:unset;cursor:pointer;color:var(--accent);font-weight:500}
+  .sub button,.sub a.how{all:unset;cursor:pointer;color:var(--accent);font-weight:500}
+  /* all:unset took the focus ring with it (the "How it works" button showed none). */
+  .sub button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
   .sub button:hover{text-decoration:underline;text-underline-offset:3px}
   .top-r{margin-left:auto;display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;justify-content:flex-end}
 
@@ -270,14 +291,14 @@
   .said .who{color:var(--ink3);font-size:13px;margin:4px 0 8px}
   /* The invite panel: the student's link, selectable, beside a Share or Copy button. */
   .invite-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
-  .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
+  .invite-row input{flex:1 1 260px;min-width:0;height:34px;padding:0 10px;border:1px solid var(--field-border);border-radius:6px;background:var(--paper);color:var(--ink);font:13px var(--mono)}
   /* The weekly email sign-up under the list: the profile's fields as checkboxes, then one row of
      label, email box and button. Quiet on purpose, so it never competes with the listings. */
   .digest fieldset{margin:10px 0 0}
   .digest legend{font-weight:500;font-size:13px;color:var(--ink)}
   .digest-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
   .digest-row label{font-weight:500;color:var(--ink)}
-  .digest-row input[type=email]{flex:1 1 220px;min-width:0;max-width:340px;height:34px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font-size:14px}
+  .digest-row input[type=email]{flex:1 1 220px;min-width:0;max-width:340px;height:34px;padding:0 10px;border:1px solid var(--field-border);border-radius:6px;background:var(--paper);color:var(--ink);font-size:14px}
 
   /* filters: search, field, state and sort on the first row, everything else behind "More filters".
      Thirteen equal-looking dropdowns in one wrapping row was the single hardest thing to read on
@@ -287,7 +308,8 @@
   .filters.extra .field{background:var(--panel)}
   .filterbar-foot{display:flex;gap:var(--s2) var(--s4);flex-wrap:wrap;align-items:center;padding:var(--s3) 0 var(--s4);font-size:13px;color:var(--ink2)}
   .filterbar-foot .btn.quiet{padding:0 6px;height:28px;font-size:13px}
-  .field{position:relative;display:flex;align-items:center;min-height:36px;background:var(--panel);border:1px solid var(--rule);border-radius:6px;
+  /* was: border:1px solid var(--rule) */
+  .field{position:relative;display:flex;align-items:center;min-height:36px;background:var(--panel);border:1px solid var(--field-border);border-radius:6px;
     transition:color var(--t-fast) ease-out,background-color var(--t-fast) ease-out,border-color var(--t-fast) ease-out}
   .field:hover{border-color:var(--ink3)}
   /* The inputs inside a .field drop their own outline, so the box itself shows focus, in the same
@@ -308,7 +330,8 @@
   .morebtn .count{margin-left:2px}
   .spacer{flex:1}
 
-  .ms{min-width:160px;border-color:color-mix(in srgb,var(--ink3) 75%,var(--panel))}
+  /* was: border-color:color-mix(in srgb,var(--ink3) 75%,var(--panel)); .field's --field-border now */
+  .ms{min-width:160px}
   .ms .box{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 28px 4px 6px;width:100%;cursor:text}
   .ms input{flex:1;min-width:60px;height:24px;border:0;outline:none;background:transparent;color:var(--ink);font-size:13px;padding:0 4px}
   .ms:focus-within .box{outline:2px solid var(--accent);outline-offset:2px}
@@ -360,7 +383,7 @@
   .score .bar{width:34px;height:4px;background:var(--rule2);border-radius:2px;overflow:hidden}
   .score .bar i{display:block;height:100%;background:var(--ink3)}
   .score.hi .bar i{background:var(--green)} .score.mid .bar i{background:var(--amber)}
-  select.mine{font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:5px;height:28px;padding:0 4px;cursor:pointer}
+  select.mine{font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--field-border);border-radius:5px;height:28px;padding:0 4px;cursor:pointer}
   .st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:7px;color:var(--ink2);white-space:nowrap;cursor:default}
   .st::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink3)}
   .st.working::before{background:var(--blue)}
@@ -414,6 +437,22 @@
   .browse .n{color:var(--ink3);font-size:12px;margin-left:4px}
   .browse p{margin:var(--s2) 0 0}
   .empty{padding:72px 20px;text-align:center;color:var(--ink2)}
+  /* The empty list says what was searched and offers the way out (2026-10-14). */
+  .empty p{margin:0 auto;max-width:60ch}
+  .empty-actions{display:flex;gap:var(--s2);justify-content:center;flex-wrap:wrap;margin-top:var(--s4)}
+  /* A button that reads as a link, so it sits in a sentence without changing its line height. */
+  .linkbtn{all:unset;cursor:pointer;color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:3px}
+  .linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+  /* The first-visit line offering the setup card (2026-10-14), in place of the card itself. */
+  .setup-ask{display:flex;gap:var(--s2) var(--s3);align-items:center;flex-wrap:wrap;padding:var(--s2) var(--s3);font-size:13.5px}
+  @media (max-width:760px){.setup-ask span{order:3;flex-basis:100%}}
+  /* Skip links: out of sight until a keyboard reaches them. */
+  .skip{position:absolute;left:var(--s4);top:-80px;z-index:60;padding:8px 12px;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:6px;font-weight:500;text-decoration:none}
+  .skip:focus{top:var(--s2)}
+  .skip.inline:not(:focus){width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;padding:0;border:0}
+  .skip.inline:focus{position:static;display:inline-block;margin:0 0 var(--s2)}
+  #listings{scroll-margin-top:var(--s2)}
+  #listings:focus,#about:focus,#list-end:focus{outline:none}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   noscript p{max-width:640px;margin:40px auto;padding:0 20px;color:var(--ink2)}
   /* Motion, each tied to a change of state and never to scrolling. Content is visible at rest: these
@@ -438,6 +477,10 @@
   }
   @media (max-width:760px){
     .wrap{padding:0 16px}
+    .figures{padding:var(--s4) 0}
+    /* Three lines held for the coverage sentence, which grows when the scan time arrives and changes with
+       loading; without it the list under it moved (2026-10-14). */
+    .coverage{min-height:calc(3 * 1.6em)}
     .figrow{gap:var(--s4) var(--s5)}
     .fig .n{font-size:28px}
     .top-r{margin-left:0}
@@ -578,7 +621,9 @@
 <div class="wrap"><header class="top">
 <div class="brand"><a class="mark" href="/">InternScout</a><nav class="sitenav" aria-label="Site"><a href="internships/">Browse</a><a href="install.html?from=dashboard-nav">Auto-Apply (free)</a><a href="pricing/">Pricing</a><a href="compare/">Compare</a><a href="about/">About</a></nav></div>
 <div class="hero"><h1>Every student internship, co-op and research role, in one free search.</h1>
-<p class="sub">Stop checking ten job boards every morning. Every open role is here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada. Sign in is optional.</p>
+<!-- 2026-10-14: the same words app.js draws, so the paragraph React puts in its place is the same size and
+     isn't timed as the page's largest paint all over again. was: "... in the US and Canada. Sign in is optional." -->
+<p class="sub">Stop checking ten job boards every morning. Every open role is here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada. · <a class="how" href="about/">How it works</a></p>
 <div class="hero-actions"><a class="btn primary" href="internships/">Search internships free · no account</a><a class="btn" href="install.html?from=hero">Add Auto-Apply to Chrome · free</a></div></div>
 </header></div>
 </div>

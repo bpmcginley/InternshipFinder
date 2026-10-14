@@ -140,6 +140,31 @@
     if (p.remote) ks.push("remote", "US");
     return ks;
   };
+  // What the list covers (2026-10-14). was: the State filter's picks, else profileKeys(p), so with no
+  // profile (or a profile with no states) the dashboard held only the eight baseline states and remote,
+  // 3,086 of 14,799 open roles, under a hero offering to "Search 14,799 internships". No state picked
+  // now means every state; ALL_KEY is the State picker's "Everywhere". { all, keys, noRemote }: keys
+  // are the files to show when the scope is not everywhere.
+  const ALL_KEY = "all";
+  function viewScope(p, picked) {
+    if (picked && picked.includes(ALL_KEY)) return { all: true, keys: [], noRemote: false };
+    if (picked && picked.length) return { all: false, keys: picked.slice(), noRemote: false };
+    if (p && p.states && p.states.length) return { all: false, keys: profileKeys(p), noRemote: false };
+    // A profile with no states that turned "U.S. remote" off still leaves the remote files out.
+    return { all: true, keys: [], noRemote: !!(p && !p.remote) };
+  }
+  // With every state in scope, these files load first, so the first rows paint as fast as they did
+  // when they were all the page loaded; the rest follow once a search or filter needs them.
+  const FIRST_KEYS = [...BASELINE, "remote"];
+  // The files to load, in order: `first` (a place named in the search, then the first files or the
+  // scoped ones) and `rest` (the remaining states, only once `everything` is asked for).
+  function loadPlan(scope, indexKeys, queryKeys, everything) {
+    const uniq = a => [...new Set(a)];
+    if (!scope.all) return { first: uniq([...queryKeys, ...scope.keys]), rest: [] };
+    const all = (indexKeys || []).filter(k => !(scope.noRemote && (k === "remote" || k === "US")));
+    const first = uniq([...queryKeys, ...FIRST_KEYS.filter(k => all.includes(k))]);
+    return { first, rest: everything ? all.filter(k => !first.includes(k)) : [] };
+  }
   // was: every picked state. The Worker's /demand accepts US codes only until it is redeployed with the
   // provinces, and one code it refuses fails the whole save, so provinces stay on this device for now.
   // was: .filter(s => US_STATES[s]). The Worker accepts province codes since 2026-10-01; "Canada" (the
@@ -153,6 +178,138 @@
     const s = String(x.salary || "").trim(), nums = (s.match(/\d[\d,]*(?:\.\d+)?/g) || []).map(n => Number(n.replace(/,/g, "")));
     return s && (!nums.length || (nums[0] !== 0 && nums.some(n => n !== 0))) ? s : "";
   };
+  // ---------- search (moved here from app.js 2026-10-14, so it can be tested) ----------
+  // Every word must appear; -word excludes; "quoted phrase" matches as a phrase. Place names (states,
+  // provinces, "new england", "nyc", "remote") filter by location, and the words seen in a few
+  // listings' locations ("boston") match anything but the description.
+  const parseQuery = q => (q.match(/-?"[^"]+"|\S+/g) || []).map(t => { const neg = t.length > 1 && t[0] === "-"; return { t: (neg ? t.slice(1) : t).replace(/"/g, "").toLowerCase(), neg }; }).filter(x => x.t);
+  const PLACES = { "new england": { states: ["MA", "CT", "RI", "NH", "VT", "ME"] }, "nyc metro": { kind: "nyc_metro" }, "new york city": { kind: "nyc_metro" }, nyc: { kind: "nyc_metro" }, remote: { kind: "remote" } };
+  Object.entries(US_STATES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
+  Object.entries(CA_PROVINCES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
+  PLACES.canada = { states: CANADA_KEYS };
+  ["ma", "ct", "ri", "nh", "vt", "nj", "ny", "ca", "tx", "fl", "nv", "wa", "il", "ga", "nc", "az", "dc", "mi", "mn", "md", "pa", "va", "tn"].forEach(c => { PLACES[c] = { states: [c.toUpperCase()] }; });
+  const PLACE_KEYS = Object.keys(PLACES).sort((a, b) => b.length - a.length);
+  function splitPlaces(q) {
+    const places = []; let rest = " " + q + " ";
+    for (const k of PLACE_KEYS) {
+      const re = new RegExp(`\\s(-?)${k.replace(/[-.]/g, "\\$&")}(?=\\s)`, "gi");
+      rest = rest.replace(re, (m, neg) => { places.push({ ...PLACES[k], neg: !!neg }); return " "; });
+    }
+    return { rest, places };
+  }
+  // The data files a place in the search lives in (2026-10-14). was: none, so "nursing alabama" looked
+  // only through the files already loaded (the Northeast) and found nothing while 18 existed.
+  const PLACE_KIND_KEYS = { nyc_metro: ["NY", "NJ", "CT"], remote: ["remote"] };
+  const queryKeys = q => [...new Set(splitPlaces(q || "").places.filter(pl => !pl.neg).flatMap(pl => pl.states || PLACE_KIND_KEYS[pl.kind] || []))];
+  const placeHit = (x, pl) => pl.kind === "remote" ? isRemote(x) : regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state));
+  const NOT_PLACE = new Set(["new", "city", "north", "south", "east", "west", "park", "hill", "hills", "beach", "heights", "falls", "center", "village", "island", "lake", "port", "united", "states", "usa", "hybrid", "office", "onsite", "the", "and", "area", "metro", "county", "greater",
+    // words the boards put in a "location" that are not places
+    "home", "work", "from", "remote", "headquarters", "campus", "corporate", "global", "site", "main", "street", "plant", "laboratory", "lab", "hospital", "university", "college", "school", "medical", "health", "nursing", "research", "science", "technology", "building", "floor", "suite"]);
+  const locText = x => [...regs(x).map(g => g.loc), x.location_raw || ""].join(" \n ").toLowerCase();
+  // Words seen in at least three listings' locations ("boston", "austin").
+  function placeWords(rows) {
+    const seen = new Map();
+    for (const x of rows) new Set(locText(x).split(/[^a-z]+/)).forEach(t => { if (t.length >= 3 && !NOT_PLACE.has(t)) seen.set(t, (seen.get(t) || 0) + 1); });
+    const words = new Set(); seen.forEach((n, t) => { if (n >= 3) words.add(t); });
+    return words;
+  }
+
+  // Matching by word start, ranked by where a word matched (2026-10-14). was: each word a substring of
+  // one long text that included the description, and the list sorted by date alone, so "cs" matched
+  // 994 roles through "physics" and "analytics", "nurse" (28) and "nursing" (11) found different sets,
+  // and 7 of the top 20 for "software" had software in the title or field.
+  // Text is lowercased, accents and punctuation become spaces (c++ and c# keep theirs), and each part
+  // is padded with spaces so " word" finds a word start.
+  const norm = s => " " + String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9+#]+/g, " ").trim() + " ";
+  // Light stemming, so one word finds its other forms by prefix: nurse, nurses, nursing -> "nurs";
+  // engineering -> "engineer"; finance -> "financ" (financial); biology -> "biolog" (biological).
+  // Five letters or more, and never shorter than four ("sales" stays "sales").
+  function stem(t) {
+    if (t.length < 5 || /[^a-z]/.test(t)) return t;
+    const s = t.replace(/(?:ings?|ies|es|ed|(?<!s)s|e|y)$/, "");
+    return s.length >= 4 ? s : t;
+  }
+  // Short forms students type, also searched as what they stand for. "cs" includes the Software field
+  // (tag "swe"), which every computer science role carries.
+  const ALIASES = { cs: ["computer science", "swe"], swe: ["software engineer"], ml: ["machine learning"], ai: ["artificial intelligence"],
+    ux: ["user experience"], ui: ["user interface"], hr: ["human resources"], ee: ["electrical engineer"],
+    pm: ["product manag", "program manag", "project manag"], rn: ["registered nurse"], bsn: ["nursing"] };
+  // The " word" needles for one search word. `exact` is the word as typed, `loose` its stem or a looser
+  // prefix, which counts for less: "marketing" puts Marketing roles ahead of "Capital Markets", while
+  // "nurse" still finds Nursing. Two letters match only a whole word, so "cs" is no longer inside
+  // "physics"; three letters match a whole word or its plural first ("art", "arts") and a longer word
+  // only loosely ("artificial").
+  function needles(t) {
+    let exact, loose = [];
+    if (t.includes(" ")) exact = [" " + t];
+    else if (t.length <= 2) exact = [" " + t + " "];
+    else if (t.length === 3) { exact = [" " + t + " ", " " + t + "s "]; loose = [" " + t]; }
+    else { exact = [" " + t]; const st = stem(t); if (st !== t) loose = [" " + st]; }
+    for (const a of ALIASES[t] || []) exact.push(" " + a + (a.length <= 3 ? " " : ""));
+    return { exact, loose };
+  }
+  const hit = (s, ns) => { for (const n of ns) if (s.includes(n)) return true; return false; };
+  // A listing's searchable text, by part, kept beside the row (a WeakMap, so it goes with the row).
+  const SX = new WeakMap();
+  function sx(x) {
+    let s = SX.get(x);
+    if (!s) {
+      const tags = x.field_tags || [];
+      s = {
+        title: norm(x.title),
+        field: norm(tags.map(t => t + " " + fieldLabel(t)).join(" ")),
+        company: norm(x.company_name),
+        meta: norm([(x.stage || []).join(" "), (x.stage || []).map(st => STAGE_LABEL[st] || "").join(" "), x.sector, locText(x), (x.region_locations || []).join(" "),
+          x.state, x.term, x.ats, ((x.insights || {}).skills || []).map(k => k.name).join(" ")].filter(Boolean).join(" ")),
+        descSrc: null, desc: " ",
+      };
+      SX.set(x, s);
+    }
+    // The description arrives later, from a sidecar file (createStore().descs).
+    if (s.descSrc !== (x.description || "")) { s.descSrc = x.description || ""; s.desc = norm(s.descSrc); }
+    return s;
+  }
+  // Where a word matched, best first. A word as typed scores its part's weight; matched only by its
+  // stem, 3 less (never under 1). Matching in both the title and a field tag adds 1.
+  const PARTS = [["title", 10], ["field", 8], ["company", 6], ["meta", 4], ["desc", 2]];
+  function termScore(s, tm) {
+    let best = 0, title = false, field = false;
+    for (const [part, w] of PARTS) {
+      if (part === "desc" && (tm.place || best)) break;
+      const text = s[part];
+      const v = hit(text, tm.ns.exact) ? w : tm.ns.loose.length && hit(text, tm.ns.loose) ? Math.max(1, w - 3) : 0;
+      if (v) { if (part === "title") title = true; if (part === "field") field = true; if (v > best) best = v; }
+    }
+    return best ? best + (title && field ? 1 : 0) : 0;
+  }
+  // `words`: placeWords() of the loaded rows. Returns null for an empty search.
+  function compileQuery(q, words) {
+    if (!q || !q.trim()) return null;
+    const { places, rest } = splitPlaces(q);
+    const terms = parseQuery(rest).map(({ t, neg }) => {
+      const n = norm(t).trim();
+      return n ? { neg, place: !!(words && words.has(n)), ns: needles(n) } : null;
+    }).filter(Boolean);
+    return { places, terms };
+  }
+  // 0 when the listing doesn't match. Otherwise how well it does, higher first: 100 times the weakest
+  // word's score plus all of them, so a role with every word in its title beats one with a word only in
+  // the description. A search of place names only (or none) gives every match 1, so the sort decides.
+  function matchScore(x, cq) {
+    if (!cq) return 1;
+    for (const pl of cq.places) if (placeHit(x, pl) === pl.neg) return 0;
+    const s = cq.terms.length ? sx(x) : null;
+    let min = Infinity, sum = 0, any = false;
+    for (const tm of cq.terms) {
+      const v = termScore(s, tm);
+      if (tm.neg) { if (v) return 0; continue; }
+      if (!v) return 0;
+      if (tm.place) continue;
+      any = true; if (v < min) min = v; sum += v;
+    }
+    return any ? min * 100 + sum : 1;
+  }
+
   const applicationBatch = (list, max = 100) => {
     const unique = [...new Map(list.filter(x => x.apply_url).map(x => [String(x.id), x])).values()];
     return { batch: unique.slice(0, max), remaining: unique.slice(max) };
@@ -226,7 +383,7 @@
     return .2;
   }
 
-  // ctx = {p, direct, related, keys:Set}
+  // ctx = {p, direct, related, keys:Set, anywhere?}
   function score(x, ctx) {
     const p = ctx.p;
     const tags = x.field_tags || [];
@@ -244,7 +401,10 @@
 
     const ks = shardKeys(x);
     let location = .3;
-    for (const k of ks) {
+    // ctx.anywhere (2026-10-14): no states picked, so no place is preferred. was: the baseline states
+    // scored full marks and every other state .3, for a student who never chose the Northeast.
+    if (ctx.anywhere) location = 1;
+    else for (const k of ks) {
       if (k !== "remote" && k !== "US" && ctx.keys.has(k)) { location = 1; break; }
       if ((k === "remote" || k === "US") && ctx.keys.has(k)) location = Math.max(location, .8);
     }
@@ -397,6 +557,21 @@
       loadedKeys: () => [...loaded.keys()],
       base: () => base,
     };
+  }
+
+  // The major a landing page's "Rank these for your major" link stands for (?field=nursing), to prefill
+  // the setup card with (2026-10-14). A major page sends all of its tags (?field=mechanical,aerospace).
+  // The major whose tags are exactly those, else the one major led by the first tag, else one led by it
+  // whose name says the field ("Data" in "Statistics and Data Science"); null when it is a guess.
+  function majorForFields(fields, majorsData) {
+    const list = ((majorsData && majorsData.majors) || []).filter(m => m.tags && m.tags[0] === (fields || [])[0]);
+    if (!list.length) return null;
+    const same = list.find(m => m.tags.length === fields.length && m.tags.every(t => fields.includes(t)));
+    if (same) return same.name;
+    if (list.length === 1) return list[0].name;
+    const label = fieldLabel(fields[0]).toLowerCase();
+    const named = list.filter(m => m.level !== "grad" && m.name.toLowerCase().includes(label));
+    return named.length === 1 ? named[0].name : null;
   }
 
   async function loadMajors() {
@@ -825,7 +1000,8 @@
   window.IS = {
     C, DAY, US_STATES, CA_PROVINCES, CANADA_KEYS, isCanadaKey, inCanadaOnly, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
     fieldLabel, keyLabel, termText, ls, ss,
-    emptyProfile, loadProfile, saveProfile, profileKeys, demandStates,
+    emptyProfile, loadProfile, saveProfile, profileKeys, demandStates, ALL_KEY, viewScope, FIRST_KEYS, loadPlan,
+    parseQuery, splitPlaces, queryKeys, placeWords, stem, compileQuery, matchScore, majorForFields,
     regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
     // was: WEIGHTS, PART_LABEL, profileFields, score,
     // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the

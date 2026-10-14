@@ -45,29 +45,8 @@
     : C.extensionInstallUrl || "install.html";
 
   // ---------- search ----------
-  // Every word must appear; -word excludes; "quoted phrase" matches exactly. Place words (city or state
-  // names seen in a few listings' locations) match the location, company and title, not the description.
-  const parseQuery = q => (q.match(/-?"[^"]+"|\S+/g) || []).map(t => { const neg = t.length > 1 && t[0] === "-"; return { t: (neg ? t.slice(1) : t).replace(/"/g, "").toLowerCase(), neg }; }).filter(x => x.t);
-  const PLACES = { "new england": { states: ["MA", "CT", "RI", "NH", "VT", "ME"] }, "nyc metro": { kind: "nyc_metro" }, "new york city": { kind: "nyc_metro" }, nyc: { kind: "nyc_metro" }, remote: { kind: "remote" } };
-  Object.entries(IS.US_STATES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
-  Object.entries(IS.CA_PROVINCES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
-  PLACES.canada = { states: IS.CANADA_KEYS };
-  ["ma", "ct", "ri", "nh", "vt", "nj", "ny", "ca", "tx", "fl", "nv", "wa", "il", "ga", "nc", "az", "dc", "mi", "mn", "md", "pa", "va", "tn"].forEach(c => { PLACES[c] = { states: [c.toUpperCase()] }; });
-  const PLACE_KEYS = Object.keys(PLACES).sort((a, b) => b.length - a.length);
-  function splitPlaces(q) {
-    const places = []; let rest = " " + q + " ";
-    for (const k of PLACE_KEYS) {
-      const re = new RegExp(`\\s(-?)${k.replace(/[-.]/g, "\\$&")}(?=\\s)`, "gi");
-      rest = rest.replace(re, (m, neg) => { places.push({ ...PLACES[k], neg: !!neg }); return " "; });
-    }
-    return { rest, places };
-  }
-  const NOT_PLACE = new Set(["new", "city", "north", "south", "east", "west", "park", "hill", "hills", "beach", "heights", "falls", "center", "village", "island", "lake", "port", "united", "states", "usa", "hybrid", "office", "onsite", "the", "and", "area", "metro", "county", "greater",
-    // words the boards put in a "location" that are not places
-    "home", "work", "from", "remote", "headquarters", "campus", "corporate", "global", "site", "main", "street", "plant", "laboratory", "lab", "hospital", "university", "college", "school", "medical", "health", "nursing", "research", "science", "technology", "building", "floor", "suite"]);
-  const locHay = x => x._loch || (x._loch = [...IS.regs(x).map(g => g.loc), x.location_raw || ""].join(" \n ").toLowerCase());
-  const placeHay = x => x._plach || (x._plach = [locHay(x), x.company_name, x.title].filter(Boolean).join(" | ").toLowerCase());
-  const hay = x => x._hay || (x._hay = [x.company_name, x.title, (x.field_tags || []).join(" "), (x.stage || []).join(" "), x.sector, x.location_raw, (x.region_locations || []).join(" "), (x.regions || []).map(g => g.loc).join(" "), x.state, x.term, x.ats, x.description, ((x.insights || {}).skills || []).map(s => s.name).join(" ")].filter(Boolean).join(" \n ").toLowerCase());
+  // was: parseQuery, PLACES, splitPlaces, NOT_PLACE and the substring "hay" here. The search moved to
+  // core.js (IS.compileQuery, IS.matchScore) on 2026-10-14, where it is tested, and ranks by relevance.
 
   // ---------- eligibility and deadline: [level, text], level bad | warn | good | "" ----------
   function checks(r, p) {
@@ -168,7 +147,7 @@
     return h("div", { className: cx("field ms", wide && "wide"), ref, onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); } },
       h("div", { className: "box", onClick: () => { setOpen(true); if (input.current) input.current.focus(); } },
         selected.map(s => { const o = byVal.get(s); return h("span", { key: s, className: "chip" }, (o && (o.chip || o.label)) || s,
-          h("button", { type: "button", "aria-label": "Remove " + s, onClick: e => { e.stopPropagation(); rm(s); } }, "×")); }),
+          h("button", { type: "button", "aria-label": "Remove " + ((o && o.label) || s), onClick: e => { e.stopPropagation(); rm(s); } }, "×")); }),
         h("input", { ref: input, value: q, role: "combobox", "aria-autocomplete": "list", "aria-expanded": open,
           "aria-controls": id + "-list", "aria-activedescendant": open && filtered.length ? id + "-option-" + active : undefined,
           "aria-label": label || placeholder, placeholder: selected.length ? "" : placeholder,
@@ -346,6 +325,19 @@
       onChange: e => setText(e.target.value), onKeyDown: e => { if (e.key === "Enter") { sent.current = text; onChange(text); } } });
   }
 
+  // Whether the window is phone-width (the same 760px as the card layout in index.html).
+  function useNarrow() {
+    const mq = useMemo(() => window.matchMedia ? matchMedia("(max-width: 760px)") : null, []);
+    const [on, setOn] = useState(() => !!(mq && mq.matches));
+    useEffect(() => {
+      if (!mq) return;
+      const f = () => setOn(mq.matches);
+      if (mq.addEventListener) mq.addEventListener("change", f); else if (mq.addListener) mq.addListener(f);
+      return () => { if (mq.removeEventListener) mq.removeEventListener("change", f); else if (mq.removeListener) mq.removeListener(f); };
+    }, [mq]);
+    return on;
+  }
+
   // ---------- landing ----------
   // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide }) {
   // `plans` is the Worker's /config payments.plans, so the prices shown here are the ones Stripe is
@@ -361,7 +353,7 @@
     // was: "aria-label": "About InternScout" and h2 "Internships, co-ops and research for your major,
     // anywhere in the US and Canada": the header's h1 says that now (2026-10-05), so this strip is
     // what it does and how, under its own name.
-    return h("section", { className: "landing", "aria-label": "How InternScout works" },
+    return h("section", { className: "landing", id: "about", tabIndex: -1, "aria-label": "How InternScout works" },
       h("div", { className: "landing-main" },
         h("h2", null, "What InternScout does"),
         h("p", null, "InternScout gathers student opportunities from employer career sites and public job boards",
@@ -477,9 +469,15 @@
     const [dir, setDir] = useState("");
     const setStep = n => { setDir(n > step ? "fwd" : "back"); setStepRaw(n); };
     const [stagesTouched, setStagesTouched] = useState(!!(initial && initial.stages && initial.stages.length));
-    const ref = useRef(), stepRef = useRef();
+    const ref = useRef(), stepRef = useRef(), mounted = useRef(false);
+    // was: scrollIntoView on every run, the first included, so a first visit opened scrolled 600 px
+    // down the page with the headline gone. On opening, the card scrolls only when it is out of
+    // sight (opened from a link under the list); a step change still brings its top into view.
     useEffect(() => {
-      if (ref.current) ref.current.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+      const el = ref.current, box = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+      const away = box && (box.top < 0 || box.top > (window.innerHeight || 800) - 120);
+      if (el && (mounted.current || away)) el.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+      mounted.current = true;
       if (stepRef.current) stepRef.current.focus({ preventScroll: true });
     }, [step]);
     const set = (k, v) => setD(s => ({ ...s, [k]: v }));
@@ -613,8 +611,10 @@
     else body = h(F, null,
       h("h3", null, "Where"),
       h("div", { className: "shortcuts" },
-        IS.REGION_SHORTCUTS.map(([name, codes]) => h("button", { type: "button", key: name, className: cx("btn small", codes.every(c => d.states.includes(c)) && "on"), onClick: () => shortcut(codes) }, name)),
-        h("button", { type: "button", className: "btn small quiet", onClick: () => set("states", []) }, "Clear")),
+        // was: the regions, then a quiet "Clear". No state picked means every state (2026-10-14), so
+        // that choice has its name and comes first.
+        h("button", { type: "button", className: cx("btn small", !d.states.length && "on"), "aria-pressed": !d.states.length, onClick: () => set("states", []) }, "Everywhere"),
+        IS.REGION_SHORTCUTS.map(([name, codes]) => h("button", { type: "button", key: name, className: cx("btn small", codes.every(c => d.states.includes(c)) && "on"), onClick: () => shortcut(codes) }, name))),
       h("label", { className: "check remote" }, h("input", { type: "checkbox", checked: !!d.remote, onChange: e => set("remote", e.target.checked) }),
         " U.S. remote", count("remote") != null ? h("span", { className: "c" }, count("remote")) : null),
       h("div", { className: "stategrid" }, stateList.map(([k, n]) => h("label", { key: k, className: cx("check", d.states.includes(k) && "on") },
@@ -625,7 +625,8 @@
           h("input", { type: "checkbox", checked: d.states.includes(k), onChange: () => toggle("states", k) }), " ", n,
           count(k) != null ? h("span", { className: "c" }, count(k)) : null))),
         h("div", { className: "meta" }, "Most roles in Canada need Canadian work authorization (citizenship, permanent residence or a work permit).")),
-      !d.states.length && h("div", { className: "meta" }, `No states picked: you'll see the baseline area (${IS.BASELINE.join(", ")}).`),
+      // was: `No states picked: you'll see the baseline area (${IS.BASELINE.join(", ")}).`
+      !d.states.length && h("div", { className: "meta" }, "No states picked, so your matches come from every state. That is a larger download (about 3 MB); picking states makes the list load faster."),
       h("fieldset", null, h("legend", null, "Work authorization"),
         h("div", { className: "checks" }, IS.WORK_AUTH.map(([k, l]) => h("label", { key: k, className: "check" },
           h("input", { type: "radio", name: "work_auth", checked: d.work_auth === k, onChange: () => set("work_auth", k) }), " ", l))),
@@ -664,16 +665,22 @@
     const [ver, setVer] = useState(0);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
-    const [setupOpen, setSetupOpen] = useState(() => !IS.loadProfile() && !IS.ls.get(SKIP_KEY, false));
+    // was: open on every first visit (no profile, not skipped), above the list, so a phone showed a
+    // three-step form for two screens before any listing. A first visit now gets one line offering it
+    // (setupAsk below), and the card opens in that place when asked for.
+    const [setupOpen, setSetupOpen] = useState(false);
+    const [skipped, setSkipped] = useState(() => !!IS.ls.get(SKIP_KEY, false));
     const [landingOpen, setLandingOpen] = useState(() => !IS.ls.get(LANDING_KEY, false));
     const initF = prof => ({ sort: prof ? "score" : "new", hide_citizen: !!(prof && prof.work_auth && prof.work_auth !== "citizen"), paid: prof && prof.paid_only ? "no_unpaid" : "" });
     // The landing pages under internships/ link here with ?field=a,b&state=MA, so the list opens on what the
     // student was reading. Only well-formed tags and state keys are taken; an unknown one matches nothing.
     const fromLink = () => {
-      const q = new URLSearchParams(location.search), list = (k, ok) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, 6);
+      // was: .slice(0, 6) for every list, so an employer page with roles in 48 places opened on 44.
+      const q = new URLSearchParams(location.search), list = (k, ok, max = 6) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, max);
       // ?company= comes from an employer's page (every spelling its listings use) and matches names
       // exactly; ?new=1 from the New this week page. Both are plain values, never markup.
-      const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada)$/),
+      // ?state=all (2026-10-14) is the State picker's "Everywhere", from the pages that cover every state.
+      const link = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada|all)$/, 80),
         company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
       if (q.get("new") === "1") link.new_only = true;
       // ?stage=, ?year= and ?paid=1 come from the co-op, research, class-year and paid pages, and
@@ -684,7 +691,9 @@
       if (q.get("paid") === "1") link.paid = "paid";
       return link;
     };
-    const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...fromLink() }));
+    // The landing link, read once: its fields also prefill the setup card's Major (prefill below).
+    const [link] = useState(fromLink);
+    const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...link }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
     const [saved, setSaved] = useState(() => IS.ls.get(SAVED_KEY, []) || []);
     const [openId, setOpenId] = useState(null);
@@ -744,16 +753,52 @@
       IS.loadStats().then(s => { setStats(s); setStatsReady(true); });
     }, [reload]);
 
-    const keys = useMemo(() => f.states.length ? f.states : IS.profileKeys(p), [f.states, p]);
-    const [failedKeys, setFailedKeys] = useState([]); const [retry, setRetry] = useState(0);
+    // Where the list looks (2026-10-14; IS.viewScope). was: keys = f.states, else IS.profileKeys(p),
+    // which with no states picked was the Northeast and remote alone. No states now means every state:
+    // the Northeast and remote load first so the first rows paint as fast as before, and the other
+    // states follow as soon as a search or a filter needs them (or "Show every state"). A place typed in
+    // the search loads that place's file first, whatever the scope.
+    const scope = useMemo(() => IS.viewScope(p, f.states), [p, f.states]);
+    const qKeys = useMemo(() => IS.queryKeys(f.q), [f.q]);
+    const qKeysKey = qKeys.join(",");
+    const indexKeys = useMemo(() => index && index.files ? Object.keys(index.files) : [], [index]);
+    const searching = f.q.trim().length >= 2;
+    // Anything that narrows the list needs every state to be honest about what matches. So does a profile
+    // saved with no states: its best matches can be anywhere.
+    const wantsAll = searching || f.states.includes(IS.ALL_KEY) || f.fields.length > 0 || f.company.length > 0 || f.new_only || f.status !== "open"
+      || !!(f.stage || f.year || f.sector || f.where || f.app_state || f.paid === "paid") || !!(p && !(p.states && p.states.length));
+    // Once the other states are loading they stay in the list: clearing the search doesn't hide them again.
+    const [allAsked, setAllAsked] = useState(false);
+    useEffect(() => { if (scope.all && wantsAll && !allAsked) setAllAsked(true); }, [scope.all, wantsAll]);
+    const everything = scope.all && (allAsked || wantsAll);
+    const plan = useMemo(() => IS.loadPlan(scope, indexKeys, qKeys, everything), [scope, indexKeys, qKeysKey, everything]);
+    const planKey = plan.first.join(",") + "|" + plan.rest.join(",");
+    // The files the list is drawn from: the scope's own, and any place in the search.
+    const keys = useMemo(() => [...plan.first, ...plan.rest], [planKey]);
     const keysKey = keys.slice().sort().join(",");
+    const viewSet = useMemo(() => scope.all ? null : new Set([...scope.keys, ...qKeys]), [scope, qKeysKey]);
+    const [failedKeys, setFailedKeys] = useState([]); const [retry, setRetry] = useState(0);
+    // Files settled so far and in all, for the "loading more states (12 of 65)" line. A ref, so a file
+    // landing doesn't redraw the page by itself; the throttled version bump below does.
+    const progress = useRef({ done: 0, total: 0 });
     useEffect(() => {
       if (!ready) return;
-      let live = true;
+      let live = true, timer = 0;
+      const st = store.current, total = [...plan.first, ...plan.rest].filter(k => index && index.files && index.files[k]).length;
+      progress.current = { done: 0, total };
+      const step = () => { progress.current = { done: Math.min(total, progress.current.done + 1), total }; };
+      // The first files redraw as each lands (the list paints from the first one); the rest at most four
+      // times a second, so 56 files arriving don't redraw the page 56 times.
+      const bump = () => { if (!timer) timer = setTimeout(() => { timer = 0; if (live) setVer(st.version()); }, 250); };
       setLoading(true); setFailedKeys([]);
-      store.current.ensure(keys, () => { if (live) setVer(store.current.version()); }).then(bad => { if (live) { setVer(store.current.version()); setLoading(false); setFailedKeys(bad || []); } });
-      return () => { live = false; };
-    }, [ready, keysKey, retry]);
+      (async () => {
+        const bad = await st.ensure(plan.first, () => { step(); if (live) setVer(st.version()); });
+        for (let i = 0; i < plan.rest.length && live; i += 4) bad.push(...await st.ensure(plan.rest.slice(i, i + 4), () => { step(); bump(); }));
+        if (!live) return;
+        clearTimeout(timer); setVer(st.version()); setLoading(false); setFailedKeys(bad || []);
+      })();
+      return () => { live = false; clearTimeout(timer); };
+    }, [ready, planKey, retry]);
 
     // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
     // Each description file is about the size of its listing file (MA: 0.9 MB), so they are fetched only
@@ -762,8 +807,7 @@
     // asks for descriptions too.
     const [descAll, setDescAll] = useState(false);
     const [descFailed, setDescFailed] = useState([]), [descLoading, setDescLoading] = useState(false), [descRetry, setDescRetry] = useState(0);
-    const searching = f.q.trim().length >= 2;
-    const descOpen = useMemo(() => keys.reduce((a, k) => a + ((index && index.files && index.files[k] && index.files[k].open) || 0), 0), [keys, index]);
+    const descOpen = useMemo(() => keys.reduce((a, k) => a + ((index && index.files && index.files[k] && index.files[k].open) || 0), 0), [keysKey, index]);
     const wantDesc = searching && (descOpen <= DESC_AUTO || descAll);
     useEffect(() => {
       if (!ready || !wantDesc) return;
@@ -960,9 +1004,13 @@
       setF(x => ({ ...x, states: [], ...initF(s) }));
       setNote(`Profile saved. Ranking for ${s.majors.length ? s.majors.join(", ") : s.fields.length ? s.fields.map(IS.fieldLabel).join(", ") : "all fields"}.`);
       setTimeout(() => setNote(""), 6000);
-      setTimeout(() => { const q = document.getElementById("q"); if (q) { q.focus(); q.scrollIntoView({ block: "center", behavior: scrollBehavior() }); } }, 0);
+      // was: focus the search box and centre it, which put the filters mid-screen and, on a phone, the
+      // keyboard over the matches. "Save and show matches" lands on the matches now: the top of the
+      // list, with focus on its heading (2026-10-14).
+      setTimeout(() => requestAnimationFrame(() => { const el = document.getElementById("listings"); if (el) { el.scrollIntoView({ block: "start", behavior: scrollBehavior() }); el.focus({ preventScroll: true }); } }), 0);
     }
-    function closeSetup() { if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); setTimeout(() => { const q = document.getElementById("q"); if (q) q.focus(); }, 0); }
+    // was: if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); ...
+    function closeSetup() { if (!p) { IS.ls.set(SKIP_KEY, true); setSkipped(true); } setSetupOpen(false); setTimeout(() => { const q = document.getElementById("q"); if (q) q.focus(); }, 0); }
     async function deleteData() {
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
@@ -1009,10 +1057,18 @@
     useEffect(() => { Object.entries(jobs).forEach(([id, j]) => { if (j.status === "submitted" && (appStates[id] || "none") === "none") setAppState(id, "applied"); }); }, [jobs]);
 
     const all = useMemo(() => store.current.all(), [ver]);
-    const ctx = useMemo(() => { const { direct, related } = IS.profileFields(p, majors); return { p, direct, related, keys: new Set(IS.profileKeys(p)) }; }, [p, majors]);
-    const keySet = useMemo(() => new Set(keys), [keysKey]);
-    const inView = useMemo(() => all.filter(x => { for (const k of IS.shardKeys(x)) if (keySet.has(k)) return true; return false; }), [all, keySet]);
-    const scores = useMemo(() => { const m = new Map(); inView.forEach(x => m.set(x.id, IS.score(x, ctx))); return m; }, [inView, ctx]);
+    // anywhere: no states on the profile (or no profile), so no place scores above another.
+    const ctx = useMemo(() => { const { direct, related } = IS.profileFields(p, majors); return { p, direct, related, keys: new Set(IS.profileKeys(p)), anywhere: !(p && p.states && p.states.length) }; }, [p, majors]);
+    // Which of a listing's places the row shows first: one in the scope, or the place searched for.
+    const keySet = useMemo(() => viewSet || new Set(qKeys), [viewSet, qKeysKey]);
+    // was: rows in `keys` only. With every state in scope it is every row loaded (less remote-only rows
+    // for a profile that turned remote off).
+    const inView = useMemo(() => !viewSet
+      ? (scope.noRemote ? all.filter(x => [...IS.shardKeys(x)].some(k => k !== "remote" && k !== "US")) : all)
+      : all.filter(x => { for (const k of IS.shardKeys(x)) if (viewSet.has(k)) return true; return false; }), [all, viewSet, scope.noRemote]);
+    // was: a Map of every row in view, rebuilt whenever a file landed. Kept per row now, so the 56 files
+    // of a nationwide search each score only their own rows.
+    const scoreOf = useMemo(() => { const m = new WeakMap(); return x => { let v = m.get(x); if (!v) { v = IS.score(x, ctx); m.set(x, v); } return v; }; }, [ctx]);
 
     const elig = useMemo(() => {
       if (!p && !extProfile) return null;
@@ -1034,6 +1090,8 @@
       const stateOpts = index
         ? Object.entries(index.files).map(([k, m]) => ({ value: k, label: IS.keyLabel(k), chip: k === "remote" ? "Remote" : k, count: m.open })).sort((a, b) => b.count - a.count)
         : count(x => [...IS.shardKeys(x)]).map(([k, n]) => ({ value: k, label: IS.keyLabel(k), chip: k === "remote" ? "Remote" : k, count: n }));
+      // "Everywhere" (2026-10-14): every state, province and remote, the same as picking none.
+      if (index) stateOpts.unshift({ value: IS.ALL_KEY, label: "Everywhere", chip: "Everywhere", hint: "every state" });
       return {
         fields: count(x => x.field_tags).map(([v, n]) => ({ value: v, label: IS.fieldLabel(v), count: n })),
         sectors: count(x => [x.sector]),
@@ -1042,15 +1100,17 @@
       };
     }, [inView, index]);
 
+    // Place words for the search ("boston"): what the loaded rows' locations say, worked out only once
+    // there is a search, and again only when more rows arrive.
+    const words = useMemo(() => f.q.trim() ? IS.placeWords(inView) : null, [inView, !!f.q.trim()]);
+    const cq = useMemo(() => IS.compileQuery(f.q, words), [f.q, words]);
+    // With words to rank by, the list comes in order of how well each role matches them (title, then
+    // field, company, place and skills, then description), with the chosen sort as the tiebreak.
+    const ranked = !!(cq && cq.terms.some(t => !t.neg && !t.place));
     const rows = useMemo(() => {
-      let r = inView.slice();
-      if (f.q.trim()) {
-        const { rest, places } = splitPlaces(f.q), terms = parseQuery(rest);
-        const seen = new Map(); r.forEach(x => new Set(locHay(x).split(/[^a-z]+/)).forEach(t => { if (t.length >= 3 && !NOT_PLACE.has(t)) seen.set(t, (seen.get(t) || 0) + 1); }));
-        const words = new Set(); seen.forEach((n, t) => { if (n >= 3) words.add(t); });
-        r = r.filter(x => places.every(pl => (pl.kind === "remote" ? IS.isRemote(x) : IS.regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state))) !== pl.neg) &&
-          terms.every(({ t, neg }) => (words.has(t) ? placeHay(x) : hay(x)).includes(t) !== neg));
-      }
+      let r, rel = null;
+      if (cq) { rel = new Map(); r = []; for (const x of inView) { const m = IS.matchScore(x, cq); if (m) { rel.set(x, m); r.push(x); } } }
+      else r = inView.slice();
       if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
       if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
       if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
@@ -1061,30 +1121,38 @@
       if (f.paid === "paid") r = r.filter(x => ["paid", "stipend"].includes(IS.payOf(x)));
       else if (f.paid === "no_unpaid") r = r.filter(x => IS.payOf(x) !== "unpaid");
       if (f.hide_citizen) r = r.filter(x => !IS.citizenBlocked(x, p ? p.work_auth : ""));
-      if (f.eligible && elig) r = r.filter(x => !scores.get(x.id).mismatch && !blockers(x, elig).length);
+      if (f.eligible && elig) r = r.filter(x => !scoreOf(x).mismatch && !blockers(x, elig).length);
       // Looking at your own applications: a posting that has since closed still belongs in the list.
       if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
       if (f.new_only) r = r.filter(x => x.is_new);
       if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
       else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
-      const S = x => scores.get(x.id);
+      const S = scoreOf;
+      const R = (a, b) => ranked ? rel.get(b) - rel.get(a) : 0;
       // Dated postings first, newest first. first_seen is only the scan that found the row, which is
       // today for nearly everything, so using it for undated rows put every undated posting on top.
       const newer = (a, b) => (b.posted_at ? 1 : 0) - (a.posted_at ? 1 : 0) || (b.posted_at || "").localeCompare(a.posted_at || "") || (b.first_seen || "").localeCompare(a.first_seen || "");
-      if (f.sort === "score") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || (S(b).score - S(a).score) || (b.first_seen || "").localeCompare(a.first_seen || ""));
-      else if (f.sort === "new") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || newer(a, b));
+      // was: no R(a, b) in these; a search was sorted by date or profile score alone.
+      if (f.sort === "score") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || R(a, b) || (S(b).score - S(a).score) || newer(a, b));
+      else if (f.sort === "new") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || R(a, b) || newer(a, b));
       else if (f.sort === "company") r.sort((a, b) => a.company_name.localeCompare(b.company_name));
-      else if (f.sort === "comp") r.sort((a, b) => (IS.realSalary(b) ? 1 : 0) - (IS.realSalary(a) ? 1 : 0) || S(b).score - S(a).score);
+      else if (f.sort === "comp") r.sort((a, b) => (IS.realSalary(b) ? 1 : 0) - (IS.realSalary(a) ? 1 : 0) || R(a, b) || S(b).score - S(a).score);
       return r;
-    }, [inView, f, appStates, jobs, elig, scores, p]);
+    }, [inView, cq, f, appStates, jobs, elig, scoreOf, p]);
 
     const shown = rows.slice(0, limit);
-    const nationwide = stats && stats.open ? stats.open : index ? Object.values(index.files).reduce((a, m) => a + (m.open || 0), 0) : null;
+    // Every file loaded: the list itself is the whole country.
+    const allLoaded = everything && !loading;
+    // was: stats.open, else the sum of index.files[].open, which counts a role filed in two states twice
+    // (21,430 for 14,799 roles). No figure until there is a true one.
+    const nationwide = stats && stats.open ? stats.open : allLoaded ? all.filter(x => x.status === "open").length : null;
     const figures = useMemo(() => ({
       open: inView.filter(x => x.status === "open").length,
       fresh: inView.filter(x => x.is_new).length,
       applied: Object.values(appStates).filter(v => v === "applied").length,
     }), [inView, appStates]);
+    // Nothing to count yet: the figures show a placeholder, not 0 (was: "0 Open in the Northeast").
+    const counting = loading && !all.length;
     const gen = (index && index.generated_at) || (stats && stats.generated_at);
     const genText = gen ? new Date(gen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "unknown";
     const jobCounts = useMemo(() => { const c = {}; Object.values(queue.jobs || {}).forEach(j => { c[j.status] = (c[j.status] || 0) + 1; }); return c; }, [queue]);
@@ -1176,7 +1244,8 @@
     }
 
     const majorsText = p ? (p.majors.length ? p.majors.join(", ") : p.fields.length ? p.fields.map(IS.fieldLabel).join(", ") : "All fields") : "";
-    const whereText = p ? [p.states.length ? (p.states.length <= 5 ? p.states.join(", ") : `${p.states.length} states`) : IS.BASELINE.join(", "), p.remote ? "remote" : ""].filter(Boolean).join(" + ") : "";
+    // was: ... : IS.BASELINE.join(", ") for a profile with no states, which now means every state.
+    const whereText = p ? (p.states.length ? [p.states.length <= 5 ? p.states.join(", ") : `${p.states.length} states`, p.remote ? "remote" : ""].filter(Boolean).join(" + ") : p.remote ? "every state and remote" : "every state") : "";
     // A real button inside the header, so the column sorts from the keyboard and a screen reader
     // hears which column the list is sorted by. Each sort here is a fixed order, so "descending"
     // is only an approximation for company (A-Z), but aria-sort has no "custom" value.
@@ -1250,7 +1319,14 @@
 
     // was: const aboutBtn = !landingOpen && h("button", { ... }, "About InternScout");
     // "About" in the nav is the /about/ page now; the in-page strip is what it says, how it works.
-    const howBtn = !landingOpen && h("button", { type: "button", onClick: () => setLandingOpen(true) }, "How it works");
+    // was: const howBtn = !landingOpen && h("button", { type: "button", onClick: () => setLandingOpen(true) }, "How it works");
+    // The strip sits under the list since 2026-10-14 (it filled a phone's first screen), so the button
+    // opens it and goes there.
+    const showAbout = () => {
+      setLandingOpen(true);
+      setTimeout(() => { const el = document.getElementById("about"); if (el) { el.scrollIntoView({ block: "start", behavior: scrollBehavior() }); el.focus({ preventScroll: true }); } }, 0);
+    };
+    const howBtn = h("button", { type: "button", onClick: showAbout }, "How it works");
     // The hero's one action (2026-10-05): straight to the search box. A first visit has the setup card
     // open above the list; closing it is what Skip does, and the list is what was asked for.
     const goSearch = () => {
@@ -1258,8 +1334,9 @@
       setTimeout(() => { const q = document.getElementById("q"); if (q) { q.focus(); q.scrollIntoView({ block: "center" }); } }, 0);
     };
     const openCount = nationwide ? nationwide.toLocaleString() : null;
-    // A first visit: the setup card is open and nothing is saved yet (D2.3, below).
-    const firstVisit = setupOpen && !p;
+    // was: const firstVisit = setupOpen && !p; (the card opened by itself on a first visit). A first visit
+    // gets one line offering the setup instead (2026-10-14), so a phone shows search and listings first.
+    const setupAsk = !p && !setupOpen && !skipped;
     // The plans line (D2.3, 2026-10-05 audit): once the announcement is hidden, the price kept no
     // home on this page but the nav's Pricing link. One quiet line under the counters, from the same
     // /config numbers as the announcement (IS.plansBanner, never hardcoded), and nothing at all on a
@@ -1268,19 +1345,156 @@
     // Numbers get thousands separators, "You applied" appears once there is something to count,
     // and the state list is one sentence under the numbers instead of a block floated to the right.
     // A const since 2026-10-05 so it can render before or after the setup card (D2.3).
-    const figuresEl = h("section", { className: "figures" },
+    // Where the list looks, in words, for the coverage line, the empty list and the live region.
+    const placeNames = ks => { const n = ks.map(IS.keyLabel).map(x => x.replace(/ \(([A-Z]{2})\)$/, "")); return n.slice(0, 8).join(", ") + (n.length > 8 ? ` and ${n.length - 8} more` : ""); };
+    const scopeKeys = scope.all ? [] : [...new Set([...scope.keys, ...qKeys])];
+    const whereWords = scope.all ? (everything ? "every state" : "the Northeast and remote") : placeNames(scopeKeys);
+    const pr = progress.current;
+    // "Show every state" with nothing picked loads the rest; with states picked it picks Everywhere.
+    const searchAll = () => { if (scope.all) setAllAsked(true); else upd("states", [IS.ALL_KEY]); };
+    // was: always the figure itself, so the page opened on "0 Open in the Northeast" and "0 New this week".
+    const fig = (n, label) => h("div", { className: "fig" }, h("div", { className: "n" }, n == null || counting ? "…" : n.toLocaleString()), h("div", { className: "l" }, label));
+    // Numbers get thousands separators, "You applied" appears once there is something to count,
+    // and the state list is one sentence under the numbers instead of a block floated to the right.
+    // A const since 2026-10-05 so it can render before or after the setup card (D2.3).
+    // was: "Open in the Northeast + remote" (or your areas), "New this week" and "Open nationwide" in
+    // every case. With every state in scope the nationwide figures are the list's own (2026-10-14).
+    const figuresEl = h("section", { className: "figures", "aria-label": "Listing counts" },
       h("div", { className: "figrow" },
-        h("div", { className: "fig" }, h("div", { className: "n" }, figures.open.toLocaleString()), h("div", { className: "l" }, f.states.length ? "Open in picked states" : p ? "Open in your areas" : "Open in the Northeast + remote")),
-        h("div", { className: "fig" }, h("div", { className: "n" }, figures.fresh.toLocaleString()), h("div", { className: "l" }, "New this week")),
-        nationwide != null && h("div", { className: "fig" }, h("div", { className: "n" }, nationwide.toLocaleString()), h("div", { className: "l" }, "Open nationwide")),
-        figures.applied > 0 && h("div", { className: "fig" }, h("div", { className: "n" }, figures.applied.toLocaleString()), h("div", { className: "l" }, "You applied"))),
+        scope.all ? fig(nationwide, "Open nationwide") : fig(figures.open, f.states.length ? "Open in picked states" : "Open in your areas"),
+        fig(scope.all ? (stats && stats.new != null ? stats.new : allLoaded ? figures.fresh : null) : figures.fresh, "New this week"),
+        !scope.all && fig(nationwide, "Open nationwide"),
+        figures.applied > 0 && fig(figures.applied, "You applied")),
+      // was: "Loading/Showing <the states in keys>." in every case.
       h("div", { className: "coverage" },
-        loading ? "Loading " : "Showing ", keys.map(IS.keyLabel).map(s => s.replace(/ \(([A-Z]{2})\)$/, "")).slice(0, 8).join(", "), keys.length > 8 ? ` and ${keys.length - 8} more` : "", ". ",
+        scope.all
+          ? (!everything ? "Showing the Northeast and remote first; a search or filter covers every state. "
+            : loading ? `Loading every state (${pr.done} of ${pr.total} files). ` : `Showing every state${scope.noRemote ? " except remote-only roles" : ""}. `)
+          : `${loading ? "Loading" : "Showing"} ${placeNames(scopeKeys)}. `,
+        !everything && h("button", { type: "button", className: "linkbtn", onClick: searchAll }, "Show every state"), !everything && ". ",
         h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", ".")),
       plansLine && h("p", { className: "plansline" },
         `Plans: free with any email; ${plansLine.plans.map(pl => `${pl.label} ${pl.price}`).join(" and ")} raise the allowance. `,
         h("a", { href: "pricing/" }, "Prices")));
+    // The setup card for a first profile opens prefilled from a landing page's ?field= (2026-10-14):
+    // "Rank these for your major" on /internships/nursing/ arrives with Nursing as the major.
+    const prefill = useMemo(() => {
+      if (p || !link.fields || !link.fields.length) return null;
+      const m = IS.majorForFields(link.fields, majors);
+      return m ? { majors: [m] } : { fields: link.fields.slice() };
+    }, [p, majors]);
+    const setupEl = setupOpen && h(Setup, { key: p ? p.updated : "new:" + JSON.stringify(prefill), initial: p || prefill, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token });
+    const setupAskEl = setupAsk && h("div", { className: "notice setup-ask" },
+      h("button", { type: "button", className: "btn primary", onClick: () => setSetupOpen(true) }, prefill && prefill.majors ? `Rank these for ${prefill.majors[0]}` : "Rank these for your major"),
+      h("span", null, "Three short steps. Your profile stays in this browser."),
+      h("button", { type: "button", className: "btn quiet", onClick: () => { IS.ls.set(SKIP_KEY, true); setSkipped(true); } }, "Not now"));
+    // What narrows the list besides the search and the place, in words, for the empty list.
+    const filterWords = [
+      f.fields.length > 0 && "field " + f.fields.map(IS.fieldLabel).join(" or "),
+      f.company.length > 0 && "employer " + f.company[0],
+      f.stage && (IS.STAGE_LABEL[f.stage] || f.stage).toLowerCase() + " roles",
+      f.year && "open to " + (IS.YEAR_PLURAL[f.year] || f.year),
+      f.sector && IS.sectorLabel(f.sector) + " sector",
+      f.paid === "paid" ? "pay or stipend listed" : f.paid === "no_unpaid" ? "unpaid roles hidden" : "",
+      f.where === "remote" ? "remote only" : f.where === "onsite" ? "in person only" : "",
+      f.status === "closed" ? "closed postings" : "",
+      f.app_state && "your progress: " + (f.app_state === "auto" ? "in the Auto-Apply queue" : STATE_LABEL[f.app_state]),
+      f.new_only && "new this week",
+      f.hide_citizen && "citizen-only roles hidden",
+      f.eligible && elig && "roles you may not be eligible for hidden",
+    ].filter(Boolean);
+    const asked = f.q.trim() ? `“${f.q.trim()}”` : "";
+    // was: "Nothing matches these filters." whatever had been searched, even with no filter set.
+    const emptyText = loading ? `Nothing yet${asked ? " for " + asked : ""}. Still loading listings (${pr.done} of ${pr.total} files)…`
+      : !inView.length ? `No listings in ${whereWords} yet.`
+      : `No ${f.status === "open" ? "open " : ""}listings match ${asked || "these filters"} in ${whereWords}${filterWords.length ? `, with ${filterWords.join(", ")}` : ""}.`;
+    const emptyEl = h("div", { className: "sheet empty" },
+      h("p", null, emptyText),
+      !loading && h("div", { className: "empty-actions" },
+        !everything && h("button", { type: "button", className: "btn primary", onClick: searchAll }, "Search every state"),
+        asked && h("button", { type: "button", className: "btn", onClick: () => upd("q", "") }, "Clear search"),
+        filterWords.length > 0 && h("button", { type: "button", className: "btn", onClick: clearFilters }, "Clear filters")));
+    // The live region (2026-10-14): the count or the empty message, said once the list has settled for
+    // a moment after the student changes something, not on every key or file. was: role=status on the
+    // count itself, which changed with each file landing and each pause in typing.
+    const liveText = loading || counting ? "" : rows.length ? `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${asked ? " " + asked : ""} in ${whereWords}.` : emptyText;
+    const [spoken, setSpoken] = useState("");
+    const firstF = useRef(f), touched = useRef(false);
+    if (f !== firstF.current) touched.current = true;
+    useEffect(() => {
+      if (!touched.current || !liveText) return;
+      const t = setTimeout(() => setSpoken(liveText), 900);
+      return () => clearTimeout(t);
+    }, [liveText]);
+    // On a phone the promotions go under the list (2026-10-14): above it they pushed the first listing
+    // two screens down. A wide screen keeps them where they were.
+    const narrow = useNarrow();
+    const promoEls = h(F, null,
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
+      // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
+      // The extension is free to install, but its Auto-Apply spends the monthly AI allowance, so
+      // calling the whole thing "free" stopped being the full story on 2026-09-19. The Deep Dive does
+      // not: worker/src/config.js gives deep_dive `allowance: null`, i.e. no monthly cap.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on your free monthly AI allowance. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // The allowance exists only per account: worker/src/index.js signs the user in on every
+      // POST /ai and serves the counts from GET /me. This notice sits under copy that promises
+      // search is free with no sign-in, so the account has to be named here or it reads as carried
+      // over. The account is free, which is why that word stays.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
+      // "Install guide" pointed at the by-hand steps; since 2026-09-22 it's one click in the Web Store.
+      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
+      // 2026-10-04: no longer waits for a saved profile (`&& p`), so a first visit hears about Auto-Apply
+      // before it is asked to fill anything in, and it sits above the plans banner so what the extension
+      // does comes before what it costs. was: it came after the plans banner and the stale-extension note.
+      // Not on a phone or tablet (2026-10-14), which can't add a Chrome extension; the hero's install
+      // button stays for them and goes to the install page.
+      info.checked && !info.installed && !info.stale && !touchOnly() && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome"),
+        // A dated third-party fact beside the store link (2026-10-05 audit): the listing's own rating and
+        // count once it has them (CONFIG.storeRating, copied from the store with its date), until then
+        // when the store accepted it. Nothing here is made up: the date is the store's approval.
+        C.storeRating
+          ? `. Rated ${C.storeRating.value} from ${C.storeRating.count} ratings on the Chrome Web Store, as of ${C.storeRating.asOf}.`
+          : ". In the Chrome Web Store since September 22, 2026."),
+      // Plans announcement (2026-10-04): every number comes from the Worker's /config (IS.plansBanner).
+      // Signed-in free students get a checkout button for the first plan; everyone else the comparison.
+      // Since 2026-10-05 it also says the one thing the terms say about money that a buyer should hear
+      // first (no refunds by default), and links the pricing page, which is the price's home now.
+      (() => {
+        const pb = !plansSeen && IS.plansBanner(auth.cfg, me);
+        if (!pb) return null;
+        const first = pb.plans[0];
+        return h("div", { className: "notice plans", role: "note" },
+          h("b", null, `New: Auto-Apply plans now start at ${pb.from}. `),
+          `It's free with any email (${pb.free} applications filled a month, or ${pb.edu} with a school .edu email), and `,
+          pb.plans.map((pl, i) => `${pl.label} gives you ${pl.runs} for ${pl.price}`).join(", or "),
+          // was: ". It never submits for you. "
+          ". It never submits for you. No refunds by default: the AI cost is spent when a run happens, so start free and pay only if you hit the cap. ",
+          auth.token && me && me.can_upgrade
+            ? h("button", { type: "button", className: "btn primary", disabled: !!busy, onClick: () => billing("checkout", first.plan) }, `Get ${first.label} · ${first.price}`)
+            : h("a", { href: "pricing/" }, "Plans and prices"),
+          " ", h("a", { href: "compare/" }, "How it compares"),
+          " ", h("a", { href: "#", onClick: prevent(hidePlans), "aria-label": "Hide this announcement" }, "Hide"));
+      })(),
+      // What students say (2026-10-05 audit): only words a student actually wrote, with permission, from
+      // CONFIG.testimonials in index.html. The list is empty until there are some, and then this renders
+      // nothing, so no invented quote can ever appear here.
+      C.testimonials && C.testimonials.length > 0 && h("section", { className: "said", "aria-labelledby": "said-title" },
+        h("h2", { id: "said-title" }, "What students say"),
+        h("ul", null, C.testimonials.map((t, i) => h("li", { key: i },
+          h("blockquote", null, `“${t.quote}”`),
+          h("div", { className: "who" }, t.name, t.who ? `, ${t.who}` : ""))))),
+      // The review line (2026-10-07). Following the link tells the extension too, so its own card stops
+      // asking. Hidden a tick later, not in the click itself: a link taken out of the page mid-click
+      // doesn't open. js/count.js counts the click as "review_click", a daily total with nothing about who.
+      reviewLine && !upgradeAsk && h("div", { className: "notice quietnote review-line" },
+        "Using Auto-Apply? A short review on the Chrome Web Store helps other students find it. ",
+        h("a", { href: IS.REVIEWS_URL, target: "_blank", rel: "noopener", onClick: () => { IS.ext.call({ type: "review_ask", action: "review" }); setTimeout(hideReview, 0); } }, "Leave a review"),
+        " ", h("a", { href: "#", style: { color: "var(--ink3)", fontWeight: 400 }, onClick: prevent(hideReview), "aria-label": "Hide this suggestion" }, "Hide")));
     return h("div", { className: "wrap" },
+      // Skip links and a main landmark (2026-10-14): a keyboard took about 750 Tab presses from the search
+      // box to "Show more", and there was no landmark or heading to jump to.
+      h("a", { className: "skip", href: "#listings" }, "Skip to listings"),
       h("header", { className: "top" },
         // was: one block of h1.mark "InternScout" and .sub, with the h1 the brand name only. The audit
         // (2026-10-05) found no audience, category or promise in the heading, the pain students name
@@ -1305,7 +1519,8 @@
             jobCounts.ready_to_submit ? h("span", { className: "count ok" }, `${jobCounts.ready_to_submit} ready`) : null),
           info.installed && h("button", { type: "button", className: "btn", onClick: () => IS.ext.call({ type: "open_deep_dive" }) }, info.onboarded ? "Deep Dive" : "Start Deep Dive"),
           // Hidden while the setup card is already open under it, so a first visit shows one way in.
-          !setupOpen && h("button", { type: "button", className: "btn", onClick: () => { setSetupOpen(true); } }, p ? "My profile" : "Set up profile"),
+          // Also hidden while the first-visit line offers the same thing just under the counters.
+          !setupOpen && !setupAsk && h("button", { type: "button", className: "btn", onClick: () => { setSetupOpen(true); } }, p ? "My profile" : "Set up profile"),
           signInBtn,
           (auth.token || ADMIN) && h(AccountMenu, {
             email: who && who.email,
@@ -1343,7 +1558,10 @@
           h("p", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}`
             // was: `Stop checking ten job boards every morning: ${...}, updated several times a day, no account needed. ...`
             // Two sentences since 2026-10-05, like the static copy in index.html (the audit's sentence length).
-            : `Stop checking ten job boards every morning. ${openCount ? openCount + " open roles are" : "Every open role is"} here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada.`,
+            // was: `... ${openCount ? openCount + " open roles are" : "Every open role is"} here, ...`. The count
+            // arrived after the first paint and redrew the page's largest text, so Lighthouse timed the page's
+            // main paint after the listings; the button under it and the figures carry the count (2026-10-14).
+            : "Stop checking ten job boards every morning. Every open role is here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada.",
             howBtn && " · ", howBtn),
           !p && h("div", { className: "hero-actions" },
             h("button", { type: "button", className: "btn primary", onClick: goSearch }, `Search ${openCount ? openCount + " " : ""}internships free · no account`),
@@ -1353,72 +1571,17 @@
             // was: the search button alone.
             !(info.installed || info.stale) && h("a", { className: "btn", href: installUrl("hero"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome · free")))),
 
-      // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
-      // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
-      // was: h(Landing, { ..., plans: payPlans, installed: info.installed || !!info.stale }),
-      h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
+      h("main", { id: "main" },
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
       // counters or any statement of what is here. Now the figures come first while the setup card is
       // open with no profile saved; once there is a profile the card is an edit form and the old order
       // (card, then figures) stays. was: Setup, then the figures section, in every case.
-      firstVisit && figuresEl,
-      // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
-      // was: setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
-      setupOpen && h(Setup, { key: p ? p.updated : "new", initial: p, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token }),
-      !firstVisit && figuresEl,
-
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
-      // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
-      // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
-      // The extension is free to install, but its Auto-Apply spends the monthly AI allowance, so
-      // calling the whole thing "free" stopped being the full story on 2026-09-19. The Deep Dive does
-      // not: worker/src/config.js gives deep_dive `allowance: null`, i.e. no monthly cap.
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on your free monthly AI allowance. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
-      // The allowance exists only per account: worker/src/index.js signs the user in on every
-      // POST /ai and serves the counts from GET /me. This notice sits under copy that promises
-      // search is free with no sign-in, so the account has to be named here or it reads as carried
-      // over. The account is free, which is why that word stays.
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
-      // "Install guide" pointed at the by-hand steps; since 2026-09-22 it's one click in the Web Store.
-      // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome")),
-      // 2026-10-04: no longer waits for a saved profile (`&& p`), so a first visit hears about Auto-Apply
-      // before it is asked to fill anything in, and it sits above the plans banner so what the extension
-      // does comes before what it costs. was: it came after the plans banner and the stale-extension note.
-      info.checked && !info.installed && !info.stale && h("div", { className: "notice quietnote" }, "Want help filling applications? The InternScout extension pre-fills forms and never presses Submit. It's free to install and runs on the free monthly AI allowance that comes with a free account. ", h("a", { href: installUrl("dashboard-notice"), target: "_blank", rel: "noopener" }, "Add it to Chrome"),
-        // A dated third-party fact beside the store link (2026-10-05 audit): the listing's own rating and
-        // count once it has them (CONFIG.storeRating, copied from the store with its date), until then
-        // when the store accepted it. Nothing here is made up: the date is the store's approval.
-        C.storeRating
-          ? `. Rated ${C.storeRating.value} from ${C.storeRating.count} ratings on the Chrome Web Store, as of ${C.storeRating.asOf}.`
-          : ". In the Chrome Web Store since September 22, 2026."),
-      // Plans announcement (2026-10-04): every number comes from the Worker's /config (IS.plansBanner).
-      // Signed-in free students get a checkout button for the first plan; everyone else the comparison.
-      // Since 2026-10-05 it also says the one thing the terms say about money that a buyer should hear
-      // first (no refunds by default), and links the pricing page, which is the price's home now.
-      (() => {
-        const pb = !plansSeen && IS.plansBanner(auth.cfg, me);
-        if (!pb) return null;
-        const first = pb.plans[0];
-        return h("div", { className: "notice plans", role: "note" },
-          h("b", null, `New: Auto-Apply plans now start at ${pb.from}. `),
-          `It's free with any email (${pb.free} applications filled a month, or ${pb.edu} with a school .edu email), and `,
-          pb.plans.map((pl, i) => `${pl.label} gives you ${pl.runs} for ${pl.price}`).join(", or "),
-          // was: ". It never submits for you. "
-          ". It never submits for you. No refunds by default: the AI cost is spent when a run happens, so start free and pay only if you hit the cap. ",
-          auth.token && me && me.can_upgrade
-            ? h("button", { type: "button", className: "btn primary", disabled: !!busy, onClick: () => billing("checkout", first.plan) }, `Get ${first.label} · ${first.price}`)
-            : h("a", { href: "pricing/" }, "Plans and prices"),
-          " ", h("a", { href: "compare/" }, "How it compares"),
-          " ", h("a", { href: "#", onClick: prevent(hidePlans), "aria-label": "Hide this announcement" }, "Hide"));
-      })(),
-      // What students say (2026-10-05 audit): only words a student actually wrote, with permission, from
-      // CONFIG.testimonials in index.html. The list is empty until there are some, and then this renders
-      // nothing, so no invented quote can ever appear here.
-      C.testimonials && C.testimonials.length > 0 && h("section", { className: "said", "aria-labelledby": "said-title" },
-        h("h2", { id: "said-title" }, "What students say"),
-        h("ul", null, C.testimonials.map((t, i) => h("li", { key: i },
-          h("blockquote", null, `“${t.quote}”`),
-          h("div", { className: "who" }, t.name, t.who ? `, ${t.who}` : ""))))),
+      // was: firstVisit && figuresEl, setupOpen && h(Setup, {...}), !firstVisit && figuresEl,
+      p && setupEl,
+      figuresEl,
+      !p && setupEl,
+      setupAskEl,
+      !narrow && promoEls,
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), "do the Deep Dive so the agent knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Start the Deep Dive")),
       note && h("div", { className: "notice", role: "status" }, note),
@@ -1446,13 +1609,6 @@
           h("a", { href: "#", onClick: prevent(openInvite) }, offerPl ? "Or invite a classmate" : "Invite a classmate"),
           // An inviter is rewarded for their first REFERRAL.maxRewards classmates only (worker/src/referral.js).
           `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates.`))),
-      // The review line (2026-10-07). Following the link tells the extension too, so its own card stops
-      // asking. Hidden a tick later, not in the click itself: a link taken out of the page mid-click
-      // doesn't open. js/count.js counts the click as "review_click", a daily total with nothing about who.
-      reviewLine && !upgradeAsk && h("div", { className: "notice quietnote review-line" },
-        "Using Auto-Apply? A short review on the Chrome Web Store helps other students find it. ",
-        h("a", { href: IS.REVIEWS_URL, target: "_blank", rel: "noopener", onClick: () => { IS.ext.call({ type: "review_ask", action: "review" }); setTimeout(hideReview, 0); } }, "Leave a review"),
-        " ", h("a", { href: "#", style: { color: "var(--ink3)", fontWeight: 400 }, onClick: prevent(hideReview), "aria-label": "Hide this suggestion" }, "Hide")),
       // Arrived from the extension's Upgrade button, with runs still left or before /me has loaded.
       !outOfRuns && upgradeAsk && h("div", { className: "notice" },
         !auth.token ? "Sign in (top right) to pick a plan. A plan raises how many Auto-Apply runs you get each month. "
@@ -1473,6 +1629,8 @@
           h("button", { type: "button", className: "btn primary", onClick: shareInvite }, navigator.share ? "Share link" : "Copy link"),
           inviteNote && h("span", { className: "muted", role: "status" }, inviteNote))),
 
+      h("section", { id: "results", "aria-labelledby": "listings" },
+      h("h2", { id: "listings", className: "sr", tabIndex: -1 }, "Listings"),
       // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
       // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows
       // how many of them are set so nothing is hidden by surprise.
@@ -1481,7 +1639,10 @@
         f.company.length > 0 && h("button", { type: "button", className: "btn", title: "Show every employer", onClick: () => upd("company", []) },
           "Employer: " + f.company[0] + " \u00d7"),
         h(MultiSelect, { placeholder: "Field", options: opts.fields, selected: f.fields, onChange: v => upd("fields", v) }),
-        h(MultiSelect, { placeholder: p ? "State (your areas)" : "State", options: opts.states, selected: f.states, onChange: v => upd("states", v) }),
+        // "Everywhere" stands alone: picking it drops the states, and picking a state drops it.
+        // was: placeholder: p ? "State (your areas)" : "State"
+        h(MultiSelect, { label: "State", placeholder: scope.all ? "State: everywhere" : "State: your areas", options: opts.states, selected: f.states,
+          onChange: v => upd("states", v[v.length - 1] === IS.ALL_KEY ? [IS.ALL_KEY] : v.filter(k => k !== IS.ALL_KEY)) }),
         h(Sel, { label: "Sort", value: f.sort, onChange: v => upd("sort", v) }, opt("score", "Sort: best match"), opt("new", "Sort: newest"), opt("company", "Sort: company A–Z"), opt("comp", "Sort: pay listed")),
         h("button", { type: "button", className: cx("btn morebtn", moreOpen && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
           moreOpen ? "Fewer filters" : "More filters", moreCount > 0 && h("span", { className: "count ok" }, moreCount)),
@@ -1503,10 +1664,14 @@
         h(Sel, { label: "Saved searches", value: "", onChange: onSaved }, opt("", "Saved searches"), saved.map(s => opt(s.name, s.name)), opt("__save", "+ Save current filters…"),
           saved.length > 0 && h("optgroup", { label: "Delete" }, saved.map(s => h("option", { key: "d" + s.name, value: "del:" + s.name }, `Delete “${s.name}”`))))),
       h("div", { className: "filterbar-foot" },
-        h("span", { role: "status" }, loading && !all.length ? "Loading…" : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${loading ? " · loading more states…" : ""}`),
+        // was: role=status on this span; the live region below says the count once it settles.
+        h("span", null, counting ? "Loading…" : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${loading ? ` · loading more states (${pr.done} of ${pr.total})…` : ""}`),
+        ranked && rows.length > 1 && h("span", { className: "muted" }, "Closest matches to your search first"),
         anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
+      h("div", { className: "sr", role: "status", "aria-live": "polite", "aria-atomic": "true" }, spoken),
 
-      searching && !wantDesc && h("div", { className: "notice" }, `Searching titles, companies and fields in ${keys.length} states. `,
+      // was: `Searching titles, companies and fields in ${keys.length} states. `
+      searching && !wantDesc && h("div", { className: "notice" }, `Searching titles, companies, fields and places in ${scope.all ? "every state" : keys.length + " states"}. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)"),
       wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
       wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
@@ -1516,19 +1681,29 @@
       err ? h("div", { className: "sheet empty", role: "alert" }, "Couldn't load listings. Check your connection and try again. ",
         h("button", { type: "button", className: "btn", onClick: () => reload(false) }, "Retry listings"))
         : loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
-          : rows.length === 0 ? h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
-            : h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" },
+          // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
+          : rows.length === 0 ? emptyEl
+            : h(F, null, h("a", { className: "skip inline", href: "#list-end" }, "Skip past the listings"),
+              h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" },
               h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
                 sortTh("company", "Company and role"), h("th", { scope: "col" }, "Field"), h("th", { scope: "col" }, "Location and term"),
                 sortTh("comp", "Pay"), sortTh("score", "Match"), h("th", { scope: "col" }, "Your status"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")))),
-              h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scores.get(r.id), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
+              h("tbody", null, shown.map(r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, elig, patterns: stats && stats.skill_patterns }))))),
-              rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))),
+              h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
+              rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: () => setLimit(l => l + PAGE) }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`))))),
+
+      narrow && promoEls,
+      // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide }),
+      // was: h(Landing, { open: landingOpen && !setupOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans }),
+      // was: h(Landing, { ..., plans: payPlans, installed: info.installed || !!info.stale }),
+      // Under the list since 2026-10-14, so "What InternScout does" no longer pushes the search down.
+      h(Landing, { open: landingOpen, setOpen: setLandingOpen, onSetup: () => setSetupOpen(true), hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
 
       // Below the list and above the footer links, so it never pushes a listing down.
-      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: () => setSetupOpen(true) }),
+      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: () => setSetupOpen(true) })),
 
       h("footer", null,
         // Same facts as before, in two short sentences instead of one long one. The plan prices
