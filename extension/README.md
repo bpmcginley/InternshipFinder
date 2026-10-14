@@ -55,6 +55,14 @@ you sign out.
   `form.submit()` and `requestSubmit()` are never used. Two kinds of widget are sent a scripted key
   press to open or pick from a list (Workday search boxes get Enter; dropdown buttons get Arrow Down,
   Enter or Space). A scripted key press does not make the browser submit a form.
+- "Submit-like" covers more than the word Submit. Apply, Send, Finish, Done and Confirm (with arrows,
+  icons or extra words, and the same words in several other languages) are refused once the
+  application has answers in it, on this page or an earlier one, and on any page whose heading says
+  it is the review step. So is any submit button inside the form that holds your answers, unless it
+  says it goes somewhere else (Next, Continue, Save, Sign in). Before anything is filled, Apply on a
+  job page still opens the form.
+- Pause and Take over stop the agent at once: the AI call in progress is cancelled, a reply that
+  arrives anyway is ignored, and nothing the agent decides afterwards replaces your status.
 - Passwords are filled by the extension and are never sent to the model. A stored password is typed
   only into a password box, and a box it was typed into is never read back.
 - Passwords in Chrome storage are not encrypted at rest. See them under **Accounts**.
@@ -82,7 +90,7 @@ test/        guard.test.mjs, fixtures/
 
 ## Tests
 ```bash
-node --test extension/test/guard.test.mjs
+node --test extension/test/*.test.mjs
 ```
 Fixture forms: serve the repo root (`python -m http.server 8000`) and queue
 `http://localhost:8000/extension/test/fixtures/workday-like.html` from the side panel.

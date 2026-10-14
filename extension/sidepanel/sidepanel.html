@@ -54,8 +54,10 @@ a{color:var(--accent)}
 .card.review .msg{margin-top:4px;color:var(--ink2);font-size:12.5px}
 .card.review .fb{margin-top:8px}
 .foot{display:flex;justify-content:center;margin-top:6px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 </style></head><body>
 <header><b>InternScout</b><nav><button data-tab="queue" class="on">Queue</button><button data-tab="answers">Answers</button><button data-tab="accounts">Accounts</button></nav></header>
 <main id="main"></main>
+<div id="live" class="sr" role="status" aria-live="polite"></div>
 <script type="module" src="sidepanel.js"></script>
 </body></html>

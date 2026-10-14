@@ -66,6 +66,96 @@ test("a submit-id'd button is rescued only when its label starts with a navigati
   }
 });
 
+// ---- 2026-10-13 product review: decorated, reworded and foreign final buttons ----
+// Every one of these was clickable on a filled form, and in headless Chrome the agent's click sent it.
+const DECORATED = ["Apply now ->", "Apply now →", "Apply ->", "Apply >>", "Apply now arrow_forward", "Apply chevron_right",
+  "arrow_forward Apply", "Apply now east", "Send ->", "Send send", "Apply for this internship", "Apply to this internship",
+  "Apply for the position", "Apply to Acme", "Apply Now - Data Intern", "Finish & Apply", "Done ✓", "Confirm ✓",
+  "Done!", "Finish", "Finalize", "Complete", "All done", "I’m done", "Easy Apply", "Quick apply",
+  "Enviar", "Enviar solicitud", "Postuler", "Bewerbung absenden", "Absenden", "Envoyer ma candidature", "Invia", "Candidatar-se", "送信"];
+
+test("decorated, reworded and non-English final buttons are refused on a filled form", () => {
+  for (const t of DECORATED) {
+    assert.equal(G.allowClick(btn(t), { filledFields: 3 }).allowed, false, t);
+    assert.equal(G.allowClick(btn(t, { type: "submit" }), { filledFields: 3 }).allowed, false, t + " (type=submit)");
+  }
+});
+
+test("the text and the aria-label are each read on their own", () => {
+  // Arrow text, real label in aria-label (the review's case), and the other way round.
+  assert.equal(G.allowClick(btn("->", { ariaLabel: "Apply now" }), filled).allowed, false);
+  assert.equal(G.allowClick(btn("arrow_forward", { ariaLabel: "Send application" }), empty).allowed, false);
+  assert.equal(G.allowClick(btn("Apply now", { ariaLabel: "Go" }), filled).allowed, false);
+  assert.equal(G.allowClick(btn("", { title: "Finish" }), filled).allowed, false);
+  assert.equal(G.allowClick(btn("", { value: "Apply ->", type: "submit" }), filled).allowed, false);
+  // A submit button with only a symbol on it says no more than an empty one.
+  assert.equal(G.allowClick(btn("→", { type: "submit" }), filled).allowed, false);
+  assert.equal(G.allowClick(btn("→", { type: "submit" }), empty).allowed, true);
+});
+
+test("before anything is filled, Apply on a job page still opens the form", () => {
+  for (const t of ["Apply", "Apply now ->", "Apply for this internship", "Apply to Acme", "Easy Apply", "Postuler", "Apply now arrow_forward"]) {
+    assert.equal(G.allowClick(btn(t), { filledFields: 0, runFilled: false, reviewStep: false }).allowed, true, t);
+  }
+});
+
+test("navigation and account buttons keep working on a filled form, once the run has filled, and decorated", () => {
+  const ctx = { filledFields: 4, runFilled: true };
+  for (const t of ["Next", "Next ->", "Next arrow_forward", "→ Next", "Continue", "Continue →", "Save and Continue", "Save & Continue",
+    "Back", "Previous", "Add Another", "Upload", "Create Account", "Sign In", "Sign in ->", "Log in", "Register", "Verify",
+    "Apply Manually", "Autofill with Resume", "Use My Last Application", "Add Work Experience",
+    "Send code", "Send verification code", "Send me a link", "Resend code", "Complete registration", "Done creating account",
+    "Confirm email", "Sign in to apply", "Review application", "Preview", "Search"]) {
+    assert.equal(G.allowClick(btn(t), ctx).allowed, true, t);
+    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 4 }), ctx).allowed, true, t + " (submit in the filled form)");
+  }
+});
+
+test("a submit button in the form holding the answers is refused unless it plainly goes somewhere else", () => {
+  for (const t of ["Let's go", "Go!", "Lets do this", "I'm ready", "Fertig"]) {
+    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 2 }), filled).allowed, false, t);
+    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 0 }), empty).allowed, true, t + " (nothing filled in its form)");
+    assert.equal(G.allowClick(btn(t, { type: "button", formFilled: 0 }), filled).allowed, true, t + " (not a submit button)");
+  }
+  for (const t of ["Save", "Proceed", "Start application", "Get started", "Edit", "Cancel", "Accept and continue"]) {
+    assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 2 }), filled).allowed, true, t);
+  }
+});
+
+test("a read-only review step: Apply, Finish, Confirm, Send and Done are refused once the run has filled answers", () => {
+  for (const t of ["Apply", "Finish", "Confirm", "Send", "Done", "Submit", "Apply now ->"]) {
+    // 0 filled fields on this page, as on a text-only summary step
+    assert.equal(G.allowClick(btn(t), { filledFields: 0, runFilled: true }).allowed, false, t + " (run filled earlier)");
+    assert.equal(G.allowClick(btn(t, { type: "submit" }), { filledFields: 0, runFilled: true }).allowed, false, t + " (type=submit)");
+    assert.equal(G.allowClick(btn(t), { filledFields: 0, runFilled: false, reviewStep: true }).allowed, false, t + " (review heading)");
+  }
+  assert.equal(G.allowClick(btn("Next"), { filledFields: 0, runFilled: true, reviewStep: true }).allowed, true);
+});
+
+test("which headings and step labels say this is the review step", () => {
+  for (const h of ["Review", "Review and Submit", "Review & submit", "Review your application", "Step 5 of 5: Review",
+    "current step 7 of 7 Review", "Confirm", "Confirmation", "Confirm your application", "Application Review", "Application summary",
+    "Summary of your application", "Check your answers", "Verify your information"]) {
+    assert.equal(G.reviewStep([h]), true, h);
+  }
+  // A job description's own headings sit right above its Apply button.
+  for (const h of ["Summary", "Job Summary", "Position Summary", "Review our benefits", "Reviews", "Data Intern", "Apply now",
+    "Confirm your email address", "My Information", "Voluntary Disclosures"]) {
+    assert.equal(G.reviewStep([h]), false, h);
+  }
+});
+
+test("the click block comes off again", () => {
+  const listeners = new Set();
+  const doc = { addEventListener: (t, h) => listeners.add(h), removeEventListener: (t, h) => listeners.delete(h) };
+  G.installClickBlock(doc);
+  G.installClickBlock(doc);
+  assert.equal(listeners.size, 1);
+  G.removeClickBlock(doc);
+  assert.equal(listeners.size, 0);
+  assert.equal(doc.__isClickBlock, undefined);
+});
+
 // ---- gates the human clears themselves ----
 const page = (o = {}) => ({ headings: [], step: "", buttons: [], text: "", elements: [], ...o });
 const el = (kind, label, extra = {}) => ({ kind, label, question: "", ...extra });

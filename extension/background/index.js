@@ -1,6 +1,6 @@
 // Service worker entry: message router, scheduler (max N tabs), notifications, submit detection.
 import { addJobs, getQueue, getJob, updateJob, removeJob, publicQueue, publicJob, onQueueChange, jobForTab, saveMsgs, getTailoredFile } from "./queue.js";
-import { runJob, resumeJob, isRunning, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
+import { runJob, resumeJob, isRunning, stopJob, takeBack, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker } from "../lib/store.js";
 import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData } from "../lib/auth.js";
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
@@ -100,10 +100,10 @@ async function control(id, action, answer) {
   if (!j) return { error: "No such job" };
   switch (action) {
     case "pause":
-      await updateJob(id, { status: "needs_you", reason: "Paused. Press Resume to continue.", activity: "" });
+      await takeBack(id, { status: "needs_you", reason: "Paused. Press Resume to continue.", activity: "" });
       break;
     case "takeover":
-      await updateJob(id, { status: "needs_you", reason: "You took over. Press Resume to hand it back.", activity: "" });
+      await takeBack(id, { status: "needs_you", reason: "You took over. Press Resume to hand it back.", activity: "" });
       await focusJob(j);
       break;
     case "resume":
@@ -116,7 +116,8 @@ async function control(id, action, answer) {
       await saveMsgs(id, []);
       // Start from a clean page: reload the tab so no half-filled form or stale page script carries over.
       if (j.tabId) await chrome.tabs.update(j.tabId, { url: j.apply_url }).catch(() => {});
-      await updateJob(id, { status: "queued", pending: null, steps: 0, reason: "", question: "", summary: "", double_check: [], run_id: null });
+      // run_filled: a new run has filled nothing yet (guard.js runFilled).
+      await takeBack(id, { status: "queued", pending: null, steps: 0, reason: "", question: "", summary: "", double_check: [], run_id: null, run_filled: false });
       schedule();
       break;
     case "approve_tailored":
@@ -130,10 +131,11 @@ async function control(id, action, answer) {
       await focusJob(j);
       break;
     case "submitted":
-      await updateJob(id, { status: "submitted", activity: "", submitted_at: Date.now() });
+      await takeBack(id, { status: "submitted", activity: "", submitted_at: Date.now() });
       break;
     case "remove":
       if (j.status === "working") await updateJob(id, { status: "failed", reason: "Removed" });
+      stopJob(id);   // was: the run kept filling and clicking in the tab after its job was gone
       await removeJob(id);
       break;
     default:

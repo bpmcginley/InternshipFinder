@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 16; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
+  const V = 17; // bump when this file changes, so a reloaded extension replaces the old copy in open tabs
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -451,9 +451,18 @@
       deepQueryAll('h1, h2, [role="heading"]').filter(A.visible).map(txt).join("|")].join("~"), 400);
   }
 
-  function snapshot() {
+  let clickSeq = 0;   // the agent's own clicks, for the click block's window in act()
+  // opts.runFilled: this run already filled answers on an earlier page (background/agent.js). Kept on
+  // the document, where guard.js pageContext reads it; a new page is a new document and is told again.
+  const markRun = (opts) => { if (opts && opts.runFilled) document.__isRunFilled = true; };
+
+  function snapshot(opts = {}) {
     if (CAPTCHA_FRAME) return { url: location.href, title: document.title, headings: [], step: "", errors: [], captcha: false, elements: [], buttons: [], text: "", filledFields: 0, captchaFrame: true };
-    G.installClickBlock(document);
+    markRun(opts);
+    // was: G.installClickBlock(document), on every snapshot and never removed, so on sites whose styled
+    // button forwards the click to a hidden submit, the student's own Submit did nothing. The block now
+    // lives only around the agent's own click (act); this clears one an older version left behind.
+    G.removeClickBlock(document);
     const elements = collect();
     const ctx = G.pageContext(document);
     const buttons = collectButtons(ctx);
@@ -464,7 +473,7 @@
       .filter(A.visible).map(txt).filter(Boolean).map((t) => cut(t, 160)))].slice(0, 12);
     const captcha = captchaShown();
     const text = elements.length < 4 ? cut(txt(document.body), 2500) : "";
-    return { url: location.href, title: document.title, headings, step, errors, captcha, elements, buttons, text, filledFields: ctx.filledFields, busy: !elements.length && busy(), frozen: frozen() };
+    return { url: location.href, title: document.title, headings, step, errors, captcha, elements, buttons, text, filledFields: ctx.filledFields, reviewStep: ctx.reviewStep, busy: !elements.length && busy(), frozen: frozen() };
   }
 
   async function fillText(rec, text, secret) {
@@ -557,11 +566,16 @@
       try { el.scrollIntoView({ block: "center" }); } catch (e) {}
       let r;
       if (action === "click") {
+        markRun(p);
         const t = G.clickTarget(el) || el;
         const verdict = G.allowClick(G.describe(t), G.pageContext(document));
         if (!verdict.allowed) return { ok: false, blocked: true, error: "BLOCKED: " + verdict.reason };
+        // Only for this click: a page script that turns it into a click on a hidden final button, at
+        // once or a moment later, is stopped. Then it comes off, so the student's own clicks work.
+        // A second click inside that window keeps it on for its own 300 ms.
+        const mine = ++clickSeq;
         G.installClickBlock(document);
-        A.mouseClick(t);
+        try { A.mouseClick(t); } finally { setTimeout(() => { if (mine === clickSeq) G.removeClickBlock(document); }, 300); }
         return { ok: true };
       }
       if (action === "fill" && p.secret) {
@@ -691,7 +705,8 @@
     return done;
   }
 
-  function highlight() {
+  function highlight(opts = {}) {
+    markRun(opts);
     if (!document.getElementById("is-hl-style")) {
       const s = document.createElement("style");
       s.id = "is-hl-style";

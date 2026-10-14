@@ -49,6 +49,7 @@ ACCOUNTS
 
 FINISHING
 - The final submit button is reserved for the human and is blocked in code. Buttons marked BLOCKED must not be clicked.
+- The final button is not always called Submit. Once the application has answers in it, a button saying Apply, Send, Finish, Done or Confirm on the last page or a review page is the final one: never click it, call ready_to_submit.
 - When all pages are complete and only final submission remains (review page, or the last page whose main button is Submit), call ready_to_submit with a one-line summary and anything worth double-checking.
 - If stuck (same page three times with no progress, broken widget, site error, page not an application), call pause_for_user and say what the human should do.
 Keep any text outside tool calls to one short line.`;
@@ -219,8 +220,10 @@ export function formatSnapshot(frames, fails = {}) {
   // Labels of fields this snapshot already shows with a value; see preFilledLine.
   const shown = new Set();
   let hasFinal = false;
+  // A frame whose heading or step indicator says review / confirm (guard.js pageContext).
+  const reviewStep = frames.some((f) => f.reviewStep);
   const top = frames.find((f) => f.frameId === 0) || frames[0];
-  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown };
+  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown, reviewStep };
   lines.push(`URL: ${top.url}`, `TITLE: ${top.title}`);
   for (const f of frames) {
     if (f.frameId !== 0 && !f.elements.length && !f.buttons.length) continue;
@@ -256,7 +259,7 @@ export function formatSnapshot(frames, fails = {}) {
     }
     if (f.text) lines.push(`PAGE TEXT: ${f.text}`);
   }
-  return { text: lines.join("\n"), index, top, hasFinal, shown };
+  return { text: lines.join("\n"), index, top, hasFinal, shown, reviewStep };
 }
 
 // fastFill reports "Label = value" for each field it filled, and the snapshot right after it shows the
@@ -441,7 +444,8 @@ function accountLine(store, url) {
 }
 
 // ---------- tailored resume ----------
-async function tailorStep(id, job, store) {
+// own: loop()'s status writer, so a Pause pressed while the resume is tailored is not overwritten.
+async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch)) {
   await updateJob(id, { activity: "Tailoring your resume to this posting…" });
   try {
     const { cost_usd, reused, ...t } = await tailorResume(store, job);
@@ -463,7 +467,7 @@ async function tailorStep(id, job, store) {
       return job;
     }
     await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${reused ? ", reused from an earlier run at no cost" : ""}${auto ? ", used automatically" : ""}.` });
-    if (!auto) job = await updateJob(id, { status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
+    if (!auto) job = await own({ status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
   } catch (e) {
     const msg = String((e && e.message) || e);
     // was: job = await updateJob(id, { tailored: { status: "failed", error: msg } });
@@ -500,35 +504,73 @@ const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter
 // ---------- main loop ----------
 const running = new Set();
 export const isRunning = (id) => running.has(id);
+// Pause, Take over, Resume, Retry, "I submitted it" and Remove all bump job.gen (index.js control,
+// resumeJob). A run owns its job only while the job is still "working" at the gen it started with.
+// Before this the loop checked the status once per turn, at the top: an AI reply already on its way
+// when the student pressed Take over still filled fields and clicked buttons, then wrote its own
+// status over "You took over" (it could even turn Submitted back into Needs you).
+export const owns = (j, gen) => !!j && j.status === "working" && (j.gen || 0) === gen;
+// The AI call in flight for each running job, so Pause and Take over can cut it off (stopJob).
+const aborts = new Map();
+// runJob was asked for while an older run of the same job was still winding down (Pause, then Resume
+// inside one AI call). It starts again once that one has gone, instead of leaving the job on "Working"
+// with no run behind it.
+const rerun = new Set();
+export function stopJob(id) {
+  const c = aborts.get(id);
+  if (c) c.abort();
+}
+// The student's own status (Pause, Take over, Retry, "I submitted it"; index.js control), written with
+// a new gen so a run still in flight knows the job is no longer its own, and with that run's AI call
+// cut off. was: the status alone, which a late AI reply then acted on and wrote over.
+export async function takeBack(id, patch) {
+  const j = await updateJob(id, (x) => ({ ...patch, gen: (x.gen || 0) + 1 }));
+  stopJob(id);
+  return j;
+}
 
 export async function runJob(id) {
-  if (running.has(id)) return;
+  if (running.has(id)) { rerun.add(id); return; }
   running.add(id);
+  const ctrl = new AbortController();
+  aborts.set(id, ctrl);
+  const run = { gen: null, signal: ctrl.signal };
   // Chrome stops an idle MV3 service worker after 30 s, and a slow AI reply counts as idle.
   // Calling any extension API resets that timer, so a job in progress is not cut off mid-step.
   const keepalive = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); } catch {} }, 20000);
   try {
-    await loop(id);
+    await loop(id, run);
   } catch (e) {
-    await updateJob(id, { status: "failed", reason: String((e && e.message) || e), activity: "" });
+    // was: written whatever the job's status. A run the student stopped ends quietly.
+    if (!ctrl.signal.aborted) await updateJob(id, (j) => ((run.gen == null ? !!j && j.status === "working" : owns(j, run.gen))
+      ? { status: "failed", reason: String((e && e.message) || e), activity: "" } : {}));
   } finally {
     clearInterval(keepalive);
     running.delete(id);
+    if (aborts.get(id) === ctrl) aborts.delete(id);
+  }
+  if (rerun.delete(id)) {
+    const j = await getJob(id);
+    if (j && j.status === "working") await runJob(id);
   }
 }
 
-async function loop(id) {
+async function loop(id, run) {
   let job = await getJob(id);
   if (!job) return;
+  const gen = run.gen = job.gen || 0;
+  // Every status this run decides goes through here, so none of it lands on a job the student has
+  // paused, taken over, finished or restarted since. A function patch sees the job as stored.
+  const own = (patch) => updateJob(id, (j) => (owns(j, gen) ? (typeof patch === "function" ? patch(j) : patch) : {}));
   let store = await loadStore();
   if (!hasKey(store)) {
-    await updateJob(id, { status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Deep Dive → Setup), then Resume.` });
+    await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Deep Dive → Setup), then Resume.` });
     return;
   }
   if (isWorker(store.ai) && !(await ensureToken())) {
     // needs_auth gives the card a "Sign in & resume" button. A plain Resume only re-ran this check, and an
     // expired sign-in (they last an hour) that could not refresh silently stayed stuck here.
-    await updateJob(id, { status: "needs_you", needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
+    await own({ status: "needs_you", needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
     return;
   }
   // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
@@ -538,18 +580,22 @@ async function loop(id) {
   if (!(await hasHostAccess(job.apply_url))) {
     // Flags outlive the pause that set them, and the side panel checks needs_auth before needs_host,
     // so clear the other one here or a sign-in that expired earlier hides the Allow button.
-    await updateJob(id, { status: "needs_you", needs_host: job.apply_url, needs_auth: false, activity: "",
+    await own({ status: "needs_you", needs_host: job.apply_url, needs_auth: false, activity: "",
       reason: `InternScout needs your permission to work on ${hostOf(job.apply_url)}. Allow it below, then Resume.` });
     return;
   }
   // One Auto-Apply run = one allowance unit on the InternScout Worker; kept across Resume, reset by Retry.
   if (!job.run_id) job = await updateJob(id, { run_id: crypto.randomUUID() });
   if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
-    job = await tailorStep(id, job, store);
-    if (job.status !== "working") return; // waiting for the human to approve it
+    job = await tailorStep(id, job, store, own);
+    if (!owns(job, gen)) return; // waiting for the human to approve it, or stopped meanwhile
   }
   let tabId = await ensureTab(job);
-  job = await updateJob(id, { tabId, status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null });
+  // was: { tabId, status: "working", ... } written whatever had happened meanwhile, which undid a
+  // Pause pressed while the resume was being tailored or the tab was opening.
+  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null };
+  job = await updateJob(id, (j) => (owns(j, gen) ? { tabId, ...fresh } : { tabId }));
+  if (!owns(job, gen)) return;
   const msgs = await loadMsgs(id);
   const fails = {};
   let pending = job.pending || null;
@@ -558,18 +604,25 @@ async function loop(id) {
   let sleepy = 0, sleepText = null;
   // The no-progress breaker's counters (progressCheck). Started fresh here, so Resume gets a clean count.
   let progress = freshProgress();
+  // Whether this run has filled answers on an earlier page (guard.js allowClick runFilled). Kept on the
+  // job so Resume keeps it; Retry clears it with the rest of the run. Sign-in and sign-up pages (any
+  // with a password box) do not count: the posting's own Apply button often comes after them.
+  let runFilled = !!job.run_filled;
+  const noteFilled = async () => { if (!runFilled) { runFilled = true; await updateJob(id, { run_filled: true }); } };
+  const shot = () => inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]);
 
   while (true) {
     job = await getJob(id);
-    if (!job || job.status !== "working") return;
+    // was: if (!job || job.status !== "working") return;
+    if (!owns(job, gen)) return;
     if (steps >= MAX_STEPS) {
-      await updateJob(id, { status: "needs_you", reason: `Stopped after ${MAX_STEPS} steps. Finish by hand, or Resume to let it keep going.`, steps: 0, pending });
+      await own({ status: "needs_you", reason: `Stopped after ${MAX_STEPS} steps. Finish by hand, or Resume to let it keep going.`, steps: 0, pending });
       await saveMsgs(id, msgs);
       return;
     }
     const sp = await spend();
     if (sp.over && !isWorker(store.ai)) {
-      await updateJob(id, { status: "needs_you", reason: `Monthly AI budget reached (${money(sp.month_usd)} of ${money(sp.budget)}). Raise it in Deep Dive → Setup, then Resume.`, pending, activity: "" });
+      await own({ status: "needs_you", reason: `Monthly AI budget reached (${money(sp.month_usd)} of ${money(sp.budget)}). Raise it in Deep Dive → Setup, then Resume.`, pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
     }
@@ -577,7 +630,7 @@ async function loop(id) {
     const cur = await waitForTab(tabId);
     // A redirect or a new tab can land on a site the student never allowed (company page -> external ATS).
     if (cur && cur.url && !(await hasHostAccess(cur.url))) {
-      await updateJob(id, { status: "needs_you", needs_host: cur.url, needs_auth: false, pending, activity: "",
+      await own({ status: "needs_you", needs_host: cur.url, needs_auth: false, pending, activity: "",
         reason: `The application moved to ${hostOf(cur.url)}. Allow InternScout there below, then Resume.` });
       await saveMsgs(id, msgs);
       return;
@@ -597,7 +650,7 @@ async function loop(id) {
     let pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
       .flatMap((r) => r.result || []);
 
-    let frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+    let frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
     // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
     // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
     //
@@ -621,7 +674,7 @@ async function loop(id) {
       if (i >= 3 && still >= 2) break;
       await sleep(i ? 2000 : 2500);
       await inject(tabId);
-      frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
     // fastFill ran before that wait, so on a page that had not drawn itself yet it was handed an empty
     // form and filled nothing. Now that the fields exist, give the rules their turn: every field the
@@ -630,7 +683,7 @@ async function loop(id) {
     if (!pre.length && frames.some((f) => f.elements.length)) {
       pre = (await inFrames(tabId, (f, file) => window.ISDom && window.ISDom.fastFill(f, file), [facts, resume]))
         .flatMap((r) => r.result || []);
-      if (pre.length) frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+      if (pre.length) frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
     }
     // A page Chrome has put to sleep answers every snapshot with whatever was on screen when the
     // student left, so acting on it would be acting on a photograph. Say so instead of guessing.
@@ -640,13 +693,15 @@ async function loop(id) {
     if (asleep) {
       await sleep(2500);
       await inject(tabId);
-      frames = (await inFrames(tabId, () => window.ISDom && window.ISDom.snapshot())).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
       asleep = frames.some((f) => f.frozen);
     }
 
     const snap = formatSnapshot(frames, fails);
     snap.tabId = tabId;
     const url = (snap.top && snap.top.url) || job.apply_url;
+    const accountPage = frames.some((f) => (f.elements || []).some((e) => e.kind === "password"));
+    if (pre.length && !accountPage) await noteFilled();
 
     // A sleeping tab still runs its scripts, just slowly, so its DOM is real and a CAPTCHA or a
     // login wall found in it is real too. Name that instead when there is one: it is the more
@@ -664,14 +719,14 @@ async function loop(id) {
     const gate = gateIn(frames) || (stuckAsleep ? { kind: "background_tab", reason: "this tab is asleep in the background and the page stopped changing" } : null);
     if (gate) {
       await appendLog(job.id, { kind: "gate", text: `Paused: ${gate.reason}` });
-      await updateJob(id, { status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
+      await own({ status: "needs_you", reason: GATE_HELP[gate.kind], question: "", pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
     }
 
     if (!msgs.length && (postingGone(job, snap, frames) || pageGone(frames))) {
       await appendLog(job.id, { kind: "gate", text: "Paused: this is not the posting you picked." });
-      await updateJob(id, { status: "needs_you", pending, activity: "", question: "",
+      await own({ status: "needs_you", pending, activity: "", question: "",
         reason: `The link for "${job.title}" opened somewhere else — the employer has most likely closed the posting. Look at the tab: if the job is gone, remove this one; if you find it, open it yourself and press Resume.` });
       await saveMsgs(id, msgs);
       return;
@@ -679,7 +734,7 @@ async function loop(id) {
 
     if (!msgs.length && deadPage(frames)) {
       await appendLog(job.id, { kind: "gate", text: "Paused: nothing loaded on this page." });
-      await updateJob(id, { status: "needs_you", pending, activity: "", question: "",
+      await own({ status: "needs_you", pending, activity: "", question: "",
         reason: "Nothing loaded on that page — no application, no Apply button. The link is probably dead, or the site is not letting us in. Have a look in the tab: if you get to a form, press Resume." });
       await saveMsgs(id, msgs);
       return;
@@ -687,11 +742,11 @@ async function loop(id) {
 
     if (!msgs.length && globalThis.ISGuard.nothingLeftForAI(frames, pre.length)) {
       await appendLog(job.id, { kind: "note", text: `Filled ${pre.length} field(s) from your profile; no AI was needed.` });
-      const hl = (await inFrames(tabId, () => window.ISDom && window.ISDom.highlight())).map((r) => r.result);
+      const hl = (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled }])).map((r) => r.result);
       const missing = hl.reduce((n, h) => n + ((h && h.missing) || 0), 0);
       // highlight() re-reads the page after the fills settled, so it is the last word: if it finds a
       // hole the snapshot missed, say so rather than claiming the form is done.
-      await updateJob(id, {
+      await own({
         status: "ready_to_submit", activity: "", steps: 0,
         summary: `Filled ${pre.length} field(s) from your profile. Nothing on this page needed AI, so it cost you no allowance. Check every answer before you submit.`,
         double_check: missing ? [`${missing} required field(s) look empty (amber outline).`] : [],
@@ -707,7 +762,7 @@ async function loop(id) {
       await appendLog(job.id, { kind: "gate", text: progress.stuckSame >= SAME_SNAPSHOTS_MAX
         ? `Paused: the page came back unchanged ${progress.stuckSame} times in a row.`
         : `Paused: ${progress.turnsHere} turns on this page without moving on.` });
-      await updateJob(id, { status: "needs_you", reason: NO_PROGRESS_HELP, question: "", steps: 0, pending, activity: "" });
+      await own({ status: "needs_you", reason: NO_PROGRESS_HELP, question: "", steps: 0, pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
     }
@@ -726,14 +781,17 @@ async function loop(id) {
     const system = buildSystem(store, job);
     let resp;
     try {
-      resp = await callAI({ ai: store.ai, model: modelFor(store, "agent"), system, messages: msgs, tools: TOOLS, max_tokens: 8000, kind: "agent", run_id: job.run_id });
+      resp = await callAI({ ai: store.ai, model: modelFor(store, "agent"), system, messages: msgs, tools: TOOLS, max_tokens: 8000, kind: "agent", run_id: job.run_id, signal: run.signal });
     } catch (e) {
+      // Pause or Take over cut the call off. The stored messages and pending results are still the ones
+      // from before this turn, so Resume picks up from there, and the student's status stands.
+      if (run.signal.aborted || !owns(await getJob(id), gen)) return;
       // Sign-in, allowance, rate or pause: hand the job to the student instead of failing it; Resume retries this step.
       if (!NEEDS_YOU_CODES.has(e && e.code)) throw e;
       msgs.pop();
       // was: await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
       // `upgrade` (a used-up allowance with a bigger plan on offer) puts an Upgrade button on the job card.
-      await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth",
+      await own({ status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth",
         upgrade: e.code === "cap" && e.offer ? e.offer : null });
       await saveMsgs(id, msgs);
       return;
@@ -741,12 +799,19 @@ async function loop(id) {
     // Only when a developer has turned recording on (evalrec.js); the step as the model saw it.
     await recordStep({ at: new Date().toISOString(), host: hostOf(url), company: job.company, title: job.title,
       model: modelFor(store, "agent"), system, messages: msgs, response: resp.content, usage: resp.usage || null });
+    // A reply that arrives after Pause or Take over is dropped unread: nothing it asks for is done, and
+    // the turn stays out of the history, as if the call had been cut off. What it cost still counts.
+    if (!owns(await getJob(id), gen)) {
+      if (resp.cost_usd) await updateJob(id, (j) => ({ cost_usd: (j.cost_usd || 0) + resp.cost_usd }));
+      return;
+    }
     msgs.push({ role: "assistant", content: resp.content });
     steps++;
 
     const uses = resp.content.filter((b) => b.type === "tool_use");
     const say = resp.content.filter((b) => b.type === "text").map((b) => b.text).join(" ").trim();
-    await updateJob(id, (j) => ({ steps, activity: (say || uses.map((u) => u.name).join(", ")).slice(0, 160), cost_usd: (j.cost_usd || 0) + (resp.cost_usd || 0) }));
+    await updateJob(id, (j) => ({ cost_usd: (j.cost_usd || 0) + (resp.cost_usd || 0),
+      ...(owns(j, gen) ? { steps, activity: (say || uses.map((u) => u.name).join(", ")).slice(0, 160) } : {}) }));
 
     if (!uses.length) {
       pending = { results: [], note: resp.stop_reason === "max_tokens"
@@ -758,11 +823,16 @@ async function loop(id) {
     }
 
     const results = [];
-    let stop = null;
+    let stop = null, stopped = false;
     for (const u of uses) {
       if (stop) { results.push(toolResult(u.id, "Not run: the job paused.")); continue; }
+      // Checked before every action, not once per turn: the student can press Pause or Take over while
+      // this reply is being carried out, and from then on the page is theirs.
+      if (!stopped && !owns(await getJob(id), gen)) stopped = true;
+      if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, store, job, fails, url });
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, runFilled, store, job, fails, url });
+      if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
         await groupTab(tabId);
@@ -781,27 +851,32 @@ async function loop(id) {
       pending = { results };
       await updateJob(id, { pending });
       await saveMsgs(id, msgs);
+      if (stopped) return;   // the student has the tab; Resume sends these results with a fresh snapshot
       continue;
     }
 
     await saveMsgs(id, msgs);
+    // pending is written either way, since the history just saved ends with this turn; the status only
+    // while this run still owns the job.
     if (stop.kind === "ready") {
-      const hl = (await inFrames(tabId, () => window.ISDom && window.ISDom.highlight())).map((r) => r.result);
+      const hl = owns(await getJob(id), gen) ? (await inFrames(tabId, (o) => window.ISDom && window.ISDom.highlight(o), [{ runFilled }])).map((r) => r.result) : [];
       const missing = hl.reduce((n, h) => n + ((h && h.missing) || 0), 0);
       const dc = [...(stop.double_check || [])];
       if (missing) dc.unshift(`${missing} required field(s) look empty (amber outline).`);
-      await updateJob(id, { status: "ready_to_submit", summary: stop.summary || "", double_check: dc, activity: "", pending: { results } });
+      await updateJob(id, (j) => (owns(j, gen) ? { status: "ready_to_submit", summary: stop.summary || "", double_check: dc, activity: "", pending: { results } } : { pending: { results } }));
       return;
     }
-    const waitResults = results; // tool_result for the waiting tool is added on resume
-    if (stop.kind === "ask") {
-      await updateJob(id, { status: "needs_you", question: stop.question, reason: stop.why || "The agent needs an answer.", pending: { results: waitResults, waitId: stop.id }, activity: "" });
-    } else {
-      await updateJob(id, { status: "needs_you", reason: stop.reason, question: "", pending: { results: waitResults, waitId: stop.id }, activity: "" });
-    }
+    const waitPending = { results, waitId: stop.id }; // tool_result for the waiting tool is added on resume
+    const asked = stop.kind === "ask"
+      ? { status: "needs_you", question: stop.question, reason: stop.why || "The agent needs an answer.", activity: "" }
+      : { status: "needs_you", reason: stop.reason, question: "", activity: "" };
+    await updateJob(id, (j) => (owns(j, gen) ? { ...asked, pending: waitPending } : { pending: waitPending }));
     return;
   }
 }
+
+// Names no button that could be the final one: only the ways to a next page.
+export const EARLY_READY_PUSHBACK = "No blocked final button is visible yet, so there may be more pages. If there is a Next, Continue or Save and Continue button, use it and keep filling. If this page only shows your answers for review, or nothing is left but the final button, call ready_to_submit again.";
 
 async function execTool(u, ctx) {
   const { name, input = {} } = u;
@@ -853,7 +928,7 @@ async function execTool(u, ctx) {
       chrome.tabs.onCreated.addListener(onNew);
       const before = await pageMark(tabId);
       try {
-        r = await act(tabId, input.ref, "click", {});
+        r = await act(tabId, input.ref, "click", { runFilled: !!ctx.runFilled });
         if (r.ok) { await sleep(1500); await waitForTab(tabId).catch(() => {}); }
       } finally {
         chrome.tabs.onCreated.removeListener(onNew);
@@ -877,10 +952,13 @@ async function execTool(u, ctx) {
     case "pause_for_user":
       return { stop: true, kind: "pause", reason: input.reason };
     case "ready_to_submit":
-      // Guard against stopping early: with no blocked final button in view, push back once.
-      if (!ctx.hasFinal && !fails.__earlyReady) {
+      // Guard against stopping early: with no blocked final button in view, push back once. Not on a
+      // page that says it is the review step, where stopping is exactly right.
+      // was: "...Click Apply / Next / Save and Continue to reach the last page...". On a read-only review
+      // step whose final button said Apply, that sent the model to press it.
+      if (!ctx.hasFinal && !ctx.reviewStep && !fails.__earlyReady) {
         fails.__earlyReady = 1;
-        return { content: "No final Submit button is visible yet, so the application is probably not finished. Click Apply / Next / Save and Continue to reach the last page. Call ready_to_submit again only if you are sure nothing is left.", isError: true };
+        return { content: EARLY_READY_PUSHBACK, isError: true };
       }
       return { stop: true, kind: "ready", summary: input.summary, double_check: input.double_check, content: "Marked ready. The human will review and submit." };
     default:
@@ -911,7 +989,8 @@ export async function resumeJob(id, answer) {
   } else if (job.status === "ready_to_submit") {
     pending = { results: pending.results || [], note: "The human asked you to keep going: re-check the page for anything unfilled or wrong, then call ready_to_submit again." };
   }
-  await updateJob(id, { status: "queued", pending, question: "", reason: "", steps: 0 });
+  // gen: a run still winding down from before the pause must not carry on as this one (agent.js owns).
+  await updateJob(id, (j) => ({ status: "queued", pending, question: "", reason: "", steps: 0, gen: (j.gen || 0) + 1 }));
 }
 
 export async function checkSubmitted(tabId) {
