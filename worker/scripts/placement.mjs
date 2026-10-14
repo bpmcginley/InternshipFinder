@@ -17,6 +17,7 @@
 //   node scripts/placement.mjs pause <id> --reason "..." --by bruce
 //   node scripts/placement.mjs end <id> --reason removed --by bruce
 //   node scripts/placement.mjs refuse <id> --reason "..." --by bruce
+//   node scripts/placement.mjs report <id> --month 2026-11
 //
 // INTERNSCOUT_API_URL overrides the Worker address (for example http://localhost:8787 with `wrangler dev`).
 import { pathToFileURL } from "node:url";
@@ -40,11 +41,13 @@ Commands:
   pause <id>                --reason TEXT
   end <id>                  --reason dates|role_closed|listing_gone|removed|refunded
   refuse <id>               --reason TEXT
+  report <id>               --month YYYY-MM   shown and opened counts for a month that has ended,
+                            rounded down to 10, "fewer than 10" below that (admin)
 
 Every change takes --by LABEL (default "bruce"). End is the first day it no longer shows.
 Set INTERNSCOUT_ADMIN_TOKEN in your environment first; it is never printed.`;
 
-const FLAGS = new Set(["lead", "listing", "url", "start", "end", "employer", "note", "checks", "ref", "reason", "by", "unpaid-ok"]);
+const FLAGS = new Set(["lead", "listing", "url", "start", "end", "employer", "note", "checks", "ref", "reason", "by", "unpaid-ok", "month"]);
 const BOOLEAN = new Set(["unpaid-ok"]);
 
 export function parseArgs(argv) {
@@ -106,6 +109,10 @@ export function toRequest({ cmd, id, extra, flags }) {
       needId();
       need("ref");
       return { method: "POST", path: "/admin/placements/on", admin: true, body: { id, by, paid_ref: flags.ref } };
+    case "report":
+      needId();
+      need("month");
+      return { method: "POST", path: "/admin/placements/report", admin: true, body: { id, month: flags.month } };
     case "pause":
     case "end":
     case "refuse":

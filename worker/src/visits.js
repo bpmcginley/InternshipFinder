@@ -80,6 +80,15 @@ const FLYER_ROWS_PER_DAY = 40;
 const BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|monitor|facebookexternalhit|embedly|curl|wget|python|node-fetch|axios/i;
 
 export const DAY_CAP = 50_000;            // views counted per day; past it, a flood cannot run up the table
+
+// Paid listings (S9, added 2026-10-14; docs/js/count.js). A box shown or its posting opened, per placement.
+// The id must look like one the Worker makes, and the row is only added for a placement that is on today
+// (countPlacementHit), so a made-up id adds nothing. Under its own daily cap, so forged hits can neither
+// crowd out the visit counts nor run up this table.
+export const PLACEMENT_EVENTS = new Set(["shown", "open"]);
+const PLACEMENT_ID = /^[A-Za-z0-9_-]{1,80}$/;
+const PLACEMENT_PAGES = new Set(["dashboard", "landing"]);
+export const PLACEMENT_DAY_CAP = 50_000;
 const PER_MINUTE = 30;                    // per address, per Worker instance, in memory only
 
 // Kept in this instance's memory for the current minute and never written anywhere: enough to stop
@@ -139,6 +148,19 @@ export function channelOf(refHost, utmSource) {
   return "";
 }
 
+// One more for a paid listing's box shown or opened, on a day and kind of page. Only for a placement that is
+// on and inside its dates today, and only on the dashboard or a landing page, where the boxes are.
+async function countPlacementHit(db, day, placement, event, page) {
+  if (!PLACEMENT_PAGES.has(page)) return false;
+  const res = await db.prepare(
+    "INSERT INTO placement_counts (day, placement, page, event, n) SELECT ?1, ?2, ?3, ?4, 1 " +
+    "WHERE EXISTS (SELECT 1 FROM placements WHERE id = ?2 AND status = 'on' AND start_day <= ?1 AND end_day > ?1) " +
+    "AND (SELECT COALESCE(SUM(n), 0) FROM placement_counts WHERE day = ?1) < ?5 " +
+    "ON CONFLICT(day, placement, page, event) DO UPDATE SET n = n + 1",
+  ).bind(day, placement, page, event, PLACEMENT_DAY_CAP).run();
+  return res.meta.changes > 0;
+}
+
 // One more for a browser's step on a day and page, under the same day's cap as the visit counts.
 async function addEvent(db, day, event, page) {
   const ev = await db.prepare(
@@ -180,6 +202,11 @@ export async function countHit(db, request, body, now) {
   if (!ua || BOT_UA.test(ua) || tooFast(request.headers.get("CF-Connecting-IP"), now)) return { counted: false };
   const page = pageKind(body.p);
   const day = now.toISOString().slice(0, 10);
+  // A paid listing's box shown or opened (S9): { s: placement id, e: "shown" | "open", p: path }, nothing else.
+  if (body.s !== undefined) {
+    if (typeof body.s !== "string" || !PLACEMENT_ID.test(body.s) || !PLACEMENT_EVENTS.has(body.e)) return { counted: false };
+    return { counted: await countPlacementHit(db, day, body.s, body.e, page) };
+  }
   // A step rather than a page load: one more for that event, the day and the page it happened on.
   if (body.e !== undefined) {
     // Browser steps only: SERVER_EVENTS are not in EVENTS, so they stop here.

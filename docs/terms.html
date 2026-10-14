@@ -67,6 +67,7 @@
   .box{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:6px 18px;margin:22px 0}
   .box.warn{border-color:color-mix(in srgb,var(--amber) 45%,var(--rule))}
   .box h3{margin-top:12px}
+  .box h2{font:inherit;font-size:16px;font-weight:700;margin:12px 0 4px;padding:0;border:0}
   footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
   footer a{color:var(--ink2)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -99,14 +100,17 @@
          saved to your account added 2026-09-26) -->
     <!-- was: <p class="meta">Last updated September 26, 2026</p>  (Supporter $5 and Pro $12 became $4 and
          $8 on 2026-09-30) -->
-    <p class="meta">Last updated September 30, 2026</p>
+    <!-- was: <p class="meta">Last updated September 30, 2026</p>  (paid listings: the employer section and the
+         qualifier on screening, added with the launch PR, S8; set this to the day it is merged) -->
+    <p class="meta">Last updated October 14, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so "a free
          tool" flat out is no longer accurate. Search genuinely is free and always has been. -->
     <!-- was: <p class="lede">InternScout is a free tool made by a UMass Amherst student. By using the dashboard or the extension, you agree to these terms.</p> -->
     <p class="lede">InternScout is a tool made by a UMass Amherst student. Search is free and needs no sign-in, AI features have a free monthly allowance, and optional paid plans raise that allowance. By using the dashboard or the extension, you agree to these terms.</p>
 
     <div class="box">
-      <h3>The short version</h3>
+      <!-- An h2 since 2026-10-14, as on privacy.html (U12): an h3 straight after the h1 (axe heading-order). Drawn as before. -->
+      <h2>The short version</h2>
       <ul>
         <li>It's provided as-is, with no guarantees.</li>
         <li>Listings can be stale or wrong. Check with the employer.</li>
@@ -136,7 +140,10 @@
       <li>Listings are collected automatically from public job boards and lists.</li>
       <li>A listing can be closed, out of date, or wrong. That includes its field tags, location, dates, pay and who can apply.</li>
       <li><strong>Always check the posting on the employer's own site before you apply.</strong></li>
-      <li>We don't screen employers. Never pay to apply, and be careful with any posting that asks for money or bank details.</li>
+      <!-- was: <li>We don't screen employers. Never pay to apply, and be careful with any posting that asks for money or bank details.</li>
+           A paid label reads as a check having been done (B1-data-privacy.md 7.3), so it says which check. -->
+      <li>We don't screen employers, except that a <a href="#employers">paid listing</a> has to be a real, open role we already list that doesn't ask you to pay or for personal details before you can see it. A paid listing is an ad, not a recommendation. Never pay to apply, and be careful with any posting that asks for money or bank details.</li>
+      <li>A paid listing never changes where any listing ranks, how it's scored, which filters it passes or what Auto-Apply does. The <a href="privacy.html#paid-listings">privacy policy</a> explains how one is chosen.</li>
     </ul>
 
     <h2>Auto-Apply and AI</h2>
@@ -194,6 +201,21 @@
       <li>The price, the allowance it buys, and the plan itself can change or end at any time. If the plan ends, subscriptions are cancelled and the free allowance still applies.</li>
       <li>The global monthly AI budget and the anti-misuse rules still apply on a paid plan.</li>
       <li>To delete your data while subscribed, cancel first (see the <a href="privacy.html">privacy policy</a>).</li>
+    </ul>
+
+    <!-- For employers (S8, 2026-10-14): what a paid listing is, as the employers page and the privacy
+         policy describe it. Prices are on /employers/, not here, so this can't drift from them. -->
+    <h2 id="employers">For employers: paid listings</h2>
+    <p>This section applies only to an employer that buys a paid listing. Students don't need to read it.</p>
+    <ul>
+      <li><strong>What you buy.</strong> One of your open roles shown in a separate box headed "Paid listing", with "Ad" before your company name, for the dates we agree. It shows on the dashboard only to a student whose search or chosen field the role already matches, and on our internship pages only on a page whose own list already includes the role. There is at most one paid listing on a page, and if several fit, each has the same chance.</li>
+      <li><strong>What it never does.</strong> It doesn't change where any of your listings, or anyone else's, rank, how they are scored, which filters they pass, how many results a student sees, or what Auto-Apply does. Your role also stays in the results at its usual place. It isn't aimed at students by profile, school, major, age or any other trait, and we won't agree to aim it that way.</li>
+      <li><strong>Which roles qualify.</strong> The role has to be one InternScout already lists from your public job board, open, and still taking applications. Paying never adds a listing. Before it goes live we check that the role is open on your own careers site, that you write from your company's domain, that the posting shows a pay range where its state requires one, that the role is paid (or you are a nonprofit or public body), that it is not hazardous work for anyone under 18 and states a minimum age if it is open to high school students, that it charges no fee and asks for no personal details before showing the posting, and that you don't ask for targeting. We may refuse any paid listing.</li>
+      <li><strong>No promised results.</strong> We don't promise views, clicks or applicants. After each calendar month you can ask for how often the box was shown and opened, rounded down to the nearest 10 ("fewer than 10" below that). The counts are estimates, not audited figures. We don't see applications, so we can't count them.</li>
+      <li><strong>Timing.</strong> Our pages are rebuilt several times a day, so a paid listing can start a few hours after its first day begins. It stops showing on its end date. If the role closes, its posting changes or it leaves InternScout, the paid listing stops showing, and you get the unused days back as credit or a refund.</li>
+      <li><strong>Payment.</strong> We send an invoice through Stripe and switch the paid listing on once it is paid, or on the agreed start day of a free pilot. Prices are on <a href="/employers/">internscout.org/employers</a>.</li>
+      <li><strong>Free either way.</strong> Your listings, adding your job board and correcting your details stay free whether or not you buy a paid listing.</li>
+      <li>We can pause or end a paid listing that breaks these terms or the law, and refund the unused days unless it was ended for breaking them.</li>
     </ul>
 
     <h2>Don't misuse it</h2>

@@ -10,6 +10,8 @@
   const noCount = () => { try { return localStorage.getItem(NOCOUNT_KEY) === "1"; } catch (e) { return false; } };
 
   const EXT_NOTICE_KEY = "internscout.extnotice.v1";
+  // The one-time notice that paid listings have started (S8, 2026-10-14): hidden for good in this browser.
+  const PLACE_NOTICE_KEY = "internscout.placements.notice.v1";
   const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
   const STATE_LABEL = { none: "Not started", interested: "Interested", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
@@ -449,6 +451,18 @@
           : [renderRow(r)]))))),
       h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
       rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: onMore }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`)));
+  }
+
+  // The notice that paid listings have started (S8, 2026-10-14; the privacy page promises a dashboard notice for
+  // big changes). Shown once there are placements, until the student hides it or follows its link; kept
+  // hidden in this browser (PLACE_NOTICE_KEY), never sent. It takes the one notice place above the list only
+  // when nothing more urgent has it (D16); otherwise it waits under the list.
+  function PlaceNotice({ onHide }) {
+    return h("div", { className: "notice place-notice" },
+      h("button", { type: "button", className: "btn quiet small notice-hide", onClick: onHide, "aria-label": "Hide this notice" }, "Hide"),
+      h("b", null, "New: paid listings. "),
+      "When you search or pick a field, you may now see one listing an employer paid for, in its own box labelled Ad. Paying never changes your results, their order or any Match score, and it is never chosen from your profile. ",
+      h("a", { href: "privacy.html#paid-listings", onClick: onHide }, "How paid listings work"));
   }
 
   // Whether the window is phone-width (the same 760px as the card layout in index.html).
@@ -1291,7 +1305,9 @@
     // `f`, so it never counts as a filter, never goes in a saved search or the address, and never touches
     // `rows`. With no placements.json, or CONFIG.placements === false, none of this shows.
     const PL = window.ISPlace;
-    const [placements, setPlacements] = useState([]);
+    // was: useState([]). What the page head already read, if it has (ISPlace.loaded, 2026-10-14), so the notice
+    // below is in the first draw; load() fills it in otherwise.
+    const [placements, setPlacements] = useState(() => (PL && PL.loaded()) || []);
     useEffect(() => { if (PL) PL.load().then(list => setPlacements(list || [])); }, []);
     const [placeHidden, setPlaceHiddenRaw] = useState(() => !!(PL && IS.ls.get(PL.HIDE_KEY, false)));
     // Kept for the session in React state even when the browser blocks storage.
@@ -1658,7 +1674,7 @@
       setPlaceHidden(true); setSpoken("Paid listings hidden. You can show them again under More filters.");
       setTimeout(() => { const el = document.getElementById("listings"); if (el && el.focus) el.focus(); }, 0);
     };
-    const placeBox = placed && PL ? h(PL.PaidBox, { key: placed.pl.id, x: placed.x, phone: narrow, facts: factsLine(placed.x, keySet),
+    const placeBox = placed && PL ? h(PL.PaidBox, { key: placed.pl.id, x: placed.x, pl: placed.pl, phone: narrow, facts: factsLine(placed.x, keySet),
       renderMatch: (open, toggle, panelId) => matchControl({ r: placed.x, sc: scoreOf(placed.x), scored: !!ctx.p, open, onToggle: toggle, onRank: openSetup, panelId }),
       renderWhy: close => h(Why, { r: placed.x, sc: scoreOf(placed.x), ctx, elig, patterns: stats && stats.skill_patterns, onClose: close, onRank: openSetup }),
       onHide: hidePlacements }) : null;
@@ -1668,9 +1684,16 @@
       // was: "do the Deep Dive so the agent knows your background. " and "Start the Deep Dive" (D29: the two-minute
       // setup is called what it is; "Deep Dive" is the optional Interview and Voice steps).
       "set up Auto-Apply so it knows your background. ", h("a", { href: "#", onClick: prevent(() => IS.ext.call({ type: "open_deep_dive" })) }, "Set up Auto-Apply (about 2 minutes)"));
-    const topNotice = setupAsk ? setupAskEl : oneStepEl;
+    // The paid-listings notice (S8): third in line for the one place above the list.
+    const [placeNoticeHidden, setPlaceNoticeHidden] = useState(() => !!IS.ls.get(PLACE_NOTICE_KEY, false));
+    const hidePlaceNotice = () => { IS.ls.set(PLACE_NOTICE_KEY, true); setPlaceNoticeHidden(true); };
+    const placeNoticeEl = placements.length > 0 && !placeNoticeHidden && h(PlaceNotice, { onHide: hidePlaceNotice });
+    // was: const topNotice = setupAsk ? setupAskEl : oneStepEl; (with `setupAsk && oneStepEl` under the list).
+    // The first of these that is on goes above the list; the rest go under it (D16: one notice above the list).
+    const [topNotice, ...laterNotices] = [setupAskEl, oneStepEl, placeNoticeEl].filter(Boolean);
     const promoEls = h(F, null,
-      setupAsk && oneStepEl,
+      // was: setupAsk && oneStepEl,
+      ...laterNotices,
       // was: info.checked && !info.installed && !info.stale && p && h("div", { className: "notice quietnote" }, "Want help filling applications? The free InternScout extension pre-fills forms and never presses Submit. ", h("a", { href: C.extensionInstallUrl || "install.html" }, "Install guide")),
       // was: // The extension is free to install, but its Auto-Apply and Deep Dive spend the monthly AI
       // was: // allowance, so calling the whole thing "free" stopped being the full story on 2026-09-19.
