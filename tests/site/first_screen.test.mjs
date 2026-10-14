@@ -9,7 +9,7 @@ const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const CORE = read("docs/js/core.js");
 const FIX = JSON.parse(read("tests/site/fixtures/first_screen.json"));
 
-function loadCore(fetchImpl) {
+function loadCore(fetchImpl, extra = {}) {
   const store = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
   const ctx = {
     CONFIG: { dataUrl: "./data/", rawDataFallback: "https://raw.example/data/" },
@@ -18,7 +18,7 @@ function loadCore(fetchImpl) {
     AbortController, TextDecoder, URLSearchParams,
     location: { origin: "https://internscout.org", pathname: "/", search: "", hash: "" },
     document: { documentElement: { dataset: {} } },
-    console,
+    console, ...extra,
   };
   ctx.window = ctx;
   vm.createContext(ctx);
@@ -99,4 +99,31 @@ test("the committed first.json is the top of the first-visit list", { skip: !exi
   // Ties at the edge may fall either way; the keys must match position by position.
   assert.deepEqual(first.map(key), rows.slice(0, first.length).map(key));
   assert.equal(first.length, index.first.rows);
+});
+
+test("a request the page head started is used once, then fetches go out as usual", async () => {
+  const asked = [];
+  const __early = { "./data/listings/index.json": ok(INDEX), "./data/first.json": ok([{ id: "early", status: "open" }]) };
+  const IS = loadCore(url => { asked.push(url); return url.includes("index.json") ? ok(INDEX) : ok([{ id: "late", status: "open" }]); }, { __early });
+  const store = IS.createStore(); await store.init();
+  assert.equal(await store.primer(), true);
+  assert.deepEqual([...store.all()].map(x => x.id), ["early"]);
+  assert.deepEqual(asked, []);
+  assert.deepEqual(Object.keys(__early), []);
+  await store.init();   // a reload asks the network
+  assert.deepEqual(asked.map(u => u.replace(/\?.*/, "")), ["./data/listings/index.json"]);
+});
+
+test("the head starts the index and, on a plain first visit, the first-screen file", () => {
+  const html = read("docs/index.html");
+  const core = read("docs/js/core.js");
+  const params = JSON.parse(core.match(/const FILTER_PARAMS = (\[[^\]]+\]);/)[1]);
+  const re = html.match(/!\/\[\?&\]\(([^)]+)\)=\/\.test\(location\.search\)/);
+  assert.ok(re, "the first-visit check in index.html");
+  assert.deepEqual(re[1].split("|"), params);
+  const key = core.match(/const PROFILE_KEY = "([^"]+)";/)[1];
+  assert.ok(html.includes(`localStorage.getItem("${key}")`));
+  assert.match(html, /get\("listings\/index\.json"\);/);
+  // Before the deferred scripts, after CONFIG.
+  assert.ok(html.indexOf("window.__early") > html.indexOf("window.CONFIG = {") && html.indexOf("window.__early") < html.indexOf("react.production"));
 });

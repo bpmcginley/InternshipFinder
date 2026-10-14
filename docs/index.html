@@ -694,6 +694,21 @@
     storeRating: null,
   };
 </script>
+<script>
+  // Started here, before the scripts below have downloaded (2026-10-14, P2): the listing index, and on a
+  // first visit (no saved profile, no filters in the address) the first-screen file. Until now neither
+  // was asked for until app.js had arrived and run, about 14 s in at 20 KB/s. js/core.js takes each of
+  // these responses the first time it asks for the same address, and fetches as usual if one failed.
+  // The filter names are core.js FILTER_PARAMS; the profile key is core.js PROFILE_KEY.
+  (function () {
+    try {
+      var d = window.CONFIG.dataUrl || "./data/", early = window.__early = {};
+      var get = function (p) { early[d + p] = fetch(d + p, { cache: "no-cache" }); early[d + p].catch(function () {}); };
+      get("listings/index.json");
+      if (!localStorage.getItem("internscout.profile.v1") && !/[?&](q|field|state|company|new|stage|year|paid|sector|where|status|progress|eligible|citizen|sort)=/.test(location.search)) get("first.json");
+    } catch (e) { /* the scripts below fetch everything themselves */ }
+  })();
+</script>
 <!-- defer (2026-10-14, P1): these two were plain blocking scripts here in <head>, so the static hero in
      #root couldn't paint until ReactDOM had downloaded (6.3 s at 20 KB/s; the HTML was done at 1.5 s).
      Deferred scripts still run in document order, after the page is parsed: React, ReactDOM, core.js,

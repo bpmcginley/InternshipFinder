@@ -581,7 +581,10 @@
       if (timeoutMs) timer = setTimeout(() => { fail(new Error("Download timed out")); if (controller) controller.abort(); }, timeoutMs);
     };
     const request = async () => {
-      const r = await fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) });
+      // A request the page head already started for this address (index.html, window.__early), used once.
+      const early = !bust && window.__early && window.__early[url];
+      if (early) delete window.__early[url];
+      const r = await (early || fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) }));
       quiet();
       if (!r.ok) { const e = new Error("HTTP " + r.status + " for " + url); e.status = r.status; throw e; }
       const reader = r.body && typeof r.body.getReader === "function" && typeof TextDecoder !== "undefined" ? r.body.getReader() : null;
