@@ -1253,9 +1253,9 @@
     // of a nationwide search each score only their own rows.
     const scoreOf = useMemo(() => { const m = new WeakMap(); return x => { let v = m.get(x); if (!v) { v = IS.score(x, ctx); m.set(x, v); } return v; }; }, [ctx]);
 
-    const elig = useMemo(() => {
-      if (!p && !extProfile) return null;
-      const e = { ...(extProfile || {}) };
+    // `base` is what the extension says about the student, or nothing (placeElig below).
+    const eligOf = (p, base) => {
+      const e = { ...(base || {}) };
       if (p) {
         const gy = parseInt((p.grad_term || "").split(" ")[1], 10); if (gy) e.grad_year = gy;
         if (p.class_year) e.class_year = p.class_year;
@@ -1266,7 +1266,12 @@
         if (p.class_year === "masters") e.degree = "master's"; else if (p.class_year === "phd") e.degree = "PhD"; else if (p.class_year && !e.degree) e.degree = "bachelor's";
       }
       return e;
-    }, [p, extProfile]);
+    };
+    const elig = useMemo(() => (!p && !extProfile ? null : eligOf(p, extProfile)), [p, extProfile]);
+    // The paid listing's hide check reads the dashboard's saved profile only, never anything from the
+    // extension: the privacy page (#paid-listings) and the Chrome Web Store limited-use promise both say
+    // so (legal review 2026-10-14). was: exclude used `elig`, which starts from extProfile.
+    const placeElig = useMemo(() => (p ? eligOf(p, null) : null), [p]);
 
     const opts = useMemo(() => {
       const count = get => { const m = new Map(); inView.forEach(x => (get(x) || []).forEach(t => t && m.set(t, (m.get(t) || 0) + 1))); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
@@ -1314,8 +1319,8 @@
     const setPlaceHidden = on => { setPlaceHiddenRaw(on); if (PL) { if (on) IS.ls.set(PL.HIDE_KEY, true); else IS.ls.del(PL.HIDE_KEY); } };
     const exclude = useCallback(x => !!(scoreOf(x).mismatch
       || IS.citizenBlocked(x, p ? p.work_auth : "")
-      || (elig && blockers(x, elig).length > 0)
-      || (p && p.terms && p.terms.length && IS.termFit(x, p.terms) < .8)), [scoreOf, p, elig]);
+      || (placeElig && blockers(x, placeElig).length > 0)
+      || (p && p.terms && p.terms.length && IS.termFit(x, p.terms) < .8)), [scoreOf, p, placeElig]);
     // The last pick, kept while it still fits, so the box doesn't swap as files land or filters change.
     const placedRef = useRef(null);
     const placed = useMemo(() => PL ? PL.pick({ placements, rows, rel: listed.rel, ranked, fieldsSet: f.fields.length > 0, appState: f.app_state,

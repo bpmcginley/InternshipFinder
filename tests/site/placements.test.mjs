@@ -430,3 +430,14 @@ test("the box's text pairs pass WCAG AA in light and dark", () => {
   assert.match(css, /\.paid\{[^}]*background:var\(--sunk\)/);
   assert.match(css, /\.ad\{[^}]*color:var\(--ink2\)/);
 });
+
+// Legal review (2026-10-14): nothing from the extension may decide whether a paid listing is hidden.
+test("the paid listing's hide check uses the dashboard profile only, never the extension's", () => {
+  const ex = APP_SRC.match(/const exclude = useCallback\(([\s\S]*?)\]\);/);
+  assert.ok(ex, "exclude found");
+  assert.doesNotMatch(ex[1], /\belig\b|extProfile/, "exclude never reads elig or extProfile");
+  assert.match(ex[1], /blockers\(x, placeElig\)/);
+  assert.match(APP_SRC, /const placeElig = useMemo\(\(\) => \(p \? eligOf\(p, null\) : null\), \[p\]\);/);
+  // The row list's own eligibility check still uses both, as before.
+  assert.match(APP_SRC, /const elig = useMemo\(\(\) => \(!p && !extProfile \? null : eligOf\(p, extProfile\)\), \[p, extProfile\]\);/);
+});
