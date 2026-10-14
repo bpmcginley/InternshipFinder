@@ -859,6 +859,10 @@
     const keys = useMemo(() => [...plan.first, ...plan.rest], [planKey]);
     const keysKey = keys.slice().sort().join(",");
     const viewSet = useMemo(() => scope.all ? null : new Set([...scope.keys, ...qKeys]), [scope, qKeysKey]);
+    // The first-screen file (data/first.json) is the top of exactly one list: no profile, newest first,
+    // nothing searched, the Northeast and remote. Any other view loads the state files as before.
+    // Filters on that view are fine (a filter keeps the order, and every row it lacks ranks below it).
+    const prime = !p && !everything && scope.all && !qKeys.length && f.sort === "new";
     const [failedKeys, setFailedKeys] = useState([]); const [retry, setRetry] = useState(0);
     // Files settled so far and in all, for the "loading more states (12 of 65)" line. A ref, so a file
     // landing doesn't redraw the page by itself; the throttled version bump below does.
@@ -877,6 +881,8 @@
       const bump = () => { if (!timer) timer = setTimeout(() => { timer = 0; paint(); }, 250); };
       setLoading(true); setFailedKeys([]);
       (async () => {
+        // A first visit paints from the small first-screen file, then fetches the state files (P2).
+        if (prime) { await st.primer(); if (!live) return; paint(); }
         const bad = await st.ensure(plan.first, () => { step(); paint(); });
         for (let i = 0; i < plan.rest.length && live; i += 4) bad.push(...await st.ensure(plan.rest.slice(i, i + 4), () => { step(); bump(); }));
         if (!live) return;

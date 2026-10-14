@@ -115,8 +115,35 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
         stem = name[:-len(".desc.json")] if name.endswith(".desc.json") else name[:-5]
         if name.endswith(".json") and name != "index.json" and stem not in shards:
             os.remove(os.path.join(shard_dir, name))
+    index["first"] = write_first_screen(listings, out_dir)
     _dump(index, os.path.join(shard_dir, "index.json"), indent=1)
     return index
+
+
+# The first screen (2026-10-14, P2). A first visit (no profile, no filters, newest first) draws its
+# list from the Northeast and remote files, about 550 KB, and on a 20 KB/s connection the first row
+# came 18 s in. first.json holds the top rows of exactly that view, as the same slim rows the state
+# files carry, so the dashboard can paint from one small request and the state files fill in after.
+# The order copies IS.sortRows "new" in docs/js/core.js with no profile: dated postings first, then
+# posted_at, then first_seen, newest first. The dashboard keeps the first copy of a row it is given,
+# so these rows are the very rows the state files hold, and the top of the list doesn't move when
+# they land. Outside listings/ so nothing that reads every state file there mistakes it for one.
+FIRST_SCREEN_ROWS = 60
+FIRST_SCREEN_KEYS = sorted(BASELINE_STATES) + ["remote"]
+
+
+def first_screen(listings: list[dict], n: int = FIRST_SCREEN_ROWS) -> list[dict]:
+    keys = set(FIRST_SCREEN_KEYS)
+    rows = [x for x in listings if x["status"] == "open" and shard_keys(x) & keys]
+    rows.sort(key=lambda x: (1 if x.get("posted_at") else 0, x.get("posted_at") or "", x.get("first_seen") or ""),
+              reverse=True)
+    return [shard_row(x) for x in rows[:n]]
+
+
+def write_first_screen(listings: list[dict], out_dir: str) -> dict:
+    rows = first_screen(listings)
+    _dump(rows, os.path.join(out_dir, "first.json"))
+    return {"file": "first.json", "keys": FIRST_SCREEN_KEYS, "sort": "new", "rows": len(rows)}
 
 
 def _listing_dict(row: Listing) -> dict:

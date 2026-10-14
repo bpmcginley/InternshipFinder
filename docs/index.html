@@ -694,8 +694,12 @@
     storeRating: null,
   };
 </script>
-<script crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
-<script crossorigin="anonymous" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<!-- defer (2026-10-14, P1): these two were plain blocking scripts here in <head>, so the static hero in
+     #root couldn't paint until ReactDOM had downloaded (6.3 s at 20 KB/s; the HTML was done at 1.5 s).
+     Deferred scripts still run in document order, after the page is parsed: React, ReactDOM, core.js,
+     app.js. -->
+<script defer crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script defer crossorigin="anonymous" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script defer src="js/core.js"></script>
 <script defer src="js/app.js"></script>
 <!-- The Auto-Apply offer when a posting it can fill is opened (2026-10-13). Plain JS, no React; the
