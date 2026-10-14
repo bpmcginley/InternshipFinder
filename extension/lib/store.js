@@ -166,10 +166,28 @@ export async function saveStore(s) {
   return s;
 }
 
-export async function updateStore(fn) {
-  const s = await loadStore();
-  const out = (await fn(s)) || s;
-  return saveStore(out);
+// Read, change and write back the whole store as one step. Two at once used to lose one of the
+// changes: a site login saved by one job and a learned answer saved by another, at the same moment,
+// left the login out, and the student had an employer account nobody knew the password to. A Web
+// Lock is shared by the service worker and every extension page (the Deep Dive, the side panel), so
+// their writes queue too; the promise chain is for anywhere without navigator.locks. fn must not
+// call updateStore itself, or it waits on its own lock.
+// was: an unlocked load, fn, save.
+const STORE_LOCK = "internscout-store";
+let storeChain = Promise.resolve();
+function withStoreLock(task) {
+  const locks = typeof navigator !== "undefined" && navigator.locks;
+  if (locks && locks.request) return locks.request(STORE_LOCK, task);
+  const p = storeChain.then(task, task);
+  storeChain = p.catch(() => {});
+  return p;
+}
+export function updateStore(fn) {
+  return withStoreLock(async () => {
+    const s = await loadStore();
+    const out = (await fn(s)) || s;
+    return saveStore(out);
+  });
 }
 
 // Profile as sent to the model: no files, no passwords, no API key.
