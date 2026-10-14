@@ -11,13 +11,22 @@ Work log for Muse (Bruce's AI agent). Read this when working in this repo.
 
 Merged on main, each after CI passed:
 - **#81** Haiku 5.5 vs Flash 3.8 autofill benchmark (`scripts/eval/haiku-vs-flash.md`). Verdict: stay on Flash (flash-low). Haiku is cheaper but makes more sensitive-answer errors.
-- **#83, #84** (the other Claude session): the under-18 autofill fix in `extension/agent/guard.js`, shipped as extension 0.5.6. It is in Chrome Web Store review; 0.5.5 is live.
+- **#83, #84** (the other Claude session): the under-18 autofill fix in `extension/agent/guard.js`, shipped as extension 0.5.6. (Updated 10-14: 0.5.6 is live; 0.5.7 is in store review, see below.)
 - **#85** Auto-Apply offer bar after "Open posting" (`docs/js/offer.js`). Desktop Chromium only, at most once a session, hidden for 14 days after a dismiss or click. Events: `apply_offer_shown`, `apply_offer_click`.
 - **#86** Search titles and descriptions written for clicks, e.g. "Under Armour Internships Summer 2027: 10+ Open". A page only says "links to <employer>'s own posting" when no role on it links to a job site (`JOB_SITE_HOSTS` in `seo_pages.py`).
 - **#87** For employers page at https://internscout.org/employers/ (footer link on every page). Its form posts to the Worker's `/employer-interest`, which saves to the D1 table `employer_leads` and keeps a lead for one year. It has a hidden spam trap and rate limits. It sends no email, so leads must be read:
   `npx wrangler d1 execute internscout --remote --command "SELECT * FROM employer_leads ORDER BY created DESC"`
 - **#88** Thin pages out of Google: a field x place page with fewer than 20 roles gets `noindex, follow` and leaves the sitemap (130 pages; the sitemap went from 1,557 to 1,428). Students can still reach those pages. A page Search Console shows a click or 5+ impressions for is never hidden (`backend/data/search_console_pages.json`, a snapshot that has to be refreshed by hand). Employer pages are never hidden. To undo: `INDEX_COMBO = 0` in `seo_pages.py`. The home page title is now "Summer 2027 Internships for College Students | InternScout"; change it when Summer 2028 recruiting opens (about August 2027).
 - **#90** Weekly email prep: `python growth/digest_send.py --check` and the Email digest workflow's `check_key` input test the Buttondown key with one read and send nothing (checked 10-13: the key works). The cron comment now gives the real send time: 12:00 UTC is 8am Eastern in daylight time and 7am in winter.
+
+## What Claude did (2026-10-14)
+
+Several Claude sessions merged #94 to #118 on main, each with Bruce's OK and after CI passed. Detail: `C:/Users/bruce/Documents/InternScout-ProductReview/CLAUDE-HANDOFF.md` (outside the repo).
+- **Extension:** 0.5.6 is live. **0.5.7 is in Chrome Web Store review** (uploaded by Bruce 10-14; #116). It carries the PR #94 review fixes, the design pass (#110), the extension fixes (#112) and the separate extension sign-in (#115). Permissions are unchanged from 0.5.6.
+- **Site:** search across every state with relevance ranking (#97), design tokens and self-hosted fonts (#106), new dashboard, landing page and extension designs (#108 to #110), filters in the address (#113), faster first paint on slow connections with `docs/data/first.json` (#114).
+- **Paid listings for employers** (#103 to #105, #111): an employers page with planned prices, Worker admin routes (`worker/scripts/placement.mjs`), and a box labelled "Paid listing" and "Ad" on landing pages. Off until the repo variable `INTERNSCOUT_PLACEMENTS_URL` is set. Not launched: #117 (dashboard box) and #119 (launch text and counts, "do not merge until the first placement goes live") are open.
+- **Analytics:** the hourly snapshot has Bing search numbers too (#101, secret `BING_WEBMASTER_KEY`).
+- **#118:** review follow-ups. The listing pipeline now treats each of an employer's job boards separately (`export_static.board_of`), so one failed board no longer drops jobs from another.
 
 ## Weekly email: status (2026-10-13)
 
