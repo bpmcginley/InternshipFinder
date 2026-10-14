@@ -57,4 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # A Google service account's JSON key, a Restricted user on the Search Console property.
           GSC_SERVICE_ACCOUNT: ${{ secrets.GSC_SERVICE_ACCOUNT }}
+          # An API key from Bing Webmaster Tools (Settings, API access). Without it the snapshot has no
+          # Bing numbers and lists "bing: no BING_WEBMASTER_KEY" under problems.
+          BING_WEBMASTER_KEY: ${{ secrets.BING_WEBMASTER_KEY }}
         run: python growth/metrics.py docs --write
