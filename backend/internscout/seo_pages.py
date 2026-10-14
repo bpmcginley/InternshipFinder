@@ -1011,7 +1011,7 @@ def tracker_page(term: str, rows: list[tuple], roles: int, now: datetime, update
         trs.append(f"<tr><td>{who}</td><td class=\"num\">{when}</td><td class=\"num\">{k:,}</td></tr>")
     body = (f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
             f"<a class=\"cta\" href=\"{term_path}\">See every {esc(term)} role</a>"
-            "<div class=\"tablewrap\"><table class=\"data\"><thead><tr><th>Employer</th><th>Opened</th>"
+            + tablewrap(f"Employers with {term} roles") + "<table class=\"data\"><thead><tr><th>Employer</th><th>Opened</th>"
             f"<th>{esc(term)} roles</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table></div>"
             + floor_note
             + "<p class=\"follow\">Roles found in the last week, whatever the term: "
@@ -1073,16 +1073,20 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
         href = esc(safe_url(x["apply_url"]))
         # On a site Auto-Apply fills, a quiet second link to the install page (2026-10-04). Internal,
         # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
-        aa = (f' <a class="aa" href="/install.html?from={esc(src)}-row">Auto-Apply this</a>'
-              if autofills(x) else "")
+        # It names the listing (listing=<id>, 2026-10-14, D21), so the install flow can carry this posting
+        # through. was: href="/install.html?from={src}-row", the same for every row.
+        aa = (f' <a class="aa" href="/install.html?from={esc(src)}-row&amp;listing={esc(quote(str(x["id"]), safe=""))}">'
+              'Auto-Apply this</a>' if autofills(x) and x.get("id") is not None else "")
         # data-aa (2026-10-13): js/offer.js may offer the extension when this posting is opened.
         rows.append(
             '<li class="job">'
             f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)}{pay_tag}</div>'
-            # was: f'<a class="go" href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
-            f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
+            # The two actions sit on one line in .acts (2026-10-14, D21): "Open posting" a secondary button,
+            # "Auto-Apply this" a quiet link after it, as on the dashboard's rows.
+            # was: f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
+            f'<div class="acts"><a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}</div>'
             "</li>")
     return "\n".join(rows)
 
@@ -1134,8 +1138,8 @@ def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str
     label = "Add Auto-Apply to Chrome, free"
     return (f"<div class=\"aa-card\"><p>{who} on {esc(where)} the free Auto-Apply extension can fill in from "
             f"your resume. It stops at Submit: you review {'it' if n == 1 else 'each one'} and send it yourself.</p>"
-            f"<a class=\"cta ext-desk\" href=\"{STORE_URL}?utm_source={esc(src)}\">{label}</a>"
-            f"<a class=\"cta ext-touch\" href=\"/install.html?from={esc(src)}\">{label}</a></div>")
+            f"<a class=\"cta secondary ext-desk\" href=\"{STORE_URL}?utm_source={esc(src)}\">{label}</a>"
+            f"<a class=\"cta secondary ext-touch\" href=\"/install.html?from={esc(src)}\">{label}</a></div>")
 
 
 def company_link(name: str, here: str | None = None) -> str:
@@ -1214,9 +1218,12 @@ transition:background-color 140ms ease-out,border-color 140ms ease-out}
 .cta[disabled],.cta[aria-disabled=true]{background:var(--sunk);border-color:var(--field-border);color:var(--ink3);cursor:default;transform:none}
 ul.jobs{list-style:none;padding:0;margin:24px 0;border-top:1px solid var(--rule)}
 .job{display:grid;grid-template-columns:1fr auto;gap:2px 16px;padding:14px 0;border-bottom:1px solid var(--rule)}
-.co{font-weight:600}.role{grid-column:1}.meta{grid-column:1;color:var(--ink3);font-size:var(--fs-3)}
+.co{font-weight:600}.co a{color:var(--ink);text-decoration:none}.co a:hover{text-decoration:underline;text-underline-offset:3px}.role{grid-column:1}.meta{grid-column:1;color:var(--ink3);font-size:var(--fs-3)}
 .pay{color:var(--ink2);font-variant-numeric:tabular-nums}.new{font-size:var(--fs-1);color:var(--accent);font-weight:600;margin-left:6px}
-.go{grid-column:2;grid-row:1/span 3;align-self:center;font-size:var(--fs-3);white-space:nowrap}
+.acts{grid-column:2;grid-row:1/span 3;align-self:center;display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s3)}
+.go{display:inline-flex;align-items:center;min-height:var(--h-ctl);padding:0 14px;border:1px solid var(--field-border);border-radius:var(--r);
+background:var(--panel);color:var(--ink);font-size:var(--fs-3);font-weight:500;text-decoration:none;white-space:nowrap;transition:border-color 140ms ease-out}
+.go:hover{border-color:var(--ink3)}
 .more,.follow{color:var(--ink2)}section.rel h2{font:600 var(--fs-6)/1.3 var(--serif);margin:36px 0 8px}
 section.rel ul{list-style:none;padding:0;margin:0;columns:2;column-gap:28px}
 section.rel li{padding:3px 0;break-inside:avoid}
@@ -1226,7 +1233,7 @@ section.faq h2{font:600 var(--fs-5)/1.3 var(--serif);margin:28px 0 6px}section.f
 @media (max-width:560px){.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}.n{color:var(--ink3);font-size:var(--fs-2)}
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:var(--fs-3)}
 footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:var(--fs-7)}section.rel ul{columns:1}
-.job{grid-template-columns:1fr}.go{grid-column:1;grid-row:auto;margin-top:4px}}
+.job{grid-template-columns:1fr}.acts{grid-column:1;grid-row:auto;margin-top:var(--s2)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
 .tablewrap{overflow-x:auto;margin:16px 0 8px}table.data{width:100%;border-collapse:collapse;font-size:var(--fs-3)}
 table.data th,table.data td{text-align:left;vertical-align:top;padding:9px 14px 9px 0;border-bottom:1px solid var(--rule)}
@@ -1238,9 +1245,10 @@ table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:var(--fs
 figure.chart{margin:8px 0 18px}figure.chart img{display:block;max-width:100%;height:auto}
 figure.chart figcaption{color:var(--ink3);font-size:var(--fs-3);margin-top:4px}
 .ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}.ext-touch{display:inline-block}}
-.aa{grid-column:2;align-self:start;font-size:var(--fs-2);color:var(--ink3);white-space:nowrap}
-.job:has(.aa) .go{grid-row:1/span 2;align-self:end}
-@media (max-width:560px){.aa{grid-column:1;margin-top:6px}.job:has(.aa) .go{grid-row:auto}}
+.aa{display:inline-flex;align-items:center;min-height:var(--h-ctl);font-size:var(--fs-2);font-weight:500;color:var(--accent);text-decoration:none;white-space:nowrap}
+.aa:hover{text-decoration:underline;text-underline-offset:3px}
+@media (max-width:560px){.go,.aa{min-height:44px}}
+main>h1:first-child{margin-top:var(--s6)}.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0 6px}
 .tier{position:relative;display:flex;flex-direction:column;padding:20px 18px 16px;background:var(--panel);
 border:1px solid var(--rule);border-radius:var(--r-lg)}.tier.pick{border-color:var(--accent);box-shadow:var(--ring)}
@@ -1273,15 +1281,19 @@ input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-co
 # Auto-Apply card, with the email box and button on one row that wraps on a phone. The box's border is
 # ink3, not rule, so the field itself can be seen (rule is too faint for a control you type into).
 # The eleven lines before those (2026-10-05) are /pricing/: three tier cards in a row, the recommended one
-# ringed in the accent with a "Most popular" badge, stacked on a phone.
+# ringed in the accent with a "Recommended" badge (was: "Most popular"), stacked on a phone. Only its button is
+# solid; the other two are .cta.secondary (2026-10-14).
 # The last five lines (2026-10-02) are the tables and headed sections of /compare/ and
 # /internships/highest-paying/. A wide table scrolls inside .tablewrap, never the page; the
 # comparison's four wordy columns keep a readable width on a phone and scroll there instead.
 # The six after them (2026-10-04) are autoapply_card and a row's "Auto-Apply this" link. The card's
 # store button shows on a computer and its install-page button on a phone or tablet (install.html's
-# query: touch is the primary input and nothing hovers). A row with the link moves "Open posting" up
-# so the two stack in the right-hand column; on a phone both go under the row's text, 8px apart so a
-# thumb meant for "Open posting" doesn't land on the install page (was: 2px, the grid gap).
+# query: touch is the primary input and nothing hovers). Since 2026-10-14 (D21, D24) a row's actions
+# sit on one line in .acts, as on the dashboard: "Open posting" a secondary button, "Auto-Apply this" a
+# quiet accent link, both 44px tall on a phone and 8px apart, and company names are ink on every row
+# (was: "Open posting" a 22px-tall text link stacked over a grey 13px "Auto-Apply this", and names
+# green and underlined only where they had an employer page). With no breadcrumb line (a one-crumb
+# page) the heading keeps its distance from the header; .vh is text only a screen reader reads.
 
 def beacon_from(site_dir: str) -> str:
     """The analytics snippets exactly as the dashboard carries them, so there is one copy to change.
@@ -1425,8 +1437,10 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
               else '<meta name="robots" content="noindex"/>')
     # was, in the head: the canonical link if index, else the noindex meta (no thin pages)
     url = SITE + path
-    crumb_html = " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1]) + \
-                 (f" › {esc(crumbs[-1][1])}" if crumbs else "")
+    # One crumb is not a trail: no line at all, rather than a lone "› Internships" (2026-10-14, D24).
+    # was: the line on every page, " › Internships" on the hub.
+    crumb_html = ("<p class=\"crumbs\">" + " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1])
+                  + f" › {esc(crumbs[-1][1])}</p>\n") if len(crumbs) > 1 else ""
     trail = {"@context": "https://schema.org", "@type": "BreadcrumbList",
              "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": t, "item": SITE + h}
                                  for i, (h, t) in enumerate(crumbs)]}
@@ -1471,8 +1485,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 <div class="wrap">
 <header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
 <main>
-<p class="crumbs">{crumb_html}</p>
-<h1>{esc(h1)}</h1>
+{crumb_html}<h1>{esc(h1)}</h1>
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
@@ -2177,18 +2190,26 @@ def pay_rows(top_roles: list[tuple], now: datetime) -> str:
             f'<div class="co">{company_link(x.get("company_name") or "")}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)} · <span class="pay">{esc(rate_words(lo, hi))}</span></div>'
-            f'<a class="go"{go_aa(x)} href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" target="_blank">Open posting</a>'
+            f'<div class="acts"><a class="go"{go_aa(x)} href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" '
+            'target="_blank">Open posting</a></div>'
             "</li>")
     return "\n".join(rows)
 
 
-def table(head: list[str], rows: list[list[str]], num_from: int = 1, cls: str = "data") -> str:
-    """An HTML table; cells are HTML already. Columns from num_from on hold figures and don't wrap."""
+def tablewrap(label: str) -> str:
+    """The opening of the box a wide table scrolls sideways in. A keyboard can reach and scroll it, and a
+    screen reader names it (2026-10-14, D24; was: a bare <div class="tablewrap">)."""
+    return f"<div class=\"tablewrap\" tabindex=\"0\" role=\"region\" aria-label=\"{esc(label)}\">"
+
+
+def table(head: list[str], rows: list[list[str]], num_from: int = 1, cls: str = "data", label: str = "Table") -> str:
+    """An HTML table; cells are HTML already. Columns from num_from on hold figures and don't wrap.
+    label: what the table is, for the scrolling box's name (tablewrap)."""
     th = "".join(f"<th scope=\"col\">{h}</th>" for h in head)
     body = "".join("<tr>" + "".join(f"<td class=\"num\">{c}</td>" if i >= num_from else
                                     (f"<th scope=\"row\">{c}</th>" if i == 0 else f"<td>{c}</td>")
                                     for i, c in enumerate(r)) + "</tr>" for r in rows)
-    return f"<div class=\"tablewrap\"><table class=\"{cls}\"><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>"
+    return f"{tablewrap(label)}<table class=\"{cls}\"><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>"
 
 
 def pay_page(rep: dict, f: dict, now: datetime, fields: dict[str, list], paid_page: bool) -> tuple[str, str, str]:
@@ -2216,14 +2237,14 @@ def pay_page(rep: dict, f: dict, now: datetime, fields: dict[str, list], paid_pa
                     f"<p>The {len(rep['by_field'])} fields where at least {MIN_PAY_FIELD} open roles list an "
                     "hourly rate, by median rate. The count is of roles that list a rate, out of the field’s "
                     "open roles; most postings in every field give no rate.</p>"
-                    + table(["Field", "Roles listing a rate", "Median", "Highest"], rows) + "</section>")
+                    + table(["Field", "Roles listing a rate", "Median", "Highest"], rows, label="Hourly pay by field") + "</section>")
     if rep["by_employer"]:
         rows = [[company_link(nm), f"{c:,}", esc(money(round(m, 2))), esc(rate_words(lo, hi).replace(" an hour", ""))]
                 for nm, c, m, lo, hi in rep["by_employer"]]
         body.append("<section class=\"prose\"><h2>Top-paying employers</h2>"
                     f"<p>Employers with at least {MIN_PAY_EMPLOYER} open roles that list an hourly rate, by "
                     f"median rate: the top {len(rows)} of {rep['employers_listing']:,}.</p>"
-                    + table(["Employer", "Roles listing a rate", "Median", "Range"], rows) + "</section>")
+                    + table(["Employer", "Roles listing a rate", "Median", "Range"], rows, label="Hourly pay by employer") + "</section>")
     body.append(
         "<section class=\"prose\"><h2>How this is counted</h2>"
         f"<p>{f['paid']:,} of the {n:,} open roles ({pct(f['paid'], n)}) list pay or say they are paid, and "
@@ -2526,7 +2547,8 @@ def compare_page(f: dict) -> tuple[str, str, str]:
         f"{plural(len(f['fields']), 'field')}.</p>"
         # was: "... cover every career level; InternScout lists only ..." in one sentence of 35 words (the
         # audit of 2026-10-05 measured the lede's sentences at over 25 words).
-        + table(["", "InternScout", "Simplify", "Jobright"], rows, num_from=99, cls="data cmp")
+        + table(["<span class=\"vh\">Feature</span>", "InternScout", "Simplify", "Jobright"], rows, num_from=99,
+                cls="data cmp", label="InternScout, Simplify and Jobright compared")
         + f"<p class=\"src\">Competitor facts as of {COMPARE_AS_OF}, from the sources below. Prices change; "
           "check each company’s site before you pay.</p>"
         "<section class=\"prose\"><h2>Who each one is for</h2>"
@@ -2565,17 +2587,20 @@ def tier_card(name: str, price: str) -> str:
     """One plan as a card: name, price, what it is for, what it gives, and where to get it."""
     edu, other = plan_allowance(name)
     pick = name == RECOMMENDED_PLAN
+    # Only the picked tier's button is solid; the others are secondary (2026-10-14, D23). was: "cta" on all three.
+    btn = "cta" if pick else "cta secondary"
     lines = [f"{edu['autofill']} Auto-Apply runs and {edu['resume_tailor']} tailored resumes a month with a school .edu email",
              f"{other['autofill']} runs and {other['resume_tailor']} resumes with any other email"]
     if name == "Free":
         lines = ["Search, ranking and browsing every listing, with no account"] + lines
-        cta = "<a class=\"cta\" href=\"/\">Search free</a>"
+        cta = f"<a class=\"{btn}\" href=\"/\">Search free</a>"
     else:
         lines = ["Everything in Free"] + lines + ["Cancel any time; the plan runs to the end of the month you paid for"]
         # The dashboard reads ?upgrade= and offers that plan's checkout (docs/js/app.js), after sign-in.
-        cta = f"<a class=\"cta\" href=\"/?upgrade={name.lower()}\">Get {esc(name)}</a>"
+        cta = f"<a class=\"{btn}\" href=\"/?upgrade={name.lower()}\">Get {esc(name)}</a>"
     return (f"<section class=\"tier{' pick' if pick else ''}\" id=\"{name.lower()}\">"
-            + ("<span class=\"badge\">Most popular</span>" if pick else "")
+            # "Recommended" (2026-10-14, D23): there is no sales data behind "Most popular", the badge's old words.
+            + ("<span class=\"badge\">Recommended</span>" if pick else "")
             + f"<h2>{esc(name)}</h2>"
             + f"<p class=\"price\">{esc(price)}<span>{' a month' if price != '$0' else ''}</span></p>"
             + f"<p class=\"blurb\">{esc(PLAN_SHORT[name])}</p>"
