@@ -27,7 +27,7 @@
     .min .body{display:none}
   </style><div class="card" id="card"><div class="top"><span class="dot"></span><b>InternScout</b><span class="muted" id="st"></span><button class="x" id="min" title="Minimize">–</button></div><div class="body" id="body"></div></div>`;
   const $ = (s) => root.querySelector(s);
-  let job = null;
+  let job = null, lastHtml = "";
 
   const LABEL = { queued: "Queued", working: "Working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
   const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -73,7 +73,15 @@
     } else {
       h += `<div class="msg">Waiting for a free slot…</div>`;
     }
+    // A redraw comes with every log line. Unchanged, it is skipped; otherwise the focused button and a
+    // half-typed answer are put back, so Pause and Take over stay reachable from the keyboard.
+    // was: $("#body").innerHTML = h; every time.
+    if (h === lastHtml) return;
+    lastHtml = h;
+    const had = root.activeElement && root.activeElement.id, typed = root.getElementById("ans") && root.getElementById("ans").value;
     $("#body").innerHTML = h;
+    if (typed && root.getElementById("ans")) root.getElementById("ans").value = typed;
+    if (had && root.getElementById(had)) root.getElementById(had).focus({ preventScroll: true });
     const on = (id, fn) => { const b = root.getElementById(id); if (b) b.onclick = fn; };
     on("pause", () => send("pause"));
     on("take", () => send("takeover"));

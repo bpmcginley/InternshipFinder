@@ -4,6 +4,7 @@ import { requestHostAccess, hostOf } from "../lib/hosts.js";
 import { loadReview, shouldShow, cardCopy, STORE_REVIEWS_URL, FEEDBACK_URL, KEY as REVIEW_KEY } from "../lib/review.js";
 
 const main = document.getElementById("main");
+const live = document.getElementById("live");
 let tab = "queue";
 const drafts = {}; // keep typed answers across re-renders
 
@@ -96,9 +97,37 @@ async function reviewAction(act) {
   await send({ type: "review_ask", action: act });
 }
 
+// The queue is redrawn about 150 ms after every log line, and the redraw used to replace the button a
+// keyboard or screen reader user had just tabbed to, so focus fell back to the page before they could
+// press Pause or Take over. Which control had focus, and which Activity lists were open, are noted
+// before a redraw and put back after it.
+function focusKey(el) {
+  if (!el || !main.contains(el)) return null;
+  const card = el.closest("[data-id]");
+  if (el.dataset.act && card) return `[data-id="${card.dataset.id}"] [data-act="${el.dataset.act}"]`;
+  if (el.dataset.review) return `[data-review="${el.dataset.review}"]`;
+  if (el.id) return "#" + el.id;
+  return null;
+}
+const openLogs = () => new Set([...main.querySelectorAll("[data-id] details[open]")].map((d) => d.closest("[data-id]").dataset.id));
+
+// Says it out loud when an application starts waiting on the student (role=status, in sidepanel.html).
+// The first draw only learns the statuses; nothing is announced for jobs that were already waiting.
+let seen = null;
+function announce(jobs) {
+  const now = new Map(jobs.map((j) => [j.id, j.status]));
+  if (seen) {
+    const lines = jobs.filter((j) => seen.get(j.id) !== j.status && (j.status === "needs_you" || j.status === "ready_to_submit"))
+      .map((j) => `${j.company || "An application"}: ${LABEL[j.status].toLowerCase()}`);
+    if (lines.length) live.textContent = lines.join(". ");
+  }
+  seen = now;
+}
+
 async function renderQueue() {
   const q = (await send({ type: "get_queue" })).queue || { order: [], jobs: {} };
   const jobs = q.order.map((id) => q.jobs[id]).filter(Boolean);
+  announce(jobs);
   const s = await loadStore();
   let h = "";
   if (!s.settings.onboarded || !hasKey(s)) h += `<div class="card needs_you"><div class="msg">Finish the Deep Dive before using Auto-Apply.</div><div class="row"><button class="b primary" id="dive">Start Deep Dive</button></div></div>`;
@@ -118,7 +147,10 @@ async function renderQueue() {
   h += `<div class="row" style="justify-content:space-between;margin-top:14px"><button class="b link" id="dive2">Redo Deep Dive</button><button class="b link" id="clear">Clear finished</button></div>`;
   // Always here, asked or not (lib/review.js).
   h += `<div class="foot"><button class="b link" data-review="review">Leave a review</button></div>`;
+  const focused = focusKey(document.activeElement), opened = openLogs();
   main.innerHTML = h;
+  for (const id of opened) main.querySelector(`[data-id="${id}"] details`)?.setAttribute("open", "");
+  if (focused) main.querySelector(focused)?.focus({ preventScroll: true });
   main.querySelectorAll("[data-review]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); reviewAction(b.dataset.review); }));
 
   main.querySelectorAll("textarea[data-ans]").forEach((t) => t.addEventListener("input", () => { drafts[t.dataset.ans] = t.value; }));
