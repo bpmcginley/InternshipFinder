@@ -107,6 +107,7 @@ function watchSubmit(id, tabId) {
 }
 
 // ---------- control actions ----------
+const TAKEOVER_FOCUS_MS = 1500;
 async function control(id, action, answer) {
   // Stop locally before any storage await lets a pending response or prefill resume.
   if (["pause", "takeover", "retry", "submitted", "remove"].includes(action)) stopJob(id);
@@ -116,10 +117,18 @@ async function control(id, action, answer) {
     case "pause":
       await takeBack(id, { status: "needs_you", reason: "Paused. Press Resume to continue.", activity: "" });
       break;
-    case "takeover":
-      await takeBack(id, { status: "needs_you", reason: "You took over. Press Resume to hand it back.", activity: "" });
+    case "takeover": {
+      // The tab comes forward once the page has stopped, or after TAKEOVER_FOCUS_MS, whichever is first:
+      // a busy Workday page can leave the halt unanswered for up to toPage's 30 s, and the button looked
+      // dead all that time. The job is already stopped (stopJob above), and the halt still reaches the
+      // page. A job without a tab has nothing to halt, so its takeBack is done before focusJob opens one.
+      // was: await takeBack(...); await focusJob(j); (2026-10-14 review)
+      const halting = takeBack(id, { status: "needs_you", reason: "You took over. Press Resume to hand it back.", activity: "" });
+      await Promise.race([halting, new Promise((r) => setTimeout(r, TAKEOVER_FOCUS_MS))]);
       await focusJob(j);
+      await halting;
       break;
+    }
     case "resume":
     case "answer":
       if (isRunning(id) && j.status === "working") break;

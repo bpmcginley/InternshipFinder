@@ -136,3 +136,13 @@ test("U4: the pages use them: Setup's step tick, its Next label and warning, the
   assert.match(onb, /if \(readAfterSignIn\(S, \{ extracting, pending: !!pendingResumeImport \}\)\) extract/);
   assert.match(onb, /refreshSignIn\(\);\s*$/);
 });
+
+test("Take over brings the tab forward within TAKEOVER_FOCUS_MS, not after a slow page's halt (2026-10-14 review)", () => {
+  const m = index.match(/case "takeover": \{([\s\S]*?)\n    \}/);
+  assert.ok(m, "takeover case found");
+  const body = m[1].replace(/^\s*\/\/.*$/gm, "");
+  assert.match(body, /const halting = takeBack\(/);
+  assert.match(body, /await Promise\.race\(\[halting, new Promise\(\(r\) => setTimeout\(r, TAKEOVER_FOCUS_MS\)\)\]\);\s*await focusJob\(j\);\s*await halting;/);
+  assert.doesNotMatch(body, /await takeBack\(/, "focus no longer waits for the whole halt");
+  assert.match(index, /const TAKEOVER_FOCUS_MS = 1500;/);
+});

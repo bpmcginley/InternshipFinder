@@ -417,3 +417,35 @@ def test_rows_carried_from_the_last_export_are_judged_new_again(tmp_path, monkey
     assert rows["0"]["is_new"] is True                       # found two days ago: still new
     assert [rows[str(i)]["is_new"] for i in (1, 2, 3)] == [False] * 3
     assert stats["new"] == 1
+
+
+def test_one_employers_two_boards_are_told_apart(tmp_path):
+    # Release checks for 0.5.7 (2026-10-14): boards were keyed on (ATS, company name), so when one of
+    # AIG's two Workday sites failed and the other answered, the failed site's jobs dropped.
+    from datetime import date
+    a = [_prev(id="a%d" % i, company_name="AIG", apply_url="https://aig.wd1.myworkdayjobs.com/aig/job/NY/Intern_%d" % i)
+         for i in range(6)]
+    b = [_prev(id="b%d" % i, company_name="AIG", apply_url="https://aig.wd1.myworkdayjobs.com/AIG_Early_Careers/job/NY/Analyst_%d" % i)
+         for i in range(5)]
+    _write_prev(tmp_path, a + b)
+    listings = [dict(r) for r in a]   # the first site answered in full, the second not at all
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 5
+    assert sorted(x["id"] for x in listings if x.get("carried")) == ["b%d" % i for i in range(5)]
+
+
+def test_the_same_board_spelled_differently_is_one_board():
+    # A board read as new would make the old one look collapsed and bring its rows back twice.
+    from internscout.export_static import board_of
+    same = lambda urls, ats: {board_of({"ats": ats, "company_name": "C", "apply_url": u}) for u in urls}
+    assert len(same(["https://aig.wd1.myworkdayjobs.com/en-US/aig/job/1", "https://aig.wd5.myworkdayjobs.com/aig/job/2"], "workday")) == 1
+    # A two-letter site is a site, not a locale: KLA posts on /UR/ and on /Search/.
+    assert len(same(["https://kla.wd1.myworkdayjobs.com/UR/job/1", "https://kla.wd1.myworkdayjobs.com/Search/job/2",
+                     "https://kla.wd1.myworkdayjobs.com/search/job/3"], "workday")) == 2
+    assert len(same(["https://boards.greenhouse.io/point72/jobs/1", "https://job-boards.greenhouse.io/Point72/jobs/2",
+                     "https://job-boards.greenhouse.io/embed/job_app?for=point72&token=3"], "greenhouse")) == 1
+    assert len(same(["https://apply.workable.com/mindex/j/1/apply", "https://apply.workable.com/j/2/apply"], "workable")) == 1
+    assert len(same(["https://careers-nrdc.icims.com/jobs/1/a/job", "https://careers-nrdc.icims.com/jobs/2/b/job"], "icims")) == 1
+    # Different employers never share a board, even on one embed host.
+    assert board_of({"ats": "greenhouse", "company_name": "A", "apply_url": "https://job-boards.greenhouse.io/embed/job_app?for=x"}) != \
+        board_of({"ats": "greenhouse", "company_name": "B", "apply_url": "https://job-boards.greenhouse.io/embed/job_app?for=x"})
+    assert board_of({"ats": "lever", "company_name": "C", "apply_url": "not a url ["})[2] in ("", "/")

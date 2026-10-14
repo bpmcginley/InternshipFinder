@@ -174,7 +174,7 @@ async function route(request, env, ctx, d) {
 
     // Is this session token live, and whose is it (2026-10-14, U8)? Only a session token: an ID token is
     // 401, since it already says all this about itself. Used by the extension to check the sign-in the
-    // dashboard offers it. Answers { account, provider, tier, expires }; no email (not stored).
+    // dashboard offers it. Answers { account, provider, tier, expires, copyable }; no email (not stored).
     case "GET /session": {
       const token = bearerOf(request);
       if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
