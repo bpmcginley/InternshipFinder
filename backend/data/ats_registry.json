@@ -2715,9 +2715,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-15"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -7753,10 +7752,9 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-10-15"
+   "sector": "health"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
@@ -18902,10 +18900,9 @@
   "wmg|wd1|WMGUS": {
    "name": "Warner Music Group",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "media",
-   "last_fail": "2026-10-15"
+   "sector": "media"
   },
   "wnet|wd1|WNETCareers": {
    "name": "WNET",
