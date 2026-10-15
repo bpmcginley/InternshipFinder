@@ -453,6 +453,7 @@
 42.8507,
 -77.3191
 ],
+"canhq: ccs hq - syracuse|NY":null,
 "canonsburg|PA":[
 40.2588,
 -80.1867
@@ -1578,6 +1579,7 @@
 "nj - princeton|NJ":null,
 "nj - ridgefield park|NJ":null,
 "nj - river edge|NJ":null,
+"nj - rockaway|NJ":null,
 "nj - roseland|NJ":null,
 "nj - secaucus|NJ":null,
 "nj - sicklerville|NJ":null,
@@ -2358,6 +2360,7 @@
 -75.3042
 ],
 "upper merion pa/onsite|PA":null,
+"upper providence pa/hybrid|PA":null,
 "upper providence pa/onsite|PA":null,
 "upstate new york|NY":null,
 "upstate ny|NY":null,
@@ -2392,6 +2395,7 @@
 "us-new york city|NY":null,
 "us-new york|NY":null,
 "us-ny|NY":null,
+"us-remote|NY":null,
 "us-san francisco|NY":null,
 "us-sf|NY":null,
 "us.nj.edison|NJ":null,
