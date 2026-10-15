@@ -7752,10 +7752,9 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-10-15"
+   "sector": "health"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
@@ -15823,8 +15822,9 @@
   "mastercard|wd1|CorporateCareers": {
    "name": "Mastercard",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-15"
   },
   "material|wd1|Material_External_Career_Site": {
    "name": "Material",
