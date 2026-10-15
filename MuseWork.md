@@ -40,6 +40,33 @@ Bruce asked Codex to finish the automated email after mailbox approval. This sup
 - PR #122 connects the verified signup form and the existing Monday schedule: 12:00 UTC, 8am Eastern during daylight time and 7am in winter. Manual runs still default to owner-only tests; the six-day duplicate guard remains.
 - Bruce reviewed the final delivered test and explicitly approved public signup and weekly activation on October 15. PR #122 enables the forms and schedule when merged. The first planned weekly send is Monday, October 19 at 08:00 Eastern; no catch-up broadcast is requested. Preserve the manual owner-only default and duplicate guard.
 
+## Weekly email signup improvements (2026-10-15, prepared for review)
+
+Bruce asked for one agent per signup-growth task. Five separate agents covered visibility, benefit copy,
+contextual invitations, promotion drafts, and measurement; their changes are consolidated on
+`codex/digest-signup-growth`. These improvements have not been merged or deployed.
+
+- Dashboard: Weekly email navigation link and a compact form after the first ten results (after the
+  last result for shorter lists). Counts, status controls, selection and pagination still count jobs only.
+- Copy: clear free/Monday benefit, explicit nonpersonalized roundup, standard Buttondown POST and
+  email confirmation. `/digest/` generates three dated examples from current listing data rather than
+  hardcoding roles. Archive links say "Browse past emails" until and after the first broadcast.
+- Context: one dismissible invitation after a deliberate Interested selection or first manual profile
+  save; the existing classmate invitation has priority. Background queue/profile updates do not trigger
+  it. Only a local shown/opened/dismissed preference is stored; blocked storage suppresses the prompt.
+- Measurement: finite anonymous placement exposure/click/submit counters; exposure requires at least
+  25% visibility. `digest_signup` still means form submissions, not confirmed subscribers. Confirmed
+  active counts remain a manual Buttondown aggregate excluding tests; see `growth/SIGNUP_MEASUREMENT.md`.
+  Deploy the Worker whitelist before the site to accept new events. No schema migration or new key
+  permissions are needed. The private analytics page outside this repo still needs its old signup
+  label changed to "Weekly email form submissions."
+- Browser verification caught mixed cached script versions breaking rendering. The new optional helper
+  now fails closed with an older core script, and this release versions the affected script URLs.
+  Desktop and 390x844 previews showed no horizontal overflow, distinct form labels/IDs, contextual
+  invitation without focus theft, and persistent dismissal. No real signup or broadcast was performed.
+- Promotion drafts and researched club contacts are prepared separately for owner review; nothing is
+  posted, scheduled, or sent by this work. Existing brand automation settings are unchanged.
+
 ## Earlier weekly email status (2026-10-13, superseded above)
 
 - **Buttondown is ready:**

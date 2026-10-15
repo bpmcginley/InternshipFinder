@@ -833,7 +833,11 @@
     // The one-time invite nudge (added 2026-10-02; core.js inviteNudgeDue): on for the rest of this page
     // load once a first Auto-Apply or first profile triggers it, until Not now or the panel opens.
     const [nudge, setNudge] = useState(false);
-    const digestPrompt = useRef(null); if (!digestPrompt.current) digestPrompt.current = IS.createDigestNudge();
+    // A browser may still have the previous core.js cached during deployment. The invitation is
+    // optional; a missing new helper must never stop the internship dashboard from rendering.
+    const digestPrompt = useRef(null);
+    if (!digestPrompt.current) digestPrompt.current = typeof IS.createDigestNudge === "function"
+      ? IS.createDigestNudge() : { claim: () => false, finish() {} };
     const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });

@@ -23,6 +23,18 @@ function load(local = memory()) {
 }
 const eligible = { enabled: true, manual: true };
 
+test("a cached pre-invitation core leaves the optional prompt disabled without breaking rendering", () => {
+  const start = APP.indexOf("    const digestPrompt = useRef(null);");
+  const end = APP.indexOf("    const [digestNudge", start);
+  assert.ok(start > -1 && end > start);
+  const ref = { current: null };
+  const ctx = { IS: {}, useRef: () => ref };
+  vm.createContext(ctx);
+  assert.doesNotThrow(() => vm.runInContext(APP.slice(start, end), ctx));
+  assert.equal(ref.current.claim("interested", eligible), false);
+  assert.doesNotThrow(() => ref.current.finish("dismissed"));
+});
+
 test("contextual email invitation waits for a deliberate useful action and never consumes a blocked opportunity", () => {
   const { IS, local } = load();
   const prompt = IS.createDigestNudge();
