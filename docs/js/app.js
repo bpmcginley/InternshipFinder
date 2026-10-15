@@ -833,6 +833,8 @@
     // The one-time invite nudge (added 2026-10-02; core.js inviteNudgeDue): on for the rest of this page
     // load once a first Auto-Apply or first profile triggers it, until Not now or the panel opens.
     const [nudge, setNudge] = useState(false);
+    const digestPrompt = useRef(null); if (!digestPrompt.current) digestPrompt.current = IS.createDigestNudge();
+    const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
@@ -1113,8 +1115,15 @@
     // A good moment just happened (first Auto-Apply queued, first profile saved): offer the invite
     // once, if it can be offered at all. Marked as shown straight away, so a reload never repeats it.
     function offerNudge() {
-      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return;
-      IS.markInviteNudge(); setNudge(true);
+      if (nudge) return true;
+      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return false;
+      IS.markInviteNudge(); setNudge(true); return true;
+    }
+    function offerDigestNudge(action) {
+      if (digestPrompt.current.claim(action, { enabled: digestOn, manual: true, blocked: !!(nudge || invite || outOfRuns || upgradeAsk) })) setDigestNudge(true);
+    }
+    function finishDigestNudge(how) {
+      digestPrompt.current.finish(how); setDigestNudge(false);
     }
     async function shareInvite() {
       // was: const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
@@ -1157,7 +1166,7 @@
 
     function saveProfile(d) {
       // was: if (!p) IS.count("profile");   // the first profile on this device, not every edit
-      if (!p) { IS.count("profile"); offerNudge(); }   // the first profile on this device, not every edit
+      if (!p) { IS.count("profile"); if (!offerNudge()) offerDigestNudge("profile"); } // manual first save; extension sync never prompts
       const s = IS.saveProfile(d);
       setP(s); setSetupOpen(false); setLimit(PAGE);
       setF(x => ({ ...x, states: [], ...initF(s) }));
@@ -1190,6 +1199,7 @@
       if (!window.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
+      setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
       if ((Object.keys(appStates).length || saved.length || ghToken) && window.confirm("Also delete your applied/saved statuses and saved searches from this browser? Cancel keeps them.")) {
         setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
@@ -1205,6 +1215,12 @@
     // The statuses as of the last render, for listeners added once (the "Did you apply?" check below).
     const appStatesRef = useRef(appStates); appStatesRef.current = appStates;
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
+    // Queue updates and batch Auto-Apply also set statuses; only the student's own status control
+    // can offer this invitation. Never perform prompt side effects inside a React state updater.
+    const setManualAppState = (id, v) => {
+      if (v === "interested" && appStatesRef.current[id] !== "interested") offerDigestNudge("interested");
+      setAppState(id, v);
+    };
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
     // "More filters" remembers whether it was open; the count is how many of the controls inside it
     // are set to something other than their default, so a hidden filter is never a silent one.
@@ -1473,7 +1489,7 @@
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
     const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
     // The review line (see reviewHidden above). It waits behind any other notice rather than stacking.
-    const reviewLine = !reviewHidden && !note && !nudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
+    const reviewLine = !reviewHidden && !note && !nudge && !digestNudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
     // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
     // upgrade_offer, at their tier; a Worker from before 2026-09-30 sends none, so no run count).
     const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
@@ -1880,6 +1896,11 @@
 
       h("section", { id: "results", "aria-labelledby": "listings" },
       h("h2", { id: "listings", className: "sr", tabIndex: -1 }, "Listings"),
+      digestNudge && digestOn && !setupOpen && !nudge && !invite && !outOfRuns && !upgradeAsk && h("div", { className: "notice quietnote", role: "note", "aria-label": "Weekly internship email" },
+        "Want new internships in your inbox every Monday? ",
+        h("a", { href: "/digest/?from=dashboard-contextual", "data-digest-placement": "contextual", onClick: () => finishDigestNudge("opened") }, "Get the free weekly email"),
+        ". Everyone gets the same roundup. ",
+        h("button", { type: "button", className: "linkbtn", "aria-label": "Dismiss weekly email invitation", onClick: () => finishDigestNudge("dismissed") }, "Dismiss")),
       // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
       // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows
       // how many of them are set so nothing is hidden by surprise.
@@ -1959,7 +1980,7 @@
                 // was: Company and role, Field, Location and term, Pay, Match, Your status, Links. Field, place, term
                 // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
                 sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
-              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
+              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns,
                 ask: askId === r.id, onOpen, onAnswer }) })),
 
