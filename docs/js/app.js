@@ -438,15 +438,18 @@
   // full-width row after the third card on a phone (after the last, with fewer). The box is never a Row, so
   // every count here, the header checkbox and the Auto-Apply selection come from `shown` alone, the same
   // with or without it (tests/site/placements.test.mjs). was: the same markup inline in App.
-  function ListTable({ shown, rows, head, renderRow, box, phone, onMore }) {
+  function ListTable({ shown, rows, head, renderRow, box, phone, onMore, inlineSignup, columns = 4 }) {
     const at = Math.min(3, shown.length) - 1;
+    const signupAt = Math.min(10, shown.length) - 1;
     return h(F, null,
       !phone && box,
       h("a", { className: "skip inline", href: "#list-end" }, "Skip past the listings"),
       h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" }, head,
-        h("tbody", null, shown.flatMap((r, i) => phone && box && i === at
-          ? [renderRow(r), h("tr", { key: "placement", className: "paid-row" }, h("td", { colSpan: 5 }, box))]
-          : [renderRow(r)]))))),
+        h("tbody", null, shown.flatMap((r, i) => [
+          renderRow(r),
+          phone && box && i === at && h("tr", { key: "placement", className: "paid-row" }, h("td", { colSpan: 5 }, box)),
+          inlineSignup && i === signupAt && h("tr", { key: "weekly-email", className: "digest-in-list" }, h("td", { colSpan: columns }, inlineSignup))
+        ].filter(Boolean)))))),
       h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
       rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: onMore }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`)));
   }
@@ -1737,6 +1740,7 @@
           h("a", { className: "mark", href: "/" }, "InternScout"),
           h("nav", { className: "sitenav", "aria-label": "Site" },
             h("a", { href: "internships/" }, "Browse"),
+            digestOn && h("a", { href: "digest/?from=dashboard-nav", "data-digest-placement": "nav" }, "Weekly email"),
             h("a", { href: "install.html?from=dashboard-nav" }, "Auto-Apply (free)"),
             h("a", { href: "pricing/" }, "Pricing"),
             h("a", { href: "compare/" }, "Compare"),
@@ -1943,7 +1947,8 @@
           // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
           : rows.length === 0 ? emptyEl
             // was: the skip link, the table, "End of the N listings shown" and "Show N more" inline here (ListTable now).
-            : h(ListTable, { shown, rows, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE),
+            : h(ListTable, { shown, rows, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
+              inlineSignup: digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
               head: h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
@@ -1963,7 +1968,7 @@
       h(Landing, { open: landingOpen, setOpen: setLandingOpen, onSetup: openSetup, hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
 
       // Below the list and above the footer links, so it never pushes a listing down.
-      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup })),
+      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "footer" })),
 
       h("footer", null,
         // Same facts as before, in two short sentences instead of one long one. The plan prices
