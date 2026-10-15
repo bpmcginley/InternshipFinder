@@ -548,33 +548,37 @@
   // The past emails (2026-10-06): Buttondown's public web archive of the newsletter, worked out from the
   // form's address (IS.digestArchive), so a student can see what they'd get before giving an address.
   // js/count.js counts a submit of this form (class "digest") as "digest_signup", with nothing about who.
-  function Digest({ cfg, fields, hasProfile, onSetup }) {
+  function Digest({ cfg, fields = [], hasProfile, onSetup, placement = "footer", compact = false }) {
     const [sent, setSent] = useState(false);
     const prov = cfg.provider || "Buttondown";
     const archive = IS.digestArchive(cfg.formAction);
+    const id = "digest-" + placement;
     // Only the form's status line changes on submit. The form and its inputs stay mounted, because
     // React can re-render before the browser has read the fields it is about to send.
-    return h("form", { id: "digest-form", className: "notice quietnote digest", action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
-      "aria-labelledby": "digest-title", onSubmit: () => setSent(true) },
-      h("b", { id: "digest-title" }, "Email me new internships each week. "),
-      `One email a week; unsubscribe any time. You'll get a confirmation email first, and nothing else arrives until you click its link. Your address${fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email, not to InternScout's servers. `,
+    return h("form", { id: id + "-form", className: "notice quietnote digest" + (compact ? " digest-compact" : ""), action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
+      "data-digest-placement": placement, "aria-labelledby": id + "-title", onSubmit: () => setSent(true) },
+      h("b", { id: id + "-title" }, "New internships in your inbox every Monday. Free. "),
+      compact
+        ? "A few new roles and links to the rest. Everyone gets the same email. Confirm by email first; unsubscribe any time. "
+        : "A weekly selection of new internships, co-ops and research roles, with links to explore the rest. Everyone gets the same email for now. Confirm by email first; unsubscribe any time. ",
+      `Your address${!compact && fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email. `,
       h("a", { href: "privacy.html#digest" }, "Details"),
       archive && " · ",
-      archive && h("a", { href: archive, target: "_blank", rel: "noopener" }, "See last Monday's email"),
+      archive && h("a", { href: archive, target: "_blank", rel: "noopener" }, "Browse past emails"),
       // The key remounts the boxes when the profile's fields change, so each new field starts ticked.
-      fields.length > 0
+      !compact && (fields.length > 0
         // was: h("legend", null, "Fields from your profile")
-        ? h("fieldset", { key: fields.join(","), id: "digest-fields" }, h("legend", null, "Fields from your profile, saved with your subscription so the email can be matched to them later"),
+        ? h("fieldset", { key: fields.join(","), id: id + "-fields" }, h("legend", null, "Optional: save fields from your profile for future email matching (not personalized yet)"),
           h("div", { className: "checks" }, fields.map(t => h("label", { key: t, className: "check" },
-            h("input", { type: "checkbox", id: "digest-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
+            h("input", { type: "checkbox", id: id + "-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
         // was: "With no fields picked, the email covers every field. ... to narrow it." For now every
         // subscriber gets the same email (growth/digest_send.py), so ticked fields only get saved.
-        : h("div", { style: { marginTop: 8 } }, "Everyone gets the same email for now. ",
-          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " and they'll be saved with your subscription, so it can be matched to them later."),
+        : h("div", { style: { marginTop: 8 } },
+          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " to improve your search results. You can subscribe without a profile.")),
       h("div", { className: "digest-row" },
-        h("label", { htmlFor: "digest-email" }, "Email"),
-        h("input", { id: "digest-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
-        h("button", { id: "digest-submit", type: "submit", className: "btn primary" }, "Subscribe"),
+        h("label", { htmlFor: id + "-email" }, "Email"),
+        h("input", { id: id + "-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
+        h("button", { id: id + "-submit", type: "submit", className: "btn primary" }, "Email me new internships"),
         sent && h("span", { className: "muted", role: "status" }, `${prov} opened in a new tab. Finish there if it asks, then look for the confirmation email.`)),
       // In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
       h("input", { type: "hidden", name: "embed", value: "1" }));
