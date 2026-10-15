@@ -87,6 +87,16 @@ def test_the_unpaid_waiver_travels_with_the_placement_so_the_email_agrees():
     assert len(again) == 1
 
 
+def test_the_worker_answer_carries_unpaid_ok_as_0_or_1():
+    # GET /placements sends unpaid_ok on every placement since 2026-10-14 (worker/src/placements.js):
+    # 0 keeps an unpaid listing out, 1 keeps it, and a paid role is kept either way, with no waiver in the file.
+    unpaid = _by_id(_listing(insights={"pay": "unpaid"}))
+    assert resolve([_pl(unpaid_ok=0, page_cap=1)], unpaid, DAY)[1][0]["reason"] == "unpaid"
+    assert len(resolve([_pl(unpaid_ok=1, page_cap=1)], unpaid, DAY)[0]) == 1
+    kept, _ = resolve([_pl(unpaid_ok=0, page_cap=1)], _by_id(_listing()), DAY)
+    assert "unpaid_ok" not in placements.public(kept)[0]
+
+
 def test_a_url_only_match_is_kept_with_a_warning_and_never_repointed_silently():
     moved = _listing(id="aaaaaaaaaaaaaaaa")             # the same role, a new id after a re-ingest
     kept, dropped = resolve([_pl()], _by_id(moved), DAY)

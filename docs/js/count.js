@@ -15,6 +15,9 @@
 // that the form was sent goes, with this page's path like every step: never the address or a field.
 // Since 2026-10-07 a click on a link to the listing's reviews page counts as "review_click" rather than
 // "install_click" (the dashboard's review line, the install page's review links), once per page load.
+// Since 2026-10-14 (S9) a paid listing's box is counted the same way: "shown" once per page load when the
+// box is at least half on screen, and "open" once when its posting link is pressed. Only the placement's
+// id goes, with this page's path: never the listing, a search, a filter or anything about who.
 (function () {
   var API = "https://internscout-api.bpmcginley.workers.dev/hit";
   // "Don't count this browser" (2026-10-01), for the owner's own visits: ?nocount=1 on any page turns
@@ -42,7 +45,29 @@
   };
   queued.forEach(function (e) { window.ISCount(e); });
   window.ISCountQ = { push: window.ISCount };
+  // Paid listings (S9, 2026-10-14). A box carries data-placement="<id>": the dashboard's (js/placements.js
+  // PaidBox, which hands its element over through window.ISPlacementQ once it is on the page) and the
+  // landing pages' (backend/internscout/seo_pages.py placement_box, in the page from the start). The Worker
+  // keeps a count only for a placement that is on today (worker/src/visits.js).
+  var plDone = {};
+  var plSend = function (id, e) {
+    if (!live || !id || !/^[A-Za-z0-9_-]{1,80}$/.test(id) || plDone[id + " " + e]) return;
+    plDone[id + " " + e] = true;
+    beacon({ s: id, e: e, p: location.pathname });
+  };
+  var plSeen = live && window.IntersectionObserver ? new IntersectionObserver(function (list) {
+    list.forEach(function (en) {
+      if (!en.isIntersecting || en.intersectionRatio < 0.5) return;
+      plSend(en.target.getAttribute("data-placement"), "shown");
+      plSeen.unobserve(en.target);
+    });
+  }, { threshold: [0.5] }) : null;
+  var plWatch = function (el) { if (plSeen && el && el.getAttribute && el.getAttribute("data-placement")) plSeen.observe(el); };
+  var plQueued = window.ISPlacementQ || [];
+  window.ISPlacementQ = { push: plWatch };
   if (!live) return;
+  if (plQueued.forEach) plQueued.forEach(plWatch);
+  if (document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll("[data-placement]"), plWatch);
   // Any link to the extension's store page, on any page (landing pages, install guide, dashboard).
   // And a posting opened from a landing page or the dashboard: the step after a search, which the
   // counts could not see before.
@@ -59,6 +84,9 @@
     // A paid listing's box (li.paid, seo_pages.placement_box) uses the same "go" link, but payment must
     // never change a count, so its clicks are left out.
     if (t && t.closest("a.go[href], a.open-link[href]") && !t.closest(".paid")) window.ISCount("posting_click");
+    // A paid listing's own posting link (rel="sponsored"), not its "Why am I seeing this?" link.
+    var box = a && a.closest && a.getAttribute ? a.closest("[data-placement]") : null;
+    if (box && /(^|\s)sponsored(\s|$)/.test(a.getAttribute("rel") || "")) plSend(box.getAttribute("data-placement"), "open");
   }, true);
   // A sign-up form sent. "submit" fires only once the browser has passed the form's own checks (the
   // email box is required), and the form still posts to Buttondown in its new tab as before.

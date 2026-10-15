@@ -45,6 +45,10 @@ test("parseArgs and toRequest build the documented calls", () => {
   assert.throws(() => toRequest(parseArgs(["create", "--token", "x"])), /Unknown flag --token/, "the token is never an argument");
   assert.throws(() => toRequest(parseArgs(["create", "--lead", "abc", "--listing", "a", "--url", "u", "--start", "s", "--end", "e"])), /--lead/);
   assert.throws(() => toRequest(parseArgs(["frobnicate"])), /Unknown command/);
+  // The S9 report (2026-10-14).
+  assert.deepEqual(toRequest(parseArgs(["report", "p-1", "--month", "2026-11"])),
+    { method: "POST", path: "/admin/placements/report", admin: true, body: { id: "p-1", month: "2026-11" } });
+  assert.throws(() => toRequest(parseArgs(["report", "p-1"])), /--month/);
 });
 
 test("redact drops paid_ref everywhere, including log rows", () => {

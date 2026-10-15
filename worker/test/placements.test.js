@@ -40,6 +40,7 @@ const ADMIN_ROUTES = [
   ["GET", "/admin/placements"], ["GET", "/admin/leads"], ["POST", "/admin/placements"],
   ["POST", "/admin/placements/update"], ["POST", "/admin/placements/check"], ["POST", "/admin/placements/on"],
   ["POST", "/admin/placements/pause"], ["POST", "/admin/placements/end"], ["POST", "/admin/placements/refuse"],
+  ["POST", "/admin/placements/report"],
 ];
 
 test("admin routes are hidden (404) while ADMIN_TOKEN is unset, even with a token", async () => {

@@ -91,11 +91,19 @@
   }
 
   // placements.json, fetched once per page load, with no retry, fallback or message. Resolves to clean()'s list.
+  // Since 2026-10-14 (S8) the page head starts it (index.html, window.__placementsP) and keeps what it read
+  // in window.__placements, so loaded() can answer on the dashboard's first draw; load() then reuses that
+  // request instead of sending a second one.
   let loading = null;
+  function loaded() {
+    const C = window.CONFIG || {};
+    return C.placements === false || window.__placements === undefined ? null : clean(window.__placements);
+  }
   function load() {
     if (loading) return loading;
     const C = window.CONFIG || {};
     if (C.placements === false || typeof fetch !== "function") return (loading = Promise.resolve([]));
+    if (window.__placementsP && window.__placementsP.then) return (loading = window.__placementsP.then(clean, () => []).catch(() => []));
     loading = fetch((C.dataUrl || "./data/") + FILE, { cache: "no-cache" })
       .then(r => r && r.ok ? r.json() : null)
       .then(clean)
@@ -109,13 +117,21 @@
   //   renderWhy(close): the Why panel; onHide: "Hide paid listings"; phone: the narrow layout.
   // It has no checkbox, no status, no Auto-Apply button and no data-aa (so js/offer.js never pitches the
   // extension from it), and its link is rel="sponsored noopener".
-  function PaidBox({ x, facts, renderMatch, renderWhy, onHide, phone }) {
-    const React = window.React, h = React.createElement, F = React.Fragment;
+  // pl (2026-10-14, S9): the placement, whose id goes on the box as data-placement. Once the box is on the
+  // page it is handed to js/count.js (window.ISPlacementQ), which counts it shown once per page load when
+  // it is half on screen and opened when its posting link is pressed: the placement id and the page's
+  // path, nothing else. ?nocount=1 stops both.
+  // was: function PaidBox({ x, facts, renderMatch, renderWhy, onHide, phone }) {
+  function PaidBox({ x, pl, facts, renderMatch, renderWhy, onHide, phone }) {
+    const React = window.React, h = React.createElement;
     const [why, setWhy] = React.useState(false);
     const [about, setAbout] = React.useState(false);
+    const box = React.useRef(null);
+    const plId = pl && pl.id;
+    React.useEffect(() => { if (plId && box.current) (window.ISPlacementQ = window.ISPlacementQ || []).push(box.current); }, [plId]);
     const id = "pl-" + String(x.id).replace(/[^A-Za-z0-9_-]/g, "");
     const who = `${x.company_name}, ${x.title}`;
-    return h("section", { className: cx("paid", phone && "phone"), "aria-label": "Paid listing, not part of the ranked results" },
+    return h("section", { className: cx("paid", phone && "phone"), ref: box, "data-placement": plId || undefined, "aria-label": "Paid listing, not part of the ranked results" },
       h("div", { className: "paid-top" },
         h("h3", { className: "paid-h" }, "Paid listing"),
         h("button", { type: "button", className: "linkbtn quietlink", "aria-expanded": about, "aria-controls": id + "-about", onClick: () => setAbout(o => !o) }, "Why am I seeing this?"),
@@ -138,5 +154,5 @@
   }
   const cx = (...a) => a.filter(Boolean).join(" ");
 
-  window.ISPlace = { pick, PaidBox, load, clean, HIDE_KEY, MAX_PER_PAGE, FLOOR_RANK };
+  window.ISPlace = { pick, PaidBox, load, loaded, clean, HIDE_KEY, MAX_PER_PAGE, FLOOR_RANK };
 })();
