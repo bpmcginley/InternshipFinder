@@ -741,6 +741,10 @@
 40.4853,
 -78.7248
 ],
+"eddystone|PA":[
+39.8601,
+-75.3444
+],
 "edgewater|NJ":[
 40.827,
 -73.9757
@@ -1473,6 +1477,7 @@
 "new york city - hybrid|NY":null,
 "new york city - office|NY":null,
 "new york city - us|NY":null,
+"new york city 3 times square|NY":null,
 "new york city area|NY":null,
 "new york city m&s|NY":null,
 "new york city office|NY":null,

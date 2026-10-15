@@ -1241,9 +1241,9 @@
   "maximor": {
    "name": "Maximor AI",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-14"
+   "last_fail": "2026-10-15"
   },
   "maxinsights": {
    "name": "Maxinsights",
@@ -3112,13 +3112,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "breezeairways": {
-   "name": "Breeze Airways",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-14"
-  },
   "brevium": {
    "name": "Brevium",
    "quant": false,
@@ -3464,9 +3457,9 @@
   "cybereason": {
    "name": "Cybereason",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-14"
+   "last_fail": "2026-10-15"
   },
   "darkwolfsolutions": {
    "name": "Dark Wolf Solutions",
@@ -8605,6 +8598,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "nonprofit"
+  },
+  "atomcomputing": {
+   "name": "Atom Computing",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-15"
   },
   "azul": {
    "name": "Azul Systems",
@@ -18865,6 +18864,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "whataburger|wd5|WAB_CAREERS": {
+   "name": "Whataburger",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-15"
   },
   "wilburellis|wd12|wilbur-ellis": {
    "name": "Wilbur-Ellis",
