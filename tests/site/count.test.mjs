@@ -7,8 +7,10 @@ import vm from "node:vm";
 
 const COUNT = readFileSync(new URL("../../docs/js/count.js", import.meta.url), "utf8");
 
-function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage } = {}) {
+function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage, placements } = {}) {
   const sent = [], listeners = {};
+  let intersection, mutation;
+  const observing = new Set();
   const ctx = {
     location: { hostname: host, pathname: path, search },
     navigator: { webdriver, sendBeacon: (url, blob) => { sent.push({ url, blob }); return true; } },
@@ -17,6 +19,19 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
     URL, URLSearchParams, JSON,
   };
   ctx.window = ctx;
+  if (placements) {
+    ctx.document.body = {};
+    ctx.document.querySelectorAll = () => placements;
+    ctx.IntersectionObserver = class {
+      constructor(callback) { intersection = callback; }
+      observe(el) { observing.add(el); }
+      unobserve(el) { observing.delete(el); }
+    };
+    ctx.MutationObserver = class {
+      constructor(callback) { mutation = callback; }
+      observe() {}
+    };
+  }
   if (storage) ctx.localStorage = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
   if (queued) ctx.ISCountQ = queued;
   vm.createContext(ctx);
@@ -26,8 +41,8 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
   // `cls` is the link's class: closest() finds it for "a[href]" always, and for a class selector only
   // when one of the selector's parts names that class. `box` is the class of an element around the link
   // (".paid" for a paid listing's box), found by closest(".<box>").
-  const click = (href, cls, box) => {
-    const link = { href };
+  const click = (href, cls, box, placement) => {
+    const link = { href, getAttribute: (name) => name === "data-digest-placement" ? placement : null };
     const closest = (sel) => (box && sel === `.${box}`) ? {} :
       (sel === "a[href]" || (cls && sel.split(",").some((s) => s.trim() === `a.${cls}[href]`)) ? link : null);
     return listeners.click({ target: { closest } });
@@ -35,7 +50,9 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
   // A form sent (2026-10-06): `cls` is the form's class, and matches() is true only for "form.<cls>".
   // `fields` stand in for what the student typed, which count.js must never read.
   const submit = (cls, fields = {}) => listeners.submit({ target: { ...fields, matches: (sel) => sel === `form.${cls}` } });
-  return { ctx, sent, bodies, click, submit };
+  return { ctx, sent, bodies, click, submit, observing,
+    expose: (target, ratio) => intersection([{ target, isIntersecting: ratio > 0, intersectionRatio: ratio }]),
+    mount: (addedNodes = [], removedNodes = []) => mutation([{ addedNodes, removedNodes }]) };
 }
 
 test("one page load sends the path, the referring host and the campaign tag", () => {
@@ -117,6 +134,46 @@ test("a local copy counts no sign-ups and attaches no submit listener", () => {
   const r = load({ host: "localhost" });
   assert.throws(() => r.submit("digest"), TypeError);
   assert.equal(r.sent.length, 0);
+});
+
+const placementElement = (placement) => ({ nodeType: 1, getAttribute: (name) => name === "data-digest-placement" ? placement : null });
+
+test("digest exposure waits for visibility and observes React mounts without counting DOM presence", () => {
+  const footer = placementElement("footer"), inline = placementElement("results-inline"), unknown = placementElement("someone@school.edu");
+  const r = load({ placements: [footer, unknown] });
+  assert.deepEqual(r.bodies().filter((b) => b.e), [], "a below-the-fold form is not a view");
+  assert.equal(r.observing.has(unknown), false, "arbitrary placement values are never observed");
+  r.expose(footer, 0.1);
+  assert.deepEqual(r.bodies().filter((b) => b.e), []);
+  r.mount([inline]);
+  assert.equal(r.observing.has(inline), true, "later React form is observed");
+  r.expose(inline, 0.25);
+  r.expose(inline, 1);
+  r.expose(footer, 0.5);
+  assert.deepEqual(r.bodies().filter((b) => b.e), [
+    { e: "digest_view_results_inline", p: "/" }, { e: "digest_view_footer", p: "/" }
+  ]);
+  assert.equal(r.observing.has(inline), false, "a measured form stops observing");
+  const contextual = placementElement("contextual");
+  r.mount([contextual]); r.mount([], [contextual]);
+  assert.equal(r.observing.has(contextual), false, "removed elements release the observer");
+  r.mount([contextual]);
+  assert.equal(r.observing.has(contextual), true, "reinserted unseen elements can still be measured");
+});
+
+test("finite digest click and submit attribution never reports confirmation or typed fields", () => {
+  const r = load();
+  r.click("https://internscout.org/digest/", "nav", null, "nav");
+  r.click("https://internscout.org/digest/", null, null, "contextual");
+  r.click("https://internscout.org/digest/", null, null, "invented");
+  const form = placementElement("results-inline");
+  Object.defineProperty(form, "email", { get: () => { throw new Error("must not read email"); } });
+  r.submit("digest", form); r.submit("digest", form);
+  r.submit("digest", placementElement("footer"));
+  assert.deepEqual(r.bodies().filter((b) => b.e).map((b) => b.e), [
+    "digest_click_nav", "digest_click_contextual", "digest_signup", "digest_submit_results_inline", "digest_submit_footer"
+  ]);
+  assert.ok(r.bodies().every((b) => !/confirmed|subscriber/.test(b.e || "")));
 });
 
 // Added 2026-10-07: a link to the listing's reviews page (the dashboard's review line, the install

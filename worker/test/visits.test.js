@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers.js";
-import { DAY_CAP, EVENTS, SERVER_EVENTS, channelOf, countEvent, pageKind, sourceOf } from "../src/visits.js";
+import { DAY_CAP, DIGEST_PLACEMENTS, EVENTS, SERVER_EVENTS, channelOf, countEvent, pageKind, sourceOf } from "../src/visits.js";
 
 const SITE = { Origin: "https://internscout.org", "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130" };
 const hit = (w, body, headers = SITE) => w.api("POST", "/hit", { body, headers });
@@ -234,6 +234,25 @@ test("a weekly email sign-up is a step the site sends, counted by the page the f
   ]);
   assert.ok(!JSON.stringify(await w.db.dump()).includes("someone@school.edu"), "nothing but the count is kept");
   assert.deepEqual(await rows(w), [], "a step is not a page load");
+});
+
+test("digest placement events are finite anonymous totals, never subscriber confirmations", async () => {
+  const w = await setup();
+  for (const step of ["view", "click", "submit"]) {
+    for (const placement of DIGEST_PLACEMENTS) {
+      const e = `digest_${step}_${placement}`;
+      assert.ok(EVENTS.has(e));
+      await hit(w, { e, p: "/", email: "someone@school.edu", placement: "arbitrary" });
+    }
+  }
+  for (const e of ["digest_confirmed", "digest_submit_arbitrary", "digest_view_someone@school.edu"]) {
+    await hit(w, { e, p: "/" });
+  }
+  const result = await events(w);
+  assert.equal(result.length, 18);
+  assert.ok(result.every((r) => r.n === 1 && r.page === "dashboard"));
+  assert.ok(!JSON.stringify(await w.db.dump()).includes("someone@school.edu"));
+  assert.ok(!JSON.stringify(result).includes("arbitrary"));
 });
 
 // Added 2026-10-07: a click through to the extension's reviews page, from the site only.

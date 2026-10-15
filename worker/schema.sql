@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS visit_channels (
 -- Since 2026-10-06 also digest_signup, a weekly email sign-up form sent, on page "dashboard", "landing"
 -- or "digest" (the /digest/ page, a page kind of its own since then in visit_counts too). It's a count
 -- of forms sent; the address goes from the browser to Buttondown and never reaches the Worker.
+-- Since 2026-10-15 also finite digest_<view|click|submit>_<placement> totals (visits.js). These are
+-- invitation exposures and attempts, never confirmed subscriptions. No schema migration is needed.
 -- Since 2026-10-13 also apply_offer_shown and apply_offer_click (docs/js/offer.js): the "Add to Chrome"
 -- bar shown after opening a posting Auto-Apply fills, and its store link pressed. No schema change.
 -- Since 2026-10-13 also employer_interest (a server step: src/leads.js stored a lead from /employers/),

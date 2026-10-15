@@ -15,6 +15,9 @@
 // that the form was sent goes, with this page's path like every step: never the address or a field.
 // Since 2026-10-07 a click on a link to the listing's reviews page counts as "review_click" rather than
 // "install_click" (the dashboard's review line, the install page's review links), once per page load.
+// Since 2026-10-15 digest placements also count an observed view (at least 25% visible), a link
+// click and a form submission separately. These are page-load totals, never unique people or
+// confirmed subscribers. The legacy digest_signup still means only that a form was submitted.
 (function () {
   var API = "https://internscout-api.bpmcginley.workers.dev/hit";
   // "Don't count this browser" (2026-10-01), for the owner's own visits: ?nocount=1 on any page turns
@@ -43,6 +46,54 @@
   queued.forEach(function (e) { window.ISCount(e); });
   window.ISCountQ = { push: window.ISCount };
   if (!live) return;
+  var digestPlacements = ["footer", "results-inline", "digest-page", "landing", "contextual", "nav"];
+  var digestPlacement = function (el) {
+    var value = el && el.getAttribute ? el.getAttribute("data-digest-placement") : "";
+    return digestPlacements.indexOf(value) >= 0 ? value.replace(/-/g, "_") : "";
+  };
+  var digestCount = function (step, el) {
+    var placement = digestPlacement(el);
+    if (placement) window.ISCount("digest_" + step + "_" + placement);
+  };
+  // Observe actual exposure, including forms React inserts later. Without IntersectionObserver,
+  // views stay unknown: being in the DOM is not evidence that someone saw a form below the list.
+  // Inspect only newly added subtrees, not every result row on every React update.
+  if (window.IntersectionObserver && document.querySelectorAll) {
+    var observed = new WeakSet();
+    var views = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
+          digestCount("view", entry.target);
+          views.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.25 });
+    var watch = function (el) {
+      if (!digestPlacement(el) || observed.has(el)) return;
+      observed.add(el);
+      views.observe(el);
+    };
+    var scan = function (node) {
+      if (!node || node.nodeType !== 1) return;
+      watch(node);
+      if (node.querySelectorAll) node.querySelectorAll("[data-digest-placement]").forEach(watch);
+    };
+    document.querySelectorAll("[data-digest-placement]").forEach(watch);
+    if (window.MutationObserver && document.body) {
+      var mounts = new MutationObserver(function (changes) {
+        changes.forEach(function (change) {
+          change.removedNodes.forEach(function (node) {
+            if (node.nodeType !== 1) return;
+            views.unobserve(node);
+            observed.delete(node);
+            if (node.querySelectorAll) node.querySelectorAll("[data-digest-placement]").forEach(function (el) { views.unobserve(el); observed.delete(el); });
+          });
+          change.addedNodes.forEach(scan);
+        });
+      });
+      mounts.observe(document.body, { childList: true, subtree: true });
+    }
+  }
   // Any link to the extension's store page, on any page (landing pages, install guide, dashboard).
   // And a posting opened from a landing page or the dashboard: the step after a search, which the
   // counts could not see before.
@@ -50,6 +101,7 @@
     // was: var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
     var t = ev.target && ev.target.closest ? ev.target : null;
     var a = t ? t.closest("a[href]") : null;
+    if (a) digestCount("click", a);
     // was: if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
     // Since 2026-10-07 a link to the listing's reviews page (".../reviews") is a "review_click" instead:
     // someone who already has the extension going to review it, not someone going to install it.
@@ -64,7 +116,10 @@
   // email box is required), and the form still posts to Buttondown in its new tab as before.
   document.addEventListener("submit", function (ev) {
     var f = ev.target;
-    if (f && f.matches && f.matches("form.digest")) window.ISCount("digest_signup");
+    if (f && f.matches && f.matches("form.digest")) {
+      window.ISCount("digest_signup");
+      digestCount("submit", f);
+    }
   }, true);
   var send = function () {
     var q = new URLSearchParams(location.search), ref = "";
