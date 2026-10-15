@@ -1,0 +1,80 @@
+{
+  "status": "draft",
+  "checked_on": "2026-10-15",
+  "export_generated_at": "2026-10-15T21:11:45.118829+00:00",
+  "verification": "Official employer-hosted ATS pages were opened read-only and showed the named opportunity and an application form. No application was started or submitted. Recheck before any release.",
+  "roles": [
+    {
+      "key": "shark_mechanical",
+      "listing_id": "82d6924ba5ee6aeb",
+      "company": "SharkNinja",
+      "title": "Summer 2027: Mechanical Engineering Intern, Shark (May to August)",
+      "official_url": "https://job-boards.greenhouse.io/sharkninjaoperatingllc/jobs/4718812006",
+      "location": "Needham, MA; full-time onsite five days per week",
+      "eligibility_note": "Related degree students or graduates within the past year; no housing or relocation assistance. The page contains inconsistent pay ranges, so the drafts omit pay."
+    },
+    {
+      "key": "shark_product",
+      "listing_id": "8d861924ed3bc04f",
+      "company": "SharkNinja",
+      "title": "Spring 2027: Product Design Engineering Co-op, Shark (January to June)",
+      "official_url": "https://job-boards.greenhouse.io/sharkninjaoperatingllc/jobs/4720273006",
+      "location": "Needham, MA; full-time onsite five days per week",
+      "eligibility_note": "Related bachelor's/master's students or graduates within the past year; no housing or relocation assistance. Do not imply a summer term or remote work."
+    },
+    {
+      "key": "vestmark_swe",
+      "listing_id": "7b18998036d5e6a9",
+      "company": "Vestmark",
+      "title": "Software Engineer Co-op",
+      "official_url": "https://job-boards.greenhouse.io/vestmark/jobs/8204509",
+      "location": "Boston, MA; local candidates only",
+      "eligibility_note": "Spring 2027; incoming college juniors/seniors in CS or computer engineering. Listed coding and relational-database experience required."
+    },
+    {
+      "key": "tenstorrent_hardware",
+      "listing_id": "831a7298688bb502",
+      "company": "Tenstorrent",
+      "title": "Hardware Intern - Architecture, AI HW & SoC (USA)",
+      "official_url": "https://job-boards.greenhouse.io/tenstorrentuniversity/jobs/5256691007",
+      "location": "Onsite; Boston is one of four listed US locations",
+      "eligibility_note": "BS/MS/PhD students in EE, ECE, CE or CS; relevant hardware coursework/projects and export-control eligibility apply. Team and location are matched through one application. The MA shard has a second title for this same URL; count it once."
+    },
+    {
+      "key": "hasbro_marketing",
+      "listing_id": "cb683af9c907a708",
+      "company": "Hasbro",
+      "title": "2027 Summer Marketing Internships",
+      "official_url": "https://job-boards.greenhouse.io/hasbro/jobs/4424981009",
+      "location": "Boston, MA and/or Renton, WA; project-dependent office schedule",
+      "eligibility_note": "General application for anticipated projects, not a specific vacancy. Students must remain enrolled for at least one term after the internship. US work authorization required; no immigration sponsorship."
+    },
+    {
+      "key": "weiss_fellowship",
+      "listing_id": "aafdf2805558f2f6",
+      "company": "Weiss Asset Management",
+      "title": "2027 Underclassmen Fellowship",
+      "official_url": "https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002",
+      "location": "Boston, MA; January 7–8, 2027",
+      "eligibility_note": "Two-day finance program for current freshmen/sophomores, classes of 2029/2030; not a summer internship. Selected fellows' transport and hotel covered.",
+      "do_not_release_at_or_after": "2026-10-16T17:00:00-04:00"
+    }
+  ],
+  "excluded_after_primary_source_review": [
+    {
+      "title": "Later — Data & Analytics Co-op",
+      "official_url": "https://job-boards.greenhouse.io/later/jobs/8880737002",
+      "reason": "Official page explicitly limits it to Northeastern University co-op students; unsuitable for a UMass-targeted share."
+    },
+    {
+      "title": "Apriori Bio — Translational Immunology Co-Op",
+      "official_url": "https://job-boards.greenhouse.io/fspco-op012325/jobs/8882282002",
+      "reason": "Official page explicitly limits it to Northeastern University co-op students; unsuitable for a UMass-targeted share."
+    },
+    {
+      "title": "Groma — Finance Systems Co-op",
+      "official_url": "https://job-boards.greenhouse.io/groma/jobs/4743496005",
+      "reason": "Official page was inaccessible to the research tool; current availability and eligibility were not verified. Not used in release drafts."
+    }
+  ]
+}

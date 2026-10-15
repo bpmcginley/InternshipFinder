@@ -1359,8 +1359,8 @@ def digest_archive(action: str) -> str:
     return f"https://buttondown.com/{m.group(1)}/archive/" if m else ""
 
 
-def signup_form(pitch: str, field: str | None = None, heading: str = "New internships by email, every Monday",
-                what: bool = True) -> str:
+def signup_form(pitch: str, field: str | None = None, heading: str = "New internships in your inbox every Monday. Free.",
+                what: bool = True, placement: str = "landing") -> str:
     """The weekly email's sign-up form, or "" while DIGEST_FORM is empty. Built like the dashboard's
     (js/app.js Digest): a plain form that posts straight from the browser to Buttondown, in a new tab
     (Buttondown may ask for a CAPTCHA or a fixed typo on its own page), so the address never reaches
@@ -1383,19 +1383,19 @@ def signup_form(pitch: str, field: str | None = None, heading: str = "New intern
              "from each and a link to the rest. For now everyone gets the same email.") if what else ""
     lead = " ".join(p for p in (pitch, about) if p)
     return (f'<form class="digest" action="{esc(DIGEST_FORM)}" method="post" target="_blank" rel="noopener" '
-            'aria-labelledby="digest-title">'
+            f'aria-labelledby="digest-title" data-digest-placement="{esc(placement)}">'
             f'<h2 id="digest-title">{esc(heading)}</h2>'
             + (f"<p>{lead}</p>" if lead else "")
             + box +
             '<div class="digest-row"><label for="digest-email">Email</label>'
             '<input id="digest-email" type="email" name="email" required autocomplete="email" spellcheck="false"/>'
-            '<button type="submit" class="cta">Subscribe</button></div>'
+            '<button type="submit" class="cta">Email me new internships</button></div>'
             # In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
             '<input type="hidden" name="embed" value="1"/>'
             "<p class=\"fine\">Buttondown opens in a new tab to finish. You'll get a confirmation email first, and "
             f"nothing else arrives until you click its link. Unsubscribe any time. {goes} to Buttondown, which "
             "sends the email, not to InternScout's servers. <a href=\"/privacy#digest\">Details</a>"
-            + (f' · <a href="{esc(archive)}" target="_blank" rel="noopener">See last Monday\'s email</a>' if archive else "")
+            + (f' · <a href="{esc(archive)}" target="_blank" rel="noopener">Browse past emails</a>' if archive else "")
             + "</p></form>")
 
 
@@ -2661,6 +2661,36 @@ def pricing_page() -> tuple[str, str, str, list]:
             body, [ORGANIZATION, PRODUCT])
 
 
+def digest_examples(new: list[dict]) -> str:
+    """Three real new roles from this export, favoring different fields and employers.
+
+    A sample is not a promise that a listing stays open or appears in next Monday's email.
+    Filtering here also keeps this safe when called outside build() with untrusted rows.
+    """
+    pool = newest_first([x for x in unique_roles(new)
+                         if x.get("status") == "open" and safe_url(x.get("apply_url"))])
+    picked, fields, employers = [], set(), set()
+    while pool and len(picked) < 3:
+        best = max(range(len(pool)), key=lambda i: (
+            bool(set(pool[i].get("field_tags") or []) - fields),
+            employer_key(pool[i].get("company_name") or "") not in employers))
+        x = pool.pop(best)
+        picked.append(x)
+        fields.update(x.get("field_tags") or [])
+        employers.add(employer_key(x.get("company_name") or ""))
+    if not picked:
+        return ""
+    dated = f" Snapshot: {GENERATED.strftime('%B %d, %Y')}." if GENERATED else ""
+    rows = "".join(
+        f'<li><a href="{esc(safe_url(x["apply_url"]))}" target="_blank" rel="nofollow noopener">'
+        f'{esc(x.get("title") or "View posting")}</a> — {esc(x.get("company_name") or "Employer")} '
+        f'<span class="meta">({esc(place(x))})</span></li>' for x in picked)
+    return ('<section class="prose digest-examples" aria-labelledby="digest-examples-title">'
+            '<h2 id="digest-examples-title">A taste of what you could find</h2>'
+            f'<p>Examples from roles found this week.{dated} Availability can change; check the employer’s posting.</p>'
+            f'<ul class="plain">{rows}</ul></section>')
+
+
 def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str, str, str]:
     """(title, description, body) of /digest/, the weekly email's page (2026-10-06). `new` is this
     week's new roles as the email counts them (new_roles) and `by_field` the same per field; new_page
@@ -2674,7 +2704,9 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
     lede = (f"<p class=\"lede\">{count + ' ' if count else ''}One free email every Monday with the internships, "
             "co-ops and research roles InternScout found that week.</p>")
     if DIGEST_FORM:
-        body = (lede + signup_form("", heading="Sign up", what=False)
+        body = (lede + signup_form("A selection of new roles, with links to explore the rest. Everyone gets the same email for now.",
+                                   heading="Get the free weekly email", what=False, placement="digest-page")
+                + digest_examples(new)
                 + "<section class=\"prose\"><h2>What you get</h2><ul class=\"plain\">"
                 "<li>One email on Mondays. It lists the fields that gained the most new roles that week, a few "
                 "postings from each, Northeast and remote first, and a link to the rest of each field.</li>"
@@ -2689,7 +2721,7 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
                  "its RSS feed can follow it in a feed reader or a Discord or Slack channel."
                  if new_page else "<a href=\"/internships/\">Browse open internships</a> by field, state or major.")
         body = lede + f"<p>Sign-ups for the email aren't open yet. Until they are, {where}</p>"
-    return ("Weekly Internship Email, Every Monday",
+    return ("New internships in your inbox every Monday. Free.",
             "One free email every Monday with the new internships, co-ops and research roles InternScout found "
             "that week. Confirm once, unsubscribe any time.",
             body)
@@ -3406,7 +3438,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     # The weekly email's own page (2026-10-06), the one address the brand posts, the extension, flyers
     # and clubs link. Indexed only once the form has an address; until then it says sign-ups aren't open.
     t_, d_, b_ = digest_page(digest_new, digest_by_field, len(new) >= MIN_OPEN)
-    add(DIGEST_PATH, t_, d_, "New internships by email, every Monday",
+    add(DIGEST_PATH, t_, d_, "New internships in your inbox every Monday. Free.",
         [("/", "InternScout"), (DIGEST_PATH, "Weekly email")], b_, index=bool(DIGEST_FORM))
     global TEXTS, HOME
     HOME = home_browse(pages, by_company, fields, states, trackers, len(new) >= MIN_OPEN, len(majors_made))

@@ -37,6 +37,12 @@ const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.l
 // was: export const EVENTS = new Set([..., "posting_click", "digest_signup", "review_click"]);
 export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open",
   "posting_click", "digest_signup", "review_click", "apply_offer_shown", "apply_offer_click"]);
+// Anonymous placement totals (2026-10-15). Finite names keep row cardinality bounded; no address,
+// arbitrary campaign value or confirmed-subscriber claim can be submitted through /hit.
+export const DIGEST_PLACEMENTS = ["footer", "results_inline", "digest_page", "landing", "contextual", "nav"];
+for (const step of ["view", "click", "submit"]) {
+  for (const placement of DIGEST_PLACEMENTS) EVENTS.add(`digest_${step}_${placement}`);
+}
 // Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
 // table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
 //   new_account     the Worker saw an account for the first time (an accounts row was made)

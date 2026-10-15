@@ -23,7 +23,7 @@ function uiHarness() {
   ctx.window = ctx; vm.createContext(ctx);
   vm.runInContext(readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8"), ctx);
   const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  vm.runInContext(app.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));', 'window.components = { MultiSelect, Setup, Row, Why };'), ctx);
+  vm.runInContext(app.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));', 'window.components = { MultiSelect, Setup, Row, Why, Digest };'), ctx);
   const attach = node => {
     if (!node || typeof node !== "object") return;
     if (node.props.ref) node.props.ref.current = {
@@ -42,6 +42,30 @@ function nodes(tree, predicate) {
   return [...(predicate(tree) ? [tree] : []), ...tree.children.flatMap(child => nodes(child, predicate))];
 }
 function key(input, name) { input.props.onKeyDown({ key: name, preventDefault() {} }); }
+
+test("inline and footer digest forms have independent accessible IDs and preserve provider POST", () => {
+  const harness = uiHarness();
+  const props = { cfg: { provider: "Buttondown", formAction: "https://buttondown.com/api/emails/embed-subscribe/test" }, fields: ["swe"], onSetup() {} };
+  const footer = harness.render(harness.components.Digest, { ...props, placement: "footer" });
+  let inline = harness.render(harness.components.Digest, { ...props, placement: "results-inline", compact: true });
+  const allIds = [...nodes(footer, n => n.props.id), ...nodes(inline, n => n.props.id)].map(n => n.props.id);
+  assert.equal(new Set(allIds).size, allIds.length);
+  for (const form of [footer, inline]) {
+    assert.equal(form.props.method, "post"); assert.equal(form.props.target, "_blank");
+    assert.equal(form.props.action, props.cfg.formAction);
+    assert.ok(nodes(form, n => n.props.id === form.props["aria-labelledby"]).length);
+    const email = nodes(form, n => n.props.type === "email")[0];
+    assert.equal(email.props.required, true); assert.equal(email.props.name, "email");
+    assert.ok(nodes(form, n => n.type === "label" && n.props.htmlFor === email.props.id).length);
+  }
+  assert.equal(nodes(inline, n => n.type === "fieldset").length, 0);
+  assert.equal(nodes(footer, n => n.props.name === "tag").length, 1);
+  assert.ok(inline.children.some(n => typeof n === "string" && n.includes("Everyone gets the same email")));
+  inline.props.onSubmit();
+  inline = harness.render(harness.components.Digest, { ...props, placement: "results-inline", compact: true });
+  assert.equal(nodes(inline, n => n.props.name === "email").length, 1);
+  assert.equal(nodes(inline, n => n.props.role === "status").length, 1);
+});
 
 test("picker keyboard navigation exposes and scrolls the active option, and Escape prevents hidden selection", () => {
   const harness = uiHarness(), chosen = [];

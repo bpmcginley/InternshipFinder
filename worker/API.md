@@ -332,7 +332,16 @@ link panel, from the one-time nudge after a first Auto-Apply or profile or from 
 2026-10-02), `posting_click` (a click through to a posting: `a.go` on a landing page, `a.open-link` on
 the dashboard; added 2026-10-04), `apply_offer_shown` and `apply_offer_click` (the "Add to Chrome" bar
 `docs/js/offer.js` shows after a posting Auto-Apply fills is opened, and its store link pressed; added
-2026-10-13); any other name is ignored. The Worker adds its own steps to the same
+2026-10-13), `review_click`, and `digest_signup` (a form submission, **not a confirmed subscriber**).
+Since 2026-10-15 the finite `digest_<step>_<placement>` names also count weekly email invitations:
+`step` is `view`, `click` or `submit`; `placement` is `footer`, `results_inline`, `digest_page`,
+`landing`, `contextual` or `nav`. A view means at least 25% of the marked invitation intersected the
+viewport; unsupported browsers do not estimate views. Each event counts at most once per page load.
+These remain anonymous daily totals; no email, field selection or subscriber status is stored.
+`digest_signup` remains the legacy total across forms and must not be added to the placement
+submission totals (that would double-count). No `digest_confirmed` event is accepted. See
+[`growth/SIGNUP_MEASUREMENT.md`](../growth/SIGNUP_MEASUREMENT.md) for the separate aggregate
+confirmed-subscriber check. Any other name is ignored. The Worker adds its own steps to the same
 table (`src/visits.js` `SERVER_EVENTS`, added 2026-10-04), which `/hit` never accepts: `new_account`
 (an account seen for the first time; page `extension` or `dashboard` by `Origin`), `ext_signin`
 (`POST /session` from the extension), `first_autofill` (an account's first answered Auto-Apply run of
