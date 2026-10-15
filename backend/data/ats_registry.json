@@ -6429,8 +6429,9 @@
   "visiersolutionsinc": {
    "name": "Visier Solutions",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-15"
   },
   "vixxo": {
    "name": "Vixxo",
@@ -7751,9 +7752,10 @@
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "health"
+   "sector": "health",
+   "last_fail": "2026-10-15"
   },
   "jobs.constellationenergy.com": {
    "name": "Constellation Energy",
