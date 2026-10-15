@@ -28,7 +28,19 @@ Several Claude sessions merged #94 to #118 on main, each with Bruce's OK and aft
 - **Analytics:** the hourly snapshot has Bing search numbers too (#101, secret `BING_WEBMASTER_KEY`).
 - **#118:** review follow-ups. The listing pipeline now treats each of an employer's job boards separately (`export_static.board_of`), so one failed board no longer drops jobs from another.
 
-## Weekly email: status (2026-10-13)
+## Weekly email: setup verified (2026-10-15)
+
+Bruce asked Codex to finish the automated email after mailbox approval. This supersedes the earlier mailbox hold below.
+
+- TKO Suites confirmed the mailbox is active. Its exact address is saved in Buttondown and the GitHub secret `DIGEST_POSTAL_ADDRESS`.
+- The existing Buttondown key works. `DIGEST_TEST_TO=hello@internscout.org` and `DIGEST_ENABLED=1` are set. Three owner-only test copies were sent; no subscriber broadcast was sent.
+- The final test from branch `codex/weekly-email` arrived at 16:15 Eastern on October 15. SPF, DKIM and DMARC passed. The postal footer and unsubscribe link resolve, and job links go directly to their destinations.
+- Fixed Buttondown's cream accent color, which made job links invisible in Gmail, to `#1d5c46`. The main digest button pins its light text against the provider's global accent CSS. The delivered final copy was checked in Gmail.
+- Click/open tracking, subscription reminders and provider-added UTM tags remain off. Public archives are enabled. A disposable owner alias was observed Unactivated before confirmation, confirmed through its emailed link, then unsubscribed successfully. No subscriber list was imported or copied into InternScout.
+- PR #122 connects the verified signup form and the existing Monday schedule: 12:00 UTC, 8am Eastern during daylight time and 7am in winter. Manual runs still default to owner-only tests; the six-day duplicate guard remains.
+- Activation is awaiting Bruce's review of the final delivered test. PR #122 is a draft; do not merge it or send a subscriber broadcast before that review. Main's signup forms and schedule remain disabled until it merges. The first planned weekly send is Monday, October 19.
+
+## Earlier weekly email status (2026-10-13, superseded above)
 
 - **Buttondown is ready:**
   - sender InternScout <hello@internscout.org>, account confirmed, two-factor on
