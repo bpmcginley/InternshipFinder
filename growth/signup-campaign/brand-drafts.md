@@ -57,9 +57,9 @@ Two different routes into technical work: Vestmark's Boston software co-op is fo
 
 Apply directly through the employer when a role fits. To hear about new opportunities every Monday, [subscribe to InternScout's free digest](https://internscout.org/digest/?utm_source=linkedin&utm_medium=social), then click the confirmation email. The digest currently has the same content for every subscriber.
 
-## Set C — Marketing and an early finance program
+## Set C — Marketing candidate pool
 
-**Time-sensitive draft: do not release at or after October 16, 2026, 5 p.m. Eastern.** Weiss's application closes then. Afterward discard the Weiss block and rewrite the introduction; this set is not suitable for Monday's email.
+The Weiss fellowship was retired from ready-to-use copy on October 16, before its 5 p.m. Eastern deadline. Its historical source and cutoff remain in `opportunities.json` under `retired_roles`. Set C now contains only Hasbro's candidate pool; recheck that employer page before any release.
 
 ### X thread for @useinternscout
 
@@ -69,20 +69,15 @@ https://job-boards.greenhouse.io/hasbro/jobs/4424981009
 ```
 
 ```text
-Finance freshmen/sophomores: Weiss's two-day Boston fellowship is Jan 7–8, 2027, for classes of 2029/2030. This is not a summer internship. Applications close Oct 16 at 5 p.m. Eastern.
-https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002
-```
-
-```text
 For new internships in your inbox every Monday, join InternScout's free weekly digest. Everyone receives the same email; click the confirmation email to finish:
 https://internscout.org/digest/?utm_source=x&utm_medium=social
 ```
 
 ### Longer brand caption
 
-Two distinct early-career options to examine: Hasbro's Summer 2027 marketing application considers students for anticipated projects in Boston and/or Renton; it does not represent one confirmed vacancy. Separately, Weiss has a two-day Boston finance fellowship on January 7–8, 2027 for current freshmen and sophomores in classes of 2029/2030. The fellowship application closes **October 16 at 5 p.m. Eastern** and is not a summer internship.
+Hasbro's Summer 2027 marketing application considers students for anticipated projects in Boston and/or Renton. It is a candidate pool, not one confirmed vacancy. Check the employer's enrollment, work authorization and location requirements before applying.
 
-[Hasbro's program details](https://job-boards.greenhouse.io/hasbro/jobs/4424981009) · [Weiss's fellowship details](https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002)
+[Hasbro's program details](https://job-boards.greenhouse.io/hasbro/jobs/4424981009)
 
 For a free Monday roundup of new internships, [join InternScout's weekly digest](https://internscout.org/digest/?utm_source=linkedin&utm_medium=social). Check each employer's eligibility rules and click your subscription confirmation email. The digest is the same for everyone for now.
 
@@ -91,7 +86,7 @@ For a free Monday roundup of new internships, [join InternScout's weekly digest]
 - **Facebook InternScout Page:** use the longer caption, change only the digest URL's `utm_source` to `facebook`, and verify the Page is the product Page. Employer links stay direct.
 - **Threads:** shorten the caption without removing eligibility or expiry details; set the digest source to `threads`. Confirm the product identity and connection first.
 - **Instagram:** a caption URL is not a reliable clickable route. Put the source-tagged digest URL in the product profile's website/link field only after approval, then replace the CTA with “Free Monday internship email: internscout.org/digest. Confirm your email to join.” Prepare accessible card alt text with the role, employer, location and term. Do not imply the profile link has already been changed.
-- **YouTube @internscoutorg / TikTok:** these are script ideas, not uploads. A 20–30 second script can say the two opportunity summaries from a set, show each employer source, and finish with “New internships every Monday, free at internscout.org/digest. Confirm your email to join.” Show captions and the signup URL onscreen. Platform links may not be clickable or enabled; verify before promising “link in bio.” Use `youtube` or `tiktok` for any approved clickable digest link.
+- **YouTube @internscoutorg / TikTok:** these are script ideas, not uploads. A 20–30 second script can summarize the currently verified opportunities in a set, show each employer source, and finish with “New internships every Monday, free at internscout.org/digest. Confirm your email to join.” Show captions and the signup URL onscreen. Platform links may not be clickable or enabled; verify before promising “link in bio.” Use `youtube` or `tiktok` for any approved clickable digest link.
 - **Reddit u/InternScout:** a product-account post still needs the community's permission and rules. Do not paste these threads into student subreddits. If a relevant community permits resource shares, disclose “I work on InternScout,” provide the useful employer links first, and make the digest optional with `utm_source=reddit`. No moderator permission has been requested or obtained by this task.
 - **Existing Bluesky/Mastodon/Discord automation:** retain its current generation and stale-data safeguards. This kit is not a reason to run another scheduled workflow or duplicate its posts.
 

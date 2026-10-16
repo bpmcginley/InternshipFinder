@@ -62,10 +62,9 @@ test("unfinished resume review cannot mark onboarding finished after a reload", 
 // extension's, to the one page every channel links.
 test("the end of setup offers the weekly email as one plain link to /digest/", () => {
   assert.equal(DIGEST_URL, "https://internscout.org/digest/?utm_source=extension&utm_medium=extension");
-  // Hidden while the digest is on hold (DIGEST_OPEN false), so setup shows nothing.
-  assert.equal(DIGEST_OPEN, false);
-  assert.equal(digestLink(), "");
-  const html = digestLink(true);
+  assert.equal(DIGEST_OPEN, true, "public signup is live");
+  assert.equal(digestLink(false), "", "the link can still be disabled without changing either finish screen");
+  const html = digestLink();
   assert.equal((html.match(/<a /g) || []).length, 1);
   assert.ok(html.includes(`href="${DIGEST_URL}"`) && html.includes('target="_blank" rel="noopener"'));
   assert.ok(html.includes("Get new internships by email every Monday"));

@@ -81,6 +81,31 @@ GONE = ("about_to_send", "scheduled", "in_flight", "sent")
 # last one (the Monday schedule, give or take the minutes a send takes) is never blocked by it.
 SAME_WEEK = timedelta(days=6)
 MAX_PAGES = 20      # of Buttondown's email list; a weekly newsletter needs years to fill that many
+MAX_EXPORT_AGE = timedelta(days=2)  # Same limit as brand posts; ingest normally runs every six hours.
+
+
+def utcnow() -> datetime:
+    """The send clock, separate from the export's date used by historical previews."""
+    return datetime.now(timezone.utc)
+
+
+def export_issue(site_dir: str, now: datetime | None = None) -> str | None:
+    """Refuse a real send when its export cannot support a current-week claim. Read-only."""
+    try:
+        with open(os.path.join(site_dir, "data", "listings", "index.json"), encoding="utf-8") as f:
+            index = json.load(f)
+        stamp = index.get("generated_at") if isinstance(index, dict) else None
+        made = datetime.fromisoformat(stamp.replace("Z", "+00:00")) if isinstance(stamp, str) else None
+    except (OSError, ValueError):
+        return "the data export index or generated_at time is missing or unreadable"
+    if made is None or made.tzinfo is None:
+        return "the data export needs a readable generated_at time with a timezone"
+    now = now or utcnow()
+    if made > now:
+        return "the data export generated_at time is in the future; check the export clock"
+    if now - made > MAX_EXPORT_AGE:
+        return f"the data export is from {made.astimezone(timezone.utc):%Y-%m-%d %H:%M} UTC, more than two days ago"
+    return None
 
 
 class ProviderError(Exception):
@@ -312,6 +337,10 @@ def main(argv: list[str]) -> int:
             missing.append(f"{ADDRESS_ENV} (the postal address every email must carry, a PO box)")
         if missing:
             print("[digest] Not sent. Missing: " + "; ".join(missing))
+            return EXIT_REFUSED
+        why = export_issue(args.site_dir)
+        if why:
+            print(f"[digest] Not sent: {why}. Refresh listings and inspect the preview before sending.")
             return EXIT_REFUSED
 
     d = digest.build(args.site_dir)

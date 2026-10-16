@@ -21,8 +21,10 @@ There is no new broadcast or test subscription required to use this measurement 
 
 The existing `digest_signup` event retains its old meaning: **form submissions, once per page load
 across all forms**. Label it "Weekly email form submissions" in the private analytics page, not
-"Subscribers" or "Confirmed signups". That private Claude page is outside this repository; its
-owner must apply the label there. Never add `digest_signup` to the placement submission totals.
+"Subscribers" or "Confirmed signups". The private Claude page was checked directly on October 16:
+it already says "Sent the weekly email sign-up form" and "forms sent, not confirmed subscribers;
+Buttondown has those." That is an acceptable equivalent and needs no rewrite. Never add
+`digest_signup` to the placement submission totals.
 
 ## Read the anonymous funnel
 
@@ -55,6 +57,10 @@ them. Do not describe either ratio as a confirmed-subscriber conversion rate. Ab
 means unknown, not zero. Dates are UTC; compare complete days or label a partial day explicitly.
 
 ## Weekly confirmed-subscriber check
+
+Owner baseline checked read-only October 16, 2026: **1 active confirmed account, 1 active owner/test,
+0 active non-test**. One separate owner test account was already unsubscribed and is not subtracted
+again. These are provider aggregates, not evidence of student adoption. No addresses were exported.
 
 1. In Buttondown's subscriber list, select the active/confirmed status rather than all addresses.
    Record only its aggregate count and the check's date/time. Do not export or copy addresses into

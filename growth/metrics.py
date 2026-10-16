@@ -47,7 +47,9 @@ REPO = os.environ.get("GITHUB_REPOSITORY") or "bpmcginley/InternshipFinder"
 # The jobs the dashboard watches, by workflow file: a failed or overdue one is something to look at.
 JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metrics.yml", "Dashboard copy"),
         ("social.yml", "Brand posts"), ("growth-report.yml", "Growth report"), ("test.yml", "Tests"),
-        ("catchup.yml", "Keep schedule")]
+        ("catchup.yml", "Keep schedule"), ("digest.yml", "Weekly email")]
+DIGEST_FIRST_DUE = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
+DIGEST_SCHEDULE_GRACE = timedelta(hours=2)
 RECENT = 8                                  # recent posts kept per account
 GSC_SITE = os.environ.get("GSC_SITE") or "sc-domain:internscout.org"
 GSC_DAYS = 28
@@ -214,21 +216,92 @@ def instagram(cf_token: str | None, now: datetime) -> dict:
             **_week(posts, now, "likes", "comments"), "recent": posts[:RECENT]}
 
 
-def automation() -> list[dict]:
+def _timestamp(value) -> datetime | None:
+    try:
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return stamp.astimezone(timezone.utc) if stamp.tzinfo else None
+    except ValueError:
+        return None
+
+
+def digest_health(runs: list[dict], now: datetime, send_step: str | None = None) -> dict:
+    """Weekly schedule health, not delivery confirmation. Manual tests never satisfy a broadcast.
+
+    Allow two hours for GitHub's best-effort scheduler. Never dispatch or retry a send from here.
+    A successful scheduled workflow must also have run its send step (DIGEST_ENABLED can skip it).
+    """
+    now = now.astimezone(timezone.utc)
+    monday = (now - timedelta(days=now.weekday())).replace(hour=12, minute=0, second=0, microsecond=0)
+    due = monday if now >= monday else monday - timedelta(days=7)
+    first_pending = due < DIGEST_FIRST_DUE
+    due = max(due, DIGEST_FIRST_DUE)
+    iso = lambda value: value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    result = {"health": "not_due" if first_pending else "waiting", "due_at": iso(due),
+              "next_due_at": iso(due if first_pending else due + timedelta(days=7)),
+              "detail": "Scheduled subscriber send not due yet." if first_pending else
+                        "Waiting for GitHub's scheduled subscriber send; two-hour scheduling grace.",
+              "delivery_confirmed": False}
+    if first_pending:
+        return result
+    eligible = [r for r in runs if r.get("event") == "schedule" and
+                (created := _timestamp(r.get("created_at"))) is not None and due <= created <= now]
+    run = max(eligible, key=lambda r: _timestamp(r["created_at"])) if eligible else None
+    if not run:
+        if now >= due + DIGEST_SCHEDULE_GRACE:
+            result.update(health="overdue", detail="No scheduled subscriber run for this Monday. Inspect Actions and Buttondown before any manual send.")
+        return result
+    result.update(run_id=run.get("id"), run_url=run.get("html_url"), event="schedule")
+    if run.get("status") != "completed":
+        result.update(health="in_progress", detail="Scheduled subscriber run is queued or running; do not start another send.")
+        if now >= due + DIGEST_SCHEDULE_GRACE:
+            result.update(health="overdue", detail="Scheduled subscriber run is still queued or running after the grace period. Inspect it; do not start a second send.")
+    elif run.get("conclusion") != "success":
+        result.update(health="failed", detail="Scheduled subscriber run failed or was cancelled. Check Buttondown sent/scheduled status before retrying: delivery may be unknown.")
+    elif send_step == "success":
+        result.update(health="success", detail="Scheduled send step succeeded: provider handoff, not proof of recipient delivery. Check Buttondown delivery results.")
+    elif send_step == "skipped":
+        result.update(health="blocked", detail="Workflow succeeded but the subscriber send step was skipped. Check DIGEST_ENABLED; no broadcast is established.")
+    else:
+        result.update(health="unknown", detail="Successful workflow has no verified successful subscriber send step. Inspect Actions and Buttondown before retrying.")
+    return result
+
+
+def automation(now: datetime | None = None) -> list[dict]:
     """The last finished run on main of each job the dashboard watches."""
     token = os.environ.get("GITHUB_TOKEN")
     headers = {"Accept": "application/vnd.github+json", **UA}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    now = now or datetime.now(timezone.utc)
+
+    def read(path):
+        req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/actions/{path}", headers=headers)
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return json.load(response)
+
     out = []
     for file, name in JOBS:
-        req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/actions/workflows/{file}/runs"
-                                     "?branch=main&status=completed&per_page=1", headers=headers)
-        with urllib.request.urlopen(req, timeout=30) as r:
-            runs = json.load(r).get("workflow_runs") or []
+        runs = read(f"workflows/{file}/runs?branch=main&status=completed&per_page=1").get("workflow_runs") or []
         run = runs[0] if runs else {}
-        out.append({"job": name, "file": file, "conclusion": run.get("conclusion"), "at": run.get("updated_at"),
-                    "event": run.get("event"), "url": run.get("html_url")})
+        row = {"job": name, "file": file, "conclusion": run.get("conclusion"), "at": run.get("updated_at"),
+               "event": run.get("event"), "url": run.get("html_url")}
+        if file == "digest.yml":
+            scheduled = read(f"workflows/{file}/runs?branch=main&event=schedule&per_page=15").get("workflow_runs") or []
+            health = digest_health(scheduled, now)
+            current = next((r for r in scheduled if r.get("id") == health.get("run_id")), {}) if health.get("run_id") else {}
+            step = None
+            if current.get("status") == "completed" and current.get("conclusion") == "success":
+                jobs = read(f"runs/{current['id']}/jobs?per_page=100").get("jobs") or []
+                step = next((s.get("conclusion") for j in jobs for s in j.get("steps", [])
+                             if s.get("name") == "Send the digest"), None)
+                health = digest_health(scheduled, now, step)
+            # Existing row fields describe the subscriber run, never the last owner-only test.
+            row.update({"conclusion": current.get("conclusion"), "at": current.get("updated_at"),
+                        "event": current.get("event"), "url": current.get("html_url"), **health})
+            if run.get("event") == "workflow_dispatch":
+                row["last_manual_run"] = {"at": run.get("updated_at"), "conclusion": run.get("conclusion"),
+                                          "url": run.get("html_url"), "audience": "not_inferred_from_manual_run"}
+        out.append(row)
     return out
 
 
@@ -526,7 +599,7 @@ def main(argv: list[str]) -> int:
     else:
         problems.append("visits: no CLOUDFLARE_API_TOKEN")
     for key, fn in (("bluesky", lambda: bluesky(now)), ("instagram", lambda: instagram(token, now)),
-                    ("mastodon", lambda: mastodon(now)), ("automation", automation),
+                    ("mastodon", lambda: mastodon(now)), ("automation", lambda: automation(now)),
                     ("search_console", lambda: search_console(now)), ("bing", lambda: bing(now)),
                     ("listings", lambda: listings(site_dir)), ("pages", page_count), ("store", store)):
         try:
@@ -535,6 +608,9 @@ def main(argv: list[str]) -> int:
         # ImportError: the cryptography package isn't installed (Search Console only).
         except (OSError, urllib.error.URLError, ValueError, KeyError, RuntimeError, ImportError) as e:
             problems.append(f"{key}: {e}")
+    problems.extend(f"weekly email: {job['detail']}" for job in snap.get("automation", [])
+                    if job.get("file") == "digest.yml" and
+                    job.get("health") in {"overdue", "failed", "blocked", "unknown"})
     snap["problems"] = problems
     print(json.dumps({"days": days[-7:], **printable(snap)}, indent=1))
     if not write:

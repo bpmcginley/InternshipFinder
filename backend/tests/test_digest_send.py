@@ -100,6 +100,8 @@ def api(monkeypatch):
     monkeypatch.delenv(digest_send.ADDRESS_ENV, raising=False)
     fake = FakeButtondown()
     monkeypatch.setattr(digest_send.urllib.request, "urlopen", fake)
+    # Fixture exports are deliberately historical; keep their send clock deterministic.
+    monkeypatch.setattr(digest_send, "utcnow", lambda: datetime(2026, 9, 23, 12, tzinfo=timezone.utc))
     return fake
 
 
@@ -476,4 +478,48 @@ def test_check_without_a_key_or_with_send_calls_nothing(monkeypatch, api, env, c
     else:
         argv = ["digest_send.py", "--check"]
     assert digest_send.main(argv) == digest_send.EXIT_REFUSED
+    assert api.requests == []
+
+
+@pytest.mark.parametrize("stamp,allowed", [
+    ("2026-09-23T10:00:00Z", True),
+    ("2026-09-23T06:00:00-04:00", True),
+    ("2026-09-21T12:00:00+00:00", True),  # exactly 48 hours
+    ("2026-09-21T11:59:59Z", False),
+    ("2026-09-23T12:00:01Z", False),
+    (None, False), ("nonsense", False), (123, False),
+    ("2026-09-23T10:00:00", False), ("2026-09-23", False),
+])
+def test_export_freshness_uses_real_send_clock_and_requires_timezone(site, stamp, allowed):
+    path = os.path.join(site, "data", "listings", "index.json")
+    with open(path, encoding="utf-8") as f:
+        index = json.load(f)
+    index["generated_at"] = stamp
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(index, f)
+    now = datetime(2026, 9, 23, 12, tzinfo=timezone.utc)
+    assert (digest_send.export_issue(site, now) is None) == allowed
+
+
+@pytest.mark.parametrize("content", [None, "{bad", "[]", "null", "{}"])
+def test_missing_or_malformed_export_never_reaches_provider(site, ready, api, content, capsys):
+    path = os.path.join(site, "data", "listings", "index.json")
+    if content is None:
+        os.remove(path)
+    else:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+    assert digest_send.main(["digest_send.py", site, "--send"]) == digest_send.EXIT_REFUSED
+    assert api.requests == []
+    assert "Not sent:" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("extra", [[], ["--test-to", "owner@example.org"], ["--allow-same-week"]])
+def test_stale_send_is_refused_before_provider_reads_or_writes(site, ready, api, monkeypatch, extra, capsys):
+    monkeypatch.setattr(digest_send, "utcnow", lambda: datetime(2026, 10, 19, 12, tzinfo=timezone.utc))
+    assert digest_send.main(["digest_send.py", site, "--send", *extra]) == digest_send.EXIT_REFUSED
+    assert api.requests == []
+    assert "more than two days ago" in capsys.readouterr().out
+    # Historical previews remain useful and must not acquire a provider dependency.
+    assert digest_send.main(["digest_send.py", site]) == 0
     assert api.requests == []

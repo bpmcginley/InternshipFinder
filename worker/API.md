@@ -14,6 +14,18 @@ dashboard (`docs/index.html`). Change it here first, then in all three.
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
   A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
 
+## Public brand videos
+
+`GET` or `HEAD /social-video/YYYY-MM-DD-field.mp4` serves a generated brand Reel from the fixed
+`bpmcginley/InternshipFinder` repository's `social-cards` branch as `video/mp4`. No sign-in, database,
+visitor counting, or new storage is involved. Only dated lowercase field filenames are accepted;
+queries, nested paths and upstream redirects are refused. Files must have a declared positive size
+at most 16 MiB; GET streams enforce that size. Single byte ranges are supported and return 206 when
+the upstream honors them. HEAD fetches only metadata. Success is cached for an hour; failures are
+not cached. Unknown files return 404, invalid ranges 416, unsupported methods 405, and unavailable
+or unsupported upstream media 502. Incoming credentials/cookies are never forwarded. This route
+exists for Meta's public `video_url` fetch, not for arbitrary user uploads or a general proxy.
+
 ## Sign-in
 - Anyone with a Google or Microsoft account can sign in (personal, school or work). Search never needs sign-in.
   Until the Entra app has publisher verification, most school/work Microsoft tenants (UMass included) ask

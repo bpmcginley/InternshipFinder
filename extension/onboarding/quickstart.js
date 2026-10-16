@@ -53,9 +53,9 @@ export async function finishOnboarding(S, save, now = Date.now()) {
 // from here, the Worker's "extension" source (worker/src/visits.js sourceOf). Ships with the next
 // extension release; 0.5.5 was already in review.
 export const DIGEST_URL = "https://internscout.org/digest/?utm_source=extension&utm_medium=extension";
-// Off in 0.5.6 (2026-10-13): the digest is on hold and /digest/ says sign-ups aren't open, so the link
-// would lead nowhere. Set true in the release after CONFIG.digest.formAction is set in docs/index.html.
-export const DIGEST_OPEN = false;
+// Public signup and the Monday schedule were approved and enabled on 2026-10-15. Keep this an optional
+// link: the extension never submits an address or subscribes someone when they finish setup.
+export const DIGEST_OPEN = true;
 export const digestLink = (open = DIGEST_OPEN) => !open ? "" :
   // A block span, not a <p>: Review puts it inside its #rstat <span>, where a <p> isn't allowed.
   `<span class="small" style="display:block;margin:6px 0 0"><a href="${DIGEST_URL}" target="_blank" rel="noopener">Get new internships by email every Monday ↗</a></span>`;
