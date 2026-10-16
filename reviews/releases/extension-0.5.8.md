@@ -3,7 +3,8 @@
 Prepared October 16, 2026. This is a local release candidate, not a published release.
 The source starts from main `cbfef6171f08ebc4f9c06a41523519b630a120aa`.
 
-Local automated verification: all 306 extension tests passed. Two packaging/release tests passed,
+Local consolidated verification: all 315 extension tests passed, including nine new synthetic
+Lever/Ashby regressions. Two packaging/release tests passed,
 including timestamp-independent rebuilds and five mocked publisher scenarios (identical retry,
 changed ZIP, changed source record, missing asset and new release). The publisher tests use local
 fixtures and no GitHub requests. The release workflow also parses as valid YAML.
