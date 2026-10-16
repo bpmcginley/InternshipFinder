@@ -170,6 +170,107 @@ def test_automation_reports_each_jobs_last_run(monkeypatch):
     assert next(j for j in got if j["file"] == "growth-report.yml")["conclusion"] is None
 
 
+def _email_run(**changes):
+    return {"id": 123, "event": "schedule", "status": "completed", "conclusion": "success",
+            "created_at": "2026-10-19T12:10:00Z", "updated_at": "2026-10-19T12:12:00Z",
+            "html_url": "https://github.com/example/actions/runs/123", **changes}
+
+
+@pytest.mark.parametrize("now,health", [
+    ("2026-10-16T17:00:00Z", "not_due"),
+    ("2026-10-19T11:59:59Z", "not_due"),
+    ("2026-10-19T12:00:00Z", "waiting"),
+    ("2026-10-19T13:59:59Z", "waiting"),
+    ("2026-10-19T14:00:00Z", "overdue"),
+    ("2026-10-20T12:00:00Z", "overdue"),
+])
+def test_digest_health_respects_first_monday_and_scheduler_grace(now, health):
+    got = metrics.digest_health([], metrics._timestamp(now))
+    assert got["health"] == health
+    assert got["due_at"] == "2026-10-19T12:00:00Z"
+    assert got["delivery_confirmed"] is False
+
+
+def test_owner_tests_prior_week_and_future_runs_do_not_satisfy_this_weeks_send():
+    now = metrics._timestamp("2026-10-26T15:00:00Z")
+    runs = [_email_run(), _email_run(id=124, event="workflow_dispatch", created_at="2026-10-26T12:00:00Z"),
+            _email_run(id=125, created_at="2026-10-27T12:00:00Z")]
+    got = metrics.digest_health(runs, now, "success")
+    assert got["health"] == "overdue"
+    assert got["due_at"] == "2026-10-26T12:00:00Z"
+
+
+@pytest.mark.parametrize("status,conclusion,step,health", [
+    ("completed", "success", "success", "success"),
+    ("completed", "success", "skipped", "blocked"),
+    ("completed", "success", None, "unknown"),
+    ("completed", "failure", None, "failed"),
+    ("completed", "cancelled", None, "failed"),
+    ("in_progress", None, None, "in_progress"),
+    ("queued", None, None, "in_progress"),
+])
+def test_digest_health_needs_a_successful_subscriber_send_step(status, conclusion, step, health):
+    now = metrics._timestamp("2026-10-19T13:00:00Z")
+    got = metrics.digest_health([_email_run(status=status, conclusion=conclusion)], now, step)
+    assert got["health"] == health
+    assert got["delivery_confirmed"] is False
+
+
+def test_digest_health_flags_stuck_run_without_proposing_another_broadcast():
+    got = metrics.digest_health([_email_run(status="in_progress", conclusion=None)],
+                               metrics._timestamp("2026-10-19T14:00:00Z"))
+    assert got["health"] == "overdue"
+    assert "do not start a second send" in got["detail"]
+
+
+def test_digest_schedule_is_utc_and_accepts_timezone_offsets():
+    # November's Monday slot remains 12 UTC (7am EST), not an invented 8am local promise.
+    run = _email_run(created_at="2026-11-02T07:10:00-05:00")
+    got = metrics.digest_health([run], metrics._timestamp("2026-11-02T08:00:00-05:00"), "success")
+    assert got["health"] == "success" and got["due_at"] == "2026-11-02T12:00:00Z"
+    assert got["next_due_at"] == "2026-11-09T12:00:00Z"
+
+
+@pytest.mark.parametrize("step,conclusion,expected", [("success", "success", "success"),
+                                                     ("skipped", "success", "blocked"),
+                                                     (None, "success", "unknown"),
+                                                     (None, "failure", "failed")])
+def test_automation_separates_manual_tests_and_checks_scheduled_send_step(monkeypatch, step, conclusion, expected):
+    class Resp:
+        def __init__(self, body): self.body = body
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return json.dumps(self.body).encode()
+    manual = _email_run(id=124, event="workflow_dispatch", updated_at="2026-10-19T12:30:00Z")
+    seen = []
+
+    def fake(req, timeout=30):
+        seen.append(req.full_url)
+        if "/runs/123/jobs?" in req.full_url:
+            return Resp({"jobs": [{"steps": [{"name": "Send the digest", "conclusion": step}]}]})
+        return Resp({"workflow_runs": [_email_run(conclusion=conclusion)] if "event=schedule" in req.full_url else [manual]})
+    monkeypatch.setattr(metrics.urllib.request, "urlopen", fake)
+    got = next(r for r in metrics.automation(metrics._timestamp("2026-10-19T13:00:00Z"))
+               if r["file"] == "digest.yml")
+    assert got["health"] == expected
+    assert got["conclusion"] == conclusion  # a successful owner test cannot hide a failed subscriber run
+    assert got["event"] == "schedule" and got["url"].endswith("/123")
+    assert got["last_manual_run"]["audience"] == "not_inferred_from_manual_run"
+    assert any("/runs/123/jobs?" in u for u in seen) == (conclusion == "success")
+
+
+def test_overdue_email_is_reported_in_snapshot_problems(monkeypatch, capsys):
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    for name in ("bluesky", "instagram", "mastodon", "search_console", "bing", "listings", "page_count", "store"):
+        monkeypatch.setattr(metrics, name, lambda *args: {})
+    for name in ("search_console", "bing"):
+        monkeypatch.setattr(metrics, name, lambda *args: {"queries": []})
+    monkeypatch.setattr(metrics, "automation", lambda now: [{"file": "digest.yml", "health": "overdue",
+                                                             "detail": "No scheduled subscriber run."}])
+    assert metrics.main(["metrics.py"]) == 0
+    assert "weekly email: No scheduled subscriber run." in json.loads(capsys.readouterr().out)["problems"]
+
+
 GSC_ROWS = {
     "date": [{"keys": ["2026-09-27"], "clicks": 2, "impressions": 100, "position": 10.0},
              {"keys": ["2026-09-10"], "clicks": 1, "impressions": 300, "position": 30.0}],
