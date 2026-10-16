@@ -58,6 +58,10 @@ means unknown, not zero. Dates are UTC; compare complete days or label a partial
 
 ## Weekly confirmed-subscriber check
 
+Owner baseline checked read-only October 16, 2026: **1 active confirmed account, 1 active owner/test,
+0 active non-test**. One separate owner test account was already unsubscribed and is not subtracted
+again. These are provider aggregates, not evidence of student adoption. No addresses were exported.
+
 1. In Buttondown's subscriber list, select the active/confirmed status rather than all addresses.
    Record only its aggregate count and the check's date/time. Do not export or copy addresses into
    this repository or the analytics dashboard.
