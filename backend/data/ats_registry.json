@@ -1241,9 +1241,9 @@
   "maximor": {
    "name": "Maximor AI",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-15"
+   "last_fail": "2026-10-16"
   },
   "maxinsights": {
    "name": "Maxinsights",
@@ -3457,9 +3457,9 @@
   "cybereason": {
    "name": "Cybereason",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-15"
+   "last_fail": "2026-10-16"
   },
   "darkwolfsolutions": {
    "name": "Dark Wolf Solutions",
@@ -4518,6 +4518,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "inversionspace": {
+   "name": "Inversion Space",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "ionq": {
    "name": "IonQ",
@@ -6429,9 +6435,9 @@
   "visiersolutionsinc": {
    "name": "Visier Solutions",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-15"
+   "last_fail": "2026-10-16"
   },
   "vixxo": {
    "name": "Vixxo",
@@ -6509,6 +6515,12 @@
    "fails": 0,
    "added": "2026-10-06"
   },
+  "wfclainc": {
+   "name": "Angel City",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
   "wheely": {
    "name": "Wheely",
    "quant": false,
@@ -6520,6 +6532,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "wikimedia": {
+   "name": "Wikimedia Foundation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "workato": {
    "name": "Workato",
@@ -8064,6 +8082,12 @@
    "fails": 0,
    "added": "2026-09-24"
   },
+  "healthpeak": {
+   "name": "Healthpeak Properties",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
   "hiebing": {
    "name": "Hiebing",
    "quant": false,
@@ -8685,6 +8709,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "cfsenergy": {
+   "name": "Commonwealth Fusion Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
   "charitywater": {
    "name": "charity: water",
    "quant": false,
@@ -9276,6 +9306,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "researchinnovations.com": {
+   "name": "Research Innovations",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
   "rhombus-systems": {
    "name": "Rhombus",
    "quant": false,
@@ -9293,6 +9329,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "runlaminar": {
+   "name": "Laminar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "rws": {
    "name": "RWS",
@@ -15862,6 +15904,12 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "education_research"
+  },
+  "mckesson|wd3|CoverMyMeds_External_Careers": {
+   "name": "CoverMyMeds",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "mckesson|wd3|External_Careers": {
    "name": "McKesson",
