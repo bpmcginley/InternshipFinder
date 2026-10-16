@@ -35,6 +35,7 @@ class ReleasePackageTests(unittest.TestCase):
                 for p in ext.rglob("*"):
                     if p.is_file():
                         os.utime(p, (1800000000, 1800000000))
+                runtime.write_bytes(b"const candidate = true;\r\n")
                 self.assertEqual(first, package_extension.build().read_bytes())
                 webstore = package_extension.build(webstore=True)
                 for p, key_expected in [(developer, True), (webstore, False)]:

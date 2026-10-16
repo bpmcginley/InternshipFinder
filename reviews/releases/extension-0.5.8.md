@@ -45,7 +45,8 @@ comparison of packaged runtime files with that source commit. It is an external 
 committed credential or a publication claim. If the candidate changes, rebuild and regenerate the record.
 
 The tag workflow now publishes both ZIPs and a `-source.json` record with their source commit and hashes.
-ZIP entry metadata is fixed so unchanged source rebuilds identically. A retry compares existing assets
+ZIP entry metadata and text line endings are fixed so Windows checkout settings and filesystem dates
+do not change the package. A retry compares existing assets
 byte for byte before uploading anything missing, and rejects a different asset under the same version.
 It never uses `--clobber`. This does not make the store or GitHub release publish automatically on merge;
 the existing `ext-v*` tag trigger remains.

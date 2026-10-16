@@ -15,7 +15,7 @@ def write_record(paths: list[Path], source_commit: str, output: Path) -> dict:
         "assets": [{"name": p.name, "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
                     "bytes": p.stat().st_size} for p in paths],
     }
-    output.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    output.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8", newline="\n")
     return record
 
 
