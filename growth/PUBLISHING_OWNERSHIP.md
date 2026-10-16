@@ -54,9 +54,23 @@ The Instagram step writes `out/instagram-status.json`, retained as the
 `instagram-publishing-result` Actions artifact for 14 days, and a step summary. It contains only the
 requested format, timestamp, finite outcome and optional reason code, never tokens, captions or raw
 provider errors. Outcomes distinguish `published_reel`, `published_card`, `card_fallback`,
-`not_configured`, `no_post` and `failed`. A card replacing a planned Reel produces an Actions warning.
+`not_configured`, `no_post`, `unknown` and `failed`. A card replacing a planned Reel produces an Actions warning.
 The native workflow can still finish green after a successful fallback; read its result rather than
 calling green proof that every channel or format published.
+
+A final `media_publish` request is the ambiguity boundary. If its response is lost, times out,
+returns an HTTP error (including 5xx), contains unreadable JSON, or has no usable media ID, Meta may
+already have published the post. The step records `unknown` / `final_publish_unconfirmed`, emits an
+error and exits unsuccessfully. It makes no second publish attempt and creates no fallback card.
+This also applies to a card's final publish. Only failures before the final publish request may
+fall back from a Reel to a card. A reporting-file error after confirmed Reel publication cannot
+enter the card fallback either.
+
+When the result is unknown, inspect the InternScout product profile and Meta's provider state before
+any retry, requeue, cross-post or `force` run. If the post exists, retain it and do not repost. If its
+state cannot be established, leave the run unresolved rather than guessing that failure means no
+post. The daily native guard still prevents an automatic second run; it does not resolve provider
+uncertainty or protect a separate Heycatch queue.
 
 ## Deployment and validation
 

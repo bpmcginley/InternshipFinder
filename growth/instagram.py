@@ -22,8 +22,9 @@ Thursdays it requests a Reel instead. The workflow puts the generated MP4 beside
 existing social-cards branch. A narrow public Worker route serves those videos as video/mp4, and
 post.json's reel_url goes to Meta as video_url. This preserves the account's Instagram Login flow;
 the former resumable request on graph.instagram.com failed with "video_url is required".
-If the video cannot be generated, fetched or published, the card remains the fallback. A warning,
-step summary and optional JSON status artifact distinguish that fallback from a successful Reel.
+If the video cannot be generated, fetched or prepared before final publication, the card remains the
+fallback. An uncertain final publish stops without any retry or fallback, because Meta may already
+have posted it. A warning/error, step summary and optional JSON status distinguish these outcomes.
 
 Run from the repo root:
   python growth/instagram.py out/post.json          # print what would be posted
@@ -34,6 +35,7 @@ Needs INSTAGRAM_TOKEN; CLOUDFLARE_API_TOKEN to keep refreshed tokens.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -58,6 +60,10 @@ REEL_WAIT = 300                         # seconds to wait for Instagram to proce
 
 class InstagramError(RuntimeError):
     """An error Meta answered with. Its text is Meta's message, which never carries the token."""
+
+
+class PublishOutcomeUnknown(RuntimeError):
+    """The final publish may have succeeded. Never retry or publish a fallback automatically."""
 
 
 def _request(method: str, path: str, params: dict) -> dict:
@@ -194,7 +200,21 @@ def publish(token: str, image_url: str, caption: str, sleep=time.sleep, timeout:
     container = _request("POST", f"{ig_id}/media", {"image_url": image_url, "caption": caption,
                                                     "access_token": token})["id"]
     _wait(container, token, "image", timeout, sleep, 3)
-    return _request("POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token})["id"]
+    return _publish_container(token, ig_id, container)
+
+
+def _publish_container(token: str, ig_id: str, container: str) -> str:
+    """A lost final response is not proof of failure: Meta may already have published the post."""
+    try:
+        answer = _request("POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token})
+    except (InstagramError, urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
+        # Do not infer success/failure from a timeout, 5xx or an unreadable response. Conservatively
+        # stop after any rejected final publish too; only pre-publication failures may use a card.
+        raise PublishOutcomeUnknown("Instagram did not confirm the final publishing result") from None
+    media_id = answer.get("id") if isinstance(answer, dict) else None
+    if not isinstance(media_id, str) or not media_id.strip():
+        raise PublishOutcomeUnknown("Instagram did not confirm the final publishing result")
+    return media_id
 
 
 def _public_video_url(video_url: str) -> None:
@@ -217,7 +237,7 @@ def publish_reel(token: str, video_url: str, caption: str, sleep=time.sleep, tim
                                                "thumb_offset": "1000", "access_token": token})
     container = made["id"]
     _wait(container, token, "video", timeout, sleep, 5)
-    return _request("POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token})["id"]
+    return _publish_container(token, ig_id, container)
 
 
 def record_status(path: str | None, requested: str, outcome: str, reason: str | None = None) -> None:
@@ -233,6 +253,8 @@ def record_status(path: str | None, requested: str, outcome: str, reason: str | 
             f.write("\n")
     if outcome == "card_fallback":
         print("::warning title=Instagram Reel unavailable::Posted the picture card instead of the planned Reel. See the Instagram result artifact.")
+    if outcome == "unknown":
+        print("::error title=Instagram publishing outcome unknown::The final publish may have succeeded. No retry or fallback was attempted. Check the product profile and provider before any manual retry.")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as f:
@@ -272,19 +294,25 @@ def main(argv: list[str]) -> int:
         if post.get("reel_path") and post.get("reel_url"):
             try:
                 wait_for_video(post["reel_url"])
-                print(f"[instagram] reel posted: {publish_reel(token, post['reel_url'], post['instagram_caption'])}")
-                record_status(status_path, requested, "published_reel")
-                return 0
+                media_id = publish_reel(token, post["reel_url"], post["instagram_caption"])
             except (InstagramError, urllib.error.URLError, OSError) as e:
-                # The day still gets its post: the card, the way every other day posts.
+                # Final publish uncertainty has its own exception and must bypass this fallback.
                 print(f"[instagram] reel failed ({type(e).__name__}: {e}); posting the card instead")
                 fallback_reason = "reel_publish_failed"
+            else:
+                print(f"[instagram] reel posted: {media_id}")
+                # Reporting errors after confirmed publication must not trigger another post.
+                record_status(status_path, requested, "published_reel")
+                return 0
         elif post.get("reel_path"):
             fallback_reason = "missing_public_video_url"
         wait_for_image(post["card_url"])
         print(f"[instagram] posted: {publish(token, post['card_url'], post['instagram_caption'])}")
         record_status(status_path, requested, "card_fallback" if requested == "reel" else "published_card", fallback_reason)
         return 0
+    except PublishOutcomeUnknown:
+        record_status(status_path, requested, "unknown", "final_publish_unconfirmed")
+        return 1
     except (InstagramError, RuntimeError, KeyError, urllib.error.URLError) as e:
         # Meta's message, never the token or a URL carrying it.
         print(f"[instagram] failed: {type(e).__name__}: {e}")

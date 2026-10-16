@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
 from datetime import datetime, timezone
 
 import pytest
@@ -217,3 +218,102 @@ def test_media_metadata_is_generated_for_the_same_dated_field_as_the_card(monkey
     data = social.card_data("docs", today=thursday)
     assert data["reel_name"] == "2026-10-22-accounting.mp4"
     assert data["reel_url"] == VIDEO_URL
+
+
+@pytest.mark.parametrize("final_response", [
+    urllib.error.URLError("connection lost after provider acceptance"),
+    TimeoutError("final response timed out"),
+    ig.InstagramError("IGApiException 500: temporary server error"),
+    ValueError("invalid JSON after final publish"),
+    {}, {"id": None}, {"id": ""}, [],
+], ids=["lost-connection", "timeout", "provider-5xx", "invalid-json", "missing-id", "null-id", "empty-id", "unexpected-json"])
+def test_uncertain_final_reel_publish_stops_without_creating_or_publishing_a_card(monkeypatch, tmp_path, capsys, final_response):
+    monkeypatch.setenv("INSTAGRAM_TOKEN", "SECRET-TOKEN-VALUE")
+    monkeypatch.setattr(ig, "token_for_run", lambda secret, cf: "tok")
+    monkeypatch.setattr(ig, "wait_for_video", lambda url: None)
+    monkeypatch.setattr(ig, "wait_for_image", lambda url: pytest.fail("no fallback after uncertain publication"))
+    (tmp_path / "reel.mp4").write_bytes(b"video")
+    post = tmp_path / "post.json"
+    post.write_text(json.dumps({"instagram_caption": "c", "card_url": "https://x/card.jpg",
+                               "reel": True, "reel_url": VIDEO_URL}), encoding="utf-8")
+    calls, accepted = [], []
+
+    def fake(method, path, params):
+        calls.append((method, path, dict(params)))
+        if path == "me":
+            return {"user_id": "1789"}
+        if path == "1789/media":
+            assert params["media_type"] == "REELS", "must not create a fallback card"
+            return {"id": "reel-container"}
+        if path == "reel-container":
+            return {"status_code": "FINISHED"}
+        if path == "1789/media_publish":
+            # Model a provider that accepted the post before its response was lost or unreadable.
+            accepted.append(params["creation_id"])
+            if isinstance(final_response, Exception):
+                raise final_response
+            return final_response
+        raise AssertionError(path)
+
+    monkeypatch.setattr(ig, "_request", fake)
+    result = tmp_path / "status.json"
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    assert ig.main(["instagram.py", str(post), "--send", f"--status-file={result}"]) == 1
+    assert accepted == ["reel-container"]
+    assert sum(path == "1789/media" for _, path, _ in calls) == 1
+    assert sum(path == "1789/media_publish" for _, path, _ in calls) == 1
+    status = json.loads(result.read_text())
+    assert status["outcome"] == "unknown" and status["reason"] == "final_publish_unconfirmed"
+    out = capsys.readouterr().out
+    assert "::error title=Instagram publishing outcome unknown::" in out
+    assert "posting the card instead" not in out
+    assert "SECRET-TOKEN-VALUE" not in out + result.read_text() + summary.read_text()
+    assert "**unknown**" in summary.read_text()
+
+
+def test_definite_reel_container_failure_before_publication_still_allows_card_fallback(monkeypatch, tmp_path):
+    monkeypatch.setenv("INSTAGRAM_TOKEN", "t")
+    monkeypatch.setattr(ig, "token_for_run", lambda secret, cf: "tok")
+    monkeypatch.setattr(ig, "wait_for_video", lambda url: None)
+    monkeypatch.setattr(ig, "wait_for_image", lambda url: None)
+    (tmp_path / "reel.mp4").write_bytes(b"video")
+    post = tmp_path / "post.json"
+    post.write_text(json.dumps({"instagram_caption": "c", "card_url": "https://x/card.jpg",
+                               "reel": True, "reel_url": VIDEO_URL}), encoding="utf-8")
+    published = []
+
+    def fake(method, path, params):
+        if path == "me":
+            return {"user_id": "1789"}
+        if path == "1789/media":
+            if params.get("media_type") == "REELS":
+                raise ig.InstagramError("IGApiException 100: video format rejected")
+            return {"id": "card-container"}
+        if path == "card-container":
+            return {"status_code": "FINISHED"}
+        if path == "1789/media_publish":
+            published.append(params["creation_id"])
+            return {"id": "card-media"}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(ig, "_request", fake)
+    result = tmp_path / "status.json"
+    assert ig.main(["instagram.py", str(post), "--send", f"--status-file={result}"]) == 0
+    assert published == ["card-container"]
+    assert json.loads(result.read_text())["outcome"] == "card_fallback"
+
+
+def test_reporting_error_after_successful_reel_cannot_trigger_a_second_post(monkeypatch, tmp_path):
+    monkeypatch.setenv("INSTAGRAM_TOKEN", "t")
+    monkeypatch.setattr(ig, "token_for_run", lambda secret, cf: "tok")
+    monkeypatch.setattr(ig, "wait_for_video", lambda url: None)
+    monkeypatch.setattr(ig, "publish_reel", lambda *args: "confirmed-reel")
+    monkeypatch.setattr(ig, "publish", lambda *args: pytest.fail("reporting failure must not post a fallback"))
+    monkeypatch.setattr(ig, "record_status", lambda *args: (_ for _ in ()).throw(OSError("status disk unavailable")))
+    (tmp_path / "reel.mp4").write_bytes(b"video")
+    post = tmp_path / "post.json"
+    post.write_text(json.dumps({"instagram_caption": "c", "card_url": "https://x/card.jpg",
+                               "reel": True, "reel_url": VIDEO_URL}), encoding="utf-8")
+    with pytest.raises(OSError, match="status disk unavailable"):
+        ig.main(["instagram.py", str(post), "--send"])
