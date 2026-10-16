@@ -431,6 +431,10 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
 
+    # One stable listing can move between an employer's boards or change its URL.
+    # A failed old board must not append a stale copy over the freshly fetched ID.
+    have_ids = {x["id"] for x in listings if x.get("id")}
+
     now_open = Counter(board_of(x) for x in listings if x.get("status") == "open")
     was_open: dict[tuple, list[dict]] = defaultdict(list)
     for it in prev:
@@ -451,7 +455,7 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
             continue
         for it in rows:
             url = it.get("apply_url")
-            if not url or url in have:
+            if not url or url in have or (it.get("id") and it["id"] in have_ids):
                 continue
             if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
                 continue   # the board has been quiet for days; it is not coming back
@@ -459,6 +463,8 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
             kept["carried"] = True
             listings.append(kept)
             have.add(url)
+            if it.get("id"):
+                have_ids.add(it["id"])
             held += 1
     return held
 
@@ -479,10 +485,12 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
+    have_ids = {x["id"] for x in listings if x.get("id")}
     held = 0
     for it in prev:
         url = it.get("apply_url")
-        if not it.get("via_search") or it.get("status") != "open" or not url or url in have:
+        if (not it.get("via_search") or it.get("status") != "open" or not url or url in have
+                or (it.get("id") and it["id"] in have_ids)):
             continue
         if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
             continue
@@ -491,6 +499,8 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
             continue
         listings.append({**it, "stage": stage, "carried": True})
         have.add(url)
+        if it.get("id"):
+            have_ids.add(it["id"])
         held += 1
     return held
 
