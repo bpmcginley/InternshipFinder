@@ -103,11 +103,13 @@ jobs:
 
       # The steps below run even when a text account failed above (a failed step still leaves the run
       # red), so one revoked password doesn't also stop the picture posts.
-      - name: Put the card where Instagram can fetch it
+      - name: Put brand media where Instagram can fetch it
         if: ${{ !cancelled() && hashFiles('out/card.jpg') != '' }}
         run: |
           name=$(python -c "import json; print(json.load(open('out/post.json'))['card_name'])")
           case "$name" in *[!A-Za-z0-9._-]*|'') echo "unexpected card name"; exit 1;; esac
+          video_name=$(python -c "import json; print(json.load(open('out/post.json')).get('reel_name', ''))")
+          case "$video_name" in *[!A-Za-z0-9._-]*) echo "unexpected video name"; exit 1;; esac
           git config --global user.name "InternScout"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin social-cards >/dev/null; then
@@ -118,9 +120,13 @@ jobs:
             (cd cards && git switch -q --orphan social-cards)
           fi
           cp out/card.jpg "cards/$name"
+          git -C cards add "$name"
+          if [ -s out/reel.mp4 ] && [ -n "$video_name" ]; then
+            cp out/reel.mp4 "cards/$video_name"
+            git -C cards add "$video_name"
+          fi
           cd cards
-          git add "$name"
-          git diff --cached --quiet || git commit -q -m "Card: $name"
+          git diff --cached --quiet || git commit -q -m "Brand media: $name"
           git push -q origin HEAD:refs/heads/social-cards
           echo "Card served at https://raw.githubusercontent.com/${{ github.repository }}/social-cards/$name"
 
@@ -131,8 +137,16 @@ jobs:
           INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          if [ -f out/post.json ]; then python growth/instagram.py out/post.json --send
-          else python growth/instagram.py --send; fi
+          if [ -f out/post.json ]; then python growth/instagram.py out/post.json --send --status-file=out/instagram-status.json
+          else python growth/instagram.py --send --status-file=out/instagram-status.json; fi
+
+      - name: Keep Instagram publishing result
+        if: ${{ !cancelled() && hashFiles('out/instagram-status.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: instagram-publishing-result
+          path: out/instagram-status.json
+          retention-days: 14
 
       - name: YouTube Short
         # The Thursday Reel, cross-posted as a Short. Only when a Reel was made; without the three

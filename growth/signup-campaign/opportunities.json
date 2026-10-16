@@ -48,9 +48,14 @@
       "official_url": "https://job-boards.greenhouse.io/hasbro/jobs/4424981009",
       "location": "Boston, MA and/or Renton, WA; project-dependent office schedule",
       "eligibility_note": "General application for anticipated projects, not a specific vacancy. Students must remain enrolled for at least one term after the internship. US work authorization required; no immigration sponsorship."
-    },
+    }
+  ],
+  "retired_roles": [
     {
       "key": "weiss_fellowship",
+      "status": "retired",
+      "retired_on": "2026-10-16",
+      "retirement_reason": "Removed from reusable drafts before today's deadline; historical evidence only, never release this item.",
       "listing_id": "aafdf2805558f2f6",
       "company": "Weiss Asset Management",
       "title": "2027 Underclassmen Fellowship",

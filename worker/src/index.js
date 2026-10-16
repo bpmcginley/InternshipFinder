@@ -12,6 +12,7 @@ import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./de
 import { countEvent, countHit } from "./visits.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
+import { socialVideo } from "./social-video.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
   livePlacements, pausePlacement, refusePlacement, requireAdmin, switchOn, updatePlacement } from "./placements.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
@@ -93,6 +94,8 @@ async function route(request, env, ctx, d) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const db = env.DB;
   const now = d.now();
+  // Brand media has no account/session access, analytics, writes, or arbitrary upstream URLs.
+  if (path.startsWith("/social-video/")) return socialVideo(request, d.fetch);
   let who = { user: null, tier: "general" };   // set by signIn()
   // was: const signIn = async () => (who = await authenticateUser(request, env, { fetch: d.fetch, now: now.getTime() })).user;
   // `later` carries a session's once-a-day refresh past the response (session.js sessionUser).
@@ -394,6 +397,10 @@ export async function handle(request, env, ctx, deps = {}) {
       console.error("internal error:", e && e.name);
       res = json({ error: "server", message: "Internal error" }, 500);
     }
+  }
+  // A just-pushed media file can briefly be missing. Never cache a failed public media lookup.
+  if (res.status >= 400 && new URL(request.url).pathname.startsWith("/social-video/")) {
+    res.headers.set("Cache-Control", "no-store");
   }
   for (const [k, v] of Object.entries(corsHeaders(request, env))) res.headers.set(k, v);
   return res;
