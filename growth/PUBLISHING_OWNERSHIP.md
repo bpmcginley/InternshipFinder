@@ -9,8 +9,10 @@ account connections, queue posts, run workflows, or grant new permissions.
 |---|---|---|
 | Bluesky | The native Brand posts workflow posted on October 15. | Keep the native workflow as publisher. Do not mirror its field posts through Heycatch. |
 | Instagram | The native workflow published its picture card on October 15 after a Reel failed. | Keep the native workflow as publisher. The repair below addresses Reel delivery; do not queue the same card in Heycatch. |
-| YouTube | Native upload skipped on October 15 because its three uploader credentials were absent. | Connected-to-Heycatch history is a separate integration. Verify that product channel/queue and choose one publisher before enabling native uploads or releasing a Heycatch video. No new native credentials are required just to keep the existing setup. |
-| X, Facebook, Threads, TikTok, Reddit | Product account connections were recorded during setup; their present permissions and queues have not been reverified here. | Keep new campaign material as drafts until the exact product account, copy, timing and permission are verified. Do not infer native support from a Heycatch connection. |
+| YouTube | Native upload skipped on October 15 because its uploader credentials were absent. Heycatch's account UI now confirms `@internscoutorg`, with posted and already-scheduled videos. | Keep Heycatch as the existing video publisher. Do not add native YouTube credentials or run a second uploader for the same material. Heycatch status alone is not independent verification of every destination post. |
+| TikTok / Facebook | Heycatch's account UI confirms the product accounts and shows existing posted/scheduled videos for these channels. | Keep the existing Heycatch queue; this work did not approve, add, edit, cancel or reschedule any post. New campaign copy stays in drafts. |
+| X / Reddit | Heycatch's account UI confirms `@useinternscout` and `u/InternScout`. | Connection is verified, not text-post delivery. Review the Catches queue and existing destination posts before approving new content. |
+| Threads | No Threads connection appears in the current Heycatch account list. | Do not claim this channel is ready. Completing any account challenge or new publishing permission is a separate owner action. |
 | LinkedIn | Native code saves a draft in private analytics; this does not establish a live Page or a post. | Manual review and release only after the destination exists and is approved. |
 | Mastodon / Discord | Native workflow supports them, but the October 16 secret inventory lacks their publishing token/webhook. | Do not create accounts or add credentials to fill every available channel. Choose based on actual student use. |
 
@@ -18,6 +20,8 @@ Before releasing a prepared campaign set, compare the native run and recent post
 queue. `SOCIAL_ENABLED=0` is the native workflow's off switch; when unset, configured native accounts
 are already enabled. Its daily guard prevents a second native run, not a duplicate in another app.
 Do not use `force` to check whether a previous post succeeded. Read its step log and the destination.
+Heycatch also lists Instagram `@internscout` as connected, but no Instagram destination appeared in the
+video queue inspected October 16. Keep native Instagram ownership until an explicit handoff is agreed.
 
 ## What failed and what changes
 
