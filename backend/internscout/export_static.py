@@ -130,7 +130,10 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
 # posted_at, then first_seen, newest first. The dashboard keeps the first copy of a row it is given,
 # so these rows are the very rows the state files hold, and the top of the list doesn't move when
 # they land. Outside listings/ so nothing that reads every state file there mistakes it for one.
-FIRST_SCREEN_ROWS = 60
+# Only the first viewport needs to arrive before a student sees usable results. Twelve rows cover
+# the ten-result email invitation and two more cards; the unchanged state files fill in the rest.
+# Keeping sixty here made that first paint wait for five screens of results it could not show yet.
+FIRST_SCREEN_ROWS = 12
 FIRST_SCREEN_KEYS = sorted(BASELINE_STATES) + ["remote"]
 
 
