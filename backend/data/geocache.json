@@ -1485,6 +1485,7 @@
 "new york city (hybrid|NY":null,
 "new york city - hybrid|NY":null,
 "new york city - office|NY":null,
+"new york city - remote first in us|NY":null,
 "new york city - us|NY":null,
 "new york city 3 times square|NY":null,
 "new york city area|NY":null,
@@ -1580,6 +1581,7 @@
 "nj - new milford|NJ":null,
 "nj - newark|NJ":null,
 "nj - north bergen|NJ":null,
+"nj - north plainfield|NJ":null,
 "nj - northvale|NJ":null,
 "nj - old tappan|NJ":null,
 "nj - pennsauken|NJ":null,
@@ -1591,6 +1593,7 @@
 "nj - roseland|NJ":null,
 "nj - secaucus|NJ":null,
 "nj - sicklerville|NJ":null,
+"nj - south plainfield|NJ":null,
 "nj - sparta|NJ":null,
 "nj - summit|NJ":null,
 "nj - teaneck|NJ":null,
@@ -1603,6 +1606,7 @@
 ],
 "nj - west caldwell|NJ":null,
 "nj - west orange|NJ":null,
+"nj - westfield|NJ":null,
 "nj - westwood|NJ":null,
 "nj - williamstown|NJ":null,
 "nj - willingboro|NJ":null,
@@ -2065,6 +2069,7 @@
 "remote location-philadelphia area|PA":null,
 "remote location|NJ":null,
 "remote location|PA":null,
+"remote|NJ":null,
 "remote|NY":[
 43.0407,
 -73.9528
@@ -2114,6 +2119,7 @@
 43.2102,
 -75.4584
 ],
+"roseland nj|NJ":null,
 "ross park mall|PA":null,
 "rutherford|NJ":[
 40.8265,
@@ -2656,6 +2662,7 @@
 40.8257,
 -73.4676
 ],
+"woodcliff lake nj|NJ":null,
 "woodcliff lake|NJ":[
 41.0234,
 -74.0665

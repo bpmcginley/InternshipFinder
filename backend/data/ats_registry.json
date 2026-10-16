@@ -12719,8 +12719,9 @@
   "blueorigin|wd5|blueorigin": {
    "name": "Blue Origin",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-16"
   },
   "bluescopenac|wd5|BNACareers": {
    "name": "BlueScope",
