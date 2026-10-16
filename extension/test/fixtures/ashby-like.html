@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'">
+  <title>Ashby-like synthetic offline application</title>
+  <style>
+    body { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; font: 16px/1.5 system-ui; }
+    .field, fieldset { margin: 1rem 0; }
+    .field label, .field input { display: block; }
+    input:not([type=file]):not([type=radio]) { box-sizing: border-box; width: 100%; padding: .5rem; }
+    button { padding: .6rem 1rem; margin: .3rem; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <p><strong>Synthetic offline fixture.</strong> Fictional employer and applicant only. No data leaves this page.</p>
+  <h1>Example Research — Design Intern</h1>
+  <form id="application-form">
+    <section id="details">
+      <h2>Application details</h2>
+      <div class="field"><label for="parser">Autofill from resume</label><input id="parser" name="autofillResume" type="file" accept=".pdf,.doc,.docx"></div>
+      <div class="field"><label for="name">Name</label><input id="name" name="name" autocomplete="name" required></div>
+      <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required></div>
+      <div class="field"><label for="phone">Phone</label><input id="phone" name="phone" type="tel"></div>
+      <div class="field"><label for="linkedin">LinkedIn URL</label><input id="linkedin" name="linkedin"></div>
+      <div class="field"><label for="resume">Resume</label><input id="resume" name="resume" type="file" accept=".pdf,.doc,.docx" required></div>
+      <div class="field"><label for="cover">Cover Letter</label><input id="cover" name="cover" type="file" accept=".pdf,.doc,.docx"></div>
+      <fieldset>
+        <label class="question-title required" for="sponsorship">Will you now or in the future require sponsorship?</label>
+        <label for="sponsorship-yes"><input id="sponsorship-yes" name="sponsorship" type="radio" value="Yes">Yes</label>
+        <label for="sponsorship-no"><input id="sponsorship-no" name="sponsorship" type="radio" value="No">No</label>
+      </fieldset>
+      <button type="button" id="replace-email">Re-render email field</button>
+      <button type="button" id="continue">Continue</button>
+    </section>
+    <section id="review" hidden>
+      <h2>Review application</h2>
+      <p>Check every answer and the attachment. The student makes the final decision.</p>
+      <button type="button" id="edit">Edit application</button>
+      <button type="submit" id="submit-application">Submit application</button>
+    </section>
+  </form>
+  <p id="status" role="status">Nothing submitted.</p>
+  <script>
+    const details = document.getElementById('details'), review = document.getElementById('review');
+    document.getElementById('continue').onclick = () => { details.hidden = true; review.hidden = false; };
+    document.getElementById('edit').onclick = () => { review.hidden = true; details.hidden = false; };
+    document.getElementById('replace-email').onclick = () => {
+      const old = document.getElementById('email'), replacement = old.cloneNode();
+      replacement.removeAttribute('data-is-ref'); replacement.value = old.value; old.replaceWith(replacement);
+    };
+    document.getElementById('application-form').addEventListener('submit', (event) => {
+      event.preventDefault(); document.getElementById('status').textContent = 'Local fixture final click received. Nothing sent.';
+    });
+  </script>
+</body>
+</html>
