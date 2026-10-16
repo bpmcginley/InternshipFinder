@@ -26,7 +26,7 @@ test("U1: the bridge's pages come from the manifest, and its match is the host a
   assert.ok(m.includes("https://internscout.org/*"));
   assert.ok(!manifest.host_permissions.some((h) => h.includes("internscout.org")), "the install prompt is unchanged");
   assert.ok(manifest.permissions.includes("scripting") && manifest.permissions.includes("tabs"));
-  assert.equal(manifest.version, "0.5.7", "manifest version is the 0.5.7 release");
+  assert.equal(manifest.version, "0.5.8", "manifest version is the 0.5.8 release candidate");
 });
 
 test("U1: every open dashboard tab gets the bridge and gives up what the offer bar remembered; one failure stops nothing", async () => {
@@ -79,7 +79,7 @@ function runBridge(ctx, runtime) {
   ctx.chrome = { runtime };
   vm.runInContext(read("bridge/bridge.js"), ctx);
 }
-const liveRuntime = (sent) => ({ id: "ext", getManifest: () => ({ version: "0.5.7" }), lastError: null,
+const liveRuntime = (sent) => ({ id: "ext", getManifest: () => ({ version: manifest.version }), lastError: null,
   connect: () => ({ onMessage: { addListener() {} }, onDisconnect: { addListener() {} }, postMessage: (m) => sent.push(m) }) });
 
 test("U1: a second copy of the bridge in the same page does nothing while the first is live", () => {

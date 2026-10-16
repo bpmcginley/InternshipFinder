@@ -56,9 +56,16 @@ def build(webstore: bool = False) -> Path:
             if rel == "manifest.json":
                 if webstore:
                     manifest.pop("key", None)
-                zf.writestr(rel, json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+                payload = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
             else:
-                zf.write(p, rel)
+                payload = p.read_bytes()
+            # A fresh checkout changes filesystem mtimes. Fixed metadata makes a rebuild of the same
+            # source byte-identical, so a release retry can verify an existing asset instead of replacing it.
+            entry = zipfile.ZipInfo(rel, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.create_system = 3
+            entry.external_attr = 0o100644 << 16
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            zf.writestr(entry, payload, compresslevel=9)
     return out
 
 
