@@ -404,6 +404,10 @@
 41.1464,
 -74.7524
 ],
+"brewster|NY":[
+41.3944,
+-73.6171
+],
 "bridgewater township|NJ":[
 40.5931,
 -74.605
@@ -1156,6 +1160,10 @@
 40.343,
 -76.4234
 ],
+"leesport|PA":[
+40.447,
+-75.9663
+],
 "lehigh county|PA":null,
 "lehighton|PA":[
 40.834,
@@ -1544,6 +1552,8 @@
 "nj - bedminster|NJ":null,
 "nj - belle mead|NJ":null,
 "nj - burlington township|NJ":null,
+"nj - carteret|NJ":null,
+"nj - clark|NJ":null,
 "nj - clifton|NJ":null,
 "nj - closter|NJ":null,
 "nj - cresskill|NJ":null,
@@ -1559,6 +1569,7 @@
 "nj - fort lee|NJ":null,
 "nj - franklin park|NJ":null,
 "nj - freehold|NJ":null,
+"nj - garwood|NJ":null,
 "nj - gloucester city|NJ":null,
 "nj - haddon heights|NJ":null,
 "nj - hamilton|NJ":null,
@@ -1587,6 +1598,7 @@
 "nj - pennsauken|NJ":null,
 "nj - plainsboro|NJ":null,
 "nj - princeton|NJ":null,
+"nj - rahway|NJ":null,
 "nj - ridgefield park|NJ":null,
 "nj - river edge|NJ":null,
 "nj - rockaway|NJ":null,
@@ -2185,6 +2197,10 @@
 "sharon hill|PA":[
 39.9063,
 -75.2721
+],
+"sharpsburg|PA":[
+40.4945,
+-79.9264
 ],
 "sheepshead bay|NY":[
 40.5912,
