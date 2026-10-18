@@ -349,6 +349,13 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "chainlink-labs": {
+   "name": "Chainlink Labs",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-10-18",
+   "last_fail": "2026-10-18"
+  },
   "charge-robotics": {
    "name": "Charge Robotics",
    "quant": false,
