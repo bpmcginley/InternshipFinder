@@ -157,7 +157,8 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
                 record_result(reg, ats, tok, False)
         else:
             if metrics is not None:
-                metrics.board_result(ats, tok, "success", count=len(r))
+                metrics.board_result(ats, tok, "success", count=len(r),
+                                     complete=getattr(r, "complete", False))
             record_result(reg, ats, tok, True)
             if completed_boards is not None and getattr(r, "complete", False):
                 completed_boards.add((ats, tok))
@@ -241,7 +242,9 @@ def main():
     save_cache()
     if args.export:
         from .export_static import export
-        exported = export(args.export)
+        # The same evidence pipeline.run closed by: CI's database is new every run, so without it
+        # the export's carry rules could put a closed posting straight back on the site.
+        exported = export(args.export, completed_boards=completed_boards)
         metrics.export_result(exported["total"], open_count=exported["open"], held=exported["held"])
     metrics_path = args.metrics or (os.path.join(args.export, "ingest-report.json") if args.export else None)
     if metrics_path:
