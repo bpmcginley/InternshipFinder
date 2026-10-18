@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 import time
 
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
 
 URL = "https://{token}/api/jobs"
@@ -74,6 +74,7 @@ def fetch_icims_site_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
     require_robots(c, f"https://{token}", "/api/jobs", token)
     seen: dict[str, dict] = {}
+    reported, rows, well_formed = None, 0, True
     for page in range(1, MAX_PAGES + 1):
         if page > 1:
             time.sleep(CRAWL_DELAY)
@@ -81,8 +82,18 @@ def fetch_icims_site_board(c, co: dict) -> list[dict]:
                   headers={"Accept": "application/json"})
         r.raise_for_status()
         payload = r.json()
+        if not isinstance(payload, dict):
+            raise ValueError("iCIMS career site response is not an object")
+        got = rows_of(payload, "jobs")
+        if got is None:
+            well_formed = False
+        if page == 1:
+            reported = reported_count(payload.get("totalCount"))
+        rows += len(got or [])
         for it in parse_icims_site(payload, co):
             seen[it["url"]] = it
         if page * LIMIT >= (payload.get("totalCount") or 0):
             break
+    # The one query read to its totalCount, not stopped at MAX_PAGES (300 results).
+    mark_complete(co, well_formed and reported is not None and rows == reported)
     return list(seen.values())

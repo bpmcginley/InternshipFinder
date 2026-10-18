@@ -2,7 +2,7 @@
 center's cid, e.g. "89da4960-4d45-4b46-b7aa-5959c5f71827". The list has no descriptions, so
 in-region internships get one detail call each (capped)."""
 from __future__ import annotations
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, mark_complete, reported_count, rows_of
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -70,10 +70,20 @@ def parse_adp(payload: dict, co: dict, cid: str) -> tuple[list[dict], int]:
 def fetch_adp_board(c, co: dict) -> list[dict]:
     cid = co["ats_token"]
     out, skip = [], 0
+    reported, rows, well_formed = None, 0, True
     while skip < MAX_SKIP:
         r = c.get(API, params={"cid": cid, **PARAMS, "$top": PAGE, "$skip": skip})
         r.raise_for_status()
-        items, total = parse_adp(r.json(), co, cid)
+        payload = r.json()
+        if not isinstance(payload, dict):
+            raise ValueError("ADP requisitions response is not an object")
+        got = rows_of(payload, "jobRequisitions")
+        if got is None:
+            well_formed = False
+        if skip == 0:
+            reported = reported_count((payload.get("meta") or {}).get("totalNumber"))
+        rows += len(got or [])
+        items, total = parse_adp(payload, co, cid)
         out += items
         skip += PAGE
         if skip >= total:
@@ -89,4 +99,6 @@ def fetch_adp_board(c, co: dict) -> list[dict]:
                 it["description"] = html_to_text(d.json().get("requisitionDescription"))[:4000]
         except Exception:
             pass
+    # Every requisition up to meta.totalNumber, not stopped at MAX_SKIP (1,000).
+    mark_complete(co, well_formed and reported is not None and rows == reported)
     return out

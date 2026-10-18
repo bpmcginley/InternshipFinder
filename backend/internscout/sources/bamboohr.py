@@ -8,7 +8,7 @@ no location, which dropped them from the export and, before that, from the detai
 a listing its description.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -51,7 +51,16 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
     require_robots(c, f"https://{token}.bamboohr.com", "/careers/list", token)
     r = c.get(LIST_URL.format(token=token), headers={"Accept": "application/json"})
     r.raise_for_status()
-    items = parse_bamboohr(r.json(), co, token)
+    payload = r.json()
+    if not isinstance(payload, dict):
+        raise ValueError("BambooHR careers list is not an object")
+    items = parse_bamboohr(payload, co, token)
+    # /careers/list is one unpaged call holding every opening. When the body also states a
+    # count, the list has to match it.
+    rows = rows_of(payload, "result")
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    stated = meta.get("totalCount")
+    complete = rows is not None and (stated is None or reported_count(stated) == len(rows))
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(DETAIL_URL.format(token=token, id=it["_bh_id"]), headers={"Accept": "application/json"})
@@ -63,4 +72,5 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
             pass
     for it in items:
         it.pop("_bh_id", None)
+    mark_complete(co, complete)
     return items
