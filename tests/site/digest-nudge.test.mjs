@@ -32,6 +32,7 @@ test("a cached pre-invitation core leaves the optional prompt disabled without b
   vm.createContext(ctx);
   assert.doesNotThrow(() => vm.runInContext(APP.slice(start, end), ctx));
   assert.equal(ref.current.claim("interested", eligible), false);
+  assert.doesNotThrow(() => ref.current.shown());
   assert.doesNotThrow(() => ref.current.finish("dismissed"));
 });
 
@@ -44,6 +45,9 @@ test("contextual email invitation waits for a deliberate useful action and never
   assert.equal(prompt.claim("profile", { manual: true }), false, "disabled email signup stays hidden");
   assert.equal(local.map.size, 0);
   assert.equal(prompt.claim("interested", eligible), true);
+  assert.equal(local.getItem(IS.DIGEST_NUDGE_KEY), null, "not used up until it is actually on screen");
+  assert.equal(IS.createDigestNudge().claim("interested", eligible), true, "a reload before it showed can still offer it");
+  prompt.shown();
   assert.equal(local.getItem(IS.DIGEST_NUDGE_KEY), "shown");
   assert.equal(prompt.claim("profile", eligible), false);
   assert.equal(IS.createDigestNudge().claim("interested", eligible), false, "a reload cannot repeat the invitation");
@@ -55,6 +59,7 @@ test("dismissal and opening persist without treating either as a subscription", 
     const { IS, local } = load();
     const prompt = IS.createDigestNudge();
     assert.equal(prompt.claim("profile", eligible), true);
+    prompt.shown();
     prompt.finish(how);
     assert.equal(local.getItem(IS.DIGEST_NUDGE_KEY), how);
     assert.equal(IS.createDigestNudge().claim("profile", eligible), false);
@@ -93,13 +98,14 @@ test("deleting dashboard data removes the local email invitation preference", as
 // Run the actual UI action adapter against a tiny tracker, rather than simulating a second
 // copy of its policy. Queue updates retain setAppState; only the rendered row uses this wrapper.
 test("the manual status adapter preserves tracking and only offers on a new Interested selection", () => {
-  const start = APP.indexOf("    const setManualAppState =");
+  const start = APP.indexOf("    const offerDigestNudgeRef =");
   const end = APP.indexOf("    const upd =", start);
   assert.ok(start > -1 && end > start);
   const offers = [], updates = [], current = { a: "interested" };
   const ctx = {
     appStatesRef: { current }, offerDigestNudge: v => offers.push(v),
     setAppState: (id, v) => { updates.push([id, v]); current[id] = v; },
+    useRef: v => ({ current: v }), useCallback: (fn, deps) => { ctx.deps = deps; return fn; },
   };
   vm.createContext(ctx);
   vm.runInContext(APP.slice(start, end) + "globalThis.change = setManualAppState;", ctx);
@@ -110,6 +116,7 @@ test("the manual status adapter preserves tracking and only offers on a new Inte
   assert.deepEqual(offers, ["interested"]);
   assert.deepEqual(updates, [["a", "interested"], ["b", "applied"], ["c", "none"], ["d", "interested"]]);
   assert.match(APP, /onState: setManualAppState/);
+  assert.deepEqual([...ctx.deps], [ctx.setAppState], "a stable handler, so memoized rows don't all redraw");
   assert.match(APP, /addedIds\.has\(String\(r\.id\)\).*setAppState\(r\.id, "interested"\)/);
   assert.match(APP, /j\.status === "submitted".*setAppState\(id, "applied"\)/);
 });

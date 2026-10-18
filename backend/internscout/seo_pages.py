@@ -2683,10 +2683,10 @@ def digest_examples(new: list[dict]) -> str:
     dated = f" Snapshot: {GENERATED.strftime('%B %d, %Y')}." if GENERATED else ""
     rows = "".join(
         f'<li><a href="{esc(safe_url(x["apply_url"]))}" target="_blank" rel="nofollow noopener">'
-        f'{esc(x.get("title") or "View posting")}</a> — {esc(x.get("company_name") or "Employer")} '
+        f'{esc(x.get("title") or "View posting")}</a> at {esc(x.get("company_name") or "Employer")} '
         f'<span class="meta">({esc(place(x))})</span></li>' for x in picked)
     return ('<section class="prose digest-examples" aria-labelledby="digest-examples-title">'
-            '<h2 id="digest-examples-title">A taste of what you could find</h2>'
+            '<h2 id="digest-examples-title">Examples from this week</h2>'
             f'<p>Examples from roles found this week.{dated} Availability can change; check the employer’s posting.</p>'
             f'<ul class="plain">{rows}</ul></section>')
 
