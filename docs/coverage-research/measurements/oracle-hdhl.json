@@ -1,0 +1,154 @@
+{
+ "ats": "oracle",
+ "token": "hdhl.fa.us6.oraclecloud.com|CX_1",
+ "name": "Stantec",
+ "sector": "energy_environment",
+ "measured_on": "2026-10-18",
+ "production_keywords": [
+  "intern",
+  "co-op",
+  "student",
+  "stagiaire"
+ ],
+ "configs": [
+  {
+   "keywords": [
+    "intern"
+   ],
+   "status": "ok",
+   "requests": 32,
+   "request_errors": 1,
+   "est_sequential_seconds": 16.0,
+   "raw_rows": 126,
+   "normalized": 126,
+   "accepted": 126,
+   "accepted_dedupe_keys": 72,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op"
+   ],
+   "status": "ok",
+   "requests": 34,
+   "request_errors": 1,
+   "est_sequential_seconds": 17.8,
+   "raw_rows": 131,
+   "normalized": 131,
+   "accepted": 131,
+   "accepted_dedupe_keys": 76,
+   "new_vs_baseline": 5,
+   "new_ids": [
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007719",
+     "title": "Water Co-op Student - Winter 2027 - 8 Months"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007922",
+     "title": "Water Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008127",
+     "title": "Architectural Technologist Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008307",
+     "title": "Water Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008328",
+     "title": "Transportation Co-op Student - Winter 2027"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student"
+   ],
+   "status": "ok",
+   "requests": 36,
+   "request_errors": 1,
+   "est_sequential_seconds": 19.3,
+   "raw_rows": 132,
+   "normalized": 132,
+   "accepted": 132,
+   "accepted_dedupe_keys": 77,
+   "new_vs_baseline": 6,
+   "new_ids": [
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007583",
+     "title": "Articling Student / Surveying Technician"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007719",
+     "title": "Water Co-op Student - Winter 2027 - 8 Months"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007922",
+     "title": "Water Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008127",
+     "title": "Architectural Technologist Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008307",
+     "title": "Water Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008328",
+     "title": "Transportation Co-op Student - Winter 2027"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 37,
+   "request_errors": 1,
+   "est_sequential_seconds": 19.5,
+   "raw_rows": 132,
+   "normalized": 132,
+   "accepted": 132,
+   "accepted_dedupe_keys": 77,
+   "new_vs_baseline": 6,
+   "new_ids": [
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007583",
+     "title": "Articling Student / Surveying Technician"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007719",
+     "title": "Water Co-op Student - Winter 2027 - 8 Months"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1007922",
+     "title": "Water Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008127",
+     "title": "Architectural Technologist Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008307",
+     "title": "Water Co-op Student - Winter 2027"
+    },
+    {
+     "id": "hdhl.fa.us6.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1008328",
+     "title": "Transportation Co-op Student - Winter 2027"
+    }
+   ]
+  }
+ ],
+ "network_requests": 37,
+ "network_wall_seconds_incl_pauses": 31.2
+}
