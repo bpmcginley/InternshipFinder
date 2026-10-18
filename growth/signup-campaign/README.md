@@ -8,7 +8,7 @@ The first milestone is **25 genuine, confirmed student subscribers**, excluding 
 
 - [Brand drafts](brand-drafts.md): three opportunity-led sets, each with a short X thread and a longer caption. Each role has an official source in [opportunities.json](opportunities.json).
 - [UMass club kit](umass-clubs.md): eight organizations, verified public contact routes where available, uncertainty flags, and individual outreach drafts.
-- Set C expires **October 16, 2026 at 5 p.m. Eastern** because the Weiss fellowship closes then. Remove the Weiss item after that deadline; do not use it for Monday's email or next week's promotion.
+- Set C is now Hasbro only: the Weiss fellowship closed October 16, 2026 at 5 p.m. Eastern and was removed on October 18.
 
 The weekly email is free, goes out on Mondays, and requires the subscriber to click the confirmation email. Everyone currently receives the same digest. These drafts do not promise personalized alerts, application success, university endorsement, or continuous availability of any employer's role.
 

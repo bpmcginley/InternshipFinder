@@ -45,13 +45,12 @@ test("weekly invitation appears once after ten listings without changing order o
   }
 });
 
-test("short result sets place the invitation after the last listing and empty sets do not insert it", () => {
+test("lists of ten or fewer leave the invitation to the footer form right after them", () => {
+  // was: placed after the last listing too, which put two forms in a row (review of #123).
   for (const count of [0, 1, 3, 9, 10]) {
     const tree = render(listings(count), { inlineSignup: h("form", { id: "inline" }) });
     const body = nodes(tree, n => n.type === "tbody")[0];
-    const prompts = nodes(body, n => n.props.className === "digest-in-list");
-    assert.equal(prompts.length, count ? 1 : 0);
-    if (count) assert.equal(body.children.indexOf(prompts[0]), count);
+    assert.equal(nodes(body, n => n.props.className === "digest-in-list").length, 0, String(count));
   }
   assert.equal(nodes(render(listings(15)), n => n.props.className === "digest-in-list").length, 0);
 });
@@ -63,7 +62,8 @@ test("the mobile paid listing stays after three rows and cannot count toward the
     const paid = nodes(body, n => n.props.className === "paid-row")[0];
     const prompt = nodes(body, n => n.props.className === "digest-in-list")[0];
     assert.equal(body.children.indexOf(paid), Math.min(3, count));
-    assert.equal(body.children.indexOf(prompt), Math.min(10, count) + 1);
+    if (count > 10) assert.equal(body.children.indexOf(prompt), 11);
+    else assert.equal(prompt, undefined);
     assert.equal(nodes(body, n => n.props["data-listing"]).length, count);
   }
 });

@@ -48,16 +48,6 @@
       "official_url": "https://job-boards.greenhouse.io/hasbro/jobs/4424981009",
       "location": "Boston, MA and/or Renton, WA; project-dependent office schedule",
       "eligibility_note": "General application for anticipated projects, not a specific vacancy. Students must remain enrolled for at least one term after the internship. US work authorization required; no immigration sponsorship."
-    },
-    {
-      "key": "weiss_fellowship",
-      "listing_id": "aafdf2805558f2f6",
-      "company": "Weiss Asset Management",
-      "title": "2027 Underclassmen Fellowship",
-      "official_url": "https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002",
-      "location": "Boston, MA; January 7–8, 2027",
-      "eligibility_note": "Two-day finance program for current freshmen/sophomores, classes of 2029/2030; not a summer internship. Selected fellows' transport and hotel covered.",
-      "do_not_release_at_or_after": "2026-10-16T17:00:00-04:00"
     }
   ],
   "excluded_after_primary_source_review": [
@@ -75,6 +65,15 @@
       "title": "Groma — Finance Systems Co-op",
       "official_url": "https://job-boards.greenhouse.io/groma/jobs/4743496005",
       "reason": "Official page was inaccessible to the research tool; current availability and eligibility were not verified. Not used in release drafts."
+    }
+  ],
+  "expired": [
+    {
+      "key": "weiss_fellowship",
+      "company": "Weiss Asset Management",
+      "title": "2027 Underclassmen Fellowship",
+      "closed": "2026-10-16T17:00:00-04:00",
+      "note": "Removed 2026-10-18 after its application closed. Do not promote."
     }
   ]
 }

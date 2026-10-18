@@ -1087,14 +1087,21 @@
     return {
       claim(action, { enabled = false, blocked = false, manual = false } = {}) {
         if (used || !enabled || blocked || !manual || !["interested", "profile"].includes(action)) return false;
+        // Checks storage works (fail closed), but keeps "shown" only from shown(), once it is on screen.
         try {
           const target = storage || localStorage;
           if (target.getItem(DIGEST_NUDGE_KEY) !== null) return false;
           target.setItem(DIGEST_NUDGE_KEY, "shown");
-          if (target.getItem(DIGEST_NUDGE_KEY) !== "shown") return false;
+          const ok = target.getItem(DIGEST_NUDGE_KEY) === "shown";
+          target.removeItem(DIGEST_NUDGE_KEY);
+          if (!ok) return false;
         } catch (e) { return false; }
         used = true;
         return true;
+      },
+      shown() {
+        if (!used) return;
+        try { const t = storage || localStorage; if (t.getItem(DIGEST_NUDGE_KEY) === null) t.setItem(DIGEST_NUDGE_KEY, "shown"); } catch (e) { }
       },
       finish(how) {
         if (!["dismissed", "opened"].includes(how)) return;
