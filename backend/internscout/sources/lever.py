@@ -46,7 +46,12 @@ def parse_lever(payload: list, co: dict) -> list[dict]:
 def fetch_lever_board(c, co: dict) -> list[dict]:
     resp = c.get(url_of(co["ats_token"]))
     resp.raise_for_status()
-    return parse_lever(resp.json(), co)
+    payload = resp.json()
+    if not isinstance(payload, list) or not all(isinstance(job, dict) for job in payload):
+        raise ValueError("Lever response is missing its complete postings list")
+    items = parse_lever(payload, co)
+    co["_scan_complete"] = True
+    return items
 
 
 def fetch_lever(companies: list[dict]) -> list[dict]:

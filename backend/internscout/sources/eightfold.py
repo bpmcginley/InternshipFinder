@@ -21,14 +21,14 @@ knowing before touching this:
 from __future__ import annotations
 from .common import board_item, require_robots
 from ..classify import is_internship
-from ..geo import STATE_NAMES
+from ..geo import PROVINCES, STATE_NAMES
 
 SEARCH_URL = "https://{tenant}.eightfold.ai/api/pcsx/search"
 JOB_URL = "https://{tenant}.eightfold.ai/careers/job/{id}"
 # The search is a relevance search, not a filter, so it answers "intern" with anything it thinks is
 # close (PayPal's top hit for it is a Manager of Internal Controls). is_internship sorts that out;
 # the words are here only to keep us from crawling an employer's whole board.
-KEYWORDS = ("intern", "co-op", "student", "graduate program")
+KEYWORDS = ("intern", "co-op", "student", "graduate program", "stagiaire")
 PAGE_SIZE = 10
 MAX_PAGES = 12
 
@@ -42,18 +42,23 @@ def host_of(token: str) -> tuple[str, str]:
 
 
 def _locations(std: list) -> list[str]:
-    """['Moline, IL, US', 'Slough, England, GB'] -> ['Moline, IL']. Non-US entries are dropped."""
+    """Keep standardized US/Canadian locations with an explicit Canadian country label."""
     out = []
     for entry in std or []:
         parts = [p.strip() for p in str(entry).split(",") if p.strip()]
-        if len(parts) < 2 or parts[-1].upper() not in ("US", "USA"):
+        if len(parts) < 2:
             continue
-        st = parts[-2].upper()
-        if st not in US_STATES:
+        country, st = parts[-1].upper(), parts[-2].upper()
+        if country in ("CA", "CAN", "CANADA"):
+            if st not in PROVINCES:
+                continue
+        elif country not in ("US", "USA") or st not in US_STATES:
             continue
         # Two parts is 'IL,US': the employer named a state and no city, which the state labeler can
         # still place. Anything longer is city first, however many commas the city itself contains.
         place = st if len(parts) == 2 else f"{', '.join(parts[:-2])}, {st}"
+        if country in ("CA", "CAN", "CANADA"):
+            place += ", Canada"
         if place not in out:
             out.append(place)
     return out

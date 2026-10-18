@@ -21,7 +21,9 @@ from ..classify import is_internship
 from ..region import maybe_in_region
 
 BASE = "https://{tenant}.taleo.net/careersection"
-KEYWORDS = ("intern", "internship", "co-op", "student")
+# Quebec employers publish French-only titles, for example Tetra Tech's
+# "Stagiaire estimateur(trice) en électricité". Keep admission in is_internship below.
+KEYWORDS = ("intern", "internship", "co-op", "student", "stagiaire")
 MAX_PAGES = 8   # 25 per page
 MAX_DETAIL = 25
 HEADERS = {"Content-Type": "application/json", "tz": "GMT-04:00", "tzname": "America/New_York"}
@@ -39,8 +41,10 @@ def _body(keyword: str, page: int) -> dict:
 
 
 def _place(s: str) -> str | None:
-    """"US-Maryland-Hunt Valley" -> "Hunt Valley, Maryland"; non-US -> None."""
+    """Place US/Canadian country-prefixed locations; reject other countries."""
     parts = [p.strip() for p in s.split("-", 2)]
+    if parts[0].upper() in ("CA", "CAN", "CANADA"):
+        return ", ".join(list(reversed(parts[1:])) + ["Canada"])
     if parts[0].upper() not in ("US", "USA", "UNITED STATES"):
         return None
     if len(parts) == 3:

@@ -146,7 +146,9 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
     host, tenant, site = host_of(co["ats_token"])
     api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
     postings, seen = [], set()
-    for text in ("intern",) + EXTRA_SEARCH.get(co.get("sector"), ()):
+    # Co-ops often omit "intern" entirely, in both US and Canadian engineering
+    # programs. Keep the existing page/detail budgets and dedupe overlapping hits.
+    for text in ("intern", "co-op") + EXTRA_SEARCH.get(co.get("sector"), ()):
         for p in _search(c, api, text):
             key = p.get("externalPath") or p.get("title")
             if key not in seen:

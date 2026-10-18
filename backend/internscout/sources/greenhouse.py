@@ -35,7 +35,11 @@ def fetch_greenhouse_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
     resp = c.get(LIST_URL.format(token=token))
     resp.raise_for_status()
-    items = parse_greenhouse(resp.json(), co)
+    payload = resp.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list) or not all(
+            isinstance(job, dict) for job in payload["jobs"]):
+        raise ValueError("Greenhouse response is missing its complete jobs list")
+    items = parse_greenhouse(payload, co)
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(JOB_URL.format(token=token, id=it["_gh_id"]))
@@ -43,6 +47,7 @@ def fetch_greenhouse_board(c, co: dict) -> list[dict]:
                 it["description"] = html_to_text(d.json().get("content"))[:4000]
         except Exception:
             pass
+    co["_scan_complete"] = True  # list endpoint is exhaustive; detail limits do not truncate it
     return items
 
 

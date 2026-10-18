@@ -1,7 +1,7 @@
 """Orchestrates: fetch -> normalize -> term/location filter -> dedupe -> score -> persist.
 
-Open/closed tracking: any listing whose dedupe_key is not seen in a run of a given
-source set is marked closed (if it was previously sourced there).
+Absence only closes a listing after its exact employer board completed an
+authoritative scan. Sampled searches and failed/capped scans cannot prove closure.
 """
 from __future__ import annotations
 from collections import Counter
@@ -11,7 +11,7 @@ from .db import SessionLocal, init_db
 from .models import Listing, SourceLink, Company, Application
 from .config import PROFILE
 from .normalize import normalize
-from .dedupe import merge_batch
+from .dedupe import merge_batch, _canon_job
 from .discover import ats_of
 from .region import place_bare_cities
 from .score import score_parts
@@ -33,23 +33,68 @@ def _field_ok(tags) -> bool:
     return any(t in PROFILE.fields for t in tags)
 
 
-def run(raw_items: list[dict], *, verbose=True) -> dict:
+def _board_key(url):
+    ats, token = ats_of(url)
+    return (ats, token.lower()) if token else None
+
+
+def _listing_boards(row):
+    """Recover employer provenance without a schema migration; ambiguity retains the row."""
+    apply_board = _board_key(row.apply_url)
+    found = {apply_board} if apply_board else set()
+    # Search/community provenance is not an authoritative source of absence. Its
+    # employer URL can identify a board, but disappearance from a list never can.
+    from .sources import BOARD_FETCHERS
+    for link in row.source_links:
+        board = _board_key(link.source_url)
+        if board:
+            found.add(board)
+        elif link.source in BOARD_FETCHERS and (not apply_board or apply_board[0] != link.source):
+            return set()  # an ATS observation whose board cannot be recovered
+    return found
+
+
+def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=None) -> dict:
+    """Persist items; only explicitly completed employer boards authorize absence closure.
+
+    completed_boards contains (ats, token) pairs, including successfully empty
+    boards. Omission is deliberately safe for fixtures and partial callers.
+    """
     init_db()
+    completed_boards = {(ats, token.lower()) for ats, token in (completed_boards or ())}
+    seen_urls = {_canon_job(raw.get(key)) for raw in raw_items
+                 for key in ("apply_url", "url", "source_url") if raw.get(key)} - {None}
     placed = place_bare_cities(raw_items)
     normalized = []
     for raw in raw_items:
-        n = normalize(raw)
+        source = raw.get("source")
+        if metrics is not None:
+            metrics.count("fetched", source=source)
+        n = normalize(raw, on_reject=(lambda reason: metrics.reject(reason, source=source))
+                      if metrics is not None else None)
         if not n:
             continue
+        if metrics is not None:
+            metrics.count("parsed", source=source)
         if not _field_ok(n["field_tags"]):
+            if metrics is not None:
+                metrics.reject("field_filter", source=source, stage="filter")
             continue
         if not _term_ok(n["season"], n["year"]):
+            if metrics is not None:
+                metrics.reject("term_filter", source=source, stage="filter")
             continue
         if not n["geo"]["in_region"]:   # anywhere in the US, or US-remote
+            if metrics is not None:
+                metrics.reject("outside_region", source=source, stage="filter")
             continue
         normalized.append(n)
+        if metrics is not None:
+            metrics.count("accepted", source=source)
 
     merged = merge_batch(normalized)
+    if metrics is not None:
+        metrics.count("unique", len(merged))
     stats = {"raw": len(raw_items), "kept": len(normalized), "unique": len(merged),
              "new": 0, "updated": 0, "closed": 0}
 
@@ -99,25 +144,35 @@ def run(raw_items: list[dict], *, verbose=True) -> dict:
             row.relevance_score = round(sum(row.score_parts.values()), 1)
             db.flush()
             # source links
-            existing = {sl.source for sl in row.source_links}
+            existing = {sl.source: sl for sl in row.source_links}
             for s, url in it["_sources"]:
                 if s not in existing:
-                    db.add(SourceLink(listing_id=row.id, source=s, source_url=url))
-                    existing.add(s)
+                    link = SourceLink(listing_id=row.id, source=s, source_url=url, seen_at=now)
+                    db.add(link)
+                    existing[s] = link
+                else:
+                    existing[s].seen_at = now
+                    if url:
+                        existing[s].source_url = url
             if row.application is None:
                 db.add(Application(listing_id=row.id, state="none"))
 
-        # close listings no longer seen from the sources we just ran
-        run_sources = {s for it in merged.values() for s, _ in it["_sources"]}
-        if run_sources:
+        # A successful board on an ATS says nothing about its failed neighbors.
+        # Nor does a missing search result mean the employer removed a posting.
+        if completed_boards:
             for row in db.scalars(select(Listing).where(Listing.status == "open")):
                 if row.dedupe_key in seen_keys:
                     continue
-                row_sources = {sl.source for sl in row.source_links}
-                if row_sources and row_sources.issubset(run_sources):
+                if any(_canon_job(url) in seen_urls for url in
+                       [row.apply_url] + [sl.source_url for sl in row.source_links] if url):
+                    continue  # fetched but rejected/changed metadata is not proof of absence
+                row_boards = _listing_boards(row)
+                if row_boards and row_boards.issubset(completed_boards):
                     row.status = "closed"
                     stats["closed"] += 1
         db.commit()
+    if metrics is not None:
+        metrics.count("persisted", len(merged))
 
     if verbose:
         print(f"[pipeline] {stats}; {placed} bare town names placed by their board")

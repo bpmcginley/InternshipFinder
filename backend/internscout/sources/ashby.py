@@ -43,4 +43,10 @@ def parse_ashby(payload: dict, co: dict) -> list[dict]:
 def fetch_ashby_board(c, co: dict) -> list[dict]:
     resp = c.get(URL.format(token=co["ats_token"]))
     resp.raise_for_status()
-    return parse_ashby(resp.json(), co)
+    payload = resp.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list) or not all(
+            isinstance(job, dict) for job in payload["jobs"]):
+        raise ValueError("Ashby response is missing its complete jobs list")
+    items = parse_ashby(payload, co)
+    co["_scan_complete"] = True
+    return items

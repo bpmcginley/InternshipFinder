@@ -11,6 +11,7 @@ import os
 import httpx
 from .base import client
 from ..config import DATA_DIR
+from ..us_metros import metro_searches
 
 # Errors are logged by status or type only: httpx puts the request URL in the message, and that URL
 # carries api_key. GitHub masks the secret in Actions logs, but a local run's log would not.
@@ -47,9 +48,20 @@ def searched_on() -> str | None:
         return None
 
 
-def mark_searched(day: str) -> None:
+def search_state() -> dict:
+    try:
+        with open(DAY_PATH, encoding="utf-8") as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def mark_searched(day: str, **updates) -> None:
+    state = search_state()
+    state.update(day=day, **updates)
     with open(DAY_PATH, "w", encoding="utf-8", newline="\n") as f:
-        json.dump({"day": day}, f)
+        json.dump(state, f)
         f.write("\n")
 
 
@@ -61,7 +73,8 @@ def is_daily_run(today: str) -> bool:
 
 def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
                       max_searches: int | None = None, focus_queries: list[str] | None = None,
-                      focus_searches: int = 0, fixed: list[tuple[str, str]] | None = None) -> list[dict]:
+                      focus_searches: int = 0, fixed: list[tuple[str, str]] | None = None,
+                      nationwide: bool = False) -> list[dict]:
     """Query Google Jobs. Stays inside the SerpApi quota by capping searches per run and
     rotating which queries are used (day-based offset), so all disciplines get covered
     across runs instead of always hitting the same few."""
@@ -105,6 +118,15 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     # location per run, so a field with five queries in the list came up about one day in six;
     # these run every day, each on a different metro, before the main plan spends the rest.
     # (query, location) pairs searched every day, first, out of the same budget: config.GOOGLE_JOBS_FIXED.
+    # Reserve nationwide slots before fixed/focus searches, even on a small plan.
+    # Existing scheduled fixed searches remain inside the same account budget.
+    cursor = search_state().get("metro_cursor", 0)
+    if not isinstance(cursor, int) or cursor < 0:
+        cursor = 0
+    requested = max(1, int(os.environ.get("SERPAPI_US_METRO_SEARCHES", "2")))
+    slots = min(requested, max(1, max_searches - len(fixed or []))) if nationwide else 0
+    national = metro_searches(cursor, slots)
+    max_searches -= len(national)
     daily = list(fixed or [])[:max_searches]
     max_searches -= len(daily)
     focus: list[tuple[str, str]] = []
@@ -121,13 +143,17 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     start = (turn * per_loc) % max(1, len(queries))
     rotated = queries[start:] + queries[:start]
     picked = rotated[:per_loc]
-    pairs = daily + focus + [(q, loc) for loc in locations for q in picked][:max(0, max_searches)]
-    print(f"[google_jobs] {len(daily)} daily, {len(focus)} focus search(es), then {len(picked)} quer(ies) x "
+    pairs = [(q, loc, cbsa) for q, loc, cbsa in national]
+    pairs += [(q, loc, None) for q, loc in daily + focus + [(q, loc) for loc in locations for q in picked][:max(0, max_searches)]]
+    print(f"[google_jobs] {len(national)} top-50 metro, {len(daily)} daily, {len(focus)} focus search(es), then {len(picked)} quer(ies) x "
           f"{len(locations)} location(s) (cap {max_searches})")
     out: list[dict] = []
     seen = set()
     with client() as c:
-        for q, loc in pairs:   # already capped at the day's budget
+        metro_failed = False
+        for q, loc, cbsa in pairs:   # already capped at the day's budget
+            if cbsa and metro_failed:
+                continue  # retry this metro next run; don't advance over a failed city
             params = {"engine": "google_jobs", "q": q, "location": loc, "hl": "en", "api_key": api_key}
             if loc.endswith(", Canada"):
                 # Google's Canadian results (2026-10-01): without it a Toronto search leans on US postings.
@@ -142,10 +168,26 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
                     print(f"[google_jobs] '{q}' @ {loc} timed out; asking once more")
                     r = c.get(URL, params=params, timeout=SEARCH_TIMEOUT)
                 r.raise_for_status()
-                for j in r.json().get("jobs_results", []):
+                payload = r.json()
+                results = payload.get("jobs_results")
+                # SerpApi reports valid empty searches with an explicit message.
+                empty = payload.get("error") == "Google hasn't returned any results for this query."
+                if not isinstance(results, list) and not empty:
+                    raise ValueError("invalid jobs response")
+                if cbsa:
+                    cursor += 1
+                    completed = search_state().get("metro_last_success", {})
+                    if not isinstance(completed, dict):
+                        completed = {}
+                    completed[cbsa] = today
+                    mark_searched(today, metro_cursor=cursor, metro_last_success=completed)
+                for j in results or []:
                     opts = j.get("apply_options") or []
                     link = (opts[0].get("link") if opts else None) or j.get("share_link")
-                    key = (j.get("company_name", ""), j.get("title", ""))
+                    # Same employer/title can represent distinct requisitions or
+                    # offices in different metro searches; preserve that evidence.
+                    key = (j.get("company_name", ""), j.get("title", ""),
+                           j.get("location") or loc, link)
                     if key in seen:
                         continue
                     seen.add(key)
@@ -162,10 +204,12 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
                         "source_url": link,
                     })
             except httpx.HTTPStatusError as e:
+                metro_failed = metro_failed or bool(cbsa)
                 print(f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}")
                 if e.response.status_code == 429:   # quota gone: the rest will fail the same way
                     print("[google_jobs] out of searches; stopping for this run")
                     return out
             except Exception as e:
+                metro_failed = metro_failed or bool(cbsa)
                 print(f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}")
     return out

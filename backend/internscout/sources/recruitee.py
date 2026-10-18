@@ -41,4 +41,10 @@ def fetch_recruitee_board(c, co: dict) -> list[dict]:
                    co["ats_token"])
     r = c.get(URL.format(token=co["ats_token"]))
     r.raise_for_status()
-    return parse_recruitee(r.json(), co)
+    payload = r.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("offers"), list) or not all(
+            isinstance(job, dict) for job in payload["offers"]):
+        raise ValueError("Recruitee response is missing its complete offers list")
+    items = parse_recruitee(payload, co)
+    co["_scan_complete"] = True
+    return items

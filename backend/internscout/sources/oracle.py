@@ -1,5 +1,5 @@
 """Oracle Recruiting Cloud (HCM) candidate-experience API. Token: "host|site",
-e.g. "jpmc.fa.oraclecloud.com|CX_1001". Searched server-side for "intern".
+e.g. "jpmc.fa.oraclecloud.com|CX_1001". Searched server-side for student-role terms.
 
 The list payload has description fields on it, but on most tenants they are present and empty:
 ShortDescriptionStr is an optional teaser an employer may never have filled in, and the two
@@ -7,10 +7,9 @@ External* fields only carry text on the requisition itself. Measured across the 
 the most listings, 11 of 250 postings had any text on the list at all, which is why four in five
 Oracle listings in the baseline states reached the dashboard with nothing to classify or read.
 
-The requisition call fills them in. It is the same public API, needs no key, and answers in about
-half a second. It is gated like Greenhouse's and Workday's - only for postings that might be
-somewhere a student asked for, and capped per board - so at 16 boards in parallel even the worst
-case, every one of the 122 tenants hitting the cap, is under two minutes.
+The requisition call fills them in. It is the same public API and needs no key. It is gated like
+Greenhouse's and Workday's - only for postings that might be somewhere a student asked for, and
+capped per board. Query expansion does not increase that detail-call cap.
 
 CorporateDescriptionStr is left out for the same reason SmartRecruiters' companyDescription is:
 it is the same employer boilerplate on every requisition, and it would crowd the real description
@@ -24,10 +23,11 @@ from ..region import maybe_in_region
 API = ("https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true"
        "&expand=requisitionList.secondaryLocations"
        "&finder=findReqs;siteNumber={site},keyword={keyword},limit={limit},offset={offset},sortBy=POSTING_DATES_DESC")
-# Hospitals title student jobs without "intern": Northwell's "Nursing Student Technician" is found
-# only by keyword=student (checked live 2026-09-18: 31 results, one page). Same rule as
-# workday.EXTRA_SEARCH, and only for these sectors, so other tenants cost what they did before.
-EXTRA_KEYWORDS = {"health": ("student",), "behavioral_health": ("student",)}
+# Separate searches avoid losing co-ops and student jobs behind noisy "intern" results. A bounded
+# Stantec check on 2026-10-16 returned 802 "intern" matches (over our 600-result cap), versus 104
+# "co-op" and 112 "student" matches. French stagiaire titles are accepted by the classifier too.
+# Keep the per-keyword pagination cap and deduplicate requisition IDs across all four searches.
+KEYWORDS = ("intern", "co-op", "student", "stagiaire")
 # The id has to arrive quoted, and ById is the only finder this resource accepts - requisitionId,
 # the name the docs use elsewhere, is rejected as an invalid finder rather than ignored.
 DETAIL = ("https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?onlyData=true"
@@ -49,7 +49,16 @@ def parse_oracle(payload: dict, co: dict, host: str, site: str) -> tuple[list[di
             continue
         sec = r.get("secondaryLocations") or []
         places = [(r.get("PrimaryLocation"), r.get("PrimaryLocationCountry"))] + [(s.get("Name"), s.get("CountryCode")) for s in sec]
-        locs = [n.replace(", United States", "") for n, cc in places if n and cc == "US"]
+        locs = []
+        for name, country in places:
+            if not name:
+                continue
+            if country == "US":
+                locs.append(name.replace(", United States", ""))
+            elif country == "CA":
+                # The explicit country prevents ambiguous names (London, Victoria) and
+                # the ISO country code CA from being interpreted as US locations.
+                locs.append(name if "canada" in name.lower() else f"{name}, Canada")
         if not locs:
             continue
         it = board_item(co, source="oracle", title=title, locations=locs,
@@ -73,7 +82,7 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
                    "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
                    co["ats_token"])
     out, seen = [], set()
-    for keyword in ("intern",) + EXTRA_KEYWORDS.get(co.get("sector"), ()):
+    for keyword in KEYWORDS:
         offset = 0
         while offset < MAX_OFFSET:
             r = c.get(API.format(host=host, site=site, keyword=keyword, limit=PAGE, offset=offset))

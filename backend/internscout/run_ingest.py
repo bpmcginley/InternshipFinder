@@ -9,6 +9,7 @@ Usage:
 """
 from __future__ import annotations
 import argparse
+import os
 import time
 import httpx
 from collections import Counter
@@ -25,6 +26,7 @@ from .discover import (load_registry, save_registry, seed_registry, discover, bo
 from .probe import probe_boards
 from .geo import save_cache
 from .pipeline import run
+from .ingest_metrics import IngestMetrics
 
 
 # A board that fails the way a busy server fails - 429, a 5xx, a timeout, a dropped connection -
@@ -63,6 +65,21 @@ def _transient(e: Exception) -> bool:
                           httpx.ConnectError, httpx.NetworkError))
 
 
+class BoardItems(list):
+    """List-compatible fetch result with explicit authoritative-scan evidence."""
+    def __init__(self, items, *, complete=False):
+        super().__init__(items)
+        self.complete = complete
+
+
+def _fetch_board(c, ats, co):
+    # The adapter opts in only after validating its entire list response. A plain
+    # list (including []) is not enough: paginated adapters may stop at a cap.
+    co.pop("_scan_complete", None)
+    items = BOARD_FETCHERS[ats](c, co)
+    return BoardItems(items, complete=co.get("_scan_complete") is True)
+
+
 def _fetch_boards(c, jobs: list, workers: int) -> dict:
     """(ats, token) -> the board's items, or the exception it raised."""
     groups: dict = {}
@@ -74,7 +91,7 @@ def _fetch_boards(c, jobs: list, workers: int) -> dict:
             ex = ThreadPoolExecutor(max_workers=min(workers, ATS_WORKERS[key]) if key else workers)
             pools.append(ex)
             for ats, tok, co in js:
-                futs[ex.submit(BOARD_FETCHERS[ats], c, co)] = (ats, tok)
+                futs[ex.submit(_fetch_board, c, ats, co)] = (ats, tok)
         for f in as_completed(futs):
             try:
                 res[futs[f]] = f.result()
@@ -88,7 +105,7 @@ def _fetch_boards(c, jobs: list, workers: int) -> dict:
 
 # was: def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -> list[dict]:
 def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
-                systemic_guard: bool = True) -> list[dict]:
+                systemic_guard: bool = True, completed_boards: set | None = None, metrics=None) -> list[dict]:
     """Fetch every registered board in parallel; records success/failure in the registry.
 
     systemic_guard=False is for scripts/verify_registry.py's second look, which is handed only the
@@ -126,16 +143,24 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
         systemic = set()
     for (ats, tok), r in res.items():
         if isinstance(r, RobotsDisallowed):
+            if metrics is not None:
+                metrics.board_result(ats, tok, "blocked", cause="robots")
             # Not a failure to report as one, but the board still has to leave the registry, and
             # (was: record_result, four days of asking again) the employer's answer will not change
             # by tomorrow, so it leaves now and stays out (discover.KEEP_OUT).
             record_closed(reg, ats, tok)
         elif isinstance(r, Exception):
+            if metrics is not None:
+                metrics.board_result(ats, tok, "failed", cause=_cause(r))
             # was: if ats not in systemic:
             if ats not in systemic and (systemic_guard or not _transient(r)):
                 record_result(reg, ats, tok, False)
         else:
+            if metrics is not None:
+                metrics.board_result(ats, tok, "success", count=len(r))
             record_result(reg, ats, tok, True)
+            if completed_boards is not None and getattr(r, "complete", False):
+                completed_boards.add((ats, tok))
             out += r
             per_ats[ats] += len(r)
     if verbose:
@@ -160,9 +185,12 @@ def main():
     ap.add_argument("--source", default="vanshb03")
     ap.add_argument("--export", metavar="DIR", help="also write static JSON for GitHub Pages")
     ap.add_argument("--workers", type=int, default=FETCH_WORKERS)
+    ap.add_argument("--metrics", metavar="PATH", help="write ingestion counts (defaults to export directory when exporting)")
     args = ap.parse_args()
 
+    metrics = IngestMetrics()
     raw: list[dict] = []
+    completed_boards: set[tuple[str, str]] = set()
     if args.fixture:
         raw += parse_fixture(args.fixture, source=args.source)
     else:
@@ -184,7 +212,8 @@ def main():
                                       focus_searches=GOOGLE_JOBS_FOCUS_SEARCHES,
                                       # was: fixed=GOOGLE_JOBS_FIXED. Today's Canadian metro search
                                       # (2026-10-01) runs every day beside it, from the same budget.
-                                      fixed=GOOGLE_JOBS_FIXED + canada_searches(date.today().toordinal()))
+                                      fixed=GOOGLE_JOBS_FIXED + canada_searches(date.today().toordinal()),
+                                      nationwide=True)
             found += discover(reg, items)
             raw += items
         if raw:
@@ -192,7 +221,7 @@ def main():
             found += probed
             print(f"[probe] +{probed} boards guessed from company names", flush=True)
         if args.ats or do_all:
-            raw += scan_boards(reg, args.workers)
+            raw += scan_boards(reg, args.workers, completed_boards=completed_boards, metrics=metrics)
         if args.public or do_all:  # government feeds: no ATS boards to discover from these
             # was: fetch_usajobs() + fetch_nyc_jobs(). UHN is one employer's own site, read the same way.
             raw += fetch_usajobs() + fetch_nyc_jobs() + fetch_uhn()
@@ -208,11 +237,15 @@ def main():
               f"{labelled} listings labelled from their board; "
               f"{ {a: len(b) for a, b in reg.items()} }")
 
-    run(raw)
+    run(raw, completed_boards=completed_boards, metrics=metrics)
     save_cache()
     if args.export:
         from .export_static import export
-        export(args.export)
+        exported = export(args.export)
+        metrics.export_result(exported["total"], open_count=exported["open"], held=exported["held"])
+    metrics_path = args.metrics or (os.path.join(args.export, "ingest-report.json") if args.export else None)
+    if metrics_path:
+        metrics.write(metrics_path)
 
 
 if __name__ == "__main__":
