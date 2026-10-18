@@ -3465,6 +3465,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "d2l": {
+   "name": "D2l",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-18"
+  },
   "darkwolfsolutions": {
    "name": "Dark Wolf Solutions",
    "quant": false,
@@ -6441,13 +6447,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "visiersolutionsinc": {
-   "name": "Visier Solutions",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-17"
   },
   "vixxo": {
    "name": "Vixxo",
@@ -10333,8 +10332,9 @@
   "hcbo.fa.us2.oraclecloud.com|CX_1": {
    "name": "Cohu",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-10-18"
   },
   "hccz.fa.em3.oraclecloud.com|CX_2": {
    "name": "Pearson",
@@ -10376,8 +10376,9 @@
   "hctz.fa.us2.oraclecloud.com|CX_1001": {
    "name": "onsemi",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-10-18"
   },
   "hcut.fa.ap2.oraclecloud.com|CX_1": {
    "name": "APL Logistics",
@@ -10480,8 +10481,9 @@
   "jpmc.fa.oraclecloud.com|CX_1001": {
    "name": "JPMorgan Chase",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-10-18"
   }
  },
  "recruitee": {
@@ -12790,8 +12792,9 @@
   "bmo|wd3|External": {
    "name": "Bank of Montreal",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-10-18"
   },
   "bnl|wd1|externa": {
    "name": "Brookhaven Lab",
