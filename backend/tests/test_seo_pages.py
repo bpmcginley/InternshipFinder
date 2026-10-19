@@ -2052,7 +2052,8 @@ def test_t7_the_box_markup(tmp_path, monkeypatch):
     files = _main_into(tmp_path, "one", [_pl()])
     text = files["internships/at/tie-co/index.html"].decode()
     box = _box(text)
-    assert box.startswith('<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">')
+    # was: '<li class="paid" data-nosnippet aria-label=...'; the placement id for js/count.js since 2026-10-14 (S9).
+    assert box.startswith(f'<li class="paid" data-placement="{_pl()["id"]}" data-nosnippet aria-label="Paid listing, not part of this page\'s list">')
     assert '<p class="paid-h">Paid listing <a href="/privacy.html#paid-listings">Why am I seeing this?</a></p>' in box
     assert '<div class="co"><span class="ad">Ad</span> Tie Co</div>' in box          # "Ad" before the company
     assert '<div class="role">Mechanical Intern 5</div>' in box

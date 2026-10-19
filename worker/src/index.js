@@ -13,7 +13,8 @@ import { countEvent, countHit } from "./visits.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
-  livePlacements, pausePlacement, refusePlacement, requireAdmin, switchOn, updatePlacement } from "./placements.js";
+  livePlacements, pausePlacement, placementReport, refusePlacement, requireAdmin, rollupPlacementCounts, switchOn,
+  updatePlacement } from "./placements.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -354,6 +355,12 @@ async function route(request, env, ctx, d) {
       return json(await listLeads(db));
     }
 
+    // The employer report (S9): one placement, one ended month, rounded counts only (placements.js).
+    case "POST /admin/placements/report": {
+      await requireAdmin(request, env);
+      const { body } = await readJson(request, MAX_ADMIN_BYTES);
+      return json({ report: await placementReport(db, body, now) });
+    }
     case "POST /admin/placements":
     case "POST /admin/placements/update":
     case "POST /admin/placements/check":
@@ -414,7 +421,9 @@ export default {
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
     //   dropOldLeads(env.DB, now)]));
     // endExpiredPlacements (2026-10-14): placements whose end day has come (placements.js).
+    // rollupPlacementCounts (2026-10-14, S9): daily paid-listing counts older than 400 days become monthly rows.
+    // was: ctx.waitUntil(Promise.all([..., dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now)]));
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
-      dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now)]));
+      dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now), rollupPlacementCounts(env.DB, now)]));
   },
 };

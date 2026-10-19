@@ -116,8 +116,10 @@
     <!-- Still October 13, 2026: the employer interest form (#employers, docs/employers/index.html) was
          added the same day, so the date stands for both changes. -->
     <!-- was: <p class="meta">Last updated October 13, 2026</p>  (the paid listings section, #paid-listings,
-         and the remembered posting's three-day deletion, added 2026-10-14) -->
-    <p class="meta">Last updated October 14, 2026</p>
+         and the remembered posting's three-day deletion, added 2026-10-14; then paid listings on the dashboard and their
+         counts, added with the launch PR, S8 and S9: set this to the day it is merged) -->
+    <!-- was: <p class="meta">Last updated October 14, 2026</p>  (the paid listings section, live with the employer terms on 2026-10-19) -->
+    <p class="meta">Last updated October 19, 2026</p>
     <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
          the whole product "free" without qualification is no longer true. Search still is. -->
     <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
@@ -162,6 +164,8 @@
         <!-- Added 2026-10-13 with the employer page. Its form is the one place InternScout's own server keeps
              a name and an email address, so the short version says so. -->
         <li>If you're an employer and fill in the interest form on <a href="/employers/">internscout.org/employers</a>, we keep what you type there, for up to a year, only to contact you about InternScout for employers. <a href="#employers">Details below</a>.</li>
+        <!-- Added with paid listings (S8, 2026-10-14). -->
+        <li>Some searches and pages show one paid listing, in its own box headed "Paid listing" with "Ad" before the company name. An employer paid for that box. It only ever shows a role that already matches what you searched for or picked, it doesn't change how any listing is ranked, scored or filtered, and it is never chosen from your profile or anything else about you. <a href="#paid-listings">Details below</a>.</li>
         <li>We never see your password.</li>
         <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
              The invite records Delete my data keeps (see #delete) are part of what "it" covers, so the
@@ -194,7 +198,7 @@
       <!-- was: ... Delete my data clears it. If the extension ...
            The one-time invite suggestion (docs/js/core.js INVITE_NUDGE_KEY) added 2026-10-02. -->
       <!-- was (2026-10-14): the same item without the remembered posting and the sign-in offer. -->
-      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it. Once the dashboard has suggested inviting a classmate, it also keeps the date, or that you waved it off or opened your link, so the suggestion appears only once; that is never sent to us. If you hide the dashboard's suggestion to review the extension, it keeps that one setting so the suggestion stays hidden; that is never sent to us either. Once the dashboard has shown its one suggestion to get the weekly email, it keeps that it was shown, dismissed or opened, so it appears only once; that is never sent to us. After you open a posting, the site may suggest the Auto-Apply extension once per browser session; your browser keeps that it was shown for the session, and the date if you dismiss it, so it stays away for 14 days. Neither is sent to us. If you press that suggestion's add-to-Chrome link, or a page's "Auto-Apply this" link, your browser also keeps which posting it was (its link, company and title) so the extension can offer to Auto-Apply it once it is set up. The extension removes it when it reads it. If it hasn't after three days, the site deletes it the next time you open the dashboard or one of its internship pages. It is not sent to us. If the extension is installed, the dashboard also hands it your profile, and the extension saves that with your Deep Dive (see <a href="#saved">below</a>). If you are signed in on the dashboard but not in the extension, the dashboard also offers the extension that sign-in; the extension checks it with our server and uses it only if you press "Use my dashboard sign-in" in the extension. Pressing it gets the extension its own sign-in for the same account from our server, so signing out of the dashboard or the extension leaves the other signed in.</li>
+      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it. Once the dashboard has suggested inviting a classmate, it also keeps the date, or that you waved it off or opened your link, so the suggestion appears only once; that is never sent to us. If you hide the dashboard's suggestion to review the extension, it keeps that one setting so the suggestion stays hidden; that is never sent to us either. Once the dashboard has shown its one suggestion to get the weekly email, it keeps that it was shown, dismissed or opened, so it appears only once; that is never sent to us. After you open a posting, the site may suggest the Auto-Apply extension once per browser session; your browser keeps that it was shown for the session, and the date if you dismiss it, so it stays away for 14 days. Neither is sent to us. If you press that suggestion's add-to-Chrome link, or a page's "Auto-Apply this" link, your browser also keeps which posting it was (its link, company and title) so the extension can offer to Auto-Apply it once it is set up. The extension removes it when it reads it. If it hasn't after three days, the site deletes it the next time you open the dashboard or one of its internship pages. It is not sent to us. If the extension is installed, the dashboard also hands it your profile, and the extension saves that with your Deep Dive (see <a href="#saved">below</a>). If you are signed in on the dashboard but not in the extension, the dashboard also offers the extension that sign-in; the extension checks it with our server and uses it only if you press "Use my dashboard sign-in" in the extension. Pressing it gets the extension its own sign-in for the same account from our server, so signing out of the dashboard or the extension leaves the other signed in. If you hide paid listings, or hide the notice that they started, your browser keeps that one setting so they stay hidden; neither is sent to us.</li>
       <li>When you sign in, the dashboard keeps your sign-in in local storage too: a random sign-in code, a short account ID, and your email address, only so it can show which account is signed in. It stays until you sign out, press Delete my data, or the sign-in ends.</li>
       <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
       <!-- was: "...loads fonts and code libraries from public servers (such as Google Fonts)." The fonts are
@@ -225,7 +229,7 @@
       <!-- 2026-10-13: "apply_offer_shown" and "apply_offer_click" (docs/js/offer.js), the Auto-Apply
            suggestion shown after opening a posting and its store link pressed, joined the same totals.
            was: ... pressing a link to review the extension there, opening a posting, sending the weekly email's ... -->
-      <li>Because Cloudflare only samples visits, our own server also counts them. Each page load sends the page's address, the name of the site that linked to it (such as google.com, not the full link) and any campaign tag on the link. We keep only daily totals by kind of page and where visits came from, for example "landing pages, from search: 12". The same way, we count how many times a day a few steps happen (pressing a link to the Chrome Web Store, pressing a link to review the extension there, opening a posting, seeing or pressing the "Add to Chrome" suggestion that can appear after you open one, seeing a weekly email invitation, pressing its link or sending its sign-up form (only the invitation's position and that it was seen, pressed or sent, never the address you typed or whether you confirmed), our server seeing an account for the first time, signing in on the site or in the extension, saving a first profile, starting Auto-Apply, a first Auto-Apply of the month, reaching a monthly limit, opening your invite link, opening a plan's checkout, buying a plan), as totals that say nothing about who. Your IP address is seen only to stop floods of fake visits; it's held in memory for a minute and never saved. If you open any page with <code>?nocount=1</code> at the end of its address, your browser keeps one setting that turns this counting off for it; <code>?nocount=0</code> turns it back on.</li>
+      <li>Because Cloudflare only samples visits, our own server also counts them. Each page load sends the page's address, the name of the site that linked to it (such as google.com, not the full link) and any campaign tag on the link. We keep only daily totals by kind of page and where visits came from, for example "landing pages, from search: 12". The same way, we count how many times a day a few steps happen (pressing a link to the Chrome Web Store, pressing a link to review the extension there, opening a posting, seeing or pressing the "Add to Chrome" suggestion that can appear after you open one, seeing a weekly email invitation, pressing its link or sending its sign-up form (only the invitation's position and that it was seen, pressed or sent, never the address you typed or whether you confirmed), our server seeing an account for the first time, signing in on the site or in the extension, saving a first profile, starting Auto-Apply, a first Auto-Apply of the month, reaching a monthly limit, opening your invite link, opening a plan's checkout, buying a plan), as totals that say nothing about who. We count <a href="#paid-listings">paid listings</a> the same way: how many times a day each one was shown and opened, by kind of page, and nothing else. Your IP address is seen only to stop floods of fake visits; it's held in memory for a minute and never saved. If you open any page with <code>?nocount=1</code> at the end of its address, your browser keeps one setting that turns this counting off for it; <code>?nocount=0</code> turns it back on.</li>
       <li>We don't use ad trackers, and we set no cookies of our own.</li>
     </ul>
 
@@ -432,14 +436,16 @@
          2026-10-04: worker/src/limits.js cleanup() now keeps run_hist (schema.sql) when it deletes a
          past month's runs: a count of runs per month, task and calls bucket, with no account in it.
          The table is introduced as the complete list, so the one new service-wide figure is named. -->
-    <p>Separately from the table, we keep running totals of what AI costs the whole service: one for the month across the whole service, and one for the day's free-allowance share, so a single busy day can't empty the month's budget. When a month's per-run counts are deleted, we keep how many runs of each AI task that month took 1, 2, 3 to 4 and so on AI calls, counted across the whole service. None of these is linked to any account, and none says anything about who used what.</p>
+    <p>Separately from the table, we keep running totals of what AI costs the whole service: one for the month across the whole service, and one for the day's free-allowance share, so a single busy day can't empty the month's budget. When a month's per-run counts are deleted, we keep how many runs of each AI task that month took 1, 2, 3 to 4 and so on AI calls, counted across the whole service. None of these is linked to any account, and none says anything about who used what. The same goes for the daily totals of how often each paid listing was shown and opened (see <a href="#paid-listings">Paid listings</a>).</p>
     <!-- was: <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
          The saved Deep Dive (2026-09-26) has the student's name and contact email in it, so the flat
          "names, emails" no longer holds without naming that one exception. -->
     <!-- was: <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
          The employer interest form (2026-10-13) keeps a name and a work email in worker/schema.sql
          `employer_leads`, so it is named as the second exception. -->
-    <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), and what an employer sends us through the <a href="#employers">employer interest form</a>, we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+    <!-- was: <p>Apart from ... we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+         Paid listings (S8, 2026-10-14) are advertising, so "we don't show ads" stopped being true the day the first one went live. -->
+    <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), and what an employer sends us through the <a href="#employers">employer interest form</a>, we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data. The only paid content on InternScout is the labelled paid listing described under <a href="#paid-listings">Paid listings</a>, and it is never chosen from data about you.</p>
     <!-- The weekly email adds nothing to the table above: the form posts from the browser straight to
          Buttondown and never touches the Worker. This line is here so "we don't store emails" isn't
          read as "no one keeps the address you gave for the email". -->
@@ -495,7 +501,9 @@
          row holds, that no IP address is in it, the salted-hash day counter in `rate` (swept by
          limits.js cleanup() two days on), and dropOldLeads(), which deletes rows older than 365 days. -->
     <h2 id="employers">If you fill in the employer interest form</h2>
-    <p>The form on <a href="/employers/">internscout.org/employers</a> is for companies that might want featured listings or promoted roles later. Students never see it or need it, and nothing on it is sold or paid for.</p>
+    <!-- was: <p>The form on <a href="/employers/">internscout.org/employers</a> is for companies that might want featured listings or promoted roles later. Students never see it or need it, and nothing on it is sold or paid for.</p>
+         Changed with paid listings (S8, 2026-10-14): the form now leads to something that is sold. -->
+    <p>The form on <a href="/employers/">internscout.org/employers</a> is for companies that want to ask about a <a href="#paid-listings">paid listing</a>, or to have their job board added or their details corrected, which is free. Students never see it or need it. Sending it costs nothing and commits no one to anything.</p>
     <ul>
       <li><strong>What we keep:</strong> what you type into the form (your name, work email and company, and, if you fill them in, your role or title, who you're hiring for, the boxes you tick and your message), and when you sent it. It is stored on InternScout's server (a Cloudflare database). Your IP address is not kept with it.</li>
       <li><strong>Why:</strong> only so the person running InternScout can read it and contact you about InternScout for employers. It isn't added to the weekly email, sold, shared, or used for anything else.</li>
@@ -508,12 +516,28 @@
          (placement_box, add_paid_boxes), and docs/js/count.js, which leaves clicks inside li.paid out of
          posting_click (2026-10-14). The paid box's "Why am I seeing this?" link points here. -->
     <h2 id="paid-listings">Paid listings</h2>
-    <p>Some internship pages can show one box headed "Paid listing", with "Ad" before the company name. It means an employer paid InternScout to show that role in that spot.</p>
+    <!-- was: <p>Some internship pages can show one box headed "Paid listing", ...</p>
+         The dashboard shows the box too since the launch PR (S8, 2026-10-14; docs/js/placements.js pick, PaidBox). -->
+    <p>Some internship pages, and the dashboard after you search or pick a field, can show one box headed "Paid listing", with "Ad" before the company name. It means the employer has a business arrangement with InternScout to show that role in that spot: it paid, or it is trying paid listings in a free pilot.</p>
     <ul>
       <li><strong>Only roles already listed:</strong> the box always points at a role InternScout already found on the employer's own job site, and the same role is also in the page's normal list. Paying can't add a listing or change one.</li>
       <li><strong>Nothing else changes:</strong> paying never changes match scores, the order of the list, filters, counts or what Auto-Apply does.</li>
       <li><strong>At most one per page,</strong> and it goes away on its end date. A box is dropped if the role closes, its deadline passes, its link changes, or it says it is unpaid (unless the employer is a nonprofit or government body).</li>
-      <li><strong>Nothing about you goes to the employer:</strong> "Open posting" goes straight to the employer's own posting, like any other link on the page. We don't count who sees the box or opens it.</li>
+      <!-- was: ... like any other link on the page. We don't count who sees the box or opens it.</li>
+           S9 (2026-10-14) counts how many times each box is shown and opened (docs/js/count.js,
+           worker/src/visits.js countPlacementHit), never who, so the sentence now says both. -->
+      <li><strong>Nothing about you goes to the employer:</strong> "Open posting" goes straight to the employer's own posting, like any other link on the page. We count how many times the box is shown and opened, never who saw or opened it (see below).</li>
+      <!-- Added with the launch PR (S8 and S9, 2026-10-14; B1-data-privacy.md section 7.1.f). Facts from
+           docs/js/placements.js (pick, PaidBox), docs/js/count.js and worker/src/placements.js
+           (placementReport, rollupPlacementCounts) and visits.js. -->
+      <li><strong>When it shows on the dashboard:</strong> only after you search for something or pick a field, and only for a role that is already in your results (when you search, among the 50 closest matches). If more than one could show, each has the same chance; the price never decides.</li>
+      <li><strong>It isn't chosen from your data:</strong> which paid listing you see depends only on what you searched for or picked and the page you're on. It is never chosen using your majors, class year, saved or applied listings, Deep Dive, sign-in, plan, or anything in the extension. The extension never shows paid listings.</li>
+      <li><strong>Your saved profile can only hide one.</strong> If you have saved a profile on the dashboard, the dashboard uses it, inside your browser, to hide a paid listing that doesn't fit you (your class year, citizenship, eligibility or season). It is never used to pick one, and it never leaves your browser.</li>
+      <li><strong>You can hide them:</strong> press "Hide paid listings" in the dashboard's box, or turn off "Show paid listings" under More filters. Your browser keeps that one setting, and it is never sent to us.</li>
+      <li><strong>What we count:</strong> how many times a day each paid listing was shown (at least half of its box on your screen, once per page load) and opened (its "Open posting" link pressed, once per page load), by kind of page: the dashboard or our internship pages. Your browser sends only the paid listing's id and the address of the page. These are totals that say nothing about who. Opening a page with <code>?nocount=1</code> turns this off too.</li>
+      <li><strong>What the employer gets:</strong> those totals, for a whole calendar month once it has ended, rounded down to the nearest 10. Any number under 10 is shown as "fewer than 10", and the totals are split by kind of page only when every number in the split is 10 or more. Employers never get anything about any student. We don't see applications, so we can't tell them who applied or how many did.</li>
+      <li><strong>What we keep about a paid listing:</strong> which listing it is, the employer's name, its dates, whether it is on, and the totals above. Nothing about any student. Daily totals are kept for 400 days, then combined into one total per month.</li>
+      <li>No ad network, tracking pixel or cookie is involved. A paid listing is an ad, not a recommendation: check it the same way as any other posting.</li>
     </ul>
 
     <h2 id="delete">Delete your data</h2>
@@ -542,7 +566,8 @@
       <!-- was: <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker), or where the law requires.</li> -->
       <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker, and your Deep Dive profile to your own InternScout account unless you turn that off), or where the law requires.</li>
       <li>Data is never sold.</li>
-      <li>Data is never used for ads, including personalized ads.</li>
+      <!-- was: <li>Data is never used for ads, including personalized ads.</li> -->
+      <li>Data is never used for ads, including personalized ads. The extension never shows paid listings, and nothing in it is used to choose the ones the website shows.</li>
       <li>Data is never used to decide credit, lending or anything like it.</li>
       <li>No person reads your data, unless you give clear permission (for example, you paste it into a bug report), it's needed for security, or the law requires it.</li>
     </ul>
@@ -553,8 +578,9 @@
     <h2>Children</h2>
     <p>InternScout is built for college students. It isn't meant for anyone under 13. If you're under
       18, a parent or guardian has to agree to the <a href="terms.html">terms</a> with you before you
-      start a paid plan. If you believe a child under 13 has given us data, write to us at the address
-      below and we'll delete it.</p>
+      start a paid plan. Paid listings are never aimed at anyone, of any age: they depend only on what is
+      searched for or picked and the page being viewed. If you believe a child under 13 has given us data,
+      write to us at the address below and we'll delete it.</p>
 
     <h2>Changes</h2>
     <p>If this policy changes, we'll update the date at the top. Big changes will also get a notice on the dashboard.</p>

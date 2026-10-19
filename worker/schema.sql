@@ -340,6 +340,24 @@ CREATE TABLE IF NOT EXISTS placement_log (
 
 CREATE INDEX IF NOT EXISTS placement_log_placement ON placement_log (placement, at);
 
+-- How many times a day each paid listing's box was shown and opened (added 2026-10-14; S9, src/visits.js
+-- countPlacementHit, the employer report in src/placements.js placementReport). Counts only, like
+-- event_counts: nothing about who. A browser sends only the placement id, "shown" (the box was at least
+-- half on screen, once per page load) or "open" (its posting link was pressed, once per page load) and the
+-- page's path, which becomes a page kind ("dashboard" or "landing"); nothing else is stored. A row is
+-- added only for a placement that is on and inside its dates, so a made-up id adds nothing. `day` is a
+-- UTC day (YYYY-MM-DD); after 400 days the daily cron folds a placement's days into one row for the month
+-- (`day` is then YYYY-MM) and deletes the daily rows. Reports read whole calendar months only.
+-- Read with: npx wrangler d1 execute internscout --remote --command "SELECT * FROM placement_counts ORDER BY day DESC LIMIT 50"
+CREATE TABLE IF NOT EXISTS placement_counts (
+  day TEXT NOT NULL,
+  placement TEXT NOT NULL,
+  page TEXT NOT NULL CHECK (page IN ('dashboard', 'landing')),
+  event TEXT NOT NULL CHECK (event IN ('shown', 'open')),
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, placement, page, event)
+);
+
 -- Backfills. `npm run deploy` runs this file before every `wrangler deploy`, so both are written to be
 -- repeated: each only ever adds a missing row or moves a value the safe way (a first-seen date
 -- earlier, a count higher), and a second run changes nothing. Each reads only small tables once.

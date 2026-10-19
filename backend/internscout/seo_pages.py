@@ -3761,12 +3761,15 @@ def placement_box(x: dict, pl: dict, state: str | None = None) -> str:
     the company name; the row's own title and grey line (row_meta); a posting link marked
     rel="sponsored noopener" with no data-aa (so the Auto-Apply offer never fires for it) and no company
     link; data-nosnippet to keep it out of search snippets. The inline script takes the box out once its
-    end date (exclusive) has come, even if no deploy has run since."""
+    end date (exclusive) has come, even if no deploy has run since. data-placement (2026-10-14, S9) carries
+    the placement's id, for js/count.js: "shown" once the box is half on screen and "open" when its link
+    is pressed, once per page load each; the id and the page's path are all it sends."""
     end = str(pl.get("end") or "")
     href = esc(safe_url(x.get("apply_url")) or "")
     if not _DAY_RE.match(end) or not href:
         return ""
-    return (f'{PLACEMENT_START}<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">\n'
+    return (f'{PLACEMENT_START}<li class="paid" data-placement="{esc(pl.get("id") or "")}" data-nosnippet '
+            'aria-label="Paid listing, not part of this page\'s list">\n'
             '<p class="paid-h">Paid listing <a href="/privacy.html#paid-listings">Why am I seeing this?</a></p>\n'
             f'<div class="co"><span class="ad">Ad</span> {esc(x.get("company_name") or "")}</div>\n'
             f'<div class="role">{esc(x.get("title") or "")}</div>\n'

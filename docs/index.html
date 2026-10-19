@@ -734,6 +734,12 @@
       var d = window.CONFIG.dataUrl || "./data/", early = window.__early = {};
       var get = function (p) { early[d + p] = fetch(d + p, { cache: "no-cache" }); early[d + p].catch(function () {}); };
       get("listings/index.json");
+      // Paid listings (2026-10-14, S8): data/placements.json, read and parsed here, so the dashboard knows on
+      // its first draw whether there are any (js/placements.js loaded()) and the one-time notice above the
+      // list is there from the start instead of pushing the page down a moment later. Off with
+      // CONFIG.placements = false, like the rest of it.
+      if (window.CONFIG.placements !== false) window.__placementsP = fetch(d + "placements.json", { cache: "no-cache" })
+        .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { window.__placements = j; return j; }, function () { window.__placements = null; return null; });
       if (!localStorage.getItem("internscout.profile.v1") && !/[?&](q|field|state|company|new|stage|year|paid|sector|where|status|progress|eligible|citizen|sort)=/.test(location.search)) get("first.json");
     } catch (e) { /* the scripts below fetch everything themselves */ }
   })();

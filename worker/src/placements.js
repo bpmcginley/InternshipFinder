@@ -332,6 +332,66 @@ export async function refusePlacement(db, body, now) {
 }
 
 // Daily cron: a placement that is on or paused and whose end day has come ends, with reason "dates".
+// ---------------------------------------------------------------- shown and opened counts (S9)
+// The employer report (B1-data-privacy.md section 4.3 and 4.4). Whole calendar months that have ended,
+// never a day, a custom range or the month still running, so two reports can't be subtracted to reveal a
+// small number. Every count is rounded down to the nearest 10 and anything under REPORT_MIN reads "fewer
+// than 10". The split by kind of page is given only when every one of its numbers is REPORT_MIN or more;
+// otherwise the totals alone. There is no breakdown by anything about the audience, because nothing
+// about the audience is counted. The counts can be forged (anyone can send /hit), so they are estimates
+// and never the basis of a price.
+export const REPORT_MIN = 10;
+// Daily rows older than this are folded into one row per month (rollupPlacementCounts).
+export const COUNT_DAYS = 400;
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export function roundedCount(n) {
+  const v = Number(n) || 0;
+  if (v < REPORT_MIN) return `fewer than ${REPORT_MIN}`;
+  return `${(Math.floor(v / 10) * 10).toLocaleString("en-US")}+`;
+}
+
+// POST /admin/placements/report { id, month: "YYYY-MM" }: one placement's report for one ended month.
+export async function placementReport(db, body, now) {
+  const id = typeof body.id === "string" ? body.id : "";
+  const row = id ? await db.prepare("SELECT id, employer, listing_id FROM placements WHERE id = ?").bind(id).first() : null;
+  if (!row) throw new HttpError(404, "not_found", "No such placement");
+  const month = body.month;
+  if (typeof month !== "string" || !MONTH.test(month)) throw bad("month", "month must be YYYY-MM");
+  if (month >= dayOf(now).slice(0, 7)) throw bad("month", "Reports cover whole months that have ended");
+  const { results } = await db.prepare(
+    "SELECT page, event, SUM(n) AS n FROM placement_counts WHERE placement = ? AND (day = ? OR day LIKE ?) GROUP BY page, event",
+  ).bind(id, month, month + "-%").all();
+  const get = (page, event) => results.filter((r) => (!page || r.page === page) && r.event === event).reduce((a, r) => a + r.n, 0);
+  const pages = ["dashboard", "landing"].filter((p) => results.some((r) => r.page === p));
+  const split = pages.length > 1 && pages.every((p) => get(p, "shown") >= REPORT_MIN && get(p, "open") >= REPORT_MIN);
+  return {
+    placement: row.id, employer: row.employer, listing_id: row.listing_id, month,
+    shown: roundedCount(get(null, "shown")),
+    opened: roundedCount(get(null, "open")),
+    by_page: split ? Object.fromEntries(pages.map((p) => [p, { shown: roundedCount(get(p, "shown")), opened: roundedCount(get(p, "open")) }])) : null,
+    about: "Daily totals InternScout counts on its own site, for the whole month (UTC), rounded down to the nearest 10; "
+      + `anything under ${REPORT_MIN} reads "fewer than ${REPORT_MIN}". They say nothing about who saw or opened the listing, can include `
+      + "repeat views by the same person and some automated traffic our filters missed, and are estimates, not audited figures. "
+      + "InternScout does not see applications, so it cannot say how many people applied. Paying did not change where any "
+      + "listing appears in search results or how it is scored.",
+  };
+}
+
+// Daily cron: a placement's daily counts older than COUNT_DAYS become one row per month, then go.
+export async function rollupPlacementCounts(db, now) {
+  const cutoff = new Date(now.getTime() - COUNT_DAYS * 86400e3).toISOString().slice(0, 10);
+  await db.batch([
+    db.prepare(
+      "INSERT INTO placement_counts (day, placement, page, event, n) " +
+      "SELECT substr(day, 1, 7), placement, page, event, SUM(n) FROM placement_counts WHERE length(day) = 10 AND day < ? " +
+      "GROUP BY substr(day, 1, 7), placement, page, event " +
+      "ON CONFLICT(day, placement, page, event) DO UPDATE SET n = n + excluded.n",
+    ).bind(cutoff),
+    db.prepare("DELETE FROM placement_counts WHERE length(day) = 10 AND day < ?").bind(cutoff),
+  ]);
+}
+
 export async function endExpiredPlacements(db, now) {
   const { results } = await db.prepare(
     "SELECT * FROM placements WHERE status IN ('on', 'paused') AND end_day <= ?",

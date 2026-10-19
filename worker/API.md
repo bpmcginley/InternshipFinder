@@ -353,6 +353,15 @@ A load arriving from Google or Microsoft sign-in or from Stripe counts as `inter
 minute from one address (counted in memory only), and anything past 50,000 views in a day are
 answered `204` but not counted. The Worker's own steps are not under that daily cap (2026-10-04), so a
 flood of forged browser steps cannot stop a real sign-in or sale from being counted.
+With `"s"` it is a paid listing's box (added 2026-10-14, S9; `docs/js/count.js`): `{ "s": "p-2026-11-acme-1",
+"e": "shown", "p": "/" }`, where `e` is `shown` (the box was at least half on screen, once per page load)
+or `open` (its posting link was pressed, once per page load). It adds one to `placement_counts` for the
+UTC day, the placement, the page kind (`dashboard` or `landing` only) and the event, and only when that
+placement is `on` and inside its dates today, so a made-up or ended id adds nothing. Nothing else is
+sent or stored: no listing, filter, search, profile or anything about the visitor. The same Origin,
+crawler and per-minute checks apply, under a separate cap of 50,000 a day. Daily rows older than 400
+days are folded by the daily cron into one row per month (`day` = `YYYY-MM`). The counts can be forged,
+so they are estimates and never the basis of a price.
 
 ### `POST /employer-interest` (site only, no auth)
 The interest form on `internscout.org/employers/` (added 2026-10-13; `src/leads.js`). Body (JSON, at most
@@ -400,9 +409,12 @@ No auth. Returns the placements that are `on`, whose `end` is after today and wh
 tomorrow at the latest (so an evening build carries one that starts at midnight):
 ```json
 { "day": "2026-11-03", "placements": [ { "id": "p-2026-11-acme-1", "listing_id": "3f9c0a1b2c3d4e5f",
-  "apply_url": "https://...", "employer": "Acme", "start": "2026-11-01", "end": "2026-12-01", "page_cap": 1 } ] }
+  "apply_url": "https://...", "employer": "Acme", "start": "2026-11-01", "end": "2026-12-01", "page_cap": 1,
+  "unpaid_ok": 0 } ] }
 ```
-Exactly those keys: never `paid_ref`, `note`, `lead_id`, `checks` or who changed what.
+Exactly those keys: never `paid_ref`, `note`, `lead_id`, `checks` or who changed what. `unpaid_ok` (added
+2026-10-14) is `1` when Bruce confirmed a nonprofit or government role (`check` with `unpaid_ok: true`); the
+site build keeps a placement whose listing says it is unpaid only then (backend `placements.resolve`).
 `Cache-Control: public, max-age=300`. The site build reads it once per deploy; visitors never call it.
 
 ### Admin routes (Bruce's terminal only)
@@ -429,6 +441,7 @@ current status does not allow (or a row that changed while it was being saved).
 | `POST /admin/placements/pause` | `{ id, by, reason }` | `on` to `paused`. |
 | `POST /admin/placements/end` | `{ id, by, reason }` | Any status not yet `ended` or `refused` to `ended`. `reason` is one of `dates`, `role_closed`, `listing_gone`, `removed`, `refunded`. The emergency stop. |
 | `POST /admin/placements/refuse` | `{ id, by, reason }` | `draft` or `checked` to `refused`. |
+| `POST /admin/placements/report` | `{ id, month }` | The employer report (added 2026-10-14, S9) for one calendar month that has ended (`YYYY-MM`; the month still running is refused): `{ report: { placement, employer, listing_id, month, shown, opened, by_page, about } }`. `shown` and `opened` are text, rounded down to the nearest 10 (`"1,230+"`), or `"fewer than 10"`. `by_page` splits them by `dashboard` and `landing` only when every number in the split is 10 or more, otherwise `null`. Raw counts are never returned. `about` is the plain-English note for the employer: what the numbers are and are not. |
 
 ## Paid plans (optional, off by default)
 
