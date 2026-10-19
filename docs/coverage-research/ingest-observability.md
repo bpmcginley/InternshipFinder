@@ -24,7 +24,7 @@ The report reconciles `fetched = parsed + normalize_rejections` and `parsed = ac
 
 ## Boundaries and next measurements
 
-Integration checkpoint (October 16): parent wired the optional normalization callback, pipeline counters/filter rejections, final board scan outcomes and export inventory into `run_ingest`. Reports write via `--metrics PATH` or to `<export-dir>/ingest-report.json`. A database-backed regression checks reconciliation across normalization and geography losses.
+Integration checkpoint (October 16): parent wired the optional normalization callback, pipeline counters/filter rejections, final board scan outcomes and export inventory into `run_ingest`. Reports write via `--metrics PATH` or to `<export-dir>/ingest-report.json` (CI passes `--metrics` to the runner's temp folder and keeps it as the `ingest-report` artifact for 30 days, so it is not published on the site). A database-backed regression checks reconciliation across normalization and geography losses.
 
 Discovery of employer boards is a different unit from discovery of listings: use board outcome counts for the former. Whole-run coverage percentages require an independent employer/sample benchmark and are not inferable from this funnel.
 
