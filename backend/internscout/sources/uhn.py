@@ -11,7 +11,7 @@ the health, research and biology majors the Canadian job boards barely served.
 """
 from __future__ import annotations
 from .base import client
-from .common import board_item
+from .common import ScanCounts, board_item, report_source
 from ..classify import is_internship
 
 LIST_URL = "https://forms.uhn.ca/UHNCareers/Home/GetAll"
@@ -20,12 +20,16 @@ POSTING_URL = "https://forms.uhn.ca/UHNCareers/Home/Posting/{id}"
 WHERE = "Toronto, ON"
 
 
-def parse_uhn(payload: dict) -> list[dict]:
-    out = []
+def parse_uhn(payload: dict, counts: ScanCounts | None = None) -> list[dict]:
+    out, counts = [], counts if counts is not None else ScanCounts()
     for j in (payload or {}).get("data") or []:
         title = (j.get("name") or "").strip()
         emp = j.get("employment") or ""
-        if not j.get("id") or not is_internship(title, emp):
+        if not j.get("id"):
+            counts.discard("unreadable")
+            continue
+        if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         site, dept = (j.get("site") or "").strip(), (j.get("department") or "").strip()
         about = " · ".join(x for x in (site, dept, emp) if x)
@@ -35,14 +39,23 @@ def parse_uhn(payload: dict) -> list[dict]:
     return out
 
 
-def fetch_uhn() -> list[dict]:
+def fetch_uhn(report=None) -> list[dict]:
+    counts = ScanCounts()
     try:
         with client() as c:
             r = c.get(LIST_URL)
             r.raise_for_status()
-            out = parse_uhn(r.json())
+            payload = r.json()
+            rows = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(rows, list) or not all(isinstance(j, dict) for j in rows):
+                raise ValueError("UHN job list is missing its data rows")
+            counts.rows(len(rows))
+            counts.reported(len(rows))   # one unpaged call: the list is every opening
+            out = parse_uhn(payload, counts)
     except Exception as e:
         print(f"[uhn] failed: {type(e).__name__}")
+        report_source(report, "uhn", error=e)
         return []
     print(f"[uhn] {len(out)} student postings")
+    report_source(report, "uhn", items=out, counts=counts)
     return out

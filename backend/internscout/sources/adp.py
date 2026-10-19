@@ -2,7 +2,7 @@
 center's cid, e.g. "89da4960-4d45-4b46-b7aa-5959c5f71827". The list has no descriptions, so
 in-region internships get one detail call each (capped)."""
 from __future__ import annotations
-from .common import board_item, html_to_text, mark_complete, reported_count, rows_of
+from .common import board_item, counts_of, html_to_text, mark_complete, reported_count, rows_of
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -48,14 +48,16 @@ def _string_field(r: dict, code: str) -> str | None:
 
 
 def parse_adp(payload: dict, co: dict, cid: str) -> tuple[list[dict], int]:
-    out = []
+    out, counts = [], counts_of(co)
     for r in payload.get("jobRequisitions") or []:
         title = r.get("requisitionTitle") or ""
         emp = (r.get("workLevelCode") or {}).get("shortName") or ""
         if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         locs = _locations(r)
         if not locs:
+            counts.discard("outside_region")
             continue
         job = _string_field(r, "ExternalJobID")
         url = JOB_URL.format(cid=cid, job=job) if job else \
@@ -69,8 +71,9 @@ def parse_adp(payload: dict, co: dict, cid: str) -> tuple[list[dict], int]:
 
 def fetch_adp_board(c, co: dict) -> list[dict]:
     cid = co["ats_token"]
-    out, skip = [], 0
+    out, skip, counts = [], 0, counts_of(co)
     reported, rows, well_formed = None, 0, True
+    total = 0
     while skip < MAX_SKIP:
         r = c.get(API, params={"cid": cid, **PARAMS, "$top": PAGE, "$skip": skip})
         r.raise_for_status()
@@ -82,12 +85,17 @@ def fetch_adp_board(c, co: dict) -> list[dict]:
             well_formed = False
         if skip == 0:
             reported = reported_count((payload.get("meta") or {}).get("totalNumber"))
+            counts.reported(reported)
         rows += len(got or [])
+        counts.rows(len(got or []))
         items, total = parse_adp(payload, co, cid)
         out += items
         skip += PAGE
         if skip >= total:
             break
+    else:
+        if skip < total:
+            counts.stop("page_cap")   # MAX_SKIP reached with requisitions left
     n = 0
     for it in out:
         if n >= MAX_DETAIL or not any(maybe_in_region(l) for l in it["locations"]):

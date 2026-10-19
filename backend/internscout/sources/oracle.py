@@ -16,7 +16,8 @@ it is the same employer boilerplate on every requisition, and it would crowd the
 out of the 4,000-character budget and give the classifier marketing copy to tag a job by.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -42,10 +43,11 @@ FIELDS = ("ExternalDescriptionStr", "ExternalResponsibilitiesStr", "ExternalQual
 def parse_oracle(payload: dict, co: dict, host: str, site: str) -> tuple[list[dict], int]:
     items = payload.get("items") or []
     head = items[0] if items else {}
-    out = []
+    out, counts = [], counts_of(co)
     for r in head.get("requisitionList") or []:
         title = r.get("Title", "")
         if not is_internship(title):
+            counts.discard("not_student")
             continue
         sec = r.get("secondaryLocations") or []
         places = [(r.get("PrimaryLocation"), r.get("PrimaryLocationCountry"))] + [(s.get("Name"), s.get("CountryCode")) for s in sec]
@@ -60,6 +62,7 @@ def parse_oracle(payload: dict, co: dict, host: str, site: str) -> tuple[list[di
                 # the ISO country code CA from being interpreted as US locations.
                 locs.append(name if "canada" in name.lower() else f"{name}, Canada")
         if not locs:
+            counts.discard("outside_region")
             continue
         it = board_item(co, source="oracle", title=title, locations=locs,
                         url=JOB_URL.format(host=host, site=site, id=r.get("Id")),
@@ -81,7 +84,7 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
     require_robots(c, f"https://{host}",
                    "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
                    co["ats_token"])
-    out, seen, complete = [], set(), True
+    out, seen, complete, counts = [], set(), True, counts_of(co)
     for keyword in KEYWORDS:
         offset, reported, rows, well_formed = 0, None, 0, True
         while offset < MAX_OFFSET:
@@ -96,15 +99,23 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
                 well_formed = False
             elif offset == 0:
                 reported = reported_count(heads[0].get("TotalJobsCount"))
+            if offset == 0:
+                counts.reported(reported)
             rows += len(page or [])
+            counts.rows(len(page or []))
             items, total = parse_oracle(payload, co, host, site)
             for it in items:
                 if it["_req_id"] not in seen:
                     seen.add(it["_req_id"])
                     out.append(it)
+                else:
+                    counts.discard("duplicate")
             offset += PAGE
             if offset >= total:
                 break
+        else:
+            if offset < total:
+                counts.stop("page_cap")   # MAX_OFFSET reached with matches left
         # A keyword whose matches run past MAX_OFFSET is read only in part, and so is the board.
         complete = complete and well_formed and reported is not None and rows == reported
     # A teaser the employer did bother to write is left alone; the call is for the ones with nothing.

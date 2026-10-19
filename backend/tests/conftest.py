@@ -25,3 +25,13 @@ def _no_real_state_files(monkeypatch, tmp_path):
     monkeypatch.setattr(discover, "_DROPPED", {})
     monkeypatch.setattr(google_jobs, "DAY_PATH", str(tmp_path / "google_jobs_day.json"))
 
+
+
+@pytest.fixture(autouse=True)
+def _default_workday_keywords(monkeypatch):
+    """Run every test with Workday's default search words, whatever the shell has set.
+
+    WORKDAY_EXTRA_KEYWORDS turns on extra searches for every Workday board. A test that wants
+    them sets the variable itself.
+    """
+    monkeypatch.delenv("WORKDAY_EXTRA_KEYWORDS", raising=False)

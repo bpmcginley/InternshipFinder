@@ -10,6 +10,7 @@ import json
 import os
 import httpx
 from .base import client
+from .common import ScanCounts, report_source
 from ..config import DATA_DIR
 from ..us_metros import metro_searches
 
@@ -74,14 +75,18 @@ def is_daily_run(today: str) -> bool:
 def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
                       max_searches: int | None = None, focus_queries: list[str] | None = None,
                       focus_searches: int = 0, fixed: list[tuple[str, str]] | None = None,
-                      nationwide: bool = False) -> list[dict]:
+                      nationwide: bool = False, report=None) -> list[dict]:
     """Query Google Jobs. Stays inside the SerpApi quota by capping searches per run and
     rotating which queries are used (day-based offset), so all disciplines get covered
-    across runs instead of always hitting the same few."""
+    across runs instead of always hitting the same few.
+
+    `report` (IngestMetrics.source_result) hears the feed's outcome: skipped and why, failed
+    when every search failed, partial when some did, empty or success otherwise."""
     import datetime
     api_key = api_key or os.environ.get("SERPAPI_KEY")
     if not api_key:
         print("[google_jobs] no SERPAPI_KEY set; skipping")
+        report_source(report, "google_jobs", skipped="no_api_key")
         return []
     if max_searches is None:
         max_searches = int(os.environ.get("SERPAPI_MAX_SEARCHES", "12"))
@@ -91,10 +96,12 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     # next push). The 250-search plan at 8 a day has no room for that, so a push never searches.
     if os.environ.get("GITHUB_EVENT_NAME") == "push" and not os.environ.get("SERPAPI_EVERY_RUN"):
         print("[google_jobs] push-triggered run; paid searches are left to the scheduled run")
+        report_source(report, "google_jobs", skipped="push_run")
         return []
     today = now.date().isoformat()
     if not os.environ.get("SERPAPI_EVERY_RUN") and not is_daily_run(today):
         print("[google_jobs] already searched today (UTC); skipping this run")
+        report_source(report, "google_jobs", skipped="already_searched_today")
         return []
     account = None
     try:
@@ -109,6 +116,7 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
     left = (account or {}).get("total_searches_left")
     print(f"[google_jobs] budget today {max_searches} (searches left this month: {left if left is not None else 'unknown'})")
     if max_searches <= 0:
+        report_source(report, "google_jobs", skipped="no_budget")
         return []
     # Before searching, not after: a run that dies halfway has still spent those searches.
     mark_searched(today)
@@ -149,11 +157,14 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
           f"{len(locations)} location(s) (cap {max_searches})")
     out: list[dict] = []
     seen = set()
+    # Google reports no result total, so discovered stays unmeasured; rows and repeats are counted.
+    counts, searched, failed, error = ScanCounts(), 0, 0, None
     with client() as c:
         metro_failed = False
         for q, loc, cbsa in pairs:   # already capped at the day's budget
             if cbsa and metro_failed:
                 continue  # retry this metro next run; don't advance over a failed city
+            searched += 1
             params = {"engine": "google_jobs", "q": q, "location": loc, "hl": "en", "api_key": api_key}
             if loc.endswith(", Canada"):
                 # Google's Canadian results (2026-10-01): without it a Toronto search leans on US postings.
@@ -174,6 +185,7 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
                 empty = payload.get("error") == "Google hasn't returned any results for this query."
                 if not isinstance(results, list) and not empty:
                     raise ValueError("invalid jobs response")
+                counts.rows(len(results or []))
                 if cbsa:
                     cursor += 1
                     completed = search_state().get("metro_last_success", {})
@@ -189,6 +201,7 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
                     key = (j.get("company_name", ""), j.get("title", ""),
                            j.get("location") or loc, link)
                     if key in seen:
+                        counts.discard("duplicate")
                         continue
                     seen.add(key)
                     out.append({
@@ -205,11 +218,16 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
                     })
             except httpx.HTTPStatusError as e:
                 metro_failed = metro_failed or bool(cbsa)
+                failed, error = failed + 1, e
                 print(f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}")
                 if e.response.status_code == 429:   # quota gone: the rest will fail the same way
                     print("[google_jobs] out of searches; stopping for this run")
-                    return out
+                    counts.stop("quota")
+                    break
             except Exception as e:
                 metro_failed = metro_failed or bool(cbsa)
+                failed, error = failed + 1, e
                 print(f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}")
+    report_source(report, "google_jobs", items=out, error=error, counts=counts,
+                  failed_units=failed, units=searched)
     return out

@@ -22,7 +22,8 @@ from __future__ import annotations
 import re
 import time
 
-from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 
 URL = "https://{token}/api/jobs"
@@ -51,15 +52,17 @@ def _locations(d: dict) -> list[str]:
 
 
 def parse_icims_site(payload: dict, co: dict) -> list[dict]:
-    out = []
+    out, counts = [], counts_of(co)
     for j in (payload or {}).get("jobs") or []:
         d = j.get("data") or {}
         title = d.get("title") or ""
         emp = (d.get("employment_type") or "").replace("_", " ")
         if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         locs = _locations(d)
         if not locs:
+            counts.discard("outside_region")
             continue
         day = DATE_RE.match(str(d.get("posted_date") or ""))
         out.append(board_item(co, source="icims_site", title=title, locations=locs,
@@ -74,7 +77,7 @@ def fetch_icims_site_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
     require_robots(c, f"https://{token}", "/api/jobs", token)
     seen: dict[str, dict] = {}
-    reported, rows, well_formed = None, 0, True
+    reported, rows, well_formed, counts, total = None, 0, True, counts_of(co), 0
     for page in range(1, MAX_PAGES + 1):
         if page > 1:
             time.sleep(CRAWL_DELAY)
@@ -89,11 +92,19 @@ def fetch_icims_site_board(c, co: dict) -> list[dict]:
             well_formed = False
         if page == 1:
             reported = reported_count(payload.get("totalCount"))
+            counts.reported(reported)
         rows += len(got or [])
+        counts.rows(len(got or []))
         for it in parse_icims_site(payload, co):
+            if it["url"] in seen:
+                counts.discard("duplicate")
             seen[it["url"]] = it
-        if page * LIMIT >= (payload.get("totalCount") or 0):
+        total = payload.get("totalCount") or 0
+        if page * LIMIT >= total:
             break
+    else:
+        if MAX_PAGES * LIMIT < total:
+            counts.stop("page_cap")   # 300 results read with more left
     # The one query read to its totalCount, not stopped at MAX_PAGES (300 results).
     mark_complete(co, well_formed and reported is not None and rows == reported)
     return list(seen.values())

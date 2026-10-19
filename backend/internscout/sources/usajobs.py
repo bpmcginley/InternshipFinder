@@ -4,7 +4,7 @@ key was requested with; USAJOBS requires it as the User-Agent). Skipped when eit
 from __future__ import annotations
 import os
 from .base import client
-from .common import board_item, html_to_text
+from .common import ScanCounts, board_item, html_to_text, report_source, reported_count
 from ..classify import is_internship
 
 API = "https://data.usajobs.gov/api/search"
@@ -45,19 +45,21 @@ def _text(v) -> str:
     return "\n".join(map(str, v)) if isinstance(v, list) else str(v or "")
 
 
-def parse_usajobs(payload: dict) -> tuple[list[dict], int]:
+def parse_usajobs(payload: dict, counts: ScanCounts | None = None) -> tuple[list[dict], int]:
     res = payload.get("SearchResult") or {}
-    out = []
+    out, counts = [], counts if counts is not None else ScanCounts()
     for hit in res.get("SearchResultItems") or []:
         d = hit.get("MatchedObjectDescriptor") or {}
         title = d.get("PositionTitle") or ""
         sched = ((d.get("PositionSchedule") or [{}])[0] or {}).get("Name") or ""
         emp = f"Intern {sched}".strip()      # every student-path posting is a student role
         if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         locs = [_place(l.get("LocationName")) for l in d.get("PositionLocation") or []
                 if (l.get("CountryCode") or "") in ("United States", "US")]
         if not locs:
+            counts.discard("outside_region")
             continue
         details = (d.get("UserArea") or {}).get("Details") or {}
         pay = (d.get("PositionRemuneration") or [{}])[0] or {}
@@ -84,24 +86,40 @@ def parse_usajobs(payload: dict) -> tuple[list[dict], int]:
     return out, int(res.get("SearchResultCountAll") or 0)
 
 
-def fetch_usajobs(api_key: str | None = None, email: str | None = None) -> list[dict]:
+def fetch_usajobs(api_key: str | None = None, email: str | None = None, report=None) -> list[dict]:
     api_key = api_key or os.environ.get("USAJOBS_API_KEY")
     email = email or os.environ.get("USAJOBS_EMAIL")
     if not (api_key and email):
         print("[usajobs] no USAJOBS_API_KEY/USAJOBS_EMAIL set; skipping")
+        report_source(report, "usajobs", skipped="no_api_key")
         return []
     headers = {"Host": "data.usajobs.gov", "User-Agent": email, "Authorization-Key": api_key}
     out: list[dict] = []
+    counts, error, total = ScanCounts(), None, 0
     try:
         with client() as c:
             for page in range(1, MAX_PAGES + 1):
                 r = c.get(API, params={"HiringPath": "student", "ResultsPerPage": PAGE, "Page": page}, headers=headers)
                 r.raise_for_status()
-                items, total = parse_usajobs(r.json())
+                payload = r.json()
+                if not isinstance(payload, dict):
+                    raise ValueError("USAJOBS search response is not an object")
+                res = payload.get("SearchResult") if isinstance(payload.get("SearchResult"), dict) else {}
+                rows = res.get("SearchResultItems")
+                if page == 1:
+                    counts.reported(reported_count(res.get("SearchResultCountAll")))
+                counts.rows(len(rows) if isinstance(rows, list) else 0)
+                items, total = parse_usajobs(payload, counts)
                 out += items
                 if page * PAGE >= total:
                     break
+            else:
+                if MAX_PAGES * PAGE < total:
+                    counts.stop("page_cap")
     except Exception as e:
+        error = e
         print(f"[usajobs] failed: {e}")
     print(f"[usajobs] {len(out)} student postings")
+    # A failure part way through is still a failure, whatever it returned before it.
+    report_source(report, "usajobs", items=out, error=error, counts=counts)
     return out

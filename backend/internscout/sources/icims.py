@@ -19,7 +19,7 @@ health, nursing and education listings live.
 from __future__ import annotations
 import json
 import re
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, counts_of, html_to_text, require_robots
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -68,14 +68,21 @@ def _location(raw: str) -> list[str]:
 
 
 def parse_icims(html: str, co: dict) -> list[dict]:
-    out = []
-    for card in CARD_RE.findall(html or ""):
+    out, counts = [], counts_of(co)
+    cards = CARD_RE.findall(html or "")
+    counts.rows(len(cards))   # one search page's job cards; there is no result total to compare
+    for card in cards:
         link = LINK_RE.search(card)
         title = html_to_text(TITLE_RE.search(card).group(1)) if TITLE_RE.search(card) else ""
-        if not link or not is_internship(title, ""):
+        if not link:
+            counts.discard("unreadable")
+            continue
+        if not is_internship(title, ""):
+            counts.discard("not_student")
             continue
         locs = _location(LOC_RE.search(card).group(1)) if LOC_RE.search(card) else []
         if not locs:
+            counts.discard("outside_region")
             continue
         url = html_to_text(link.group(1)).replace("&amp;", "&")
         url = re.sub(r"[?&]in_iframe=1", "", url)
@@ -103,7 +110,7 @@ def parse_icims_detail(html: str) -> tuple[str, str | None]:
 def fetch_icims_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
     require_robots(c, f"https://{token}.icims.com", "/jobs/search", token)
-    seen, items = set(), []
+    seen, items, counts = set(), [], counts_of(co)
     for kw in KEYWORDS:
         for page in range(MAX_PAGES):
             r = c.get(SEARCH_URL.format(token=token),
@@ -113,7 +120,10 @@ def fetch_icims_board(c, co: dict) -> list[dict]:
             if moved:
                 raise ValueError(f"icims tenant {token!r} has moved to {moved.group(1).replace(chr(92), '')}")
             found = parse_icims(r.text, co)
+            full = len(CARD_RE.findall(r.text)) >= 20
             if not found:
+                if full:
+                    counts.stop("dry_pages")   # a full page with no internship ends the keyword
                 break
             for it in found:
                 m = ID_RE.search(it["url"] or "")
@@ -121,9 +131,13 @@ def fetch_icims_board(c, co: dict) -> list[dict]:
                 if key not in seen:
                     seen.add(key)
                     items.append(it)
+                else:
+                    counts.discard("duplicate")
             # A short page is the last page; iCIMS serves 20 cards when there are more.
-            if len(CARD_RE.findall(r.text)) < 20:
+            if not full:
                 break
+        else:
+            counts.stop("page_cap")   # MAX_PAGES full pages, and the next may hold more
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(it["url"], params={"in_iframe": 1})

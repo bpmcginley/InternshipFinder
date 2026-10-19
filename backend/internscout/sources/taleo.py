@@ -16,7 +16,8 @@ from __future__ import annotations
 import json
 import re
 import urllib.parse
-from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -58,11 +59,12 @@ def _date(s: str | None) -> str | None:
 
 
 def parse_taleo(payload: dict, co: dict, tenant: str, section: str) -> tuple[list[dict], int]:
-    out = []
+    out, counts = [], counts_of(co)
     for r in payload.get("requisitionList") or []:
         cols = r.get("column") or []
         title = cols[r.get("linkedColumn", 0)] if cols else ""
         if not is_internship(title):
+            counts.discard("not_student")
             continue
         locs, dates = [], []
         for i, v in enumerate(cols):
@@ -75,6 +77,7 @@ def parse_taleo(payload: dict, co: dict, tenant: str, section: str) -> tuple[lis
             elif _date(v):
                 dates.append(_date(v))
         if not locs:
+            counts.discard("outside_region")
             continue
         out.append(board_item(co, source="taleo", title=title, locations=locs,
                               url=f"{BASE.format(tenant=tenant)}/{section}/jobdetail.ftl?job={r.get('contestNo')}",
@@ -114,9 +117,9 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
     portal = parts[2] if len(parts) > 2 else _portal(c, tenant, section)
     url = f"{BASE.format(tenant=tenant)}/rest/jobboard/searchjobs"
     seen: dict[str, dict] = {}
-    complete = True
+    complete, counts = True, counts_of(co)
     for kw in KEYWORDS:
-        reported, rows, well_formed = None, 0, True
+        reported, rows, well_formed, total = None, 0, True, 0
         for page in range(1, MAX_PAGES + 1):
             r = c.post(url, params={"lang": "en", "portal": portal}, json=_body(kw, page), headers=HEADERS)
             r.raise_for_status()
@@ -128,12 +131,19 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
                 well_formed = False
             if page == 1:
                 reported = reported_count((payload.get("pagingData") or {}).get("totalCount"))
+                counts.reported(reported)
             rows += len(got or [])
+            counts.rows(len(got or []))
             items, total = parse_taleo(payload, co, tenant, section)
             for it in items:
+                if it["url"] in seen:
+                    counts.discard("duplicate")
                 seen.setdefault(it["url"], it)
             if page * 25 >= total:
                 break
+        else:
+            if MAX_PAGES * 25 < total:
+                counts.stop("page_cap")   # 200 results read with more left
         # MAX_PAGES caps a keyword at 200 results; one with more is read only in part.
         complete = complete and well_formed and reported is not None and rows == reported
     out = list(seen.values())

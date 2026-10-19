@@ -12,7 +12,8 @@ real description inside the 4,000-character budget and hand the classifier a com
 copy to tag a job by.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -25,15 +26,17 @@ SECTIONS = ("jobDescription", "qualifications", "additionalInformation")
 
 
 def parse_smartrecruiters(payload: dict, co: dict, token: str) -> list[dict]:
-    out = []
+    out, counts = [], counts_of(co)
     for j in payload.get("content") or []:
         title = j.get("name", "")
         emp = ((j.get("typeOfEmployment") or {}).get("label")) or ""
         if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         loc = j.get("location") or {}
         country = (loc.get("country") or "us").lower()
         if country != "us":
+            counts.discard("outside_region")
             continue
         where = ", ".join(x for x in (loc.get("city"), loc.get("region")) if x)
         locs = [where]
@@ -57,7 +60,7 @@ def parse_smartrecruiters_detail(payload: dict) -> str:
 def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
     token, out, offset = co["ats_token"], [], 0
     require_robots(c, "https://api.smartrecruiters.com", "/v1/companies/", token)
-    reported, rows, well_formed = None, 0, True
+    reported, rows, well_formed, counts, total = None, 0, True, counts_of(co), 0
     while offset < MAX_OFFSET:
         r = c.get(URL.format(token=token), params={"q": "intern", "limit": 100, "offset": offset})
         r.raise_for_status()
@@ -69,11 +72,17 @@ def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
             well_formed = False
         if offset == 0:
             reported = reported_count(data.get("totalFound"))
+            counts.reported(reported)
         rows += len(page or [])
+        counts.rows(len(page or []))
         out += parse_smartrecruiters(data, co, token)
         offset += 100
-        if offset >= (data.get("totalFound") or 0):
+        total = data.get("totalFound") or 0
+        if offset >= total:
             break
+    else:
+        if offset < total:
+            counts.stop("page_cap")   # MAX_OFFSET reached with results left
     # The one "intern" search read to its totalFound, not stopped at MAX_OFFSET.
     complete = well_formed and reported is not None and rows == reported
     for it in [i for i in out if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
