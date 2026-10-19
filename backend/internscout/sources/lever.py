@@ -6,7 +6,7 @@ serves them. Plenty of EU-hosted boards advertise US internships, so they are wo
 """
 from __future__ import annotations
 from .base import client
-from .common import board_item, stamp_board_newest
+from .common import board_item, counts_of, stamp_board_newest
 from ..classify import is_internship
 from ..region import board_state, place_bare_cities
 
@@ -20,12 +20,13 @@ def url_of(token: str) -> str:
 
 
 def parse_lever(payload: list, co: dict) -> list[dict]:
-    out, board = [], []
+    out, board, counts = [], [], counts_of(co)
     for j in payload or []:
         cats = j.get("categories") or {}
         board.append(cats.get("location"))
         title = j.get("text", "")
         if not is_internship(title, cats.get("commitment") or ""):
+            counts.discard("not_student")
             continue
         locs = list(dict.fromkeys([cats.get("location")] + list(cats.get("allLocations") or [])))
         if (j.get("workplaceType") == "remote") and not any("remote" in (l or "").lower() for l in locs):
@@ -49,6 +50,9 @@ def fetch_lever_board(c, co: dict) -> list[dict]:
     payload = resp.json()
     if not isinstance(payload, list) or not all(isinstance(job, dict) for job in payload):
         raise ValueError("Lever response is missing its complete postings list")
+    counts = counts_of(co)
+    counts.rows(len(payload))
+    counts.reported(len(payload))   # unpaged: the list is everything the board listed
     items = parse_lever(payload, co)
     co["_scan_complete"] = True
     return items

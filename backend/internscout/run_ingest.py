@@ -17,7 +17,7 @@ from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, fetch_uhn, BOARD_FETCHERS
 from .sources.base import client
-from .sources.common import RobotsDisallowed
+from .sources.common import RobotsDisallowed, ScanCounts, failure_cause
 from .sources.github_lists import parse_fixture
 from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
 from .config import GOOGLE_JOBS_FOCUS_QUERIES, GOOGLE_JOBS_FOCUS_SEARCHES, GOOGLE_JOBS_FIXED, canada_searches
@@ -50,9 +50,7 @@ ATS_WORKERS = {"workday": 6}
 
 def _cause(e: Exception) -> str:
     """A short name for why a board failed, for the run summary: an HTTP status or an error type."""
-    if isinstance(e, httpx.HTTPStatusError):
-        return str(e.response.status_code)
-    return type(e).__name__
+    return failure_cause(e)
 
 
 def _transient(e: Exception) -> bool:
@@ -66,18 +64,22 @@ def _transient(e: Exception) -> bool:
 
 
 class BoardItems(list):
-    """List-compatible fetch result with explicit authoritative-scan evidence."""
-    def __init__(self, items, *, complete=False):
+    """List-compatible fetch result with explicit authoritative-scan evidence and page counts."""
+    def __init__(self, items, *, complete=False, counts: ScanCounts | None = None):
         super().__init__(items)
         self.complete = complete
+        self.counts = counts
 
 
 def _fetch_board(c, ats, co):
     # The adapter opts in only after validating its entire list response. A plain
     # list (including []) is not enough: paginated adapters may stop at a cap.
     co.pop("_scan_complete", None)
+    # A fresh set of page counts per attempt, so a retried board reports only the attempt that
+    # counted. The worker thread writes it; the coordinator reads it once the future is done.
+    counts = co["_counts"] = ScanCounts()
     items = BOARD_FETCHERS[ats](c, co)
-    return BoardItems(items, complete=co.get("_scan_complete") is True)
+    return BoardItems(items, complete=co.get("_scan_complete") is True, counts=counts)
 
 
 def _fetch_boards(c, jobs: list, workers: int) -> dict:
@@ -157,8 +159,10 @@ def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
                 record_result(reg, ats, tok, False)
         else:
             if metrics is not None:
+                counts = getattr(r, "counts", None)
                 metrics.board_result(ats, tok, "success", count=len(r),
-                                     complete=getattr(r, "complete", False))
+                                     complete=getattr(r, "complete", False),
+                                     scan=counts.as_dict() if counts is not None else None)
             record_result(reg, ats, tok, True)
             if completed_boards is not None and getattr(r, "complete", False):
                 completed_boards.add((ats, tok))
@@ -200,7 +204,7 @@ def main():
         seeded = seed_registry(reg)
         found = 0
         if args.lists or do_all:
-            items = fetch_github_lists()
+            items = fetch_github_lists(report=metrics.source_result)
             found += discover(reg, items)
             raw += items
         if args.google or do_all:
@@ -214,7 +218,7 @@ def main():
                                       # was: fixed=GOOGLE_JOBS_FIXED. Today's Canadian metro search
                                       # (2026-10-01) runs every day beside it, from the same budget.
                                       fixed=GOOGLE_JOBS_FIXED + canada_searches(date.today().toordinal()),
-                                      nationwide=True)
+                                      nationwide=True, report=metrics.source_result)
             found += discover(reg, items)
             raw += items
         if raw:
@@ -225,7 +229,9 @@ def main():
             raw += scan_boards(reg, args.workers, completed_boards=completed_boards, metrics=metrics)
         if args.public or do_all:  # government feeds: no ATS boards to discover from these
             # was: fetch_usajobs() + fetch_nyc_jobs(). UHN is one employer's own site, read the same way.
-            raw += fetch_usajobs() + fetch_nyc_jobs() + fetch_uhn()
+            raw += (fetch_usajobs(report=metrics.source_result)
+                    + fetch_nyc_jobs(report=metrics.source_result)
+                    + fetch_uhn(report=metrics.source_result))
         # Boards first, so the listings below can be labelled off them in the same run.
         named = label_boards(reg)
         # Last, so it sees every item from every source in this run.

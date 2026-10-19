@@ -22,7 +22,7 @@ from __future__ import annotations
 import html
 import re
 
-from .common import board_item, require_robots
+from .common import board_item, counts_of, require_robots
 from ..classify import is_internship
 from ..region import board_state, place_bare_cities
 
@@ -41,18 +41,26 @@ def _text(s: str) -> str:
 
 
 def parse_jazzhr(page: str, co: dict) -> list[dict]:
-    out, seen, board = [], set(), []
-    for chunk in _ITEM_SPLIT.split(page or "")[1:]:
+    out, seen, board, counts = [], set(), [], counts_of(co)
+    chunks = _ITEM_SPLIT.split(page or "")[1:]
+    counts.rows(len(chunks))   # the job entries on the one board page; there is no total to compare
+    for chunk in chunks:
         link = _LINK_RE.search(chunk)
         if not link:
+            counts.discard("unreadable")
             continue
         loc = _LOC_RE.search(chunk)
         board.append(_text(loc.group("loc")) if loc else None)
         title = _text(link.group("title"))
-        if not title or not is_internship(title):
+        if not title:
+            counts.discard("unreadable")
+            continue
+        if not is_internship(title):
+            counts.discard("not_student")
             continue
         url = html.unescape(link.group("url"))
         if url in seen:
+            counts.discard("duplicate")
             continue
         seen.add(url)
         out.append(board_item(co, source="jazzhr", title=title,

@@ -146,7 +146,7 @@ def test_cli_partial_modes_pass_only_explicit_board_evidence(monkeypatch, flag):
     for name in ("save_registry", "save_cache"):
         monkeypatch.setattr(run_ingest, name, lambda *a: None)
     monkeypatch.setattr(run_ingest, "load_registry", lambda: {})
-    monkeypatch.setattr(run_ingest, "fetch_github_lists", lambda: [])
+    monkeypatch.setattr(run_ingest, "fetch_github_lists", lambda **kw: [])
     monkeypatch.setattr(run_ingest, "fetch_google_jobs", lambda *a, **kw: [])
 
     def scan(reg, workers, *, completed_boards, metrics=None):

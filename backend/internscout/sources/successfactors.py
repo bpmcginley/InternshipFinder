@@ -29,7 +29,7 @@ where the health, education and energy listings live.
 from __future__ import annotations
 import re
 from urllib.parse import unquote
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, counts_of, html_to_text, require_robots
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -158,12 +158,15 @@ def parse_successfactors(html: str, co: dict) -> list[dict]:
                                               "slug": job.group(1), "raw": ""})
         if loc and not rec["raw"]:
             rec["raw"] = loc.group(1)
-    out = []
+    out, counts = [], counts_of(co)
+    counts.rows(len(by_id))   # distinct jobs on the page; the template repeats each link
     for rec in by_id.values():
         if not is_internship(rec["title"], ""):
+            counts.discard("not_student")
             continue
         locs = _location(rec["raw"], rec["slug"], rec["title"])
         if not locs:
+            counts.discard("outside_region")
             continue
         out.append(board_item(co, source="successfactors", title=rec["title"], locations=locs,
                               url=f"https://{host}{rec['href']}"))
@@ -171,7 +174,7 @@ def parse_successfactors(html: str, co: dict) -> list[dict]:
 
 
 def fetch_successfactors_board(c, co: dict) -> list[dict]:
-    token, seen, items = co["ats_token"], set(), []
+    token, seen, items, counts = co["ats_token"], set(), [], counts_of(co)
     require_robots(c, f"https://{token}", "/search/", token)
     for kw in KEYWORDS:
         for page in range(MAX_PAGES):
@@ -190,9 +193,13 @@ def fetch_successfactors_board(c, co: dict) -> list[dict]:
                 if key not in seen:
                     seen.add(key)
                     items.append(it)
+                else:
+                    counts.discard("duplicate")
             # A short page is the last page; SuccessFactors serves 25 links when there are more.
             if len({m.group(2) for m in JOB_RE.finditer(r.text)}) < PAGE_SIZE:
                 break
+        else:
+            counts.stop("page_cap")   # MAX_PAGES full pages, and the next may hold more
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(it["url"])

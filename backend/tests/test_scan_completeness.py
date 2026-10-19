@@ -65,9 +65,12 @@ def workday(by_kw, mode):
             return _robots_or_detail(request)
         body = json.loads(request.content)
         kw, off, lim = body["searchText"], body["offset"], body["limit"]
-        if mode == "failed" and kw == "co-op":
+        # Every board searches only "intern" by default, so the failure is its second page.
+        if mode == "failed" and (kw == "co-op" or off > 0):
             return httpx.Response(500)
         rows = _rows(by_kw, kw, mode, 1000)
+        if mode == "failed":
+            rows += [NOISE] * 30   # a second page to fail on
         page = [{"title": t, "externalPath": f"/job/{kw}-{i}", "locationsText": "Boston, MA"}
                 for i, t in enumerate(rows[off:off + lim], off)]
         data = {"jobPostings": page}
@@ -344,14 +347,49 @@ def test_workday_dry_stop_past_the_core_offset_is_not_complete():
     assert len(result) == 200 and result.complete is False
 
 
-def test_workday_every_keyword_must_complete():
-    # "intern" read whole is not enough when the "co-op" search hit the page cap.
-    server = workday({"intern": ["Software Engineer Intern"],
-                      "co-op": ["Mechanical Co-op"] + [NOISE] * 1000}, "complete")
-    co = {"name": "Acme", "ats_token": "acme|wd1|Careers", "sector": None, "location": None}
-    with httpx.Client(transport=httpx.MockTransport(server)) as c:
-        result = run_ingest._fetch_board(c, "workday", co)
-    assert result.complete is False
+def _workday_scan(by_kw, sector=None):
+    server = workday(by_kw, "complete")
+    co = {"name": "Acme", "ats_token": "acme|wd1|Careers", "sector": sector, "location": None}
+    searched = []
+
+    def handle(request):
+        if request.method == "POST":
+            searched.append(json.loads(request.content)["searchText"])
+        return server(request)
+
+    with httpx.Client(transport=httpx.MockTransport(handle)) as c:
+        return run_ingest._fetch_board(c, "workday", co), list(dict.fromkeys(searched))
+
+
+def test_workday_every_keyword_searched_must_complete(monkeypatch):
+    # With co-op switched on, "intern" read whole is not enough when "co-op" hit the page cap.
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
+    result, searched = _workday_scan({"intern": ["Software Engineer Intern"],
+                                      "co-op": ["Mechanical Co-op"] + [NOISE] * 1000})
+    assert searched == ["intern", "co-op"] and result.complete is False
+
+
+def test_workday_default_evidence_covers_only_the_intern_search():
+    # Co-op is off by default, so its results are never asked for and cannot hold back the
+    # evidence: the one search the run made was read to its total.
+    result, searched = _workday_scan({"intern": ["Software Engineer Intern"],
+                                      "co-op": ["Mechanical Co-op"] + [NOISE] * 1000})
+    assert searched == ["intern"] and result.complete is True
+
+
+def test_workday_switched_on_co_op_read_whole_is_evidence(monkeypatch):
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
+    result, searched = _workday_scan({"intern": ["Software Engineer Intern"],
+                                      "co-op": ["Mechanical Co-op"]})
+    assert searched == ["intern", "co-op"] and result.complete is True and len(result) == 2
+
+
+def test_workday_health_student_search_must_complete_too():
+    # The hospital "student" search predates the expansion and still runs; a capped one is a gap.
+    result, searched = _workday_scan({"intern": ["Pharmacy Intern"],
+                                      "student": ["Student Nurse Technician"] + [NOISE] * 1000},
+                                     sector="health")
+    assert searched == ["intern", "student"] and result.complete is False
 
 
 def test_keyword_scoped_evidence_cannot_close_a_posting_only_a_list_found(listing_db):

@@ -19,7 +19,7 @@ knowing before touching this:
     neither a description nor a snippet is reported.
 """
 from __future__ import annotations
-from .common import board_item, mark_complete, reported_count, require_robots, rows_of
+from .common import board_item, counts_of, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
 from ..geo import PROVINCES, STATE_NAMES
 
@@ -66,13 +66,15 @@ def _locations(std: list) -> list[str]:
 
 def parse_eightfold(payload: dict, co: dict) -> list[dict]:
     tenant, _ = host_of(co["ats_token"])
-    out = []
+    out, counts = [], counts_of(co)
     for p in ((payload or {}).get("data") or {}).get("positions") or []:
         title = p.get("name") or ""
         if not is_internship(title, p.get("department") or ""):
+            counts.discard("not_student")
             continue
         locs = _locations(p.get("standardizedLocations"))
         if not locs:
+            counts.discard("outside_region")
             continue
         # positionUrl is site-relative ('/careers/job/137482769212'); build the same link from the
         # id when it is missing, which is the form every tenant checked serves.
@@ -89,7 +91,7 @@ def fetch_eightfold_board(c, co: dict) -> list[dict]:
     tenant, domain = host_of(co["ats_token"])
     require_robots(c, f"https://{tenant}.eightfold.ai", "/api/pcsx/search",
                    co["ats_token"])
-    seen, items, complete = set(), [], True
+    seen, items, complete, counts = set(), [], True, counts_of(co)
     for kw in KEYWORDS:
         reported, rows, well_formed = None, 0, True
         for page in range(MAX_PAGES):
@@ -109,14 +111,20 @@ def fetch_eightfold_board(c, co: dict) -> list[dict]:
                 well_formed = False
             if page == 0:
                 reported = reported_count(data.get("count") if isinstance(data, dict) else None)
+                counts.reported(reported)
             got = data.get("positions") or []
             rows += len(counted or [])
+            counts.rows(len(counted or []))
             for it in parse_eightfold(payload, co):
                 if it["url"] not in seen:
                     seen.add(it["url"])
                     items.append(it)
+                else:
+                    counts.discard("duplicate")
             if len(got) < PAGE_SIZE or (page + 1) * PAGE_SIZE >= (data.get("count") or 0):
                 break
+        else:
+            counts.stop("page_cap")   # every page was full and the count ran past them
         # MAX_PAGES caps a keyword at 120 results, and a short page before `count` is a gap.
         complete = complete and well_formed and reported is not None and rows == reported
     mark_complete(co, complete)

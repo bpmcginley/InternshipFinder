@@ -35,3 +35,13 @@ def _near_pages_only_where_tested(request, monkeypatch):
         return
     from internscout import seo_pages
     monkeypatch.setattr(seo_pages, "NEAR_ON", False)
+
+
+@pytest.fixture(autouse=True)
+def _default_workday_keywords(monkeypatch):
+    """Run every test with Workday's default search words, whatever the shell has set.
+
+    WORKDAY_EXTRA_KEYWORDS turns on extra searches for every Workday board. A test that wants
+    them sets the variable itself.
+    """
+    monkeypatch.delenv("WORKDAY_EXTRA_KEYWORDS", raising=False)

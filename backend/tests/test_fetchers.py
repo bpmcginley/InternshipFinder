@@ -10,7 +10,7 @@ from internscout.sources.workday import (CORE_OFFSET, DRY_PAGES, PAGE,
                                          robots_allows,
                                          fetch_workday_board,
                                          parse_workday_list, parse_workday_detail,
-                                         parse_posted_on, host_of)
+                                         parse_posted_on, host_of, search_terms)
 from internscout.sources.smartrecruiters import parse_smartrecruiters, parse_smartrecruiters_detail
 from internscout.sources.workable import parse_workable
 from internscout.sources.recruitee import parse_recruitee
@@ -733,20 +733,36 @@ def test_a_hospital_board_is_also_searched_for_student_roles():
     co = dict(_deepco(), sector="health")
     out = fetch_workday_board(board, co)
     assert sorted(x["title"] for x in out) == ["Pharmacy Intern", "Student Nurse Technician"]
-    assert board.texts == ["intern", "co-op", "student"]
+    assert board.texts == ["intern", "student"]
 
 
-def test_other_boards_search_interns_and_coops_without_general_student_search():
-    board = _SearchBoard({"intern": ["Software Engineer Intern"], "student": ["Student Nurse Technician"]})
+def test_other_boards_search_only_interns_by_default():
+    # The co-op search for every board is opt-in since 2026-10-19: it found nothing extra on the
+    # boards measured and cost about 13,500 requests a run (live-verification-2026-10-18.md).
+    board = _SearchBoard({"intern": ["Software Engineer Intern"], "student": ["Student Nurse Technician"],
+                          "co-op": ["Mechanical Engineering Co-op"]})
     assert len(fetch_workday_board(board, _deepco())) == 1
-    assert board.texts == ["intern", "co-op"]
+    assert board.texts == ["intern"]
 
 
-def test_workday_keeps_coops_missing_from_intern_search():
+def test_workday_keeps_coops_missing_from_intern_search_when_co_op_is_switched_on(monkeypatch):
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
     board = _SearchBoard({"intern": ["Software Engineer Intern"],
                           "co-op": ["Software Engineer Intern", "Mechanical Engineering Co-op"]})
     out = fetch_workday_board(board, _deepco())
     assert [x["title"] for x in out] == ["Software Engineer Intern", "Mechanical Engineering Co-op"]
+    assert board.texts == ["intern", "co-op"]
+
+
+def test_extra_workday_words_are_read_once_each_in_order(monkeypatch):
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", " Co-op , intern,,student ")
+    assert search_terms(None) == ("intern", "co-op", "student")
+    assert search_terms("health") == ("intern", "co-op", "student")
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
+    assert search_terms("health") == ("intern", "co-op", "student")
+    monkeypatch.delenv("WORKDAY_EXTRA_KEYWORDS")
+    assert search_terms(None) == ("intern",)
+    assert search_terms("behavioral_health") == ("intern", "student")
 
 class _Robots:
     """A Workday host serving one robots.txt and nothing else."""

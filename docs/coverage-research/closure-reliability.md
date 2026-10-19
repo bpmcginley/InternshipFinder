@@ -95,7 +95,7 @@ Authoritative only for what their keyword searches return (`SEARCH_SCOPED`):
 
 | Adapter | Evidence |
 | --- | --- |
-| Workday | every search (intern, co-op, plus student for health boards) read to its `total` |
+| Workday | every search the run made read to its `total`: intern, student on health boards, and any words in `WORKDAY_EXTRA_KEYWORDS` (co-op is opt-in since October 19) |
 | Oracle | every keyword read to its `TotalJobsCount` |
 | SmartRecruiters | the intern search read to its `totalFound` |
 | Taleo | every keyword read to its `pagingData.totalCount` |
@@ -144,7 +144,7 @@ keeps the old carry behavior. The export log prints how many rows complete
 scans closed, and the ingest report counts complete boards per ATS.
 
 Answer to the question that started this: yes. A role that disappears from a
-Workday board whose intern and co-op searches were both read to their totals
+Workday board whose searches were all read to their totals
 leaves the published site on the next refresh, even when the board lost enough
 roles to look like a failed fetch. Before, a role gone from a board that kept
 more than half its rows already left; a role gone from a board of three or more that

@@ -30,7 +30,7 @@ Latest full local suite: `PYTHONPATH=backend python -m pytest backend/tests -q` 
 1. Implement and render/verify the 500 requested major-city pages; test exact Cartesian product, distinct paths, truthful location filtering, empty pages, escaping, canonical URLs and browse links.
 2. Inspect discovered board identity and admit Nova Scotia/Sanford with the discovery CLI's explicit apply option, then measure accepted unique yield in a controlled ingestion without paid search calls.
 3. Measure expanded-query runtime/yield before raising any caps or budgets. Keep search quotas unchanged unless the user explicitly requests an increase.
-4. Expand metrics to adapter-side candidate counts and whole-source failures; unknown is not zero.
+4. Done October 19 (branch `cov-metrics`): adapter page counts (discovered, read, discarded by reason, capped) and whole-source outcomes are in the ingest report, with reconciliation; see ingest-observability.md. The Workday `co-op` search is now opt-in through `WORKDAY_EXTRA_KEYWORDS`; see query-expansion.md.
 5. Reconcile static export carry-over with authoritative closure evidence and ephemeral CI DB behavior.
 6. Review full diff, run relevant tests after further edits, and prepare reviewable changes. User has not requested production deployment.
 
