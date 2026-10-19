@@ -11063,10 +11063,9 @@
   "www.careers.zurich.com": {
    "name": "Zurich Insurance",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "insurance_finance",
-   "last_fail": "2026-10-19"
+   "sector": "insurance_finance"
   },
   "www.optimumcareers.com": {
    "name": "Altice USA",
@@ -17464,9 +17463,8 @@
   "salesforce|wd12|Futureforce_Internships": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-19"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "salesforce|wd12|futureforce_newgradroles": {
    "name": "Salesforce",
@@ -17888,9 +17886,8 @@
   "spgi|wd5|SPGI_Careers": {
    "name": "S&P Global ",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-19"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "springernature|wd3|SpringerNatureCareers": {
    "name": "Springer Nature",
