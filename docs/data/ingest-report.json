@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
-  "started_at": "2026-10-19T18:08:17.208039+00:00",
+  "started_at": "2026-10-19T18:40:57.430996+00:00",
   "funnel": {
-    "fetched": 40746,
-    "parsed": 39591,
-    "accepted": 26485,
-    "unique": 19034,
-    "persisted": 19034
+    "fetched": 40752,
+    "parsed": 39597,
+    "accepted": 26491,
+    "unique": 19059,
+    "persisted": 19059
   },
   "by_source": {
     "adamkoch4221": {
@@ -68,29 +68,29 @@
       "rejected_filter_term_filter": 22
     },
     "eightfold": {
-      "fetched": 192,
-      "parsed": 192,
-      "accepted": 192
+      "fetched": 190,
+      "parsed": 190,
+      "accepted": 190
     },
     "greenhouse": {
-      "fetched": 2291,
-      "parsed": 2291,
-      "accepted": 1813,
+      "fetched": 2294,
+      "parsed": 2294,
+      "accepted": 1816,
       "rejected_filter_outside_region": 437,
       "rejected_filter_term_filter": 41
     },
     "icims": {
-      "fetched": 1132,
-      "parsed": 1114,
-      "accepted": 1100,
+      "fetched": 1131,
+      "parsed": 1113,
+      "accepted": 1099,
       "rejected_filter_term_filter": 3,
       "rejected_normalize_stale_untermed": 18,
       "rejected_filter_outside_region": 11
     },
     "icims_site": {
-      "fetched": 1237,
-      "parsed": 1232,
-      "accepted": 1213,
+      "fetched": 1241,
+      "parsed": 1236,
+      "accepted": 1217,
       "rejected_filter_term_filter": 14,
       "rejected_normalize_stale_untermed": 5,
       "rejected_filter_outside_region": 5
@@ -157,9 +157,9 @@
       "rejected_filter_term_filter": 3
     },
     "oracle": {
-      "fetched": 1678,
-      "parsed": 1676,
-      "accepted": 1668,
+      "fetched": 1680,
+      "parsed": 1678,
+      "accepted": 1670,
       "rejected_filter_term_filter": 5,
       "rejected_normalize_stale_untermed": 2,
       "rejected_filter_outside_region": 3
@@ -187,17 +187,17 @@
       "accepted": 1
     },
     "simplify": {
-      "fetched": 16852,
-      "parsed": 15737,
-      "accepted": 8612,
+      "fetched": 16851,
+      "parsed": 15736,
+      "accepted": 8611,
       "rejected_filter_term_filter": 6616,
       "rejected_normalize_not_student_role": 1115,
       "rejected_filter_outside_region": 509
     },
     "successfactors": {
-      "fetched": 544,
-      "parsed": 544,
-      "accepted": 501,
+      "fetched": 555,
+      "parsed": 555,
+      "accepted": 512,
       "rejected_filter_term_filter": 3,
       "rejected_filter_outside_region": 40
     },
@@ -207,9 +207,9 @@
       "accepted": 126
     },
     "usajobs": {
-      "fetched": 197,
-      "parsed": 197,
-      "accepted": 171,
+      "fetched": 198,
+      "parsed": 198,
+      "accepted": 172,
       "rejected_filter_term_filter": 14,
       "rejected_filter_outside_region": 12
     },
@@ -229,11 +229,11 @@
       "rejected_filter_term_filter": 1
     },
     "workday": {
-      "fetched": 13957,
-      "parsed": 13957,
-      "accepted": 9019,
-      "rejected_filter_outside_region": 4756,
-      "rejected_filter_term_filter": 182
+      "fetched": 13946,
+      "parsed": 13946,
+      "accepted": 9008,
+      "rejected_filter_outside_region": 4755,
+      "rejected_filter_term_filter": 183
     },
     "zach-marto": {
       "fetched": 1,
@@ -252,11 +252,11 @@
       "stale_untermed": 31
     },
     "filter": {
-      "term_filter": 7141,
-      "outside_region": 5965
+      "term_filter": 7142,
+      "outside_region": 5964
     }
   },
-  "deduplicated": 7451,
+  "deduplicated": 7432,
   "boards": {
     "adp": {
       "success": 3,
@@ -279,24 +279,24 @@
     },
     "eightfold": {
       "success": 6,
-      "returned": 192,
+      "returned": 190,
       "complete": 5,
       "empty_success": 1
     },
     "greenhouse": {
       "success": 683,
-      "returned": 2291,
+      "returned": 2294,
       "complete": 683,
-      "empty_success": 350
+      "empty_success": 349
     },
     "icims": {
       "success": 129,
-      "returned": 1132,
+      "returned": 1131,
       "empty_success": 71
     },
     "icims_site": {
       "success": 61,
-      "returned": 1237,
+      "returned": 1241,
       "complete": 61,
       "empty_success": 14
     },
@@ -318,7 +318,7 @@
     },
     "oracle": {
       "success": 131,
-      "returned": 1678,
+      "returned": 1680,
       "complete": 113,
       "empty_success": 43
     },
@@ -334,10 +334,9 @@
       "empty_success": 37
     },
     "successfactors": {
-      "success": 25,
-      "returned": 544,
-      "empty_success": 3,
-      "failed": 1
+      "success": 26,
+      "returned": 555,
+      "empty_success": 3
     },
     "taleo": {
       "success": 11,
@@ -352,11 +351,11 @@
       "empty_success": 50
     },
     "workday": {
-      "success": 1226,
-      "returned": 13957,
+      "success": 1227,
+      "returned": 13946,
       "complete": 986,
-      "empty_success": 367,
-      "failed": 4
+      "empty_success": 365,
+      "failed": 3
     }
   },
   "board_scans": {
@@ -377,26 +376,26 @@
       "boards": 384,
       "capped": 0,
       "read_boards": 384,
-      "read": 14089,
+      "read": 14094,
       "returned_by_read_boards": 602,
       "discarded": {
-        "not_student": 13487
+        "not_student": 13492
       },
       "discovered_boards": 384,
-      "discovered": 14089
+      "discovered": 14094
     },
     "bamboohr": {
       "boards": 21,
       "capped": 0,
       "read_boards": 21,
-      "read": 776,
+      "read": 778,
       "returned_by_read_boards": 133,
       "discarded": {
-        "not_student": 634,
+        "not_student": 636,
         "outside_region": 9
       },
       "discovered_boards": 21,
-      "discovered": 776
+      "discovered": 778
     },
     "eightfold": {
       "boards": 6,
@@ -406,11 +405,11 @@
       },
       "read_boards": 6,
       "read": 666,
-      "returned_by_read_boards": 192,
+      "returned_by_read_boards": 190,
       "discarded": {
-        "outside_region": 188,
-        "not_student": 222,
-        "duplicate": 64
+        "outside_region": 191,
+        "not_student": 220,
+        "duplicate": 65
       },
       "discovered_boards": 6,
       "discovered": 747
@@ -419,13 +418,13 @@
       "boards": 683,
       "capped": 0,
       "read_boards": 683,
-      "read": 49031,
-      "returned_by_read_boards": 2291,
+      "read": 49014,
+      "returned_by_read_boards": 2294,
       "discarded": {
-        "not_student": 46740
+        "not_student": 46720
       },
       "discovered_boards": 683,
-      "discovered": 49031
+      "discovered": 49014
     },
     "icims": {
       "boards": 129,
@@ -435,26 +434,26 @@
         "page_cap": 1
       },
       "read_boards": 129,
-      "read": 2648,
-      "returned_by_read_boards": 1132,
+      "read": 2644,
+      "returned_by_read_boards": 1131,
       "discarded": {
-        "outside_region": 380,
-        "not_student": 879,
-        "duplicate": 257
+        "outside_region": 376,
+        "not_student": 881,
+        "duplicate": 256
       }
     },
     "icims_site": {
       "boards": 61,
       "capped": 0,
       "read_boards": 61,
-      "read": 2228,
-      "returned_by_read_boards": 1237,
+      "read": 2230,
+      "returned_by_read_boards": 1241,
       "discarded": {
-        "not_student": 772,
+        "not_student": 770,
         "outside_region": 219
       },
       "discovered_boards": 61,
-      "discovered": 2228
+      "discovered": 2230
     },
     "jazzhr": {
       "boards": 83,
@@ -480,13 +479,13 @@
       "boards": 193,
       "capped": 0,
       "read_boards": 193,
-      "read": 10075,
+      "read": 10081,
       "returned_by_read_boards": 516,
       "discarded": {
-        "not_student": 9559
+        "not_student": 9565
       },
       "discovered_boards": 193,
-      "discovered": 10075
+      "discovered": 10081
     },
     "oracle": {
       "boards": 131,
@@ -495,15 +494,15 @@
         "page_cap": 14
       },
       "read_boards": 131,
-      "read": 26636,
-      "returned_by_read_boards": 1678,
+      "read": 26637,
+      "returned_by_read_boards": 1680,
       "discarded": {
-        "not_student": 22591,
+        "not_student": 22589,
         "outside_region": 1184,
-        "duplicate": 1183
+        "duplicate": 1184
       },
       "discovered_boards": 131,
-      "discovered": 47783
+      "discovered": 47775
     },
     "recruitee": {
       "boards": 1,
@@ -522,43 +521,43 @@
       "boards": 63,
       "capped": 0,
       "read_boards": 63,
-      "read": 1557,
+      "read": 1556,
       "returned_by_read_boards": 60,
       "discarded": {
-        "not_student": 1491,
+        "not_student": 1490,
         "duplicate": 6
       },
       "discovered_boards": 63,
-      "discovered": 1557
+      "discovered": 1556
     },
     "successfactors": {
-      "boards": 25,
-      "capped": 14,
+      "boards": 26,
+      "capped": 15,
       "stops": {
-        "page_cap": 16
+        "page_cap": 17
       },
-      "read_boards": 25,
-      "read": 4637,
-      "returned_by_read_boards": 544,
+      "read_boards": 26,
+      "read": 4806,
+      "returned_by_read_boards": 555,
       "discarded": {
-        "not_student": 3479,
-        "outside_region": 145,
-        "duplicate": 469
+        "not_student": 3609,
+        "outside_region": 170,
+        "duplicate": 472
       }
     },
     "taleo": {
       "boards": 11,
       "capped": 0,
       "read_boards": 11,
-      "read": 567,
+      "read": 568,
       "returned_by_read_boards": 126,
       "discarded": {
-        "not_student": 256,
+        "not_student": 257,
         "duplicate": 108,
         "outside_region": 77
       },
       "discovered_boards": 11,
-      "discovered": 585
+      "discovered": 586
     },
     "workable": {
       "boards": 81,
@@ -574,21 +573,21 @@
       "discovered": 3376
     },
     "workday": {
-      "boards": 1226,
+      "boards": 1227,
       "capped": 240,
       "stops": {
         "dry_pages": 228,
         "page_cap": 22
       },
-      "read_boards": 1226,
-      "read": 120590,
-      "returned_by_read_boards": 13957,
+      "read_boards": 1227,
+      "read": 120790,
+      "returned_by_read_boards": 13946,
       "discarded": {
-        "not_student": 106452,
-        "duplicate": 181
+        "not_student": 106661,
+        "duplicate": 183
       },
-      "discovered_boards": 1226,
-      "discovered": 254203
+      "discovered_boards": 1227,
+      "discovered": 254532
     }
   },
   "board_failures": [
@@ -598,13 +597,6 @@
       "status": "failed",
       "returned": 0,
       "cause": "404"
-    },
-    {
-      "source": "successfactors",
-      "board_id": "953ada08b7dda8be",
-      "status": "failed",
-      "returned": 0,
-      "cause": "408"
     },
     {
       "source": "workday",
@@ -626,13 +618,6 @@
       "status": "failed",
       "returned": 0,
       "cause": "429"
-    },
-    {
-      "source": "workday",
-      "board_id": "fa567d484ad2fa90",
-      "status": "failed",
-      "returned": 0,
-      "cause": "JSONDecodeError"
     }
   ],
   "sources": {
@@ -656,10 +641,10 @@
     },
     "simplify": {
       "status": "success",
-      "returned": 17061,
+      "returned": 17060,
       "scan": {
-        "discovered": 17062,
-        "read": 17062,
+        "discovered": 17061,
+        "read": 17061,
         "discarded": {
           "unlisted": 1
         },
@@ -670,20 +655,20 @@
       "status": "empty",
       "returned": 0,
       "scan": {
-        "discovered": 163,
-        "read": 163,
+        "discovered": 162,
+        "read": 162,
         "discarded": {
-          "not_student": 163
+          "not_student": 162
         },
         "capped": false
       }
     },
     "usajobs": {
       "status": "success",
-      "returned": 197,
+      "returned": 198,
       "scan": {
-        "discovered": 202,
-        "read": 202,
+        "discovered": 203,
+        "read": 203,
         "discarded": {
           "not_student": 5
         },
@@ -702,9 +687,9 @@
     }
   },
   "export": {
-    "total": 19201,
-    "held": 167,
-    "open": 14982
+    "total": 19135,
+    "held": 76,
+    "open": 14917
   },
   "discrepancies": [],
   "limits": [
