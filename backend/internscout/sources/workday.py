@@ -7,7 +7,7 @@ that domain in the middle field: "wf|wd1.myworkdaysite.com|WellsFargoJobs".
 from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
-from .common import RobotsDisallowed, board_item, html_to_text
+from .common import RobotsDisallowed, board_item, html_to_text, mark_complete, reported_count, rows_of
 from .common import robots_allows as _host_allows
 from ..classify import is_internship
 from ..region import maybe_in_region
@@ -119,25 +119,39 @@ def parse_workday_detail(payload: dict) -> tuple[list[str], str]:
 EXTRA_SEARCH = {"health": ("student",), "behavioral_health": ("student",)}
 
 
-def _search(c, api: str, text: str) -> list[dict]:
+def _search(c, api: str, text: str) -> tuple[list[dict], bool]:
+    """(internship postings, whether every result of this search was read).
+
+    Complete means the first page reported a total, every page was a well-formed list, and the
+    rows read add up to that total. Hitting MAX_OFFSET, stopping on DRY_PAGES of noise, or a page
+    that came back short or empty before the total was reached all leave the search incomplete.
+    """
     postings, offset, total, dry = [], 0, None, 0
+    reported, rows, well_formed, complete = None, 0, True, False
     while True:
         r = c.post(f"{api}/jobs", headers=HEADERS,
                    json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": text})
         r.raise_for_status()
         data = r.json()
-        page = data.get("jobPostings") or []
+        if not isinstance(data, dict):
+            raise ValueError("Workday search response is not an object")
+        page = rows_of(data, "jobPostings")
+        if page is None:
+            well_formed, page = False, []
         if total is None:
+            reported = reported_count(data.get("total"))
             total = data.get("total") or 0   # only reported on the first page
+        rows += len(page)
         found = parse_workday_list(data)
         postings += found
         dry = 0 if found else dry + 1
         offset += PAGE
         if not page or offset >= total or offset >= MAX_OFFSET:
+            complete = well_formed and reported is not None and rows == reported
             break
         if offset >= CORE_OFFSET and dry >= DRY_PAGES:
             break   # the matches have run out; the rest of this board is "internal" and "overseas"
-    return postings
+    return postings, complete
 
 
 def fetch_workday_board(c, co: dict) -> list[dict]:
@@ -145,11 +159,13 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
         raise RobotsDisallowed(co["ats_token"])
     host, tenant, site = host_of(co["ats_token"])
     api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
-    postings, seen = [], set()
+    postings, seen, complete = [], set(), True
     # Co-ops often omit "intern" entirely, in both US and Canadian engineering
     # programs. Keep the existing page/detail budgets and dedupe overlapping hits.
     for text in ("intern", "co-op") + EXTRA_SEARCH.get(co.get("sector"), ()):
-        for p in _search(c, api, text):
+        found, whole = _search(c, api, text)
+        complete = complete and whole
+        for p in found:
             key = p.get("externalPath") or p.get("title")
             if key not in seen:
                 seen.add(key)
@@ -183,4 +199,8 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                               url=url, description=desc,
                               posted_at=parse_posted_on(p.get("postedOn")),
                               employment_type=" ".join(p.get("bulletFields") or [])))
+    # Every search read to its reported total. The detail budget above trims descriptions, never
+    # postings, so it does not affect this. The evidence covers what these searches return, not
+    # the whole board: scan_evidence.SEARCH_SCOPED keeps that limit in view.
+    mark_complete(co, complete)
     return out

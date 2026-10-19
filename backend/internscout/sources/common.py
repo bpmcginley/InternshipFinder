@@ -166,3 +166,37 @@ def seed_location(co: dict, locations: list) -> list:
     if not where or any(state_of(l) or _NON_US.search(l) or REMOTE_RE.search(l) for l in locations):
         return locations
     return locations + [where]
+
+
+def reported_count(value) -> int | None:
+    """A result total as an API reported it, or None when it is missing or not a whole number.
+
+    A scan only proves it read a whole board (or a whole search) when the rows it fetched add up
+    to the total the API said there were. A total that is absent, negative or not a number proves
+    nothing, so it is None rather than 0: 0 would read as "an empty board, fully read".
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def rows_of(payload, key: str) -> list | None:
+    """payload[key] when it is a list of objects, else None (a shape we cannot count on)."""
+    rows = payload.get(key) if isinstance(payload, dict) else None
+    if isinstance(rows, list) and all(isinstance(r, dict) for r in rows):
+        return rows
+    return None
+
+
+def mark_complete(co: dict, complete: bool) -> None:
+    """Tell scan_boards this board was read to its end, so absence from it can close a listing.
+
+    Only ever set True, and only at the very end of a fetch: an exception before this line, a
+    page cap, a short or malformed page or a total that does not add up all leave it unset.
+    """
+    if complete:
+        co["_scan_complete"] = True

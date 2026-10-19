@@ -16,7 +16,7 @@ it is the same employer boilerplate on every requisition, and it would crowd the
 out of the 4,000-character budget and give the classifier marketing copy to tag a job by.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -81,13 +81,23 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
     require_robots(c, f"https://{host}",
                    "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
                    co["ats_token"])
-    out, seen = [], set()
+    out, seen, complete = [], set(), True
     for keyword in KEYWORDS:
-        offset = 0
+        offset, reported, rows, well_formed = 0, None, 0, True
         while offset < MAX_OFFSET:
             r = c.get(API.format(host=host, site=site, keyword=keyword, limit=PAGE, offset=offset))
             r.raise_for_status()
-            items, total = parse_oracle(r.json(), co, host, site)
+            payload = r.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Oracle search response is not an object")
+            heads = payload.get("items")
+            page = rows_of(heads[0], "requisitionList") if isinstance(heads, list) and heads else None
+            if page is None:
+                well_formed = False
+            elif offset == 0:
+                reported = reported_count(heads[0].get("TotalJobsCount"))
+            rows += len(page or [])
+            items, total = parse_oracle(payload, co, host, site)
             for it in items:
                 if it["_req_id"] not in seen:
                     seen.add(it["_req_id"])
@@ -95,6 +105,8 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
             offset += PAGE
             if offset >= total:
                 break
+        # A keyword whose matches run past MAX_OFFSET is read only in part, and so is the board.
+        complete = complete and well_formed and reported is not None and rows == reported
     # A teaser the employer did bother to write is left alone; the call is for the ones with nothing.
     todo = [i for i in out if not (i["description"] or "").strip()
             and any(maybe_in_region(l) for l in i["locations"])]
@@ -105,4 +117,5 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
                 it["description"] = parse_oracle_detail(d.json())[:4000]
         except Exception:
             pass
+    mark_complete(co, complete)   # every keyword read to its TotalJobsCount; see scan_evidence
     return out

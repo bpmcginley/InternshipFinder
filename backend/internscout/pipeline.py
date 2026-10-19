@@ -15,6 +15,7 @@ from .dedupe import merge_batch, _canon_job
 from .discover import ats_of
 from .region import place_bare_cities
 from .score import score_parts
+from .scan_evidence import SEARCH_SCOPED, canonical, url_board
 
 
 def _term_ok(season, year) -> bool:
@@ -33,9 +34,8 @@ def _field_ok(tags) -> bool:
     return any(t in PROFILE.fields for t in tags)
 
 
-def _board_key(url):
-    ats, token = ats_of(url)
-    return (ats, token.lower()) if token else None
+def _board_key(url, source=None):
+    return url_board(url, source)
 
 
 def _listing_boards(row):
@@ -46,12 +46,23 @@ def _listing_boards(row):
     # employer URL can identify a board, but disappearance from a list never can.
     from .sources import BOARD_FETCHERS
     for link in row.source_links:
-        board = _board_key(link.source_url)
+        board = _board_key(link.source_url, link.source)
         if board:
             found.add(board)
         elif link.source in BOARD_FETCHERS and (not apply_board or apply_board[0] != link.source):
             return set()  # an ATS observation whose board cannot be recovered
     return found
+
+
+def _in_scan_scope(row, boards) -> bool:
+    """Whether every board's evidence covers this row (see scan_evidence.SEARCH_SCOPED).
+
+    A keyword-scoped scan can only vouch for postings its own searches return, so the row must
+    have been found by that adapter before. One known only from a search engine or a list may be
+    a title the keywords never match, and its absence from them says nothing.
+    """
+    sources = {link.source for link in row.source_links}
+    return all(ats not in SEARCH_SCOPED or ats in sources for ats, _ in boards)
 
 
 def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=None) -> dict:
@@ -61,7 +72,7 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
     boards. Omission is deliberately safe for fixtures and partial callers.
     """
     init_db()
-    completed_boards = {(ats, token.lower()) for ats, token in (completed_boards or ())}
+    completed_boards = canonical(completed_boards)
     seen_urls = {_canon_job(raw.get(key)) for raw in raw_items
                  for key in ("apply_url", "url", "source_url") if raw.get(key)} - {None}
     placed = place_bare_cities(raw_items)
@@ -167,7 +178,7 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
                        [row.apply_url] + [sl.source_url for sl in row.source_links] if url):
                     continue  # fetched but rejected/changed metadata is not proof of absence
                 row_boards = _listing_boards(row)
-                if row_boards and row_boards.issubset(completed_boards):
+                if row_boards and row_boards.issubset(completed_boards) and _in_scan_scope(row, row_boards):
                     row.status = "closed"
                     stats["closed"] += 1
         db.commit()

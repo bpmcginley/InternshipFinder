@@ -7,7 +7,7 @@ Rippling gives a posting date. Checked live on four tenants, all the same shape.
 """
 from __future__ import annotations
 import re
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, mark_complete
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -49,7 +49,12 @@ def fetch_rippling_board(c, co: dict) -> list[dict]:
     token = co["ats_token"]
     r = c.get(URL.format(token=token))
     r.raise_for_status()
-    items = parse_rippling(r.json(), co)
+    payload = r.json()
+    items = parse_rippling(payload, co)
+    # The v1 board call takes no paging parameters and answers with a bare array of every
+    # (job, location) row. Only that shape is the whole board: an object wrapping "jobs" could be
+    # one page of a paged envelope, so it is read but proves nothing.
+    complete = isinstance(payload, list) and all(isinstance(j, dict) for j in payload)
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(JOB_URL.format(token=token, uuid=it["_rp_uuid"]))
@@ -61,4 +66,5 @@ def fetch_rippling_board(c, co: dict) -> list[dict]:
             pass
     for it in items:
         it.pop("_rp_uuid", None)
+    mark_complete(co, complete)
     return items

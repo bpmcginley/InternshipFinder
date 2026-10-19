@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.parse
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -114,15 +114,28 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
     portal = parts[2] if len(parts) > 2 else _portal(c, tenant, section)
     url = f"{BASE.format(tenant=tenant)}/rest/jobboard/searchjobs"
     seen: dict[str, dict] = {}
+    complete = True
     for kw in KEYWORDS:
+        reported, rows, well_formed = None, 0, True
         for page in range(1, MAX_PAGES + 1):
             r = c.post(url, params={"lang": "en", "portal": portal}, json=_body(kw, page), headers=HEADERS)
             r.raise_for_status()
-            items, total = parse_taleo(r.json(), co, tenant, section)
+            payload = r.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Taleo search response is not an object")
+            got = rows_of(payload, "requisitionList")
+            if got is None:
+                well_formed = False
+            if page == 1:
+                reported = reported_count((payload.get("pagingData") or {}).get("totalCount"))
+            rows += len(got or [])
+            items, total = parse_taleo(payload, co, tenant, section)
             for it in items:
                 seen.setdefault(it["url"], it)
             if page * 25 >= total:
                 break
+        # MAX_PAGES caps a keyword at 200 results; one with more is read only in part.
+        complete = complete and well_formed and reported is not None and rows == reported
     out = list(seen.values())
     for it in [i for i in out if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
@@ -131,4 +144,5 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
                 it["description"] = parse_taleo_detail(d.text)[:4000]
         except Exception:
             pass
+    mark_complete(co, complete)
     return out

@@ -55,7 +55,7 @@ class IngestMetrics:
             self.by_source.setdefault(_label(source), Counter())[key] += 1
 
     def board_result(self, source: str, board: str, status: str, *, count: int = 0,
-                     cause: str | None = None):
+                     cause: str | None = None, complete: bool = False):
         """Record the FINAL outcome after retries; repeated boards replace their outcome.
 
         The board token is hashed so reports cannot accidentally publish a URL or token.
@@ -69,6 +69,9 @@ class IngestMetrics:
         self.boards[(_label(source), board_id)] = {
             "status": status, "returned": count, "cause": _label(cause) if cause else None,
         }
+        if status == "success" and complete:
+            # Read to the end (scan_evidence): absence from this board closed postings this run.
+            self.boards[(_label(source), board_id)]["complete"] = True
 
     def export_result(self, total: int, *, open_count: int | None = None,
                       held: int = 0, unplaced: int | None = None):
@@ -85,6 +88,8 @@ class IngestMetrics:
             bucket = summary.setdefault(source, Counter())
             bucket[result["status"]] += 1
             bucket["returned"] += result["returned"]
+            if result.get("complete"):
+                bucket["complete"] += 1
             if result["status"] != "success":
                 failures.append({"source": source, "board_id": board_id, **result})
             elif result["returned"] == 0:
