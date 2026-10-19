@@ -102,6 +102,7 @@ def test_one_failed_check_does_not_stop_the_others(monkeypatch, capsys):
     monkeypatch.setattr(cu, "runs", lambda f: (_ for _ in ()).throw(OSError("boom")) if f == "ingest.yml" else [])
     monkeypatch.setattr(cu, "dispatch", started.append)
     monkeypatch.setattr(cu, "post_due", lambda rs, now: False)
+    monkeypatch.setattr(cu, "digest_due", lambda rs, now: False)
     assert cu.main(["catchup.py"]) == 1
     assert started == ["metrics.yml"]
     assert "ingest.yml: check failed (OSError)" in capsys.readouterr().out
@@ -115,3 +116,40 @@ def test_a_catch_up_asks_for_the_guard_explicitly(monkeypatch):
     cu.dispatch("metrics.yml")
     assert sent == [("workflows/ingest.yml/dispatches", {"ref": "main", "inputs": {"force": "false"}}),
                     ("workflows/metrics.yml/dispatches", {"ref": "main"})]
+
+
+MON = datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc)    # the Monday GitHub dropped the first send
+
+
+def test_the_weekly_email_is_started_once_on_a_monday_between_noon_and_ten_pm_utc():
+    assert cu.digest_due([], MON)
+    assert cu.digest_due([], MON.replace(hour=12, minute=4))
+    assert not cu.digest_due([], MON.replace(hour=11, minute=59))          # before the hour
+    assert not cu.digest_due([], MON.replace(hour=22))                     # too late at night
+    assert not cu.digest_due([], MON + timedelta(days=1))                  # Tuesday
+    # Any run since 11:55 that day, however it ended, means no catch-up (a failure isn't retried).
+    assert not cu.digest_due([_run(9, MON.replace(hour=12, minute=1), conclusion="failure")], MON)
+    assert not cu.digest_due([_run(9, MON.replace(hour=11, minute=56))], MON)
+    # Last week's run doesn't count.
+    assert cu.digest_due([_run(8, MON - timedelta(days=7))], MON)
+
+
+def test_the_email_catch_up_asks_for_everyone_explicitly(monkeypatch):
+    # A dispatch sends only a test copy unless everyone is true; the schedule it stands in for sends to all.
+    sent = []
+    monkeypatch.setattr(cu, "_call", lambda method, path, body=None: sent.append((path, body)) or {})
+    cu.dispatch("digest.yml")
+    assert sent == [("workflows/digest.yml/dispatches",
+                     {"ref": "main", "inputs": {"everyone": "true", "check_key": "false"}})]
+
+
+def test_main_starts_the_email_when_due(monkeypatch, capsys):
+    started = []
+    monkeypatch.setattr(cu, "runs", lambda f: [])
+    monkeypatch.setattr(cu, "overdue", lambda *a, **k: False)
+    monkeypatch.setattr(cu, "post_due", lambda rs, now: False)
+    monkeypatch.setattr(cu, "digest_due", lambda rs, now: True)
+    monkeypatch.setattr(cu, "dispatch", started.append)
+    assert cu.main(["catchup.py"]) == 0
+    assert started == ["digest.yml"]
+    assert "digest.yml: this Monday's email had not started, started" in capsys.readouterr().out
