@@ -2904,6 +2904,9 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
 # MIN_EMPLOYERS_NEW employers, and not near_same as a page the site already indexes. The rest are
 # "noindex, follow" and out of the sitemap (page(thin=True)), like a thin field-in-a-place page.
 NEAR_ROOT = "/internships/near/"
+# Off only in tests (backend/tests/conftest.py), except the near-page tests themselves: the 500 pages
+# made every test build about ten times slower. Production always builds them.
+NEAR_ON = True
 NEAR_INDEX_MIN = 5      # local open roles a near page needs before search engines are asked to index it
 NEAR_INDEX_SLACK = 1    # ...and one already in the live sitemap stays indexed down to NEAR_INDEX_MIN - this
 NEAR_REMOTE_SHOWN = 10  # remote roles listed on a page that is not indexed (an indexed one gives a count)
@@ -3544,11 +3547,12 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     # "<field> internships near <city>" (2026-10-18, near_pages): all 500 built, the thin ones noindex. Judged
     # against the list pages made so far, so one that repeats a field, place or employer page stays out of search.
     rivals = [frozenset(x["id"] for x in p["items"]) for p in pages if p["index"] and p["items"]]
-    near_specs, near_grid = near_pages(listings, now, updated, live, earning, rivals)
-    for spec in near_specs:
-        add(**spec)
-    t_, d_, b_ = near_hub(near_grid)
-    add(NEAR_ROOT, t_, d_, "Internships near 50 US cities", [root, (NEAR_ROOT, "Near 50 US cities")], b_)
+    if NEAR_ON:
+        near_specs, near_grid = near_pages(listings, now, updated, live, earning, rivals)
+        for spec in near_specs:
+            add(**spec)
+        t_, d_, b_ = near_hub(near_grid)
+        add(NEAR_ROOT, t_, d_, "Internships near 50 US cities", [root, (NEAR_ROOT, "Near 50 US cities")], b_)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
     # This page lists every new listing, and the email counts a role posted on two of an employer's
@@ -3628,7 +3632,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                                   for k in ["Canada", *CA_METRO_PAGES, *CA_PROVINCES] if k in states])
            + "<section class=\"rel\"><h2>More ways to browse</h2><ul><li><a href=\"/internships/for/\">"
              f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(by_company):,} employers"
-             "</a></li>" + f"<li><a href=\"{NEAR_ROOT}\">By field near 50 US cities</a></li>" + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
+             "</a></li>" + (f"<li><a href=\"{NEAR_ROOT}\">By field near 50 US cities</a></li>" if NEAR_ON else "") + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
                             if len(new) >= MIN_OPEN else "")
            + "".join(f"<li><a href=\"{p}\">{esc(k['h1'][0].upper() + k['h1'][1:])}</a> "
                      f"<span class=\"n\">{len(v):,}</span></li>" for p, k, v in kind_made)

@@ -55,7 +55,8 @@ def test_pages_only_where_there_are_enough_open_listings(tmp_path):
     assert "/internships/" in paths
 
 
-def test_closed_and_non_web_links_are_left_out(tmp_path):
+def test_closed_and_non_web_links_are_left_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "NEAR_ON", True)   # this test checks the near pages are always built (conftest)
     rows = [_row(i) for i in range(4)]
     rows.append(_row(4, status="closed"))
     rows.append(_row(5, apply_url="javascript:alert(1)"))
