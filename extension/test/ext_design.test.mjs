@@ -131,6 +131,16 @@ test("after setup: Edit setup and the review link show; a replaced resume asks f
   assert.deepEqual([paused.stage, paused.label, paused.showReview], ["paused", "Review my resume", true]);
 });
 
+test("entering details by hand with the name or email blank asks for them, not for a resume review", () => {
+  const e = entryState(store({ onboarded: true, resume_details_ready: true, resume_details_manual: true }, { profile: { facts: { first_name: "Ada" } } }));
+  assert.equal(e.stage, "paused");
+  assert.equal(e.label, "Add my details");
+  assert.doesNotMatch(e.note, /resume/);
+  const done = entryState(store({ onboarded: true, resume_details_ready: true, resume_details_manual: true },
+    { profile: { facts: { first_name: "Ada", last_name: "L", email: "a@x.edu" } } }));
+  assert.equal(done.stage, "ready");
+});
+
 test("popup and side panel follow entryState: review link hidden until set up, no Start Deep Dive", () => {
   const html = read("popup/popup.html"), js = read("popup/popup.js");
   assert.match(html, /<div class="foot" id="foot" hidden>/);

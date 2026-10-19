@@ -366,7 +366,9 @@ def render_html(digest: dict, fields=None, postal_address=None) -> str:
     button = (f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0">'
               f'<tr><td style="background:{ACCENT};border-radius:6px">'
               f'<a href="{esc(new_url)}" style="display:inline-block;padding:11px 18px;{SANS};font-size:15px;'
-              f'font-weight:bold;color:{PAPER};text-decoration:none;border-radius:6px">See every new role</a>'
+              # Buttondown adds an !important accent color to every link. Keep the
+              # button text light instead of allowing dark text on its dark background.
+              f'font-weight:bold;color:{PAPER}!important;text-decoration:none;border-radius:6px">See every new role</a>'
               "</td></tr></table>") if new_url else ""
     chosen = pick_placement(digest, sections)
     body = "".join(_section_html(s, chosen[0] if chosen and chosen[1] is s else None) for s in sections)

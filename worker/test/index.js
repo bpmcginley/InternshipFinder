@@ -9,6 +9,8 @@ import "./limits.test.js";
 import "./referral.test.js";
 import "./session.test.js";
 import "./profile.test.js";
+// The site build's record of each live paid listing (2026-10-14).
+import "./placement-runs.test.js";
 import "./visits.test.js";
 import "./clock.test.js";
 import "./leads.test.js";

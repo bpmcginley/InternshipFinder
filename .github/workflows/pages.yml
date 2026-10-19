@@ -98,13 +98,31 @@ jobs:
         run: |
           cp -r docs _site
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
-          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json)
+          # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
+          # outside _site, so it is never published.
+          (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
+          # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)
           # For the notify job: what was live before this deploy, and what this deploy publishes.
           mkdir -p sitemaps
           cp _site/sitemap.xml sitemaps/new.xml
           if [ -f live-sitemap.xml ]; then cp live-sitemap.xml sitemaps/old.xml; fi
+
+      - name: Record which paid listings this build kept or dropped
+        # Added 2026-10-14 (backend/internscout/placements.py record_runs). Adds today's kept and dropped
+        # placements to the Worker's placement_runs table over Cloudflare's D1 HTTP API, so refunds for
+        # days a paid box was not on the site can be worked out. Only when paid listings are on (the repo
+        # variable is set). It must never fail or hold up the deploy: the script turns any problem,
+        # a missing token included, into one ::warning:: that names no secret and no address, and this
+        # step may fail without failing the job.
+        if: ${{ vars.INTERNSCOUT_PLACEMENTS_URL != '' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          # The same token growth/metrics.py uses; it needs D1: Edit.
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: (cd backend && python -m internscout.placements record ../placements-report.json)
 
       - uses: actions/configure-pages@v6
 

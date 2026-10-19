@@ -440,15 +440,20 @@
   // full-width row after the third card on a phone (after the last, with fewer). The box is never a Row, so
   // every count here, the header checkbox and the Auto-Apply selection come from `shown` alone, the same
   // with or without it (tests/site/placements.test.mjs). was: the same markup inline in App.
-  function ListTable({ shown, rows, head, renderRow, box, phone, onMore }) {
+  function ListTable({ shown, rows, head, renderRow, box, phone, onMore, inlineSignup, columns = 4 }) {
     const at = Math.min(3, shown.length) - 1;
+    // After the tenth row, only when more follow: on a shorter list the footer form comes right after
+    // the last row, and two forms in a row read as a mistake. was: Math.min(10, shown.length) - 1.
+    const signupAt = shown.length > 10 ? 9 : -1;
     return h(F, null,
       !phone && box,
       h("a", { className: "skip inline", href: "#list-end" }, "Skip past the listings"),
       h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" }, head,
-        h("tbody", null, shown.flatMap((r, i) => phone && box && i === at
-          ? [renderRow(r), h("tr", { key: "placement", className: "paid-row" }, h("td", { colSpan: 5 }, box))]
-          : [renderRow(r)]))))),
+        h("tbody", null, shown.flatMap((r, i) => [
+          renderRow(r),
+          phone && box && i === at && h("tr", { key: "placement", className: "paid-row" }, h("td", { colSpan: 5 }, box)),
+          inlineSignup && i === signupAt && h("tr", { key: "weekly-email", className: "digest-in-list" }, h("td", { colSpan: columns }, inlineSignup))
+        ].filter(Boolean)))))),
       h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
       rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: onMore }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`)));
   }
@@ -559,33 +564,37 @@
   // The past emails (2026-10-06): Buttondown's public web archive of the newsletter, worked out from the
   // form's address (IS.digestArchive), so a student can see what they'd get before giving an address.
   // js/count.js counts a submit of this form (class "digest") as "digest_signup", with nothing about who.
-  function Digest({ cfg, fields, hasProfile, onSetup }) {
+  function Digest({ cfg, fields = [], hasProfile, onSetup, placement = "footer", compact = false }) {
     const [sent, setSent] = useState(false);
     const prov = cfg.provider || "Buttondown";
     const archive = IS.digestArchive(cfg.formAction);
+    const id = "digest-" + placement;
     // Only the form's status line changes on submit. The form and its inputs stay mounted, because
     // React can re-render before the browser has read the fields it is about to send.
-    return h("form", { id: "digest-form", className: "notice quietnote digest", action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
-      "aria-labelledby": "digest-title", onSubmit: () => setSent(true) },
-      h("b", { id: "digest-title" }, "Email me new internships each week. "),
-      `One email a week; unsubscribe any time. You'll get a confirmation email first, and nothing else arrives until you click its link. Your address${fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email, not to InternScout's servers. `,
+    return h("form", { id: id + "-form", className: "notice quietnote digest" + (compact ? " digest-compact" : ""), action: cfg.formAction, method: "post", target: "_blank", rel: "noopener",
+      "data-digest-placement": placement, "aria-labelledby": id + "-title", onSubmit: () => setSent(true) },
+      h("b", { id: id + "-title" }, "New internships in your inbox every Monday. Free. "),
+      compact
+        ? "A few new roles and links to the rest. Everyone gets the same email. Confirm by email first; unsubscribe any time. "
+        : "A weekly selection of new internships, co-ops and research roles, with links to explore the rest. Everyone gets the same email for now. Confirm by email first; unsubscribe any time. ",
+      `Your address${!compact && fields.length ? " and the fields you tick go" : " goes"} to ${prov}, which sends the email. `,
       h("a", { href: "privacy.html#digest" }, "Details"),
       archive && " · ",
-      archive && h("a", { href: archive, target: "_blank", rel: "noopener" }, "See last Monday's email"),
+      archive && h("a", { href: archive, target: "_blank", rel: "noopener" }, "Browse past emails"),
       // The key remounts the boxes when the profile's fields change, so each new field starts ticked.
-      fields.length > 0
+      !compact && (fields.length > 0
         // was: h("legend", null, "Fields from your profile")
-        ? h("fieldset", { key: fields.join(","), id: "digest-fields" }, h("legend", null, "Fields from your profile, saved with your subscription so the email can be matched to them later"),
+        ? h("fieldset", { key: fields.join(","), id: id + "-fields" }, h("legend", null, "Optional: save fields from your profile for future email matching (not personalized yet)"),
           h("div", { className: "checks" }, fields.map(t => h("label", { key: t, className: "check" },
-            h("input", { type: "checkbox", id: "digest-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
+            h("input", { type: "checkbox", id: id + "-tag-" + t, name: "tag", value: t, defaultChecked: true }), IS.fieldLabel(t)))))
         // was: "With no fields picked, the email covers every field. ... to narrow it." For now every
         // subscriber gets the same email (growth/digest_send.py), so ticked fields only get saved.
-        : h("div", { style: { marginTop: 8 } }, "Everyone gets the same email for now. ",
-          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " and they'll be saved with your subscription, so it can be matched to them later."),
+        : h("div", { style: { marginTop: 8 } },
+          h("a", { href: "#", onClick: prevent(onSetup) }, hasProfile ? "Add fields to your profile" : "Set up your profile"), " to improve your search results. You can subscribe without a profile.")),
       h("div", { className: "digest-row" },
-        h("label", { htmlFor: "digest-email" }, "Email"),
-        h("input", { id: "digest-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
-        h("button", { id: "digest-submit", type: "submit", className: "btn primary" }, "Subscribe"),
+        h("label", { htmlFor: id + "-email" }, "Email"),
+        h("input", { id: id + "-email", type: "email", name: "email", required: true, autoComplete: "email", spellCheck: false }),
+        h("button", { id: id + "-submit", type: "submit", className: "btn primary" }, "Email me new internships"),
         sent && h("span", { className: "muted", role: "status" }, `${prov} opened in a new tab. Finish there if it asks, then look for the confirmation email.`)),
       // In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
       h("input", { type: "hidden", name: "embed", value: "1" }));
@@ -840,6 +849,12 @@
     // The one-time invite nudge (added 2026-10-02; core.js inviteNudgeDue): on for the rest of this page
     // load once a first Auto-Apply or first profile triggers it, until Not now or the panel opens.
     const [nudge, setNudge] = useState(false);
+    // A browser may still have the previous core.js cached during deployment. The invitation is
+    // optional; a missing new helper must never stop the internship dashboard from rendering.
+    const digestPrompt = useRef(null);
+    if (!digestPrompt.current) digestPrompt.current = typeof IS.createDigestNudge === "function"
+      ? IS.createDigestNudge() : { claim: () => false, shown() {}, finish() {} };
+    const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
@@ -1120,8 +1135,15 @@
     // A good moment just happened (first Auto-Apply queued, first profile saved): offer the invite
     // once, if it can be offered at all. Marked as shown straight away, so a reload never repeats it.
     function offerNudge() {
-      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return;
-      IS.markInviteNudge(); setNudge(true);
+      if (nudge) return true;
+      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return false;
+      IS.markInviteNudge(); setNudge(true); return true;
+    }
+    function offerDigestNudge(action) {
+      if (digestPrompt.current.claim(action, { enabled: digestOn, manual: true, blocked: !!(nudge || invite || outOfRuns || upgradeAsk) })) setDigestNudge(true);
+    }
+    function finishDigestNudge(how) {
+      digestPrompt.current.finish(how); setDigestNudge(false);
     }
     async function shareInvite() {
       // was: const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
@@ -1164,7 +1186,7 @@
 
     function saveProfile(d) {
       // was: if (!p) IS.count("profile");   // the first profile on this device, not every edit
-      if (!p) { IS.count("profile"); offerNudge(); }   // the first profile on this device, not every edit
+      if (!p) { IS.count("profile"); if (!offerNudge()) offerDigestNudge("profile"); } // manual first save; extension sync never prompts
       const s = IS.saveProfile(d);
       setP(s); setSetupOpen(false); setLimit(PAGE);
       setF(x => ({ ...x, states: [], ...initF(s) }));
@@ -1197,6 +1219,7 @@
       if (!window.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
+      setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
       if ((Object.keys(appStates).length || saved.length || ghToken) && window.confirm("Also delete your applied/saved statuses and saved searches from this browser? Cancel keeps them.")) {
         setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
@@ -1212,6 +1235,16 @@
     // The statuses as of the last render, for listeners added once (the "Did you apply?" check below).
     const appStatesRef = useRef(appStates); appStatesRef.current = appStates;
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
+    // Queue updates and batch Auto-Apply also set statuses; only the student's own status control
+    // can offer this invitation. Never perform prompt side effects inside a React state updater.
+    // Stable, like the rows' other handlers: rows are memoized, and a new function here each render
+    // redrew every row on every keystroke. The ref reads the current notices when it fires.
+    // was: const setManualAppState = (id, v) => { ... } (a new function each render, review of #123).
+    const offerDigestNudgeRef = useRef(offerDigestNudge); offerDigestNudgeRef.current = offerDigestNudge;
+    const setManualAppState = useCallback((id, v) => {
+      if (v === "interested" && appStatesRef.current[id] !== "interested") offerDigestNudgeRef.current("interested");
+      setAppState(id, v);
+    }, [setAppState]);
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
     // "More filters" remembers whether it was open; the count is how many of the controls inside it
     // are set to something other than their default, so a hidden filter is never a silent one.
@@ -1481,8 +1514,12 @@
     // was: ... && !me.paused && inviteOffer && autoAllow && ...: the notice only showed while invites were on,
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
     const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // Kept as shown only once it is actually on screen, so a higher-priority notice (or setup) that
+    // covers it until a reload doesn't use it up unseen. was: kept as shown when offered (review of #123).
+    const digestVisible = !!(digestNudge && digestOn && !setupOpen && !nudge && !invite && !outOfRuns && !upgradeAsk);
+    useEffect(() => { if (digestVisible && digestPrompt.current.shown) digestPrompt.current.shown(); }, [digestVisible]);
     // The review line (see reviewHidden above). It waits behind any other notice rather than stacking.
-    const reviewLine = !reviewHidden && !note && !nudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
+    const reviewLine = !reviewHidden && !note && !nudge && !digestNudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
     // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
     // upgrade_offer, at their tier; a Worker from before 2026-09-30 sends none, so no run count).
     const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
@@ -1760,6 +1797,9 @@
           h("a", { className: "mark", href: "/" }, "InternScout"),
           h("nav", { className: "sitenav", "aria-label": "Site" },
             h("a", { href: "internships/" }, "Browse"),
+            // Always shown, like the static nav before the app loads (no flash): /digest/ itself says
+            // whether sign-ups are open. was: digestOn && h("a", ...) (review of #123).
+            h("a", { href: "digest/?from=dashboard-nav", "data-digest-placement": "nav" }, "Weekly email"),
             h("a", { href: "install.html?from=dashboard-nav" }, "Auto-Apply (free)"),
             h("a", { href: "pricing/" }, "Pricing"),
             h("a", { href: "compare/" }, "Compare"),
@@ -1895,6 +1935,11 @@
 
       h("section", { id: "results", "aria-labelledby": "listings" },
       h("h2", { id: "listings", className: "sr", tabIndex: -1 }, "Listings"),
+      digestVisible && h("div", { className: "notice quietnote", role: "note", "aria-label": "Weekly internship email" },
+        "Want new internships in your inbox every Monday? ",
+        h("a", { href: "/digest/?from=dashboard-contextual", "data-digest-placement": "contextual", onClick: () => finishDigestNudge("opened") }, "Get the free weekly email"),
+        ". Everyone gets the same roundup. ",
+        h("button", { type: "button", className: "linkbtn", "aria-label": "Dismiss weekly email invitation", onClick: () => finishDigestNudge("dismissed") }, "Dismiss")),
       // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
       // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows
       // how many of them are set so nothing is hidden by surprise.
@@ -1966,14 +2011,15 @@
           // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
           : rows.length === 0 ? emptyEl
             // was: the skip link, the table, "End of the N listings shown" and "Show N more" inline here (ListTable now).
-            : h(ListTable, { shown, rows, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE),
+            : h(ListTable, { shown, rows, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
+              inlineSignup: digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
               head: h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
                 // was: Company and role, Field, Location and term, Pay, Match, Your status, Links. Field, place, term
                 // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
                 sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
-              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setAppState, job: jobs[String(r.id)],
+              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
                 checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns,
                 ask: askId === r.id, onOpen, onAnswer }) })),
 
@@ -1986,7 +2032,7 @@
       h(Landing, { open: landingOpen, setOpen: setLandingOpen, onSetup: openSetup, hasProfile: !!p, nationwide, plans: payPlans, installed: info.installed || !!info.stale, inviteOffer, inviteWords }),
 
       // Below the list and above the footer links, so it never pushes a listing down.
-      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup })),
+      digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "footer" })),
 
       h("footer", null,
         // Same facts as before, in two short sentences instead of one long one. The plan prices

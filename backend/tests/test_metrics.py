@@ -315,3 +315,20 @@ def test_bing_dates_read_in_their_own_offset():
 def test_bing_queries_stay_out_of_the_public_run_log():
     snap = {"bing": {"queries": [{"query": "a private search"}], "pages": []}}
     assert metrics.printable(snap)["bing"]["queries"] == "1 queries"
+
+
+def test_bing_odd_replies_become_one_problem_line_not_a_crash(monkeypatch):
+    """An answer that isn't {"d": [...]}, or a row with a field of the wrong type, is reported as a
+    RuntimeError, which main() turns into a "bing: ..." problem while the other sources still save."""
+    monkeypatch.setenv("BING_WEBMASTER_KEY", "secret-key-123")
+    for reply in ([1, 2], "oops", {"d": "nope"}):
+        monkeypatch.setattr(metrics, "_json", lambda url, *a, reply=reply, **k: reply)
+        with pytest.raises(RuntimeError, match="unexpected reply"):
+            metrics.bing(NOW)
+    bad = {**BING, "GetRankAndTrafficStats": [{"Date": _ms("2026-09-27"), "Clicks": "3", "Impressions": 60}]}
+    monkeypatch.setattr(metrics, "_json", lambda url, *a, **k: {"d": bad[url.split("/json/")[1].split("?")[0]]})
+    with pytest.raises(RuntimeError) as e:
+        metrics.bing(NOW)
+    assert "secret-key-123" not in str(e.value)
+    monkeypatch.setattr(metrics, "_json", lambda url, *a, **k: {"d": None})
+    assert metrics.bing(NOW)["days"] == []

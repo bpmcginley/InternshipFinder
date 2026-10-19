@@ -332,11 +332,19 @@ def _bing_get(method: str, key: str) -> list[dict]:
     url = (f"https://ssl.bing.com/webmaster/api.svc/json/{method}?"
            + urllib.parse.urlencode({"siteUrl": BING_SITE, "apikey": key}))
     try:
-        return (_json(url) or {}).get("d") or []
+        reply = _json(url)
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Bing {method}: HTTP {e.code}") from None
     except urllib.error.URLError:
         raise RuntimeError(f"Bing {method}: no connection") from None
+    # was: (_json(url) or {}).get("d") or [], which raised AttributeError (not caught by main(), so the
+    # whole run stopped) when Bing answered with anything but an object (2026-10-14 review).
+    if reply is None or (isinstance(reply, dict) and reply.get("d") is None):
+        return []
+    rows = reply.get("d") if isinstance(reply, dict) else None
+    if not isinstance(rows, list):
+        raise RuntimeError(f"Bing {method}: unexpected reply")
+    return [r for r in rows if isinstance(r, dict)]
 
 
 def _bing_day(stamp: str | None) -> str | None:
@@ -379,6 +387,14 @@ def bing(now: datetime) -> dict:
     key = os.environ.get("BING_WEBMASTER_KEY")
     if not key:
         raise ValueError("no BING_WEBMASTER_KEY")
+    try:
+        return _bing_read(now, key)
+    except (TypeError, AttributeError) as e:
+        # A row with a field of the wrong type: one problem line, not a stopped run.
+        raise RuntimeError(f"Bing: unexpected reply ({type(e).__name__})") from None
+
+
+def _bing_read(now: datetime, key: str) -> dict:
     since = (now.date() - timedelta(days=GSC_DAYS - 1)).isoformat()
     days = {}
     for r in _bing_get("GetRankAndTrafficStats", key):

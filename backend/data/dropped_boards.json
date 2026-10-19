@@ -36,6 +36,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "maximor": {
+   "on": "2026-10-17",
+   "why": "dead"
+  },
   "mentis": {
    "on": "2026-10-01",
    "why": "dead"
@@ -96,12 +100,20 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "breezeairways": {
+   "on": "2026-10-15",
+   "why": "dead"
+  },
   "campusopportunities": {
    "on": "2026-10-01",
    "why": "dead"
   },
   "capitalrx": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "cybereason": {
+   "on": "2026-10-17",
    "why": "dead"
   },
   "designmehair": {
@@ -175,6 +187,10 @@
   "transcarent": {
    "on": "2026-10-01",
    "why": "dead"
+  },
+  "visiersolutionsinc": {
+   "on": "2026-10-18",
+   "why": "dead"
   }
  },
  "icims": {
@@ -224,6 +240,10 @@
   },
   "careers-federatedinsurance": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-fhcrc": {
+   "on": "2026-10-17",
    "why": "robots"
   },
   "careers-framatome": {
@@ -1032,6 +1052,10 @@
   },
   "winsupply1": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "wise": {
+   "on": "2026-10-19",
    "why": "robots"
   }
  },

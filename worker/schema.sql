@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS visit_channels (
 -- Since 2026-10-06 also digest_signup, a weekly email sign-up form sent, on page "dashboard", "landing"
 -- or "digest" (the /digest/ page, a page kind of its own since then in visit_counts too). It's a count
 -- of forms sent; the address goes from the browser to Buttondown and never reaches the Worker.
+-- Since 2026-10-15 also finite digest_<view|click|submit>_<placement> totals (visits.js). These are
+-- invitation exposures and attempts, never confirmed subscriptions. No schema migration is needed.
 -- Since 2026-10-13 also apply_offer_shown and apply_offer_click (docs/js/offer.js): the "Add to Chrome"
 -- bar shown after opening a posting Auto-Apply fills, and its store link pressed. No schema change.
 -- Since 2026-10-13 also employer_interest (a server step: src/leads.js stored a lead from /employers/),
@@ -387,3 +389,19 @@ ON CONFLICT(user_hash) DO UPDATE SET first = excluded.first WHERE excluded.first
 INSERT INTO inviters (user_hash, rewarded)
 SELECT referrer, COUNT(*) FROM referrals WHERE referrer != '' AND rewarded = 1 GROUP BY referrer
 ON CONFLICT(user_hash) DO UPDATE SET rewarded = excluded.rewarded WHERE excluded.rewarded > inviters.rewarded;
+
+-- What the site build did with each live paid listing, per UTC day (added 2026-10-14), so refunds for
+-- unused days can be worked out. The pages workflow writes it over the D1 HTTP API after each build
+-- (backend/internscout/placements.py record_runs): `shown` is how many builds that day kept the
+-- placement, `dropped` how many dropped it while it was live, `reason` the latest drop's reason
+-- (placements.py REASONS) and `updated` when a build last wrote the row. Drops for "dates" (not started
+-- yet) and "duplicate" are not recorded. GET /admin/placements reads it as `runs`. Nothing about visitors.
+CREATE TABLE IF NOT EXISTS placement_runs (
+  placement_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  shown INTEGER NOT NULL DEFAULT 0,
+  dropped INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
+  updated TEXT,
+  PRIMARY KEY (placement_id, day)
+);

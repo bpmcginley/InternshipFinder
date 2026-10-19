@@ -49,6 +49,8 @@ test("checkSession asks GET /session on the Worker with the token, and anything 
   assert.deepEqual(ok.calls, [{ url: `${WORKER_URL}/session`, method: "GET", auth: `Bearer ${TOKEN}` }]);
   for (const status of [401, 404, 500]) assert.equal(await auth.checkSession(TOKEN, worker(status), NOW), null, String(status));
   assert.equal(await auth.checkSession(TOKEN, async () => { throw new Error("offline"); }, NOW), null);
+  assert.equal(await auth.checkSession(TOKEN, worker(200, { ...REPLY, copyable: false }), NOW), null, "already passed on once");
+  assert.equal((await auth.checkSession(TOKEN, worker(200, { ...REPLY, copyable: true }), NOW)).account, REPLY.account);
   const never = worker();
   assert.equal(await auth.checkSession("not-a-session", never, NOW), null);
   assert.equal(never.calls.length, 0, "a token of the wrong shape never leaves the extension");

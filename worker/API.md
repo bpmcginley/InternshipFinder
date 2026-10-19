@@ -332,7 +332,16 @@ link panel, from the one-time nudge after a first Auto-Apply or profile or from 
 2026-10-02), `posting_click` (a click through to a posting: `a.go` on a landing page, `a.open-link` on
 the dashboard; added 2026-10-04), `apply_offer_shown` and `apply_offer_click` (the "Add to Chrome" bar
 `docs/js/offer.js` shows after a posting Auto-Apply fills is opened, and its store link pressed; added
-2026-10-13); any other name is ignored. The Worker adds its own steps to the same
+2026-10-13), `review_click`, and `digest_signup` (a form submission, **not a confirmed subscriber**).
+Since 2026-10-15 the finite `digest_<step>_<placement>` names also count weekly email invitations:
+`step` is `view`, `click` or `submit`; `placement` is `footer`, `results_inline`, `digest_page`,
+`landing`, `contextual` or `nav`. A view means at least 25% of the marked invitation intersected the
+viewport; unsupported browsers do not estimate views. Each event counts at most once per page load.
+These remain anonymous daily totals; no email, field selection or subscriber status is stored.
+`digest_signup` remains the legacy total across forms and must not be added to the placement
+submission totals (that would double-count). No `digest_confirmed` event is accepted. See
+[`growth/SIGNUP_MEASUREMENT.md`](../growth/SIGNUP_MEASUREMENT.md) for the separate aggregate
+confirmed-subscriber check. Any other name is ignored. The Worker adds its own steps to the same
 table (`src/visits.js` `SERVER_EVENTS`, added 2026-10-04), which `/hit` never accepts: `new_account`
 (an account seen for the first time; page `extension` or `dashboard` by `Origin`), `ext_signin`
 (`POST /session` from the extension), `first_autofill` (an account's first answered Auto-Apply run of
@@ -423,7 +432,7 @@ current status does not allow (or a row that changed while it was being saved).
 
 | Route | Body | Does |
 |---|---|---|
-| `GET /admin/placements` | none | `{ placements: [...] }`: every row with its private fields, plus `log`, its last 20 log entries, newest first. |
+| `GET /admin/placements` | none | `{ placements: [...] }`: every row with its private fields, plus `log`, its last 20 log entries, newest first, and (added 2026-10-14) `runs`, `{ days_shown, days_dropped, drops: [{ day, reason }] }`, from `placement_runs`: the UTC days a site build kept the placement, and the days one dropped it while it was live (`dropped > 0`) with the latest reason. The pages workflow writes that table after each build (`backend/internscout/placements.py` `record_runs`, over the D1 HTTP API); drops for `dates` (not started yet) and `duplicate` are not recorded. |
 | `GET /admin/leads` | none | `{ leads: [{ id, created, company, wants }] }`, the 100 newest employer leads, without name, email or message. |
 | `POST /admin/placements` | `{ lead_id?, employer?, listing_id, apply_url, start, end, note?, by }` | Creates a `draft` with an id like `p-2026-11-acme-1`. With `lead_id` the lead must exist, and its company is the employer unless `employer` is given; nothing else is copied from the lead. `apply_url` must be `https://`; `end` must be after `start` and at most 62 days later. |
 | `POST /admin/placements/update` | `{ id, by, start?, end?, listing_id?, apply_url?, employer?, note? }` | In `draft`, `checked` or `paused`: any of those. A new `listing_id` or `apply_url` clears the checks and sends it back to `draft`. While `on`: only a later `end` and `note`. |

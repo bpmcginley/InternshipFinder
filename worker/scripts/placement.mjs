@@ -27,7 +27,8 @@ export const DEFAULT_API = "https://internscout-api.bpmcginley.workers.dev";
 export const USAGE = `Usage: node scripts/placement.mjs <command> [id] [--flags]
 
 Commands:
-  list                      every placement with its recent log (admin)
+  list                      every placement with its recent log and its run days: days a site build
+                            kept it and days one dropped it while live, with the reason (admin)
   leads                     recent employer leads: id, date, company, wants (admin; no contact details)
   live                      what GET /placements shows the site build today (public)
   create                    --listing ID --url URL --start YYYY-MM-DD --end YYYY-MM-DD

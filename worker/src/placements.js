@@ -179,11 +179,13 @@ export async function listPlacements(db) {
     "SELECT placement, at, by, action, reason, before, after FROM (SELECT *, ROW_NUMBER() OVER " +
     "(PARTITION BY placement ORDER BY at DESC, id DESC) AS n FROM placement_log) WHERE n <= ? ORDER BY at DESC, id DESC",
   ).bind(LOG_SHOWN).all()).results;
+  const runs = await placementRuns(db);   // 2026-10-14: the build's record, at the end of this file
   return {
     placements: rows.map((r) => ({
       ...r,
       log: log.filter((e) => e.placement === r.id).map(({ placement, before, after, ...e }) =>
         ({ ...e, before: before && JSON.parse(before), after: after && JSON.parse(after) })),
+      runs: runs[r.id] || { days_shown: 0, days_dropped: 0, drops: [] },
     })),
   };
 }
@@ -403,4 +405,28 @@ export async function endExpiredPlacements(db, now) {
     }
   }
   return results.length;
+}
+
+// ---------------------------------------------------------------- the build's record (2026-10-14)
+// `runs` in GET /admin/placements, by placement id, from placement_runs (worker/schema.sql), which the
+// site build writes after each deploy's build (backend/internscout/placements.py record_runs). For
+// working out refunds for days a paid box was not on the site:
+//   days_shown    days on which at least one build kept the placement
+//   days_dropped  days on which at least one build dropped it while it was live (dropped > 0)
+//   drops         those days, oldest first, with the latest drop's reason (placements.py REASONS)
+// One day can count in both when two builds that day disagreed.
+export async function placementRuns(db) {
+  const { results } = await db.prepare(
+    "SELECT placement_id, day, shown, dropped, reason FROM placement_runs ORDER BY placement_id, day",
+  ).all();
+  const runs = {};
+  for (const d of results) {
+    const r = (runs[d.placement_id] ||= { days_shown: 0, days_dropped: 0, drops: [] });
+    if (d.shown > 0) r.days_shown += 1;
+    if (d.dropped > 0) {
+      r.days_dropped += 1;
+      r.drops.push({ day: d.day, reason: d.reason || "" });
+    }
+  }
+  return runs;
 }

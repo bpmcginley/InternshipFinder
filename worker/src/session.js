@@ -98,9 +98,14 @@ export async function sessionUser(db, token, { now = Date.now(), later } = {}) {
 // GET /session (2026-10-14, U8): what a session token is, so the extension can check a token the
 // dashboard offers it with the Worker before keeping it, instead of trusting what the page says about it.
 // The same fields as POST /session's reply except the email, which the Worker never stores.
+// copyable: whether POST /session/copy would still make a copy from it (2026-10-14 review). Without it the
+// extension kept offering "Use my dashboard sign-in" for a session already passed on once, and the
+// button always failed.
 export async function sessionInfo(db, token, deps = {}) {
   const { user, tier, provider, expires } = await sessionUser(db, token, deps);
-  return { account: user.slice(0, 16), provider, tier, expires };
+  const id = await sha256Hex(token);
+  const copyable = !(await db.prepare("SELECT 1 FROM session_copies WHERE source = ? OR copy = ?").bind(id, id).first());
+  return { account: user.slice(0, 16), provider, tier, expires, copyable };
 }
 
 // DELETE /session: signing out removes this one session. Anything else (an ID token, an unknown or

@@ -16,11 +16,22 @@ that pays (the pay filter).
 
 The repo and its Actions logs are public, so warnings name only placement ids, listing ids and reasons,
 which are public already (they are in /data/placements.json).
+
+The build's record (added 2026-10-14): seo_pages writes report() to a file, and the pages workflow then
+runs `python -m internscout.placements record FILE`, which adds the day's kept and dropped placements to
+the Worker's placement_runs table over Cloudflare's D1 HTTP API (record_runs), so refunds for days a
+paid box was not on the site can be worked out. That step can never fail or hold up a deploy: any
+problem is one ::warning:: line naming no secret and no address.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
 
 # Paid boxes on one page or in one view. The D1 column page_cap is held at 1 by a CHECK as well.
 MAX_PER_PAGE = 1
@@ -171,3 +182,124 @@ def read(path: str | None) -> list:
         return []
     items = raw.get("placements") if isinstance(raw, dict) else None
     return [p for p in items if isinstance(p, dict)] if isinstance(items, list) else []
+
+
+# ---------------------------------------------------------------- the build's record (2026-10-14)
+# Which days a live paid listing was on the site, for refunds. Written to the Worker's D1 table
+# placement_runs (worker/schema.sql) from the pages workflow, with the same account and database as
+# growth/metrics.py d1() and the same CLOUDFLARE_API_TOKEN secret (it needs D1: Edit).
+
+ACCOUNT = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "d4a5640a67faee275d9df91204c4ec59")
+D1_DATABASE = os.environ.get("INTERNSCOUT_D1_ID", "ef477808-f94c-4dce-a0b3-1198f00e5c39")
+# A drop that says nothing about a paid day: "dates" is a placement outside its dates today (GET
+# /placements also returns one that starts tomorrow, for a late build), and "duplicate" a second copy
+# of one that was kept. Neither is a day the box should have been on the site and was not.
+NOT_A_PAID_DAY = ("dates", "duplicate")
+# Rows per statement: six parameters each, under D1's limit of 100 bound parameters a query.
+ROWS_PER_STATEMENT = 16
+
+
+def report(kept: list[dict], dropped: list[dict], today: str) -> dict:
+    """What one build did with the placements, for record_runs: {"day": today, "kept": [id, ...],
+    "dropped": [{"id", "reason"}, ...]}. A dropped entry with no readable id is left out."""
+    return {"day": today, "kept": [p["id"] for p in kept],
+            "dropped": [{"id": d["id"], "reason": d["reason"]} for d in dropped if d.get("id")]}
+
+
+def runs_rows(rep, now: datetime) -> list[tuple]:
+    """(placement_id, day, shown, dropped, reason, updated) per placement in a report: shown 1 for each
+    kept id, dropped 1 with its reason for each id dropped while it was live (NOT_A_PAID_DAY left out,
+    and so is an id the same build also kept). Anything malformed in the report is skipped."""
+    if not isinstance(rep, dict) or not isinstance(rep.get("day"), str) or not _DAY.match(rep["day"]):
+        raise ValueError("report has no day")
+    day, updated = rep["day"], now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    kept = [i for i in rep.get("kept") or [] if isinstance(i, str) and _ID.match(i)]
+    rows, seen = [], set()
+    for i in kept:
+        if i not in seen:
+            seen.add(i)
+            rows.append((i, day, 1, 0, None, updated))
+    for d in rep.get("dropped") or []:
+        i = d.get("id") if isinstance(d, dict) else None
+        reason = d.get("reason") if isinstance(d, dict) else None
+        if not (isinstance(i, str) and _ID.match(i)) or reason not in REASONS or reason in NOT_A_PAID_DAY or i in seen:
+            continue
+        seen.add(i)
+        rows.append((i, day, 0, 1, reason, updated))
+    return rows
+
+
+def runs_sql(rows: list[tuple]) -> list[tuple[str, list]]:
+    """The upserts that add rows to placement_runs: the counts add up across builds on one day, the
+    reason is the latest drop's (a later build that kept it leaves the reason as it was), and updated
+    is the latest build's time."""
+    out = []
+    for n in range(0, len(rows), ROWS_PER_STATEMENT):
+        chunk = rows[n:n + ROWS_PER_STATEMENT]
+        out.append(("INSERT INTO placement_runs (placement_id, day, shown, dropped, reason, updated) VALUES "
+                    + ", ".join(["(?, ?, ?, ?, ?, ?)"] * len(chunk))
+                    + " ON CONFLICT(placement_id, day) DO UPDATE SET shown = shown + excluded.shown, "
+                    "dropped = dropped + excluded.dropped, reason = COALESCE(excluded.reason, placement_runs.reason), "
+                    "updated = excluded.updated",
+                    [v for row in chunk for v in row]))
+    return out
+
+
+def _post(url: str, body: dict, token: str) -> dict:
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}",
+                                          "User-Agent": "InternScout-build"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.load(r)
+
+
+def record_runs(report_path: str, token: str, post=_post, now: datetime | None = None) -> int:
+    """Adds one build's report (seo_pages --placements-report) to placement_runs; the number of
+    placements written. Raises on any problem; main() turns that into a warning."""
+    with open(report_path, encoding="utf-8") as f:
+        rep = json.load(f)
+    rows = runs_rows(rep, now or datetime.now(timezone.utc))
+    url = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT}/d1/database/{D1_DATABASE}/query"
+    for sql, params in runs_sql(rows):
+        r = post(url, {"sql": sql, "params": params}, token)
+        if not isinstance(r, dict) or not r.get("success"):
+            raise RuntimeError("D1 did not accept the write")
+    return len(rows)
+
+
+def _why(e: Exception) -> str:
+    """A short reason for the warning line: never the token, a URL or a response body."""
+    if isinstance(e, urllib.error.HTTPError):
+        return f"Cloudflare answered HTTP {e.code}"
+    if isinstance(e, urllib.error.URLError):
+        return "Cloudflare could not be reached"
+    if isinstance(e, FileNotFoundError):
+        return "no report file"
+    if isinstance(e, ValueError):
+        return "the report could not be read"
+    if isinstance(e, RuntimeError):
+        return str(e)
+    return type(e).__name__
+
+
+def main(argv: list[str]) -> int:
+    """python -m internscout.placements record REPORT: record_runs with CLOUDFLARE_API_TOKEN. Always
+    exits 0 once called that way, so the deploy goes on whatever happens here."""
+    if len(argv) != 3 or argv[1] != "record":
+        print("usage: python -m internscout.placements record REPORT", file=sys.stderr)
+        return 2
+    token = os.environ.get("CLOUDFLARE_API_TOKEN") or ""
+    if not token:
+        print("::warning::paid listing runs not recorded: no Cloudflare token in this run")
+        return 0
+    try:
+        n = record_runs(argv[2], token)
+    except Exception as e:          # noqa: BLE001 - nothing here may stop a deploy
+        print("::warning::paid listing runs not recorded: " + _why(e).replace(token, "[token]").replace("\n", " "))
+        return 0
+    print(f"[placements] recorded today's runs for {n} placement(s)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

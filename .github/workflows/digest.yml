@@ -22,11 +22,11 @@ on:
         description: "Only check that the BUTTONDOWN_API_KEY secret works: one read from Buttondown, nothing sent."
         type: boolean
         default: false
-  # To send every Monday, uncomment the two schedule lines below, once a test copy has been checked
-  # (growth/README.md). A scheduled run sends to every subscriber when DIGEST_ENABLED is 1, and only
-  # writes the preview when it isn't.
-  # schedule:
-  #   - cron: "0 12 * * 1"    # Mondays 12:00 UTC: 8am Eastern in daylight time (EDT), 7am in winter (EST)
+  # Weekly opt-in digest. The postal mailbox was approved on 2026-10-15.
+  # A scheduled run sends to confirmed subscribers when DIGEST_ENABLED is 1, and only
+  # writes the preview when it isn't. Manual runs still default to an owner-only test.
+  schedule:
+    - cron: "0 12 * * 1"    # Mondays 12:00 UTC: 8am Eastern in daylight time (EDT), 7am in winter (EST)
   # was: # Mondays, 8am US Eastern. GitHub's cron is UTC and doesn't follow daylight saving time.
 
 permissions:

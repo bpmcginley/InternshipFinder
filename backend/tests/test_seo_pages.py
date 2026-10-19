@@ -1299,7 +1299,7 @@ def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(
     pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
     with_form = {path for path, html in pages.items() if "<form" in html}
     assert with_form == {"/internships/mechanical-engineering/", "/internships/nursing/", "/internships/new/", "/digest/"}
-    archive = '<a href="https://buttondown.com/internscout-test/archive/" target="_blank" rel="noopener">See last Monday\'s email</a>'
+    archive = '<a href="https://buttondown.com/internscout-test/archive/" target="_blank" rel="noopener">Browse past emails</a>'
     for path in with_form:
         html = pages[path]
         form = re.search(r'<form class="digest".*?</form>', html, re.S).group(0)
@@ -1312,7 +1312,9 @@ def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(
     assert '<input type="checkbox" name="tag" value="mechanical"/> Save mechanical engineering with my subscription' \
         in pages["/internships/mechanical-engineering/"]
     assert 'name="tag"' not in pages["/internships/new/"] and 'name="tag"' not in pages["/digest/"]
-    assert '<h2 id="digest-title">Sign up</h2>' in pages["/digest/"]
+    assert '<h2 id="digest-title">Get the free weekly email</h2>' in pages["/digest/"]
+    assert 'data-digest-placement="digest-page"' in pages["/digest/"]
+    assert 'data-digest-placement="landing"' in pages["/internships/new/"]
     seo_pages.write(site, list(seo_pages.build(site)))
     assert "<loc>https://internscout.org/digest/</loc>" in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
 
@@ -1350,6 +1352,29 @@ def test_the_digest_page_has_no_number_in_a_quiet_week(tmp_path):
     assert "/internships/new/" not in pages
     lede = re.search(r'<p class="lede">(.*?)</p>', pages["/digest/"]).group(1)
     assert lede.startswith("One free email every Monday") and "new internships" not in lede
+
+
+def test_digest_examples_are_real_dated_new_roles_and_favor_breadth(tmp_path):
+    site = _email_site(tmp_path, FORM)
+    html = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/digest/")
+    sample = re.search(r'<section class="prose digest-examples".*?</section>', html, re.S).group(0)
+    assert sample.count('<li>') == 3
+    assert 'Snapshot: September 23, 2026.' in sample and 'Availability can change' in sample
+    assert 'Mechanical Intern' in sample and 'Nursing Extern' in sample
+    for url in re.findall(r'href="([^"]+)"', sample):
+        assert url in {x["apply_url"] for x in seo_pages.new_roles(seo_pages.load(site), seo_pages.GENERATED)}
+    assert '<h1>New internships in your inbox every Monday. Free.</h1>' in html
+    assert 'For now everyone gets the same email.' in html
+
+
+def test_digest_examples_omit_closed_or_unsafe_rows_and_escape_board_text():
+    rows = [_row(1, company_name='<script>bad</script>', title='<b>Real role</b>'),
+            _row(2, status='closed'), _row(3, apply_url='javascript:alert(1)')]
+    sample = seo_pages.digest_examples(rows)
+    assert sample.count('<li>') == 1
+    assert '&lt;script&gt;bad&lt;/script&gt;' in sample and '&lt;b&gt;Real role&lt;/b&gt;' in sample
+    assert '<script>' not in sample and 'javascript:' not in sample
+    assert seo_pages.digest_examples([]) == ''
 
 
 def test_workday_country_state_city_places_read_as_city_and_state():

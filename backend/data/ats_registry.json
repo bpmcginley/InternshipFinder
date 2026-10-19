@@ -83,6 +83,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "agzen": {
+   "name": "AgZen",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "airspace-intelligence.com": {
    "name": "Airspace Intelligence",
    "quant": false,
@@ -179,6 +185,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "arts_museums"
+  },
+  "assorthealth": {
+   "name": "Assort Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
   },
   "astera": {
    "name": "Astera",
@@ -336,6 +348,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "chainlink-labs": {
+   "name": "Chainlink Labs",
+   "quant": false,
+   "fails": 2,
+   "added": "2026-10-18",
+   "last_fail": "2026-10-19"
   },
   "charge-robotics": {
    "name": "Charge Robotics",
@@ -780,6 +799,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "FSH": {
+   "name": "FSH Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
   },
   "fundwell": {
    "name": "Fundwell",
@@ -1237,13 +1262,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "maximor": {
-   "name": "Maximor AI",
-   "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-14"
   },
   "maxinsights": {
    "name": "Maxinsights",
@@ -2715,8 +2733,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-19"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -3112,13 +3131,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "breezeairways": {
-   "name": "Breeze Airways",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-14"
-  },
   "brevium": {
    "name": "Brevium",
    "quant": false,
@@ -3461,12 +3473,11 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "cybereason": {
-   "name": "Cybereason",
+  "d2l": {
+   "name": "D2l",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-14"
+   "fails": 0,
+   "added": "2026-10-18"
   },
   "darkwolfsolutions": {
    "name": "Dark Wolf Solutions",
@@ -4197,6 +4208,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "gravitonresearchcapital": {
+   "name": "Graviton",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-19"
+  },
   "greenworkssunriseglobalmarketing": {
    "name": "Greenworks",
    "quant": false,
@@ -4360,6 +4377,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "hubblenetwork": {
+   "name": "Hubble Network Inc.",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
   },
   "hudl": {
    "name": "Hudl",
@@ -4525,6 +4548,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "inversionspace": {
+   "name": "Inversion Space",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "ionq": {
    "name": "IonQ",
@@ -6433,12 +6462,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "visiersolutionsinc": {
-   "name": "Visier Solutions",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
-  },
   "vixxo": {
    "name": "Vixxo",
    "quant": false,
@@ -6515,6 +6538,12 @@
    "fails": 0,
    "added": "2026-10-06"
   },
+  "wfclainc": {
+   "name": "Angel City",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
   "wheely": {
    "name": "Wheely",
    "quant": false,
@@ -6526,6 +6555,18 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "wikimedia": {
+   "name": "Wikimedia Foundation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
+  "woolpert": {
+   "name": "Woolpert",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
   },
   "workato": {
    "name": "Workato",
@@ -6663,6 +6704,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "economic_consulting"
+  },
+  "associatecareers-analysisgroup": {
+   "name": "UNAVAILABLE",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-19"
   },
   "campus-libertymutual": {
    "name": "Liberty Mutual",
@@ -6900,12 +6947,6 @@
   },
   "careers-eyesouthpartners": {
    "name": "EyeSouth Partners",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-fhcrc": {
-   "name": "Fred Hutchinson Cancer Center",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -7946,6 +7987,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "cityofottawa": {
+   "name": "CityofOttawa",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "cloudfitsoftware": {
    "name": "CloudFit Software",
    "quant": false,
@@ -8069,6 +8116,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-24"
+  },
+  "healthpeak": {
+   "name": "Healthpeak Properties",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "hiebing": {
    "name": "Hiebing",
@@ -8447,6 +8500,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "src-inc": {
+   "name": "SRC, Inc",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "tylertech": {
    "name": "Tyler Technologies",
    "quant": false,
@@ -8606,6 +8665,12 @@
    "added": "2026-09-18",
    "sector": "nonprofit"
   },
+  "atomcomputing": {
+   "name": "Atom Computing",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-15"
+  },
   "azul": {
    "name": "Azul Systems",
    "quant": false,
@@ -8684,6 +8749,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "cfsenergy": {
+   "name": "Commonwealth Fusion Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "charitywater": {
    "name": "charity: water",
@@ -9160,6 +9231,12 @@
    "fails": 0,
    "added": "2026-10-01"
   },
+  "pattern": {
+   "name": "Pattern",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "pelmorex": {
    "name": "Pelmorex",
    "quant": false,
@@ -9276,6 +9353,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "researchinnovations.com": {
+   "name": "Research Innovations",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
+  },
   "rhombus-systems": {
    "name": "Rhombus",
    "quant": false,
@@ -9293,6 +9376,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "runlaminar": {
+   "name": "Laminar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "rws": {
    "name": "RWS",
@@ -10621,6 +10710,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "linea-energy": {
+   "name": "Linea Energy",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "loop-careers": {
    "name": "Loop",
    "quant": false,
@@ -11811,6 +11906,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "aliaxis|wd3|aliaxis": {
+   "name": "Alliaxis",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "allegion|wd5|careers": {
    "name": "Allegion",
    "quant": false,
@@ -12162,6 +12263,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "astreya|wd5|life-at-astreya-opportunities": {
+   "name": "Astreya",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
   },
   "asuep|wd5|ASUEP": {
    "name": "Arizona State University",
@@ -12726,8 +12833,9 @@
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-19"
   },
   "boeing|wd1|INTERN": {
    "name": "The Boeing Company",
@@ -15832,6 +15940,12 @@
    "added": "2026-09-18",
    "sector": "social_research"
   },
+  "materion|wd5|Materion": {
+   "name": "Materion Corporation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "matthey|wd3|Ext_Career_Site": {
    "name": "Johnson Matthey",
    "quant": false,
@@ -15862,6 +15976,12 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "education_research"
+  },
+  "mckesson|wd3|CoverMyMeds_External_Careers": {
+   "name": "CoverMyMeds",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-16"
   },
   "mckesson|wd3|External_Careers": {
    "name": "McKesson",
@@ -16780,6 +16900,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "plexus|wd504|plexus_careers": {
+   "name": "Plexus",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
+  },
   "plugpower|wd5|Plug_Power_Inc": {
    "name": "Plug Power",
    "quant": false,
@@ -17318,8 +17444,9 @@
   "salesforce|wd12|External_Career_Site": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-19"
   },
   "salesforce|wd12|Futureforce_Internships": {
    "name": "Salesforce",
@@ -17330,8 +17457,9 @@
   "salesforce|wd12|futureforce_newgradroles": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-19"
   },
   "salesforce|wd12|Salesforce_Research": {
    "name": "Salesforce",
@@ -17601,6 +17729,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "snapchat|wd1|snap": {
+   "name": "Snap",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17"
   },
   "snapfinance|wd1|snap_external_careers": {
    "name": "Snap Finance",
@@ -17962,6 +18096,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "tamus|wd1|ETAMU_Student_Employment": {
+   "name": "East Texas A&M University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-17",
+   "sector": "education_research"
   },
   "tamus|wd1|pvamu_external": {
    "name": "Prairie View A&M University",
@@ -18515,8 +18656,9 @@
   "usbank|wd1|US_Bank_Careers": {
    "name": "U.S. Bank",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-19"
   },
   "usertesting|wd12|UserTesting": {
    "name": "UserTesting",
@@ -18865,6 +19007,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "whataburger|wd5|WAB_CAREERS": {
+   "name": "Whataburger",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-15"
   },
   "wilburellis|wd12|wilbur-ellis": {
    "name": "Wilbur-Ellis",

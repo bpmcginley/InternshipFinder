@@ -1079,6 +1079,37 @@
   const inviteNudgeSeen = () => ls.get(INVITE_NUDGE_KEY, null) != null;
   // how: "dismissed" or "opened"; with nothing, the day it was shown, so a reload doesn't show it twice.
   const markInviteNudge = how => ls.set(INVITE_NUDGE_KEY, how || new Date().toISOString().slice(0, 10));
+  // One quiet email invitation per browser, after an explicit useful action. Keep no profile,
+  // listing ID or email here. Fail closed if persistence is blocked: a reload must not nag again.
+  const DIGEST_NUDGE_KEY = "internscout.digest_nudge.v1";
+  function createDigestNudge(storage) {
+    let used = false;
+    return {
+      claim(action, { enabled = false, blocked = false, manual = false } = {}) {
+        if (used || !enabled || blocked || !manual || !["interested", "profile"].includes(action)) return false;
+        // Checks storage works (fail closed), but keeps "shown" only from shown(), once it is on screen.
+        try {
+          const target = storage || localStorage;
+          if (target.getItem(DIGEST_NUDGE_KEY) !== null) return false;
+          target.setItem(DIGEST_NUDGE_KEY, "shown");
+          const ok = target.getItem(DIGEST_NUDGE_KEY) === "shown";
+          target.removeItem(DIGEST_NUDGE_KEY);
+          if (!ok) return false;
+        } catch (e) { return false; }
+        used = true;
+        return true;
+      },
+      shown() {
+        if (!used) return;
+        try { const t = storage || localStorage; if (t.getItem(DIGEST_NUDGE_KEY) === null) t.setItem(DIGEST_NUDGE_KEY, "shown"); } catch (e) { }
+      },
+      finish(how) {
+        if (!["dismissed", "opened"].includes(how)) return;
+        used = true;
+        try { (storage || localStorage).setItem(DIGEST_NUDGE_KEY, how); } catch (e) { }
+      },
+    };
+  }
   async function fetchInvite(token) {
     if (!workerOn() || !token) return null;
     try {
@@ -1190,7 +1221,7 @@
         if (r.status === 409) return { server: false, blocked: true };
       } catch (e) { server = false; }
     }
-    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.set(DELETED_KEY, true);
+    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.del(DIGEST_NUDGE_KEY); ls.set(DELETED_KEY, true);
     // was: ss.del(TOKEN_KEY);
     // The invite check now keeps the account's sub for the session; it comes from the token and goes with it.
     // was: ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY);
@@ -1237,6 +1268,7 @@
     workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
     fetchMe, leftOf, allowanceText, plansBanner, PLANS_BANNER_KEY, PLANS_BANNER_ID, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
     INVITE_NUDGE_KEY, inviteNudgeDue, inviteNudgeSeen, markInviteNudge,
+    DIGEST_NUDGE_KEY, createDigestNudge,
     REVIEW_LINE_KEY, REVIEWS_URL, reviewLineDue,
     reportUrl, digestArchive, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
   };
