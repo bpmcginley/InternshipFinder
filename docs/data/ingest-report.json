@@ -1,0 +1,715 @@
+{
+  "schema_version": 2,
+  "started_at": "2026-10-19T18:08:17.208039+00:00",
+  "funnel": {
+    "fetched": 40746,
+    "parsed": 39591,
+    "accepted": 26485,
+    "unique": 19034,
+    "persisted": 19034
+  },
+  "by_source": {
+    "adamkoch4221": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "adp": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "almondcroffle": {
+      "fetched": 165,
+      "parsed": 159,
+      "rejected_filter_term_filter": 149,
+      "accepted": 10,
+      "rejected_normalize_not_student_role": 6
+    },
+    "amcso1000": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "amhw460": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "aprameyak": {
+      "fetched": 25,
+      "parsed": 25,
+      "rejected_filter_term_filter": 1,
+      "accepted": 24
+    },
+    "ashby": {
+      "fetched": 602,
+      "parsed": 598,
+      "accepted": 484,
+      "rejected_filter_outside_region": 87,
+      "rejected_filter_term_filter": 27,
+      "rejected_normalize_stale_untermed": 4
+    },
+    "bamboohr": {
+      "fetched": 133,
+      "parsed": 133,
+      "rejected_filter_outside_region": 2,
+      "accepted": 131
+    },
+    "christianhirschey": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "derec4": {
+      "fetched": 34,
+      "parsed": 34,
+      "accepted": 12,
+      "rejected_filter_term_filter": 22
+    },
+    "eightfold": {
+      "fetched": 192,
+      "parsed": 192,
+      "accepted": 192
+    },
+    "greenhouse": {
+      "fetched": 2291,
+      "parsed": 2291,
+      "accepted": 1813,
+      "rejected_filter_outside_region": 437,
+      "rejected_filter_term_filter": 41
+    },
+    "icims": {
+      "fetched": 1132,
+      "parsed": 1114,
+      "accepted": 1100,
+      "rejected_filter_term_filter": 3,
+      "rejected_normalize_stale_untermed": 18,
+      "rejected_filter_outside_region": 11
+    },
+    "icims_site": {
+      "fetched": 1237,
+      "parsed": 1232,
+      "accepted": 1213,
+      "rejected_filter_term_filter": 14,
+      "rejected_normalize_stale_untermed": 5,
+      "rejected_filter_outside_region": 5
+    },
+    "jamesthechen": {
+      "fetched": 5,
+      "parsed": 5,
+      "rejected_filter_term_filter": 5
+    },
+    "jazzhr": {
+      "fetched": 186,
+      "parsed": 186,
+      "accepted": 174,
+      "rejected_filter_term_filter": 10,
+      "rejected_filter_outside_region": 2
+    },
+    "jobvite": {
+      "fetched": 35,
+      "parsed": 35,
+      "accepted": 27,
+      "rejected_filter_outside_region": 8
+    },
+    "katie0014": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "lever": {
+      "fetched": 516,
+      "parsed": 515,
+      "accepted": 400,
+      "rejected_filter_outside_region": 91,
+      "rejected_filter_term_filter": 24,
+      "rejected_normalize_stale_untermed": 1
+    },
+    "matthewjyhan": {
+      "fetched": 1,
+      "parsed": 1,
+      "rejected_filter_term_filter": 1
+    },
+    "mfon-19": {
+      "fetched": 1,
+      "parsed": 1,
+      "rejected_filter_term_filter": 1
+    },
+    "mxkr08": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "natalieh235": {
+      "fetched": 2,
+      "parsed": 2,
+      "rejected_filter_term_filter": 2
+    },
+    "natoli74": {
+      "fetched": 1,
+      "rejected_normalize_not_student_role": 1
+    },
+    "nyc_jobs": {
+      "fetched": 34,
+      "parsed": 34,
+      "accepted": 31,
+      "rejected_filter_term_filter": 3
+    },
+    "oracle": {
+      "fetched": 1678,
+      "parsed": 1676,
+      "accepted": 1668,
+      "rejected_filter_term_filter": 5,
+      "rejected_normalize_stale_untermed": 2,
+      "rejected_filter_outside_region": 3
+    },
+    "recruitee": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "rikkayyy": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "rippling": {
+      "fetched": 60,
+      "parsed": 60,
+      "accepted": 58,
+      "rejected_filter_outside_region": 1,
+      "rejected_filter_term_filter": 1
+    },
+    "sbui056": {
+      "fetched": 1,
+      "parsed": 1,
+      "accepted": 1
+    },
+    "simplify": {
+      "fetched": 16852,
+      "parsed": 15737,
+      "accepted": 8612,
+      "rejected_filter_term_filter": 6616,
+      "rejected_normalize_not_student_role": 1115,
+      "rejected_filter_outside_region": 509
+    },
+    "successfactors": {
+      "fetched": 544,
+      "parsed": 544,
+      "accepted": 501,
+      "rejected_filter_term_filter": 3,
+      "rejected_filter_outside_region": 40
+    },
+    "taleo": {
+      "fetched": 126,
+      "parsed": 126,
+      "accepted": 126
+    },
+    "usajobs": {
+      "fetched": 197,
+      "parsed": 197,
+      "accepted": 171,
+      "rejected_filter_term_filter": 14,
+      "rejected_filter_outside_region": 12
+    },
+    "vanshb03": {
+      "fetched": 636,
+      "parsed": 635,
+      "accepted": 619,
+      "rejected_filter_term_filter": 15,
+      "rejected_normalize_dead_url": 1,
+      "rejected_filter_outside_region": 1
+    },
+    "workable": {
+      "fetched": 92,
+      "parsed": 91,
+      "accepted": 90,
+      "rejected_normalize_stale_untermed": 1,
+      "rejected_filter_term_filter": 1
+    },
+    "workday": {
+      "fetched": 13957,
+      "parsed": 13957,
+      "accepted": 9019,
+      "rejected_filter_outside_region": 4756,
+      "rejected_filter_term_filter": 182
+    },
+    "zach-marto": {
+      "fetched": 1,
+      "parsed": 1,
+      "rejected_filter_term_filter": 1
+    },
+    "zaku-seven": {
+      "fetched": 1,
+      "rejected_normalize_not_student_role": 1
+    }
+  },
+  "rejections": {
+    "normalize": {
+      "dead_url": 1,
+      "not_student_role": 1123,
+      "stale_untermed": 31
+    },
+    "filter": {
+      "term_filter": 7141,
+      "outside_region": 5965
+    }
+  },
+  "deduplicated": 7451,
+  "boards": {
+    "adp": {
+      "success": 3,
+      "returned": 1,
+      "complete": 3,
+      "empty_success": 2
+    },
+    "ashby": {
+      "success": 384,
+      "returned": 602,
+      "complete": 384,
+      "empty_success": 168,
+      "failed": 1
+    },
+    "bamboohr": {
+      "success": 21,
+      "returned": 133,
+      "complete": 21,
+      "empty_success": 11
+    },
+    "eightfold": {
+      "success": 6,
+      "returned": 192,
+      "complete": 5,
+      "empty_success": 1
+    },
+    "greenhouse": {
+      "success": 683,
+      "returned": 2291,
+      "complete": 683,
+      "empty_success": 350
+    },
+    "icims": {
+      "success": 129,
+      "returned": 1132,
+      "empty_success": 71
+    },
+    "icims_site": {
+      "success": 61,
+      "returned": 1237,
+      "complete": 61,
+      "empty_success": 14
+    },
+    "jazzhr": {
+      "success": 83,
+      "returned": 186,
+      "empty_success": 39
+    },
+    "jobvite": {
+      "success": 20,
+      "returned": 35,
+      "empty_success": 13
+    },
+    "lever": {
+      "success": 193,
+      "returned": 516,
+      "complete": 193,
+      "empty_success": 112
+    },
+    "oracle": {
+      "success": 131,
+      "returned": 1678,
+      "complete": 113,
+      "empty_success": 43
+    },
+    "recruitee": {
+      "success": 1,
+      "returned": 1,
+      "complete": 1
+    },
+    "rippling": {
+      "success": 63,
+      "returned": 60,
+      "complete": 63,
+      "empty_success": 37
+    },
+    "successfactors": {
+      "success": 25,
+      "returned": 544,
+      "empty_success": 3,
+      "failed": 1
+    },
+    "taleo": {
+      "success": 11,
+      "returned": 126,
+      "complete": 5,
+      "empty_success": 7
+    },
+    "workable": {
+      "success": 81,
+      "returned": 92,
+      "complete": 81,
+      "empty_success": 50
+    },
+    "workday": {
+      "success": 1226,
+      "returned": 13957,
+      "complete": 986,
+      "empty_success": 367,
+      "failed": 4
+    }
+  },
+  "board_scans": {
+    "adp": {
+      "boards": 3,
+      "capped": 0,
+      "read_boards": 3,
+      "read": 35,
+      "returned_by_read_boards": 1,
+      "discarded": {
+        "not_student": 33,
+        "outside_region": 1
+      },
+      "discovered_boards": 3,
+      "discovered": 35
+    },
+    "ashby": {
+      "boards": 384,
+      "capped": 0,
+      "read_boards": 384,
+      "read": 14089,
+      "returned_by_read_boards": 602,
+      "discarded": {
+        "not_student": 13487
+      },
+      "discovered_boards": 384,
+      "discovered": 14089
+    },
+    "bamboohr": {
+      "boards": 21,
+      "capped": 0,
+      "read_boards": 21,
+      "read": 776,
+      "returned_by_read_boards": 133,
+      "discarded": {
+        "not_student": 634,
+        "outside_region": 9
+      },
+      "discovered_boards": 21,
+      "discovered": 776
+    },
+    "eightfold": {
+      "boards": 6,
+      "capped": 1,
+      "stops": {
+        "page_cap": 1
+      },
+      "read_boards": 6,
+      "read": 666,
+      "returned_by_read_boards": 192,
+      "discarded": {
+        "outside_region": 188,
+        "not_student": 222,
+        "duplicate": 64
+      },
+      "discovered_boards": 6,
+      "discovered": 747
+    },
+    "greenhouse": {
+      "boards": 683,
+      "capped": 0,
+      "read_boards": 683,
+      "read": 49031,
+      "returned_by_read_boards": 2291,
+      "discarded": {
+        "not_student": 46740
+      },
+      "discovered_boards": 683,
+      "discovered": 49031
+    },
+    "icims": {
+      "boards": 129,
+      "capped": 13,
+      "stops": {
+        "dry_pages": 15,
+        "page_cap": 1
+      },
+      "read_boards": 129,
+      "read": 2648,
+      "returned_by_read_boards": 1132,
+      "discarded": {
+        "outside_region": 380,
+        "not_student": 879,
+        "duplicate": 257
+      }
+    },
+    "icims_site": {
+      "boards": 61,
+      "capped": 0,
+      "read_boards": 61,
+      "read": 2228,
+      "returned_by_read_boards": 1237,
+      "discarded": {
+        "not_student": 772,
+        "outside_region": 219
+      },
+      "discovered_boards": 61,
+      "discovered": 2228
+    },
+    "jazzhr": {
+      "boards": 83,
+      "capped": 0,
+      "read_boards": 83,
+      "read": 1960,
+      "returned_by_read_boards": 186,
+      "discarded": {
+        "not_student": 1774
+      }
+    },
+    "jobvite": {
+      "boards": 20,
+      "capped": 0,
+      "read_boards": 20,
+      "read": 814,
+      "returned_by_read_boards": 35,
+      "discarded": {
+        "not_student": 779
+      }
+    },
+    "lever": {
+      "boards": 193,
+      "capped": 0,
+      "read_boards": 193,
+      "read": 10075,
+      "returned_by_read_boards": 516,
+      "discarded": {
+        "not_student": 9559
+      },
+      "discovered_boards": 193,
+      "discovered": 10075
+    },
+    "oracle": {
+      "boards": 131,
+      "capped": 14,
+      "stops": {
+        "page_cap": 14
+      },
+      "read_boards": 131,
+      "read": 26636,
+      "returned_by_read_boards": 1678,
+      "discarded": {
+        "not_student": 22591,
+        "outside_region": 1184,
+        "duplicate": 1183
+      },
+      "discovered_boards": 131,
+      "discovered": 47783
+    },
+    "recruitee": {
+      "boards": 1,
+      "capped": 0,
+      "read_boards": 1,
+      "read": 678,
+      "returned_by_read_boards": 1,
+      "discarded": {
+        "not_student": 666,
+        "outside_region": 11
+      },
+      "discovered_boards": 1,
+      "discovered": 678
+    },
+    "rippling": {
+      "boards": 63,
+      "capped": 0,
+      "read_boards": 63,
+      "read": 1557,
+      "returned_by_read_boards": 60,
+      "discarded": {
+        "not_student": 1491,
+        "duplicate": 6
+      },
+      "discovered_boards": 63,
+      "discovered": 1557
+    },
+    "successfactors": {
+      "boards": 25,
+      "capped": 14,
+      "stops": {
+        "page_cap": 16
+      },
+      "read_boards": 25,
+      "read": 4637,
+      "returned_by_read_boards": 544,
+      "discarded": {
+        "not_student": 3479,
+        "outside_region": 145,
+        "duplicate": 469
+      }
+    },
+    "taleo": {
+      "boards": 11,
+      "capped": 0,
+      "read_boards": 11,
+      "read": 567,
+      "returned_by_read_boards": 126,
+      "discarded": {
+        "not_student": 256,
+        "duplicate": 108,
+        "outside_region": 77
+      },
+      "discovered_boards": 11,
+      "discovered": 585
+    },
+    "workable": {
+      "boards": 81,
+      "capped": 0,
+      "read_boards": 81,
+      "read": 3376,
+      "returned_by_read_boards": 92,
+      "discarded": {
+        "not_student": 3236,
+        "outside_region": 48
+      },
+      "discovered_boards": 81,
+      "discovered": 3376
+    },
+    "workday": {
+      "boards": 1226,
+      "capped": 240,
+      "stops": {
+        "dry_pages": 228,
+        "page_cap": 22
+      },
+      "read_boards": 1226,
+      "read": 120590,
+      "returned_by_read_boards": 13957,
+      "discarded": {
+        "not_student": 106452,
+        "duplicate": 181
+      },
+      "discovered_boards": 1226,
+      "discovered": 254203
+    }
+  },
+  "board_failures": [
+    {
+      "source": "ashby",
+      "board_id": "1b4b3693f41c5b62",
+      "status": "failed",
+      "returned": 0,
+      "cause": "404"
+    },
+    {
+      "source": "successfactors",
+      "board_id": "953ada08b7dda8be",
+      "status": "failed",
+      "returned": 0,
+      "cause": "408"
+    },
+    {
+      "source": "workday",
+      "board_id": "0be6ce85e55e362a",
+      "status": "failed",
+      "returned": 0,
+      "cause": "429"
+    },
+    {
+      "source": "workday",
+      "board_id": "49b462fe6ea98a89",
+      "status": "failed",
+      "returned": 0,
+      "cause": "429"
+    },
+    {
+      "source": "workday",
+      "board_id": "ddc53df57b31591b",
+      "status": "failed",
+      "returned": 0,
+      "cause": "429"
+    },
+    {
+      "source": "workday",
+      "board_id": "fa567d484ad2fa90",
+      "status": "failed",
+      "returned": 0,
+      "cause": "JSONDecodeError"
+    }
+  ],
+  "sources": {
+    "google_jobs": {
+      "status": "skipped",
+      "returned": 0,
+      "cause": "push_run"
+    },
+    "nyc_jobs": {
+      "status": "success",
+      "returned": 34,
+      "scan": {
+        "read": 87,
+        "discarded": {
+          "duplicate": 43,
+          "expired": 4,
+          "not_student": 6
+        },
+        "capped": false
+      }
+    },
+    "simplify": {
+      "status": "success",
+      "returned": 17061,
+      "scan": {
+        "discovered": 17062,
+        "read": 17062,
+        "discarded": {
+          "unlisted": 1
+        },
+        "capped": false
+      }
+    },
+    "uhn": {
+      "status": "empty",
+      "returned": 0,
+      "scan": {
+        "discovered": 163,
+        "read": 163,
+        "discarded": {
+          "not_student": 163
+        },
+        "capped": false
+      }
+    },
+    "usajobs": {
+      "status": "success",
+      "returned": 197,
+      "scan": {
+        "discovered": 202,
+        "read": 202,
+        "discarded": {
+          "not_student": 5
+        },
+        "capped": false
+      }
+    },
+    "vanshb03": {
+      "status": "success",
+      "returned": 671,
+      "scan": {
+        "discovered": 671,
+        "read": 671,
+        "discarded": {},
+        "capped": false
+      }
+    }
+  },
+  "export": {
+    "total": 19201,
+    "held": 167,
+    "open": 14982
+  },
+  "discrepancies": [],
+  "limits": [
+    "board_scans covers successful board scans only. A key missing there was not measured, and discovered sums only the boards whose API reported a total.",
+    "Export totals may include prior-run listings and closed listings.",
+    "Counts do not estimate the share of all online internships covered."
+  ]
+}
