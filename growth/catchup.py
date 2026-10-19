@@ -40,6 +40,11 @@ EVERY = {
 INGEST_GUARD = timedelta(hours=4)
 # Brand posts: Tuesdays and Thursdays (weekday 1 and 3), from 15:00 UTC, once that day.
 POST_DAYS, POST_HOUR = (1, 3), 15
+# The weekly email: Mondays (weekday 0) from 12:00 UTC. GitHub dropped the first scheduled send on
+# 2026-10-19 entirely, so it is caught up like the posts, but only until 22:00 UTC: an email that
+# would land in the middle of the night waits for a person instead. digest_send.py's six-day check
+# is the backstop if GitHub's late scheduled run turns up after a catch-up.
+DIGEST_DAY, DIGEST_HOUR, DIGEST_LAST_HOUR = 0, 12, 22
 BUSY = ("queued", "in_progress", "waiting", "pending", "requested")
 
 
@@ -99,6 +104,15 @@ def post_due(rs: list[dict], now: datetime) -> bool:
     return not any(_when(r["created_at"]) >= since for r in rs)
 
 
+def digest_due(rs: list[dict], now: datetime) -> bool:
+    """A Monday between 12:00 and 22:00 UTC, and no run of any kind started since 11:55: at most one
+    catch-up per Monday, however the day's runs ended (a send that failed is not retried by this)."""
+    if now.weekday() != DIGEST_DAY or not DIGEST_HOUR <= now.hour < DIGEST_LAST_HOUR:
+        return False
+    since = now.replace(hour=DIGEST_HOUR, minute=0, second=0, microsecond=0) - timedelta(minutes=5)
+    return not any(_when(r["created_at"]) >= since for r in rs)
+
+
 def post_done_today(rs: list[dict], now: datetime, this_id, jobs_of=None) -> bool:
     """Another run today already got as far as posting (or is posting). Failed runs count: Bluesky
     may have posted before Instagram failed, and posting it twice is worse than once."""
@@ -125,6 +139,10 @@ def dispatch(file: str) -> None:
     body = {"ref": "main"}
     if file in FORCE_INPUT:
         body["inputs"] = {"force": "false"}
+    if file == "digest.yml":
+        # A scheduled run sends to every subscriber; a dispatch only does when asked. Sending still
+        # needs DIGEST_ENABLED=1, and the six-day check still refuses a second copy.
+        body["inputs"] = {"everyone": "true", "check_key": "false"}
     _call("POST", f"workflows/{file}/dispatches", body)
 
 
@@ -163,6 +181,13 @@ def main(argv: list[str]) -> int:
         except Exception as e:            # one API hiccup must not stop the other jobs' checks
             failed = True
             print(f"[catchup] {file}: check failed ({type(e).__name__})")
+    try:
+        if digest_due(runs("digest.yml"), now):
+            dispatch("digest.yml")
+            print("[catchup] digest.yml: this Monday's email had not started, started")
+    except Exception as e:
+        failed = True
+        print(f"[catchup] digest.yml: check failed ({type(e).__name__})")
     try:
         if post_due(runs("social.yml"), now):
             dispatch("social.yml")
