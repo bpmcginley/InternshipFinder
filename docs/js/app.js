@@ -440,7 +440,9 @@
   // with or without it (tests/site/placements.test.mjs). was: the same markup inline in App.
   function ListTable({ shown, rows, head, renderRow, box, phone, onMore, inlineSignup, columns = 4 }) {
     const at = Math.min(3, shown.length) - 1;
-    const signupAt = Math.min(10, shown.length) - 1;
+    // After the tenth row, only when more follow: on a shorter list the footer form comes right after
+    // the last row, and two forms in a row read as a mistake. was: Math.min(10, shown.length) - 1.
+    const signupAt = shown.length > 10 ? 9 : -1;
     return h(F, null,
       !phone && box,
       h("a", { className: "skip inline", href: "#list-end" }, "Skip past the listings"),
@@ -837,7 +839,7 @@
     // optional; a missing new helper must never stop the internship dashboard from rendering.
     const digestPrompt = useRef(null);
     if (!digestPrompt.current) digestPrompt.current = typeof IS.createDigestNudge === "function"
-      ? IS.createDigestNudge() : { claim: () => false, finish() {} };
+      ? IS.createDigestNudge() : { claim: () => false, shown() {}, finish() {} };
     const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
@@ -1221,10 +1223,14 @@
     const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
     // Queue updates and batch Auto-Apply also set statuses; only the student's own status control
     // can offer this invitation. Never perform prompt side effects inside a React state updater.
-    const setManualAppState = (id, v) => {
-      if (v === "interested" && appStatesRef.current[id] !== "interested") offerDigestNudge("interested");
+    // Stable, like the rows' other handlers: rows are memoized, and a new function here each render
+    // redrew every row on every keystroke. The ref reads the current notices when it fires.
+    // was: const setManualAppState = (id, v) => { ... } (a new function each render, review of #123).
+    const offerDigestNudgeRef = useRef(offerDigestNudge); offerDigestNudgeRef.current = offerDigestNudge;
+    const setManualAppState = useCallback((id, v) => {
+      if (v === "interested" && appStatesRef.current[id] !== "interested") offerDigestNudgeRef.current("interested");
       setAppState(id, v);
-    };
+    }, [setAppState]);
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
     // "More filters" remembers whether it was open; the count is how many of the controls inside it
     // are set to something other than their default, so a hidden filter is never a silent one.
@@ -1492,6 +1498,10 @@
     // was: ... && !me.paused && inviteOffer && autoAllow && ...: the notice only showed while invites were on,
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
     const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    // Kept as shown only once it is actually on screen, so a higher-priority notice (or setup) that
+    // covers it until a reload doesn't use it up unseen. was: kept as shown when offered (review of #123).
+    const digestVisible = !!(digestNudge && digestOn && !setupOpen && !nudge && !invite && !outOfRuns && !upgradeAsk);
+    useEffect(() => { if (digestVisible && digestPrompt.current.shown) digestPrompt.current.shown(); }, [digestVisible]);
     // The review line (see reviewHidden above). It waits behind any other notice rather than stacking.
     const reviewLine = !reviewHidden && !note && !nudge && !digestNudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
     // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
@@ -1764,7 +1774,9 @@
           h("a", { className: "mark", href: "/" }, "InternScout"),
           h("nav", { className: "sitenav", "aria-label": "Site" },
             h("a", { href: "internships/" }, "Browse"),
-            digestOn && h("a", { href: "digest/?from=dashboard-nav", "data-digest-placement": "nav" }, "Weekly email"),
+            // Always shown, like the static nav before the app loads (no flash): /digest/ itself says
+            // whether sign-ups are open. was: digestOn && h("a", ...) (review of #123).
+            h("a", { href: "digest/?from=dashboard-nav", "data-digest-placement": "nav" }, "Weekly email"),
             h("a", { href: "install.html?from=dashboard-nav" }, "Auto-Apply (free)"),
             h("a", { href: "pricing/" }, "Pricing"),
             h("a", { href: "compare/" }, "Compare"),
@@ -1900,7 +1912,7 @@
 
       h("section", { id: "results", "aria-labelledby": "listings" },
       h("h2", { id: "listings", className: "sr", tabIndex: -1 }, "Listings"),
-      digestNudge && digestOn && !setupOpen && !nudge && !invite && !outOfRuns && !upgradeAsk && h("div", { className: "notice quietnote", role: "note", "aria-label": "Weekly internship email" },
+      digestVisible && h("div", { className: "notice quietnote", role: "note", "aria-label": "Weekly internship email" },
         "Want new internships in your inbox every Monday? ",
         h("a", { href: "/digest/?from=dashboard-contextual", "data-digest-placement": "contextual", onClick: () => finishDigestNudge("opened") }, "Get the free weekly email"),
         ". Everyone gets the same roundup. ",

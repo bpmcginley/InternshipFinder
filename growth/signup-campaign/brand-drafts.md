@@ -57,9 +57,9 @@ Two different routes into technical work: Vestmark's Boston software co-op is fo
 
 Apply directly through the employer when a role fits. To hear about new opportunities every Monday, [subscribe to InternScout's free digest](https://internscout.org/digest/?utm_source=linkedin&utm_medium=social), then click the confirmation email. The digest currently has the same content for every subscriber.
 
-## Set C — Marketing and an early finance program
+## Set C: Marketing
 
-**Time-sensitive draft: do not release at or after October 16, 2026, 5 p.m. Eastern.** Weiss's application closes then. Afterward discard the Weiss block and rewrite the introduction; this set is not suitable for Monday's email.
+Updated 2026-10-18: the Weiss fellowship closed October 16, so its block was removed and this set is Hasbro only.
 
 ### X thread for @useinternscout
 
@@ -69,20 +69,15 @@ https://job-boards.greenhouse.io/hasbro/jobs/4424981009
 ```
 
 ```text
-Finance freshmen/sophomores: Weiss's two-day Boston fellowship is Jan 7–8, 2027, for classes of 2029/2030. This is not a summer internship. Applications close Oct 16 at 5 p.m. Eastern.
-https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002
-```
-
-```text
 For new internships in your inbox every Monday, join InternScout's free weekly digest. Everyone receives the same email; click the confirmation email to finish:
 https://internscout.org/digest/?utm_source=x&utm_medium=social
 ```
 
 ### Longer brand caption
 
-Two distinct early-career options to examine: Hasbro's Summer 2027 marketing application considers students for anticipated projects in Boston and/or Renton; it does not represent one confirmed vacancy. Separately, Weiss has a two-day Boston finance fellowship on January 7–8, 2027 for current freshmen and sophomores in classes of 2029/2030. The fellowship application closes **October 16 at 5 p.m. Eastern** and is not a summer internship.
+Hasbro's Summer 2027 marketing application considers students for anticipated projects in Boston and/or Renton; it does not represent one confirmed vacancy. Check the enrollment and work authorization rules on the posting.
 
-[Hasbro's program details](https://job-boards.greenhouse.io/hasbro/jobs/4424981009) · [Weiss's fellowship details](https://job-boards.greenhouse.io/weissassetmanagement/jobs/8831639002)
+[Hasbro's program details](https://job-boards.greenhouse.io/hasbro/jobs/4424981009)
 
 For a free Monday roundup of new internships, [join InternScout's weekly digest](https://internscout.org/digest/?utm_source=linkedin&utm_medium=social). Check each employer's eligibility rules and click your subscription confirmation email. The digest is the same for everyone for now.
 

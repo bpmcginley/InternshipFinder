@@ -352,9 +352,9 @@
   "chainlink-labs": {
    "name": "Chainlink Labs",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-10-18",
-   "last_fail": "2026-10-18"
+   "last_fail": "2026-10-19"
   },
   "charge-robotics": {
    "name": "Charge Robotics",
@@ -2733,8 +2733,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-19"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -4206,6 +4207,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "gravitonresearchcapital": {
+   "name": "Graviton",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-19"
   },
   "greenworkssunriseglobalmarketing": {
    "name": "Greenworks",
@@ -6697,6 +6704,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "economic_consulting"
+  },
+  "associatecareers-analysisgroup": {
+   "name": "UNAVAILABLE",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-19"
   },
   "campus-libertymutual": {
    "name": "Liberty Mutual",
@@ -12827,8 +12840,9 @@
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-19"
   },
   "boeing|wd1|INTERN": {
    "name": "The Boeing Company",
@@ -17437,8 +17451,9 @@
   "salesforce|wd12|External_Career_Site": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-19"
   },
   "salesforce|wd12|Futureforce_Internships": {
    "name": "Salesforce",
@@ -17449,8 +17464,9 @@
   "salesforce|wd12|futureforce_newgradroles": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-19"
   },
   "salesforce|wd12|Salesforce_Research": {
    "name": "Salesforce",
@@ -18654,8 +18670,9 @@
   "usbank|wd1|US_Bank_Careers": {
    "name": "U.S. Bank",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-19"
   },
   "usertesting|wd12|UserTesting": {
    "name": "UserTesting",
