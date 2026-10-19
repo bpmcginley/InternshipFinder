@@ -27,6 +27,7 @@ from .majors import majors_export
 from .normalize import listing_id
 from .score import W
 from .region import evaluate_locations
+from .scan_evidence import FULL_LIST, canonical, export_board
 
 DESC_CHARS = 1500
 
@@ -406,7 +407,8 @@ def board_of(x: dict) -> tuple:
     return (x.get("ats"), x.get("company_name"), f"{host}/{token}")
 
 
-def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
+def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
+                      completed_boards=None) -> int:
     """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
 
     An export is only what this run managed to fetch, so a board that timed out deletes all of
@@ -426,10 +428,16 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
     The hold is not open-ended. A carried listing keeps the last_seen of the run that really did
     fetch it, so a board that is genuinely gone empties out after CARRY_DAYS and stays empty.
     Carried listings are marked, so the dashboard can say the board did not answer this time.
+
+    A collapse is only a guess at a failed fetch, and completed_boards replaces the guess with a
+    fact. Those are the boards this run read to the end (scan_evidence, the same set pipeline.run
+    closes by), so their missing rows are closed and are not carried, however far the count fell.
+    A board that failed, hit a page cap, or has no way to prove a full read keeps the old rule.
     """
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
+    completed = canonical(completed_boards)
 
     now_open = Counter(board_of(x) for x in listings if x.get("status") == "open")
     was_open: dict[tuple, list[dict]] = defaultdict(list)
@@ -455,6 +463,8 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
                 continue
             if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
                 continue   # the board has been quiet for days; it is not coming back
+            if completed and export_board(it, completed):
+                continue   # read to the end this run and not there: closed, not missing
             kept = dict(it)
             kept["carried"] = True
             listings.append(kept)
@@ -463,7 +473,8 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None)
     return held
 
 
-def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
+def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None,
+                       completed_boards=None) -> int:
     """Keep what the Google Jobs searches found until they have had a chance to find it again.
 
     Those searches cost money and run once a day, on the first run after midnight UTC; the three
@@ -475,14 +486,22 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
 
     So such a listing is carried from the last export for CARRY_DAYS after a search last saw it,
     the same bound a board that failed to answer gets.
+
+    Except when the posting's own board was read whole this run and it was not there. That only
+    counts for a FULL_LIST board: a keyword-scoped scan (Workday, Oracle...) may never have asked
+    for a title a search engine found, so its evidence leaves these rows alone, as pipeline.run does.
     """
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
+    completed = canonical(completed_boards)
     held = 0
     for it in prev:
         url = it.get("apply_url")
         if not it.get("via_search") or it.get("status") != "open" or not url or url in have:
+            continue
+        board = export_board(it, completed) if completed else None
+        if board and board[0] in FULL_LIST:
             continue
         if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
             continue
@@ -495,7 +514,24 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     return held
 
 
-def export(out_dir: str) -> dict:
+def closed_by_scan(listings: list[dict], prev: list[dict], completed_boards) -> int:
+    """How many of the last export's open rows this run's complete scans closed, for the log."""
+    completed = canonical(completed_boards)
+    if not completed:
+        return 0
+    have = {x.get("apply_url") for x in listings}
+    return sum(1 for it in prev if it.get("status") == "open" and it.get("apply_url")
+               and it["apply_url"] not in have and export_board(it, completed))
+
+
+def export(out_dir: str, completed_boards=None) -> dict:
+    """Write the static site data.
+
+    completed_boards is the (ats, token) evidence run_ingest.scan_boards collected this run. CI
+    rebuilds its database every run, so the carry rules below, not the database, decide whether
+    a missing posting stays on the site; passing the evidence makes them close what the scans
+    proved closed. Without it (a standalone export) every board keeps the carry rules as before.
+    """
     init_db()
     os.makedirs(out_dir, exist_ok=True)
     with SessionLocal() as db:
@@ -512,8 +548,9 @@ def export(out_dir: str) -> dict:
         # first saw any of this and of what the boards held, because the db does not outlive a run.
         prev = previous_export(out_dir)
         carried = carry_first_seen(listings, out_dir, prev=prev)
-        held = carry_open_boards(listings, out_dir, prev=prev)
-        held += carry_search_finds(listings, out_dir, prev=prev)
+        held = carry_open_boards(listings, out_dir, prev=prev, completed_boards=completed_boards)
+        held += carry_search_finds(listings, out_dir, prev=prev, completed_boards=completed_boards)
+        closed = closed_by_scan(listings, prev, completed_boards)
         # Again, now the carried rows are in: they came with the is_new the last export gave them.
         # Dated from generated_at, the "today" seo_pages.fresh uses for /internships/new/.
         mark_new(listings, datetime.fromisoformat(generated_at).date())
@@ -551,6 +588,9 @@ def export(out_dir: str) -> dict:
           f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days")
     print(f"[export] {held} listings held from the last export because their board came back "
           f"with half or less of what it had")
+    print(f"[export] {closed} listings from the last export left the site because a complete "
+          f"scan of their board this run did not find them "
+          f"({len(canonical(completed_boards))} boards read to the end)")
     index = write_shards(listings, out_dir, generated_at)
     unplaced = [x for x in listings if not shard_keys(x)]
     print(f"[export] wrote {len(listings) - len(unplaced)} listings "

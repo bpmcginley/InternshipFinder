@@ -88,14 +88,27 @@ unique live listings. Newly admitted boards enter ordinary ingestion on its next
 
 ## Resume
 
-1. Inspect Nova Scotia and Sanford's parsed opportunities and employer identity.
-   Re-run a small bounded `--scan --verify` batch when ready to admit verified boards.
-2. Review employer identity, then use a curated target manifest for any desired
-   `--apply` batch. Keep research reports outside committed data unless deliberately
-   adding a reviewed public source inventory.
-3. Fill uncovered jurisdiction/sector worklist cells with official employer evidence.
-   The 16 starters are a seed, not a complete national employer catalog.
-4. Measure accepted unique listing yield during ordinary ingestion and prioritize
-   custom adapters for readable sources with useful vacancies and no supported board.
-5. Consider scheduled discovery only after validating yield and choosing an explicit
+Updated October 18, 2026. Details and numbers: [live verification](live-verification-2026-10-18.md).
+
+1. Done: Nova Scotia (`jobs.novascotia.ca`, 1 parsed student role) and Sanford Health
+   (`sanford|wd5|SanfordHealth`, 14) passed identity and content review and were admitted
+   with `--scan --verify --apply` and a curated targets file. Both enter ordinary ingestion
+   on its next run.
+2. Done: the other 14 starters were scanned. None had a supported board with student roles.
+   Four are blocked by robots (Nunavut, Yukon government, Maine, TVA answer 403 for
+   `/robots.txt`); Saskatchewan's `careers.saskatchewan.ca` redirects its robots file;
+   Memorial's student system is login-only; the rest have no supported board.
+3. Remaining: re-verify Oak Ridge (`jobs.ornl.gov`, a working classic SuccessFactors site with
+   no student roles parsed today) during recruiting season and admit it if student roles
+   appear. It needs a curated target at `ornl.gov/careers-at-ornl/`, because the starter's
+   internship hub links the board only two levels deep.
+4. Remaining: custom-adapter candidates with readable public vacancies and no supported
+   board: GNWT eRecruit (`gov.nt.ca/careers/en/search/job`), UNB and Yukon University
+   first-party lists, Manitoba Hydro (SAP E-Recruiting). Saskatchewan looks like Oracle
+   Recruiting Cloud on a branded host, which the Oracle adapter does not recognise.
+5. Remaining: decide whether the discovery client should follow a robots redirect that ends
+   in a 404 (RFC 9309 allows this). Keep treating 403 as blocked.
+6. Remaining: fill uncovered jurisdiction/sector worklist cells with official employer
+   evidence. The 16 starters are a seed, not a complete national employer catalog.
+7. Consider scheduled discovery only after validating yield and choosing an explicit
    maintenance owner. No new scheduled job was installed in this workstream.

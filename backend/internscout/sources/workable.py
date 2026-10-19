@@ -1,6 +1,6 @@
 """Workable public widget API: one call per account, descriptions included."""
 from __future__ import annotations
-from .common import board_item, html_to_text
+from .common import board_item, html_to_text, mark_complete, rows_of
 from ..classify import is_internship
 
 URL = "https://apply.workable.com/api/v1/widget/accounts/{token}"
@@ -37,4 +37,12 @@ def parse_workable(payload: dict, co: dict) -> list[dict]:
 def fetch_workable_board(c, co: dict) -> list[dict]:
     r = c.get(URL.format(token=co["ats_token"]), params={"details": "true"})
     r.raise_for_status()
-    return parse_workable(r.json(), co)
+    payload = r.json()
+    if not isinstance(payload, dict):
+        raise ValueError("Workable widget response is not an object")
+    items = parse_workable(payload, co)
+    # The widget call takes no paging parameters and answers with every published job at once,
+    # so a well-formed jobs list (empty included) is the whole board. A body without one is not
+    # read as an empty board.
+    mark_complete(co, rows_of(payload, "jobs") is not None)
+    return items

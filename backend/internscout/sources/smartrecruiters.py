@@ -12,7 +12,7 @@ real description inside the 4,000-character budget and hand the classifier a com
 copy to tag a job by.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text, require_robots
+from .common import board_item, html_to_text, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -57,14 +57,25 @@ def parse_smartrecruiters_detail(payload: dict) -> str:
 def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
     token, out, offset = co["ats_token"], [], 0
     require_robots(c, "https://api.smartrecruiters.com", "/v1/companies/", token)
+    reported, rows, well_formed = None, 0, True
     while offset < MAX_OFFSET:
         r = c.get(URL.format(token=token), params={"q": "intern", "limit": 100, "offset": offset})
         r.raise_for_status()
         data = r.json()
+        if not isinstance(data, dict):
+            raise ValueError("SmartRecruiters postings response is not an object")
+        page = rows_of(data, "content")
+        if page is None:
+            well_formed = False
+        if offset == 0:
+            reported = reported_count(data.get("totalFound"))
+        rows += len(page or [])
         out += parse_smartrecruiters(data, co, token)
         offset += 100
         if offset >= (data.get("totalFound") or 0):
             break
+    # The one "intern" search read to its totalFound, not stopped at MAX_OFFSET.
+    complete = well_formed and reported is not None and rows == reported
     for it in [i for i in out if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(JOB_URL.format(token=token, id=it["_sr_id"]))
@@ -72,4 +83,5 @@ def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
                 it["description"] = parse_smartrecruiters_detail(d.json())[:4000]
         except Exception:
             pass
+    mark_complete(co, complete)
     return out
