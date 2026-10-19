@@ -4,7 +4,7 @@
   "academic_year": "2021-22",
   "basis": "Ten largest broad fields by US bachelor's degrees conferred in the last column of the verified table; these are field groups, not ten individual degree programs.",
   "fields": [
-    {"rank": 1, "name": "Business", "slug": "business", "degrees": 375418, "tags": ["business", "finance", "accounting", "consulting", "marketing", "sales", "hr", "operations", "supply_chain", "entrepreneurship", "pm", "real_estate", "insurance", "retail"]},
+    {"rank": 1, "name": "Business", "slug": "business", "degrees": 375418, "tags": ["business", "finance", "accounting", "consulting", "marketing", "sales", "hr", "operations", "supply_chain", "entrepreneurship", "pm", "real_estate", "insurance", "retail", "hospitality"]},
     {"rank": 2, "name": "Health Professions", "nces_name": "Health professions and related programs", "slug": "health-professions", "degrees": 263765, "tags": ["health", "nursing", "public_health", "clinical_research"]},
     {"rank": 3, "name": "Social Sciences and History", "slug": "social-sciences-and-history", "degrees": 151109, "tags": ["social_science", "economics", "government", "museums"]},
     {"rank": 4, "name": "Biological and Biomedical Sciences", "slug": "biological-and-biomedical-sciences", "degrees": 131462, "tags": ["biology", "biomedical"]},
