@@ -1,0 +1,311 @@
+{
+ "ats": "taleo",
+ "token": "textron|textron",
+ "name": "Textron",
+ "sector": null,
+ "measured_on": "2026-10-18",
+ "production_keywords": [
+  "intern",
+  "internship",
+  "co-op",
+  "student",
+  "stagiaire"
+ ],
+ "configs": [
+  {
+   "keywords": [
+    "intern"
+   ],
+   "status": "ok",
+   "requests": 11,
+   "request_errors": 1,
+   "est_sequential_seconds": 2.2,
+   "raw_rows": 82,
+   "normalized": 82,
+   "accepted": 82,
+   "accepted_dedupe_keys": 78,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op"
+   ],
+   "status": "ok",
+   "requests": 12,
+   "request_errors": 1,
+   "est_sequential_seconds": 2.3,
+   "raw_rows": 88,
+   "normalized": 88,
+   "accepted": 88,
+   "accepted_dedupe_keys": 84,
+   "new_vs_baseline": 6,
+   "new_ids": [
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342620",
+     "title": "2027 Co-Op - Electrical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342622",
+     "title": "2027 Co-Op - Mechanical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342650",
+     "title": "2027 Co-Op - Software Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342651",
+     "title": "2027 Co-Op - Systems Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344703",
+     "title": "CWC Quality Engineering Co-Op"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=345619",
+     "title": "2027 Co-Op - Legal (Air Systems)  - Hunt Valley, MD"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student"
+   ],
+   "status": "ok",
+   "requests": 13,
+   "request_errors": 1,
+   "est_sequential_seconds": 2.6,
+   "raw_rows": 89,
+   "normalized": 89,
+   "accepted": 89,
+   "accepted_dedupe_keys": 85,
+   "new_vs_baseline": 7,
+   "new_ids": [
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342620",
+     "title": "2027 Co-Op - Electrical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342622",
+     "title": "2027 Co-Op - Mechanical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342650",
+     "title": "2027 Co-Op - Software Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342651",
+     "title": "2027 Co-Op - Systems Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342798",
+     "title": "2027 Internship: CWC Finance (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344703",
+     "title": "CWC Quality Engineering Co-Op"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=345619",
+     "title": "2027 Co-Op - Legal (Air Systems)  - Hunt Valley, MD"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 17,
+   "request_errors": 1,
+   "est_sequential_seconds": 3.2,
+   "raw_rows": 92,
+   "normalized": 92,
+   "accepted": 92,
+   "accepted_dedupe_keys": 88,
+   "new_vs_baseline": 10,
+   "new_ids": [
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342620",
+     "title": "2027 Co-Op - Electrical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342622",
+     "title": "2027 Co-Op - Mechanical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342650",
+     "title": "2027 Co-Op - Software Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342651",
+     "title": "2027 Co-Op - Systems Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342798",
+     "title": "2027 Internship: CWC Finance (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=343165",
+     "title": "Stage automne 2026 - Technologie de l'information / 2026 fall Internship - Information Technology (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=343983",
+     "title": "Stage automne 2026 - Technologie de l'information des systèmes de qualité / 2026 Fall Internship - Quality Systems Information Technology (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344703",
+     "title": "CWC Quality Engineering Co-Op"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344876",
+     "title": "Stage hiver 2027 - Chargé de projet en stratégie et gouvernance / 2027 winter Internship - Project Manager in Strategy and Governance (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=345619",
+     "title": "2027 Co-Op - Legal (Air Systems)  - Hunt Valley, MD"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "internship",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 23,
+   "request_errors": 1,
+   "est_sequential_seconds": 4.4,
+   "raw_rows": 110,
+   "normalized": 110,
+   "accepted": 110,
+   "accepted_dedupe_keys": 105,
+   "new_vs_baseline": 28,
+   "new_ids": [
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342620",
+     "title": "2027 Co-Op - Electrical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342622",
+     "title": "2027 Co-Op - Mechanical Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342650",
+     "title": "2027 Co-Op - Software Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342651",
+     "title": "2027 Co-Op - Systems Engineer (Uncrewed Land & Air) - Hunt Valley, MD"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342738",
+     "title": "2027 Internship: CWC Quality Engineering (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342755",
+     "title": "2027 Internship: CWC Human Resources (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342758",
+     "title": "2027 Internship: CWC Supply Chain (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342759",
+     "title": "2027 Internship: CWC Manufacturing Engineer (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342763",
+     "title": "2027 Internship: Supply Chain (Detroit, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342767",
+     "title": "2027 Internship: Supply Chain (Lavonia, GA)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342769",
+     "title": "2027 Internship: Manufacturing Engineer (Lavonia, GA)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342773",
+     "title": "2027 Internship: Quality Engineer (Troy, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342775",
+     "title": " 2027 Internship:  Sales (Troy, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342780",
+     "title": "2027 Internship: Strategic Logistics (Troy, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342782",
+     "title": "2027 Internship: Procurement (Troy, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342786",
+     "title": "2027 Internship: Quality (San Antonio, TX)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342787",
+     "title": "2027 Internship: Automation Engineering (San Antonio, TX)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342789",
+     "title": "2027 Internship: Supply Chain (San Antonio, TX)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342790",
+     "title": "2027 Internship: Manufacturing Engineer (Avilla, IN)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342791",
+     "title": "2027 Internship: Quality Engineering (Avilla, IN)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=342798",
+     "title": "2027 Internship: CWC Finance (Muskegon, MI)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=343085",
+     "title": "2027 Internship: Finance - Lavonia, GA"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=343165",
+     "title": "Stage automne 2026 - Technologie de l'information / 2026 fall Internship - Information Technology (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=343983",
+     "title": "Stage automne 2026 - Technologie de l'information des systèmes de qualité / 2026 Fall Internship - Quality Systems Information Technology (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344703",
+     "title": "CWC Quality Engineering Co-Op"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344800",
+     "title": "Stage hiver 2027 - Ingénieur Industriel / 2027 Winter Internship - Industrial Engineer (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=344876",
+     "title": "Stage hiver 2027 - Chargé de projet en stratégie et gouvernance / 2027 winter Internship - Project Manager in Strategy and Governance (Mirabel, QC)"
+    },
+    {
+     "id": "textron.taleo.net/careersection/textron/jobdetail.ftl?job=345619",
+     "title": "2027 Co-Op - Legal (Air Systems)  - Hunt Valley, MD"
+    }
+   ]
+  }
+ ],
+ "network_requests": 23,
+ "network_wall_seconds_incl_pauses": 11.8
+}

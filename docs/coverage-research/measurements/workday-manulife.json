@@ -1,0 +1,81 @@
+{
+ "ats": "workday",
+ "token": "manulife|wd3|MFCJH_Jobs",
+ "name": "Manulife Financial",
+ "sector": null,
+ "measured_on": "2026-10-18",
+ "production_keywords": [
+  "intern",
+  "co-op"
+ ],
+ "configs": [
+  {
+   "keywords": [
+    "intern"
+   ],
+   "status": "ok",
+   "requests": 38,
+   "request_errors": 0,
+   "est_sequential_seconds": 20.8,
+   "raw_rows": 37,
+   "normalized": 37,
+   "accepted": 20,
+   "accepted_dedupe_keys": 20,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op"
+   ],
+   "status": "ok",
+   "requests": 48,
+   "request_errors": 0,
+   "est_sequential_seconds": 28.8,
+   "raw_rows": 37,
+   "normalized": 37,
+   "accepted": 20,
+   "accepted_dedupe_keys": 20,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student"
+   ],
+   "status": "ok",
+   "requests": 50,
+   "request_errors": 0,
+   "est_sequential_seconds": 30.2,
+   "raw_rows": 37,
+   "normalized": 37,
+   "accepted": 20,
+   "accepted_dedupe_keys": 20,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 51,
+   "request_errors": 0,
+   "est_sequential_seconds": 31.2,
+   "raw_rows": 37,
+   "normalized": 37,
+   "accepted": 20,
+   "accepted_dedupe_keys": 20,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  }
+ ],
+ "network_requests": 51,
+ "network_wall_seconds_incl_pauses": 46.9
+}

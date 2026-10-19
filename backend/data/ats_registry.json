@@ -11005,6 +11005,13 @@
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
   },
+  "jobs.novascotia.ca": {
+   "name": "Province of Nova Scotia",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-18",
+   "sector": "government"
+  },
   "jobs.nucor.com": {
    "name": "Nucor",
    "quant": false,
@@ -17466,6 +17473,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sanford|wd5|SanfordHealth": {
+   "name": "Sanford Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-18",
+   "sector": "health"
   },
   "sanofi|wd3|SanofiCareers": {
    "name": "Sanofi",

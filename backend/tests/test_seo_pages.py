@@ -55,15 +55,20 @@ def test_pages_only_where_there_are_enough_open_listings(tmp_path):
     assert "/internships/" in paths
 
 
-def test_closed_and_non_web_links_are_left_out(tmp_path):
+def test_closed_and_non_web_links_are_left_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "NEAR_ON", True)   # this test checks the near pages are always built (conftest)
     rows = [_row(i) for i in range(4)]
     rows.append(_row(4, status="closed"))
     rows.append(_row(5, apply_url="javascript:alert(1)"))
     site = _site(tmp_path, {"MA": rows})
     # Only 4 usable listings, so nothing but the hubs, and /about/, /compare/ (2026-10-02), /pricing/
     # (2026-10-05) and /digest/ (2026-10-06), is built.
-    assert _paths(seo_pages.build(site)) == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/",
-                                             "/pricing/", "/digest/"}
+    # The 500 near pages and their hub (2026-10-18) are built whatever is open, so a link to one never breaks.
+    paths = _paths(seo_pages.build(site))
+    near = {p for p in paths if p.startswith(seo_pages.NEAR_ROOT)}
+    assert len(near) == 501
+    assert paths - near == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/",
+                            "/pricing/", "/digest/"}
     # was: == {"/internships/", "/internships/for/", "/internships/at/", "/about/", "/compare/"}
     # was: == {..., "/about/", "/compare/", "/pricing/"}
 
@@ -1749,7 +1754,9 @@ def test_a_thin_field_in_a_place_page_is_built_and_linked_but_kept_out_of_search
     from internscout import feeds
     feeds.write_all(site, list(built.values()))                        # and its feed, for the club channels
     assert os.path.exists(os.path.join(site, "internships", "mechanical-engineering", "massachusetts", "feed.xml"))
-    assert seo_pages.held_paths(os.path.join(site, seo_pages.HELD_FILE)) == {COMBO}
+    held = seo_pages.held_paths(os.path.join(site, seo_pages.HELD_FILE))
+    # was: == {COMBO}. The near pages with too few roles are held the same way (2026-10-18).
+    assert {p for p in held if not p.startswith(seo_pages.NEAR_ROOT)} == {COMBO}
 
 
 def test_only_field_in_a_place_pages_are_ever_thin(tmp_path):
@@ -1759,8 +1766,9 @@ def test_only_field_in_a_place_pages_are_ever_thin(tmp_path):
                                                   "level": "undergrad"}])
     built = _built(site)
     assert "/internships/at/small-co/" in built and "/internships/massachusetts/" in built
-    assert not [p for p, v in built.items() if v["thin"]]
-    assert all(v["index"] for p, v in built.items() if p != "/digest/")       # /digest/ waits for its form
+    # was: no page thin at all; the near pages (2026-10-18) are the other kind that can be.
+    assert not [p for p, v in built.items() if v["thin"] and v["kind"] != "near"]
+    assert all(v["index"] for p, v in built.items() if p != "/digest/" and v["kind"] != "near")   # /digest/ waits for its form
 
 
 def test_a_page_people_find_in_search_stays_indexed_however_small(tmp_path):
@@ -1792,7 +1800,7 @@ def test_a_noindex_page_is_still_live_for_keep_at(tmp_path):
 def test_index_combo_zero_indexes_every_page_again(tmp_path, monkeypatch):
     monkeypatch.setattr(seo_pages, "INDEX_COMBO", 0)                    # the one-constant revert
     built = _built(_combo_site(tmp_path, seo_pages.MIN_COMBO))
-    assert built[COMBO]["index"] and not any(v["thin"] for v in built.values())
+    assert built[COMBO]["index"] and not any(v["thin"] for v in built.values() if v["kind"] != "near")
 
 
 def test_earning_paths_reads_clicks_and_impressions(tmp_path):
