@@ -5,9 +5,11 @@ second domain, where the tenant is a path segment rather than a subdomain; those
 that domain in the middle field: "wf|wd1.myworkdaysite.com|WellsFargoJobs".
 """
 from __future__ import annotations
+import os
 import re
 from datetime import datetime, timedelta, timezone
-from .common import RobotsDisallowed, board_item, html_to_text
+from .common import (RobotsDisallowed, ScanCounts, board_item, counts_of, html_to_text,
+                     mark_complete, reported_count, rows_of)
 from .common import robots_allows as _host_allows
 from ..classify import is_internship
 from ..region import maybe_in_region
@@ -117,27 +119,76 @@ def parse_workday_detail(payload: dict) -> tuple[list[str], str]:
 # fuzzy-matches it to "external". The extra search runs only for these sectors, so other boards
 # cost what they did before.
 EXTRA_SEARCH = {"health": ("student",), "behavioral_health": ("student",)}
+# Every board is searched for "intern". More words for every board are opt-in, comma separated:
+# WORKDAY_EXTRA_KEYWORDS="co-op" restores the co-op search the October 16 expansion added.
+# Measured on 2026-10-18 (docs/coverage-research/live-verification-2026-10-18.md), "co-op" added
+# no accepted listing on three boards, because Workday's fuzzy "intern" search already returns
+# most co-ops, while costing about 11 extra requests a board: about 13,500 requests and 9
+# minutes a full run across 1,230 boards. "student" for every board found one more listing on
+# Oshkosh ("Quality Intern (Summer 2027)") for about 4 more requests a board; it is not on by
+# default either. Whatever words a run searches, completion means every one of them was read
+# to its total (see _search).
+BASE_SEARCH = ("intern",)
+EXTRA_KEYWORDS_ENV = "WORKDAY_EXTRA_KEYWORDS"
 
 
-def _search(c, api: str, text: str) -> list[dict]:
+def search_terms(sector: str | None = None) -> tuple[str, ...]:
+    """The searchText values a board gets this run, in order, each once.
+
+    "intern" always; then any words in WORKDAY_EXTRA_KEYWORDS; then the sector's own extra
+    search (hospitals' "student"), which predates the expansion and stays on.
+    """
+    terms = list(BASE_SEARCH)
+    for word in os.environ.get(EXTRA_KEYWORDS_ENV, "").split(","):
+        word = " ".join(word.split()).lower()
+        if word and word not in terms:
+            terms.append(word)
+    for word in EXTRA_SEARCH.get(sector, ()):
+        if word not in terms:
+            terms.append(word)
+    return tuple(terms)
+
+
+def _search(c, api: str, text: str, counts: ScanCounts | None = None) -> tuple[list[dict], bool]:
+    """(internship postings, whether every result of this search was read).
+
+    Complete means the first page reported a total, every page was a well-formed list, and the
+    rows read add up to that total. Hitting MAX_OFFSET, stopping on DRY_PAGES of noise, or a page
+    that came back short or empty before the total was reached all leave the search incomplete.
+    """
+    counts = counts if counts is not None else ScanCounts()
     postings, offset, total, dry = [], 0, None, 0
+    reported, rows, well_formed, complete = None, 0, True, False
     while True:
         r = c.post(f"{api}/jobs", headers=HEADERS,
                    json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": text})
         r.raise_for_status()
         data = r.json()
-        page = data.get("jobPostings") or []
+        if not isinstance(data, dict):
+            raise ValueError("Workday search response is not an object")
+        page = rows_of(data, "jobPostings")
+        if page is None:
+            well_formed, page = False, []
         if total is None:
+            reported = reported_count(data.get("total"))
+            counts.reported(reported)
             total = data.get("total") or 0   # only reported on the first page
+        rows += len(page)
+        counts.rows(len(page))
         found = parse_workday_list(data)
+        counts.discard("not_student", max(0, len(page) - len(found)))
         postings += found
         dry = 0 if found else dry + 1
         offset += PAGE
         if not page or offset >= total or offset >= MAX_OFFSET:
+            if page and offset < total:
+                counts.stop("page_cap")
+            complete = well_formed and reported is not None and rows == reported
             break
         if offset >= CORE_OFFSET and dry >= DRY_PAGES:
+            counts.stop("dry_pages")
             break   # the matches have run out; the rest of this board is "internal" and "overseas"
-    return postings
+    return postings, complete
 
 
 def fetch_workday_board(c, co: dict) -> list[dict]:
@@ -145,13 +196,19 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
         raise RobotsDisallowed(co["ats_token"])
     host, tenant, site = host_of(co["ats_token"])
     api, base = f"{host}/wday/cxs/{tenant}/{site}", page_base(host, tenant, site)
-    postings, seen = [], set()
-    for text in ("intern",) + EXTRA_SEARCH.get(co.get("sector"), ()):
-        for p in _search(c, api, text):
+    postings, seen, complete, counts = [], set(), True, counts_of(co)
+    # "intern" finds most co-ops too (Workday's search is fuzzy); see search_terms for the words
+    # that can be added. Keep the existing page/detail budgets and dedupe overlapping hits.
+    for text in search_terms(co.get("sector")):
+        found, whole = _search(c, api, text, counts)
+        complete = complete and whole
+        for p in found:
             key = p.get("externalPath") or p.get("title")
             if key not in seen:
                 seen.add(key)
                 postings.append(p)
+            else:
+                counts.discard("duplicate")
 
     out = []
     # The cap used to be "i < MAX_DETAIL": the posting's place in the list, not the calls made. On a
@@ -181,4 +238,8 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                               url=url, description=desc,
                               posted_at=parse_posted_on(p.get("postedOn")),
                               employment_type=" ".join(p.get("bulletFields") or [])))
+    # Every search this run made read to its reported total. The detail budget above trims descriptions, never
+    # postings, so it does not affect this. The evidence covers what these searches return, not
+    # the whole board: scan_evidence.SEARCH_SCOPED keeps that limit in view.
+    mark_complete(co, complete)
     return out

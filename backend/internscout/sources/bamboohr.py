@@ -8,7 +8,8 @@ no location, which dropped them from the export and, before that, from the detai
 a listing its description.
 """
 from __future__ import annotations
-from .common import board_item, html_to_text, require_robots
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -21,10 +22,11 @@ _CANADA = {"ca", "can", "canada"}
 
 
 def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
-    out = []
+    out, counts = [], counts_of(co)
     for j in payload.get("result") or []:
         title, emp = j.get("jobOpeningName", ""), j.get("employmentStatusLabel") or ""
         if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         ats, plain = j.get("atsLocation") or {}, j.get("location") or {}
         city = ats.get("city") or plain.get("city")
@@ -33,8 +35,10 @@ def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
         if ats.get("country"):
             # was: not in _US. Canada is kept since 2026-09-30.
             if ats["country"].strip().lower() not in _US and not canada:
+                counts.discard("outside_region")
                 continue
         elif state and state.strip().lower() not in STATE_NAMES:
+            counts.discard("outside_region")
             continue     # no country field to go on, so a state that is not one of the 50 is abroad
         names = [", ".join(x for x in (city, state, "Canada" if canada else None) if x)]
         if j.get("isRemote"):
@@ -51,7 +55,20 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
     require_robots(c, f"https://{token}.bamboohr.com", "/careers/list", token)
     r = c.get(LIST_URL.format(token=token), headers={"Accept": "application/json"})
     r.raise_for_status()
-    items = parse_bamboohr(r.json(), co, token)
+    payload = r.json()
+    if not isinstance(payload, dict):
+        raise ValueError("BambooHR careers list is not an object")
+    # /careers/list is one unpaged call holding every opening. When the body also states a
+    # count, the list has to match it.
+    rows = rows_of(payload, "result")
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    stated = meta.get("totalCount")
+    if rows is not None:
+        counts = counts_of(co)
+        counts.rows(len(rows))
+        counts.reported(reported_count(stated) if stated is not None else len(rows))
+    items = parse_bamboohr(payload, co, token)
+    complete = rows is not None and (stated is None or reported_count(stated) == len(rows))
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(DETAIL_URL.format(token=token, id=it["_bh_id"]), headers={"Accept": "application/json"})
@@ -63,4 +80,5 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
             pass
     for it in items:
         it.pop("_bh_id", None)
+    mark_complete(co, complete)
     return items

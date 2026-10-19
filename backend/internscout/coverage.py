@@ -23,6 +23,7 @@ import json
 import os
 from .classify import SECTOR_FIELDS
 from .config import BASELINE_STATES
+from .geo import PROVINCES, STATE_NAMES
 
 CLUSTERS = {
     "Health": ("health", "nursing", "public_health", "clinical_research", "biomedical"),
@@ -105,7 +106,7 @@ def per_tag(listings: list[dict], baseline_only: bool = True) -> collections.Cou
 def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True,
            env: dict | None = None) -> str:
     rows = sorted(counts(listings, baseline_only).items(), key=lambda kv: kv[1])
-    where = "baseline + remote" if baseline_only else "whole US"
+    where = "baseline + remote" if baseline_only else "US + Canada"
     lines = [f"| Field cluster | Open ({where}) | |", "|---|---:|---|"]
     lines += [f"| {n} | {c} | {'**thin**' if c < minimum else ''} |" for n, c in rows]
     thin = [n for n, c in rows if c < minimum]
@@ -139,6 +140,42 @@ def report(listings: list[dict], minimum: int = 15, baseline_only: bool = True,
     return "\n".join(lines)
 
 
+def geographic_report(listings: list[dict], minimum: int = 15) -> str:
+    """Count a listing once per jurisdiction; include empty places to expose gaps.
+
+    Country-only and remote listings are separate from state/province coverage.
+    A multi-location role can count in several rows, so rows must not be summed.
+    """
+    places = {**{code: name.title() for name, code in STATE_NAMES.items()}, **PROVINCES}
+    counts = collections.Counter()
+    for row in open_here(listings, baseline_only=False):
+        keys = set()
+        for region in row.get("regions") or []:
+            state, kind = region.get("state"), region.get("kind")
+            if kind == "canada":
+                keys.add(state if state in PROVINCES else "Canada (unassigned province)")
+            elif state in places and state not in PROVINCES:
+                keys.add(state)
+            elif kind == "remote":
+                keys.add("US remote (unassigned state)")
+            elif kind in {"us", "new_england", "nyc_metro"}:
+                keys.add("US (unassigned state)")
+        if not row.get("regions") and row.get("state") in places:
+            keys.add(row["state"])
+        counts.update(keys)
+    lines = ["### Geographic coverage", "",
+             "Unique open listings per place; multi-location roles count once in each place.", "",
+             "| Country | State / province / territory | Open | |", "|---|---|---:|---|"]
+    for country, codes in (("US", set(places) - set(PROVINCES)), ("Canada", set(PROVINCES))):
+        for code in sorted(codes, key=lambda c: (counts[c], c)):
+            lines.append(f"| {country} | {places[code]} ({code}) | {counts[code]} | "
+                         f"{'**thin**' if counts[code] < minimum else ''} |")
+    lines += ["", "Country-only / remote locations (excluded from place rows):"]
+    for key in ("US (unassigned state)", "US remote (unassigned state)", "Canada (unassigned province)"):
+        lines.append(f"- {key}: {counts[key]}")
+    return "\n".join(lines)
+
+
 def load(path: str) -> list[dict]:
     """A folder of per-state files (a listing in several states is counted once) or one JSON array."""
     if not os.path.isdir(path):
@@ -160,9 +197,10 @@ def main() -> None:
     # Worth running both ways when something is thin: thin here but healthy nationally is a New
     # England employer to seed, thin both ways is a classifier rule or a whole source missing.
     ap.add_argument("--all-states", action="store_true",
-                    help="count the whole country instead of the baseline states")
+                    help="count all US and Canadian listings instead of the baseline states")
     args = ap.parse_args()
-    text = report(load(args.path), args.min, not args.all_states)
+    listings = load(args.path)
+    text = report(listings, args.min, not args.all_states) + "\n\n" + geographic_report(listings, args.min)
     print(text)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:

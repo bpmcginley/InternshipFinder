@@ -1,8 +1,11 @@
 """Helpers shared by the ATS fetchers."""
 from __future__ import annotations
 import html
+from collections import Counter
 import re
 from datetime import timezone
+
+import httpx
 
 from ..config import USER_AGENT
 from ..geo import REMOTE_RE, _NON_US, state_of
@@ -166,3 +169,153 @@ def seed_location(co: dict, locations: list) -> list:
     if not where or any(state_of(l) or _NON_US.search(l) or REMOTE_RE.search(l) for l in locations):
         return locations
     return locations + [where]
+
+
+def reported_count(value) -> int | None:
+    """A result total as an API reported it, or None when it is missing or not a whole number.
+
+    A scan only proves it read a whole board (or a whole search) when the rows it fetched add up
+    to the total the API said there were. A total that is absent, negative or not a number proves
+    nothing, so it is None rather than 0: 0 would read as "an empty board, fully read".
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def rows_of(payload, key: str) -> list | None:
+    """payload[key] when it is a list of objects, else None (a shape we cannot count on)."""
+    rows = payload.get(key) if isinstance(payload, dict) else None
+    if isinstance(rows, list) and all(isinstance(r, dict) for r in rows):
+        return rows
+    return None
+
+
+def mark_complete(co: dict, complete: bool) -> None:
+    """Tell scan_boards this board was read to its end, so absence from it can close a listing.
+
+    Only ever set True, and only at the very end of a fetch: an exception before this line, a
+    page cap, a short or malformed page or a total that does not add up all leave it unset.
+    """
+    if complete:
+        co["_scan_complete"] = True
+
+
+# ------------------------------------------------------------------ page-boundary counts
+# What a scan saw before it handed anything to the pipeline. The returned items are already
+# filtered, so without these the ingest report cannot tell a board that listed nothing from one
+# whose 300 results were all "Internal Audit Manager". Reasons are program-defined labels, never
+# text from the response.
+DISCARD_REASONS = frozenset({
+    "not_student",      # is_internship said no to the title (and employment type)
+    "outside_region",   # no US or Canadian place the adapter could keep
+    "duplicate",        # the same job again: another keyword's search, another location row
+    "unlisted",         # the API marked the row hidden or unlisted
+    "expired",          # the row's own closing date has passed
+    "unreadable",       # a row without the fields a listing needs (no link, not an object)
+})
+STOP_REASONS = frozenset({
+    "page_cap",         # the adapter's page or offset ceiling stopped the read with results left
+    "dry_pages",        # Workday: past CORE_OFFSET, pages in a row held no internship
+    "row_limit",        # one request whose row limit was filled, so more may exist
+    "quota",            # a paid search quota ran out before the plan was done
+})
+
+
+class ScanCounts:
+    """Counts one scan keeps at its page boundaries: discovered, read, discarded, capped.
+
+    discovered is the sum of the totals the API reported, one per search; it stays None when the
+    API reports none, or when any one search of the scan lacked one, because a partial sum would
+    look like a whole one. read is the rows the adapter actually received, and stays None until a
+    page is counted, so an adapter that was never instrumented reports nothing rather than zero.
+    Every row read is either returned or discarded with one reason, so read = returned + discarded
+    is checkable. Not thread-safe; each scan owns one, and the coordinator reads it afterwards.
+    """
+
+    def __init__(self):
+        self.discovered: int | None = None
+        self._total_unknown = False
+        self.read: int | None = None
+        self.discarded: Counter = Counter()
+        self.stops: Counter = Counter()
+
+    def reported(self, total: int | None) -> None:
+        """One search's API-reported total (common.reported_count), or None if it gave none."""
+        if total is None or self._total_unknown:
+            self._total_unknown, self.discovered = True, None
+        else:
+            self.discovered = (self.discovered or 0) + total
+
+    def rows(self, n: int) -> None:
+        self.read = (self.read or 0) + n
+
+    def discard(self, reason: str, n: int = 1) -> None:
+        if reason not in DISCARD_REASONS:
+            raise ValueError(f"unknown discard reason: {reason}")
+        if n:
+            self.discarded[reason] += n
+
+    def stop(self, reason: str) -> None:
+        if reason not in STOP_REASONS:
+            raise ValueError(f"unknown stop reason: {reason}")
+        self.stops[reason] += 1
+
+    def as_dict(self) -> dict:
+        """Only what was measured: a key is absent when its count is unknown."""
+        out: dict = {}
+        if self.discovered is not None:
+            out["discovered"] = self.discovered
+        if self.read is not None:
+            out["read"] = self.read
+            out["discarded"] = dict(self.discarded)
+        out["capped"] = bool(self.stops)
+        if self.stops:
+            out["stops"] = dict(self.stops)
+        return out
+
+
+def counts_of(co: dict) -> ScanCounts:
+    """The counts run_ingest attached to this board scan, or a throwaway set when there are none.
+
+    Parsers are also called directly (tests, scripts), so they count into whatever this returns
+    without checking for None.
+    """
+    counts = co.get("_counts") if isinstance(co, dict) else None
+    return counts if isinstance(counts, ScanCounts) else ScanCounts()
+
+
+def failure_cause(e: BaseException) -> str:
+    """A short, safe name for why a fetch failed: an HTTP status or an exception class, never str(e)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return str(e.response.status_code)
+    return type(e).__name__
+
+
+def report_source(report, source: str, *, items=None, error: BaseException | None = None,
+                  skipped: str | None = None, counts: ScanCounts | None = None,
+                  failed_units: int = 0, units: int | None = None) -> None:
+    """Hand a whole non-board source's outcome to the run's collector (IngestMetrics.source_result).
+
+    Exactly one status: skipped (with a code-defined cause), failed (an error stopped the fetch,
+    whatever it returned before that), partial (some of a multi-search feed's searches failed),
+    empty (it ran and returned nothing), or success. A failed feed never reads as an empty one.
+    `report` may be None, in which case nothing is recorded.
+    """
+    if report is None:
+        return
+    n = len(items or [])
+    if skipped:
+        status, cause = "skipped", skipped
+    elif error is not None and (not failed_units or failed_units == units):
+        status, cause = "failed", failure_cause(error)
+    elif failed_units:
+        status, cause = "partial", failure_cause(error) if error is not None else None
+    else:
+        status, cause = ("success" if n else "empty"), None
+    report(source, status, count=n, cause=cause,
+           scan=counts.as_dict() if counts is not None else None)
