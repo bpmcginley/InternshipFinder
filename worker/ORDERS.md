@@ -138,3 +138,12 @@ list.
 The terms let an employer cancel an order by email for a full refund until it is approved. The
 "received" email says to reply. Bruce opens the order's review link and uses **Refuse** with the reason
 "Cancelled at your request": that refunds in full and emails the employer, the same as any refusal.
+
+For a verified request to remove a contact name/email early, follow
+[ORDER_CONTACT_REMOVAL.md](ORDER_CONTACT_REMOVAL.md). Resolve ongoing placements and compensation,
+stop pending email delivery, and invalidate links before clearing contact fields; retain the required
+financial record. Do not delete a sale or leave a queued email containing the removed contact data.
+
+Pilot allocation: the owner requested five unassigned single-use codes for the first five employer
+buyers, not codes tied to preset companies. Keep the codes private and allocate one per employer.
+Creating a code does not automatically apply it to an order or send it to anyone.
