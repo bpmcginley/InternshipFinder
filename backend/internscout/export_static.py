@@ -22,7 +22,7 @@ from .models import Listing, Application
 from .seo_pages import baseline_day, canada_first_scan, placeholder_pay
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
-from .classify import STAGES, never_student, stage_of, years_of
+from .classify import STAGES, never_student, non_cyber_security, stage_of, years_of
 from .majors import majors_export
 from .normalize import listing_id
 from .score import W
@@ -537,6 +537,19 @@ def closed_by_scan(listings: list[dict], prev: list[dict], completed_boards) -> 
                and it["apply_url"] not in have and export_board(it, completed))
 
 
+def correct_non_cyber_security_tags(listings: list[dict]) -> None:
+    """Apply the explicit non-cyber exclusion to stored and carried classifications too.
+
+    Normalization classifies fetched rows, but a failed board's carried rows retain their old tags.
+    Remove only this disproven tag: do not replace historical field evidence or alter the dates,
+    status or provenance of a posting that this run did not actually fetch.
+    """
+    for x in listings:
+        tags = x.get("field_tags") or []
+        if "security" in tags and non_cyber_security(x.get("title") or ""):
+            x["field_tags"] = [t for t in tags if t != "security"] or ["other"]
+
+
 def export(out_dir: str, completed_boards=None) -> dict:
     """Write the static site data.
 
@@ -564,6 +577,7 @@ def export(out_dir: str, completed_boards=None) -> dict:
         held = carry_open_boards(listings, out_dir, prev=prev, completed_boards=completed_boards)
         held += carry_search_finds(listings, out_dir, prev=prev, completed_boards=completed_boards)
         closed = closed_by_scan(listings, prev, completed_boards)
+        correct_non_cyber_security_tags(listings)
         # Again, now the carried rows are in: they came with the is_new the last export gave them.
         # Dated from generated_at, the "today" seo_pages.fresh uses for /internships/new/.
         mark_new(listings, datetime.fromisoformat(generated_at).date())

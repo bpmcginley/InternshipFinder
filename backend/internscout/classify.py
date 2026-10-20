@@ -465,11 +465,44 @@ def _runs_the_programme(title: str) -> bool:
 _FALLBACK_FIELDS = frozenset({"engineering", "business"})
 
 
+# The security field is displayed as "Cybersecurity". National-security legal/policy placements,
+# food security and physical guards/installers are different disciplines, even though they contain
+# the same word. Keep the broad rule for ambiguous "Security Intern" titles, and let an explicit
+# computing-security signal override this exclusion (for example, national-security cyber work).
+_NON_CYBER_SECURITY_RE = re.compile(
+    r"\b(food|physical) security\b|\bsecurity (guard|officer)\b|"
+    r"\bsecurity systems apprentice\b", re.I)
+_NATIONAL_SECURITY_RE = re.compile(r"\bnational security\b", re.I)
+_NATIONAL_POLICY_RE = re.compile(r"\b(legal|law|policy|project|liberty|fellowship)\b", re.I)
+_PHYSICAL_SECURITY_RE = re.compile(r"\bphysical security\b", re.I)
+_EXPLICIT_CYBER_SECURITY_RE = re.compile(
+    r"cyber|infosec|\bappsec\b|cryptograph|penetration|digital forensic|"
+    r"\b(information|information technology|it|network|cloud|application|software|hardware|computer)[ -]security\b|"
+    r"\bsecurity operations cent(er|re)\b|detection engineer|privacy engineer|identity (&|and) access", re.I)
+_SECURITY_ENGINEER_RE = re.compile(r"\bsecurity engineer", re.I)
+
+
+def non_cyber_security(title: str, description: str = "") -> bool:
+    """Explicit non-computing security title, safe to prune from existing security field tags.
+
+    Ambiguous national-security titles remain eligible. Generic security engineering alone does
+    not override a title that explicitly says physical security; actual computing evidence can.
+    """
+    non_cyber = (_NON_CYBER_SECURITY_RE.search(title)
+                 or (_NATIONAL_SECURITY_RE.search(title) and _NATIONAL_POLICY_RE.search(title)))
+    text = f"{title} {description or ''}"
+    computing = (_EXPLICIT_CYBER_SECURITY_RE.search(text)
+                 or (_SECURITY_ENGINEER_RE.search(text) and not _PHYSICAL_SECURITY_RE.search(title)))
+    return bool(non_cyber and not computing)
+
+
 def classify(title: str, description: str = "") -> list[str]:
     text = f"{title} {description or ''}".lower()
     tags: list[str] = []
     for tag, pat in RULES:
         if re.search(pat, text):
+            if tag == "security" and non_cyber_security(title, description):
+                continue
             tags.append(tag)
     seen = set()
     out = [t for t in tags if not (t in seen or seen.add(t))]

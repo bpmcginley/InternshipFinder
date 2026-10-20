@@ -7,6 +7,48 @@ from internscout.majors import UNDERGRAD, GRADUATE, majors_export
 from internscout.normalize import parse_term_from_text
 
 
+def test_cybersecurity_does_not_include_explicit_policy_or_physical_security_roles():
+    # Public cybersecurity landing-page rows observed on 2026-10-20. These should remain available
+    # under their own disciplines, rather than appearing as computing-security opportunities.
+    for title in [
+        "Summer 2027 Legal Intern, National Security Project",
+        "Summer 2027 Undergraduate Intern, National Security Project",
+        "Spring 2027 Liberty and National Security Legal Internship",
+        "Fall 2027 National Security Fellowship, National Security Project",
+        "Security Systems Apprentice",
+        "Physical Security Intern",
+        "Food Security Research Intern",
+        "Security Officer Intern",
+        "Physical Security Engineer Intern",
+    ]:
+        assert "security" not in classify(title), (title, classify(title))
+    assert "law" in classify("Spring 2027 Liberty and National Security Legal Internship")
+
+
+def test_explicit_computing_security_and_ambiguous_security_titles_are_preserved():
+    for title in [
+        "Cybersecurity Intern",
+        "National Security Cyber Research Intern",
+        "National Security Information Security Intern",
+        "Hardware Security Engineer Intern",
+        "Information Security Officer Intern",
+        "IT Security Officer Intern",
+        "Information Technology Security Officer Intern",
+        "Security Officer Intern - Security Operations Center",
+        "Security Officer Intern - Security Operations Centre",
+        "Physical Security and Network Security Engineering Intern",
+        "National Security Solutions Intern - Nss",
+        "Security Engineering Intern, National Security",
+        "Security Intern",
+        "Security Operations Intern",
+        "Global Security Co-Op",
+        "Digital Forensics Intern",
+        "Application Security Intern",
+    ]:
+        assert "security" in classify(title), (title, classify(title))
+    assert "security" in classify("National Security Research Intern", "Research into cybersecurity.")
+
+
 def test_stages():
     assert stage_of("Python Software Engineer Co-op") == ["co_op"]
     assert stage_of("Campus Quantitative Trader (Intern)") == ["internship"]
