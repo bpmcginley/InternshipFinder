@@ -507,3 +507,65 @@ def test_export_counts_each_stable_id_once_when_a_board_changes_url(tmp_path, mo
     assert stats["total"] == stats["open"] == len({r["id"] for r in rows}) == len(rows) == 4
     assert stats["held"] == 3
     assert next(r for r in rows if r["id"] == "0")["apply_url"] == fresh["apply_url"]
+
+
+def test_carried_security_corrections_reach_counts_and_shards_without_refreshing_jobs(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from internscout import export_static
+
+    class NoRows:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def scalars(self, query):
+            return SimpleNamespace(all=lambda: [])
+
+    monkeypatch.setattr(export_static, "SessionLocal", NoRows)
+    monkeypatch.setattr(export_static, "init_db", lambda: None)
+    now = datetime.now(timezone.utc)
+    first = (now - timedelta(days=10)).isoformat()
+    last = (now - timedelta(hours=3)).isoformat()
+    titles = ["National Security Legal Internship", "Security Systems Apprentice",
+              "Information Security Intern", "National Security Solutions Intern - Nss"]
+    prev = [_prev(id=str(i), title=title, apply_url=f"https://example.test/board/{i}",
+                  field_tags=["security", "law"] if i == 0 else ["security"],
+                  first_seen=first, last_seen=last, posted_at=first, is_new=False)
+            for i, title in enumerate(titles)]
+    # The search-only path has a separate carry rule from a collapsed employer board.
+    prev.append(_prev(id="search", title="Food Security Intern", company_name="Search Employer",
+                      apply_url="https://search.test/job/1", via_search=True, field_tags=["security"],
+                      first_seen=first, last_seen=last, posted_at=first, is_new=False))
+    _write_prev(tmp_path, prev)
+
+    stats = export_static.export(str(tmp_path))
+    rows = {x["id"]: x for x in export_static.previous_export(str(tmp_path))}
+    assert stats["held"] == 5 and stats["open"] == 5
+    assert stats["by_field"] == {"law": 1, "other": 2, "security": 2}
+    index = json.loads((tmp_path / "listings" / "index.json").read_text(encoding="utf-8"))
+    assert index["files"]["MA"]["by_field"] == stats["by_field"]
+    for original in prev:
+        row = rows[original["id"]]
+        for key in ("id", "apply_url", "first_seen", "last_seen", "posted_at", "status", "is_new"):
+            assert row[key] == original[key], (key, original["id"])
+        assert row["carried"] is True
+    assert rows["0"]["field_tags"] == ["law"]
+    assert rows["1"]["field_tags"] == rows["search"]["field_tags"] == ["other"]
+    assert rows["search"]["via_search"] is True
+
+
+def test_security_correction_preserves_all_other_stored_record_evidence():
+    from copy import deepcopy
+    from internscout.export_static import correct_non_cyber_security_tags
+    rows = [{"id": "closed", "title": "National Security Legal Internship", "status": "closed",
+             "field_tags": ["security", "law", "communications"], "first_seen": "old",
+             "last_seen": "older", "carried": True, "description": "Preserve source description"},
+            {"id": "ambiguous", "title": "National Security Solutions Intern - Nss",
+             "field_tags": ["security", "custom_historical_evidence"]}]
+    expected = deepcopy(rows)
+    expected[0]["field_tags"] = ["law", "communications"]
+    correct_non_cyber_security_tags(rows)
+    assert rows == expected
