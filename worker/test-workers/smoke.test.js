@@ -41,3 +41,24 @@ it("profile encryption (HKDF-SHA256 -> AES-GCM-256) round-trips in the Workers r
   expect(JSON.parse(await unseal(key, "user-a", data))).toEqual({ skills: ["Python"] });
   await expect(unseal(key, "user-b", data)).rejects.toThrow();
 });
+
+it("D1 enforces field capacity and rolls back a whole reservation batch", async () => {
+  const at = "2026-10-20T00:00:00Z";
+  const day = "2026-11-01";
+  const insert = (order, listing, field, expires = null) => env.DB.prepare(
+    "INSERT INTO employer_capacity_reservations (order_id, listing_id, field, day, expires_at, checked_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).bind(order, listing, field, day, expires, at);
+  for (let n = 0; n < 5; n++) await insert(`runtime-${n}`, `listing-${n}`, "runtime-field").run();
+  await expect(env.DB.batch([
+    insert("runtime-sixth", "listing-sixth", "runtime-other"),
+    insert("runtime-sixth", "listing-sixth", "runtime-field"),
+  ])).rejects.toThrow(/employer_capacity_full/);
+  expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM employer_capacity_reservations WHERE field = 'runtime-field'").first("n")).toBe(5);
+  expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM employer_capacity_reservations WHERE order_id = 'runtime-sixth'").first("n")).toBe(0);
+  await expect(insert("runtime-duplicate", "listing-0", "runtime-other").run()).rejects.toThrow(/employer_listing_taken/);
+
+  // Expired checkout holds do not consume a current field slot.
+  await insert("runtime-old", "listing-old", "runtime-expiring", "2026-10-19T00:00:00Z").run();
+  for (let n = 0; n < 5; n++) await insert(`runtime-fresh-${n}`, `fresh-${n}`, "runtime-expiring").run();
+  expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM employer_capacity_reservations WHERE field = 'runtime-expiring' AND expires_at IS NULL").first("n")).toBe(5);
+});
