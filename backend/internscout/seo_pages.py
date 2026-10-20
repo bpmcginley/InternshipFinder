@@ -3963,9 +3963,9 @@ def main(argv: list[str]) -> None:
                   held_paths(argv[3]) if len(argv) > 3 else frozenset())
     # was: pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
     built = pages                  # as build() made them, before any paid box, for the feeds
+    today = today_utc()
     if placements_path is not None:
         from . import placements
-        today = today_utc()
         kept, dropped = placements.resolve(placements.read(placements_path),
                                            {str(x["id"]): x for x in LISTINGS}, today)
         for line in placements.warnings(kept, dropped):
@@ -3982,6 +3982,11 @@ def main(argv: list[str]) -> None:
         pages = add_paid_boxes(pages, kept, today)
         print(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
     write(site_dir, pages)
+    # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
+    # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.
+    from . import role_index       # role_index imports this module, so not at the top
+    shards = role_index.write(site_dir, LISTINGS, GENERATED or datetime.now(timezone.utc), today)
+    print(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
     from . import feeds            # feeds imports this module, so not at the top
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
     # `python -m internscout.seo_pages` this module is __main__, and the internscout.seo_pages that

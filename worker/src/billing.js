@@ -5,6 +5,7 @@
 // date. Stripe holds the card, the name and the email; they never reach this Worker or D1.
 import { HttpError } from "./http.js";
 import { countEvent } from "./visits.js";
+import { listingEvent } from "./orders.js";
 
 const API = "https://api.stripe.com/v1/";
 // The same version the webhook endpoint is set to, so events and API replies share one shape.
@@ -51,7 +52,10 @@ function need(env, config) {
   if (!paymentsOn(env, config)) throw new HttpError(404, "not_found", "Paid plans are not turned on");
 }
 
-async function stripe(env, path, form, fetchImpl, idempotencyKey, method = "POST") {
+// Exported (2026-10-19) so the paid listing orders (orders.js) make their Stripe calls through the same
+// pinned version, key handling and error hiding instead of a copy.
+// was: async function stripe(env, path, form, fetchImpl, idempotencyKey, method = "POST") {
+export async function stripe(env, path, form, fetchImpl, idempotencyKey, method = "POST") {
   const headers = {
     Authorization: "Bearer " + env.STRIPE_SECRET_KEY,
     "Content-Type": "application/x-www-form-urlencoded",
@@ -94,7 +98,8 @@ async function savePlan(db, user, { plan, status, customer, subscription, period
 }
 
 const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
-const siteUrl = (env) => (env.SITE_URL || "https://internscout.org").replace(/\/+$/, "");
+// was: const siteUrl = (env) => ... (exported 2026-10-19 for orders.js)
+export const siteUrl = (env) => (env.SITE_URL || "https://internscout.org").replace(/\/+$/, "");
 
 // Checkout for a paid tier. client_reference_id carries the hash back on the webhook, so a
 // payment can be matched to an account without Stripe ever learning who the student is.
@@ -152,15 +157,18 @@ export async function portal(db, env, config, user, fetchImpl) {
   return { url: session.url };
 }
 
-const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+export const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-async function hmacHex(secret, message) {
+// hmacHex and sameHex are exported (2026-10-19) for the signed review links of orders.js.
+// was: async function hmacHex(secret, message) {
+export async function hmacHex(secret, message) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return hex(await crypto.subtle.sign("HMAC", key, enc.encode(message)));
 }
 
-const sameHex = (a, b) => {
+// was: const sameHex = (a, b) => {
+export const sameHex = (a, b) => {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -235,6 +243,12 @@ export async function applyEvent(db, env, config, event, now, fetchImpl) {
 
 async function applyFresh(db, env, config, event, now, fetchImpl) {
   const o = (event.data && event.data.object) || {};
+
+  // Paid listings bought by employers (orders.js, added 2026-10-19) go first: a Checkout session whose
+  // metadata.kind is "listing", and a dispute or refund on a payment that belongs to an order. They are
+  // never a student's plan, and everything below is left exactly as it was. null means "not a listing".
+  const listing = await listingEvent(db, env, event, now, fetchImpl);
+  if (listing) return listing;
 
   if (event.type === "checkout.session.completed") {
     const user = o.client_reference_id;

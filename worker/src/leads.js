@@ -35,7 +35,9 @@ const ALL = "lead:*";             // the day's total, like limits.js GLOBAL_USER
 // of the site gets a 403, so testing a page never writes a lead into the live table.
 const SITE = /^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/;
 // Plausible, not proof: one @, no spaces or angle brackets, a dot in the domain and a 2+ letter ending.
-const EMAIL = /^[^\s@<>()[\]\\,;:"]{1,64}@(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+// Exported (2026-10-19) so the paid listing orders (orders.js) check a work address the same way.
+// was: const EMAIL = /^...
+export const EMAIL = /^[^\s@<>()[\]\\,;:"]{1,64}@(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
 // Control characters other than the newline and tab a message may hold.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 

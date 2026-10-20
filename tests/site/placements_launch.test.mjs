@@ -77,7 +77,7 @@ test("terms: an employer section, and the screening line says what a paid listin
     /We don't promise views, clicks or applicants/, /rounded down to the nearest 10/,
     /stay free whether or not you buy a paid listing/,
     // Legal review 2026-10-14: acceptance, B2B clauses, hiding, count caveat, who picks credit or refund.
-    /when you pay our invoice or, for a free pilot, when you confirm its start date with us in writing/,
+    /when you tick the box that accepts them as you order on our site, when you pay our invoice, or, for a free pilot arranged with us by email, when you confirm its start date with us in writing/,
     /Your promises\. You promise that the role and its posting are real, accurate and lawful, including the laws on pay transparency/,
     /wages and hours, child labor \(no hazardous work for anyone under 18/, /non-discrimination/,
     /Your name\. You let us show your company's name/,
@@ -95,7 +95,8 @@ test("terms: an employer section, and the screening line says what a paid listin
     /refund the unused days unless it was ended for breaking them/,
     /we may take part with our own lawyer at our own cost/,
     /This doesn't limit how we show your public listings, as we do for every employer/,
-    /the invoice or confirmation wins/,
+    /the invoice or confirmation wins\. If the email approving your order gives different dates from the ones you chose[^.]*, the dates in that email win/,
+    /If you dispute a payment with your bank, we may pause the paid listing until the dispute is settled/,
     /A student's own settings or saved profile can only hide it/]) assert.match(emp, want);
   assert.doesNotMatch(emp, /we check that[^.]*pay range/, "pay range is the employer's promise, not our check");
   const v = words(visible(TERMS));

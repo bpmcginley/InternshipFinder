@@ -51,7 +51,9 @@ export function fakeD1() {
     exec: async (query) => (sql.exec(query), { count: 1 }),
     dump() {
       const out = {};
-      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events", "spend", "tokens", "task_tokens", "forget", "invite_codes", "referrals", "bonus", "accounts", "inviters", "sessions", "session_copies", "profiles", "visit_counts", "visit_channels", "event_counts", "run_hist", "placements", "placement_log", "placement_counts"]) {
+      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events", "spend", "tokens", "task_tokens", "forget", "invite_codes", "referrals", "bonus", "accounts", "inviters", "sessions", "session_copies", "profiles", "visit_counts", "visit_channels", "event_counts", "run_hist", "placements", "placement_log", "placement_counts",
+        // Paid listing orders (2026-10-19, orders.js).
+        "employer_orders", "employer_order_roles", "placement_fields", "employer_credits", "pilot_codes"]) {
         out[t] = sql.prepare(`SELECT * FROM ${t}`).all().map((r) => ({ ...r }));
       }
       return out;
@@ -136,7 +138,9 @@ export function stripeReply(url) {
   return Response.json({ error: { type: "invalid_request_error" } }, { status: 400 });
 }
 
-export function fakeFetch(jwks, gemini = geminiReply, stripe = stripeReply) {
+// `site` (2026-10-19, orders.test.js) answers any other address, such as the site's role index; when it
+// returns nothing the call falls through to the 404.
+export function fakeFetch(jwks, gemini = geminiReply, stripe = stripeReply, site = null) {
   const calls = [];
   const fn = async (url, init = {}) => {
     url = String(url);
@@ -144,6 +148,10 @@ export function fakeFetch(jwks, gemini = geminiReply, stripe = stripeReply) {
     if (url.endsWith("/certs") || url.endsWith("/keys")) return Response.json({ keys: jwks });
     if (url.includes("generativelanguage.googleapis.com")) return gemini(url, init);
     if (url.startsWith("https://api.stripe.com/")) return stripe(url, init);
+    if (site) {
+      const res = await site(url, init);
+      if (res) return res;
+    }
     return new Response("not found", { status: 404 });
   };
   fn.calls = calls;
@@ -156,21 +164,22 @@ export function fakeFetch(jwks, gemini = geminiReply, stripe = stripeReply) {
 export const CAPPED_DEEP_DIVE = { TASKS: { ...CONFIG.TASKS, deep_dive: { ...CONFIG.TASKS.deep_dive, allowance: 2 } } };
 
 // A Worker plus helpers: api(method, path, {token, body, headers}) and token(claimOverrides)
-export async function setup({ env = {}, config = {}, gemini, stripe, now = NOW } = {}) {
+export async function setup({ env = {}, config = {}, gemini, stripe, site, now = NOW } = {}) {
   clearJwksCache();
   const keys = await sharedKeys();
   const e = makeEnv(env);
-  const fetch = fakeFetch([keys.jwk], gemini, stripe);
+  const fetch = fakeFetch([keys.jwk], gemini, stripe, site);
   const cfg = { ...CONFIG, ...config };
   const pending = [];
   const ctx = { waitUntil: (p) => pending.push(p) };
   const t = { now };
-  const api = async (method, path, { token, body, headers = {} } = {}) => {
+  // `raw` (2026-10-19) sends a body as it is, with the caller's own Content-Type (a form post).
+  const api = async (method, path, { token, body, raw, headers = {} } = {}) => {
     const h = { ...headers };
     if (token) h.Authorization = `Bearer ${token}`;
     if (body !== undefined) h["Content-Type"] = "application/json";
     const req = new Request("https://api.test" + path, {
-      method, headers: h, body: body === undefined ? undefined : JSON.stringify(body),
+      method, headers: h, body: raw !== undefined ? raw : body === undefined ? undefined : JSON.stringify(body),
     });
     const res = await handle(req, e, ctx, { fetch, now: () => t.now, config: cfg });
     await Promise.all(pending.splice(0));
