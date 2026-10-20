@@ -13,15 +13,15 @@ No current confirmed-subscriber or returning-student count has yet been establis
 
 | Priority | Work | Completion criterion | Owner / status |
 | --- | --- | --- | --- |
-| 1 | Reconcile PR #124 and release fixes | Current-main integration reviewed; relevant suites pass; safe Worker/site changes deployed; exact-package extension gates recorded before store submission | Release agent + Codex; in progress |
-| 1 | Accurate homepage promise | Static and hydrated copy agree and avoid universal coverage claims; live deployment verified | Codex; in progress |
-| 1 | Listing quality | Reproducible 40-role stratified sample; duplicate, location and eligibility results distinguish unknowns; evidenced safe fixes tested | Listing agent; in progress |
-| 1 | Student journey | Browser checks on desktop/mobile; installed-package authentication/update checks where tools permit; five-person protocol and recording sheet ready | Codex + growth agent; pending |
-| 2 | Conversion baseline | Existing anonymous exposure/click/submit metrics summarized; confirmed non-test subscribers checked separately; unknown counts explicitly marked | Growth agent + Codex; in progress |
-| 2 | Two growth experiments | Career-center/widget and one well-covered major campaign have ready materials, tagged destinations, success/stop rules and recording sheet | Growth agent; in progress |
-| 2 | Heycatch trial value | Actual renewal date/cost, account queues and failure status inspected if authenticated; preserve existing schedules and one publishing owner per channel | Codex; pending |
-| 2 | Employer operational readiness | Existing synthetic approval/refusal/delayed-payment/refund coverage verified; recovery/backup procedure documented and nonproduction restore tested where possible | Codex; pending |
-| 3 | Search quality | Inspect current evidence for representative high-value pages; identify actionable indexing issues without treating every unindexed page as a fault | Codex; pending access |
+| 1 | Reconcile PR #124 and release fixes | Current-main integration reviewed; relevant suites pass; safe Worker/site changes deployed; exact-package extension gates recorded before store submission | Merged/deployed #124; store gates remain |
+| 1 | Accurate homepage promise | Static and hydrated copy agree and avoid universal coverage claims; live deployment verified | Implemented; live check after #134 |
+| 1 | Listing quality | Reproducible 40-role stratified sample; duplicate, location and eligibility results distinguish unknowns; evidenced safe fixes tested | Audited and source fix tested; next export pending |
+| 1 | Student journey | Browser checks on desktop/mobile; installed-package authentication/update checks where tools permit; five-person protocol and recording sheet ready | Protocol ready; desktop checked; participant/profile gates remain |
+| 2 | Conversion baseline | Existing anonymous exposure/click/submit metrics summarized; confirmed non-test subscribers checked separately; unknown counts explicitly marked | Growth agent + Implemented; live check after #134 |
+| 2 | Two growth experiments | Career-center/widget and one well-covered major campaign have ready materials, tagged destinations, success/stop rules and recording sheet | Materials ready; actual distribution pending |
+| 2 | Heycatch trial value | Actual renewal date/cost, account queues and failure status inspected if authenticated; preserve existing schedules and one publishing owner per channel | Checked; see STATUS.md for limits |
+| 2 | Employer operational readiness | Existing synthetic approval/refusal/delayed-payment/refund coverage verified; recovery/backup procedure documented and nonproduction restore tested where possible | Checked; see STATUS.md for limits |
+| 3 | Search quality | Inspect current evidence for representative high-value pages; identify actionable indexing issues without treating every unindexed page as a fault | Inspected; report lag noted, key URL indexed |
 
 ## Sequence
 
