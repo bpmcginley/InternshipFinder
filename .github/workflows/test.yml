@@ -54,6 +54,12 @@ jobs:
       - name: Run tests
         working-directory: worker
         run: node --test test/
+      - name: Install pinned Workers runtime test dependencies
+        working-directory: worker
+        run: npm ci
+      - name: Check local Workers runtime and D1 behavior
+        working-directory: worker
+        run: npm run test:workers
 
   extension:
     runs-on: ubuntu-24.04

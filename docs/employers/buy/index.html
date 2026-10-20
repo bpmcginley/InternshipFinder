@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<!-- The employer buy page (added 2026-10-19; worker/ORDERS.md "The flow"). Hand-written like
+     /employers/, whose head, colours, nav and footer it copies (tests/site/tokens.test.mjs keeps the
+     token block equal). All of its work is in /js/buy.js: it asks the Worker for /employer/config first and
+     shows nothing for sale unless that says enabled, with the prices in cents from there. It is also where
+     the Worker's email links and Stripe send people back to (?order=&t=, ?paid=, ?cancelled=1,
+     ?credit=&t=). Not in the sitemap and noindex for now. Every line must fit the placement rule on
+     /employers/: payment never changes any score, order, filter, count or Auto-Apply behaviour. -->
+<title>Buy a Paid Listing | InternScout for Employers</title>
+<meta name="description" content="Buy a paid listing for one of your open internships on InternScout: pick the role, the start day, and pay online."/>
+<meta name="robots" content="noindex"/>
+<link rel="canonical" href="https://internscout.org/employers/buy/"/>
+<link rel="icon" type="image/png" sizes="48x48" href="/icon48.png"/>
+<link rel="apple-touch-icon" href="/icon128.png"/>
+<link rel="preload" href="/fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href="/fonts/source-serif-4-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<style>
+@font-face{font-family:"IBM Plex Sans";src:url(/fonts/ibm-plex-sans-latin.woff2) format("woff2");font-weight:100 700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Source Serif 4";src:url(/fonts/source-serif-4-latin.woff2) format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:400;size-adjust:100.1%;ascent-override:102.4%;descent-override:27.5%;line-gap-override:0%}
+@font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:500;size-adjust:102.1%;ascent-override:100.4%;descent-override:26.9%;line-gap-override:0%}
+@font-face{font-family:"Plex Fallback";src:local("Arial Bold"),local("Arial-BoldMT"),local("Helvetica Neue Bold"),local("Helvetica Bold"),local("Roboto Bold");font-weight:600 700;size-adjust:97.2%;ascent-override:105.5%;descent-override:28.3%;line-gap-override:0%}
+@font-face{font-family:"Serif Fallback";src:local("Georgia Bold"),local("Georgia-Bold");font-weight:600 700;size-adjust:86%;ascent-override:120.5%;descent-override:39%;line-gap-override:0%}
+:root{--paper:#f6f4ef;--panel:#fffefb;--sunk:#efece5;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;--rule2:#ece9e1;--field-border:#80858c;--accent:#1d5c46;--accent-ink:#fff;--accent-hover:#164a38;--accent-soft:#e3eee8;--blue:#2b5aa0;--amber:#8c5a0f;--amber-soft:#f6ecd9;--green:#1d7549;--red:#a8362c;
+--serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;--sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;--fs-1:12px;--fs-2:13px;--fs-3:15px;--fs-4:16px;--fs-5:18px;--fs-6:22px;--fs-7:28px;--fs-8:34px;--lh:1.5;--lh-head:1.2;--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--r-sm:4px;--r:6px;--r-lg:8px;--r-pill:999px;--shadow-pop:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent);--ring:0 0 0 1px var(--accent);--h-ctl:36px;--h-ctl-sm:32px;--h-field:40px;--ease-out:cubic-bezier(.2,.7,.3,1);--t-fast:140ms;--t-move:200ms;--i-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");--i-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E");--i-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E");--i-cross:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");--i-alert:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5v.01'/%3E%3C/svg%3E");--i-external:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E");--i-select:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23646a73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--paper:#131416;--panel:#1a1b1e;--sunk:#232427;--ink:#ecebe6;--ink2:#b8b6af;--ink3:#95948e;--rule:#2c2d31;--rule2:#232427;--field-border:#6e7077;--accent:#7cc3a1;--accent-ink:#0f1a15;--accent-hover:#95d2b3;--accent-soft:#1c2a24;--blue:#8fb2e8;--amber:#e0b25e;--amber-soft:#2e2717;--green:#7cc3a1;--red:#e48a80;
+--i-select:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2395948e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");color-scheme:dark}}
+@media (pointer:coarse){:root{--h-ctl:44px;--h-ctl-sm:44px;--h-field:44px}}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);
+font:var(--fs-4)/var(--lh) var(--sans)}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px 64px}a{color:var(--accent)}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 20px;flex-wrap:wrap;
+padding:22px 0 14px;border-bottom:1px solid var(--ink)}
+.mark{font:600 var(--fs-6)/1 var(--serif);color:var(--ink);text-decoration:none}
+nav{display:flex;gap:4px 14px;flex-wrap:wrap}
+nav a{color:var(--ink2);font-size:var(--fs-3);text-decoration:none;transition:color 140ms ease-out}nav a:hover{color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.crumbs{font-size:var(--fs-3);color:var(--ink3);margin:22px 0 0}.crumbs a{color:var(--ink3)}
+h1{font:600 var(--fs-8)/1.2 var(--serif);margin:10px 0 8px}
+.lede{color:var(--ink2);font-size:var(--fs-5);margin:0 0 6px;max-width:680px}
+section.prose h2{font:600 var(--fs-6)/1.3 var(--serif);margin:34px 0 6px}
+section.prose p{color:var(--ink2);margin:0 0 10px;max-width:680px}
+ul.plain{padding-left:18px;color:var(--ink2);max-width:680px}ul.plain li{margin:6px 0}
+.cta{display:inline-flex;align-items:center;justify-content:center;min-height:var(--h-ctl);padding:10px 16px;border-radius:var(--r);
+border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:600;text-decoration:none;
+transition:background-color 140ms ease-out,border-color 140ms ease-out}
+.cta:hover{background:var(--accent-hover);border-color:var(--accent-hover)}.cta:active{transform:translateY(1px)}
+form.lead,.done{margin:16px 0 8px;padding:18px 18px 14px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}
+.f{margin:0 0 14px;min-width:0}.f.wide{grid-column:1/-1}
+.f label,fieldset legend{display:block;font-weight:600;margin:0 0 4px;padding:0}
+.opt{font-weight:400;color:var(--ink3)}
+.hint{color:var(--ink3);font-size:var(--fs-3);margin:-2px 0 6px}
+.f input,.f textarea{display:block;width:100%;min-width:0;padding:8px 10px;border:1px solid var(--field-border);
+border-radius:var(--r);background:var(--paper);color:var(--ink);font:inherit}
+.f input{height:var(--h-field)}.f textarea{min-height:110px;resize:vertical}
+.f input[aria-invalid=true],.f textarea[aria-invalid=true]{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+.err{color:var(--red);font-size:var(--fs-3);margin:4px 0 0}
+fieldset{border:0;padding:0;margin:0 0 14px;min-width:0}
+.check{display:flex;gap:10px;align-items:baseline;color:var(--ink2);margin:6px 0}
+.check input{width:18px;height:18px;margin:0;flex:none;position:relative;top:3px;accent-color:var(--accent)}
+.hp{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+button.cta{font:inherit;font-weight:600;cursor:pointer}
+button.cta[disabled]{background:var(--sunk);border-color:var(--field-border);color:var(--ink3);cursor:progress;transform:none}
+.fine{font-size:var(--fs-3);color:var(--ink3);margin:10px 0 0}
+.status{margin:10px 0 0;color:var(--red)}.status:empty{display:none}
+.done h2{font:600 var(--fs-6)/1.3 var(--serif);margin:0 0 6px}.done p{margin:0;color:var(--ink2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:var(--fs-3)}
+footer a{color:var(--ink2)}
+@media (max-width:560px){h1{font-size:var(--fs-7)}.grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
+.i{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.125em;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+.i-chevron{--i:var(--i-chevron)}.i-search{--i:var(--i-search)}.i-check{--i:var(--i-check)}.i-cross{--i:var(--i-cross)}.i-alert{--i:var(--i-alert)}.i-external{--i:var(--i-external)}
+input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-color:var(--sunk);cursor:default}
+.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.note{color:var(--ink2);margin:16px 0 0}
+section.step{margin:24px 0 0;padding:18px 18px 8px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
+section.step h2{font:600 var(--fs-6)/1.3 var(--serif);margin:0 0 10px}
+.price{font-weight:600;margin:0 0 12px;color:var(--ink)}
+.combo{position:relative}
+#co-list{position:absolute;z-index:5;left:0;right:0;top:100%;margin:4px 0 0;padding:4px;list-style:none;background:var(--panel);
+border:1px solid var(--field-border);border-radius:var(--r);box-shadow:var(--shadow-pop);max-height:280px;overflow:auto}
+#co-list li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 10px;border-radius:var(--r-sm);cursor:pointer}
+#co-list li.on,#co-list li:hover{background:var(--accent-soft)}
+#co-list li.on{box-shadow:inset 0 0 0 1px var(--accent)}
+.co-n{min-width:0;overflow-wrap:anywhere}.co-c{flex:none;color:var(--ink3);font-size:var(--fs-3)}
+.msg{color:var(--ink2);font-size:var(--fs-3);margin:6px 0 0;max-width:680px}.msg:empty{display:none}
+ul.roles{list-style:none;padding:0;margin:0 0 6px}
+li.role{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--rule2)}
+li.role:first-child{border-top:0}
+li.role input{width:18px;height:18px;margin:3px 0 0;flex:none;accent-color:var(--accent)}
+.role-b{min-width:0;flex:1}
+.role-t{display:block;font-weight:600;overflow-wrap:anywhere;cursor:pointer}
+li.role.off .role-t{color:var(--ink3);cursor:default}
+.role-m{margin:2px 0 0;color:var(--ink3);font-size:var(--fs-3);overflow-wrap:anywhere}
+.role-why{margin:4px 0 0;color:var(--amber);font-size:var(--fs-3)}
+.role-a{display:inline-flex;align-items:center;gap:4px;margin:4px 0 0;font-size:var(--fs-3)}
+.f input[type=date]{max-width:240px}
+#run{color:var(--ink2);margin:0 0 8px;max-width:680px}#run:empty{display:none}
+ul.avail{list-style:none;padding:0;margin:0 0 12px}
+ul.avail li{margin:6px 0;color:var(--ink2);overflow-wrap:anywhere}
+ul.avail li.fits .i{color:var(--green)}ul.avail li.full .i{color:var(--amber)}
+#avail{margin:0 0 8px;color:var(--ink2)}#avail:empty{display:none}
+.cta.alt{background:var(--panel);color:var(--accent)}.cta.alt:hover{background:var(--accent-soft);border-color:var(--accent)}
+.cta.small{min-height:var(--h-ctl-sm);padding:4px 10px;font-size:var(--fs-3);margin:4px 0 0}
+.choices{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.code{font-size:var(--fs-5);letter-spacing:.04em;user-select:all;overflow-wrap:anywhere}
+.terms{margin:0 0 14px}.terms .check{color:var(--ink)}
+.done ul.plain{margin:8px 0}.done p+p{margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
+<main id="buy">
+<p class="crumbs"><a href="/">InternScout</a> › <a href="/employers/">For employers</a> › Buy a paid listing</p>
+<h1>Buy a paid listing</h1>
+<p class="lede">Show one of your open roles on InternScout in a box headed "Paid listing", or three of them. Pick the roles and the day it starts, and pay online. <a href="/employers/#interest">What a paid listing is and isn't</a></p>
+
+<p class="note" id="boot" role="status">Checking whether buying is open.</p>
+<noscript><p class="note">This page needs JavaScript. You can email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a> to buy a paid listing instead.</p></noscript>
+
+<div class="done" id="closed" hidden>
+<h2>Buying on the site isn't open yet</h2>
+<p>You can't buy a paid listing on this page yet. To ask for one, use the form on <a href="/employers/#interest">the employers page</a> or email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>.</p>
+</div>
+
+<div class="done" id="landing" tabindex="-1" aria-live="polite" hidden>
+<h2 id="landing-h"></h2>
+<div id="landing-body"></div>
+</div>
+
+<form id="order" novalidate hidden aria-label="Order a paid listing">
+<section class="step" aria-labelledby="step1-h">
+<h2 id="step1-h">1. Choose roles</h2>
+<p class="price" id="prices"></p>
+<div class="f combo">
+<label for="co-q">Your company</label>
+<p class="hint" id="co-q-hint">Type its name as InternScout lists it, then choose it from the list.</p>
+<input id="co-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="co-list" aria-describedby="co-q-hint" autocomplete="off" spellcheck="false" maxlength="120" disabled/>
+<ul id="co-list" role="listbox" aria-label="Employers" hidden></ul>
+<p class="err" id="co-q-err" hidden></p>
+<p class="msg" id="co-msg" aria-live="polite"></p>
+</div>
+<label class="check" for="pub"><input type="checkbox" id="pub" aria-describedby="pub-hint"/> We are a nonprofit or a public body</label>
+<p class="hint" id="pub-hint"></p>
+<fieldset id="roles-box" hidden>
+<legend id="roles-legend">Open roles</legend>
+<p class="hint">Pick one role, or three for the three-role price. Each runs for <span class="days">30</span> days.</p>
+<ul class="roles" id="role-list"></ul>
+<p class="err" id="roles-err" hidden></p>
+<p class="msg" id="pick-msg" aria-live="polite"></p>
+</fieldset>
+</section>
+
+<section class="step" id="step2" aria-labelledby="step2-h" hidden>
+<h2 id="step2-h">2. Start day</h2>
+<div class="f">
+<label for="start">First day of the listing</label>
+<p class="hint" id="start-hint"></p>
+<input id="start" type="date" required aria-describedby="start-hint"/>
+<p class="err" id="start-err" hidden></p>
+</div>
+<p id="run" aria-live="polite"></p>
+<div id="avail" aria-live="polite"></div>
+</section>
+
+<section class="step" id="step3" aria-labelledby="step3-h" hidden>
+<h2 id="step3-h">3. Your details</h2>
+<div class="grid">
+<div class="f">
+<label for="name">Name</label>
+<input id="name" name="name" type="text" required maxlength="100" autocomplete="name"/>
+<p class="err" id="name-err" hidden></p>
+</div>
+<div class="f">
+<label for="email">Work email</label>
+<p class="hint" id="email-hint">At your company's domain. We can't accept Gmail, Outlook or other free addresses.</p>
+<input id="email" name="email" type="email" required maxlength="254" autocomplete="email" spellcheck="false" aria-describedby="email-hint"/>
+<p class="err" id="email-err" hidden></p>
+</div>
+<div class="f">
+<label for="company">Company</label>
+<input id="company" name="company" type="text" required maxlength="120" autocomplete="organization"/>
+<p class="err" id="company-err" hidden></p>
+</div>
+<div class="f">
+<label for="pilot">Pilot code <span class="opt">(optional)</span></label>
+<p class="hint" id="pilot-hint">Only if we gave you one. A pilot is free, so there's nothing to pay.</p>
+<input id="pilot" name="pilot_code" type="text" maxlength="40" autocomplete="off" spellcheck="false" aria-describedby="pilot-hint"/>
+<p class="err" id="pilot-err" hidden></p>
+</div>
+</div>
+<div class="terms">
+<label class="check" for="terms"><input type="checkbox" id="terms" name="accept_terms" required/> <span>I have read and accept the <a href="/terms.html" target="_blank" rel="noopener">InternScout terms</a>, including <a href="/terms.html#employers" target="_blank" rel="noopener">the section for employers</a>, on behalf of my company, and I am authorized to accept them for it.</span></label>
+<!-- was: I accept the InternScout terms, including the section for employers, for my company, and I am allowed to accept them for it.
+     (legal review round 4, 2026-10-19; worker/src/orders.js TERMS_BOX stores these words on every order) -->
+<p class="err" id="terms-err" hidden></p>
+</div>
+<!-- The honeypot, as on the interest form: off-screen, hidden from screen readers and skipped by Tab. -->
+<div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"/></div>
+<!-- Before paying (legal review round 4, 2026-10-19): what is sold, the refund rule, cancelling and who to write to. -->
+<p class="fine" id="refunds">You are buying a paid listing for each role you picked, for the days shown, in US dollars. If we don't approve your order, you get a full refund. Until we approve it, you can cancel it by email for a full refund. If a role closes early, you get its unused days back as a refund or a credit code, your choice. Questions: <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>.</p>
+<button type="submit" class="cta" id="send">Order</button>
+<p class="status" id="status" role="alert"></p>
+<p class="fine">Next we email you a link to confirm your address. It works for 48 hours. Then you pay through Stripe, unless you have a pilot code. <a href="/privacy.html#employer-orders">What we keep</a></p>
+</section>
+</form>
+
+<div class="done" id="sent" tabindex="-1" hidden>
+<h2>Check your email</h2>
+<p id="sent-text"></p>
+</div>
+
+<section class="prose" id="how">
+<h2>How it works</h2>
+<ul class="plain">
+<li>Pick one of your open roles that InternScout already lists, or three, and the day it starts.</li>
+<li>We email a link to your work address. Open it within 48 hours to confirm the address, then pay through Stripe.</li>
+<li>We review every paid listing before it goes live, usually within 2 business days. If we can't run it, you get a full refund.</li>
+<li>It runs for <span class="days">30</span> days from your start day. If our review finishes after the start day, the <span class="days">30</span> days start from the day we approve it.</li>
+<li>If the role closes early, you get the unused days back, as a refund or a code for another paid listing, whichever you choose.</li>
+</ul>
+<h2>No bidding</h2>
+<p>Prices are fixed and there's no automatic renewal. A page shows at most one paid listing, and when several fit, each has the same chance. At most <span id="cap">5</span> paid listings run at once in a field, so each keeps its share. When a field is full, we show the first day it has room.</p>
+</section>
+</main>
+<footer><strong>Built by one student, made for all students.</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/internships/at/">Employers hiring now</a> · <a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+</div>
+<script defer src="/js/buy.js?v=20261019-buy-recovery"></script>
+<script defer src="/js/count.js"></script>
+</body>
+</html>

@@ -1,4 +1,35 @@
-# October 16 implementation checkpoint
+# October 20 integration checkpoint
+
+Integrated with main `0c70655d` in PR #124. Employer checkout and the current terms version
+(2026-10-20), six Stripe webhook events, EMAIL binding and EMPLOYER_CHECKOUT=1 remain intact.
+PRs #119, #131, #132 and #133 have merged; paid-listing launch is no longer a pending gate.
+Manual listing activation/update stays refused while checkout is enabled; pilots use site checkout
+with an allocated pilot code. Draft/pause/end/refuse remain available. No new launch action is needed.
+
+The October 19 Monday digest was delivered by the catch-up path at 18:04 UTC; the later scheduled
+run was stopped by the existing six-day duplicate guard. Do not resend to validate this branch.
+
+The dashboard preview keeps the latest main data, reduced to 12 rows. The widget independently
+uses its bounded full-field feed; both widget and employer role-index generation remain present.
+The carryover merge preserves both stable-ID deduplication and completed-board closure evidence.
+
+## Integrated validation and remaining gates
+
+October 20 integrated suites passed: **315 extension, 214 site, 265 Worker and 1,108 backend**;
+two optional backend checks skipped. Five real local Workers/D1 tests and two offline packaging tests
+passed. The six public-media tests are now imported by the Worker directory runner, so normal CI
+actually executes them. No real payment, application submission, social post or email was sent.
+
+Exact-package real Google/personal-Microsoft sign-in and ordinary update preservation remain release
+gates. Root is handling browser verification, merge/deployment and any separate publication decision.
+Deploy the Worker media route before the changed scheduled social workflow next runs; do not force a post.
+The existing employer config, orders, payment code, clickwrap text and terms page are identical to main.
+
+`npm audit` reports six high-severity paths in existing dev-only Wrangler/Miniflare tooling; these are
+not runtime imports deployed in the Worker. Plan a separately tested tooling update (audit suggests
+Wrangler 4.151.2 and Cloudflare Vitest plugin 1.4.5), rather than an unreviewed launch-time upgrade.
+
+## Historical October 16 checkpoint
 
 Prepared on `codex/post-release-ready`, based on main `cbfef617`. These changes are reviewable source
 and a local 0.5.8 candidate, not a deployment or store publication. No new social posts, outreach,
@@ -46,12 +77,13 @@ real sign-in, installed-candidate update or real employer submission was perform
 3. Complete the exact-package Google/personal-Microsoft sign-in, setup and ordinary-update checks in
    `../releases/extension-0.5.8.md`. Then submit the recorded Web Store ZIP and publish its matching
    developer release. Update the store support URL after `/install#troubleshooting` is live.
-4. Observe the first scheduled October 19 12:00 UTC / 8 a.m. EDT digest, provider delivery and archive.
-   Inspect provider status before any recovery; no catch-up broadcast is requested. See the email runbook.
+4. Observe the next normal weekly digest and weekly health; October 19 delivery is complete.
+   Inspect provider status before any recovery; do not retry an already delivered broadcast.
 5. Security headers need host/proxy/TLS inspection before applying the staged rule. Do not change DNS
    or enable proxying merely to apply it. Controlled cold-load timing and consenting student sessions remain.
 
 Heycatch account checks showed six connected brand accounts and an existing YouTube/TikTok/Facebook
 video queue. Preserve it; native YouTube must remain disabled. Threads is absent, and X/Reddit text
 queues remain unverified. The private analytics page already separates form submissions from subscribers.
-PR #119 remains intentionally gated to the first paid placement and is outside this checkpoint.
+PR #119 and the later employer checkout launch (#132) are merged. Their production settings and
+manual-activation restriction must be preserved by this integration.

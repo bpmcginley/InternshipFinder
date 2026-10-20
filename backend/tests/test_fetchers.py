@@ -10,7 +10,7 @@ from internscout.sources.workday import (CORE_OFFSET, DRY_PAGES, PAGE,
                                          robots_allows,
                                          fetch_workday_board,
                                          parse_workday_list, parse_workday_detail,
-                                         parse_posted_on, host_of)
+                                         parse_posted_on, host_of, search_terms)
 from internscout.sources.smartrecruiters import parse_smartrecruiters, parse_smartrecruiters_detail
 from internscout.sources.workable import parse_workable
 from internscout.sources.recruitee import parse_recruitee
@@ -245,8 +245,8 @@ def test_taleo():
         {"contestNo": "2", "linkedColumn": 0, "locationsColumns": [1],
          "column": ["Machinist", '["US-Texas-Fort Worth"]', "09/01/2026"]},
     ]}, CO, "acme", "ext")
-    assert total == 3 and len(items) == 1
-    assert items[0]["locations"] == ["Hunt Valley, Maryland"] and items[0]["posted_at"] == "2026-09-01"
+    assert total == 3 and len(items) == 2
+    assert items[0]["locations"] == ["Hunt Valley, Maryland", "Toronto, Ontario, Canada"] and items[0]["posted_at"] == "2026-09-01"
     assert items[0]["url"] == "https://acme.taleo.net/careersection/ext/jobdetail.ftl?job=342925"
 
 
@@ -736,10 +736,33 @@ def test_a_hospital_board_is_also_searched_for_student_roles():
     assert board.texts == ["intern", "student"]
 
 
-def test_other_boards_are_searched_once():
-    board = _SearchBoard({"intern": ["Software Engineer Intern"], "student": ["Student Nurse Technician"]})
+def test_other_boards_search_only_interns_by_default():
+    # The co-op search for every board is opt-in since 2026-10-19: it found nothing extra on the
+    # boards measured and cost about 13,500 requests a run (live-verification-2026-10-18.md).
+    board = _SearchBoard({"intern": ["Software Engineer Intern"], "student": ["Student Nurse Technician"],
+                          "co-op": ["Mechanical Engineering Co-op"]})
     assert len(fetch_workday_board(board, _deepco())) == 1
     assert board.texts == ["intern"]
+
+
+def test_workday_keeps_coops_missing_from_intern_search_when_co_op_is_switched_on(monkeypatch):
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
+    board = _SearchBoard({"intern": ["Software Engineer Intern"],
+                          "co-op": ["Software Engineer Intern", "Mechanical Engineering Co-op"]})
+    out = fetch_workday_board(board, _deepco())
+    assert [x["title"] for x in out] == ["Software Engineer Intern", "Mechanical Engineering Co-op"]
+    assert board.texts == ["intern", "co-op"]
+
+
+def test_extra_workday_words_are_read_once_each_in_order(monkeypatch):
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", " Co-op , intern,,student ")
+    assert search_terms(None) == ("intern", "co-op", "student")
+    assert search_terms("health") == ("intern", "co-op", "student")
+    monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
+    assert search_terms("health") == ("intern", "co-op", "student")
+    monkeypatch.delenv("WORKDAY_EXTRA_KEYWORDS")
+    assert search_terms(None) == ("intern",)
+    assert search_terms("behavioral_health") == ("intern", "student")
 
 class _Robots:
     """A Workday host serving one robots.txt and nothing else."""
@@ -948,7 +971,7 @@ def test_a_hospital_oracle_tenant_is_also_searched_for_student_roles():
           "sector": "health", "location": None}
     out = fetch_oracle_board(tenant, co)
     assert sorted(x["title"] for x in out) == ["Nursing Student Technician - FlexStaff", "Pharmacy Intern"]
-    assert tenant.keywords == ["intern", "student"]
+    assert tenant.keywords == ["intern", "co-op", "student", "stagiaire"]
     tenant.keywords = []
     fetch_oracle_board(tenant, dict(co, sector="insurance_finance"))
-    assert tenant.keywords == ["intern"]
+    assert tenant.keywords == ["intern", "co-op", "student", "stagiaire"]

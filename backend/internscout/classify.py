@@ -337,7 +337,8 @@ _STUDENT_WORD_RE = re.compile(r"\b(student|undergrad(uate)?|summer)\b", re.I)
 _NEW_GRAD_RE = re.compile(r"new ?grad|early career|entry[- ]level|recent (college )?grad|university grad|"
                           r"graduate (development |rotational )?program|rotational program|leadership development program", re.I)
 _NEW_GRAD_STRONG_RE = re.compile(r"new[- ]?grad|recent (college )?grad|university grad|entry[- ]level", re.I)
-_STUDENT_TERM_RE = re.compile(r"\bintern(ship)?s?\b|\bco-?op\b|\bstudents?\b", re.I)
+_FRENCH_INTERN_RE = re.compile(r"\bstagiaires?\b", re.I)
+_STUDENT_TERM_RE = re.compile(r"\bintern(ship)?s?\b|\bco-?op\b|\bstudents?\b|\bstagiaires?\b", re.I)
 # Three more wordings where the dated season is when a full-time job begins, found on the live board
 # in the 2026-09 audit. None of them says new grad, so the rule above let them through:
 #   a start date        "Operations Management Development Program - Summer 2027 Start"
@@ -504,6 +505,10 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
     if never_student(title):
         return []
     found = {s for s, rx in _STAGE_RULES if rx.search(title)}
+    # Quebec employers publish French titles. "Stage" alone also means a theatre
+    # job in English, so only the unambiguous person noun admits a title here.
+    if _FRENCH_INTERN_RE.search(title) or re.fullmatch(r"\s*stage\s*", emp, re.I):
+        found.add("internship")
     if _LOWER_YEARS_RE.search(title) and _PROGRAM_RE.search(title):
         found.add("early_insight")
     if _RESEARCH_AIDE_RE.search(title) and _STUDENT_WORD_RE.search(title):
@@ -530,7 +535,7 @@ def stage_of(title: str, employment_type: str = "") -> list[str]:
     # a dated summer role ("Summer 2027: Supply Chain") is an internship
     # (was: the example here was "Early Career Mechanical Engineering - Summer 2027". That posting is a
     # full-time job - see _FT_DATED_RE - and is now turned away below.)
-    explicit = re.search(r"\bintern(ship)?s?\b|\bco-?op\b|\bsummer 20[2-3]\d\b", title, re.I)
+    explicit = re.search(r"\bintern(ship)?s?\b|\bco-?op\b|\bstagiaires?\b|\bsummer 20[2-3]\d\b", title, re.I)
     if _NEW_GRAD_RE.search(title) and not explicit:
         return []
     # For a new-grad job the summer date is a start date, not a term: "Additive Engineer (New Grad

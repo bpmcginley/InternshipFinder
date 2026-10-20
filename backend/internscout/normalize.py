@@ -13,8 +13,9 @@ from .region import evaluate_locations
 _SEASON_RE = re.compile(r"\b(summer|fall(?!\s+(?:under|within|into|in|on|behind|short|outside|off|river)\b)|autumn|"
                         r"winter(?!\s+(?:park|haven|garden|springs)\b)|"
                         r"(?<!silver\s)(?<!cold\s)spring(?!\s*(?:boot|framework|mvc|cloud|batch|data|hill|valley|lake|house|harbor)\b)(?!,\s*tx\b)|"
-                        r"year[- ]round|academic year)\b", re.I)
-_SEASON_NAME = {"autumn": "Fall", "year round": "Year-round", "year-round": "Year-round", "academic year": "Year-round"}
+                        r"hiver|printemps|été|ete|automne|year[- ]round|academic year)\b", re.I)
+_SEASON_NAME = {"autumn": "Fall", "year round": "Year-round", "year-round": "Year-round", "academic year": "Year-round",
+                "hiver": "Winter", "printemps": "Spring", "été": "Summer", "ete": "Summer", "automne": "Fall"}
 _YEAR_RE = re.compile(r"\b(20[2-3]\d)\b")  # 2020-2039, avoids matching job-id digits
 
 
@@ -31,7 +32,7 @@ def parse_term_from_text(text: str):
 # form a DESCRIPTION is trusted for: a lone year in one is as likely to be "founded in 2021" or
 # "graduating in 2028" as the term, and it used to override the title.
 _TERM_PAIR_RE = re.compile(
-    r"\b(summer|fall|autumn|winter|spring)\s+(?:of\s+)?(20[2-3]\d)\b|\b(20[2-3]\d)\s+(summer|fall|autumn|winter|spring)\b", re.I)
+    r"\b(summer|fall|autumn|winter|spring|hiver|printemps|été|ete|automne)\s+(?:of\s+)?(20[2-3]\d)\b|\b(20[2-3]\d)\s+(summer|fall|autumn|winter|spring|hiver|printemps|été|ete|automne)\b", re.I)
 
 
 def parse_term_pair(text: str):
@@ -329,7 +330,7 @@ def readable_title(title: str) -> str:
     return _WORD.sub(word, title)
 
 
-def normalize(raw: dict) -> dict | None:
+def normalize(raw: dict, *, on_reject=None) -> dict | None:
     """raw fields expected: company_name, title, locations[list], season, year,
     apply_url, source, source_url, posted_at, active(bool), description(optional).
 
@@ -337,13 +338,17 @@ def normalize(raw: dict) -> dict | None:
     or off-target field)."""
     title = (raw.get("title") or "").strip()
     company = (raw.get("company_name") or "").strip()
+    def reject(reason):
+        if on_reject is not None:
+            on_reject(reason)
+        return None
     if not title or not company:
-        return None
+        return reject("missing_identity")
     if _dead_url(raw.get("apply_url") or raw.get("url") or ""):
-        return None
+        return reject("dead_url")
     stages = stage_of(title, raw.get("employment_type", ""))
     if not stages:  # student opportunities only
-        return None
+        return reject("not_student_role")
 
     tags = classify(title)  # title-only: avoids off-target tags from JD boilerplate
     if tags == ["other"] and employer_research_field(company, title):
@@ -355,7 +360,7 @@ def normalize(raw: dict) -> dict | None:
     if raw.get("source") in PUBLIC_SOURCES:  # every posting from a government feed is government work
         tags = [t for t in tags if t != "other"] + ([] if "government" in tags else ["government"])
     if not tags:
-        return None
+        return reject("no_field_tags")
 
     _blob = f"{title} {raw.get('description','') or ''}"
     geo = evaluate_locations(raw.get("locations") or [])
@@ -402,7 +407,7 @@ def normalize(raw: dict) -> dict | None:
     posted = _to_dt(raw.get("posted_at") or raw.get("date_posted"))
     # was: if _zombie(posted, season, year):   (the board's newest date is the second opinion, above)
     if _zombie(posted, season, year, board_newest=_to_dt(raw.get("board_newest"))):
-        return None
+        return reject("stale_untermed")
 
     return {
         "company_name": company,

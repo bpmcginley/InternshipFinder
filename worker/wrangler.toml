@@ -20,6 +20,14 @@ binding = "DB"
 database_name = "internscout"
 database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 
+# Email for the paid listing orders (src/mail.js, src/orders.js; worker/ORDERS.md "Turning it on").
+# Uncomment only AFTER internscout.org is onboarded in the Cloudflare dashboard (Compute > Email Service >
+# Email Sending > Onboard Domain); a live binding before then might fail the deploy. Sending to any
+# address needs the Workers Paid plan. Until it is set, env.EMAIL is missing and the orders stay off.
+[[send_email]]
+name = "EMAIL"
+allowed_sender_addresses = ["listings@internscout.org"]
+
 # was: # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
 # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
 # GITHUB_DISPATCH_TOKEN (a fine-grained GitHub token, InternshipFinder only, "Actions: Read and
@@ -29,6 +37,9 @@ database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
 # which answer 404 while it is unset; its own secret, not DEMAND_TOKEN, which CI also holds),
 # and for the optional paid plans: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
 # (Supporter) and STRIPE_PRICE_ID_PRO (Pro). A plan whose price id is unset is simply not offered.
+# REVIEW_TO (2026-10-19): the address Bruce's paid listing review emails go to, and the reply-to of the
+# emails employers get (src/orders.js). The orders also need STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and
+# ADMIN_TOKEN (which signs the review links).
 #
 # This block is the COMPLETE set of plain vars after every deploy. `wrangler deploy` defaults to
 # --keep-vars=false, so anything typed into the Cloudflare dashboard Variables panel and not repeated
@@ -80,3 +91,9 @@ PRO_PRICE_TEXT = "$8/month"
 # Where Stripe sends students back to after checkout
 # was: SITE_URL = "https://bpmcginley.github.io/InternshipFinder"
 SITE_URL = "https://internscout.org"
+# Paid listings bought on the site (src/orders.js, worker/ORDERS.md): off until this is "1" AND the
+# secrets above (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, ADMIN_TOKEN, REVIEW_TO) and the [[send_email]]
+# binding are set. While off, every /employer/* route but GET /employer/config answers 404.
+EMPLOYER_CHECKOUT = "1"
+# The sender of every order email. Must be an address at a domain onboarded to Email Sending.
+ORDER_FROM = "InternScout <listings@internscout.org>"

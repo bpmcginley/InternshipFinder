@@ -91,8 +91,20 @@ jobs:
           # optional: federal student jobs (free key from developer.usajobs.gov; the email it was issued to)
           USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
           USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
+        # The ingest report (counts per source, board and filter) goes to the runner's temp folder and
+        # is kept as a run artifact below, not in docs/data, which the website serves to everyone.
+        # was: no --metrics, so it defaulted to docs/data/ingest-report.json (2026-10-19).
         run: |
-          python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data"
+          python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data" --metrics "${{ runner.temp }}/ingest-report.json"
+
+      - name: Keep the ingest report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ingest-report
+          path: ${{ runner.temp }}/ingest-report.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Coverage report
         working-directory: backend

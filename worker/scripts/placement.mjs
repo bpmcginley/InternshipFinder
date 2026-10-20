@@ -17,6 +17,9 @@
 //   node scripts/placement.mjs pause <id> --reason "..." --by bruce
 //   node scripts/placement.mjs end <id> --reason removed --by bruce
 //   node scripts/placement.mjs refuse <id> --reason "..." --by bruce
+//   node scripts/placement.mjs report <id> --month 2026-11
+//   node scripts/placement.mjs orders
+//   node scripts/placement.mjs pilot-code --note "first pilot"
 //
 // INTERNSCOUT_API_URL overrides the Worker address (for example http://localhost:8787 with `wrangler dev`).
 import { pathToFileURL } from "node:url";
@@ -41,11 +44,19 @@ Commands:
   pause <id>                --reason TEXT
   end <id>                  --reason dates|role_closed|listing_gone|removed|refunded
   refuse <id>               --reason TEXT
+  report <id>               --month YYYY-MM   shown and opened counts for a month that has ended,
+                            rounded down to 10, "fewer than 10" below that (admin)
+  orders                    recent paid listing orders bought on the site: id, date, status, package,
+                            start, amount in cents, number of roles, company (admin; no name or email)
+  pilot-code                [--note TEXT]   a new free pilot code (at most 5 ever) (admin)
 
 Every change takes --by LABEL (default "bruce"). End is the first day it no longer shows.
 Set INTERNSCOUT_ADMIN_TOKEN in your environment first; it is never printed.`;
 
-const FLAGS = new Set(["lead", "listing", "url", "start", "end", "employer", "note", "checks", "ref", "reason", "by", "unpaid-ok"]);
+const FLAGS = new Set(["lead", "listing", "url", "start", "end", "employer", "note", "checks", "ref", "reason", "by", "unpaid-ok", "month"]);
+// What `orders` prints for each order (2026-10-19): the Worker never sends the name or email, and this
+// list keeps it that way should it ever start to.
+export const ORDER_KEYS = ["id", "created", "status", "package", "start", "amount", "roles", "company"];
 const BOOLEAN = new Set(["unpaid-ok"]);
 
 export function parseArgs(argv) {
@@ -107,6 +118,14 @@ export function toRequest({ cmd, id, extra, flags }) {
       needId();
       need("ref");
       return { method: "POST", path: "/admin/placements/on", admin: true, body: { id, by, paid_ref: flags.ref } };
+    // Paid listing orders (2026-10-19; src/orders.js, worker/ORDERS.md).
+    case "orders": return { method: "GET", path: "/admin/orders", admin: true };
+    case "pilot-code":
+      return { method: "POST", path: "/admin/pilot-codes", admin: true, body: pick({ note: flags.note }) };
+    case "report":
+      needId();
+      need("month");
+      return { method: "POST", path: "/admin/placements/report", admin: true, body: { id, month: flags.month } };
     case "pause":
     case "end":
     case "refuse":
@@ -177,6 +196,10 @@ export async function run(argv, { env = process.env, fetch: f = fetch, out = con
     err(mask(`HTTP ${res.status} (${what})`));
     if (res.status === 404 && req.admin) err("A 404 here can also mean ADMIN_TOKEN is not set on the Worker yet.");
     return 1;
+  }
+  // was: out(mask(JSON.stringify(redact(data), null, 2)));
+  if (req.path === "/admin/orders" && data && Array.isArray(data.orders)) {
+    data = { orders: data.orders.map((o) => Object.fromEntries(ORDER_KEYS.map((k) => [k, o[k]]))) };
   }
   out(mask(JSON.stringify(redact(data), null, 2)));
   return 0;

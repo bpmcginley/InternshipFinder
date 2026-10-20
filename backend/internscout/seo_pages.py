@@ -30,6 +30,8 @@ from statistics import median
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
+from . import near_metros
+
 SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
 SLOGAN = "Built by one student, made for all students."
@@ -2683,10 +2685,10 @@ def digest_examples(new: list[dict]) -> str:
     dated = f" Snapshot: {GENERATED.strftime('%B %d, %Y')}." if GENERATED else ""
     rows = "".join(
         f'<li><a href="{esc(safe_url(x["apply_url"]))}" target="_blank" rel="nofollow noopener">'
-        f'{esc(x.get("title") or "View posting")}</a> — {esc(x.get("company_name") or "Employer")} '
+        f'{esc(x.get("title") or "View posting")}</a> at {esc(x.get("company_name") or "Employer")} '
         f'<span class="meta">({esc(place(x))})</span></li>' for x in picked)
     return ('<section class="prose digest-examples" aria-labelledby="digest-examples-title">'
-            '<h2 id="digest-examples-title">A taste of what you could find</h2>'
+            '<h2 id="digest-examples-title">Examples from this week</h2>'
             f'<p>Examples from roles found this week.{dated} Availability can change; check the employer’s posting.</p>'
             f'<ul class="plain">{rows}</ul></section>')
 
@@ -2889,6 +2891,219 @@ def llms_files(f: dict, made: dict[str, tuple[str, int]], rep: dict | None, majo
              "Amherst, or with any employer it lists. Not affiliated with Simplify or Jobright.", "",
              SLOGAN, ""]
     return {"llms.txt": short, "llms-full.txt": "\n".join(full)}
+
+
+# ---------------------------------------------------------------- <field> internships near <city> (2026-10-18)
+# Ten NCES degree-field groups (top_degree_fields.json) in each of the 50 largest US metros
+# (us_top50_metros.json): 500 pages at /internships/near/<city>/<field>/, and a hub at /internships/near/
+# linking every one. near_metros decides which listings are local to a metro (towns per state, New York's
+# 50-mile radius, never a statewide or remote role) and which tags make up each field group.
+# Every one of the 500 URLs is built on every deploy, with whatever is open, so a link to one never breaks.
+# But 500 pages from one template are what search engines treat as doorway pages, so one is indexed only
+# when it is a real list of its own (near_indexed): NEAR_INDEX_MIN local roles at least, from
+# MIN_EMPLOYERS_NEW employers, and not near_same as a page the site already indexes. The rest are
+# "noindex, follow" and out of the sitemap (page(thin=True)), like a thin field-in-a-place page.
+NEAR_ROOT = "/internships/near/"
+# Off only in tests (backend/tests/conftest.py), except the near-page tests themselves: the 500 pages
+# made every test build about ten times slower. Production always builds them.
+NEAR_ON = True
+NEAR_INDEX_MIN = 5      # local open roles a near page needs before search engines are asked to index it
+NEAR_INDEX_SLACK = 1    # ...and one already in the live sitemap stays indexed down to NEAR_INDEX_MIN - this
+NEAR_REMOTE_SHOWN = 10  # remote roles listed on a page that is not indexed (an indexed one gives a count)
+
+
+def near_path(m: dict, slug: str) -> str:
+    return f"{NEAR_ROOT}{near_metros.metro_slug(m)}/{slug}/"
+
+
+def near_indexed(local: list[dict], path: str, live, earning: frozenset, rivals: list[frozenset]) -> bool:
+    """Whether a near page is asked into search (NEAR_INDEX_MIN). A page people already find in search
+    (earning) stays in whatever its count."""
+    if path in earning:
+        return True
+    need = NEAR_INDEX_MIN - (NEAR_INDEX_SLACK if path in live else 0)
+    employers = {employer_key(x["company_name"]) for x in local if x.get("company_name")}
+    if len(local) < need or len(employers) < MIN_EMPLOYERS_NEW:
+        return False
+    mine = frozenset(x["id"] for x in local)
+    # Only lists of about the same size can be near_same (the shared roles are NEAR_SAME of all of either).
+    return not any(NEAR_SAME * max(len(r), len(mine)) <= min(len(r), len(mine)) and near_same(mine, r)
+                   for r in rivals)
+
+
+def near_local(listings: list[dict]) -> dict[str, list[tuple[dict, list[dict]]]]:
+    """CBSA -> [(listing, its regions inside that metro)], each listing once per metro, in listing order."""
+    out: dict[str, list] = {}
+    for x in listings:
+        inside: dict[str, list] = {}
+        for g in x.get("regions") or []:
+            for cbsa in sorted(near_metros.region_metros(g)):
+                inside.setdefault(cbsa, []).append(g)
+        for cbsa, regs in sorted(inside.items()):
+            out.setdefault(cbsa, []).append((x, regs))
+    return out
+
+
+def near_town(g: dict, cbsa: str) -> str:
+    """The town a local region is in, as the page names it: the region's own city name when that is the
+    town ("McKinney"), else the town it matched ("Denver" for "Hybrid - Denver, CO")."""
+    name = city_name(g, g.get("state") or "")
+    town = near_metros.region_town(g, cbsa)
+    if not town or near_metros.place_key(name) == town:
+        return name
+    if town in near_metros.TOWN_NAMES:
+        return near_metros.TOWN_NAMES[town]
+    return " ".join(w if w in ("of", "and") else w[:1].upper() + w[1:] for w in town.split())
+
+
+def near_view(x: dict, regs: list[dict]) -> dict:
+    """The listing with its regions in this metro first, so its row names the local one (place())."""
+    rest = [g for g in x.get("regions") or [] if not any(g is r for r in regs)]
+    return dict(x, regions=list(regs) + rest)
+
+
+def near_how(m: dict, f: dict) -> str:
+    """What the page counts, in plain words: the metro as drawn, and the tags that make up the field."""
+    cbsa = m["cbsa"]
+    where = (near_metros.RADIUS_WORDS[cbsa] if cbsa in near_metros.RADIUS_WORDS
+             else f"in the {m['name']} metro area, matched by town name")
+    tags = [field_title(t) for t in near_metros.FIELD_TAGS[f["slug"]]]
+    return (f"Counted here: roles with a location {where}. Roles that only name a state, and remote roles, "
+            f"are not counted as local. {f['name']} here means the roles InternScout tags {join_words(tags)}.")
+
+
+def near_title(f: dict, m: dict, local: list[dict]) -> Head:
+    """ "Business Internships near Denver: 75+ Open | InternScout". The count floor (or, under 10 roles, the
+    start term most of them share) is the page's own; the field's short name when the full one won't fit."""
+    floor, term = count_floor(len(local)), main_term(local)
+    subjects = [f"{name} Internships near {m['city']}"
+                for name in dict.fromkeys([f["name"], near_metros.FIELD_SHORT.get(f["slug"], f["name"])])]
+    tails = [f": {floor} Open"] if floor else [f", {term}"] if term else []
+    # The page's own figure outranks the field's full name and the brand, in that order.
+    forms = ([s + t + TITLE_SUFFIX for s in subjects for t in tails] + [s + t for s in subjects for t in tails]
+             + [s + TITLE_SUFFIX for s in subjects] + subjects)
+    return Head(next((c for c in forms if len(c) <= TITLE_MAX), fit_title(subjects[-1])))
+
+
+def near_description(f: dict, m: dict, local: list[dict], remote: int, updated: str) -> str:
+    what, label = f"{lower_name(f['name'])} internships", near_metros.metro_label(m)
+    if local:
+        return listing_description(len(local), what, f"near {label}", local, updated)
+    # Long enough as it is that fit_description adds nothing about roles this page does not have.
+    more = f", and {remote:,} remote ones" if remote else ""
+    return (f"No open {what} near {label} right now. This page links {lower_name(f['name'])} roles near other "
+            f"US cities{more}. Updated {updated}.")
+
+
+def near_body(f: dict, m: dict, local: list[tuple[dict, list[dict]]], remote: list[dict], now: datetime,
+              path: str, indexed: bool, related: str) -> str:
+    label, lname = near_metros.metro_label(m), lower_name(f["name"])
+    key = "near:" + m["cbsa"]            # no region is filed under this, so place() leads with regions[0]
+    items = [near_view(x, regs) for x, regs in local]
+    tags = list(near_metros.FIELD_TAGS[f["slug"]])
+    # The dashboard reads at most six fields (docs/js/core.js filtersFromUrl): the six with the most roles here.
+    by_tag = Counter(t for x, _ in local for t in x.get("field_tags") or [] if t in tags)
+    dash_tags = sorted(tags, key=lambda t: (-by_tag[t], tags.index(t)))[:6]
+    # The dashboard filters by state, not by town, so the link says so.
+    states = near_metros.metro_states(m["cbsa"])
+    dash = dash_link(dash_tags, ",".join(states))
+    out = []
+    if items:
+        towns = Counter(n for _, regs in local for n in {near_town(g, m["cbsa"]) for g in regs} if n)
+        where = sorted(towns.items(), key=lambda kv: (-kv[1], kv[0]))
+        lead = summary(items, f"in {lname}", f" near {label}", tail="")
+        if len(where) > 1:
+            lead += " " + esc(f"By town: {counted(where, 3)}.")
+        out.append(f"<p class=\"lede\">{lead}</p>")
+    else:
+        out.append(f"<p class=\"lede\">{esc(f'InternScout has no open {lname} roles with a location near {label} right now.')} "
+                   "Listings are collected from public job boards several times a day, so this page changes as "
+                   "employers post.</p>")
+    out.append(f"<p class=\"fits\">{esc(near_how(m, f))}</p>")
+    cta = f"Search {lname} roles in {join_words([US_STATES[k] for k in states])} on the dashboard"
+    out.append(f"<a class=\"cta\" href=\"{dash}\">{esc(cta)}</a>")
+    if items:
+        out.append(autoapply_card(items, "seo-near", key))
+        out.append(f"<ul class=\"jobs\">{listing_rows(items, now, key, path, 'seo-near')}</ul>")
+        if len(items) > PER_PAGE:
+            out.append(f"<p class=\"more\">Showing the {PER_PAGE} newest of {len(items):,}. "
+                       f"<a href=\"{dash}\">See every one on the dashboard</a>.</p>")
+        out.append(chart_figure(items, key))
+    # Remote roles, apart and labelled: open to a student in this city, but not in it.
+    if remote:
+        words = (f"{plural(len(remote), 'remote ' + lname + ' role')} {'is' if len(remote) == 1 else 'are'} open "
+                 "to students anywhere in the US. They are not counted above.")
+    else:
+        words = f"No remote {lname} roles are open right now."
+    section = (f"<section class=\"rel\"><h2>{esc('Remote ' + lname + ' roles')}</h2><p class=\"more\">{esc(words)}"
+               + (f" <a href=\"{dash_link(dash_tags, 'remote')}\">See them on the dashboard</a>." if remote else "")
+               + "</p>")
+    if remote and not indexed:
+        section += f"<ul class=\"jobs\">{listing_rows(remote[:NEAR_REMOTE_SHOWN], now, 'remote', path, 'seo-near')}</ul>"
+    out.append(section + "</section>")
+    if items:
+        out.append("<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
+                   "<a href=\"feed.xml\">RSS feed</a></p>")
+    out.append(related + f"<p class=\"more\"><a href=\"{NEAR_ROOT}\">Every field near all 50 cities</a></p>")
+    return "".join(out)
+
+
+def near_pages(listings: list[dict], now: datetime, updated: str, live, earning: frozenset,
+               rivals: list[frozenset]) -> tuple[list[dict], dict]:
+    """The 500 pages as add() arguments, and (path, field, local roles) per (CBSA, field slug) for the hub."""
+    local_by_metro = near_local(listings)
+    remote_all = newest_first([x for x in listings if near_metros.us_remote(x)])
+
+    def tagged(slug: str, x: dict) -> bool:
+        return bool(set(near_metros.FIELD_TAGS[slug]) & set(x.get("field_tags") or []))
+
+    grid = {(m["cbsa"], f["slug"]): [(x, regs) for x, regs in local_by_metro.get(m["cbsa"], []) if tagged(f["slug"], x)]
+            for m in near_metros.METROS for f in near_metros.FIELDS}
+    remote_by_field = {f["slug"]: [x for x in remote_all if tagged(f["slug"], x)] for f in near_metros.FIELDS}
+    hub = {(m["cbsa"], f["slug"]): (near_path(m, f["slug"]), f["name"], len(grid[(m["cbsa"], f["slug"])]))
+           for m in near_metros.METROS for f in near_metros.FIELDS}
+    specs = []
+    for m in near_metros.METROS:
+        label = near_metros.metro_label(m)
+        for f in near_metros.FIELDS:
+            local = grid[(m["cbsa"], f["slug"])]
+            path = near_path(m, f["slug"])
+            ids = {x["id"] for x, _ in local}
+            remote = [x for x in remote_by_field[f["slug"]] if x["id"] not in ids]
+            items = [near_view(x, regs) for x, regs in local]
+            indexed = near_indexed(items, path, live, earning, rivals)
+            # The city's other fields and the field's other cities, most roles first (then by name).
+            fields_here = sorted((hub[(m["cbsa"], ff["slug"])] for ff in near_metros.FIELDS if ff["slug"] != f["slug"]),
+                                 key=lambda e: (-e[2], e[1]))
+            cities = sorted(((hub[(mm["cbsa"], f["slug"])][0], near_metros.metro_label(mm), hub[(mm["cbsa"], f["slug"])][2])
+                             for mm in near_metros.METROS if mm["cbsa"] != m["cbsa"]), key=lambda e: (-e[2], e[1]))
+            related = (link_list(f"Other fields near {m['city']}", fields_here)
+                       + link_list(f"{f['name']} internships near other cities", cities))
+            specs.append({
+                "path": path, "title": near_title(f, m, items),
+                "desc": near_description(f, m, items, len(remote), updated),
+                "h1": f"{f['name']} internships near {label}",
+                "crumbs": [("/internships/", "Internships"), (NEAR_ROOT, "Near 50 US cities"),
+                           (path, f"{f['name']} near {m['city']}")],
+                "body": near_body(f, m, local, remote, now, path, indexed, related),
+                "items": items or None, "state": "near:" + m["cbsa"], "thin": not indexed, "kind": "near"})
+    return specs, hub
+
+
+def near_hub(hub: dict) -> tuple[list[str], str, str]:
+    """(title forms, description, body) of /internships/near/: every one of the 500 pages, by city."""
+    sections = [link_list(f"Near {near_metros.metro_label(m)}", [hub[(m["cbsa"], f["slug"])] for f in near_metros.FIELDS])
+                for m in near_metros.METROS]
+    body = ("<p class=\"lede\">Internships in ten of the largest college degree fields, near each of the 50 largest "
+            "US metro areas. The fields are the ten largest by bachelor's degrees awarded in 2021-22 (NCES Digest "
+            "2023, Table 322.10). The metro areas are the 50 largest by population (Census estimates for July 2025). "
+            "Each number is how many open roles have a location in that metro area now. A role in two cities "
+            "counts in both. Remote roles are listed apart on each page.</p>"
+            + "".join(sections))
+    title = ["Internships by Field Near 50 US Cities", "Internships Near 50 US Cities"]
+    desc = ("Internships in the ten largest college degree fields near the 50 largest US metro areas, counted by "
+            "city and field from open listings. Remote roles listed apart. Free, no sign-up.")
+    return title, desc, body
 
 
 # ---------------------------------------------------------------- build
@@ -3329,6 +3544,16 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         t_, d_, h_, b_ = tracker_page(t, rows, sum(r[4] for r in rows), now, updated, term_path)
         add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_, dated=items)
 
+    # "<field> internships near <city>" (2026-10-18, near_pages): all 500 built, the thin ones noindex. Judged
+    # against the list pages made so far, so one that repeats a field, place or employer page stays out of search.
+    rivals = [frozenset(x["id"] for x in p["items"]) for p in pages if p["index"] and p["items"]]
+    if NEAR_ON:
+        near_specs, near_grid = near_pages(listings, now, updated, live, earning, rivals)
+        for spec in near_specs:
+            add(**spec)
+        t_, d_, b_ = near_hub(near_grid)
+        add(NEAR_ROOT, t_, d_, "Internships near 50 US cities", [root, (NEAR_ROOT, "Near 50 US cities")], b_)
+
     new = [x for x in listings if fresh(x, now, d["baseline"])]
     # This page lists every new listing, and the email counts a role posted on two of an employer's
     # boards once, so when the two numbers differ the form says why its number is the smaller one.
@@ -3407,7 +3632,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                                   for k in ["Canada", *CA_METRO_PAGES, *CA_PROVINCES] if k in states])
            + "<section class=\"rel\"><h2>More ways to browse</h2><ul><li><a href=\"/internships/for/\">"
              f"All {len(majors_made)} majors</a></li><li><a href=\"/internships/at/\">All {len(by_company):,} employers"
-             "</a></li>" + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
+             "</a></li>" + (f"<li><a href=\"{NEAR_ROOT}\">By field near 50 US cities</a></li>" if NEAR_ON else "") + (f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
                             if len(new) >= MIN_OPEN else "")
            + "".join(f"<li><a href=\"{p}\">{esc(k['h1'][0].upper() + k['h1'][1:])}</a> "
                      f"<span class=\"n\">{len(v):,}</span></li>" for p, k, v in kind_made)
@@ -3536,12 +3761,15 @@ def placement_box(x: dict, pl: dict, state: str | None = None) -> str:
     the company name; the row's own title and grey line (row_meta); a posting link marked
     rel="sponsored noopener" with no data-aa (so the Auto-Apply offer never fires for it) and no company
     link; data-nosnippet to keep it out of search snippets. The inline script takes the box out once its
-    end date (exclusive) has come, even if no deploy has run since."""
+    end date (exclusive) has come, even if no deploy has run since. data-placement (2026-10-14, S9) carries
+    the placement's id, for js/count.js: "shown" once the box is half on screen and "open" when its link
+    is pressed, once per page load each; the id and the page's path are all it sends."""
     end = str(pl.get("end") or "")
     href = esc(safe_url(x.get("apply_url")) or "")
     if not _DAY_RE.match(end) or not href:
         return ""
-    return (f'{PLACEMENT_START}<li class="paid" data-nosnippet aria-label="Paid listing, not part of this page\'s list">\n'
+    return (f'{PLACEMENT_START}<li class="paid" data-placement="{esc(pl.get("id") or "")}" data-nosnippet '
+            'aria-label="Paid listing, not part of this page\'s list">\n'
             '<p class="paid-h">Paid listing <a href="/privacy.html#paid-listings">Why am I seeing this?</a></p>\n'
             f'<div class="co"><span class="ad">Ad</span> {esc(x.get("company_name") or "")}</div>\n'
             f'<div class="role">{esc(x.get("title") or "")}</div>\n'
@@ -3735,9 +3963,9 @@ def main(argv: list[str]) -> None:
                   held_paths(argv[3]) if len(argv) > 3 else frozenset())
     # was: pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
     built = pages                  # as build() made them, before any paid box, for the feeds
+    today = today_utc()
     if placements_path is not None:
         from . import placements
-        today = today_utc()
         kept, dropped = placements.resolve(placements.read(placements_path),
                                            {str(x["id"]): x for x in LISTINGS}, today)
         for line in placements.warnings(kept, dropped):
@@ -3754,11 +3982,19 @@ def main(argv: list[str]) -> None:
         pages = add_paid_boxes(pages, kept, today)
         print(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
     write(site_dir, pages)
+    # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
+    # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.
+    from . import role_index       # role_index imports this module, so not at the top
+    shards = role_index.write(site_dir, LISTINGS, GENERATED or datetime.now(timezone.utc), today)
+    print(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
     from . import feeds            # feeds imports this module, so not at the top
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
     # `python -m internscout.seo_pages` this module is __main__, and the internscout.seo_pages that
     # feeds imports is a second copy whose build() never ran, so its GENERATED is None.
     feeds.write_all(site_dir, built, GENERATED)     # was: feeds.write_all(site_dir, pages)
+    # The embedded widget needs real per-field coverage, not the dashboard's 60-row preview.
+    from . import widget_data
+    widget_data.write(site_dir, LISTINGS, GENERATED, today_utc())
     print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
 
 

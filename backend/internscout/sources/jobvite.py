@@ -4,7 +4,7 @@ one job-page fetch for the description (capped)."""
 from __future__ import annotations
 import html
 import re
-from .common import board_item, html_to_text
+from .common import board_item, counts_of, html_to_text
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -16,10 +16,13 @@ _DESC = re.compile(r'<div class="jv-job-detail-description"[^>]*>(.*?)<div class
 
 
 def parse_jobvite(page: str, co: dict) -> list[dict]:
-    out = []
-    for href, title, loc in _ROW.findall(page):
+    out, counts = [], counts_of(co)
+    rows = _ROW.findall(page)
+    counts.rows(len(rows))   # the job rows on the one list page; there is no total to compare
+    for href, title, loc in rows:
         title = html.unescape(title).strip()
         if not is_internship(title):
+            counts.discard("not_student")
             continue
         loc = re.sub(r"\s+", " ", html_to_text(loc)).strip()
         loc = re.sub(r"\s+,", ",", loc)

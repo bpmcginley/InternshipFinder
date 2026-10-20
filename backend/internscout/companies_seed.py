@@ -363,6 +363,8 @@ WORKDAY += [
 # These employers were already reaching students one job at a time through Google Jobs; seeding
 # them reads the whole board instead.
 SUCCESSFACTORS: list = [
+    # Public search boards verified 2026-10-16; Canadian student/co-op hiring.
+    {"name": "Scotiabank", "ats_token": "jobs.scotiabank.com", "is_quant_target": False, "sector": "insurance_finance"},
     {'name': 'Qorvo', 'ats_token': 'careers.qorvo.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
     {'name': 'Corning', 'ats_token': 'corningjobs.corning.com', 'is_quant_target': False, 'sector': 'engineering_manufacturing'},
     {'name': 'Edison International', 'ats_token': 'apply.edisoncareers.com', 'is_quant_target': False, 'sector': 'energy_environment'},

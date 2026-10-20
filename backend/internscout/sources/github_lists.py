@@ -8,16 +8,20 @@ from __future__ import annotations
 import json
 import re
 from .base import client
+from .common import ScanCounts, report_source
 from ..config import GITHUB_LISTS, PROFILE
 
 
-def _parse(payload: list[dict], source: str, cycle_years: dict) -> list[dict]:
+def _parse(payload: list[dict], source: str, cycle_years: dict,
+           counts: ScanCounts | None = None) -> list[dict]:
     wanted = {f"{s} {y}" for s, y in PROFILE.terms}
-    out = []
+    out, counts = [], counts if counts is not None else ScanCounts()
     for r in payload:
         if not isinstance(r, dict):
+            counts.discard("unreadable")
             continue
         if r.get("is_visible") is False:
+            counts.discard("unlisted")
             continue
         season = r.get("season")
         year = cycle_years.get(season) if season else None
@@ -45,18 +49,30 @@ def _parse(payload: list[dict], source: str, cycle_years: dict) -> list[dict]:
     return out
 
 
-def fetch_github_lists(lists=None) -> list[dict]:
+def fetch_github_lists(lists=None, report=None) -> list[dict]:
+    """Every configured list's rows. `report` (IngestMetrics.source_result) hears each list's
+    outcome, so a list that failed to load is not mistaken for one that is empty today."""
     lists = lists or GITHUB_LISTS
     results: list[dict] = []
     with client() as c:
         for spec in lists:
+            counts = ScanCounts()
             try:
                 resp = c.get(spec["url"])
                 resp.raise_for_status()
                 payload = resp.json()
-                results.extend(_parse(payload, spec["source"], spec["cycle_years"]))
-            except (httpx_err := Exception) as e:  # noqa: F841
+                if not isinstance(payload, list):
+                    # A changed file shape used to parse to nothing, which read as an empty list.
+                    raise ValueError("listings file is not a list")
+                counts.rows(len(payload))
+                counts.reported(len(payload))   # the file is the whole list
+                items = _parse(payload, spec["source"], spec["cycle_years"], counts)
+            except Exception as e:
                 print(f"[github_lists] {spec['source']} failed: {e}")
+                report_source(report, spec["source"], error=e)
+                continue
+            results.extend(items)
+            report_source(report, spec["source"], items=items, counts=counts)
     return results
 
 

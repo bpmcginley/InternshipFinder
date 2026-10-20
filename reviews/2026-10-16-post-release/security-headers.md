@@ -27,4 +27,4 @@ Primary references:
 - https://developers.cloudflare.com/rules/transform/response-header-modification/
 - https://developers.cloudflare.com/rules/transform/response-header-modification/create-api/
 
-This is independent of PR #119's paid-placement launch, which remains gated.
+This is independent of the paid-placement launch; PRs #119 and #132 are now merged.

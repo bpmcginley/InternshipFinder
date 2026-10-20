@@ -1,7 +1,10 @@
 # Extension 0.5.8 candidate
 
 Prepared October 16, 2026. This is a local release candidate, not a published release.
-The source starts from main `cbfef6171f08ebc4f9c06a41523519b630a120aa`.
+The original candidate started from main `cbfef6171f08ebc4f9c06a41523519b630a120aa`.
+On October 20, PR #124 was reconciled with main `0c70655d`, including employer checkout and the
+repaired widget. Integrated automated verification is recorded in `../2026-10-16-post-release/STATUS.md`.
+Regenerate the source/hash record from the reconciled clean commit before browser QA.
 
 Local consolidated verification: all 315 extension tests passed, including nine new synthetic
 Lever/Ashby regressions. Two packaging/release tests passed,

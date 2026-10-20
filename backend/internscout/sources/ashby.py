@@ -1,6 +1,6 @@
 """Ashby public job-board API."""
 from __future__ import annotations
-from .common import board_item, stamp_board_newest
+from .common import board_item, counts_of, stamp_board_newest
 from ..classify import is_internship
 from ..region import board_state, place_bare_cities
 
@@ -15,14 +15,16 @@ def _addr(a: dict | None) -> str | None:
 
 
 def parse_ashby(payload: dict, co: dict) -> list[dict]:
-    out, board = [], []
+    out, board, counts = [], [], counts_of(co)
     for j in payload.get("jobs", []):
         if j.get("isListed") is False:
+            counts.discard("unlisted")
             continue
         board.append(j.get("location"))
         title = j.get("title", "")
         emp = j.get("employmentType") or ""
         if not is_internship(title, emp):
+            counts.discard("not_student")
             continue
         locs = [j.get("location"), _addr(j.get("address"))]
         for s in j.get("secondaryLocations") or []:
@@ -43,4 +45,13 @@ def parse_ashby(payload: dict, co: dict) -> list[dict]:
 def fetch_ashby_board(c, co: dict) -> list[dict]:
     resp = c.get(URL.format(token=co["ats_token"]))
     resp.raise_for_status()
-    return parse_ashby(resp.json(), co)
+    payload = resp.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list) or not all(
+            isinstance(job, dict) for job in payload["jobs"]):
+        raise ValueError("Ashby response is missing its complete jobs list")
+    counts = counts_of(co)
+    counts.rows(len(payload["jobs"]))
+    counts.reported(len(payload["jobs"]))   # unpaged: the list is everything the board listed
+    items = parse_ashby(payload, co)
+    co["_scan_complete"] = True
+    return items

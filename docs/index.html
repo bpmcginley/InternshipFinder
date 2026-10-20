@@ -737,6 +737,12 @@
       var d = window.CONFIG.dataUrl || "./data/", early = window.__early = {};
       var get = function (p) { early[d + p] = fetch(d + p, { cache: "no-cache" }); early[d + p].catch(function () {}); };
       get("listings/index.json");
+      // Paid listings (2026-10-14, S8): data/placements.json, read and parsed here, so the dashboard knows on
+      // its first draw whether there are any (js/placements.js loaded()) and the one-time notice above the
+      // list is there from the start instead of pushing the page down a moment later. Off with
+      // CONFIG.placements = false, like the rest of it.
+      if (window.CONFIG.placements !== false) window.__placementsP = fetch(d + "placements.json", { cache: "no-cache" })
+        .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { window.__placements = j; return j; }, function () { window.__placements = null; return null; });
       if (!localStorage.getItem("internscout.profile.v1") && !/[?&](q|field|state|company|new|stage|year|paid|sector|where|status|progress|eligible|citizen|sort)=/.test(location.search)) get("first.json");
     } catch (e) { /* the scripts below fetch everything themselves */ }
   })();
@@ -747,11 +753,11 @@
      app.js. -->
 <script defer crossorigin="anonymous" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
 <script defer crossorigin="anonymous" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-<script defer src="js/core.js?v=20261015-digest"></script>
+<script defer src="js/core.js?v=20261018-digest"></script>
 <!-- Paid listings (2026-10-14): between core.js and app.js, which reads window.ISPlace. Nothing in it
      touches the list, its order or its scores; with no data/placements.json it shows nothing. -->
 <script defer src="js/placements.js"></script>
-<script defer src="js/app.js?v=20261015-digest"></script>
+<script defer src="js/app.js?v=20261018-digest"></script>
 <!-- The Auto-Apply offer when a posting it can fill is opened (2026-10-13). Plain JS, no React; the
      generated pages load the same file (backend/internscout/seo_pages.py OFFER_TAG). -->
 <script defer src="js/offer.js"></script>

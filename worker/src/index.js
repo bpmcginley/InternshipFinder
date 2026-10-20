@@ -14,8 +14,11 @@ import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
 import { socialVideo } from "./social-video.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
-  livePlacements, pausePlacement, refusePlacement, requireAdmin, switchOn, updatePlacement } from "./placements.js";
+  livePlacements, pausePlacement, placementReport, refusePlacement, requireAdmin, rollupPlacementCounts, switchOn,
+  updatePlacement } from "./placements.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
+import { MAX_ORDER_BYTES, availability, chooseCredit, confirmOrder, createPilotCode, creditInfo, listOrders, orderConfig,
+  notePlacementFields, ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // InternScout's own extension IDs, named here instead of trusting every chrome-extension:// origin.
@@ -244,8 +247,11 @@ async function route(request, env, ctx, d) {
     }
 
     // Called by Stripe, not by a student: no sign-in, a signature instead.
+    // was: if (!paymentsOn(env, d.config) || !env.STRIPE_WEBHOOK_SECRET) throw ...
+    // Since 2026-10-19 the same endpoint also takes the paid listing orders' payments (orders.js), which
+    // can be on while the student plans are off.
     case "POST /billing/webhook": {
-      if (!paymentsOn(env, d.config) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
+      if ((!paymentsOn(env, d.config) && !ordersOn(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
       const body = await request.text();
       if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
       const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
@@ -357,6 +363,12 @@ async function route(request, env, ctx, d) {
       return json(await listLeads(db));
     }
 
+    // The employer report (S9): one placement, one ended month, rounded counts only (placements.js).
+    case "POST /admin/placements/report": {
+      await requireAdmin(request, env);
+      const { body } = await readJson(request, MAX_ADMIN_BYTES);
+      return json({ report: await placementReport(db, body, now) });
+    }
     case "POST /admin/placements":
     case "POST /admin/placements/update":
     case "POST /admin/placements/check":
@@ -370,7 +382,79 @@ async function route(request, env, ctx, d) {
       const act = { "/admin/placements": createPlacement, "/admin/placements/update": updatePlacement,
         "/admin/placements/check": checkPlacement, "/admin/placements/on": switchOn, "/admin/placements/pause": pausePlacement,
         "/admin/placements/end": endPlacement, "/admin/placements/refuse": refusePlacement }[path];
-      return json({ placement: await act(db, body, now) });
+      // These legacy admin writes do not share the order's atomic capacity transaction. Keep them
+      // unavailable during live checkout rather than allow a manual edit to bypass the field cap.
+      // Stops remain available; paid-order approval uses its own reserved, reviewed path.
+      if (ordersOn(env) && (path === "/admin/placements/on" || path === "/admin/placements/update")) {
+        throw new HttpError(409, "manual_capacity_hold", "Manual activation and edits are paused while employer checkout is open. Use the order review flow, or reconcile outstanding orders before maintenance. Pause and end remain available.");
+      }
+      // was: return json({ placement: await act(db, body, now) });
+      const placement = await act(db, body, now);
+      // A placement made by hand counts toward the orders' per-field cap under its role's fields (orders.js
+      // notePlacementFields; the daily cron catches any this misses).
+      if ((path === "/admin/placements" || path === "/admin/placements/update") && ordersOn(env)) {
+        later(ctx, notePlacementFields(db, env, placement.id, d.fetch, now));
+      }
+      return json({ placement });
+    }
+
+    // Paid listings bought on the site (orders.js, added 2026-10-19; worker/ORDERS.md). Every route but
+    // the config answers 404 until ordersOn(env). The order, confirm and credit choice take the site's
+    // Origin only; the review page is Bruce's, signed with ADMIN_TOKEN, and answers HTML.
+    case "GET /employer/config": {
+      return json(orderConfig(env));
+    }
+
+    case "GET /employer/availability": {
+      requireOrders(env);
+      return json(await availability(db, env, url.searchParams, now, d.fetch));
+    }
+
+    case "POST /employer/order": {
+      requireOrders(env);
+      const { body } = await readJson(request, MAX_ORDER_BYTES);
+      return json(await takeOrder(db, env, request, body, now, d.fetch));
+    }
+
+    case "POST /employer/order/confirm": {
+      requireOrders(env);
+      const { body } = await readJson(request, MAX_ORDER_BYTES);
+      return json(await confirmOrder(db, env, request, body, now, d.fetch));
+    }
+
+    case "GET /employer/review": {
+      requireOrders(env);
+      return reviewPage(db, env, url.searchParams, now, d.fetch);
+    }
+
+    case "POST /employer/review": {
+      requireOrders(env);
+      return reviewDecision(db, env, request, now, d.fetch);
+    }
+
+    case "GET /employer/credit": {
+      requireOrders(env);
+      return json(await creditInfo(db, url.searchParams, now));
+    }
+
+    case "POST /employer/credit": {
+      requireOrders(env);
+      const { body } = await readJson(request, MAX_ORDER_BYTES);
+      return json(await chooseCredit(db, env, request, body, now, d.fetch));
+    }
+
+    // Bruce's terminal (scripts/placement.mjs orders, pilot-code): the same admin rules as the placements.
+    // Not tied to ordersOn, so pilot codes can be made before buying opens.
+    case "GET /admin/orders": {
+      await requireAdmin(request, env);
+      return json(await listOrders(db));
+    }
+
+    case "POST /admin/pilot-codes": {
+      await requireAdmin(request, env);
+      const { body } = await readJson(request, MAX_ADMIN_BYTES, true);
+      if (Array.isArray(body)) throw new HttpError(400, "bad_request", "Body must be a JSON object");
+      return json(await createPilotCode(db, body, now));
     }
 
     case "GET /demand": {
@@ -421,7 +505,13 @@ export default {
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
     //   dropOldLeads(env.DB, now)]));
     // endExpiredPlacements (2026-10-14): placements whose end day has come (placements.js).
+    // rollupPlacementCounts (2026-10-14, S9): daily paid-listing counts older than 400 days become monthly rows.
+    // was: ctx.waitUntil(Promise.all([..., dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now)]));
+    // ordersCron (2026-10-19, orders.js): drops orders never confirmed; and while orders are on, resends
+    // review emails, reminds Bruce once, closes roles every build dropped and settles unused-day offers.
+    // was: ctx.waitUntil(Promise.all([..., endExpiredPlacements(env.DB, now), rollupPlacementCounts(env.DB, now)]));
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
-      dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now)]));
+      dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now), rollupPlacementCounts(env.DB, now),
+      ordersCron(env.DB, env, now)]));
   },
 };

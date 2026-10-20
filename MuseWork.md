@@ -2,7 +2,7 @@
 
 Work log for Muse (Bruce's AI agent). Read this when working in this repo.
 
-## Current handoff (2026-10-16; supersedes historical status below)
+## Current handoff (2026-10-20; supersedes historical status below)
 
 - Chrome Web Store 0.5.7 is live, independently checked October 16. The public package predates
   PR #118's three extension follow-ups. A 0.5.8 candidate now includes those existing fixes and
@@ -11,7 +11,8 @@ Work log for Muse (Bruce's AI agent). Read this when working in this repo.
   `reviews/releases/extension-0.5.8.md`.
 - PR #122 activated the approved weekly email; PR #123 signup improvements were merged and
   deployed October 15 (Worker before site). Do not repeat mailbox, provider or signup activation.
-  The first scheduled subscriber send is October 19 at 12:00 UTC / 8 a.m. EDT. No catch-up send.
+  The October 19 digest was delivered at 18:04 UTC by catch-up; the later scheduled run was
+  refused by the six-day duplicate guard. Do not resend it.
   New freshness refusal and weekly-aware health checks are prepared here; see `growth/EMAIL_RUNBOOK.md`.
 - The private analytics page already labels form submissions separately from confirmed subscribers,
   verified October 16. The older request below to change that label is superseded. Buttondown's
@@ -27,6 +28,10 @@ Work log for Muse (Bruce's AI agent). Read this when working in this repo.
   The next normal ingest/export applies the listing correction; full shards were not regenerated here.
 - Support guidance now has an `/install#troubleshooting` destination. Update the store support URL
   after the page is live. Security headers are a staged host-rule proposal, not a deployed change.
+- PRs #119, #131, #132 and #133 are merged. Employer checkout is live with terms version
+  2026-10-20. Preserve its email binding, review inbox, checkout flag and webhook settings.
+  Manual listing activation/update remains blocked while checkout is enabled; pilots use site checkout
+  and allocated pilot codes. Draft/pause/end/refuse remain available.
 - Product validation uses synthetic offline ATS fixtures and owner QA. No employer application,
   student outreach, new social post, broadcast or account permission change was performed here.
 
