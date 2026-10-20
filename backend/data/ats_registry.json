@@ -125,6 +125,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "amplify": {
+   "name": "Amplify",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
+  },
   "Antares": {
    "name": "Antares Nuclear",
    "quant": false,
@@ -352,9 +358,9 @@
   "chainlink-labs": {
    "name": "Chainlink Labs",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-10-18",
-   "last_fail": "2026-10-19"
+   "last_fail": "2026-10-20"
   },
   "charge-robotics": {
    "name": "Charge Robotics",
@@ -1449,6 +1455,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "nubank": {
+   "name": "Nubank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "obvious": {
    "name": "Obvious",
@@ -2733,9 +2745,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-19"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -3130,6 +3141,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "braze": {
+   "name": "Braze",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "brevium": {
    "name": "Brevium",
@@ -4488,6 +4505,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "insomniac": {
+   "name": "Insomniac Games",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "inspiremedicalsystemsinc": {
    "name": "Inspire Medical Systems",
@@ -6350,6 +6373,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-07"
+  },
+  "ursamajor": {
+   "name": "Ursa Major",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "usafacts": {
    "name": "USAFacts",
@@ -11033,6 +11062,13 @@
    "added": "2026-09-18",
    "sector": "hospitality_sports"
   },
+  "jobs.scotiabank.com": {
+   "name": "Scotiabank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-19",
+   "sector": "insurance_finance"
+  },
   "jobs.ulalaunch.com": {
    "name": "United Launch Alliance",
    "quant": false,
@@ -11412,6 +11448,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "health"
+  },
+  "nuovophotography": {
+   "name": "Nuovo Photography",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "oceancomm": {
    "name": "OceanComm",
@@ -12840,9 +12882,8 @@
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-19"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|INTERN": {
    "name": "The Boeing Company",
@@ -17374,6 +17415,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "roguefitness|wd1|RogueFitness_External_Careers": {
+   "name": "Rogue Fitness",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
+  },
   "rollsroyce|wd3|Intern_Graduate": {
    "name": "Rolls-Royce",
    "quant": false,
@@ -17451,22 +17498,22 @@
   "salesforce|wd12|External_Career_Site": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-19"
+   "last_fail": "2026-10-20"
   },
   "salesforce|wd12|Futureforce_Internships": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-20"
   },
   "salesforce|wd12|futureforce_newgradroles": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-19"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "salesforce|wd12|Salesforce_Research": {
    "name": "Salesforce",
@@ -18670,9 +18717,8 @@
   "usbank|wd1|US_Bank_Careers": {
    "name": "U.S. Bank",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-19"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "usertesting|wd12|UserTesting": {
    "name": "UserTesting",
@@ -19174,6 +19220,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "zebra|wd501|Zebra_careers": {
+   "name": "Zebra Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "zeissgroup|wd3|External": {
    "name": "Zeiss",

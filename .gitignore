@@ -30,3 +30,5 @@ scripts/eval/bench-*.md
 scripts/eval/node_modules/
 !scripts/eval/package.json
 !scripts/eval/package-lock.json
+# The ingest report is a run artifact, never part of the published site (2026-10-19).
+docs/data/ingest-report.json
