@@ -33,6 +33,7 @@
 "105-22 northern blvd.|NY":null,
 "1050 ridge rd|NY":null,
 "11000 roosevelt blvd ste 3|PA":null,
+"11013 - new jersey cvs pharmacy|NJ":null,
 "112 w 34th st|NY":null,
 "1139 white horse rd|NJ":null,
 "1140 commerce blvd|PA":null,
@@ -340,6 +341,10 @@
 43.0009,
 -73.849
 ],
+"bayonne|NJ":[
+40.6687,
+-74.1143
+],
 "bedford-450 sunnyside road|PA":null,
 "bedford|PA":[
 40.0187,
@@ -446,6 +451,7 @@
 40.022,
 -75.3194
 ],
+"buffalo ny|NY":null,
 "bulger|PA":[
 40.3784,
 -80.3278
@@ -464,6 +470,7 @@
 40.2398,
 -76.92
 ],
+"can01: carrier-syracuse|NY":null,
 "can79: clifton|NJ":null,
 "canandaigua|NY":[
 42.8507,
@@ -1060,6 +1067,10 @@
 40.7944,
 -73.07
 ],
+"holtsville|NY":[
+40.8154,
+-73.0451
+],
 "home based-pennsylvania|PA":null,
 "homer|NY":[
 42.6369,
@@ -1595,6 +1606,7 @@
 "nj - bayonne|NJ":null,
 "nj - bedminster|NJ":null,
 "nj - belle mead|NJ":null,
+"nj - bridgewater|NJ":null,
 "nj - burlington township|NJ":null,
 "nj - carteret|NJ":null,
 "nj - chatham|NJ":null,
@@ -1608,9 +1620,11 @@
 "nj - east brunswick|NJ":null,
 "nj - east orange|NJ":null,
 "nj - east windsor|NJ":null,
+"nj - eatontown|NJ":null,
 "nj - edison|NJ":null,
 "nj - elizabeth|NJ":null,
 "nj - englewood|NJ":null,
+"nj - ewing|NJ":null,
 "nj - fair lawn|NJ":null,
 "nj - fairfield|NJ":null,
 "nj - flemington|NJ":null,
@@ -1624,10 +1638,12 @@
 "nj - hamilton|NJ":null,
 "nj - hazlet|NJ":null,
 "nj - highlands|NJ":null,
+"nj - hillsborough|NJ":null,
 "nj - hillside|NJ":null,
 "nj - hoboken|NJ":null,
 "nj - howell|NJ":null,
 "nj - jersey city|NJ":null,
+"nj - kendall park|NJ":null,
 "nj - lakewood|NJ":null,
 "nj - lawrenceville|NJ":null,
 "nj - leonia|NJ":null,
@@ -1639,6 +1655,7 @@
 "nj - manalapan|NJ":null,
 "nj - maplewood|NJ":null,
 "nj - margate city|NJ":null,
+"nj - matawan|NJ":null,
 "nj - middlesex|NJ":null,
 "nj - millburn|NJ":null,
 "nj - montclair|NJ":null,
@@ -1666,6 +1683,7 @@
 "nj - scotch plains|NJ":null,
 "nj - secaucus|NJ":null,
 "nj - sicklerville|NJ":null,
+"nj - somerset|NJ":null,
 "nj - south plainfield|NJ":null,
 "nj - sparta|NJ":null,
 "nj - stanhope|NJ":null,
@@ -2466,6 +2484,10 @@
 "uniontown|PA":[
 39.9009,
 -79.7259
+],
+"union|NJ":[
+40.6965,
+-74.2698
 ],
 "united states - new jersey - parsippany|NJ":null,
 "united states - new york - new york city|NY":null,
