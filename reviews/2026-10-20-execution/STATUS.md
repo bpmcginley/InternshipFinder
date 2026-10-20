@@ -13,7 +13,10 @@ parallel agents and independent reviews; other work in the primary checkout was 
   265 Worker, five local Workers/D1 and two packaging tests passed. Included six media tests
   previously omitted from the Worker directory runner. No production-only dependency advisories
   were reported; six high advisory paths in development tooling remain a separate maintenance task.
-- Corrected the homepage's static and hydrated promise to avoid claiming every role/major.
+- Corrected the homepage's static, hydrated, metadata and structured-data promise to avoid
+  claiming universal coverage. Added a conditional Free Monday email link before internship
+  listings, reusing the existing signup page and anonymous navigation counters. Existing lower
+  forms stay unchanged; 135 SEO generator tests passed, including enabled/disabled checks.
 - Added a bounded 40-role listing audit and tenant-specific UT Austin location correction.
   See [listing review](../2026-10-20-listing-quality/README.md). The next successful ingest must
   verify the geography correction; no hand-edited generated listing shards were published.
