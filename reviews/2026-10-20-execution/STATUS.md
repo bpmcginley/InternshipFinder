@@ -36,7 +36,7 @@ parallel agents and independent reviews; other work in the primary checkout was 
 
 ## Search and account checks
 
-Search Console reports 768 indexed and 854 excluded URLs, but its report explicitly says last updated October 11; those totals are not a current verdict on the October 19–20 fixes. Individual inspection confirms the software-engineering landing page is indexed. Inspect high-value URLs before changing crawl rules or adding pages. Heycatch account health is its own advisory score, not an X policy or enforcement result; do not treat suggested founder claims or follower targets as verified requirements.
+Search Console reports 768 indexed and 854 excluded URLs, but its report explicitly says last updated October 11; those totals are not a current verdict on the October 19–20 fixes. Individual inspection confirms both the software-engineering and software-engineering/Dallas landing pages are indexed. Inspect high-value URLs before changing crawl rules or adding pages. Heycatch account health is its own advisory score, not an X policy or enforcement result; do not treat suggested founder claims or follower targets as verified requirements.
 
 ## External gates and next actions
 
