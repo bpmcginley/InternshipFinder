@@ -1,15 +1,9 @@
-// Smoke test in the Workers runtime with a local D1. Not run yet; needs `npm install`.
+// Smoke tests in the Workers runtime with local D1. No provider requests or live database access.
 import { env, exports } from "cloudflare:workers";
 import { beforeAll, expect, it } from "vitest";
-import schema from "../schema.sql?raw";
 
 beforeAll(async () => {
-  const statements = schema
-    .replace(/^\s*--.*$/gm, "")
-    .split(";")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  await env.DB.batch(statements.map((s) => env.DB.prepare(s)));
+  await env.DB.batch(env.TEST_SCHEMA_SQL.map((s) => env.DB.prepare(s)));
 });
 
 it("GET /config answers without sign-in", async () => {
