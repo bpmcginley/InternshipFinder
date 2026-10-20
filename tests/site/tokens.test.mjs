@@ -16,6 +16,8 @@ const SHEETS = {
   dashboard: noComments(styleOf(read("docs/index.html"))),
   landing: noComments((() => { const s = read("backend/internscout/seo_pages.py"); const a = s.indexOf('CSS = """') + 9; return s.slice(a, s.indexOf('"""', a)); })()),
   employers: noComments(styleOf(read("docs/employers/index.html"))),
+  // The buy page (2026-10-19) copies /employers/ whole, so its block is checked the same way.
+  buy: noComments(styleOf(read("docs/employers/buy/index.html"))),
   extension: noComments(read("extension/lib/theme.css")),
 };
 const OVERLAY = noComments((() => { const s = read("extension/agent/overlay.js"); return s.slice(s.indexOf("<style>") + 7, s.indexOf("</style>")); })());
@@ -109,7 +111,7 @@ test("the two faces are self-hosted, the same files for the site and the extensi
       assert.match(read(dir + f), /SIL Open Font License, Version 1\.1/);
     }
   }
-  const faces = { dashboard: "fonts/", landing: "/fonts/", employers: "/fonts/", extension: "fonts/" };
+  const faces = { dashboard: "fonts/", landing: "/fonts/", employers: "/fonts/", buy: "/fonts/", extension: "fonts/" };
   for (const [name, base] of Object.entries(faces)) {
     const css = SHEETS[name];
     assert.ok(css.includes(`@font-face{font-family:"IBM Plex Sans";src:url(${base}ibm-plex-sans-latin.woff2) format("woff2")`), `${name} loads Plex Sans`);
