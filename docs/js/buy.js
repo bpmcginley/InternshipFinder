@@ -101,15 +101,15 @@
   // One role is the "one" package and three are "three". Anything else isn't a package.
   function packageFor(n) { return n === 1 ? "one" : n === 3 ? "three" : null; }
 
-  // The price in cents from /employer/config. Read as {one, three, one_public, three_public}; also accepts
-  // {one: {standard, public_body}, ...} and {standard: {one, three}, public_body: {...}}. Null when missing.
+  // The price in cents from /employer/config, which sends {one: {roles, cents, public_body_cents}, three: {...}}
+  // (worker/API.md). The flat and nested shapes the page was first written against are still read. Null when missing.
   function priceCents(cfg, pkg, publicBody) {
     var p = cfg && cfg.prices;
     if (!p || typeof p !== "object" || (pkg !== "one" && pkg !== "three")) return null;
     var o = p[pkg] && typeof p[pkg] === "object" ? p[pkg] : {};
     var c = publicBody
-      ? [p[pkg + "_public"], p[pkg + "_public_body"], o.public_body, o.public, p.public_body && p.public_body[pkg], p.public && p.public[pkg]]
-      : [p[pkg], o.standard, o.price, p.standard && p.standard[pkg]];
+      ? [o.public_body_cents, p[pkg + "_public"], p[pkg + "_public_body"], o.public_body, o.public, p.public_body && p.public_body[pkg], p.public && p.public[pkg]]
+      : [o.cents, p[pkg], o.standard, o.price, p.standard && p.standard[pkg]];
     for (var i = 0; i < c.length; i++) if (typeof c[i] === "number" && Number.isInteger(c[i]) && c[i] > 0) return c[i];
     return null;
   }
@@ -170,16 +170,22 @@
     return ids.map(function (id) {
       var x = Object.prototype.hasOwnProperty.call(byId, String(id)) ? byId[String(id)] : null;
       if (!x || typeof x !== "object") return { id: id, known: false, fits: null, full: [], next_start: null };
+      if (x.listed === false) return { id: id, known: true, listed: false, fits: false, full: [], taken: false, next_start: null };
       var full = x.full != null ? x.full : x.full_fields != null ? x.full_fields : [];
       full = (Array.isArray(full) ? full : [full]).filter(function (t) { return typeof t === "string" && t; });
       var next = validIso(x.next_start) ? x.next_start : null;
       var fits = x.fits === true ? true : x.fits === false ? false : !full.length && !next;
-      return { id: id, known: true, fits: fits, full: full, next_start: fits ? null : next };
+      return { id: id, known: true, listed: true, fits: fits, full: full, taken: x.taken === true, next_start: fits ? null : next };
     });
   }
   function availText(a) {
     if (!a || !a.known) return "";
     if (a.fits) return "Fits: there's room from this start day.";
+    if (a.listed === false) return "This role isn't in today's listings any more, so it can't be bought.";
+    if (a.taken && !a.full.length) {
+      return a.next_start ? "This role already has a paid listing on some of these days. It's free from " + fmtDate(a.next_start) + "."
+        : "This role already has a paid listing on some of these days.";
+    }
     var fields = a.full.length ? joinWords(a.full.map(fieldLabel)) : "its field";
     return a.next_start ? "Paid listings in " + fields + " are full until " + fmtDate(a.next_start) + "."
       : "Paid listings in " + fields + " are full on these dates.";
@@ -200,8 +206,8 @@
   function hasToken(state) { return state.kind === "confirm" || state.kind === "credit" || state.kind === "badlink"; }
 
   // The Worker's 400s name the field; this is the box on the page that shows its message.
-  var FIELD_FOR = { name: "name", email: "email", company: "company", pilot_code: "pilot", start: "start", accept_terms: "terms",
-    terms_version: "terms", listing_ids: "roles", package: "roles", shard: "roles", public_body: "roles", employer: "co-q" };
+  var FIELD_FOR = { name: "name", email: "email", company: "company", pilot_code: "pilot", start: "start", terms: "terms",
+    roles: "roles", ids: "roles", package: "roles", shard: "roles", public_body: "roles", employer: "co-q" };
   function errorTarget(field) { return Object.prototype.hasOwnProperty.call(FIELD_FOR, field) ? FIELD_FOR[field] : null; }
   function serverMessage(out) {
     var m = out && (typeof out.message === "string" ? out.message : typeof out.error === "string" ? out.error : "");
@@ -211,8 +217,8 @@
   function orderBody(o) {
     return {
       name: o.name, email: o.email, company: o.company, public_body: !!o.publicBody, package: packageFor(o.roles.length),
-      shard: o.shard, listing_ids: o.roles.map(function (r) { return r.id; }), start: o.start, accept_terms: true,
-      terms_version: o.cfg.terms_version, pilot_code: o.pilot || "", website: o.website || "",
+      shard: o.shard, roles: o.roles.map(function (r) { return r.id; }), start: o.start, terms: true,
+      pilot_code: o.pilot || "", website: o.website || "",
     };
   }
 
@@ -226,13 +232,16 @@
     return x.protocol === "https:" || x.protocol === "http:" ? x.href : null;
   }
 
-  // GET /employer/credit: the amount in cents ("amount_cents" or "amount"), and what was already chosen.
+  // GET /employer/credit ({status, amount, role: {title, company}, code}) and POST ({done, amount, code}): the
+  // amount in cents and what was already chosen ("offered" means not yet).
   function readCredit(out) {
     out = out || {};
+    var role = out.role && typeof out.role === "object" ? out.role : out;
     var cents = Number.isInteger(out.amount_cents) ? out.amount_cents : Number.isInteger(out.amount) ? out.amount : null;
+    var chose = [out.choice, out.done, out.status].filter(function (v) { return v === "refund" || v === "credit"; })[0] || null;
     return {
-      cents: cents, title: typeof out.title === "string" ? out.title : "", company: typeof out.company === "string" ? out.company : "",
-      choice: out.choice === "refund" || out.choice === "credit" ? out.choice : null, code: typeof out.code === "string" ? out.code : "",
+      cents: cents, title: typeof role.title === "string" ? role.title : "", company: typeof role.company === "string" ? role.company : "",
+      choice: chose, code: typeof out.code === "string" ? out.code : "",
     };
   }
 
@@ -613,6 +622,8 @@
         if (url) {
           say("Email confirmed", el("p", {}, "Taking you to Stripe to pay. If nothing happens, ", el("a", { href: url }, "open the payment page"), "."));
           root.location.assign(url);
+        } else if (res.ok && res.out.done === "paid") {
+          say("This order is already paid", "We review every paid listing before it goes live, usually within 2 business days. You'll get an email when it's approved, with its dates.");
         } else if (res.ok && res.out.done === "pilot") {
           say("Your pilot is booked", "Thanks for confirming your email. We review every listing before it goes live, usually within 2 business days. You'll get an email when it's approved, with its dates.");
         } else {

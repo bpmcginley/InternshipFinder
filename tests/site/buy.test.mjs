@@ -15,7 +15,8 @@ const EMPLOYERS = read("docs/employers/index.html");
 const API = "https://internscout-api.bpmcginley.workers.dev";
 
 // The config this page expects from GET /employer/config (prices in cents).
-const CFG = { enabled: true, prices: { one: 2900, three: 6900, one_public: 1500, three_public: 3500 }, days: 30, field_cap: 5, max_start_days: 90, terms_version: "2026-10-19" };
+// The shape worker/API.md documents for GET /employer/config.
+const CFG = { enabled: true, prices: { one: { roles: 1, cents: 2900, public_body_cents: 1500 }, three: { roles: 3, cents: 6900, public_body_cents: 3500 } }, days: 30, field_cap: 5, max_start_days: 90, terms_version: "2026-10-19" };
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
 function pure() {
@@ -147,7 +148,7 @@ test("availability: fits, or the full fields and the first day they have room", 
   assert.equal(B.availText(a[3]), "Paid listings in Finance are full on these dates.");
   // Keyed by id, with full_fields, and a bad date is dropped.
   const k = B.readAvailability({ 7: { fits: false, full_fields: "other", next_start: "soon" } }, ["7"]);
-  assert.deepEqual(plain(k[0]), { id: "7", known: true, fits: false, full: ["other"], next_start: null });
+  assert.deepEqual(plain(k[0]), { id: "7", known: true, listed: true, fits: false, full: ["other"], taken: false, next_start: null });
 });
 
 test("address-bar states, with ids and tokens checked for shape", () => {
@@ -166,8 +167,8 @@ test("address-bar states, with ids and tokens checked for shape", () => {
 test("server errors go to the field the Worker names", () => {
   assert.equal(B.errorTarget("email"), "email");
   assert.equal(B.errorTarget("pilot_code"), "pilot");
-  assert.equal(B.errorTarget("listing_ids"), "roles");
-  assert.equal(B.errorTarget("accept_terms"), "terms");
+  assert.equal(B.errorTarget("roles"), "roles");
+  assert.equal(B.errorTarget("terms"), "terms");
   assert.equal(B.errorTarget("start"), "start");
   assert.equal(B.errorTarget("toString"), null);
   assert.equal(B.errorTarget("nope"), null);
@@ -180,7 +181,7 @@ test("the order body has exactly the fields the Worker reads", () => {
   const body = B.orderBody({ name: "Ann", email: "ann@acme.com", company: "Acme", publicBody: false, shard: "a",
     roles: [{ id: 11 }, { id: 12 }, { id: 13 }], start: "2026-11-03", cfg: CFG, pilot: "", website: "" });
   assert.deepEqual(plain(body), { name: "Ann", email: "ann@acme.com", company: "Acme", public_body: false, package: "three", shard: "a",
-    listing_ids: [11, 12, 13], start: "2026-11-03", accept_terms: true, terms_version: "2026-10-19", pilot_code: "", website: "" });
+    roles: [11, 12, 13], start: "2026-11-03", terms: true, pilot_code: "", website: "" });
 });
 
 test("only a Stripe checkout address is followed, and only http(s) posting links are shown", () => {
@@ -343,7 +344,7 @@ test("an order: search, pick three roles (an unpaid one only as a nonprofit), a 
   $("order").fire("submit");
   await tick();
   assert.deepEqual(order, { name: "Ann Lee", email: "ann@acme.com", company: "Acme <Robotics>", public_body: true, package: "three", shard: "a",
-    listing_ids: [12, 11, 13], start: B.addDays(today, 5), accept_terms: true, terms_version: "2026-10-19", pilot_code: "", website: "" });
+    roles: [12, 11, 13], start: B.addDays(today, 5), terms: true, pilot_code: "", website: "" });
   assert.equal($("sent").hidden, false);
   assert.equal($("sent-text").textContent, "We sent a link to ann@acme.com. It works for 48 hours.");
 });
@@ -374,8 +375,8 @@ test("an order that fits is sent once with the Worker's fields, and the 400 mess
   $("order").fire("submit");
   await tick();
   assert.equal(sent.length, 1);
-  assert.deepEqual(sent[0], { name: "Ann", email: "ann@gmail.com", company: "Acme", public_body: false, package: "one", shard: "a", listing_ids: ["r1"],
-    start: today, accept_terms: true, terms_version: "2026-10-19", pilot_code: "", website: "" });
+  assert.deepEqual(sent[0], { name: "Ann", email: "ann@gmail.com", company: "Acme", public_body: false, package: "one", shard: "a", roles: ["r1"],
+    start: today, terms: true, pilot_code: "", website: "" });
   assert.equal($("email-err").textContent, "Use your company email address, not a free one.");
   assert.equal($("email").getAttribute("aria-invalid"), "true");
   assert.equal(p.doc.activeElement, $("email"));
@@ -430,7 +431,7 @@ test("paid and cancelled say what happens next; neither calls the Worker", async
 
 test("the credit link offers a refund or a code, then shows the code", async () => {
   const p = page({ search: "?credit=c1&t=tok2", routes: {
-    [API + "/employer/credit?"]: () => reply(200, { amount_cents: 1450, title: "Data Intern", company: "Acme" }),
+    [API + "/employer/credit?"]: () => reply(200, { credit: "c-1", status: "offered", amount: 1450, unused_days: 15, role: { title: "Data Intern", company: "Acme" }, choose_by: "2026-11-30" }),
     [API + "/employer/credit"]: () => reply(200, { choice: "credit", code: "IS-7QX2" }),
   } });
   assert.deepEqual(p.replaced, ["/employers/buy/"]);
@@ -491,4 +492,18 @@ test("employers page: final prices, the buy link hidden until the config says en
   assert.match(visible, /<form class="lead" id="lead"/);
   assert.match(EMPLOYERS, /\/employer-interest"/);
   assert.doesNotMatch(visible, /[\u2013\u2014]/);
+});
+
+test("reads the Worker's documented shapes: flat prices still work, taken and unlisted roles, credit status", () => {
+  assert.equal(B.priceCents({ prices: { one: 2900, three: 6900, one_public: 1500, three_public: 3500 } }, "three", true), 3500);
+  assert.equal(B.priceCents(CFG, "one", false), 2900);
+  assert.equal(B.priceCents(CFG, "three", true), 3500);
+  const [taken, gone] = B.readAvailability({ roles: [{ id: "a", listed: true, fits: false, taken: true, next_start: "2026-12-01" }, { id: "b", listed: false }] }, ["a", "b"]);
+  assert.match(B.availText(taken), /already has a paid listing/);
+  assert.match(B.availText(taken), /December 1, 2026/);
+  assert.equal(gone.fits, false);
+  assert.match(B.availText(gone), /isn't in today's listings/);
+  assert.equal(B.readCredit({ status: "credit", amount: 900, code: "X1", role: { title: "T", company: "C" } }).choice, "credit");
+  assert.equal(B.readCredit({ status: "offered", amount: 900 }).choice, null);
+  assert.equal(B.readCredit({ done: "refund", amount: 900 }).choice, "refund");
 });
