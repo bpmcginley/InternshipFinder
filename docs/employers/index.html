@@ -7,7 +7,11 @@
      backend/internscout/seo_pages.py, so it is copied to the site as it is; write() lists it in
      sitemap.xml and page() links it from every landing page's footer. Its shell (header, nav, footer,
      colours) is copied from page() and its CSS, so it looks like /about/ and /pricing/.
-     Its job is a test: would employers pay for a clearly labelled paid listing? Nothing is sold here yet;
+     It started (2026-10-13) as a test of whether employers would pay for a clearly labelled paid listing.
+     Since 2026-10-19 the prices below are final and /employers/buy/ sells one; the "Buy a paid listing"
+     link shows only when the Worker's GET /employer/config says enabled (worker/ORDERS.md), so until then
+     the page reads as before. The interest form stays for questions and free requests.
+     was: Its job is a test: would employers pay for a clearly labelled paid listing? Nothing is sold here yet;
      the planned price is stated below. Every line must fit the placement rule: payment never changes any score, order,
      filter, count or Auto-Apply behaviour, nothing is targeted at students, and nothing says or implies
      that paying brings more applicants. Adding a board and fixing a listing are free for every employer. The form posts to the Worker (worker/src/leads.js, POST /employer-interest), which keeps the
@@ -118,18 +122,25 @@ input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-co
 <li>Filling in applications with the optional, free <a href="/install.html">Auto-Apply</a> Chrome extension. It never submits: the student reviews every answer and presses Submit.</li>
 </ul>
 
-<h2 id="interest">Paid listings: would you want one?</h2>
-<p>We're planning one paid option: a paid listing. It would show one of your open roles in a separate box headed "Paid listing", with "Ad" before your company name. Here's how it would work, so you know before you ask:</p>
+<!-- was: <h2 id="interest">Paid listings: would you want one?</h2> -->
+<h2 id="interest">Paid listings</h2>
+<!-- was: <p>We're planning one paid option: a paid listing. It would show one of your open roles in a separate box headed "Paid listing", with "Ad" before your company name. Here's how it would work, so you know before you ask:</p> -->
+<p>We offer one paid option: a paid listing. It shows one of your open roles in a separate box headed "Paid listing", with "Ad" before your company name. Here's how it works, so you know before you buy or ask:</p>
 <ul class="plain">
 <li>It shows only when a student has searched for something the role matches or picked its field, and on our pages for its field or location. There's at most one paid listing on a page.</li>
 <li>Paying never changes where any listing ranks, how it's scored, which filters it passes or how many results a student sees. Your role also stays in its usual place in the results. Auto-Apply works the same for every listing, paid or not.</li>
 <li>It isn't aimed at students by their profile, school, major, class year or anything else about them. It follows only what a student has searched for or picked. Students can hide paid listings, and a student's own saved profile can hide one that doesn't fit them (class year, citizenship, eligibility or season).</li>
-<li>We don't promise views, clicks or applicants. You'd get a monthly count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li>
+<!-- was: <li>We don't promise views, clicks or applicants. You'd get a monthly count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li> (2026-10-19: the terms say you can ask for it after each month) -->
+<li>We don't promise views, clicks or applicants. After each month you can ask for a count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li>
 <li>Your listings, board additions and corrections stay free whether or not you buy a paid listing.</li>
-<li>Planned price: $29 per role for 30 days, or $69 for three role-months. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. Your invoice states the price and dates that apply. If the role closes early, you get the unused days back, as credit or a refund, whichever you choose.</li>
+<!-- was: <li>Planned price: $29 per role for 30 days, or $69 for three role-months. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. Your invoice states the price and dates that apply. If the role closes early, you get the unused days back, as credit or a refund, whichever you choose.</li> -->
+<li>Price: $29 per role for 30 days, or $69 for three roles, 30 days each. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. Your invoice states the price and dates that apply. If the role closes early, you get the unused days back, as credit or a refund, whichever you choose.</li>
 <li>The first five employers get a free 30-day pilot for one role.</li>
 </ul>
-<p>There's nothing to buy yet. This form only tells us you're interested. You can also use it to ask us to add your job board or correct your details, which is free.</p>
+<!-- The link shows only when GET /employer/config says buying is open (the script at the bottom). -->
+<p id="buy-link" hidden><a class="cta" href="/employers/buy/">Buy a paid listing</a></p>
+<!-- was: <p>There's nothing to buy yet. This form only tells us you're interested. You can also use it to ask us to add your job board or correct your details, which is free.</p> -->
+<p>This form doesn't buy anything. Use it to tell us you're interested in a paid listing or to ask about one, or to ask us to add your job board or correct your details, which is free.</p>
 </section>
 
 <form class="lead" id="lead" novalidate aria-labelledby="interest">
@@ -196,6 +207,15 @@ input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-co
   fetch("/data/stats.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
     var n = s && Number(s.open);
     if (n >= 1000) document.getElementById("open-count").textContent = (Math.floor(n / 1000) * 1000).toLocaleString("en-US") + "+";
+  }).catch(function () {});
+})();
+
+// The "Buy a paid listing" link, shown only when the Worker says buying on the site is open
+// (worker/ORDERS.md, GET /employer/config). Until then, or if the Worker can't be reached, it stays hidden.
+(function () {
+  if (!window.fetch) return;
+  fetch("https://internscout-api.bpmcginley.workers.dev/employer/config").then(function (r) { return r.ok ? r.json() : null; }).then(function (c) {
+    if (c && c.enabled === true) document.getElementById("buy-link").hidden = false;
   }).catch(function () {});
 })();
 
