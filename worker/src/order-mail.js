@@ -6,17 +6,32 @@ const KINDS = new Set(["receipt", "approved", "refused"]);
 const LEASE_MS = 5 * 60_000;
 const BATCH_SIZE = 100;
 
+async function eligible(db, orderId, kind) {
+  const order = await db.prepare("SELECT status, disputed_at FROM employer_orders WHERE id = ?").bind(orderId).first();
+  if (!order) return false;
+  if (kind === "receipt") return ["paid", "approved", "refused"].includes(order.status);
+  return order.status === kind && (kind !== "approved" || !order.disputed_at);
+}
+
 async function deliver(db, env, orderId, kind, now) {
   const at = now.toISOString();
   const row = await db.prepare("SELECT * FROM employer_order_mail WHERE order_id = ? AND kind = ?")
     .bind(orderId, kind).first();
   if (!row) return false;
   if (row.sent_at) return true;
+  // The caller can persist an outbox row before committing a decision. Neither this call nor a cron
+  // racing it may announce a decision that never committed (or an approval paused by a dispute).
+  if (!(await eligible(db, orderId, kind))) return false;
   const lease = new Date(now.getTime() + LEASE_MS).toISOString();
   const claim = await db.prepare("UPDATE employer_order_mail SET sending_until = ?, attempted_at = ?, attempts = attempts + 1 " +
     "WHERE order_id = ? AND kind = ? AND sent_at IS NULL AND (sending_until IS NULL OR sending_until <= ?)")
     .bind(lease, at, orderId, kind, at).run();
   if (!claim.meta.changes) return false;
+  if (!(await eligible(db, orderId, kind))) {
+    await db.prepare("UPDATE employer_order_mail SET sending_until = NULL WHERE order_id = ? AND kind = ? AND sending_until = ?")
+      .bind(orderId, kind, lease).run();
+    return false;
+  }
   const sent = await trySend(env, { to: row.to_address, subject: row.subject, text: row.body,
     ...(row.reply_to ? { replyTo: row.reply_to } : {}) }, `order ${kind}`);
   if (sent) {
@@ -34,14 +49,14 @@ async function deliver(db, env, orderId, kind, now) {
 // message or resend one whose acceptance has already been recorded. Returns true for an accepted send.
 // A process dying after provider acceptance but before the sent marker can still cause a duplicate;
 // the durable queue provides retries, not an impossible exactly-once delivery guarantee.
-export async function queueOrderMail(db, env, { orderId, kind, mail }, now) {
+export async function queueOrderMail(db, env, { orderId, kind, mail, defer = false }, now) {
   if (!KINDS.has(kind)) throw new Error("Unknown order email kind");
   if (typeof orderId !== "string" || !/^o-[0-9a-f]{16}$/.test(orderId)) throw new Error("Invalid order id");
   if (!mail || typeof mail.to !== "string" || typeof mail.subject !== "string" || typeof mail.text !== "string" ||
       (mail.replyTo != null && typeof mail.replyTo !== "string")) throw new Error("Invalid order email");
   await db.prepare("INSERT OR IGNORE INTO employer_order_mail (order_id, kind, created, to_address, subject, body, reply_to) " +
     "VALUES (?, ?, ?, ?, ?, ?, ?)").bind(orderId, kind, now.toISOString(), mail.to, mail.subject, mail.text, mail.replyTo || null).run();
-  return deliver(db, env, orderId, kind, now);
+  return defer ? false : deliver(db, env, orderId, kind, now);
 }
 
 // Called by the existing orders cron. A crashed attempt becomes eligible once its short lease ends.

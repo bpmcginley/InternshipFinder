@@ -9,9 +9,13 @@ const NOW = new Date("2026-10-19T12:00:00Z");
 const ORDER = "o-0000000000000001";
 const MAIL = { to: "hiring@employer.example", subject: "Your order", text: "Your order is approved.",
   replyTo: "listings@internscout.example" };
-async function world() {
+async function world({ state = "approved", seed = true } = {}) {
   const db = fakeD1();
   await db.exec(readFileSync(new URL("../order-mail-schema.sql", import.meta.url), "utf8"));
+  if (seed) await db.prepare("INSERT INTO employer_orders (id, created, updated, status, package, start_day, employer_key, employer, " +
+    "company, name, email, email_domain, terms_version, terms_at, price) VALUES (?, ?, ?, ?, 'one', '2026-10-19', 'acme', " +
+    "'Acme', 'Acme', 'Hiring', 'hiring@employer.example', 'employer.example', '2026-10-19', ?, 2900)")
+    .bind(ORDER, NOW.toISOString(), NOW.toISOString(), state, NOW.toISOString()).run();
   const sent = [];
   const email = { failures: 0, send: async (mail) => {
     if (email.failures-- > 0) throw Object.assign(new Error("test outage"), { code: "E_DELIVERY_FAILED" });
@@ -45,13 +49,35 @@ test("concurrent webhook/decision calls send each message kind once and keep the
 });
 
 test("an interrupted sender's lease expires and retries without discarding its queued message", async () => {
-  const w = await world();
+  const w = await world({ state: "refused" });
   const until = new Date(NOW.getTime() + 5 * 60_000).toISOString();
   await w.db.prepare("INSERT INTO employer_order_mail (order_id, kind, created, to_address, subject, body, sending_until) " +
     "VALUES (?, 'refused', ?, ?, ?, ?, ?)").bind(ORDER, NOW.toISOString(), MAIL.to, MAIL.subject, MAIL.text, until).run();
   assert.deepEqual(await retryOrderMail(w.db, w.env, NOW), { attempted: 0, sent: 0 });
   assert.deepEqual(await retryOrderMail(w.db, w.env, new Date(until)), { attempted: 1, sent: 1 });
   assert.equal(w.sent.length, 1);
+});
+
+test("deferred decisions cannot send until their state commits, including cron or duplicate calls", async () => {
+  const w = await world({ state: "paid" });
+  assert.equal(await queueOrderMail(w.db, w.env, { orderId: ORDER, kind: "approved", mail: MAIL, defer: true }, NOW), false);
+  assert.equal(w.sent.length, 0);
+  assert.deepEqual(await retryOrderMail(w.db, w.env, NOW), { attempted: 1, sent: 0 });
+  assert.equal(await queueOrderMail(w.db, w.env, { orderId: ORDER, kind: "approved", mail: MAIL }, NOW), false);
+  await w.db.prepare("UPDATE employer_orders SET status = 'approved' WHERE id = ?").bind(ORDER).run();
+  assert.equal(await queueOrderMail(w.db, w.env, { orderId: ORDER, kind: "approved", mail: MAIL }, NOW), true);
+  assert.equal(w.sent.length, 1);
+  // A refused message queued by an abandoned decision must not follow the approval.
+  assert.equal(await queueOrderMail(w.db, w.env, { orderId: ORDER, kind: "refused", mail: MAIL }, NOW), false);
+  assert.equal(w.sent.length, 1);
+});
+
+test("a disputed approval stays queued without telling the employer its listing is approved", async () => {
+  const w = await world();
+  await w.db.prepare("UPDATE employer_orders SET disputed_at = ? WHERE id = ?").bind(NOW.toISOString(), ORDER).run();
+  assert.equal(await queueOrderMail(w.db, w.env, { orderId: ORDER, kind: "approved", mail: MAIL }, NOW), false);
+  assert.equal(w.sent.length, 0);
+  assert.equal((await w.db.prepare("SELECT sent_at FROM employer_order_mail").first()).sent_at, null);
 });
 
 test("unknown kinds and malformed messages cannot become persisted order messages", async () => {
@@ -63,7 +89,7 @@ test("unknown kinds and malformed messages cannot become persisted order message
 });
 
 test("seven-year retention deletes confirmed contact records and related jobs but preserves current records and pilot history", async () => {
-  const w = await world();
+  const w = await world({ seed: false });
   // These integration tables are owned by the separate financial-safety patch. Replace only this
   // test's empty in-memory tables with their reference columns, so its unrelated required financial
   // fields do not become duplicated fixtures here. The integrated order tests exercise the full schema.
