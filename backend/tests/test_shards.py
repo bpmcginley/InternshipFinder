@@ -449,3 +449,61 @@ def test_the_same_board_spelled_differently_is_one_board():
     assert board_of({"ats": "greenhouse", "company_name": "A", "apply_url": "https://job-boards.greenhouse.io/embed/job_app?for=x"}) != \
         board_of({"ats": "greenhouse", "company_name": "B", "apply_url": "https://job-boards.greenhouse.io/embed/job_app?for=x"})
     assert board_of({"ats": "lever", "company_name": "C", "apply_url": "not a url ["})[2] in ("", "/")
+
+
+def test_a_failed_board_does_not_restore_a_fresh_listing_under_an_old_url(tmp_path):
+    from datetime import date
+    # Ryan publishes one role through two Workday boards. A freshly fetched row keeps
+    # its stable ID when the URL changes; the old board can still look collapsed.
+    prev = [_prev(id=str(i), apply_url=f"https://ryan.wd1.myworkdayjobs.com/Students/job/CA/Intern_{i}")
+            for i in range(4)]
+    fresh = dict(prev[0], apply_url="https://ryan.wd1.myworkdayjobs.com/Careers/job/CA/Intern_0-1",
+                 years=["masters"], regions=[{"loc": "Toronto", "kind": "canada", "state": "ON", "metro": "Toronto"}])
+    _write_prev(tmp_path, prev)
+    listings = [fresh]
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 3
+    assert len({x["id"] for x in listings}) == len(listings) == 4
+    assert listings[0] is fresh
+    assert listings[0]["years"] == ["masters"]
+    assert "carried" not in listings[0]
+
+
+def test_search_carryover_does_not_restore_a_fresh_or_closed_id_under_an_old_url(tmp_path):
+    from datetime import date
+    from internscout.export_static import carry_search_finds
+    prev = [_prev(id="g", apply_url="https://example.test/old", via_search=True)]
+    for status in ("open", "closed"):
+        fresh = dict(prev[0], apply_url="https://example.test/new", status=status, via_search=False)
+        listings = [fresh]
+        assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 18), prev=prev) == 0
+        assert listings == [fresh]
+
+
+def test_export_counts_each_stable_id_once_when_a_board_changes_url(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from internscout import export_static
+    stamp = datetime.now(timezone.utc).isoformat()
+    prev = [_prev(id=str(i), apply_url=f"https://example.test/old/{i}", field_tags=["mechanical"],
+                  first_seen=stamp, last_seen=stamp) for i in range(4)]
+    fresh = dict(prev[0], apply_url="https://example.test/new/0")
+
+    class Rows:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def scalars(self, query):
+            return SimpleNamespace(all=lambda: [fresh])
+
+    monkeypatch.setattr(export_static, "SessionLocal", Rows)
+    monkeypatch.setattr(export_static, "init_db", lambda: None)
+    monkeypatch.setattr(export_static, "_listing_dict", lambda row: row)
+    _write_prev(tmp_path, prev)
+    stats = export_static.export(str(tmp_path))
+    rows = json.loads((tmp_path / "listings" / "MA.json").read_text(encoding="utf-8"))
+    assert stats["total"] == stats["open"] == len({r["id"] for r in rows}) == len(rows) == 4
+    assert stats["held"] == 3
+    assert next(r for r in rows if r["id"] == "0")["apply_url"] == fresh["apply_url"]

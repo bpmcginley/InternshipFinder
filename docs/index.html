@@ -86,8 +86,11 @@
      2026-10-14 the two faces are self-hosted (docs/fonts/, Latin subsets from Google Fonts, unmodified, OFL
      licence files beside them), shared with the landing pages, /employers/ and the extension. There is no
      mono any more: numbers use the sans with tabular figures. -->
-<link rel="preload" href="fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin/>
-<link rel="preload" href="fonts/source-serif-4-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<!-- Keep the same measured fallback faces and eventual brand fonts, while asking the browser to
+     prefer listing data and dashboard scripts to these 97 KB on a cold connection. Priority is a hint;
+     browsers that do not support it retain the existing preload and font-display:swap behaviour. -->
+<link rel="preload" href="fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low"/>
+<link rel="preload" href="fonts/source-serif-4-latin.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low"/>
 <style>
   /* Fallback faces sized like the web fonts (2026-10-14). Until IBM Plex Sans and Source Serif 4 arrive
      the page draws in Arial and Georgia; Georgia is about 25% wider than Source Serif, so the headline

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write               # create the release and upload the zip
 
+concurrency:
+  group: extension-release-${{ github.ref }}
+  cancel-in-progress: false
+
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   release:
@@ -30,19 +34,26 @@ jobs:
       - name: Run extension tests
         run: node --test extension/test/*.test.mjs
 
-      - name: Build zip
-        id: build
-        run: echo "zip=$(python3 scripts/package_extension.py)" >> "$GITHUB_OUTPUT"
+      - name: Check package reproducibility
+        run: python3 -m unittest discover -s scripts -p 'test_release_extension.py'
 
-      - name: Create or update the release
+      - name: Build packages and source record
+        id: build
+        run: |
+          python3 scripts/release_extension.py > "$RUNNER_TEMP/extension-build.json"
+          python3 - <<'PY'
+          import json, os
+          with open(os.environ["RUNNER_TEMP"] + "/extension-build.json") as f:
+              paths = json.load(f)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              for key, path in paths.items():
+                  f.write(f"{key}={path}\n")
+          PY
+
+      - name: Publish verified assets without overwriting
         env:
           GH_TOKEN: ${{ github.token }}
-          ZIP: ${{ steps.build.outputs.zip }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" "$ZIP" \
-              --title "InternScout extension ${GITHUB_REF_NAME#ext-v}" \
-              --notes "Most people should add the extension from the Chrome Web Store instead, which updates itself: https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=github-release. To load this zip by hand: https://internscout.org/install.html#by-hand"
-          fi
+          DEVELOPER: ${{ steps.build.outputs.developer }}
+          WEBSTORE: ${{ steps.build.outputs.webstore }}
+          RECORD: ${{ steps.build.outputs.record }}
+        run: bash scripts/publish_extension_release.sh

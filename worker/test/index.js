@@ -21,3 +21,4 @@ import "./placement-counts.test.js";
 import "./mail.test.js";
 import "./order-mail.test.js";
 import "./orders.test.js";
+import "./social-video.test.js";

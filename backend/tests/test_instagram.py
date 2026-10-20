@@ -1,5 +1,6 @@
 """growth/instagram.py: the token that must outlive Meta's 60 days, and the two-step publish."""
 import importlib.util
+import json
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -121,10 +122,12 @@ def test_publish_stops_on_a_container_error(monkeypatch):
         ig.publish("tok", "u", "c", sleep=lambda s: None)
 
 
-def test_no_secret_means_nothing_is_sent(monkeypatch, capsys):
+def test_no_secret_means_nothing_is_sent_and_result_does_not_claim_a_post(monkeypatch, capsys, tmp_path):
     monkeypatch.delenv("INSTAGRAM_TOKEN", raising=False)
-    assert ig.main(["instagram.py", "--send"]) == 0
+    status = tmp_path / "result.json"
+    assert ig.main(["instagram.py", "--send", f"--status-file={status}"]) == 0
     assert "nothing sent" in capsys.readouterr().out
+    assert json.loads(status.read_text())["outcome"] == "not_configured"
 
 
 def test_a_failure_prints_meta_message_but_never_the_token(monkeypatch, capsys, tmp_path):
@@ -137,10 +140,23 @@ def test_a_failure_prints_meta_message_but_never_the_token(monkeypatch, capsys, 
     monkeypatch.setattr(ig, "wait_for_image", lambda url: None)
     monkeypatch.setattr(ig, "publish", lambda *a, **k: (_ for _ in ()).throw(
         ig.InstagramError("OAuthException 190: Error validating access token")))
-    assert ig.main(["instagram.py", str(post), "--send"]) == 1
+    status = tmp_path / "result.json"
+    assert ig.main(["instagram.py", str(post), "--send", f"--status-file={status}"]) == 1
     out = capsys.readouterr().out
     assert "SECRET-TOKEN-VALUE" not in out
     assert "replace the INSTAGRAM_TOKEN secret" in out
+    result = json.loads(status.read_text())
+    assert result["outcome"] == "failed" and result["reason"] == "publishing_error"
+    assert "SECRET-TOKEN-VALUE" not in status.read_text()
+    assert "OAuthException" not in status.read_text()
+
+
+def test_preview_does_not_refresh_send_or_write_a_publishing_result(monkeypatch, tmp_path):
+    monkeypatch.setenv("INSTAGRAM_TOKEN", "not-used")
+    monkeypatch.setattr(ig, "token_for_run", lambda *a: pytest.fail("preview must not refresh a token"))
+    status = tmp_path / "result.json"
+    assert ig.main(["instagram.py", f"--status-file={status}"]) == 0
+    assert not status.exists()
 
 
 def test_a_blocked_app_is_not_reported_as_an_expired_token():

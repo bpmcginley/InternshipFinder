@@ -2,6 +2,41 @@
 
 Work log for Muse (Bruce's AI agent). Read this when working in this repo.
 
+## Current handoff (2026-10-20; supersedes historical status below)
+
+- Chrome Web Store 0.5.7 is live, independently checked October 16. The public package predates
+  PR #118's three extension follow-ups. A 0.5.8 candidate now includes those existing fixes and
+  enables the optional weekly-email finish link. It is not store-published; exact-package real
+  Google/Microsoft sign-in and normal-update preservation checks remain release gates. See
+  `reviews/releases/extension-0.5.8.md`.
+- PR #122 activated the approved weekly email; PR #123 signup improvements were merged and
+  deployed October 15 (Worker before site). Do not repeat mailbox, provider or signup activation.
+  The October 19 digest was delivered at 18:04 UTC by catch-up; the later scheduled run was
+  refused by the six-day duplicate guard. Do not resend it.
+  New freshness refusal and weekly-aware health checks are prepared here; see `growth/EMAIL_RUNBOOK.md`.
+- The private analytics page already labels form submissions separately from confirmed subscribers,
+  verified October 16. The older request below to change that label is superseded. Buttondown's
+  baseline was one active owner account, one unsubscribed owner test account, and zero non-test
+  active subscribers; no addresses were exported.
+- Heycatch already has posted and scheduled videos for YouTube, TikTok and Facebook. Six brand
+  accounts are connected; Threads is absent. Preserve that queue and leave the native YouTube
+  uploader disabled. Bluesky and Instagram use the existing native workflow. See
+  `growth/PUBLISHING_OWNERSHIP.md`; a connection alone does not prove a post succeeded.
+- Prepared fixes prevent stale carried listings from duplicating freshly fetched stable IDs,
+  reduce the first-results preview from 60 to 12 rows, and repair Instagram Login Reel publishing
+  through a bounded public video route. Deploy the Worker before the updated publishing workflow.
+  The next normal ingest/export applies the listing correction; full shards were not regenerated here.
+- Support guidance now has an `/install#troubleshooting` destination. Update the store support URL
+  after the page is live. Security headers are a staged host-rule proposal, not a deployed change.
+- PRs #119, #131, #132 and #133 are merged. Employer checkout is live with terms version
+  2026-10-20. Preserve its email binding, review inbox, checkout flag and webhook settings.
+  Manual listing activation/update remains blocked while checkout is enabled; pilots use site checkout
+  and allocated pilot codes. Draft/pause/end/refuse remain available.
+- Product validation uses synthetic offline ATS fixtures and owner QA. No employer application,
+  student outreach, new social post, broadcast or account permission change was performed here.
+
+Older sections are historical records, not instructions to reactivate services or duplicate publishers.
+
 ## What Muse did (2026-10-08)
 
 - Fixed a failing date test — commit `e8001db8` on main ("Install page: visible Updated date matches the HowTo's (Oct 7)", PR #79). The assertion was about the install page's visible "Updated" date.
