@@ -3992,6 +3992,9 @@ def main(argv: list[str]) -> None:
     # `python -m internscout.seo_pages` this module is __main__, and the internscout.seo_pages that
     # feeds imports is a second copy whose build() never ran, so its GENERATED is None.
     feeds.write_all(site_dir, built, GENERATED)     # was: feeds.write_all(site_dir, pages)
+    # The embedded widget needs real per-field coverage, not the dashboard's 60-row preview.
+    from . import widget_data
+    widget_data.write(site_dir, LISTINGS, GENERATED, today_utc())
     print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
 
 

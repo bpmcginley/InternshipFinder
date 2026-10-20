@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, follow">
-<title>Open internships — InternScout widget</title>
+<title>Open internships | InternScout widget</title>
 <style>
   /* Self-contained widget styles. Scoped under .isw so they never leak
      into the embedding page. No external dependencies. */
@@ -38,12 +38,12 @@
 </style>
 </head>
 <body>
-<div class="isw" id="isw">
+<div class="isw" id="isw" aria-busy="true">
   <div class="isw-head">
     <p class="isw-title" id="isw-title">Open internships</p>
     <a class="isw-brand" href="https://internscout.org" target="_blank" rel="noopener">Powered by InternScout</a>
   </div>
-  <ul class="isw-list" id="isw-list"></ul>
+  <ul class="isw-list" id="isw-list" aria-live="polite"><li class="isw-empty" role="status">Loading open internships.</li></ul>
   <div class="isw-foot" id="isw-foot"></div>
 </div>
 <script>
@@ -67,7 +67,7 @@
     "biomedical-engineering": "biomedical",
     "computer-engineering": "hardware",
     "accounting": "accounting", "marketing": "marketing",
-    "healthcare": "health", "nursing": "health",
+    "healthcare": "health",
     "law": "law", "legal": "law",
     "sales": "sales", "government": "government"
   };
@@ -89,12 +89,14 @@
     return typeof u === "string" && /^https?:\/\//i.test(u);
   }
   function locOf(r) {
+    if (typeof r.location === "string") return r.location;
     if (r.is_remote) return "Remote";
     if (r.regions && r.regions.length && r.regions[0].loc) return r.regions[0].loc;
     return r.state || "";
   }
 
-  function render(rows) {
+  function render(rows, data) {
+    document.getElementById("isw").setAttribute("aria-busy", "false");
     listEl.innerHTML = "";
     if (!rows.length) {
       listEl.innerHTML = '<li class="isw-empty">No open roles in this field right now. ' +
@@ -117,32 +119,74 @@
         "</li>";
     });
     listEl.innerHTML = html;
-    footEl.innerHTML = 'Listings refresh daily. <a href="https://internscout.org" target="_blank" rel="noopener">Search 14,000+ internships on InternScout</a>.';
+    footEl.innerHTML = 'Updated ' + esc(data.generated_at.slice(0, 10)) + ' (UTC). <a href="https://internscout.org" target="_blank" rel="noopener">Search all ' +
+      esc(data.total.toLocaleString("en-US")) + ' open roles on InternScout</a>.';
   }
 
   if (rawField) {
     titleEl.textContent = "Open internships: " + rawField;
   }
 
-  fetch("../data/first.json", { cache: "no-store" })
-    .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
-    .then(function (data) {
-      var rows = Array.isArray(data) ? data.slice() : [];
-      rows.sort(function (a, b) {
-        return String(b.posted_at || "") < String(a.posted_at || "") ? -1 : 1;
+  // Built from the complete open corpus: newest 12 per field plus global newest 12, deduplicated.
+  // No embed downloads dozens of state files, and a field absent from the dashboard preview is not
+  // mistaken for an empty field. Download size and time are bounded even for a malformed response.
+  var MAX_BYTES = 2 * 1024 * 1024, MAX_ROWS = 12 * 129;
+  function readFeed(r) {
+    if (!r.ok || !r.body || !r.body.getReader || Number(r.headers.get("Content-Length")) > MAX_BYTES) throw new Error("feed unavailable");
+    var reader = r.body.getReader(), decoder = new TextDecoder(), text = "", bytes = 0;
+    function next() {
+      return reader.read().then(function (part) {
+        if (part.done) return JSON.parse(text + decoder.decode());
+        bytes += part.value.byteLength;
+        if (bytes > MAX_BYTES) { reader.cancel(); throw new Error("feed too large"); }
+        text += decoder.decode(part.value, { stream: true });
+        return next();
       });
+    }
+    return next();
+  }
+  function validFeed(data) {
+    if (!data || data.schema !== 1 || data.per_field !== 12 || !Number.isInteger(data.total) || data.total < 0 ||
+        typeof data.generated_at !== "string" || !isFinite(Date.parse(data.generated_at)) ||
+        !Array.isArray(data.rows) || data.rows.length > MAX_ROWS || data.rows.length > data.total ||
+        !data.counts || typeof data.counts !== "object" || Array.isArray(data.counts)) throw new Error("incomplete feed");
+    var fields = Object.keys(data.counts), seen = new Set();
+    if (fields.length > 128) throw new Error("too many fields");
+    data.rows.forEach(function (r) {
+      if (!r || typeof r.id !== "string" || !r.id || seen.has(r.id) || typeof r.title !== "string" || !r.title.trim() ||
+          !okUrl(r.apply_url) || !Array.isArray(r.field_tags) || r.field_tags.some(function (f) { return typeof f !== "string" || !/^[a-z][a-z0-9_]{0,39}$/.test(f); })) throw new Error("invalid role");
+      seen.add(r.id);
+    });
+    fields.forEach(function (field) {
+      var count = data.counts[field];
+      if (!/^[a-z][a-z0-9_]{0,39}$/.test(field) || !Number.isInteger(count) || count < 1 || count > data.total ||
+          data.rows.filter(function (r) { return r.field_tags.indexOf(field) !== -1; }).length < Math.min(12, count)) throw new Error("incomplete field coverage");
+    });
+    if (data.rows.length < Math.min(12, data.total)) throw new Error("incomplete global coverage");
+    return data;
+  }
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, 12000);
+  fetch("../data/widget.json", { cache: "no-store", signal: controller.signal })
+    .then(readFeed)
+    .then(validFeed)
+    .then(function (data) {
+      var rows = data.rows;
       if (tags.length) {
         rows = rows.filter(function (r) {
           var ft = (r.field_tags || []).map(function (t) { return String(t).toLowerCase(); });
           return tags.some(function (t) { return ft.indexOf(t) !== -1; });
         });
       }
-      render(rows);
+      render(rows, data);
     })
     .catch(function () {
-      listEl.innerHTML = '<li class="isw-error">Could not load listings right now. ' +
+      controller.abort();  // release a rejected/oversized response instead of leaving its body open
+      document.getElementById("isw").setAttribute("aria-busy", "false");
+      listEl.innerHTML = '<li class="isw-error" role="alert">Could not load the full listings right now. Reload to try again, or ' +
         '<a href="https://internscout.org" target="_blank" rel="noopener">Search internships on InternScout</a>.</li>';
-    });
+      footEl.innerHTML = "";
+    }).finally(function () { clearTimeout(timer); });
 })();
 </script>
 </body>
