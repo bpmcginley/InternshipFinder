@@ -443,6 +443,127 @@ current status does not allow (or a row that changed while it was being saved).
 | `POST /admin/placements/refuse` | `{ id, by, reason }` | `draft` or `checked` to `refused`. |
 | `POST /admin/placements/report` | `{ id, month }` | The employer report (added 2026-10-14, S9) for one calendar month that has ended (`YYYY-MM`; the month still running is refused): `{ report: { placement, employer, listing_id, month, shown, opened, by_page, about } }`. `shown` and `opened` are text, rounded down to the nearest 10 (`"1,230+"`), or `"fewer than 10"`. `by_page` splits them by `dashboard` and `landing` only when every number in the split is 10 or more, otherwise `null`. Raw counts are never returned. `about` is the plain-English note for the employer: what the numbers are and are not. |
 
+## Paid listing orders (bought on the site; off until `EMPLOYER_CHECKOUT` is `"1"`)
+
+Added 2026-10-19 (`src/orders.js`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
+paid listing for 1 or 3 of its open roles on `internscout.org/employers/buy/`; Bruce approves or refuses
+each order from a signed link in his email. Approving runs the same placement steps as the admin routes
+above (`update` if the start day has passed, `check` with all eight checks, `on`), by `"bruce"`, so every
+placement rule and log entry still applies.
+
+Every route below answers `404 not_found` unless `EMPLOYER_CHECKOUT` is `"1"` **and** `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `ADMIN_TOKEN`, `REVIEW_TO` and `ORDER_FROM` are set **and** the `EMAIL` email
+binding exists. The one exception is `GET /employer/config`, which then answers `enabled: false`.
+"Site only" routes answer `403` unless `Origin` is `https://internscout.org` (or the github.io origin).
+JSON bodies are at most 4,000 bytes.
+
+Prices in cents: `one` (1 role) 2900, or 1500 for a nonprofit or public body; `three` (3 roles of one
+employer) 6900, or 3500. Each role runs 30 days. At most 5 paid roles at once share a field tag (a role
+with no field tags counts under `other`); the cap counts roles of paid or approved orders while their
+placements are `draft`, `checked`, `on` or `paused`, and roles of a verified order for 35 minutes after its
+Checkout opened. Placements made by hand with `scripts/placement.mjs` have no field tags and do not count.
+The start day is today up to 90 days ahead (UTC days).
+
+The roles come from the site's role index, `SITE_URL/data/roles/<shard>.json` (`shard` is one of `a`-`z`,
+`0`-`9`, `_`, the first character of the employer key), shaped
+`{ generated, roles: [{ id, k, co, t, loc, u, f: [...], unpaid }] }`. A role qualifies only if it is in
+that file today with an `https://` apply link; a role with `unpaid: true` only for a nonprofit or public
+body. `502 roles_unavailable` when the file can't be read (a missing shard file is an empty shard).
+
+### `GET /employer/config` (no auth)
+`{ "enabled": true, "prices": { "one": { "roles": 1, "cents": 2900, "public_body_cents": 1500 }, "three": { "roles": 3, "cents": 6900, "public_body_cents": 3500 } }, "days": 30, "field_cap": 5, "max_start_days": 90, "terms_version": "2026-10-19" }`.
+
+### `GET /employer/availability?shard=&ids=&start=` (no auth)
+`ids` is 1 to 20 role ids (16 lowercase hex), comma separated; `start` defaults to today. Each role on its
+own: `{ "start": "...", "roles": [ { "id", "listed": true, "fits": true } | { "id", "listed": true, "fits": false, "full": ["engineering"], "taken": true, "next_start": "YYYY-MM-DD" } | { "id", "listed": false } ] }`.
+`full` and `taken` appear only when they apply. `taken` means the same role is already paid for on some
+of those days. `next_start` is the first day it would fit (it can be past the 90-day window).
+
+### `POST /employer/order` (site only)
+`{ "shard": "a", "roles": ["<id>", ...], "package": "one" | "three", "start": "YYYY-MM-DD", "name": "...", "email": "...", "company": "...", "public_body": false, "terms": true, "pilot_code": "", "website": "" }`.
+`name` (100), `email` (254) and `company` (120) are required; the email may not be at a free webmail domain
+(gmail.com, outlook.com and the like). `terms` must be `true`; the order stores the terms version and the
+time. `roles` must be exactly the package's number of distinct ids, all listed today, all of one employer.
+`website` is a honeypot: filled, the answer is the same and nothing is stored. A good order is stored as
+`unverified` and a link (`SITE_URL/employers/buy/?order=ID&t=TOKEN`, valid 48 hours, stored only as a
+SHA-256) is emailed to the work address. Answers `200 { "ok": true }`.
+Errors: `400 bad_request` with `field`; `409 full` with `roles` (those that don't fit) and `next_start`
+(the first start day on which the whole order fits); `429 rate` (with `retry_after`) after 5 orders from
+one address in a UTC day or 100 from everyone; `502 mail` if the email could not be sent (the order is
+then not kept).
+
+### `POST /employer/order/confirm` (site only)
+`{ "order": "o-...", "token": "..." }` from the emailed link. `403 link` for a wrong, expired or other
+order's token. The order becomes `verified`, and the field cap is checked again (`409 full`). With a
+pilot code it becomes `paid` at once and the answer is `{ "done": "pilot" }` (`409 pilot_used` if the code
+was taken since). Otherwise `{ "url": "https://checkout.stripe.com/..." }`: a Checkout session in
+`payment` mode for the order's price (`price_data`, USD), `customer_email`, `client_reference_id` = the
+order id, `metadata` and `payment_intent_data[metadata]` `{ kind: "listing", order }`, an invoice
+(`invoice_creation[enabled]`), promotion codes allowed, expiring after 31 minutes, returning to
+`SITE_URL/employers/buy/?paid=ID` or `?cancelled=1`. Never Managed Payments. Asked again within 30 minutes
+it hands back the same session. An order that is already paid answers `{ "done": "paid" }`.
+
+### Payment (`POST /billing/webhook`)
+The existing Stripe endpoint. It is on when the student plans are on **or** the orders are on. Handled
+before anything about student plans, which are unchanged:
+- `checkout.session.completed` and `checkout.session.async_payment_succeeded` with `metadata.kind =
+  "listing"`: when `payment_status` is `paid` or `no_payment_required` the order becomes `paid` (`paid_ref`
+  `stripe:pi_...`), one `draft` placement per role is made (`created_by` `"checkout"`), Bruce gets the
+  review email and the employer a "received" email. `unpaid` waits for the async event. A second paid
+  session for an order already paid is refunded in full automatically (and both are told).
+- `charge.dispute.created` on an order's payment: its live placements are paused (by `"stripe"`) and Bruce
+  is emailed. `charge.refunded` on an order's payment is ignored (the order already records its refunds).
+
+An email that fails never undoes the payment record; the daily cron sends a missing review email again.
+
+### `GET /employer/review?order=&sig=` (Bruce, from the email)
+`sig` is the hex HMAC-SHA256 of `"review:" + order id` under `ADMIN_TOKEN`, compared in constant time
+(`403` otherwise). Answers a self-contained HTML page: no script, a strict `Content-Security-Policy`
+(`default-src 'none'`, the one style block by hash, `form-action 'self'`), `Cache-Control: no-store`,
+`Referrer-Policy: no-referrer`. It shows the order, the verified email and its domain beside the apply
+link hosts, the nonprofit claim, the roles as the role index lists them right now, the field counts and
+the dates, and two forms.
+
+### `POST /employer/review` (Bruce, that page)
+`application/x-www-form-urlencoded`: `order`, `sig`, `action` (`approve` or `refuse`), `reason` (refuse
+only, required, at most 200 characters). Only a `paid` order can be decided (`409` otherwise).
+- `approve`: if the start day has passed the placements move to today + 30 days; all eight checks are
+  recorded by `"bruce"` (`unpaid_ok` for an unpaid role of a public body), every placement is switched on
+  with the order's `paid_ref`, the order becomes `approved` and the employer is emailed the dates. Refused
+  while a payment dispute is open.
+- `refuse`: the full amount is refunded through Stripe (idempotency key per order), the placements become
+  `refused`, a pilot code is freed, the order becomes `refused` and the employer is emailed the reason.
+
+Answers a plain HTML page.
+
+### `GET /employer/credit?credit=&t=` (employer, from the email)
+When the daily cron ends a placement because every site build dropped its role on both of the last two
+days (`placement_runs` reasons `listing_gone`, `closed`, `url_changed`, `deadline`), the unused days
+(from the first such day), times the role's share of what was paid, over 30, are offered back by email.
+Answers `{ credit, status: "offered" | "refund" | "credit", amount, unused_days, role: { title, company }, choose_by, code }`
+(`code` only once a promotion code was chosen); `403 link` for a wrong token.
+
+### `POST /employer/credit` (site only)
+`{ "credit": "c-...", "token": "...", "choice": "refund" | "credit" }`. `refund`: that amount is refunded
+on the order's payment; answers `{ "done": "refund", "amount" }`. `credit`: a Stripe coupon (`amount_off`,
+USD, `duration` once, `max_redemptions` 1) and a promotion code for it (`max_redemptions` 1, for an order of
+at least $15 so it can't be spent on a student plan); answers `{ "done": "credit", "code", "amount" }`.
+`409 decided` once chosen. No answer in 30 days: the daily cron refunds it.
+
+### Order admin routes (Bruce's terminal)
+The placement admin rules apply: `404` without `ADMIN_TOKEN`, `403` with an `Origin`, `401` without the
+token. Not tied to `EMPLOYER_CHECKOUT`, so pilot codes can be made before buying opens.
+
+| Route | Body | Does |
+|---|---|---|
+| `GET /admin/orders` | none | `{ orders: [{ id, created, status, package, start, amount, company, roles }] }`, the 100 newest; never the name or email. `amount` is what was paid, else the list price, in cents. |
+| `POST /admin/pilot-codes` | `{ note? }` | `{ code, note, created, made, max }`: a new pilot code such as `PILOT-7KQ2M9XA`; `409` once 5 have ever been made. |
+
+### The daily cron
+Deletes orders never confirmed after 7 days (always, even while orders are off). While on: sends a review
+email that failed, reminds Bruce once about an order waiting more than a day, ends closed roles and makes
+the offer above, sends an offer email that failed, and refunds offers unanswered after 30 days.
+
 ## Paid plans (optional, off by default)
 
 Every route below returns `404 not_found` unless `PAYMENTS_ENABLED` is `"1"` **and** `STRIPE_SECRET_KEY`
@@ -470,7 +591,8 @@ applying twice. A signature header may carry several `v1=` values (Stripe sends 
 while a secret is being rolled); any one that matches is enough. Handled types:
 `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`,
 `charge.refunded` (only a full refund) and `charge.dispute.created`, which both cancel the
-subscription and put the student back on free. Anything else is ignored.
+subscription and put the student back on free. Anything else is ignored. Since 2026-10-19 events about
+paid listing orders are handled first and never touch a plan (see "Paid listing orders" above).
 
 The tier comes from the subscription's price id rather than its metadata, because a student who
 switches tier inside Stripe's portal keeps the metadata the original checkout wrote. Metadata is only
@@ -490,7 +612,8 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
     Unset, the `/profile` routes answer `503 sync_off`. Replacing it makes every saved copy unreadable
     (each is replaced on that student's next save), so set it once and keep it.
   - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (Supporter), `STRIPE_PRICE_ID_PRO` (Pro),
-    `STRIPE_WEBHOOK_SECRET` — only for the paid plans
+    `STRIPE_WEBHOOK_SECRET`: only for the paid plans (the key and webhook secret also for listing orders)
+  - `REVIEW_TO` (2026-10-19): where the paid listing review emails go, and the reply-to of employer emails
 - **Vars:**
   - `GOOGLE_CLIENT_ID`, `MS_CLIENT_ID` (a provider is off while its ID is empty)
   - `EDU_EXTRA_DOMAINS` (comma list of non-`.edu` school domains, default empty), `GENERAL_ALLOWANCE_PCT` (default 50)
@@ -498,14 +621,19 @@ In the Stripe dashboard the endpoint URL is `<worker-url>/billing/webhook`.
   - `MONTHLY_BUDGET_CENTS` (default 7500)
   - `GLOBAL_RPM` (AI calls per minute across everyone, default 120; `"0"` turns AI off)
   - `PAYMENTS_ENABLED` (`"0"` by default), `SUPPORTER_PRICE_TEXT` and `PRO_PRICE_TEXT` (display only),
-    `SITE_URL` (where Stripe returns to)
+    `SITE_URL` (where Stripe returns to, and where the role index is read)
+  - `EMPLOYER_CHECKOUT` (`"0"` by default; `"1"` turns on the listing orders), `ORDER_FROM` (their sender),
+    `API_URL` (optional: the Worker's own address in the review links; default the workers.dev one)
+- **Email binding** (2026-10-19): `EMAIL` (`[[send_email]]`, Cloudflare Email Sending), for the listing
+  orders only; commented out in `wrangler.toml` until internscout.org is onboarded.
 <!-- was: - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `plans`, `stripe_events`. -->
 - **D1 binding:** `DB`, with tables `usage`, `runs`, `rate`, `demand`, `budget`, `spend`, `tokens`, `forget`,
   `plans`, `stripe_events`, `invite_codes`, `referrals`, `bonus`, `accounts`, `inviters`, `sessions`, `profiles`,
   `task_tokens`, `visit_counts`, `visit_channels` (social visits by site; added 2026-10-05), `event_counts`
   and `run_hist` (calls per run, by month, task and bucket, kept by the daily cron when it drops a past
   month's `runs`; added 2026-10-04), `employer_leads`, and `placements` and `placement_log` (paid listings
-  and their change history; added 2026-10-14). The schema is in `worker/schema.sql`.
+  and their change history; added 2026-10-14), and `employer_orders`, `employer_order_roles`,
+  `employer_credits` and `pilot_codes` (listings bought on the site; added 2026-10-19). The schema is in `worker/schema.sql`.
 
 ## Dashboard ↔ extension bridge
 - The existing bridge (`extension/bridge/bridge.js`) relays `{__internscout:"req", id, msg}`. The background worker handles it by `msg.type`.

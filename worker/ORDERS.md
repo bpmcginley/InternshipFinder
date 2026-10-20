@@ -102,6 +102,19 @@ list.
 | `GET /admin/orders` | Bruce's terminal | recent orders, without email or name |
 | `POST /admin/pilot-codes` | Bruce's terminal | a new pilot code (at most 5 ever) |
 
+## Details settled while building it (2026-10-19)
+
+- Only roles of orders bought here count against `FIELD_CAP`. A placement made by hand with
+  `scripts/placement.mjs` has no field tags, so it does not count.
+- The same role can't be bought twice for overlapping days (`taken`, with `next_start`).
+- An order that was confirmed but never paid is kept like any order: its Checkout may still be a bank
+  payment on its way. Only `unverified` orders are deleted after 7 days.
+- A promotion code made for unused days works once and only on an order of at least $15, so it can't be
+  spent on a student plan (their Checkout also takes promotion codes).
+- `GET /admin/orders` and `POST /admin/pilot-codes` need only `ADMIN_TOKEN`, so pilot codes can be made
+  before buying opens.
+- The review link points at the Worker's workers.dev address; the optional var `API_URL` changes it.
+
 ## Turning it on
 
 1. Cloudflare dashboard: Compute > Email Service > Email Sending > Onboard Domain > internscout.org.
