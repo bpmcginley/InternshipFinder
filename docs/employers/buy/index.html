@@ -196,11 +196,15 @@ ul.avail li.fits .i{color:var(--green)}ul.avail li.full .i{color:var(--amber)}
 </div>
 </div>
 <div class="terms">
-<label class="check" for="terms"><input type="checkbox" id="terms" name="accept_terms" required/> <span>I accept the <a href="/terms.html" target="_blank" rel="noopener">InternScout terms</a>, including <a href="/terms.html#employers" target="_blank" rel="noopener">the section for employers</a>, for my company, and I am allowed to accept them for it.</span></label>
+<label class="check" for="terms"><input type="checkbox" id="terms" name="accept_terms" required/> <span>I have read and accept the <a href="/terms.html" target="_blank" rel="noopener">InternScout terms</a>, including <a href="/terms.html#employers" target="_blank" rel="noopener">the section for employers</a>, on behalf of my company, and I am authorized to accept them for it.</span></label>
+<!-- was: I accept the InternScout terms, including the section for employers, for my company, and I am allowed to accept them for it.
+     (legal review round 4, 2026-10-19; worker/src/orders.js TERMS_BOX stores these words on every order) -->
 <p class="err" id="terms-err" hidden></p>
 </div>
 <!-- The honeypot, as on the interest form: off-screen, hidden from screen readers and skipped by Tab. -->
 <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"/></div>
+<!-- Before paying (legal review round 4, 2026-10-19): what is sold, the refund rule, cancelling and who to write to. -->
+<p class="fine" id="refunds">You are buying a paid listing for each role you picked, for the days shown, in US dollars. If we don't approve your order, you get a full refund. Until we approve it, you can cancel it by email for a full refund. If a role closes early, you get its unused days back as a refund or a credit code, your choice. Questions: <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>.</p>
 <button type="submit" class="cta" id="send">Order</button>
 <p class="status" id="status" role="alert"></p>
 <p class="fine">Next we email you a link to confirm your address. It works for 48 hours. Then you pay through Stripe, unless you have a pilot code. <a href="/privacy.html#employer-orders">What we keep</a></p>

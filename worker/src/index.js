@@ -17,7 +17,7 @@ import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements,
   updatePlacement } from "./placements.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
 import { MAX_ORDER_BYTES, availability, chooseCredit, confirmOrder, createPilotCode, creditInfo, listOrders, orderConfig,
-  ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
+  notePlacementFields, ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // InternScout's own extension IDs, named here instead of trusting every chrome-extension:// origin.
@@ -379,7 +379,14 @@ async function route(request, env, ctx, d) {
       const act = { "/admin/placements": createPlacement, "/admin/placements/update": updatePlacement,
         "/admin/placements/check": checkPlacement, "/admin/placements/on": switchOn, "/admin/placements/pause": pausePlacement,
         "/admin/placements/end": endPlacement, "/admin/placements/refuse": refusePlacement }[path];
-      return json({ placement: await act(db, body, now) });
+      // was: return json({ placement: await act(db, body, now) });
+      const placement = await act(db, body, now);
+      // A placement made by hand counts toward the orders' per-field cap under its role's fields (orders.js
+      // notePlacementFields; the daily cron catches any this misses).
+      if ((path === "/admin/placements" || path === "/admin/placements/update") && ordersOn(env)) {
+        later(ctx, notePlacementFields(db, env, placement.id, d.fetch, now));
+      }
+      return json({ placement });
     }
 
     // Paid listings bought on the site (orders.js, added 2026-10-19; worker/ORDERS.md). Every route but

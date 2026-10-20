@@ -37,7 +37,13 @@ export const PILOT_MAX = 5;          // pilot codes, ever
 export const TOKEN_HOURS = 48;       // the email link works this long
 export const UNVERIFIED_DAYS = 7;    // an order never confirmed is deleted after this
 export const CREDIT_DEFAULT_DAYS = 30;   // an unanswered unused-days offer becomes a refund after this
-export const TERMS_VERSION = "2026-10-19";   // docs/terms.html#employers, as the order's clickwrap box shows it
+// The terms an order accepts: docs/terms.html's "Last updated" day (tests/site/buy.test.mjs holds the two
+// together), and the clickwrap box exactly as docs/employers/buy/ shows it, stored on every order (legal
+// review round 4, 2026-10-19). was: "2026-10-19", and only the version was stored.
+export const TERMS_VERSION = "2026-10-20";
+export const TERMS_BOX = "I have read and accept the InternScout terms, including the section for employers, on behalf of my company, and I am authorized to accept them for it.";
+// Each published version of the terms is kept unchanged under a git tag terms-YYYY-MM-DD (ORDERS.md).
+export const TERMS_ARCHIVE = "https://github.com/bpmcginley/InternshipFinder/blob/terms-";
 export const MAX_ORDER_BYTES = 4_000;
 export const MAX_FORM_BYTES = 4_000;
 
@@ -217,6 +223,44 @@ export async function readShard(env, shard, fetchImpl) {
 
 // ---------------------------------------------------------------- the field cap
 
+// A placement not made for an order (one Bruce made with scripts/placement.mjs).
+const NOT_ORDERED = "p.id NOT IN (SELECT placement_id FROM employer_order_roles WHERE placement_id IS NOT NULL)";
+const ALL_SHARDS = [..."abcdefghijklmnopqrstuvwxyz0123456789_"];
+
+// A listing's field tags from the role index: the shard its employer's name points at first, then the
+// rest. [] when the role isn't listed today; readShard throws when the index can't be read.
+async function listingFields(env, listingId, employer, fetchImpl) {
+  const first = shardOf(String(employer || "").toLowerCase());
+  for (const s of [first, ...ALL_SHARDS.filter((x) => x !== first)]) {
+    const r = (await readShard(env, s, fetchImpl)).get(listingId);
+    if (r) return r.f;
+  }
+  return [];
+}
+
+// Records the fields of a placement made by hand, so it counts toward FIELD_CAP. Run after the admin
+// create and update routes (index.js) and by the daily cron for any not done yet, moved to another
+// listing, or not found last time. A placement made for an order is left alone: its role has its fields.
+export async function notePlacementFields(db, env, id, fetchImpl, now) {
+  const p = await db.prepare(`SELECT p.id, p.listing_id, p.employer FROM placements p WHERE p.id = ? AND ${NOT_ORDERED}`).bind(id).first();
+  if (!p) return null;
+  const fields = fieldsOf(await listingFields(env, p.listing_id, p.employer, fetchImpl));
+  await db.prepare(
+    "INSERT INTO placement_fields (placement_id, listing_id, fields, looked_up) VALUES (?, ?, ?, ?) ON CONFLICT(placement_id) " +
+    "DO UPDATE SET listing_id = excluded.listing_id, fields = excluded.fields, looked_up = excluded.looked_up",
+  ).bind(p.id, p.listing_id, fields.join(","), now.toISOString()).run();
+  return fields;
+}
+
+async function fillPlacementFields(db, env, now, fetchImpl) {
+  const { results } = await db.prepare(
+    "SELECT p.id FROM placements p LEFT JOIN placement_fields f ON f.placement_id = p.id " +
+    `WHERE p.status IN (${HOLDING.map(() => "?").join(", ")}) AND ${NOT_ORDERED} ` +
+    "AND (f.placement_id IS NULL OR f.listing_id != p.listing_id OR f.fields = 'other')",
+  ).bind(...HOLDING).all();
+  for (const r of results) await notePlacementFields(db, env, r.id, fetchImpl, now);
+}
+
 // Every paid role that holds days, other than `exceptOrder`'s: { listing, fields, start, end } (end
 // exclusive). Paid and approved orders hold the days of their placements while those are draft, checked,
 // on or paused (or the order's own days if its placements are not made yet); a verified order holds its
@@ -236,6 +280,15 @@ async function heldRoles(db, now, exceptOrder = "") {
     } else if (r.status !== "approved") {
       held.push({ listing: r.listing_id, fields, start: r.start_day, end: addDays(r.start_day, DAYS) });
     }
+  }
+  // Placements made by hand hold their days too, under the fields recorded for them (notePlacementFields).
+  // was: only orders' roles counted, so the cap the terms promise could be passed by hand-made ones.
+  const manual = await db.prepare(
+    "SELECT p.listing_id, p.start_day, p.end_day, f.fields FROM placements p LEFT JOIN placement_fields f ON f.placement_id = p.id " +
+    `WHERE p.status IN (${HOLDING.map(() => "?").join(", ")}) AND ${NOT_ORDERED}`,
+  ).bind(...HOLDING).all();
+  for (const r of manual.results) {
+    held.push({ listing: r.listing_id, fields: fieldsOf(String(r.fields || "").split(",").filter(Boolean)), start: r.start_day, end: r.end_day });
   }
   return held;
 }
@@ -408,7 +461,7 @@ export async function takeOrder(db, env, request, body, now, fetchImpl) {
   const row = {
     id, created: at, updated: at, status: "unverified", package: pkg, public_body: publicBody ? 1 : 0,
     start_day: start, employer_key: roles[0].k, employer: roles[0].co, company, name, email, email_domain: domain,
-    terms_version: TERMS_VERSION, terms_at: at, token_hash: await tokenHash(token),
+    terms_version: TERMS_VERSION, terms_box: TERMS_BOX, terms_at: at, token_hash: await tokenHash(token),
     token_expires: new Date(now.getTime() + TOKEN_HOURS * 3600e3).toISOString(), pilot_code: pilot || null,
     price: pilot ? 0 : PRICES[pkg][publicBody ? "public_body_cents" : "cents"],
   };
@@ -750,7 +803,7 @@ export async function reviewPage(db, env, params, now, fetchImpl) {
       row("Package", `${esc(order.package)}, ${rolesWord(roles.length)}, ${DAYS} days each`),
       row("Paid", `${money(order.paid_amount)} (${esc(order.paid_ref || "")})${order.pilot_code ? " pilot" : ""}`),
       row("Start asked", esc(order.start_day) + (order.start_day < today ? ` <span class="warn">has passed; approving today runs ${esc(start)} to ${esc(addDays(end, -1))}</span>` : "")),
-      row("Terms accepted", `${esc(order.terms_version)} at ${esc(order.terms_at)}`),
+      row("Terms accepted", `${esc(order.terms_version)} at ${esc(order.terms_at)}: "${esc(order.terms_box || "")}"`),
       row("Ordered", esc(order.created)),
     ].join("")}</table>` +
     `<h2>The roles, as InternScout lists them now</h2><ul>${rolesHtml}</ul>` +
@@ -925,7 +978,7 @@ async function settleCredit(db, env, credit, choice, who, now, fetchImpl) {
 export async function ordersCron(db, env, now, fetchImpl = (...a) => fetch(...a)) {
   await dropUnverifiedOrders(db, now);
   if (!ordersOn(env)) return;
-  for (const job of [resendReviews, remindReviews, closeRoles, resendOffers, defaultCredits]) {
+  for (const job of [fillPlacementFields, resendReviews, remindReviews, closeRoles, resendOffers, defaultCredits]) {
     try {
       await job(db, env, now, fetchImpl);
     } catch (e) {
@@ -1092,7 +1145,12 @@ function receivedMail(env, order, roles) {
       (order.pilot_code ? "This is a pilot order, so there is nothing to pay.\n\n"
         : `You paid ${money(order.paid_amount)}. Stripe emails your receipt and invoice separately.\n\n`) +
       "We review every order within 2 business days and email you when it is approved. If we can't list a role, " +
-      "we refund the full amount and tell you why.\n\nIf you have a question, reply to this email.\n" + sign(env),
+      "we refund the full amount and tell you why. Until we approve it, you can cancel it for a full refund by " +
+      "replying to this email.\n\n" +
+      `You accepted the InternScout terms, including the section for employers, as they read on ${longDay(order.terms_version)} ` +
+      `(version ${order.terms_version}):\n${siteUrl(env)}/terms.html#employers\n` +
+      `A copy of that version, kept unchanged: ${TERMS_ARCHIVE}${order.terms_version}/docs/terms.html#employers\n\n` +
+      "If you have a question, reply to this email.\n" + sign(env),
   };
 }
 

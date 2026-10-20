@@ -34,7 +34,7 @@ the buy page says buying on the site is not open yet.
 
 1. **Order** (`POST /employer/order`, the site's Origin only, honeypot, per-address daily limit like
    the interest form). The employer picks 1 or 3 of its open roles, a start day, gives name, work email
-   and company, ticks the terms box (clickwrap: we store the terms version and the time) and
+   and company, ticks the terms box (clickwrap: we store the terms version, the box's exact words and the time) and
    optionally enters a pilot code. The Worker re-reads the roles from the site's role index, checks
    the rules above and stores an `unverified` order. It emails a link to the work address. The link
    works for 48 hours.
@@ -104,8 +104,10 @@ list.
 
 ## Details settled while building it (2026-10-19)
 
-- Only roles of orders bought here count against `FIELD_CAP`. A placement made by hand with
-  `scripts/placement.mjs` has no field tags, so it does not count.
+- Every paid listing counts against `FIELD_CAP`, however it was bought (the terms promise it). A
+  placement made by hand with `scripts/placement.mjs` gets its role's fields from the role index
+  (`placement_fields`), right after the admin route and again in the daily cron if that missed it.
+  was (until legal review round 4): hand-made placements had no field tags and did not count.
 - The same role can't be bought twice for overlapping days (`taken`, with `next_start`).
 - An order that was confirmed but never paid is kept like any order: its Checkout may still be a bank
   payment on its way. Only `unverified` orders are deleted after 7 days.
@@ -125,4 +127,14 @@ list.
 4. Stripe: the existing webhook endpoint already sends `checkout.session.completed`; add
    `checkout.session.async_payment_succeeded` and `charge.dispute.created` if they are not on it.
 5. `npm run deploy`, then `node scripts/placement.mjs pilot-code --note "first pilot"` for each pilot.
-6. Only after the lawyer has approved the terms and privacy changes on the same PR.
+6. Only after the lawyer has approved the terms and privacy changes on the same PR (done 2026-10-19,
+   round 4).
+7. On the day the terms change goes live, `TERMS_VERSION` in `src/orders.js` must equal the terms page's
+   "Last updated" day (a site test fails otherwise), and that version is tagged so the link in the
+   "received" email works: `git tag terms-YYYY-MM-DD <merge commit>` and `git push origin terms-YYYY-MM-DD`.
+
+## Cancelling before approval
+
+The terms let an employer cancel an order by email for a full refund until it is approved. The
+"received" email says to reply. Bruce opens the order's review link and uses **Refuse** with the reason
+"Cancelled at your request": that refunds in full and emails the employer, the same as any refusal.
