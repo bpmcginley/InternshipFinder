@@ -41,9 +41,10 @@ The latter's public description concerns installing intrusion alarms, access con
 intercom and fire alarms. These are useful opportunities, but the titles do not describe cyber
 security roles.
 
-The correction excludes explicit national/food/physical security, guards/officers and Security
-Systems Apprentice titles from this field unless explicit computing-security evidence is also
-present. Existing law or other field matches remain; a listing with no other match remains
+The correction excludes national-security titles with legal/policy/project/liberty/fellowship
+wording, explicit food/physical security, guards/officers and Security Systems Apprentice titles
+from this field unless computing-security evidence is also present. Ambiguous national-security
+titles remain eligible. Existing law or other field matches remain; a listing with no other match remains
 available as `other`. Ambiguous Security Intern / Security Operations / Global Security titles
 are preserved. Cyber, information/network/application/software/hardware security and digital
 forensics remain supported, including national-security cyber roles.
@@ -64,7 +65,9 @@ correction is a relevance improvement, not an established explanation or ranking
 
 From `backend/`: `python -m pytest tests/test_classify_stage.py tests/test_seo_pages.py -q`:
 **185 passed**. Fixtures cover the observed false positives, retained legal tagging, ambiguous
-security titles and explicit cyber work overriding a national/physical security phrase.
+security titles and explicit cyber work overriding a national/physical security phrase. Review
+also added technical IT / Information Technology Security Officer and Security Operations Center
+regressions, and confirms generic Security Engineer alone cannot override explicit physical security.
 
 Normalization calls `classify(title)` at `backend/internscout/normalize.py:353`. The change reaches
 published listing data and generated pages after the next normal ingest/export and successful

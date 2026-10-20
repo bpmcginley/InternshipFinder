@@ -19,6 +19,7 @@ def test_cybersecurity_does_not_include_explicit_policy_or_physical_security_rol
         "Physical Security Intern",
         "Food Security Research Intern",
         "Security Officer Intern",
+        "Physical Security Engineer Intern",
     ]:
         assert "security" not in classify(title), (title, classify(title))
     assert "law" in classify("Spring 2027 Liberty and National Security Legal Internship")
@@ -31,6 +32,12 @@ def test_explicit_computing_security_and_ambiguous_security_titles_are_preserved
         "National Security Information Security Intern",
         "Hardware Security Engineer Intern",
         "Information Security Officer Intern",
+        "IT Security Officer Intern",
+        "Information Technology Security Officer Intern",
+        "Security Officer Intern - Security Operations Center",
+        "Security Officer Intern - Security Operations Centre",
+        "Physical Security and Network Security Engineering Intern",
+        "National Security Solutions Intern - Nss",
         "Security Engineering Intern, National Security",
         "Security Intern",
         "Security Operations Intern",
