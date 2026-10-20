@@ -1996,7 +1996,7 @@ def listing_faq(items: list[dict], field: str | None, state: str | None, updated
 ORG_ID, SITE_ID = SITE + "/#organization", SITE + "/#website"
 ORGANIZATION = {"@context": "https://schema.org", "@type": "Organization", "@id": ORG_ID, "name": "InternScout",
                 "url": SITE + "/", "logo": SITE + "/icon512.png", "slogan": SLOGAN,
-                "description": "A free internship search for college students of every major in the US and Canada.",
+                "description": "A free internship search for college students in the US and Canada.",
                 # The brand's own profiles. Mastodon links back here (docs/index.html: rel="me"); the
                 # rest are InternScout's product accounts, made 2026-10-05 (the audit: sameAs had one
                 # link). docs/index.html carries the same list; test_seo_pages.py checks they agree.
@@ -2059,7 +2059,7 @@ def _offer(name: str, price: str) -> dict:
 # object, in docs/index.html; backend/tests/test_seo_pages.py checks the two agree.
 PRODUCT = {"@context": "https://schema.org", "@type": "Product", "@id": SITE + "/#product",
            "name": "InternScout Auto-Apply",
-           "description": "A free internship search for college students of every major, with a Chrome extension that "
+           "description": "A free internship search for college students, with a Chrome extension that "
                           "fills in applications from your resume and never submits them. Search needs no account; the "
                           "extension has a free monthly allowance, and two paid plans raise it.",
            "brand": {"@id": ORG_ID}, "url": SITE + "/pricing/", "image": SITE + "/icon512.png",
