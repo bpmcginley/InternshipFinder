@@ -110,6 +110,17 @@ def parse_workday_detail(payload: dict) -> tuple[list[str], str]:
     return [l for l in locs if l], html_to_text(info.get("jobDescription"))
 
 
+def board_locations(tenant: str, locations: list[str]) -> list[str]:
+    """Expand verified employer campus labels before a state-code parser sees them.
+
+    UT Austin's 'UT MAIN CAMPUS' means Austin, Texas, not Utah. This alias belongs
+    only to that employer: a general 'UT' replacement would corrupt Utah roles.
+    See https://www.utexas.edu/about-texas for the university's campus location.
+    """
+    return ["Austin, TX" if tenant.lower() == "utaustin" and
+            " ".join(loc.upper().split()) == "UT MAIN CAMPUS" else loc for loc in locations]
+
+
 # Hospitals rarely write "intern". Their student jobs are "Student Nurse Technician", "PACU
 # Certified Nursing Assistant/ Nursing Student", "Apprentice Nurse Program", "Pathology Tech
 # Student PD", and searchText="intern" never returns them. Nine Northeast health systems were
@@ -221,9 +232,9 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
         path = p.get("externalPath") or ""
         url = f"{base}{path}"
         text = p.get("locationsText") or ""
-        locs, desc = [text], ""
+        locs, desc = board_locations(tenant, [text]), ""
         multi = "location" in text.lower()   # "3 Locations"
-        wanted = multi or maybe_in_region(text)
+        wanted = multi or any(maybe_in_region(loc) for loc in locs)
         if wanted and (calls < MAX_DETAIL or (multi and multi_calls < MAX_DETAIL)):
             calls += 1
             multi_calls += multi
@@ -231,7 +242,7 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                 d = c.get(f"{api}{path}", headers=HEADERS)
                 if d.status_code == 200:
                     dl, desc = parse_workday_detail(d.json())
-                    locs = dl or locs
+                    locs = board_locations(tenant, dl) or locs
             except Exception:
                 pass
         out.append(board_item(co, source="workday", title=p.get("title", ""), locations=locs,

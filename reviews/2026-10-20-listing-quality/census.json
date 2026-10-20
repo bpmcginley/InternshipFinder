@@ -1,0 +1,2595 @@
+{
+  "scope": "offline census; deterministic field-stratified coverage sample; no live status inferred",
+  "open_record_variants": 15231,
+  "unique_open_ids": 15133,
+  "excess_id_variants": 98,
+  "ids_with_multiple_variants": 98,
+  "unique_ids_without_description": 5928,
+  "field_counts": {
+    "accounting": 474,
+    "aerospace": 70,
+    "agriculture": 54,
+    "architecture": 85,
+    "arts": 28,
+    "biology": 141,
+    "biomedical": 12,
+    "business": 149,
+    "chemical": 173,
+    "chemistry": 31,
+    "civil": 331,
+    "clinical_research": 5,
+    "communications": 164,
+    "consulting": 207,
+    "data": 839,
+    "design": 168,
+    "economics": 46,
+    "education": 212,
+    "electrical": 493,
+    "engineering": 1261,
+    "entrepreneurship": 7,
+    "environmental": 319,
+    "film": 27,
+    "finance": 869,
+    "government": 318,
+    "hardware": 558,
+    "health": 230,
+    "hospitality": 90,
+    "hr": 277,
+    "industrial": 623,
+    "insurance": 173,
+    "journalism": 72,
+    "lab_research": 98,
+    "languages": 14,
+    "law": 267,
+    "library": 18,
+    "marketing": 640,
+    "materials": 34,
+    "math": 66,
+    "mechanical": 689,
+    "media": 100,
+    "ml": 782,
+    "museums": 18,
+    "music": 12,
+    "nonprofit": 101,
+    "nursing": 49,
+    "operations": 776,
+    "other": 1656,
+    "physics": 70,
+    "pm": 242,
+    "psychology": 37,
+    "public_health": 14,
+    "publishing": 13,
+    "quant": 176,
+    "real_estate": 39,
+    "retail": 240,
+    "sales": 440,
+    "security": 197,
+    "social_science": 14,
+    "social_work": 39,
+    "sports": 56,
+    "supply_chain": 443,
+    "sustainability": 137,
+    "swe": 2472,
+    "theater": 8,
+    "urban_planning": 80
+  },
+  "canonical_groups_with_multiple_ids": 119,
+  "canonical_groups_with_years_conflict": 10,
+  "canonical_candidates": [
+    {
+      "canonical_url": "ameren.wd1.myworkdayjobs.com/External/job/St-Louis-MO/Digital-Co-op_033841-1",
+      "ids": [
+        "1fea2bb5aadb80ae",
+        "f388c1fa232d3eec"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "aptiv.wd5.myworkdayjobs.com/aptiv_careers/job/CAN-Kanata-2-ON---WR/Cloud-Engineering-Intern_J000704383",
+      "ids": [
+        "06b59d5b24201888",
+        "6071c4b0d259452b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "aptiv.wd5.myworkdayjobs.com/aptiv_careers/job/CAN-Kanata-2-ON---WR/Engineering-Intern_J000704381",
+      "ids": [
+        "118d033f6f32abc5",
+        "63dd1c7e6b67b33d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "bcbsla.wd1.myworkdayjobs.com/Generation_Blue/job/Corporate---Baton-Rouge-LA/Healthcare-Price-and-Transparency-Data-Analyst-Intern_R11903",
+      "ids": [
+        "5af396301f7ad2e4",
+        "dcf4bd837a6bfb58"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.amd.com/jobs/91764",
+      "ids": [
+        "b22b0b41a687171d",
+        "f26e50140fbd147f"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.amd.com/jobs/91767",
+      "ids": [
+        "1664ddc181a96f7d",
+        "85b99a65d6d24c88"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.jhuapl.edu/jobs/59800",
+      "ids": [
+        "56af23ee68937b8b",
+        "fef33afaacad2228"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.medpace.com/jobs/12962",
+      "ids": [
+        "75fec372bd3b97b8",
+        "9adaeab4b9b765ff"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "careers.point72.com/CSJobDetail",
+      "ids": [
+        "2212a67461b24e07",
+        "a30eb9f5d9cb4b8f",
+        "abef8de936fbfa18"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.rivian.com/jobs/33725",
+      "ids": [
+        "1bead270749ecd33",
+        "51359d1f1c317bf3"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.rivian.com/jobs/33746",
+      "ids": [
+        "354154d4622d4989",
+        "e8ee4e875c833101"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.rivian.com/jobs/33800",
+      "ids": [
+        "ad6c90aab0f6b7ad",
+        "e91a4987f460153c"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "careers.trccompanies.com/jobs/27074",
+      "ids": [
+        "3b32a35e4072e94a",
+        "430e6f7a37c962d7"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "countryfinancial.wd5.myworkdayjobs.com/COUNTRYCorporateInternships/job/Bloomington-IL/Auto-Product-Analyst-Intern_R26_0000000995",
+      "ids": [
+        "14237f023906d0e0",
+        "5bf49c0b6fc8f6cb"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "countryfinancial.wd5.myworkdayjobs.com/COUNTRYCorporateInternships/job/Bloomington-IL/Automation-Developer-Intern_R26_0000001000",
+      "ids": [
+        "bb4e36326acbba09",
+        "c6966a6932fc7401"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "danaher.wd1.myworkdayjobs.com/danaherjobs/job/Logan-Utah-United-States/CCM-Data-Governance---Intern-Summer-2027_R1318977",
+      "ids": [
+        "195c9f1388f99189",
+        "d0200835b78f0ce2"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "ebxr.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/214410",
+      "ids": [
+        "8648b3833124807b",
+        "bc43456568bcda1c"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "ebxr.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/214478",
+      "ids": [
+        "0066bfa35f0d596a",
+        "b2024eec4a53f8b3"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "fa-exby-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1013/job/227",
+      "ids": [
+        "670853e0eda86884",
+        "f84a65a551955167"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "gevernova.wd5.myworkdayjobs.com/vernova_externalsite/job/Bellevue/GE-Vernova---AGI---AI-Evaluation---Benchmarking-Intern---Summer-2027_R5054821-2",
+      "ids": [
+        "9fcf111d1d43bab3",
+        "e7c8aff806f87f2b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "gh:6138140004",
+      "ids": [
+        "303786d2fe2f4137",
+        "e7162ef66fde3777",
+        "f2d1effa870390e4"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "gh:7848371",
+      "ids": [
+        "ed38c577c4c02a96",
+        "f980a78a45c64aaf"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "gh:7905463",
+      "ids": [
+        "aa4b8f45ed822ec1",
+        "fc662baed3dd11c0"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "gh:7992560",
+      "ids": [
+        "277b5f85db18a8fc",
+        "5fb01e670a02a439"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "gh:8003019",
+      "ids": [
+        "5a5a85d19976a1e7",
+        "951f1c6ff79d8a9a"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "gh:8242621",
+      "ids": [
+        "31c06a2d719218d4",
+        "7956cae5c1e3a793"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "gilead.wd1.myworkdayjobs.com/gileadcareers/job/United-States---California---Foster-City/Intern---Research---Strategy--Innovation---Portfolio_R0054502",
+      "ids": [
+        "09d5368c0305add4",
+        "5082da7b1038e2f8"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "hctz.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/2506642",
+      "ids": [
+        "473e9f0bcdc6e290",
+        "4a2d75fdb64ed760"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "hctz.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/2506799",
+      "ids": [
+        "5de9fda11487173a",
+        "793dddf7c4a1cc5b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "hdjq.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/26009454",
+      "ids": [
+        "878b4606f8969bf5",
+        "974cc77657a49fca"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "hitachi.wd1.myworkdayjobs.com/hitachi/job/Santa-Clara-California-United-States/Research-Intern--Knowledge-Engineering---Generative-AI_R0148396",
+      "ids": [
+        "0c36a30caa6bb382",
+        "bd377841c63e6e84"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "hitachi.wd1.myworkdayjobs.com/hitachi/job/Toronto-Ontario-Canada/Electrical-Component-Engineering-Intern--Winter-2027--16months-_R0145359",
+      "ids": [
+        "4a9fb40ee4abf651",
+        "66ab48e52df1e296"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "iadugs.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/1345",
+      "ids": [
+        "57c938e9fa7122e7",
+        "ce82c0d4f07c888d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "ibqbjb.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/Honeywell/job/158088",
+      "ids": [
+        "6c6a0e37c68e795a",
+        "feda1ac813c3aea7"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "ibqbjb.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/Honeywell/job/158957",
+      "ids": [
+        "2ec289627dff472b",
+        "bea9ac4a9c30f6df"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "irhythmtech.wd5.myworkdayjobs.com/irhythm/job/San-Francisco-CA/Electrical-Test-Engineering-Co-op-Intern-January-June-2027_JR1785",
+      "ids": [
+        "337fc29c45b9a594",
+        "490193d45629ea4d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jj.wd5.myworkdayjobs.com/JJ/job/Malvern-Pennsylvania-United-States-of-America/TDS-CGT-Digital-Automation-Co-Op_R-098537",
+      "ids": [
+        "40713e281b46c9d3",
+        "4906251fe5d79d47"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jj.wd5.myworkdayjobs.com/JJ/job/Raritan-New-Jersey-United-States-of-America/Technology-Off-Cycle-Co-Op_R-099204",
+      "ids": [
+        "bb80691c70c22080",
+        "e93334cb643acd0d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/advancedspace/jobs/4444656009",
+      "ids": [
+        "4227dc04bb049628",
+        "cbbff70737a73072"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/asteraearlycareer2027/jobs/4731401005",
+      "ids": [
+        "25ca723fe4ef4b98",
+        "70c50bcd18cedbeb"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/eulerity/jobs/4709040006",
+      "ids": [
+        "054836ee20fd35e6",
+        "bf2443aa02ffff57"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/figureai/jobs/4613067006",
+      "ids": [
+        "408d435b87c1e146",
+        "8f8dcd65057cc56d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/figureai/jobs/4694889006",
+      "ids": [
+        "0cc4b0d54fa68074",
+        "b339736f71d70f45"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/figureai/jobs/4721113006",
+      "ids": [
+        "1d06c0377da86751",
+        "c3e617157f40ac61"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/ruggedrobotics/jobs/4724214005",
+      "ids": [
+        "52587fbd486ddafb",
+        "cd5e328968978bf0"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/ruggedrobotics/jobs/4730908005",
+      "ids": [
+        "5806b854b136ee96",
+        "c21926bdd7c8b0ce"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/sevenresearch/jobs/4894946008",
+      "ids": [
+        "6faa152482d8d3ba",
+        "f77539da8695870e"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/sevenresearch/jobs/4895007008",
+      "ids": [
+        "be9f077d17e23de9",
+        "d64bdbe7002d608b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/sevenresearch/jobs/4895047008",
+      "ids": [
+        "5ea68f63626037e1",
+        "720b1f5f16b3506b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/sevenresearch/jobs/4895082008",
+      "ids": [
+        "5fc221308a474bf2",
+        "df5fb5e39d0f8547"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/tenstorrentuniversity/jobs/5256691007",
+      "ids": [
+        "831a7298688bb502",
+        "d594a9621fed6e8f"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/tenstorrentuniversity/jobs/5256699007",
+      "ids": [
+        "d9ec8bf2c0785652",
+        "f288699619870017"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/tenstorrentuniversity/jobs/5256706007",
+      "ids": [
+        "3e4f8ee8dc372179",
+        "7cfff1019ee232b3"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/voloridgeinvestmentmanagement/jobs/4224862009",
+      "ids": [
+        "00f9a20368be0fdf",
+        "e30718424f605391"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "job-boards.greenhouse.io/wikimedia/jobs/8268853",
+      "ids": [
+        "7a74f34b0f89d380",
+        "9ed66213a31b7533"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/Etched/27e5bd6b-9357-45f0-9e79-cfa2bf4eeba8",
+      "ids": [
+        "073134cfc6d0423d",
+        "d81e50d76aa59d23"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/Etched/b45e357c-07ea-4499-9911-1d3cc9b9ac71",
+      "ids": [
+        "0bbc291ffff22075",
+        "ae23b6188e7f41d9"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/Etched/bd8c5768-7efa-4a18-9e56-485ccaf4ec77",
+      "ids": [
+        "1ccf326957e08f9d",
+        "e144ab571c985e13"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/NPX/048ca8da-bfb9-4454-8147-ac9497629634",
+      "ids": [
+        "2783a4b1606eca94",
+        "e8a39c1905cf290b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/abridge/aab11857-7ed3-4fc5-aab3-35256601117e",
+      "ids": [
+        "2a18fd082ea3b19d",
+        "3d1dfc4a8e797866",
+        "91208301da38d8b3"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/anthelioncap/5e2ea37b-2369-474e-b717-c24c60976e96",
+      "ids": [
+        "6e9e78c82f28c461",
+        "a84aa194380bd90e"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/apex-technology-inc/d3e21f84-3637-4521-833d-fd07b3ca5f2e",
+      "ids": [
+        "1eaa97bf0565809a",
+        "e0b52572c4bd2347"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/barnes/1881dbc0-846e-4805-968f-4e27d663f7b0",
+      "ids": [
+        "0e4fe1f4b387b93f",
+        "187652b44b779ca0"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/cohere/36d1f52f-8270-4652-adf5-5303a0ff341b",
+      "ids": [
+        "04876588a5ecbac4",
+        "ff2d7ca0ac905539"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/cohere/73bd3e2b-6597-4124-b64b-1e5dbc32e785",
+      "ids": [
+        "030e53981a557335",
+        "57b73f7954ce94ed"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/cohere/8c035d3d-081d-4c8a-914a-72f4efaad254",
+      "ids": [
+        "4065c18665da4246",
+        "9ad3135acefcf15d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/hadrian-automation/2b0423c6-947d-4226-8d23-90743bd5e63e",
+      "ids": [
+        "080d9fdf85733931",
+        "ad4f90784dd6b3f6"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/hadrian-automation/f718bcfe-3f5b-4682-a294-697499caf813",
+      "ids": [
+        "45b5856bfdaf24c0",
+        "9a29b9e680c4d1dd"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/melius/b61f063a-4f94-4e50-a4ef-05aaab552280",
+      "ids": [
+        "2e59191a0085d380",
+        "6595d7f8779f660a",
+        "6701692364c6cd3a"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/modal/38888294-6bc7-4dab-b072-6d0f0c2ed79a",
+      "ids": [
+        "2471a9ca03d41236",
+        "7430d74243c243de"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/netic/b0ea7aab-8eea-4d31-96f9-278364180ae7",
+      "ids": [
+        "54f1cbce5ba0d982",
+        "d75df361ebc3ac43"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/netic/f291394a-f3c5-4f46-9b87-77aea3d487ef",
+      "ids": [
+        "48cff43bcfe068c8",
+        "a00c6e7f9204c843"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/netic/ffd6af1a-cebb-41f5-ac1d-e695adfd067c",
+      "ids": [
+        "01af44c8f3fb463c",
+        "ec39291875d624ec"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/oneapp/901eab26-08e3-4e6c-ad3d-c4acef4662c8",
+      "ids": [
+        "23a53970b6c0fa2f",
+        "970d7a8eaadc9a0e"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/persona.ai/a68c0823-0b61-4741-9fbc-a1f6d701e4ed",
+      "ids": [
+        "677dd7453c7232a5",
+        "c93b3c896d1f0dfe"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/phonic/a6c8c3d2-250a-4c2f-8a20-e4667ca38e41",
+      "ids": [
+        "18fc6c88da325348",
+        "ac1543bdd670737b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/primer/edd1667b-6323-444a-adc1-40bae5b9a3b0",
+      "ids": [
+        "45cf1d7df1d5a955",
+        "e97f30c1494301b3"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/terranova/8fdce1f7-a1df-4e64-8f10-c78771a399da",
+      "ids": [
+        "2d1828b6844ccdb4",
+        "86c80bed6607785b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/terranova/a8e5a8d2-4af3-4736-b66e-e0804447f7a0",
+      "ids": [
+        "b11da70fa40d7167",
+        "d58a152e7d05531e"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/tessera-labs/892bb150-8c98-47f4-a8b6-93633ecb2ea7",
+      "ids": [
+        "14d83536059cea71",
+        "61a3f1d1d8a4b975"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.ashbyhq.com/windborne-systems/75c5c65c-8179-4ca0-9659-39bf0f8f7b8b",
+      "ids": [
+        "2f0bc95151deaa38",
+        "d9db415fef757b55"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.eu.lever.co/cirrus/0310fbd1-a2a8-4c0f-a842-86e05ae7d98e",
+      "ids": [
+        "dd2d480036646918",
+        "e9148665c40053e2"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.eu.lever.co/cirrus/46a841b3-e3ce-4c78-b010-0e9cfe9e0f8e",
+      "ids": [
+        "1fdeaf26a2be4408",
+        "7e18e5253f19e676"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.eu.lever.co/cirrus/89813bb2-94fb-42f6-aec2-03154cfde027",
+      "ids": [
+        "09124e0428c055cd",
+        "b680ef0187a704ac"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.eu.lever.co/cirrus/c71a6365-31c7-4ba1-bdc4-9f2df1fc483e",
+      "ids": [
+        "b9f34af0045f066c",
+        "e70329ed4cb33411"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.eu.lever.co/cirrus/df033a94-155f-427f-a178-88bd18c3d5ec",
+      "ids": [
+        "41560dd9eeb77278",
+        "58b8358c70431333"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.keysight.com/jobs/54724",
+      "ids": [
+        "0b5e7e5b2a4911fd",
+        "11d1b9ffa9b32ca2"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "jobs.lever.co/field-ai/40a22216-c73b-4ec1-bfc1-dc0e1938eaba",
+      "ids": [
+        "a02554f9233face4",
+        "e15e4dfb35400fd6"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "jobs.lever.co/field-ai/b37569c3-d07f-4968-82dc-44020f34e54e",
+      "ids": [
+        "1da238110997d3c1",
+        "239cb28e82c4785d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.lever.co/field-ai/ef35c537-b864-479f-9dbe-b30429ac7704",
+      "ids": [
+        "2bd1944f79837384",
+        "a8e0286b0f64e6f3"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.lever.co/hermeus/445db430-6f81-41cf-847a-56a947afb936",
+      "ids": [
+        "c5bbd911d3b496f5",
+        "e9c8399cf8f62021"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.lever.co/hermeus/5b08e2df-c9db-4831-aece-67d89e744796",
+      "ids": [
+        "0b8effb8adc3a54f",
+        "2804e29ff8492f52"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.lever.co/kepler/5514238a-8301-49f1-8116-26d38ea0900c",
+      "ids": [
+        "5860f5dcfea40131",
+        "82b5b4379f8c98da"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.lever.co/palantir/4d29249a-d7e8-4c39-880d-3b35d7b2f6f6",
+      "ids": [
+        "5e0313547e835737",
+        "c2209b5cbb9988f8"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.lever.co/standtogether/e4dd1d3c-79a0-435d-87b3-eac542b4c2b5",
+      "ids": [
+        "71a2b3a18b2d63e9",
+        "d144a9b49fc340ea"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.smartrecruiters.com/BoschGroup/744000154911489",
+      "ids": [
+        "125164f118116e67",
+        "68b262d784a2a80d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.smartrecruiters.com/ServiceNow/744000155345889",
+      "ids": [
+        "9ca56f886af05a6d",
+        "c020f0e4c627ee5d"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "jobs.uhsinc.com/jobs/367247",
+      "ids": [
+        "10d1023d465885b3",
+        "56cfaa6f72d85af6"
+      ],
+      "years_conflict": true
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7667934302872537397",
+      "ids": [
+        "6c7ee3baa78bf7a6",
+        "91e8c33657870e9c"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7667934860750063925",
+      "ids": [
+        "02a2bfdafe8d10c6",
+        "9631abff2383661c"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7667935150530840837",
+      "ids": [
+        "459702c5506c0aae",
+        "4b5a5095de46d1c8"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7667935399050692917",
+      "ids": [
+        "98dab5efcc265765",
+        "ed644ec393b131ee"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7667935565120112949",
+      "ids": [
+        "3ded6660aa12110c",
+        "3ec33278c9d116c6"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7667935739300792629",
+      "ids": [
+        "ad1ac0f0d796cff2",
+        "f329470cbe63ff1f"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7668582146236631349",
+      "ids": [
+        "ad42d8052cfa3107",
+        "f433ed88ebbfb8a4"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "lifeattiktok.com/search/7668725183121000757",
+      "ids": [
+        "692b2bb9953f0d12",
+        "94653dfcf080127c"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "njdepartmentofenvironmentalprotection.applytojob.com/apply/Usjk4gjg3N/CIER202610i-Economic-Analysis-Intern",
+      "ids": [
+        "0b6956c74d463546",
+        "aa77b1515b4f2234"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "njdepartmentofenvironmentalprotection.applytojob.com/apply/k6SokzCoje/WRM20262i-Environmental-Services-Intern",
+      "ids": [
+        "51acc0fd7d8075f3",
+        "bb49f84d0ed44050"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "njdepartmentofenvironmentalprotection.applytojob.com/apply/vPwbyhmsxt/Watershed-Land-Management-Intern-WLM20265i",
+      "ids": [
+        "7b65995c787d94a9",
+        "827bebd162d817ed"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "qualcomm.eightfold.ai/careers/job/446721615591",
+      "ids": [
+        "28aa7ad7a3693000",
+        "a2f0b813198b3344"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "rb.wd5.myworkdayjobs.com/FRS/job/Cleveland-OH/Research-Intern---2027_R-0000033640",
+      "ids": [
+        "9a5b48b8264eee73",
+        "d4d1b1f3f013fec2"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "regeneron.wd1.myworkdayjobs.com/Careers/job/TARRYTOWN/XMLNAME-2027-Co-op-Data-Science---Digital-Innovation--Preclinical-Manufacturing---Research-IT-_R51031-1",
+      "ids": [
+        "1413e9e82a5ca104",
+        "83d2259ca018dd40"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "selinc.wd1.myworkdayjobs.com/SEL/job/Washington---Pullman/Engineering-Intern_2025-18137",
+      "ids": [
+        "4e5e99ab76e56fe8",
+        "66e2480e140f1947"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "specteraerospace.bamboohr.com/careers/122",
+      "ids": [
+        "053d2fcd54190906",
+        "e060283a617caa9b"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "symbotic.wd504.myworkdayjobs.com/Symbotic/job/USA-Brooksville-FL/Co-Op--System-Engineer_R8261",
+      "ids": [
+        "28da4ae396488bc6",
+        "905eb7379160f9de"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "symbotic.wd504.myworkdayjobs.com/Symbotic/job/USA-Wilmington--MA---HQ/Co-op--Robot-Manipulation_R8257",
+      "ids": [
+        "089fa647280d9bf6",
+        "318e15e0c21ba5e1"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "www.glassdoor.com/job-listing/jv",
+      "ids": [
+        "3712c65eec3efa7f",
+        "d6f6f67fac561840"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "www.google.com/about/careers/applications/jobs/results/75665705386549958",
+      "ids": [
+        "c2e57da9566dc5b1",
+        "f60c79060ea56d27"
+      ],
+      "years_conflict": false
+    },
+    {
+      "canonical_url": "www.nyfa.org/jobs/job-info",
+      "ids": [
+        "23b8c1f3e0506c6b",
+        "a87048d640aee80e"
+      ],
+      "years_conflict": false
+    }
+  ],
+  "samples": [
+    {
+      "sample_field": "swe",
+      "id": "fe0981c94b165830",
+      "company_name": "FOX",
+      "title": "Summer 2027 FOX Technology Internship Program - Tempe, AZ",
+      "field_tags": [
+        "swe"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "New York, New York, USA",
+          "kind": "nyc_metro",
+          "state": "NY"
+        },
+        {
+          "loc": "Los Angeles, California, USA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://fox.wd1.myworkdayjobs.com/Domestic/job/USA---AZ---Tempe---2010-E-Centennial-Cir/Summer-2027-FOX-Technology-Internship-Program---Tempe--AZ_R50033969-1",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "Machine learning",
+            "level": "preferred"
+          },
+          {
+            "name": "Python",
+            "level": "preferred"
+          },
+          {
+            "name": "Java",
+            "level": "preferred"
+          },
+          {
+            "name": "SQL",
+            "level": "preferred"
+          },
+          {
+            "name": "HTML/CSS",
+            "level": "preferred"
+          },
+          {
+            "name": "Linux",
+            "level": "preferred"
+          },
+          {
+            "name": "Tableau",
+            "level": "preferred"
+          }
+        ],
+        "deadline": "2027-01-10"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "swe",
+      "id": "f9237b52a5b027d1",
+      "company_name": "Lonza",
+      "title": "Summer 2027 Manufacturing, Science & Technology Internship",
+      "field_tags": [
+        "swe",
+        "mechanical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [
+        "junior"
+      ],
+      "regions": [
+        {
+          "loc": "US - Portsmouth, NH",
+          "kind": "new_england",
+          "state": "NH"
+        }
+      ],
+      "apply_url": "https://lonza.wd3.myworkdayjobs.com/lonza_careers/job/US---Portsmouth-NH/Summer-2026-Manufacturing--Science---Technology-Internship_R79570",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "Wet lab",
+            "level": "required"
+          }
+        ],
+        "class_standing": [
+          "junior"
+        ],
+        "gpa_min": 3.0
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "swe",
+      "id": "92b3296462ac0277",
+      "company_name": "Magna International",
+      "title": "Intern - IT",
+      "field_tags": [
+        "swe"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Auburn Hills, Michigan, US",
+          "kind": "us",
+          "state": "MI"
+        }
+      ],
+      "apply_url": "https://magna.wd3.myworkdayjobs.com/Magna/job/Auburn-Hills-Michigan-US/Intern---IT_R00262352",
+      "ats": "workday",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "swe",
+      "id": "a6221727d02e476c",
+      "company_name": "Altera",
+      "title": "Software Engineer Intern",
+      "field_tags": [
+        "swe"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Toronto, ON",
+          "kind": "canada",
+          "state": "ON",
+          "metro": "Toronto"
+        },
+        {
+          "loc": "Toronto, ON, Canada",
+          "kind": "canada",
+          "state": "ON",
+          "metro": "Toronto"
+        },
+        {
+          "loc": "Toronto, Ontario, Canada",
+          "kind": "canada",
+          "state": "ON",
+          "metro": "Toronto"
+        }
+      ],
+      "apply_url": "https://altera.wd1.myworkdayjobs.com/en-US/altera/job/Toronto-Ontario-Canada/Software-Engineer----Intern_R03320",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "FPGA",
+            "level": "required"
+          },
+          {
+            "name": "Embedded systems",
+            "level": "required"
+          },
+          {
+            "name": "Deep learning",
+            "level": "required"
+          },
+          {
+            "name": "Data structures & algorithms",
+            "level": "required"
+          },
+          {
+            "name": "CAD",
+            "level": "required"
+          },
+          {
+            "name": "Python",
+            "level": "required"
+          },
+          {
+            "name": "C++",
+            "level": "required"
+          },
+          {
+            "name": "Verilog/VHDL",
+            "level": "required"
+          }
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "finance",
+      "id": "1ce94c83a2707e2b",
+      "company_name": "The Federal Reserve System",
+      "title": "Enterprise Risk Management Intern - 2027",
+      "field_tags": [
+        "finance"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Cleveland, OH",
+          "kind": "us",
+          "state": "OH"
+        }
+      ],
+      "apply_url": "https://rb.wd5.myworkdayjobs.com/FRS/job/Cleveland-OH/Enterprise-Risk-Management-Intern---2027_R-0000033621",
+      "ats": "workday",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "finance",
+      "id": "a6195ed43db56c4b",
+      "company_name": "Upbound Group",
+      "title": "IT Asset Management Intern",
+      "field_tags": [
+        "swe",
+        "finance"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Plano, TX",
+          "kind": "us",
+          "state": "TX"
+        }
+      ],
+      "apply_url": "https://upbound.wd501.myworkdayjobs.com/Upbound/job/Plano-TX/IT-Asset-Management-Intern_R-100777",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {
+        "gpa_min": 3.2
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "finance",
+      "id": "6869d58507d30256",
+      "company_name": "Elanco",
+      "title": "Finance Intern - Fort Dodge, Iowa (Summer 2027)",
+      "field_tags": [
+        "finance"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Fort Dodge, IA",
+          "kind": "us",
+          "state": "IA"
+        }
+      ],
+      "apply_url": "https://elanco.wd5.myworkdayjobs.com/External_Career/job/Fort-Dodge-IA/Finance-Intern---Fort-Dodge--Iowa--Summer-2027-_R0027194",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "finance",
+      "id": "25a8cd5b0a6ddce3",
+      "company_name": "Insulet Corporation",
+      "title": "Intern, Treasury: June - August 2027 (Hybrid)",
+      "field_tags": [
+        "finance"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Acton, Massachusetts",
+          "kind": "new_england",
+          "state": "MA"
+        }
+      ],
+      "apply_url": "https://insulet.wd5.myworkdayjobs.com/insuletcareers/job/Acton-Massachusetts/Intern--Treasury--June---August-2027--Hybrid-_REQ-2026-18143",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "skills": [
+          {
+            "name": "Accounting",
+            "level": "required"
+          },
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ],
+        "gpa_min": 3.0,
+        "no_sponsorship": true,
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "mechanical",
+      "id": "850c29ab2ba91764",
+      "company_name": "Quantinuum",
+      "title": "Mechanical Engineering Intern for Photonics Physics Package R&D - 996",
+      "field_tags": [
+        "mechanical",
+        "physics"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "US Broomfield, CO",
+          "kind": "us",
+          "state": "CO"
+        }
+      ],
+      "apply_url": "https://jobs.eu.lever.co/quantinuum/d36cdf8b-3100-4e0f-9b8b-2177a62cd822/apply",
+      "ats": "lever",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "mechanical",
+      "id": "7591e75c01529d22",
+      "company_name": "Astranis",
+      "title": "Harness Manufacturing Intern (Summer 2027)",
+      "field_tags": [
+        "mechanical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "San Francisco",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://job-boards.greenhouse.io/astranis/jobs/4705255006",
+      "ats": "greenhouse",
+      "term": "Summer 2027",
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "mechanical",
+      "id": "178b627667e79da5",
+      "company_name": "Olsson",
+      "title": "Mechanical Engineering Internship - Facilities",
+      "field_tags": [
+        "mechanical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Oklahoma City, OK",
+          "kind": "us",
+          "state": "OK"
+        }
+      ],
+      "apply_url": "https://job-boards.greenhouse.io/olsson/jobs/5394246008",
+      "ats": "greenhouse",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "mechanical",
+      "id": "511c61409e7d2631",
+      "company_name": "Emerson Electric",
+      "title": "Mechanical Design Engineering Intern",
+      "field_tags": [
+        "mechanical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Shakopee, MN",
+          "kind": "us",
+          "state": "MN"
+        },
+        {
+          "loc": "Eden Prairie, MN",
+          "kind": "us",
+          "state": "MN"
+        }
+      ],
+      "apply_url": "https://hdjq.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/26009630",
+      "ats": "oracle",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "marketing",
+      "id": "ed2755cf25892cda",
+      "company_name": "Axis Communications AB",
+      "title": "Marketing Operations Intern (Fall/Winter)",
+      "field_tags": [
+        "marketing",
+        "operations"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Chelmsford, MA",
+          "kind": "new_england",
+          "state": "MA"
+        }
+      ],
+      "apply_url": "https://axis.wd3.myworkdayjobs.com/external_career_site/job/USA---MA---Chelmsford/Marketing-Operations-Intern--Fall-Winter-_R-123976",
+      "ats": "workday",
+      "term": "Fall 2026",
+      "insights": {
+        "skills": [
+          {
+            "name": "Salesforce",
+            "level": "required"
+          },
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "marketing",
+      "id": "9acb886cd2e4c076",
+      "company_name": "COUNTRY Financial",
+      "title": "Digital Marketing Intern",
+      "field_tags": [
+        "marketing"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Bloomington, IL",
+          "kind": "us",
+          "state": "IL"
+        }
+      ],
+      "apply_url": "https://countryfinancial.wd5.myworkdayjobs.com/COUNTRYCorporateInternships/job/Bloomington-IL/Digital-Marketing-Intern_R26_0000001020",
+      "ats": "workday",
+      "term": "Fall 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "SEO",
+            "level": "required"
+          },
+          {
+            "name": "Adobe Creative Suite",
+            "level": "required"
+          }
+        ],
+        "grad_years": [
+          2027
+        ]
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "marketing",
+      "id": "014c306765962fd1",
+      "company_name": "Stryker",
+      "title": "Summer 2027 Internship - Downstream Marketing Intern - Texas",
+      "field_tags": [
+        "marketing"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Flower Mound, Texas",
+          "kind": "us",
+          "state": "TX"
+        }
+      ],
+      "apply_url": "https://stryker.wd1.myworkdayjobs.com/StrykerCareers/job/Flower-Mound-Texas/Summer-2027-Internship---Downstream-Marketing-Intern---Texas_R572807",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ],
+        "gpa_min": 3.0,
+        "pay": "stipend"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "marketing",
+      "id": "ad65be0ce9e26374",
+      "company_name": "University of Pikeville",
+      "title": "WS - Spring Term - INTERNSHIP – First Baptist Church of Pikeville – Media & Communications– IWS",
+      "field_tags": [
+        "marketing",
+        "communications"
+      ],
+      "stage": [
+        "internship",
+        "part_time"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Pikeville, Kentucky",
+          "kind": "us",
+          "state": "KY"
+        }
+      ],
+      "apply_url": "https://upike.bamboohr.com/careers/583",
+      "ats": "bamboohr",
+      "term": "Spring",
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "civil",
+      "id": "5df53a328f2b8850",
+      "company_name": "HNTB",
+      "title": "Fall 2026 Civil Engineering Intern - Aviation Group",
+      "field_tags": [
+        "civil"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Dallas, TX",
+          "kind": "us",
+          "state": "TX"
+        }
+      ],
+      "apply_url": "https://hntb.wd5.myworkdayjobs.com/hntb_university_careers/job/Dallas-TX/Fall-2026-Civil-Engineering-Intern---Aviation-Group_R-31384",
+      "ats": "workday",
+      "term": "Fall 2026",
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "civil",
+      "id": "88be952e02fcde61",
+      "company_name": "Olsson",
+      "title": "Structural Drafting Internship - Industrial Facilities",
+      "field_tags": [
+        "civil"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Des Moines, IA",
+          "kind": "us",
+          "state": "IA"
+        }
+      ],
+      "apply_url": "https://job-boards.greenhouse.io/olsson/jobs/5408530008",
+      "ats": "greenhouse",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "civil",
+      "id": "a6b83f82a8e7da64",
+      "company_name": "WSP",
+      "title": "Civil Engineering Intern- Summer 2027",
+      "field_tags": [
+        "civil"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "New York, NY",
+          "kind": "nyc_metro",
+          "state": "NY"
+        },
+        {
+          "loc": "Indianapolis, IN",
+          "kind": "us",
+          "state": "IN"
+        },
+        {
+          "loc": "Lakewood, CO",
+          "kind": "us",
+          "state": "CO"
+        },
+        {
+          "loc": "Madison, WI",
+          "kind": "us",
+          "state": "WI"
+        },
+        {
+          "loc": "Columbus, OH",
+          "kind": "us",
+          "state": "OH"
+        },
+        {
+          "loc": "Tampa, FL",
+          "kind": "us",
+          "state": "FL"
+        },
+        {
+          "loc": "Greensboro, NC",
+          "kind": "us",
+          "state": "NC"
+        },
+        {
+          "loc": "Charlotte, NC",
+          "kind": "us",
+          "state": "NC"
+        },
+        {
+          "loc": "Raleigh, NC",
+          "kind": "us",
+          "state": "NC"
+        },
+        {
+          "loc": "Mooresville, NC",
+          "kind": "us",
+          "state": "NC"
+        },
+        {
+          "loc": "Louisville, KY",
+          "kind": "us",
+          "state": "KY"
+        },
+        {
+          "loc": "Boston, MA",
+          "kind": "new_england",
+          "state": "MA"
+        },
+        {
+          "loc": "Glastonbury, CT",
+          "kind": "new_england",
+          "state": "CT"
+        },
+        {
+          "loc": "Fort Worth, TX",
+          "kind": "us",
+          "state": "TX"
+        }
+      ],
+      "apply_url": "https://emit.fa.ca3.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_2001/job/97889",
+      "ats": "oracle",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "Excel",
+            "level": "required"
+          },
+          {
+            "name": "AutoCAD",
+            "level": "preferred"
+          }
+        ],
+        "grad_years": [
+          2028
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "civil",
+      "id": "45fbfd90fe22706e",
+      "company_name": "The Aerospace Corporation",
+      "title": "2027 Flight Loads Structural Dynamics Graduate Intern",
+      "field_tags": [
+        "civil"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [
+        "masters"
+      ],
+      "regions": [
+        {
+          "loc": "El Segundo, CA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://aero.wd5.myworkdayjobs.com/external/job/El-Segundo-CA/XMLNAME-2027-Flight-Loads-Structural-Dynamics-Graduate-Intern_R016755",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "skills": [
+          {
+            "name": "Embedded systems",
+            "level": "required"
+          },
+          {
+            "name": "Python",
+            "level": "required"
+          },
+          {
+            "name": "MATLAB",
+            "level": "required"
+          }
+        ],
+        "citizenship": "citizen",
+        "clearance": true,
+        "gpa_min": 3.5
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "biomedical",
+      "id": "a3ae28f944a901bc",
+      "company_name": "ZOLL Medical Corporation",
+      "title": "Biomedical Engineering Co-Op",
+      "field_tags": [
+        "biomedical"
+      ],
+      "stage": [
+        "co_op"
+      ],
+      "years": [
+        "junior",
+        "senior"
+      ],
+      "regions": [
+        {
+          "loc": "Chelmsford, MA",
+          "kind": "new_england",
+          "state": "MA"
+        }
+      ],
+      "apply_url": "https://zoll.wd5.myworkdayjobs.com/ZOLLMedicalCorp/job/Chelmsford-MA/Biomedical-Engineering-Co-Op_R20358",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "class_standing": [
+          "junior",
+          "senior"
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "biomedical",
+      "id": "8d740b3ad8dd4564",
+      "company_name": "Zeiss",
+      "title": "Intern AI Innovation for Medical Devices (f/m/x)",
+      "field_tags": [
+        "ml",
+        "biomedical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Oberkochen, CA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://zeissgroup.wd3.myworkdayjobs.com/External/job/Oberkochen/Intern-AI-Innovation-for-Medical-Devices--f-m-x-_JR_1053345",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "skills": [
+          {
+            "name": "Computer vision",
+            "level": "required"
+          },
+          {
+            "name": "Machine learning",
+            "level": "required"
+          },
+          {
+            "name": "Python",
+            "level": "required"
+          },
+          {
+            "name": "Data structures & algorithms",
+            "level": "required"
+          }
+        ]
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "biomedical",
+      "id": "bbf100afc277ffe7",
+      "company_name": "Alcon",
+      "title": "2027 Summer Mechanical & Biomedical Engineering Intern",
+      "field_tags": [
+        "mechanical",
+        "biomedical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Fort Worth, Texas",
+          "kind": "us",
+          "state": "TX"
+        },
+        {
+          "loc": "Lake Forest, California",
+          "kind": "us",
+          "state": "CA"
+        },
+        {
+          "loc": "Johns Creek, Georgia",
+          "kind": "us",
+          "state": "GA"
+        },
+        {
+          "loc": "Houston, Texas",
+          "kind": "us",
+          "state": "TX"
+        },
+        {
+          "loc": "Goleta, California",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://alcon.wd5.myworkdayjobs.com/careers_alcon/job/Fort-Worth-Texas/XMLNAME-2027-Summer-Mechanical---Biomedical-Engineering-Intern_R-2026-49483",
+      "ats": "workday",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "CAD",
+            "level": "required"
+          },
+          {
+            "name": "3D printing",
+            "level": "required"
+          }
+        ],
+        "gpa_min": 2.8
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "biomedical",
+      "id": "99c9203cc40c1005",
+      "company_name": "Analog Devices",
+      "title": "Biomedical Engineering Intern",
+      "field_tags": [
+        "biomedical"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "US, MA",
+          "kind": "new_england",
+          "state": "MA"
+        }
+      ],
+      "apply_url": "https://analogdevices.wd1.myworkdayjobs.com/External/job/US-MA-Wilmington/Biomedical-Engineering-Intern_R265577",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "skills": [
+          {
+            "name": "Data structures & algorithms",
+            "level": "required"
+          },
+          {
+            "name": "Embedded systems",
+            "level": "required"
+          },
+          {
+            "name": "Statistics",
+            "level": "required"
+          },
+          {
+            "name": "Python",
+            "level": "required"
+          },
+          {
+            "name": "MATLAB",
+            "level": "required"
+          },
+          {
+            "name": "Machine learning",
+            "level": "preferred"
+          }
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "publishing",
+      "id": "388b576c5864760f",
+      "company_name": "Insomniac Games",
+      "title": "Publishing Project Management Intern - Undergraduate",
+      "field_tags": [
+        "operations",
+        "publishing"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [
+        "first_year",
+        "sophomore",
+        "junior",
+        "senior"
+      ],
+      "regions": [
+        {
+          "loc": "United States, Burbank, CA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://job-boards.greenhouse.io/insomniac/jobs/6226347004",
+      "ats": "greenhouse",
+      "term": null,
+      "insights": {
+        "skills": [
+          {
+            "name": "Agile",
+            "level": "preferred"
+          },
+          {
+            "name": "Git",
+            "level": "preferred"
+          }
+        ],
+        "grad_years": [
+          2026,
+          2029
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "publishing",
+      "id": "e32de5a01989922c",
+      "company_name": "Insomniac",
+      "title": "Paid Spring Music Group Publishing Intern",
+      "field_tags": [
+        "publishing",
+        "music",
+        "arts"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Calabasas, CA, USA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://livenation.wd503.myworkdayjobs.com/InsomniacExternalSite/job/Calabasas-CA-USA/Paid-Spring-Music-Group-Publishing-Intern_JR-93566",
+      "ats": "workday",
+      "term": "Spring",
+      "insights": {
+        "skills": [
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "publishing",
+      "id": "61a2129a6fb359b1",
+      "company_name": "KQED",
+      "title": "KQED Food & Check, Please! Bay Area Editorial & Audience Engagement Intern",
+      "field_tags": [
+        "media",
+        "journalism",
+        "publishing"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "San Francisco, CA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://kqed.applytojob.com/apply/m7yUBNbzcz/KQED-Food-Check-Please-Bay-Area-Editorial-Audience-Engagement-Intern",
+      "ats": "jazzhr",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "publishing",
+      "id": "28789c91bc018b8c",
+      "company_name": "University of Wyoming",
+      "title": "Work Study Posn Student - Editorial, Design, and Production Internship - University Libraries/University Press of Colorado",
+      "field_tags": [
+        "media",
+        "journalism",
+        "publishing",
+        "film"
+      ],
+      "stage": [
+        "internship",
+        "part_time"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Laramie, WY",
+          "kind": "us",
+          "state": "WY"
+        }
+      ],
+      "apply_url": "https://eeik.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/262916",
+      "ats": "oracle",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "music",
+      "id": "c219804f62e7140a",
+      "company_name": "Insomniac",
+      "title": "Insomniac - Paid Spring Music Group PR & Promo Intern",
+      "field_tags": [
+        "music",
+        "arts"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Calabasas, CA, USA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://livenation.wd503.myworkdayjobs.com/InsomniacExternalSite/job/Calabasas-CA-USA/Insomniac---Paid-Spring-Music-Group-PR---Promo-Intern_JR-93562",
+      "ats": "workday",
+      "term": "Spring",
+      "insights": {
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "music",
+      "id": "a865d093490f14c2",
+      "company_name": "Insomniac",
+      "title": "Insomniac - Paid Spring Music Group Marketing Intern",
+      "field_tags": [
+        "marketing",
+        "music",
+        "arts"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Calabasas, CA, USA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://livenation.wd503.myworkdayjobs.com/InsomniacExternalSite/job/Calabasas-CA-USA/Insomniac---Paid-Spring-Music-Group-Marketing-Intern_JR-93563-1",
+      "ats": "workday",
+      "term": "Spring",
+      "insights": {
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "music",
+      "id": "ecba6982d00640c5",
+      "company_name": "American University",
+      "title": "Instrumental Musician, Gentleman's Guide (Student)",
+      "field_tags": [
+        "music"
+      ],
+      "stage": [
+        "part_time"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Main Campus (Washington, DC)",
+          "kind": "us",
+          "state": "DC"
+        }
+      ],
+      "apply_url": "https://american.wd1.myworkdayjobs.com/au/job/Main-Campus-Washington-DC/Instrumental-Musician--Gentleman-s-Guide--Student-_R5034",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "music",
+      "id": "362214bc2924cd39",
+      "company_name": "Live Nation Entertainment",
+      "title": "Paid Spring Music Group Publishing Intern",
+      "field_tags": [
+        "publishing",
+        "music",
+        "arts"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Calabasas, CA, USA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://livenation.wd503.myworkdayjobs.com/LNExternalSite/job/Calabasas-CA-USA/Paid-Spring-Music-Group-Publishing-Intern_JR-93566-1",
+      "ats": "workday",
+      "term": "Spring",
+      "insights": {
+        "skills": [
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ],
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "theater",
+      "id": "ba41f7d9d89960b2",
+      "company_name": "University of Pikeville",
+      "title": "WS - Spring Term INTERNSHIP - Appalachian Center For The Arts Stage Management Intern - FWS",
+      "field_tags": [
+        "theater",
+        "arts"
+      ],
+      "stage": [
+        "internship",
+        "part_time"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Pikeville, Kentucky",
+          "kind": "us",
+          "state": "KY"
+        }
+      ],
+      "apply_url": "https://upike.bamboohr.com/careers/568",
+      "ats": "bamboohr",
+      "term": "Spring",
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "theater",
+      "id": "6f1844b4837d4de2",
+      "company_name": "Maple Leaf Sports & Entertainment Partnership (MLSE)",
+      "title": "Live Entertainment & Venue Marketing Intern",
+      "field_tags": [
+        "marketing",
+        "theater"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Toronto, Ontario",
+          "kind": "canada",
+          "state": "ON",
+          "metro": "Toronto"
+        }
+      ],
+      "apply_url": "https://mlse.wd3.myworkdayjobs.com/MLSE/job/Toronto-Ontario/Live-Entertainment---Venue-Marketing-Intern_JR0000848-2",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "theater",
+      "id": "c990b8638fcdd107",
+      "company_name": "Sony Pictures Entertainment",
+      "title": "Intern, Casting, Sony Pictures Television - Spring 2027",
+      "field_tags": [
+        "theater"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Culver City, California",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://spe.wd1.myworkdayjobs.com/SonyPicturesEntertainment/job/Culver-City-California/Intern--Casting--Sony-Pictures-Television---Spring-2027_JR114862",
+      "ats": "workday",
+      "term": "Spring 2027",
+      "insights": {
+        "pay": "paid"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "theater",
+      "id": "ea2272de194edabe",
+      "company_name": "NBCUniversal",
+      "title": "Feature Technical Direction Intern",
+      "field_tags": [
+        "theater"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Glendale, CA",
+          "kind": "us",
+          "state": "CA"
+        }
+      ],
+      "apply_url": "https://jobs.smartrecruiters.com/NBCUniversal3/744000153538044",
+      "ats": "smartrecruiters",
+      "term": "Spring 2027",
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "clinical_research",
+      "id": "d488b5a53e8f9b1d",
+      "company_name": "Merck",
+      "title": "2027 Future Talent Program – Translational Sciences and Outsourcing – Co-op",
+      "field_tags": [
+        "clinical_research",
+        "supply_chain"
+      ],
+      "stage": [
+        "co_op"
+      ],
+      "years": [
+        "phd"
+      ],
+      "regions": [
+        {
+          "loc": "USA - Massachusetts - Boston (MA Parcel B Laboratory)",
+          "kind": "new_england",
+          "state": "MA"
+        }
+      ],
+      "apply_url": "https://msd.wd5.myworkdayjobs.com/searchjobs/job/USA---Massachusetts---Boston-MA-Parcel-B-Laboratory/XMLNAME-2027-Future-Talent-Program---Translational-Sciences-and-Outsourcing---Co-op_R412935",
+      "ats": "workday",
+      "term": null,
+      "insights": {
+        "skills": [
+          {
+            "name": "Machine learning",
+            "level": "required"
+          },
+          {
+            "name": "Statistics",
+            "level": "required"
+          },
+          {
+            "name": "Python",
+            "level": "required"
+          },
+          {
+            "name": "pandas/NumPy",
+            "level": "required"
+          },
+          {
+            "name": "scikit-learn",
+            "level": "required"
+          },
+          {
+            "name": "PyTorch",
+            "level": "required"
+          },
+          {
+            "name": "Deep learning",
+            "level": "required"
+          }
+        ],
+        "degree_only": "phd"
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "clinical_research",
+      "id": "c157e5f2648fb11a",
+      "company_name": "Medpace",
+      "title": "Summer 2027 Clinical Trials Feasibility & Proposals Internship",
+      "field_tags": [
+        "health",
+        "clinical_research"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Cincinnati, Ohio",
+          "kind": "us",
+          "state": "OH"
+        }
+      ],
+      "apply_url": "https://careers.medpace.com/jobs/13001",
+      "ats": "other",
+      "term": "Summer 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "GCP",
+            "level": "required"
+          },
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ]
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "clinical_research",
+      "id": "4c3eb30dab00ff92",
+      "company_name": "University of Texas at Austin",
+      "title": "CRC Community Outreach Intern",
+      "field_tags": [
+        "clinical_research",
+        "nonprofit"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "UT MAIN CAMPUS",
+          "kind": "us",
+          "state": "UT"
+        }
+      ],
+      "apply_url": "https://utaustin.wd1.myworkdayjobs.com/utstudent/job/UT-MAIN-CAMPUS/CRC-Community-Outreach-Intern_R_00041237",
+      "ats": "workday",
+      "term": null,
+      "insights": {},
+      "carried": null,
+      "description_available": false,
+      "live_status": "not_checked"
+    },
+    {
+      "sample_field": "clinical_research",
+      "id": "22b6a875192fd721",
+      "company_name": "Medpace",
+      "title": "Spring 2027 Clinical Trials Feasibility & Proposals Internship",
+      "field_tags": [
+        "health",
+        "clinical_research"
+      ],
+      "stage": [
+        "internship"
+      ],
+      "years": [],
+      "regions": [
+        {
+          "loc": "Cincinnati, Ohio",
+          "kind": "us",
+          "state": "OH"
+        }
+      ],
+      "apply_url": "https://careers.medpace.com/jobs/12955",
+      "ats": "other",
+      "term": "Spring 2027",
+      "insights": {
+        "skills": [
+          {
+            "name": "GCP",
+            "level": "required"
+          },
+          {
+            "name": "Excel",
+            "level": "required"
+          }
+        ]
+      },
+      "carried": null,
+      "description_available": true,
+      "live_status": "not_checked"
+    }
+  ],
+  "export_generated_at": "2026-10-20T02:44:58.802800+00:00"
+}

@@ -1301,6 +1301,31 @@ def test_no_page_has_a_form_while_the_address_is_empty(tmp_path):
     assert "/digest/" not in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
 
 
+def test_landing_digest_navigation_is_absent_when_signup_is_disabled(tmp_path):
+    site = _email_site(tmp_path, "")
+    pages = seo_pages.build(site)
+    assert any(p["path"].startswith("/internships/") for p in pages)
+    assert all('data-digest-placement="nav"' not in p["html"] for p in pages)
+
+
+def test_landing_digest_link_precedes_listings_without_duplicating_the_form(tmp_path):
+    site = _email_site(tmp_path, FORM)
+    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    link = '<a href="/digest/" data-digest-placement="nav">Free Monday email</a>'
+    landing_pages = {path: html for path, html in pages.items() if path.startswith("/internships/")}
+    assert landing_pages
+    for path, html in landing_pages.items():
+        nav = re.search(r"<nav>.*?</nav>", html, re.S).group(0)
+        assert link in nav and html.count(link) == 1, path
+        if '<ul class="jobs">' in html:
+            assert html.index(link) < html.index('<ul class="jobs">'), path
+        assert html.count('id="digest-email"') <= 1, path
+    field_page = pages["/internships/mechanical-engineering/"]
+    assert field_page.count('<form class="digest"') == 1
+    assert 'data-digest-placement="landing"' in field_page
+    assert link not in pages["/digest/"]  # no link inviting the reader to the page already open
+
+
 def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(tmp_path):
     site = _email_site(tmp_path, FORM)
     pages = {p["path"]: p["html"] for p in seo_pages.build(site)}

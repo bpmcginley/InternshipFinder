@@ -1474,6 +1474,10 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
     # Pricing, Compare and About are in the nav since 2026-10-05 (the audit: the comparison page, the
     # site's best price story, was reachable only from the footer, and the prices had no page at all).
     # was: <nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a></nav>
+    # A landing visitor can find the optional digest before scrolling through the listings.
+    # Reuse the existing nav link counter; the lower form keeps its landing placement.
+    digest_nav = ('<a href="/digest/" data-digest-placement="nav">Free Monday email</a>'
+                  if DIGEST_FORM and path.startswith("/internships/") else "")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1498,7 +1502,7 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 </head>
 <body>
 <div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
+<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
 <main>
 {crumb_html}<h1>{esc(h1)}</h1>
 {body}
@@ -1992,7 +1996,7 @@ def listing_faq(items: list[dict], field: str | None, state: str | None, updated
 ORG_ID, SITE_ID = SITE + "/#organization", SITE + "/#website"
 ORGANIZATION = {"@context": "https://schema.org", "@type": "Organization", "@id": ORG_ID, "name": "InternScout",
                 "url": SITE + "/", "logo": SITE + "/icon512.png", "slogan": SLOGAN,
-                "description": "A free internship search for college students of every major in the US and Canada.",
+                "description": "A free internship search for college students in the US and Canada.",
                 # The brand's own profiles. Mastodon links back here (docs/index.html: rel="me"); the
                 # rest are InternScout's product accounts, made 2026-10-05 (the audit: sameAs had one
                 # link). docs/index.html carries the same list; test_seo_pages.py checks they agree.
@@ -2055,7 +2059,7 @@ def _offer(name: str, price: str) -> dict:
 # object, in docs/index.html; backend/tests/test_seo_pages.py checks the two agree.
 PRODUCT = {"@context": "https://schema.org", "@type": "Product", "@id": SITE + "/#product",
            "name": "InternScout Auto-Apply",
-           "description": "A free internship search for college students of every major, with a Chrome extension that "
+           "description": "A free internship search for college students, with a Chrome extension that "
                           "fills in applications from your resume and never submits them. Search needs no account; the "
                           "extension has a free monthly allowance, and two paid plans raise it.",
            "brand": {"@id": ORG_ID}, "url": SITE + "/pricing/", "image": SITE + "/icon512.png",

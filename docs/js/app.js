@@ -1847,7 +1847,7 @@
             ].filter(Boolean) : null,
           })),
         h("div", { className: "hero" },
-          h("h1", null, "Every student internship, co-op and research role, in one free search."),
+          h("h1", null, "Find student internships, co-ops and research roles in one free search."),
           // was: ... : "Internships, co-ops and research for students in every major, anywhere in the US and Canada.",
           // The listings, majors and states were never UMass-only, and the line read as a gate to everyone else.
           h("p", { className: "sub" }, p ? `${majorsText}${p.class_year ? " · " + IS.YEAR_LABEL[p.class_year] : ""} · ${whereText}`
@@ -1856,7 +1856,7 @@
             // was: `... ${openCount ? openCount + " open roles are" : "Every open role is"} here, ...`. The count
             // arrived after the first paint and redrew the page's largest text, so Lighthouse timed the page's
             // main paint after the listings; the button under it and the figures carry the count (2026-10-14).
-            : "Stop checking ten job boards every morning. Every open role is here, updated several times a day, with no account needed. Every major, anywhere in the US and Canada.",
+            : "Explore internships, co-ops and research roles across the US and Canada. Listings refresh several times a day. Search free, with no account needed.",
             howBtn && " · ", howBtn),
           !p && h("div", { className: "hero-actions" },
             h("button", { type: "button", className: "btn primary", onClick: goSearch }, `Search ${openCount ? openCount + " " : ""}internships free · no account`),
