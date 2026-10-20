@@ -19,4 +19,5 @@ import "./placement-script.test.js";
 import "./placement-counts.test.js";
 // Paid listings bought on the site (2026-10-19).
 import "./mail.test.js";
+import "./order-mail.test.js";
 import "./orders.test.js";
