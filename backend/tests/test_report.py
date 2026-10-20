@@ -5,7 +5,7 @@ import importlib.util
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -111,3 +111,24 @@ def test_nothing_left_out_says_nothing(cloudflare):
     data = _analytics([("/", 10)], [("www.google.com", 9)])
     cloudflare += [data, data]
     assert "left out" not in "\n".join(report.visits_section(NOW))
+
+
+def test_visit_period_matches_utc_query_and_does_not_claim_people(monkeypatch):
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-test-token")
+    requested = []
+    data = _analytics([("/", 100)], [("", 100)])
+
+    def capture(url, body, token):
+        requested.append(body["variables"])
+        return data
+
+    monkeypatch.setattr(report, "_post", capture)
+    local_now = datetime(2026, 10, 19, 22, 47, tzinfo=timezone(timedelta(hours=-4)))
+    md = "\n".join(report.visits_section(local_now))
+    for variables in requested:
+        assert variables["start"] == "2026-10-13T02:00:00Z"
+        assert variables["end"] == "2026-10-20T02:00:00Z"
+    assert "2026-10-13T02:00:00Z to 2026-10-20T02:00:00Z" in md
+    assert "end exclusive" in md
+    assert "not unique people, students, installs, or confirmed email subscribers" in md
+    assert "do not add the two totals together" in md

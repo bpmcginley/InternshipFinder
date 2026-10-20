@@ -6,6 +6,8 @@ The first milestone is **25 genuine, confirmed student subscribers**, excluding 
 
 ## Ready to review
 
+- [October 20–November 2 experiment](EXPERIMENT-2026-10-20.md): the finite next cycle, partner widget and computing roundups, measurement limits, and decision rules. No messages or posts have been sent for it.
+- [Student session recording sheet](student-session-recording.csv): blank CSV to copy outside the repository; use the five tasks in the existing pilot kit. Completed notes never belong in Git.
 - [Brand drafts](brand-drafts.md): three opportunity-led sets, each with a short X thread and a longer caption. Each role has an official source in [opportunities.json](opportunities.json).
 - [UMass club kit](umass-clubs.md): eight organizations, verified public contact routes where available, uncertainty flags, and individual outreach drafts.
 - Set C is now Hasbro only: the Weiss fellowship closed October 16, 2026 at 5 p.m. Eastern and was removed on October 18.

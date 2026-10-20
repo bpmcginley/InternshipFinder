@@ -105,7 +105,7 @@ def visits_section(now: datetime) -> list[str]:
     if not token:
         return out + ["Not connected: add a Cloudflare API token with *Account Analytics: Read* as the repo "
                       "secret `CLOUDFLARE_API_TOKEN`.", ""]
-    end = now.replace(minute=0, second=0, microsecond=0)
+    end = now.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start, prev = end - timedelta(days=7), end - timedelta(days=14)
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
     try:
@@ -125,7 +125,11 @@ def visits_section(now: datetime) -> list[str]:
     total = lambda rows: (rows[0]["sum"]["visits"] if rows else 0)  # noqa: E731
     week, before = total(acct["week"]), total(acct["prev"])
     change = f" ({'+' if week >= before else ''}{week - before} on the week before)" if before else ""
-    out += [f"**{week:,} visits**{change}.", "", "| Page | Visits |", "|---|---|"]
+    out += [f"**{week:,} visits**{change}.",
+            f"Period (UTC, end exclusive): {iso(start)} to {iso(end)}.",
+            "Visits are Cloudflare's sampled visit estimates, not unique people, students, installs, "
+            "or confirmed email subscribers. Anonymous Worker counters use a separate collection method; "
+            "do not add the two totals together.", "", "| Page | Visits |", "|---|---|"]
     # was: f"| `{p['dimensions']['requestPath']}` | ...": a path with a backtick or pipe in it broke out
     # of the code span and the table. And the referrer went in as bare text, so a spoofed one could put
     # a link or an @mention in a public issue. Both are now inert() code spans.
