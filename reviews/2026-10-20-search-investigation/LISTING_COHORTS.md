@@ -63,12 +63,17 @@ correction is a relevance improvement, not an established explanation or ranking
 
 ## Validation and release behavior
 
-From `backend/`: `python -m pytest tests/test_classify_stage.py tests/test_seo_pages.py -q`:
-**185 passed**. Fixtures cover the observed false positives, retained legal tagging, ambiguous
+From `backend/`: `python -m pytest tests/test_classify_stage.py tests/test_seo_pages.py
+tests/test_shards.py tests/test_export_closure.py -q`: **221 passed**. Fixtures cover the observed
+false positives, retained legal tagging, ambiguous
 security titles and explicit cyber work overriding a national/physical security phrase. Review
 also added technical IT / Information Technology Security Officer and Security Operations Center
 regressions, and confirms generic Security Engineer alone cannot override explicit physical security.
 
-Normalization calls `classify(title)` at `backend/internscout/normalize.py:353`. The change reaches
-published listing data and generated pages after the next normal ingest/export and successful
-Pages deployment; this source patch alone does not rewrite the current public data.
+Normalization calls `classify(title)` at `backend/internscout/normalize.py:353`. Failed-board and
+search-result carryover paths can retain historical tags, so a shared narrow correction also runs
+at the final export boundary after both carry paths and before field counts and shards are written.
+It removes only the disproven security tag, preserving every other field and all timestamps,
+status, descriptions and provenance. Carryover tests verify field/index statistics too. The change
+reaches published listing data and generated pages after the next normal ingest/export and
+successful Pages deployment; this source patch alone does not rewrite the current public data.
