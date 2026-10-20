@@ -8,8 +8,9 @@ an implementation task, not merely a product review.
 
 The October 19 growth report (#129) reports 990 visits, 640 to internship landing pages.
 These are visits, not unique students. Employer checkout and the full-field widget are
-live through PRs #132 and #133. PR #124 remains an unreleased product candidate.
-No current confirmed-subscriber or returning-student count has yet been established.
+live through PRs #132 and #133. At kickoff PR #124 was an unreleased candidate.
+Its site/Worker changes are now deployed; store publication remains gated. Provider and
+anonymous baselines were checked privately; returning-student counts remain unknown.
 
 | Priority | Work | Completion criterion | Owner / status |
 | --- | --- | --- | --- |
