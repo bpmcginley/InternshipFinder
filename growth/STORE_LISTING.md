@@ -1,8 +1,24 @@
-# Chrome Web Store listing for 0.5.5
+# Chrome Web Store listing draft and release notes
 
-Paste these into the Chrome Web Store developer dashboard (Store listing tab) when submitting 0.5.5.
-Updating this file does **not** change the listing; after publishing, reopen the public page and check it.
-Written 2026-10-06 from the live 0.5.4 listing. Four reasons to change it now:
+The description below is the maintained copy for the Store listing tab, not a record of a submitted
+change. Updating this file does **not** change the listing. The public 0.5.7 listing was reviewed on
+2026-10-16; its prices, optional Deep Dive and encrypted-profile wording are already current.
+
+## Proposed 0.5.8 release notes (not submitted)
+
+- Take over brings the application tab forward promptly, even when the page is slow to respond.
+- Setup offers a dashboard sign-in only while it can still be used.
+- When details entered by hand are incomplete, setup asks for the missing details.
+- After setup, an optional link opens the free Monday internship email signup page. Signing up is
+  separate and requires email confirmation.
+
+The first three fixes were merged after the 0.5.7 package was built. They are already implemented on
+main and are included in the 0.5.8 candidate; this is not a claim that 0.5.8 has been published.
+See `reviews/releases/extension-0.5.8.md` for release gates and package verification.
+
+## Description history (2026-10-06)
+
+The description was rewritten from the live 0.5.4 listing for these reasons:
 
 1. **A privacy sentence is no longer true.** The live text says the profile is stored only in Chrome and
    that the only profile data on InternScout's server is the chosen states. Since Deep Dive account saving

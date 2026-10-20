@@ -10,7 +10,7 @@ The first milestone is **25 genuine, confirmed student subscribers**, excluding 
 - [Student session recording sheet](student-session-recording.csv): blank CSV to copy outside the repository; use the five tasks in the existing pilot kit. Completed notes never belong in Git.
 - [Brand drafts](brand-drafts.md): three opportunity-led sets, each with a short X thread and a longer caption. Each role has an official source in [opportunities.json](opportunities.json).
 - [UMass club kit](umass-clubs.md): eight organizations, verified public contact routes where available, uncertainty flags, and individual outreach drafts.
-- Set C is now Hasbro only: the Weiss fellowship closed October 16, 2026 at 5 p.m. Eastern and was removed on October 18.
+- The Weiss fellowship was retired from Set C on October 16, ahead of its **5 p.m. Eastern** deadline. It is historical material only in `opportunities.json` under `retired_roles`; never reuse it for Monday's email or next week's promotion. Set C now contains only Hasbro's candidate pool and still needs a live employer-page check before release.
 
 The weekly email is free, goes out on Mondays, and requires the subscriber to click the confirmation email. Everyone currently receives the same digest. These drafts do not promise personalized alerts, application success, university endorsement, or continuous availability of any employer's role.
 
@@ -43,4 +43,4 @@ This is a finite launch kit. It does not create a new recurring automation, enab
 
 ## Validation performed
 
-The six opportunity IDs, official URLs, and open status matched the MA export used for this kit. Each selected official page was opened through the research tool and contained an application form; no applications were submitted. The nine X draft blocks were checked with URLs counted as 23 characters and each was below 280 characters (177–237). Markdown HTTPS links were parsed, JSON was parsed, and `git diff --check` passed. These checks do not verify live social authentication, club permission, deliverability, or future role availability. No application code changed, so no product test suite was run for this editorial kit.
+The original six opportunity IDs, official URLs, and open status matched the October 15 MA export used for this kit. Each selected official page was opened through the research tool and contained an application form; no applications were submitted. The original nine X draft blocks were below 280 characters with URLs counted as 23 characters (177–237). The October 16 retirement removes the Weiss block and leaves five ready-for-recheck opportunities and eight X blocks. This is a safety retirement, not a new availability check on the other roles. Markdown HTTPS links were parsed, JSON was parsed, and `git diff --check` passed. These checks do not verify live social authentication, club permission, deliverability, or future role availability.
