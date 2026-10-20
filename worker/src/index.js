@@ -379,6 +379,12 @@ async function route(request, env, ctx, d) {
       const act = { "/admin/placements": createPlacement, "/admin/placements/update": updatePlacement,
         "/admin/placements/check": checkPlacement, "/admin/placements/on": switchOn, "/admin/placements/pause": pausePlacement,
         "/admin/placements/end": endPlacement, "/admin/placements/refuse": refusePlacement }[path];
+      // These legacy admin writes do not share the order's atomic capacity transaction. Keep them
+      // unavailable during live checkout rather than allow a manual edit to bypass the field cap.
+      // Stops remain available; paid-order approval uses its own reserved, reviewed path.
+      if (ordersOn(env) && (path === "/admin/placements/on" || path === "/admin/placements/update")) {
+        throw new HttpError(409, "manual_capacity_hold", "Manual activation and edits are paused while employer checkout is open. Use the order review flow, or reconcile outstanding orders before maintenance. Pause and end remain available.");
+      }
       // was: return json({ placement: await act(db, body, now) });
       const placement = await act(db, body, now);
       // A placement made by hand counts toward the orders' per-field cap under its role's fields (orders.js

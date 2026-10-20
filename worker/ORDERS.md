@@ -147,3 +147,90 @@ financial record. Do not delete a sale or leave a queued email containing the re
 Pilot allocation: the owner requested five unassigned single-use codes for the first five employer
 buyers, not codes tied to preset companies. Keep the codes private and allocate one per employer.
 Creating a code does not automatically apply it to an order or send it to anyone.
+
+## Financial safety and reconciliation (October 19 review)
+
+Apply the complete `schema.sql` before enabling the Worker. New tables are additive; no existing
+table is rebuilt. The order email schema is included in it, so a separate manual SQL append is not
+needed after this revision.
+
+- `employer_capacity_reservations` reserves field/listing/day combinations atomically before a
+  Stripe Checkout is opened. The database trigger enforces five per field and prevents another
+  order holding the same role/day. The all-or-nothing reservation uses `json_each` with two bound
+  parameters, including three roles with twenty fields each; it does not generate one bound SQL
+  statement per role/day. Changing `FIELD_CAP` also requires changing the database trigger.
+- Checkout holds expire after 35 minutes. Paid orders have permanent reservations. A delayed bank
+  payment is still recorded and sent for review if its old hold expired and the dates filled; the
+  owner must choose dates with room or refuse/refund it. Approval reserves shifted dates again
+  before switching on any placement. It cannot silently overbook when review takes several days.
+- Free pilot claims are idempotent for their own order and use temporary capacity before payment
+  is recorded. An unpaid interrupted claim is released when its confirmation link expires. A code
+  used by another order creates no permanent capacity hold.
+- `employer_decisions` records one immutable approve/refuse claim before any external effect. A
+  concurrent opposite click is refused. A capacity failure before approval changes anything releases
+  its claim, allowing refusal. Other incomplete outcomes remain held for reconciliation.
+- `employer_credit_jobs` records one immutable refund/credit choice before calling Stripe. A timeout,
+  malformed response, database failure after provider acceptance, or interrupted process cannot
+  switch choices or blindly repeat a payout. The amount owed remains in `employer_credits`; an
+  unresolved job is `running` or `unknown`, not a completed refund. The offer's GET response includes
+  `processing`, and another choice POST is refused. Disputed or refused orders also require review.
+- The daily cron emails the owner once for unknown operations or claims running for over fifteen
+  minutes, retrying that alert if sending failed. This does **not** mean a fifteen-minute scheduler
+  exists; the alert happens at the next daily cron. The system prioritizes avoiding duplicate money
+  movements over automatically retrying an uncertain result after Stripe's idempotency window.
+- Closing a role and recording its unused-day credit are one transaction. A failed credit insert
+  rolls back the end, so the next cron can retry. Ordinary date expiry running first cannot erase a
+  credit for the last two unused days. Bundle prices allocate remainder cents once, so a $35 bundle
+  can never offer $35.01 back across its three roles.
+- The employer's thirty-day choice window starts with the successfully sent offer email, not an
+  earlier failed attempt or the credit's creation date. An offer that never sent is not default-refunded
+  by a timer the employer never received.
+
+### Manual maintenance while checkout is open
+
+All existing manual placements count toward capacity using `placement_fields`; their reservations
+are read from the database in the same transaction as a new order's reservation. Direct legacy
+`/admin/placements/on` and `/admin/placements/update` requests return **409 manual_capacity_hold**
+while employer checkout is enabled. Those writes do not share the reviewed order transaction, so a
+read-before-write cap check would still race with a buyer's Checkout. This is an intentional launch
+restriction, not an assertion that legacy manual activation is now transaction-safe.
+
+Read-only admin routes, creating drafts, pilot-code commands, and emergency pause/end/refuse remain
+available. Self-service orders activate through their reserved review flow. For manual activation or
+date/listing changes, the owner must first pause new checkout and reconcile outstanding Checkout
+sessions and paid orders, then verify the combined field capacity before maintenance and reopening.
+Do not merely toggle checkout off while someone still has a payable session. Stopping a placement
+does not require this maintenance window.
+
+### An operation is held or unknown
+
+Do not clear a claim, choose the opposite action, rerun a payout, or assume that an HTTP error means
+no money moved. The owner should inspect the private order and financial-job records, the placement
+log, and Stripe's payment/refund/coupon/promotion records using the order/credit metadata and recorded
+idempotency keys. The keys are operation identifiers, not secrets.
+
+Read-only starting points through the existing authorized D1 access:
+
+```sql
+SELECT order_id, action, state, created, updated, alerted_at
+FROM employer_decisions WHERE state != 'done';
+SELECT credit_id, order_id, choice, state, created, updated, alerted_at
+FROM employer_credit_jobs WHERE state != 'done';
+```
+
+If Stripe accepted the operation, reconcile its returned reference and the matching final database
+state; do not create a second payout. If it definitively did not, prepare and review a recovery for
+that same choice. There is deliberately no public endpoint that resets a financial claim. A database
+write failure or process interruption may require owner intervention; money owed is retained rather
+than silently discarded. A promotion code/refund result is not proof the employer's notification
+arrived or a bank has completed settlement.
+
+Receipt and decision emails use a durable outbox. Decisions are persisted before final state changes
+but dispatched only after the matching state commits; an uncommitted or disputed approval cannot
+announce success. Failed sends retry in the daily cron. Successful sends erase the message's contact
+details/body from the outbox and keep its small idempotency record. Provider acceptance followed by
+a process interruption can still duplicate a notification; this is retryable delivery, not an
+exactly-once guarantee. Review responses say the notice is recorded for delivery, not that it arrived.
+Confirmed order contacts, credits, related jobs and pending mail are removed after seven calendar
+years by the existing daily cron, including while new checkout is off. Anonymous placement history
+retains its existing policy.

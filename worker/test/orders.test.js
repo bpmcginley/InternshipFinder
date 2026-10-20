@@ -3,7 +3,7 @@
 // daily cron and the admin routes. No network: the role index, Stripe and the email binding are fakes.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CHECKS } from "../src/placements.js";
+import { CHECKS, endExpiredPlacements } from "../src/placements.js";
 import { FIELD_CAP, PRICES, TERMS_VERSION, ordersCron, reviewSig } from "../src/orders.js";
 import { parseArgs, toRequest, run } from "../scripts/placement.mjs";
 import { handle } from "../src/index.js";
@@ -69,7 +69,7 @@ function stripeFake() {
 
 const GOOD = {
   shard: "a", roles: [ID(1)], package: "one", start: "2026-09-20", name: "Dana Reyes",
-  email: "dana@acme-robotics.example", company: "Acme Robotics", public_body: false, terms: true, website: "",
+  email: "dana@acme-robotics.example", company: "Acme Robotics", public_body: false, terms: true, terms_version: TERMS_VERSION, website: "",
 };
 
 async function sign(body, at) {
@@ -86,9 +86,9 @@ const sessionEvent = (order, over = {}, type = "checkout.session.completed") => 
     metadata: { kind: "listing", order }, payment_status: "paid", payment_intent: "pi_1", amount_total: 2900, ...over } },
 });
 
-async function world({ env = {}, site = siteReply } = {}) {
+async function world({ env = {}, site = siteReply, stripe: customStripe } = {}) {
   const mail = fakeEmail();
-  const stripe = stripeFake();
+  const stripe = customStripe || stripeFake();
   const w = await setup({ env: { ...ON, EMAIL: mail, ...env }, site, stripe });
   const t = { now: NOW };
   const setNow = (d) => { t.now = d; w.setNow(d); };
@@ -437,7 +437,8 @@ test("paid: draft placements, Bruce's review email, the employer's receipt email
     assert.equal(p.employer, "Acme Robotics");
     assert.equal(p.paid_ref, "");
   }
-  const [, review, received] = w.mail.sent;
+  const review = w.mail.sent.find(m => /^Review listing/.test(m.subject));
+  const received = w.mail.sent.find(m => /^We have your/.test(m.subject));
   assert.equal(review.to, "bruce@internscout.test");
   assert.match(review.text, new RegExp(`/employer/review\\?order=${id}&sig=${await reviewSig(w.env, id)}`));
   assert.equal(received.to, "dana@acme-robotics.example");
@@ -486,7 +487,12 @@ test("a review email that fails never undoes the payment; the daily cron sends i
   await w.order();
   const { id, token } = w.lastLink();
   await w.confirm(id, token);
-  w.mail.failNext = 1;   // the review email
+  const send = w.mail.send;
+  let failReview = true;
+  w.mail.send = async m => {
+    if (failReview && m.to === ON.REVIEW_TO) { failReview = false; throw new Error("synthetic review outage"); }
+    return send(m);
+  };
   assert.equal((await w.webhook(sessionEvent(id))).status, 200);
   let o = w.orderRow(id);
   assert.equal(o.status, "paid");
@@ -697,6 +703,197 @@ async function liveOrder(w) {
 const dropped = (w, placement, day, reason = "listing_gone", shown = 0) => w.db.prepare(
   "INSERT INTO placement_runs (placement_id, day, shown, dropped, reason, updated) VALUES (?, ?, ?, 1, ?, ?)",
 ).bind(placement, day, shown, reason, day + "T12:00:00Z").run();
+
+test("financial safety: simultaneous Checkouts cannot both reserve the final field slot", async () => {
+  const base = stripeFake();
+  const delayed = async (...args) => { await new Promise(r => setTimeout(r, 10)); return base(...args); };
+  delayed.calls = base.calls;
+  const w = await world({ stripe: delayed });
+  for (let i = 0; i < 4; i++) await hold(w);
+  await w.order(); const a = w.lastLink();
+  await w.order({ roles: [ID(2)] }); const b = w.lastLink();
+  const results = await Promise.all([w.confirm(a.id, a.token), w.confirm(b.id, b.token)]);
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+  assert.equal(base.calls.filter(c => c.url.endsWith("checkout/sessions")).length, 1);
+  const rows = (await w.db.prepare("SELECT day, field, COUNT(*) AS n FROM employer_capacity_reservations GROUP BY day, field").all()).results;
+  assert.ok(rows.every(r => r.n <= FIELD_CAP));
+});
+
+test("financial safety: a three-role, twenty-field order reserves its full capacity without per-row bindings", async () => {
+  const tags = Array.from({ length: 20 }, (_, i) => `field_${i}`);
+  const w = await world({ site: url => url.endsWith("/data/roles/a.json")
+    ? Response.json({ roles: ROLES.slice(0, 3).map(r => ({ ...r, f: tags })) }) : siteReply(url) });
+  await w.order({ roles: [ID(1), ID(2), ID(3)], package: "three" }); const { id, token } = w.lastLink();
+  assert.equal((await w.confirm(id, token)).status, 200);
+  assert.equal(await w.db.prepare("SELECT COUNT(*) AS n FROM employer_capacity_reservations WHERE order_id = ?").bind(id).first("n"), 1800);
+});
+
+test("financial safety: a used pilot creates no leaked capacity and its own interrupted claim can resume", async () => {
+  const w = await world();
+  const { code } = await (await w.adminCall("POST", "/admin/pilot-codes", {})).json();
+  await w.order({ pilot_code: code }); const a = w.lastLink();
+  await w.order({ pilot_code: code, roles: [ID(2)] }); const b = w.lastLink();
+  // Simulates a process interruption immediately after its pilot claim.
+  await w.db.prepare("UPDATE pilot_codes SET order_id = ?, used_at = ? WHERE code = ?").bind(a.id, NOW.toISOString(), code).run();
+  assert.equal((await w.confirm(a.id, a.token)).status, 200);
+  assert.equal((await w.confirm(b.id, b.token)).status, 409);
+  assert.equal(await w.db.prepare("SELECT COUNT(*) AS n FROM employer_capacity_reservations WHERE order_id = ?").bind(b.id).first("n"), 0);
+  assert.equal(w.orderRow(a.id).status, "paid");
+});
+
+test("financial safety: shifted approval dates reserve capacity again before activating", async () => {
+  const w = await world();
+  const id = await w.paid({ start: TODAY });
+  for (let i = 0; i < FIELD_CAP; i++) await hold(w, { start: "2026-10-14" });
+  w.setNow(new Date("2026-09-15T10:00:00Z"));
+  assert.equal((await w.reviewForm(id, { action: "approve" })).status, 409);
+  assert.ok(w.placementsOf(id).every(p => p.status === "draft"));
+  assert.equal((await w.reviewForm(id, { action: "refuse", reason: "No room on the shifted dates" })).status, 200);
+});
+
+test("financial safety: approve and refuse claim one immutable decision before side effects", async () => {
+  const w = await world(); const id = await w.paid();
+  const results = await Promise.all([w.reviewForm(id, { action: "approve" }),
+    w.reviewForm(id, { action: "refuse", reason: "Synthetic opposite decision" })]);
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+  const o = w.orderRow(id);
+  const refunded = w.stripe.calls.some(c => c.url.endsWith("refunds"));
+  assert.equal(refunded, o.status === "refused");
+  assert.ok(w.placementsOf(id).every(p => p.status === (refunded ? "refused" : "on")));
+});
+
+test("financial safety: an accepted refund with a lost response cannot switch to a promotion code", async () => {
+  const base = stripeFake(); let accepted = 0;
+  const uncertain = (...args) => {
+    if (args[0].endsWith("refunds")) { accepted++; throw new Error("synthetic response lost after acceptance"); }
+    return base(...args);
+  };
+  uncertain.calls = base.calls;
+  const w = await world({ stripe: uncertain }); const { p } = await liveOrder(w);
+  await dropped(w, p.id, "2026-09-22"); await dropped(w, p.id, "2026-09-23");
+  const at = new Date("2026-09-24T07:17:00Z"); w.setNow(at);
+  await ordersCron(w.db, w.env, at, w.fetch);
+  const link = /credit=(c-[0-9a-f]{16})&t=([A-Za-z0-9_-]{43})/.exec(w.mail.sent.at(-1).text);
+  const choose = choice => w.api("POST", "/employer/credit", { body: { credit: link[1], token: link[2], choice }, headers: SITE });
+  assert.equal((await choose("refund")).status, 500);
+  assert.equal((await choose("credit")).status, 409);
+  assert.equal((await choose("refund")).status, 409);
+  assert.equal(accepted, 1);
+  assert.equal((await w.db.prepare("SELECT state FROM employer_credit_jobs").first()).state, "unknown");
+  await ordersCron(w.db, w.env, new Date("2026-11-01T07:17:00Z"), w.fetch);
+  assert.equal(accepted, 1, "cron cannot blindly repeat an ambiguous payout");
+  assert.ok(w.mail.sent.some(m => /needs reconciliation/.test(m.subject)));
+});
+
+test("financial safety: a crash after credit claim remains held and alerts the owner instead of paying twice", async () => {
+  const w = await world(); const { p, id } = await liveOrder(w);
+  await dropped(w, p.id, "2026-09-22"); await dropped(w, p.id, "2026-09-23");
+  const at = new Date("2026-09-24T07:17:00Z"); await ordersCron(w.db, w.env, at, w.fetch);
+  const c = w.db.dump().employer_credits[0];
+  await w.db.prepare("INSERT INTO employer_credit_jobs (credit_id, order_id, choice, state, created, updated) VALUES (?, ?, 'credit', 'running', ?, ?)")
+    .bind(c.id, id, at.toISOString(), at.toISOString()).run();
+  const before = w.stripe.calls.length;
+  await ordersCron(w.db, w.env, new Date("2026-11-01T07:17:00Z"), w.fetch);
+  assert.equal(w.stripe.calls.length, before);
+  assert.equal(w.db.dump().employer_credits[0].status, "offered", "money owed is retained");
+  assert.ok(w.mail.sent.some(m => /needs reconciliation/.test(m.subject)));
+});
+
+test("financial safety: closing and recording money owed are one rollback-safe transaction", async () => {
+  const w = await world(); const { p } = await liveOrder(w);
+  await dropped(w, p.id, "2026-09-22"); await dropped(w, p.id, "2026-09-23");
+  const prepare = w.db.prepare;
+  w.db.prepare = query => {
+    if (query.startsWith("INSERT OR IGNORE INTO employer_credits")) return { bind: () => ({ run: async () => { throw new Error("synthetic insert failure"); } }) };
+    return prepare(query);
+  };
+  const at = new Date("2026-09-24T07:17:00Z");
+  await ordersCron(w.db, w.env, at, w.fetch);
+  assert.equal(w.placementsOf(w.orderRow(w.db.dump().employer_orders[0].id).id)[0].status, "on");
+  assert.equal(w.db.dump().employer_credits.length, 0);
+  w.db.prepare = prepare;
+  await ordersCron(w.db, w.env, at, w.fetch);
+  assert.equal(w.db.dump().employer_credits.length, 1);
+  assert.equal(w.db.dump().placements[0].status, "ended");
+});
+
+test("financial safety: bundle refunds allocate remainder cents without exceeding the $35 payment", async () => {
+  const w = await world();
+  const id = await w.paid({ start: TODAY, roles: [ID(1), ID(2), ID(3)], package: "three", public_body: true }, { amount_total: 3500 });
+  await w.reviewForm(id, { action: "approve" });
+  for (const p of w.placementsOf(id)) { await dropped(w, p.id, TODAY); await dropped(w, p.id, "2026-09-15"); }
+  await ordersCron(w.db, w.env, new Date("2026-09-16T07:17:00Z"), w.fetch);
+  const amounts = w.db.dump().employer_credits.map(c => c.amount).sort();
+  assert.deepEqual(amounts, [1166, 1167, 1167]);
+  assert.equal(amounts.reduce((a, b) => a + b), 3500);
+});
+
+test("financial safety: normal expiry cannot erase unused days detected by the simultaneous closure cron", async () => {
+  const w = await world(); const { p } = await liveOrder(w);
+  await dropped(w, p.id, "2026-10-12"); await dropped(w, p.id, "2026-10-13");
+  const at = new Date("2026-10-14T07:17:00Z");
+  await endExpiredPlacements(w.db, at);
+  assert.equal(w.db.dump().placements[0].ended_reason, "dates");
+  await ordersCron(w.db, w.env, at, w.fetch);
+  assert.equal(w.db.dump().employer_credits[0].unused_days, 2);
+  assert.equal(w.db.dump().employer_credits[0].amount, Math.round(2900 * 2 / 30));
+});
+
+test("current clickwrap version is required and availability checks selected roles together", async () => {
+  const w = await world();
+  for (const terms_version of [undefined, "2000-01-01"]) {
+    const bad = await w.order({ terms_version }); assert.equal(bad.status, 400);
+    assert.equal((await bad.json()).field, "terms_version");
+  }
+  for (let i = 0; i < 3; i++) await hold(w);
+  const result = await (await w.api("GET", `/employer/availability?shard=a&ids=${[ID(1), ID(2), ID(3)].join(",")}&start=2026-09-20`)).json();
+  assert.ok(result.roles.some(r => r.fits === false));
+});
+
+test("manual placements seed atomic reservations and direct activation/edits cannot bypass live checkout capacity", async () => {
+  const w = await world();
+  for (let i = 0; i < 4; i++) {
+    const made = await w.adminCall("POST", "/admin/placements", { employer: "Acme Robotics", listing_id: ID(1),
+      apply_url: "https://jobs.acme.example/1", start: "2026-09-18", end: "2026-10-18", by: "bruce" });
+    assert.equal(made.status, 200);
+  }
+  await w.order({ roles: [ID(3)] }); const first = w.lastLink();
+  assert.equal((await w.confirm(first.id, first.token)).status, 200);
+  const manual = w.db.dump().placements[0];
+  assert.ok((await w.db.prepare("SELECT COUNT(*) AS n FROM employer_capacity_reservations WHERE order_id LIKE 'manual:%'").first("n")) > 0);
+  const on = await w.adminCall("POST", "/admin/placements/on", { id: manual.id, paid_ref: "synthetic", by: "bruce" });
+  assert.equal(on.status, 409); assert.equal((await on.json()).error, "manual_capacity_hold");
+  assert.equal((await w.adminCall("POST", "/admin/placements/update", { id: manual.id, start: "2026-09-19", end: "2026-10-19", by: "bruce" })).status, 409);
+  assert.equal((await w.adminCall("POST", "/admin/placements/end", { id: manual.id, reason: "removed", by: "bruce" })).status, 200);
+  await w.order({ roles: [ID(2)] }); const next = w.lastLink();
+  assert.equal((await w.confirm(next.id, next.token)).status, 200, "ending a manual placement frees its atomic capacity");
+});
+
+test("refund choice window starts with a successfully sent offer, not an earlier failed send", async () => {
+  const w = await world(); const { p } = await liveOrder(w);
+  await dropped(w, p.id, "2026-09-22"); await dropped(w, p.id, "2026-09-23");
+  w.mail.failNext = 2; // closeRoles and the same run's resendOffers both fail.
+  await ordersCron(w.db, w.env, new Date("2026-09-24T07:17:00Z"), w.fetch);
+  assert.equal(w.db.dump().employer_credits[0].offer_sent_at, null);
+  await ordersCron(w.db, w.env, new Date("2026-10-01T07:17:00Z"), w.fetch);
+  assert.equal(w.db.dump().employer_credits[0].offer_sent_at, "2026-10-01T07:17:00.000Z");
+  assert.match(w.mail.sent.at(-1).text, /October 31, 2026/);
+  await ordersCron(w.db, w.env, new Date("2026-10-25T07:17:00Z"), w.fetch);
+  assert.equal(w.db.dump().employer_credits[0].status, "offered");
+  await ordersCron(w.db, w.env, new Date("2026-11-01T07:17:00Z"), w.fetch);
+  assert.equal(w.db.dump().employer_credits[0].status, "refund");
+});
+
+test("failed decision email remains queued and daily cron retries without another decision", async () => {
+  const w = await world(); const id = await w.paid();
+  w.mail.failNext = 1;
+  const res = await w.reviewForm(id, { action: "approve" });
+  assert.equal(res.status, 200); assert.match(await res.text(), /recorded for delivery/);
+  assert.equal((await w.db.prepare("SELECT sent_at FROM employer_order_mail WHERE order_id = ? AND kind = 'approved'").bind(id).first()).sent_at, null);
+  await ordersCron(w.db, w.env, new Date(NOW.getTime() + 3600e3), w.fetch);
+  assert.ok((await w.db.prepare("SELECT sent_at FROM employer_order_mail WHERE order_id = ? AND kind = 'approved'").bind(id).first()).sent_at);
+  assert.equal(w.orderRow(id).status, "approved");
+});
 
 test("cron: a role every build dropped on both of the last two days ends, and its unused days are offered back", async () => {
   const w = await world();

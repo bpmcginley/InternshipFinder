@@ -24,6 +24,7 @@ import { CHECKS, addDays, checkPlacement, createPlacement, dayOf, daysBetween, e
   refusePlacement, switchOn, updatePlacement } from "./placements.js";
 import { hex, hmacHex, sameHex, siteUrl, stripe } from "./billing.js";
 import { trySend, sendMail } from "./mail.js";
+import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
 
 // Prices in cents (Bruce, 2026-10-19: final). public_body is the price for a nonprofit or public body.
 export const PRICES = {
@@ -268,7 +269,7 @@ async function fillPlacementFields(db, env, now, fetchImpl) {
 async function heldRoles(db, now, exceptOrder = "") {
   const cutoff = new Date(now.getTime() - CHECKOUT_HOLD_MS).toISOString();
   const { results } = await db.prepare(
-    "SELECT r.listing_id, r.fields, o.status, o.start_day, p.status AS p_status, p.start_day AS p_start, p.end_day AS p_end " +
+    "SELECT o.id AS order_id, o.checkout_at, r.listing_id, r.fields, o.status, o.start_day, p.status AS p_status, p.start_day AS p_start, p.end_day AS p_end " +
     "FROM employer_order_roles r JOIN employer_orders o ON o.id = r.order_id LEFT JOIN placements p ON p.id = r.placement_id " +
     "WHERE o.id != ? AND (o.status IN ('paid', 'approved') OR (o.status = 'verified' AND o.checkout_at > ?))",
   ).bind(exceptOrder, cutoff).all();
@@ -276,21 +277,66 @@ async function heldRoles(db, now, exceptOrder = "") {
   for (const r of results) {
     const fields = fieldsOf(String(r.fields || "").split(",").filter(Boolean));
     if (r.p_status) {
-      if (HOLDING.includes(r.p_status)) held.push({ listing: r.listing_id, fields, start: r.p_start, end: r.p_end });
+      if (HOLDING.includes(r.p_status)) held.push({ order: r.order_id, listing: r.listing_id, fields, start: r.p_start, end: r.p_end, expires: null });
     } else if (r.status !== "approved") {
-      held.push({ listing: r.listing_id, fields, start: r.start_day, end: addDays(r.start_day, DAYS) });
+      held.push({ order: r.order_id, listing: r.listing_id, fields, start: r.start_day, end: addDays(r.start_day, DAYS),
+        expires: r.status === "verified" ? new Date(Date.parse(r.checkout_at) + CHECKOUT_HOLD_MS).toISOString() : null });
     }
   }
   // Placements made by hand hold their days too, under the fields recorded for them (notePlacementFields).
   // was: only orders' roles counted, so the cap the terms promise could be passed by hand-made ones.
   const manual = await db.prepare(
-    "SELECT p.listing_id, p.start_day, p.end_day, f.fields FROM placements p LEFT JOIN placement_fields f ON f.placement_id = p.id " +
+    "SELECT p.id AS placement_id, p.listing_id, p.start_day, p.end_day, f.fields FROM placements p LEFT JOIN placement_fields f ON f.placement_id = p.id " +
     `WHERE p.status IN (${HOLDING.map(() => "?").join(", ")}) AND ${NOT_ORDERED}`,
   ).bind(...HOLDING).all();
   for (const r of manual.results) {
-    held.push({ listing: r.listing_id, fields: fieldsOf(String(r.fields || "").split(",").filter(Boolean)), start: r.start_day, end: r.end_day });
+    held.push({ order: "manual:" + r.placement_id, listing: r.listing_id, fields: fieldsOf(String(r.fields || "").split(",").filter(Boolean)), start: r.start_day, end: r.end_day, expires: null });
   }
   return held;
+}
+
+async function reserveCapacity(db, order, roles, start, now, expires = null) {
+  const at = now.toISOString();
+  const held = await heldRoles(db, now, order.id);
+  const fit = fitAll(held, roles, start);
+  if (!fit.fits) throw conflict("full", "Those dates no longer have room. Choose other dates or refuse and refund the order.",
+    { next_start: firstFit(held, roles, start) });
+  const rows = [];
+  for (const h of [...held, ...roles.map(r => ({ order: order.id, listing: r.id, fields: r.fields,
+    start, end: addDays(start, DAYS), expires }))]) {
+    if (h.order.startsWith("manual:")) continue; // Read and reserve these inside the transaction below.
+    for (let day = h.start < dayOf(now) ? dayOf(now) : h.start; day < h.end; day = addDays(day, 1)) {
+      for (const field of h.fields) rows.push({ order: h.order, listing: h.listing, field, day, expires: h.expires });
+    }
+  }
+  try {
+    await db.batch([
+      db.prepare("DELETE FROM employer_capacity_reservations WHERE expires_at <= ? OR day < ? OR order_id IN " +
+        "(SELECT id FROM employer_orders WHERE status = 'refused') OR EXISTS " +
+        "(SELECT 1 FROM employer_order_roles r JOIN placements p ON p.id = r.placement_id " +
+        "WHERE r.order_id = employer_capacity_reservations.order_id AND r.listing_id = employer_capacity_reservations.listing_id " +
+        "AND p.status IN ('ended', 'refused'))").bind(at, dayOf(now)),
+      db.prepare("DELETE FROM employer_capacity_reservations WHERE order_id = ?").bind(order.id),
+      db.prepare("DELETE FROM employer_capacity_reservations WHERE order_id LIKE 'manual:%'"),
+      db.prepare("WITH RECURSIVE days(order_id, listing_id, fields, day, end_day) AS (" +
+        "SELECT 'manual:' || p.id, p.listing_id, COALESCE(NULLIF(f.fields, ''), 'other'), MAX(p.start_day, ?), p.end_day " +
+        "FROM placements p LEFT JOIN placement_fields f ON f.placement_id = p.id " +
+        `WHERE p.status IN ('draft', 'checked', 'on', 'paused') AND p.end_day > ? AND ${NOT_ORDERED} ` +
+        "UNION ALL SELECT order_id, listing_id, fields, date(day, '+1 day'), end_day FROM days WHERE date(day, '+1 day') < end_day) " +
+        "INSERT OR IGNORE INTO employer_capacity_reservations (order_id, listing_id, field, day, expires_at, checked_at) " +
+        "SELECT order_id, listing_id, j.value, day, NULL, ? FROM days JOIN json_each('[\"' || replace(fields, ',', '\",\"') || '\"]') j")
+        .bind(dayOf(now), dayOf(now), at),
+      db.prepare("INSERT OR IGNORE INTO employer_capacity_reservations (order_id, listing_id, field, day, expires_at, checked_at) " +
+        "SELECT json_extract(value,'$.order'), json_extract(value,'$.listing'), json_extract(value,'$.field'), " +
+        "json_extract(value,'$.day'), json_extract(value,'$.expires'), ? FROM json_each(?)")
+        .bind(at, JSON.stringify(rows)),
+    ]);
+  } catch (e) {
+    if (/employer_capacity_full|employer_listing_taken/.test(String(e))) {
+      throw conflict("full", "Those dates were reserved a moment ago. Please choose other dates.");
+    }
+    throw e;
+  }
 }
 
 // What stops one role running DAYS days from `start` alongside `held`: the fields that would go over
@@ -359,14 +405,16 @@ export async function availability(db, env, params, now, fetchImpl) {
   }
   const index = await readShard(env, params.get("shard"), fetchImpl);
   const held = await heldRoles(db, now);
+  const selected = [...new Set(ids)].map(id => index.get(id)).filter(Boolean).map(r => ({ id: r.id, fields: fieldsOf(r.f) }));
+  const fits = new Map(fitAll(held, selected, start).roles.map(r => [r.id, r]));
   return {
     start,
     roles: [...new Set(ids)].map((id) => {
       const r = index.get(id);
       if (!r) return { id, listed: false };
       const role = { id, fields: fieldsOf(r.f) };
-      const fit = fitAll(held, [role], start).roles[0];
-      return fit.fits ? { id, listed: true, fits: true } : { ...fit, listed: true, next_start: firstFit(held, [role], start) };
+      const fit = fits.get(id);
+      return fit.fits ? { id, listed: true, fits: true } : { ...fit, listed: true, next_start: firstFit(held, selected, start) };
     }),
   };
 }
@@ -404,6 +452,7 @@ export async function takeOrder(db, env, request, body, now, fetchImpl) {
   if (body.public_body != null && typeof body.public_body !== "boolean") throw bad("public_body", "public_body must be true or false");
   const publicBody = body.public_body === true;
   if (body.terms !== true) throw bad("terms", "Please tick the box to accept the employer terms");
+  if (body.terms_version !== TERMS_VERSION) throw bad("terms_version", "The employer terms have changed. Reload this page and review them before ordering.");
   const ids = body.roles;
   if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || !LISTING_ID.test(id))) {
     throw bad("roles", "roles must be a list of role ids");
@@ -521,10 +570,18 @@ export async function confirmOrder(db, env, request, body, now, fetchImpl) {
   }
 
   if (order.pilot_code) {
-    const r = await db.prepare("UPDATE pilot_codes SET order_id = ?, used_at = ? WHERE code = ? AND order_id IS NULL")
-      .bind(order.id, at, order.pilot_code).run();
+    const r = await db.prepare("UPDATE pilot_codes SET order_id = ?, used_at = ? WHERE code = ? AND (order_id IS NULL OR order_id = ?)")
+      .bind(order.id, at, order.pilot_code, order.id).run();
     if (!r.meta.changes) {
       throw conflict("pilot_used", "That pilot code has been used since you ordered. Please start a new order without it.");
+    }
+    try {
+      await reserveCapacity(db, order, cap, from, now, new Date(now.getTime() + CHECKOUT_HOLD_MS).toISOString());
+    } catch (e) {
+      await db.prepare("UPDATE pilot_codes SET order_id = NULL, used_at = NULL WHERE code = ? AND order_id = ? " +
+        "AND NOT EXISTS (SELECT 1 FROM employer_orders WHERE id = ? AND status IN ('paid', 'approved'))")
+        .bind(order.pilot_code, order.id, order.id).run();
+      throw e;
     }
     await markPaid(db, env, { ...order, status: "verified" },
       { ref: "pilot:" + order.pilot_code, amount: 0, pi: null, session: null }, now);
@@ -534,6 +591,8 @@ export async function confirmOrder(db, env, request, body, now, fetchImpl) {
   if (order.checkout_url && order.checkout_at && now.getTime() - Date.parse(order.checkout_at) < CHECKOUT_REUSE_MS) {
     return { url: order.checkout_url };
   }
+  // The reservation is atomic and happens before an external Checkout exists, not after its response.
+  await reserveCapacity(db, order, cap, from, now, new Date(now.getTime() + CHECKOUT_HOLD_MS).toISOString());
   const session = await stripe(env, "checkout/sessions", checkoutForm(env, order, roles, now), fetchImpl,
     `listing-checkout:${order.id}:${Math.floor(now.getTime() / CHECKOUT_REUSE_MS)}`);
   await db.prepare("UPDATE employer_orders SET checkout_session = ?, checkout_url = ?, checkout_at = ?, updated = ? WHERE id = ?")
@@ -581,8 +640,15 @@ async function markPaid(db, env, order, pay, now) {
   ).bind(pay.ref, pay.amount, pay.pi, pay.session, at, at, order.id).run();
   if (!r.meta.changes) return false;
   const fresh = await loadOrder(db, order.id);
+  // A delayed bank payment can arrive after its temporary hold. Keep the payment/review record even
+  // if capacity has since filled; approval reserves its dates again and cannot overbook the field.
+  try {
+    const cap = (await orderRoles(db, order.id)).map(r => ({ id: r.listing_id, fields: fieldsOf(r.fields.split(",")) }));
+    await reserveCapacity(db, fresh, cap, fresh.start_day, now);
+  } catch (e) {
+    if (!(e instanceof HttpError) || e.code !== "full") throw e;
+  }
   await settle(db, env, fresh, now);
-  await trySend(env, receivedMail(env, fresh, await orderRoles(db, fresh.id)), "order received");
   return true;
 }
 
@@ -591,6 +657,7 @@ async function markPaid(db, env, order, pay, now) {
 async function settle(db, env, order, now) {
   if (order.status !== "paid") return;
   await ensurePlacements(db, order, now);
+  await queueOrderMail(db, env, { orderId: order.id, kind: "receipt", mail: receivedMail(env, order, await orderRoles(db, order.id)) }, now);
   if (!order.review_sent_at) await sendReview(db, env, order, now);
 }
 
@@ -682,6 +749,8 @@ async function sessionPaid(db, env, o, now, fetchImpl) {
 
 // A dispute pauses the order's live placements and tells Bruce. Everything else about it stays manual.
 async function disputed(db, env, order, now) {
+  await db.prepare("UPDATE employer_orders SET disputed_at = ?, updated = ? WHERE id = ?")
+    .bind(now.toISOString(), now.toISOString(), order.id).run();
   const paused = [];
   for (const role of await orderRoles(db, order.id)) {
     if (!role.placement_id) continue;
@@ -694,8 +763,6 @@ async function disputed(db, env, order, now) {
       if (!(e instanceof HttpError)) throw e;
     }
   }
-  await db.prepare("UPDATE employer_orders SET disputed_at = ?, updated = ? WHERE id = ?")
-    .bind(now.toISOString(), now.toISOString(), order.id).run();
   await trySend(env, { to: env.REVIEW_TO, subject: `Payment dispute on listing order ${order.id}`,
     text: `A payment dispute was opened on order ${order.id} (${order.employer}, ${money(order.paid_amount)}).\n\n` +
       (paused.length ? `These listings were paused:\n${paused.map((p) => "- " + p).join("\n")}\n\n` : "No listing was live, so nothing was paused.\n\n") +
@@ -831,18 +898,35 @@ export async function reviewDecision(db, env, request, now, fetchImpl) {
   if (!order) return message("No such order", "This order is not in the database.", 404);
   if (order.status !== "paid") return message("Already decided", `This order is ${order.status}; nothing was changed.`, 409);
   const action = form.get("action");
+  if (!["approve", "refuse"].includes(action)) return message("Not done", "Choose Approve or Refuse.", 400);
+  let reason;
+  if (action === "refuse") {
+    try { reason = text({ reason: form.get("reason") }, "reason", { required: true }); }
+    catch (e) { if (e instanceof HttpError) return message("Not done", e.message, e.status); throw e; }
+  }
+  if (action === "approve" && order.disputed_at) return message("Not approved", "A payment dispute is open on this order, so it was not approved.", 409);
+  const claim = await db.prepare("INSERT OR IGNORE INTO employer_decisions (order_id, action, state, created, updated) VALUES (?, ?, 'running', ?, ?)")
+    .bind(id, action, now.toISOString(), now.toISOString()).run();
+  if (!claim.meta.changes) return message("Decision held", "A decision already started for this order. Check its records and Stripe before retrying or choosing the opposite action.", 409);
   try {
     if (action === "approve") {
       if (order.disputed_at) return message("Not approved", "A payment dispute is open on this order, so it was not approved.", 409);
       const dates = await approve(db, env, order, now);
-      return message("Approved", `Order ${id} is approved. Its roles run ${dates}. The employer has been emailed.`);
+      await db.prepare("UPDATE employer_decisions SET state = 'done', updated = ? WHERE order_id = ?").bind(now.toISOString(), id).run();
+      return message("Approved", `Order ${id} is approved. Its roles run ${dates}. Confirmation email is recorded for delivery.`);
     }
     if (action === "refuse") {
-      const reason = text({ reason: form.get("reason") }, "reason", { required: true });
       const refunded = await refuse(db, env, order, reason, now, fetchImpl);
-      return message("Refused", `Order ${id} is refused. ${refunded ? `${money(refunded)} was refunded. ` : ""}The employer has been emailed the reason.`);
+      await db.prepare("UPDATE employer_decisions SET state = 'done', updated = ? WHERE order_id = ?").bind(now.toISOString(), id).run();
+      return message("Refused", `Order ${id} is refused. ${refunded ? `${money(refunded)} was refunded. ` : ""}The reason email is recorded for delivery.`);
     }
   } catch (e) {
+    // Capacity refusal happens before approval changes anything; it is safe to choose refusal later.
+    if (action === "approve" && e instanceof HttpError && e.code === "full") {
+      await db.prepare("DELETE FROM employer_decisions WHERE order_id = ?").bind(id).run();
+    } else {
+      await db.prepare("UPDATE employer_decisions SET state = 'unknown', updated = ? WHERE order_id = ?").bind(now.toISOString(), id).run();
+    }
     if (e instanceof HttpError) return message("Not done", e.message, e.status);
     throw e;
   }
@@ -852,11 +936,14 @@ export async function reviewDecision(db, env, request, now, fetchImpl) {
 // The same steps Bruce runs by hand, by "bruce", each one skipped if it is already done, so a second
 // click after a failure finishes the job. Returns the dates as text for the page.
 async function approve(db, env, order, now) {
-  await ensurePlacements(db, order, now);
   const today = dayOf(now);
   const roles = await orderRoles(db, order.id);
+  const start = order.start_day < today ? today : order.start_day;
+  await reserveCapacity(db, order, roles.map(r => ({ id: r.listing_id, fields: fieldsOf(r.fields.split(",")) })), start, now);
+  await ensurePlacements(db, order, now);
+  const placed = await orderRoles(db, order.id);
   const done = [];
-  for (const role of roles) {
+  for (const role of placed) {
     let p = await db.prepare("SELECT * FROM placements WHERE id = ?").bind(role.placement_id).first();
     if (["draft", "checked"].includes(p.status) && p.start_day < today) {
       // No paid day is lost to the review: the 30 days start on the day of approval.
@@ -866,13 +953,20 @@ async function approve(db, env, order, now) {
       p = await checkPlacement(db, { id: p.id, by: "bruce", checks: CHECKS, unpaid_ok: !!(role.unpaid && order.public_body) }, now);
     }
     if (p.status === "checked") p = await switchOn(db, { id: p.id, by: "bruce", paid_ref: order.paid_ref }, now);
+    if ((await loadOrder(db, order.id)).disputed_at) {
+      if (p.status === "on") await pausePlacement(db, { id: p.id, by: "stripe", reason: "payment dispute during approval" }, now);
+      throw conflict("disputed", "A payment dispute arrived during approval. The listing is paused; reconcile the order before continuing.");
+    }
     if (p.status !== "on") throw conflict("conflict", `Placement ${p.id} is ${p.status}, so it was not switched on.`);
     done.push({ role, p });
   }
   const at = now.toISOString();
-  await db.prepare("UPDATE employer_orders SET status = 'approved', decided_at = ?, updated = ? WHERE id = ? AND status = 'paid'")
+  const approvalNotice = { orderId: order.id, kind: "approved", mail: approvedMail(env, order, done) };
+  await queueOrderMail(db, env, { ...approvalNotice, defer: true }, now);
+  const approved = await db.prepare("UPDATE employer_orders SET status = 'approved', decided_at = ?, updated = ? WHERE id = ? AND status = 'paid' AND disputed_at IS NULL")
     .bind(at, at, order.id).run();
-  await trySend(env, approvedMail(env, order, done), "approved");
+  if (!approved.meta.changes) throw conflict("disputed", "The order changed during approval. Reconcile it before continuing.");
+  await queueOrderMail(db, env, approvalNotice, now);
   const spans = [...new Set(done.map(({ p }) => `${p.start_day} to ${addDays(p.end_day, -1)}`))];
   return spans.join(", ");
 }
@@ -883,6 +977,7 @@ async function refuse(db, env, order, reason, now, fetchImpl) {
   if (order.payment_intent && order.paid_amount > 0) {
     refund = await stripe(env, "refunds", { payment_intent: order.payment_intent, "metadata[order]": order.id, "metadata[why]": "refused" },
       fetchImpl, `listing-refund:${order.id}`);
+    if (!refund || typeof refund.id !== "string" || !refund.id) throw new Error("Refund result unknown");
   }
   for (const role of await orderRoles(db, order.id)) {
     if (!role.placement_id) continue;
@@ -891,6 +986,8 @@ async function refuse(db, env, order, reason, now, fetchImpl) {
   }
   const at = now.toISOString();
   const amount = refund ? (Number.isSafeInteger(refund.amount) ? refund.amount : order.paid_amount) : 0;
+  const refusalNotice = { orderId: order.id, kind: "refused", mail: refusedMail(env, order, reason, amount) };
+  await queueOrderMail(db, env, { ...refusalNotice, defer: true }, now);
   await db.batch([
     db.prepare("UPDATE employer_orders SET status = 'refused', decided_at = ?, decided_reason = ?, refund_id = ?, " +
       "refunded_amount = ?, updated = ? WHERE id = ? AND status = 'paid'")
@@ -898,7 +995,7 @@ async function refuse(db, env, order, reason, now, fetchImpl) {
     // A refused pilot does not use up one of the five.
     db.prepare("UPDATE pilot_codes SET order_id = NULL, used_at = NULL WHERE order_id = ?").bind(order.id),
   ]);
-  await trySend(env, refusedMail(env, order, reason, amount), "refused");
+  await queueOrderMail(db, env, refusalNotice, now);
   return amount;
 }
 
@@ -907,11 +1004,13 @@ async function refuse(db, env, order, reason, now, fetchImpl) {
 // GET /employer/credit?credit=&t=: the offer, for the buy page to show.
 export async function creditInfo(db, params, now) {
   const credit = await loadCredit(db, params.get("credit"), params.get("t"));
+  const job = await db.prepare("SELECT state FROM employer_credit_jobs WHERE credit_id = ?").bind(credit.id).first();
   const role = await db.prepare("SELECT title, company FROM employer_order_roles WHERE placement_id = ?").bind(credit.placement_id).first();
   return {
     credit: credit.id, status: credit.status, amount: credit.amount, unused_days: credit.unused_days,
     role: role ? { title: role.title, company: role.company } : null,
-    choose_by: addDays(credit.created.slice(0, 10), CREDIT_DEFAULT_DAYS),
+    choose_by: addDays((credit.offer_sent_at || now.toISOString()).slice(0, 10), CREDIT_DEFAULT_DAYS),
+    ...(job && job.state !== "done" ? { processing: job.state } : {}),
     ...(credit.status === "credit" ? { code: credit.promotion_code } : {}),
   };
 }
@@ -935,23 +1034,32 @@ export async function chooseCredit(db, env, request, body, now, fetchImpl) {
       { status: credit.status, ...(credit.status === "credit" ? { code: credit.promotion_code } : {}) });
   }
   const done = await settleCredit(db, env, credit, body.choice, "employer", now, fetchImpl);
-  if (!done) throw conflict("decided", "This was decided a moment ago. Please reload the page.");
+  if (!done) throw conflict("processing", "Your choice is being reconciled. Do not choose again; reply to your order email for help.");
   return body.choice === "refund" ? { done: "refund", amount: credit.amount } : { done: "credit", code: done.code, amount: credit.amount };
 }
 
-// Claims the offer first (offered -> the choice), so two clicks, or a click and the cron, can't both
-// act; then Stripe; and if Stripe fails, the offer goes back to `offered` for another try.
+// A permanent choice claim precedes Stripe. An ambiguous result or a crash cannot change choice or
+// blindly repeat a payout after the provider's idempotency window; the owner reconciles it instead.
 async function settleCredit(db, env, credit, choice, who, now, fetchImpl) {
   const at = now.toISOString();
-  const claim = await db.prepare("UPDATE employer_credits SET status = ?, chosen_at = ?, chosen_by = ?, updated = ? WHERE id = ? AND status = 'offered'")
-    .bind(choice, at, who, at, credit.id).run();
+  const claim = await db.prepare("INSERT OR IGNORE INTO employer_credit_jobs (credit_id, order_id, choice, state, created, updated) " +
+    "SELECT ?, ?, ?, 'running', ?, ? WHERE EXISTS (SELECT 1 FROM employer_credits WHERE id = ? AND status = 'offered')")
+    .bind(credit.id, credit.order_id, choice, at, at, credit.id).run();
   if (!claim.meta.changes) return null;
   const order = await db.prepare("SELECT * FROM employer_orders WHERE id = ?").bind(credit.order_id).first();
   try {
+    if (!order || order.disputed_at || order.status === "refused") {
+      throw conflict("reconcile", "This order needs payment reconciliation before any refund or promotion code. Reply to your order email for help.");
+    }
     if (choice === "refund") {
       const refund = await stripe(env, "refunds", { payment_intent: order.payment_intent, amount: String(credit.amount),
         "metadata[order]": order.id, "metadata[credit]": credit.id, "metadata[why]": "role_closed" }, fetchImpl, `listing-credit-refund:${credit.id}`);
-      await db.prepare("UPDATE employer_credits SET refund_id = ? WHERE id = ?").bind(String(refund.id || ""), credit.id).run();
+      if (!refund || typeof refund.id !== "string" || !refund.id) throw new Error("Refund result unknown");
+      await db.batch([
+        db.prepare("UPDATE employer_credits SET status = 'refund', refund_id = ?, chosen_at = ?, chosen_by = ?, updated = ? WHERE id = ? AND status = 'offered'")
+          .bind(refund.id, at, who, at, credit.id),
+        db.prepare("UPDATE employer_credit_jobs SET state = 'done', updated = ? WHERE credit_id = ?").bind(at, credit.id),
+      ]);
       await trySend(env, creditMail(env, order, credit, who === "default" ? "default" : "refund"), "credit refund");
       return { refund: refund.id };
     }
@@ -959,16 +1067,22 @@ async function settleCredit(db, env, credit, choice, who, now, fetchImpl) {
     // it can't be spent on a student plan, whose Checkout also takes promotion codes.
     const coupon = await stripe(env, "coupons", { amount_off: String(credit.amount), currency: "usd", duration: "once",
       max_redemptions: "1", name: "InternScout listing credit", "metadata[credit]": credit.id }, fetchImpl, `listing-coupon:${credit.id}`);
+    if (!coupon || typeof coupon.id !== "string" || !coupon.id) throw new Error("Coupon result unknown");
     const promo = await stripe(env, "promotion_codes", { "promotion[type]": "coupon", "promotion[coupon]": String(coupon.id),
       max_redemptions: "1", "restrictions[minimum_amount]": String(PRICES.one.public_body_cents),
       "restrictions[minimum_amount_currency]": "usd", "metadata[credit]": credit.id }, fetchImpl, `listing-promo:${credit.id}`);
-    const code = String(promo.code || "");
-    await db.prepare("UPDATE employer_credits SET promotion_code = ? WHERE id = ?").bind(code, credit.id).run();
+    if (!promo || typeof promo.code !== "string" || !promo.code) throw new Error("Promotion result unknown");
+    const code = promo.code;
+    await db.batch([
+      db.prepare("UPDATE employer_credits SET status = 'credit', promotion_code = ?, chosen_at = ?, chosen_by = ?, updated = ? WHERE id = ? AND status = 'offered'")
+        .bind(code, at, who, at, credit.id),
+      db.prepare("UPDATE employer_credit_jobs SET state = 'done', updated = ? WHERE credit_id = ?").bind(at, credit.id),
+    ]);
     await trySend(env, creditMail(env, order, { ...credit, promotion_code: code }, "credit"), "credit code");
     return { code };
   } catch (e) {
-    await db.prepare("UPDATE employer_credits SET status = 'offered', chosen_at = NULL, chosen_by = NULL WHERE id = ? AND status = ?")
-      .bind(credit.id, choice).run();
+    await db.prepare("UPDATE employer_credit_jobs SET state = 'unknown', updated = ? WHERE credit_id = ?")
+      .bind(at, credit.id).run();
     throw e;
   }
 }
@@ -977,8 +1091,9 @@ async function settleCredit(db, env, credit, choice, who, now, fetchImpl) {
 
 export async function ordersCron(db, env, now, fetchImpl = (...a) => fetch(...a)) {
   await dropUnverifiedOrders(db, now);
+  await dropRetainedOrders(db, now);
   if (!ordersOn(env)) return;
-  for (const job of [fillPlacementFields, resendReviews, remindReviews, closeRoles, resendOffers, defaultCredits]) {
+  for (const job of [fillPlacementFields, resendReviews, remindReviews, closeRoles, resendOffers, defaultCredits, retryOrderMail, alertFinancialHolds]) {
     try {
       await job(db, env, now, fetchImpl);
     } catch (e) {
@@ -987,10 +1102,31 @@ export async function ordersCron(db, env, now, fetchImpl = (...a) => fetch(...a)
   }
 }
 
+// Crash/unknown claims remain visible, never silently reset. One owner alert, retried if mail fails.
+async function alertFinancialHolds(db, env, now) {
+  const cutoff = new Date(now.getTime() - 15 * 60_000).toISOString();
+  for (const [table, idField] of [["employer_decisions", "order_id"], ["employer_credit_jobs", "credit_id"]]) {
+    const { results } = await db.prepare(`SELECT * FROM ${table} WHERE state != 'done' AND alerted_at IS NULL AND (state = 'unknown' OR created < ?)`)
+      .bind(cutoff).all();
+    for (const job of results) {
+      if (await trySend(env, { to: env.REVIEW_TO, subject: "InternScout financial operation needs reconciliation",
+        text: `Order ${job.order_id}; operation ${job[idField]} (${job.action || job.choice}) is ${job.state}. ` +
+          "Check the order, placement records and Stripe before any retry, opposite decision or second payout. " +
+          "Automatic retries are held to avoid duplicate compensation. See worker/ORDERS.md." }, "financial reconciliation")) {
+        await db.prepare(`UPDATE ${table} SET alerted_at = ? WHERE ${idField} = ?`).bind(now.toISOString(), job[idField]).run();
+      }
+    }
+  }
+}
+
 // An order never confirmed is deleted after UNVERIFIED_DAYS (docs/privacy.html#employers).
 export async function dropUnverifiedOrders(db, now) {
   const cutoff = new Date(now.getTime() - UNVERIFIED_DAYS * 86400e3).toISOString();
   await db.batch([
+    // A crash after claiming a free pilot can be retried by that same order. Once its link expires,
+    // release an unpaid abandoned claim; temporary capacity already expired after 35 minutes.
+    db.prepare("UPDATE pilot_codes SET order_id = NULL, used_at = NULL WHERE order_id IN " +
+      "(SELECT id FROM employer_orders WHERE status = 'verified' AND paid_at IS NULL AND token_expires <= ?)").bind(now.toISOString()),
     db.prepare("DELETE FROM employer_order_roles WHERE order_id IN (SELECT id FROM employer_orders WHERE status = 'unverified' AND created < ?)").bind(cutoff),
     db.prepare("DELETE FROM employer_orders WHERE status = 'unverified' AND created < ?").bind(cutoff),
   ]);
@@ -1022,7 +1158,7 @@ async function closeRoles(db, env, now) {
   const d1 = addDays(today, -1), d2 = addDays(today, -2);
   const { results } = await db.prepare(
     "SELECT r.order_id, r.title, r.placement_id, p.start_day, p.end_day FROM employer_order_roles r " +
-    "JOIN placements p ON p.id = r.placement_id WHERE p.status = 'on' AND p.start_day <= ?",
+    "JOIN placements p ON p.id = r.placement_id WHERE (p.status = 'on' OR (p.status = 'ended' AND p.ended_reason = 'dates')) AND p.start_day <= ?",
   ).bind(d2).all();
   for (const r of results) {
     const runs = (await db.prepare("SELECT day, shown, dropped, reason FROM placement_runs WHERE placement_id = ? AND day <= ? ORDER BY day DESC")
@@ -1031,27 +1167,44 @@ async function closeRoles(db, env, now) {
     if (!closedDay(byDay[d1]) || !closedDay(byDay[d2])) continue;
     let first = d2;
     while (first > r.start_day && closedDay(byDay[addDays(first, -1)])) first = addDays(first, -1);
-    try {
-      await endPlacement(db, { id: r.placement_id, by: "cron", reason: "role_closed" }, now);
-    } catch (e) {
-      if (!(e instanceof HttpError)) throw e;
-      continue;   // changed by hand at the same moment: left for tomorrow
-    }
     const order = await db.prepare("SELECT * FROM employer_orders WHERE id = ?").bind(r.order_id).first();
-    const count = (await db.prepare("SELECT COUNT(*) AS n FROM employer_order_roles WHERE order_id = ?").bind(r.order_id).first("n")) || 1;
+    const allRoles = await orderRoles(db, order.id);
+    const count = allRoles.length || 1;
+    const index = allRoles.findIndex(x => x.placement_id === r.placement_id);
+    const paid = Math.max(0, Number(order.paid_amount) || 0);
+    // Allocate remainder cents once, so three $35 roles refund 1167 + 1167 + 1166, never 3501.
+    const share = Math.floor(paid / count) + (index < paid % count ? 1 : 0);
     const unused = Math.max(0, Math.min(DAYS, daysBetween(first, r.end_day)));
-    const amount = Math.round((unused * (Number(order.paid_amount) || 0)) / Number(count) / DAYS);
-    if (!(amount > 0) || !order.payment_intent) {
+    const amount = Math.round(unused * share / DAYS);
+    const token = newToken();
+    const credit = amount > 0 && order.payment_intent ? { id: "c-" + randomHex(8), order_id: order.id, placement_id: r.placement_id, created: now.toISOString(),
+      amount, unused_days: unused, token_hash: await tokenHash(token), status: "offered", updated: now.toISOString() } : null;
+    const before = await db.prepare("SELECT * FROM placements WHERE id = ?").bind(r.placement_id).first();
+    if (!before || !(before.status === "on" || (before.status === "ended" && before.ended_reason === "dates"))) continue;
+    if (before.status === "ended" && unused === 0) continue;
+    const at = new Date(Math.max(now.getTime(), Date.parse(before.updated) + 1)).toISOString();
+    const after = { ...before, status: "ended", ended_reason: "role_closed", updated: at, updated_by: "cron" };
+    const statements = [
+      db.prepare("UPDATE placements SET status = 'ended', ended_reason = 'role_closed', updated = ?, updated_by = 'cron' WHERE id = ? AND status = ? AND updated = ?")
+        .bind(at, before.id, before.status, before.updated),
+      db.prepare("INSERT INTO placement_log (placement, at, by, action, reason, before, after) SELECT ?, ?, 'cron', 'end', 'role_closed', ?, ? " +
+        "WHERE EXISTS (SELECT 1 FROM placements WHERE id = ? AND updated = ? AND updated_by = 'cron')")
+        .bind(before.id, at, JSON.stringify(before), JSON.stringify(after), before.id, at),
+      db.prepare("DELETE FROM employer_capacity_reservations WHERE order_id = ? AND listing_id = ?").bind(order.id, before.listing_id),
+    ];
+    if (credit) {
+    const cols = Object.keys(credit);
+      statements.push(db.prepare(`INSERT OR IGNORE INTO employer_credits (${cols.join(", ")}) SELECT ${cols.map(() => "?").join(", ")} ` +
+        "WHERE EXISTS (SELECT 1 FROM placements WHERE id = ? AND updated = ? AND updated_by = 'cron')")
+        .bind(...cols.map(c => credit[c]), before.id, at));
+    }
+    const [ended] = await db.batch(statements);
+    if (!ended.meta.changes) continue;
+    if (!credit) {
       await trySend(env, closedMail(env, order, r, first, unused, 0, null), "role closed");
       continue;
     }
-    const token = newToken();
-    const credit = { id: "c-" + randomHex(8), order_id: order.id, placement_id: r.placement_id, created: now.toISOString(),
-      amount, unused_days: unused, token_hash: await tokenHash(token), status: "offered", updated: now.toISOString() };
-    const cols = Object.keys(credit);
-    await db.prepare(`INSERT OR IGNORE INTO employer_credits (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`)
-      .bind(...cols.map((c) => credit[c])).run();
-    if (await trySend(env, closedMail(env, order, r, first, unused, amount, { ...credit, token }), "credit offer")) {
+    if (await trySend(env, closedMail(env, order, r, first, unused, amount, { ...credit, token, offer_sent_at: now.toISOString() }), "credit offer")) {
       await db.prepare("UPDATE employer_credits SET offer_sent_at = ? WHERE id = ?").bind(now.toISOString(), credit.id).run();
     }
   }
@@ -1069,7 +1222,7 @@ async function resendOffers(db, env, now) {
     const token = newToken();
     await db.prepare("UPDATE employer_credits SET token_hash = ? WHERE id = ?").bind(await tokenHash(token), c.id).run();
     const first = addDays(p.end_day, -c.unused_days);
-    if (await trySend(env, closedMail(env, order, { title: c.title }, first, c.unused_days, c.amount, { ...c, token }), "credit offer")) {
+    if (await trySend(env, closedMail(env, order, { title: c.title }, first, c.unused_days, c.amount, { ...c, token, offer_sent_at: now.toISOString() }), "credit offer")) {
       await db.prepare("UPDATE employer_credits SET offer_sent_at = ? WHERE id = ?").bind(now.toISOString(), c.id).run();
     }
   }
@@ -1078,7 +1231,7 @@ async function resendOffers(db, env, now) {
 // No answer in CREDIT_DEFAULT_DAYS: a refund, as the offer said.
 async function defaultCredits(db, env, now, fetchImpl) {
   const cutoff = new Date(now.getTime() - CREDIT_DEFAULT_DAYS * 86400e3).toISOString();
-  const { results } = await db.prepare("SELECT * FROM employer_credits WHERE status = 'offered' AND created < ?").bind(cutoff).all();
+  const { results } = await db.prepare("SELECT * FROM employer_credits WHERE status = 'offered' AND offer_sent_at IS NOT NULL AND offer_sent_at < ?").bind(cutoff).all();
   for (const credit of results) {
     try {
       await settleCredit(db, env, credit, "refund", "default", now, fetchImpl);
@@ -1202,7 +1355,7 @@ function closedMail(env, order, role, first, unused, amount, credit) {
         "\nIf the role is open again at a new address, reply to this email.\n" + sign(env) };
   }
   const link = `${siteUrl(env)}/employers/buy/?credit=${credit.id}&t=${credit.token}`;
-  const by = longDay(addDays(credit.created.slice(0, 10), CREDIT_DEFAULT_DAYS));
+  const by = longDay(addDays((credit.offer_sent_at || credit.created).slice(0, 10), CREDIT_DEFAULT_DAYS));
   return {
     to: order.email, replyTo: env.REVIEW_TO,
     subject: "Your InternScout listing ended early: choose a refund or a credit",

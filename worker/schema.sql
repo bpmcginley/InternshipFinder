@@ -521,3 +521,57 @@ CREATE TABLE IF NOT EXISTS placement_fields (
   fields TEXT NOT NULL,
   looked_up TEXT NOT NULL
 );
+
+-- Atomic daily field capacity, including Checkouts not yet returned by Stripe. A single INSERT
+-- generated from JSON reserves every role/day or rolls the entire transaction back.
+CREATE TABLE IF NOT EXISTS employer_capacity_reservations (
+  order_id TEXT NOT NULL, listing_id TEXT NOT NULL, field TEXT NOT NULL, day TEXT NOT NULL,
+  expires_at TEXT, checked_at TEXT NOT NULL,
+  PRIMARY KEY (order_id, listing_id, field, day)
+);
+CREATE INDEX IF NOT EXISTS employer_capacity_field ON employer_capacity_reservations (field, day);
+CREATE INDEX IF NOT EXISTS employer_capacity_listing ON employer_capacity_reservations (listing_id, day);
+CREATE TRIGGER IF NOT EXISTS employer_capacity_limit
+BEFORE INSERT ON employer_capacity_reservations
+WHEN NOT EXISTS (SELECT 1 FROM employer_capacity_reservations WHERE order_id = NEW.order_id
+  AND listing_id = NEW.listing_id AND field = NEW.field AND day = NEW.day)
+BEGIN
+  SELECT RAISE(ABORT, 'employer_capacity_full') WHERE
+    (SELECT COUNT(*) FROM employer_capacity_reservations WHERE field = NEW.field AND day = NEW.day
+      AND (expires_at IS NULL OR expires_at > NEW.checked_at)) >= 5;
+  SELECT RAISE(ABORT, 'employer_listing_taken') WHERE NEW.order_id NOT LIKE 'manual:%' AND EXISTS
+    (SELECT 1 FROM employer_capacity_reservations WHERE listing_id = NEW.listing_id AND day = NEW.day
+      AND order_id != NEW.order_id AND (expires_at IS NULL OR expires_at > NEW.checked_at));
+END;
+
+-- Financial decisions are immutable claims. Unknown/crashed operations require reconciliation,
+-- never a new choice or an automatic repeat after Stripe's idempotency window expires.
+CREATE TABLE IF NOT EXISTS employer_decisions (
+  order_id TEXT PRIMARY KEY, action TEXT NOT NULL CHECK (action IN ('approve', 'refuse')),
+  state TEXT NOT NULL CHECK (state IN ('running', 'done', 'unknown')),
+  created TEXT NOT NULL, updated TEXT NOT NULL, alerted_at TEXT
+);
+CREATE TABLE IF NOT EXISTS employer_credit_jobs (
+  credit_id TEXT PRIMARY KEY, order_id TEXT NOT NULL,
+  choice TEXT NOT NULL CHECK (choice IN ('refund', 'credit')),
+  state TEXT NOT NULL CHECK (state IN ('running', 'done', 'unknown')),
+  created TEXT NOT NULL, updated TEXT NOT NULL, alerted_at TEXT
+);
+
+-- Append to schema.sql before deploying order-mail.js. Sent rows keep only the order/kind/date,
+-- preventing duplicate receipt/decision emails while discarding their contact details and contents.
+CREATE TABLE IF NOT EXISTS employer_order_mail (
+  order_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('receipt', 'approved', 'refused')),
+  created TEXT NOT NULL,
+  to_address TEXT,
+  subject TEXT,
+  body TEXT,
+  reply_to TEXT,
+  sent_at TEXT,
+  attempted_at TEXT,
+  sending_until TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (order_id, kind)
+);
+CREATE INDEX IF NOT EXISTS employer_order_mail_pending ON employer_order_mail(sent_at, sending_until);
