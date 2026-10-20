@@ -95,7 +95,8 @@ test("terms: an employer section, and the screening line says what a paid listin
     /refund the unused days unless it was ended for breaking them/,
     /we may take part with our own lawyer at our own cost/,
     /This doesn't limit how we show your public listings, as we do for every employer/,
-    /that invoice, confirmation or email wins/,
+    /the invoice or confirmation wins\. If the email approving your order gives different dates from the ones you chose[^.]*, the dates in that email win/,
+    /If you dispute a payment with your bank, we may pause the paid listing until the dispute is settled/,
     /A student's own settings or saved profile can only hide it/]) assert.match(emp, want);
   assert.doesNotMatch(emp, /we check that[^.]*pay range/, "pay range is the employer's promise, not our check");
   const v = words(visible(TERMS));

@@ -461,7 +461,8 @@ Prices in cents: `one` (1 role) 2900, or 1500 for a nonprofit or public body; `t
 employer) 6900, or 3500. Each role runs 30 days. At most 5 paid roles at once share a field tag (a role
 with no field tags counts under `other`); the cap counts roles of paid or approved orders while their
 placements are `draft`, `checked`, `on` or `paused`, and roles of a verified order for 35 minutes after its
-Checkout opened. Placements made by hand with `scripts/placement.mjs` have no field tags and do not count.
+Checkout opened, and placements made by hand with `scripts/placement.mjs` while `draft`, `checked`, `on` or
+`paused`, under their role's fields from the role index (`placement_fields`; "other" until looked up).
 The start day is today up to 90 days ahead (UTC days).
 
 The roles come from the site's role index, `SITE_URL/data/roles/<shard>.json` (`shard` is one of `a`-`z`,

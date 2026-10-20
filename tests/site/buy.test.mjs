@@ -459,7 +459,6 @@ test("buy page: noindex, labelled fields, the honeypot, the terms box and live s
   assert.match(PAGE, /<div class="hp" aria-hidden="true"><label for="website">Website<\/label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"\/><\/div>/);
   const terms = noComments(PAGE).match(/<label class="check" for="terms"><input type="checkbox" id="terms"[^>]*\/> <span>([\s\S]*?)<\/span><\/label>/);
   assert.ok(terms, "the terms checkbox");
-  assert.equal(terms[1].replace(/<[^>]+>/g, ""), "I accept the InternScout terms, including the section for employers, for my company, and I am allowed to accept them for it.");
   assert.match(terms[1], /href="\/terms\.html"/);
   assert.match(terms[1], /href="\/terms\.html#employers"/);
   for (const id of ["co-q", "start", "name", "email", "company", "pilot"]) assert.match(PAGE, new RegExp(`<label for="${id}">`), id);
@@ -506,4 +505,32 @@ test("reads the Worker's documented shapes: flat prices still work, taken and un
   assert.equal(B.readCredit({ status: "credit", amount: 900, code: "X1", role: { title: "T", company: "C" } }).choice, "credit");
   assert.equal(B.readCredit({ status: "offered", amount: 900 }).choice, null);
   assert.equal(B.readCredit({ done: "refund", amount: 900 }).choice, "refund");
+});
+
+// The Worker records the box's words and the terms version on every order (worker/src/orders.js TERMS_BOX
+// and TERMS_VERSION); both have to be what this page and the terms actually say (legal review round 4,
+// 2026-10-19). Read from the Worker's source so the site tests need nothing from worker/.
+const ORDERS_SRC = read("worker/src/orders.js");
+const TERMS_BOX = ORDERS_SRC.match(/export const TERMS_BOX = "([^"]+)";/)[1];
+const TERMS_VERSION = ORDERS_SRC.match(/export const TERMS_VERSION = "(\d{4}-\d{2}-\d{2})";/)[1];
+
+test("the Worker's TERMS_BOX and TERMS_VERSION match the buy page and the terms' Last updated day", () => {
+  const box = noComments(PAGE).match(/<label class="check" for="terms"><input[^>]*\/> <span>([\s\S]*?)<\/span><\/label>/);
+  assert.equal(box[1].replace(/<[^>]+>/g, ""), TERMS_BOX);
+  const terms = noComments(read("docs/terms.html"));
+  const m = terms.match(/<p class="meta">Last updated ([A-Z][a-z]+) (\d{1,2}), (\d{4})<\/p>/);
+  assert.ok(m, "the terms' Last updated line");
+  const month = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+    "November", "December"].indexOf(m[1]) + 1;
+  assert.equal(TERMS_VERSION, `${m[3]}-${String(month).padStart(2, "0")}-${m[2].padStart(2, "0")}`);
+});
+
+test("before paying, the page says what is sold, the refund rule, cancelling and who to write to", () => {
+  const p = noComments(PAGE).match(/<p class="fine" id="refunds">([\s\S]*?)<\/p>/);
+  assert.ok(p, "the refunds paragraph");
+  const words = p[1].replace(/<[^>]+>/g, "");
+  for (const want of [/in US dollars/, /If we don't approve your order, you get a full refund/,
+    /Until we approve it, you can cancel it by email for a full refund/, /unused days back as a refund or a credit code/,
+    /brucepmcginley@gmail\.com/]) assert.match(words, want);
+  assert.ok(PAGE.indexOf('id="refunds"') < PAGE.indexOf('id="send"'), "shown before the Order button");
 });

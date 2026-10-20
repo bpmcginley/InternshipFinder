@@ -886,3 +886,49 @@ test("scripts/placement.mjs: orders and pilot-code, printing no name or email", 
   assert.match(printed, /o-0000000000000123/);
   assert.ok(!printed.includes("Secret Name") && !printed.includes("secret@acme.example") && !printed.includes(ADMIN));
 });
+
+// Legal review round 4 (2026-10-19): the terms promise at most five paid listings in a field however they
+// were bought, so placements Bruce makes by hand count too, under their role's fields from the index.
+test("placements made by hand count toward the field cap under their role's fields", async () => {
+  const w = await world();
+  const make = (listing) => w.adminCall("POST", "/admin/placements", { employer: "Acme Robotics", listing_id: listing,
+    apply_url: "https://jobs.acme.example/1", start: "2026-09-18", end: "2026-10-18", by: "bruce" });
+  for (let i = 0; i < FIELD_CAP; i++) assert.equal((await make(ID(1))).status, 200);
+  const looked = w.db.dump().placement_fields;
+  assert.equal(looked.length, FIELD_CAP);
+  assert.ok(looked.every((f) => f.fields === "engineering" && f.listing_id === ID(1)));
+  // ID(3) is engineering too, on overlapping days: full, with the day the hand-made ones end.
+  const res = await w.order({ roles: [ID(3)] });
+  assert.equal(res.status, 409, await res.clone().text());
+  const out = await res.json();
+  assert.equal(out.error, "full");
+  assert.equal(out.next_start, "2026-10-18");
+  // Apex's science role shares no field with them.
+  assert.equal((await w.order({ roles: [ID(5)], email: "lab@apex.example", company: "Apex Labs" })).status, 200);
+  // An ended one stops holding days.
+  const id = w.db.dump().placements[0].id;
+  assert.equal((await w.adminCall("POST", "/admin/placements/end", { id, reason: "removed", by: "bruce" })).status, 200);
+  assert.equal((await w.order({ roles: [ID(3)] })).status, 200);
+});
+
+test("the daily cron looks up a hand-made placement's fields the admin route missed, and placements of orders are left alone", async () => {
+  const w = await world();
+  await w.db.prepare("INSERT INTO placements (id, employer, listing_id, apply_url, start_day, end_day, status, created, created_by, updated, updated_by) " +
+    "VALUES ('p-2026-09-acme-robotics-9', 'Acme Robotics', ?, 'https://jobs.acme.example/2', '2026-09-15', '2026-10-15', 'on', ?, 'bruce', ?, 'bruce')")
+    .bind(ID(2), NOW.toISOString(), NOW.toISOString()).run();
+  const id = await w.paid();
+  await ordersCron(w.db, w.env, new Date(NOW.getTime() + 3600e3), w.fetch);
+  const rows = w.db.dump().placement_fields;
+  assert.deepEqual(rows.map((r) => [r.placement_id, r.fields]), [["p-2026-09-acme-robotics-9", "engineering,software"]]);
+  assert.ok(!rows.some((r) => w.placementsOf(id).map((p) => p.id).includes(r.placement_id)));
+});
+
+test("the order records the clickwrap box's words, and the received email links the terms version accepted", async () => {
+  const w = await world();
+  const id = await w.paid();
+  assert.match(w.orderRow(id).terms_box, /^I have read and accept the InternScout terms, including the section for employers, on behalf of my company/);
+  const got = w.mail.sent.find((m) => m.to === GOOD.email && /We have your/.test(m.subject));
+  assert.match(got.text, new RegExp(`version ${TERMS_VERSION}`));
+  assert.match(got.text, new RegExp(`blob/terms-${TERMS_VERSION}/docs/terms\.html#employers`));
+  assert.match(got.text, /Until we approve it, you can cancel it for a full refund by replying to this email/);
+});

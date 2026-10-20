@@ -433,6 +433,7 @@ CREATE TABLE IF NOT EXISTS employer_orders (
   email TEXT NOT NULL,                       -- private: the work address the link went to
   email_domain TEXT NOT NULL,
   terms_version TEXT NOT NULL,
+  terms_box TEXT NOT NULL DEFAULT '',        -- the clickwrap box's words as the buyer saw them
   terms_at TEXT NOT NULL,
   token_hash TEXT,                           -- sha256 hex of the email link's token
   token_expires TEXT,
@@ -508,4 +509,15 @@ CREATE TABLE IF NOT EXISTS pilot_codes (
   note TEXT NOT NULL DEFAULT '',
   order_id TEXT,
   used_at TEXT
+);
+
+-- The field tags of a placement made by hand (scripts/placement.mjs), looked up in the site's role index,
+-- so it counts toward the per-field cap like an order's roles (src/orders.js FIELD_CAP; terms.html says at
+-- most five paid listings in a field, however they were bought; legal review round 4, 2026-10-19).
+-- `fields` is a comma list; "other" when the role has no field tags or isn't in the index.
+CREATE TABLE IF NOT EXISTS placement_fields (
+  placement_id TEXT PRIMARY KEY,
+  listing_id TEXT NOT NULL,                  -- the listing the lookup was for; a moved placement is looked up again
+  fields TEXT NOT NULL,
+  looked_up TEXT NOT NULL
 );
