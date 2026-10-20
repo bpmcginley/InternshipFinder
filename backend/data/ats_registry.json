@@ -1798,6 +1798,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "red-gate": {
+   "name": "Redgate",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
+  },
   "reflect-orbital": {
    "name": "Reflect Orbital",
    "quant": false,
@@ -2008,6 +2014,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "spaitial": {
+   "name": "SpAItial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
+  },
   "span": {
    "name": "Span",
    "quant": false,
@@ -2019,6 +2031,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "steel": {
+   "name": "Steel",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "stradahq": {
    "name": "Strada",
@@ -2399,6 +2417,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "geospectrum": {
+   "name": "GeoSpectrum Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "idinsight": {
    "name": "IDinsight",
