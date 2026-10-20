@@ -683,6 +683,34 @@ def _deepco():
             "sector": None, "location": None}
 
 
+def test_ut_austin_main_campus_is_texas_in_list_and_detail():
+    from internscout.normalize import normalize
+
+    class AustinBoard(_Board):
+        def post(self, url, headers=None, json=None):
+            return _Page({"total": 1, "jobPostings": [{"title": "CRC Community Outreach Intern",
+                "externalPath": "/job/UT-MAIN-CAMPUS/CRC-Community-Outreach-Intern_R_00041237",
+                "locationsText": "UT MAIN CAMPUS"}]})
+
+        def get(self, url, headers=None, timeout=None):
+            if with_detail and not url.endswith("robots.txt"):
+                return _Page({"jobPostingInfo": {"location": "UT MAIN CAMPUS"}})
+            return _Missing()
+
+    co = dict(_deepco(), name="University of Texas at Austin", ats_token="utaustin|wd1|utstudent")
+    for with_detail in (False, True):
+        item = fetch_workday_board(AustinBoard([]), co)[0]
+        assert item["locations"] == ["Austin, TX"]
+        assert normalize(item)["geo"]["regions"][0]["state"] == "TX"
+
+
+def test_ut_austin_campus_alias_does_not_rewrite_other_employers_or_utah():
+    from internscout.sources.workday import board_locations
+    assert board_locations("utah", ["UT MAIN CAMPUS"]) == ["UT MAIN CAMPUS"]
+    assert board_locations("utaustin", ["Salt Lake City, UT", "UT SOUTH CAMPUS"]) == [
+        "Salt Lake City, UT", "UT SOUTH CAMPUS"]
+
+
 def test_a_big_workday_board_is_read_past_the_first_two_hundred_results():
     # searchText="intern" matches "internal" and "international" too, so a large board buries
     # real internships in noise. Of 39 boards sampled live, 9 held more than 200 results, and
