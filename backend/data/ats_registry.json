@@ -11743,8 +11743,9 @@
   "accenture|wd103|AccentureCareers": {
    "name": "Accenture",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-20"
   },
   "accenture|wd103|AvanadeCareers": {
    "name": "Avanade",
@@ -17498,16 +17499,14 @@
   "salesforce|wd12|External_Career_Site": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-20"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "salesforce|wd12|Futureforce_Internships": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-20"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "salesforce|wd12|futureforce_newgradroles": {
    "name": "Salesforce",
