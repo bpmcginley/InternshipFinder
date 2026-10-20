@@ -64,9 +64,11 @@ test("unknown kinds and malformed messages cannot become persisted order message
 
 test("seven-year retention deletes confirmed contact records and related jobs but preserves current records and pilot history", async () => {
   const w = await world();
-  // These integration tables are owned by the separate financial-safety patch. Use their exact
-  // identifiers/foreign-key columns here without duplicating its full schema in the mail patch.
-  await w.db.exec("CREATE TABLE employer_capacity_reservations (order_id TEXT); " +
+  // These integration tables are owned by the separate financial-safety patch. Replace only this
+  // test's empty in-memory tables with their reference columns, so its unrelated required financial
+  // fields do not become duplicated fixtures here. The integrated order tests exercise the full schema.
+  await w.db.exec("DROP TABLE IF EXISTS employer_capacity_reservations; DROP TABLE IF EXISTS employer_decisions; " +
+    "DROP TABLE IF EXISTS employer_credit_jobs; CREATE TABLE employer_capacity_reservations (order_id TEXT); " +
     "CREATE TABLE employer_decisions (order_id TEXT); CREATE TABLE employer_credit_jobs (credit_id TEXT, order_id TEXT);");
   const order = async (id, status, verified, paid = null) => w.db.prepare(
     "INSERT INTO employer_orders (id, created, updated, status, package, start_day, employer_key, employer, company, name, email, " +
