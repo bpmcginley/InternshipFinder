@@ -890,6 +890,7 @@
 40.7654,
 -73.8174
 ],
+"fnb financial center|PA":null,
 "forest city|PA":[
 41.6515,
 -75.4666
@@ -1392,6 +1393,10 @@
 40.4335,
 -79.7606
 ],
+"monroe|NJ":[
+41.1145,
+-74.6341
+],
 "monroe|NY":[
 41.3305,
 -74.1866
@@ -1508,6 +1513,7 @@
 "new jersey - princeton|NJ":null,
 "new jersey - remote|NJ":null,
 "new jersey office - 210 hudson street|NJ":null,
+"new jersey remote work|NJ":null,
 "new jersey|NJ":[
 40.5353,
 -74.3456
@@ -1572,6 +1578,7 @@
 "new york privy hq|NY":null,
 "new york remote office (ny99|NY":null,
 "new york remote office|NY":null,
+"new york remote work|NY":null,
 "new york state (other|NY":null,
 "new york united states|NY":null,
 "new york virtual|NY":null,
@@ -1615,6 +1622,7 @@
 "nj - carteret|NJ":null,
 "nj - chatham|NJ":null,
 "nj - cherry hill|NJ":null,
+"nj - chester|NJ":null,
 "nj - clark|NJ":null,
 "nj - clifton|NJ":null,
 "nj - closter|NJ":null,
@@ -1667,6 +1675,7 @@
 "nj - margate city|NJ":null,
 "nj - matawan|NJ":null,
 "nj - medford|NJ":null,
+"nj - mendham|NJ":null,
 "nj - middlesex|NJ":null,
 "nj - millburn|NJ":null,
 "nj - montclair|NJ":null,
@@ -1675,6 +1684,7 @@
 "nj - mount holly|NJ":null,
 "nj - mullica hill|NJ":null,
 "nj - new milford|NJ":null,
+"nj - new providence|NJ":null,
 "nj - newark|NJ":null,
 "nj - north bergen|NJ":null,
 "nj - north plainfield|NJ":null,
@@ -1682,10 +1692,12 @@
 "nj - nutley|NJ":null,
 "nj - oak ridge|NJ":null,
 "nj - old tappan|NJ":null,
+"nj - parsippany|NJ":null,
 "nj - pennsauken|NJ":null,
 "nj - plainsboro|NJ":null,
 "nj - princeton|NJ":null,
 "nj - rahway|NJ":null,
+"nj - randolph|NJ":null,
 "nj - ridgefield park|NJ":null,
 "nj - ringwood|NJ":null,
 "nj - river edge|NJ":null,
@@ -1907,6 +1919,7 @@
 -78.4321
 ],
 "pa - ambler|PA":null,
+"pa - aston|PA":null,
 "pa - audubon|PA":null,
 "pa - bangor|PA":null,
 "pa - bensalem|PA":null,
@@ -1932,6 +1945,7 @@
 "pa - douglassville|PA":null,
 "pa - downingtown|PA":null,
 "pa - doylestown|PA":null,
+"pa - drexel hill|PA":null,
 "pa - dunmore|PA":null,
 "pa - east stroudsburg|PA":null,
 "pa - easton|PA":null,
@@ -1947,6 +1961,7 @@
 "pa - exton|PA":null,
 "pa - fairless hills|PA":null,
 "pa - feasterville|PA":null,
+"pa - folsom|PA":null,
 "pa - frazer|PA":null,
 "pa - freeland|PA":null,
 "pa - gettysburg|PA":null,
@@ -1963,6 +1978,7 @@
 "pa - honesdale|PA":null,
 "pa - hummelstown|PA":null,
 "pa - indiana|PA":null,
+"pa - jenkintown|PA":null,
 "pa - jersey shore|PA":null,
 "pa - johnstown|PA":null,
 "pa - kennett square|PA":null,
@@ -2086,6 +2102,7 @@
 "pennsylvania - philadelphia|PA":null,
 "pennsylvania - radnor|PA":null,
 "pennsylvania - remote|PA":null,
+"pennsylvania remote work|PA":null,
 "pennsylvania|PA":[
 40.0117,
 -75.1844

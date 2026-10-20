@@ -15579,8 +15579,9 @@
   "kcura|wd1|External_Career_Site": {
    "name": "Relativity",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-20"
   },
   "kengarff|wd1|external_site": {
    "name": "Ken Garff Auto Group",
