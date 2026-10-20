@@ -7,8 +7,8 @@
 // What it asks the Worker (worker/src/orders.js), and nothing else:
 //   GET  /employer/config                      prices (cents), days, field_cap, max_start_days, terms_version
 //   GET  /employer/availability?shard=&ids=&start=
-//   POST /employer/order                       {name, email, company, public_body, package, shard, listing_ids,
-//                                               start, accept_terms, terms_version, pilot_code, website}
+//   POST /employer/order                       {name, email, company, public_body, package, shard, roles,
+//                                               start, terms, terms_version, pilot_code, website}
 //   POST /employer/order/confirm               {order, token} -> {url} (Stripe) or {done: "pilot"}
 //   GET  /employer/credit?credit=&t=           the unused-days offer
 //   POST /employer/credit                      {credit, token, choice: "refund" or "credit"}
@@ -122,7 +122,7 @@
     if (!cfg || cfg.enabled !== true) return false;
     for (var pub = 0; pub < 2; pub++) for (var k = 0; k < 2; k++) if (priceCents(cfg, k ? "three" : "one", !!pub) == null) return false;
     return Number.isInteger(cfg.days) && cfg.days > 0 && Number.isInteger(cfg.max_start_days) && cfg.max_start_days >= 0 &&
-      (typeof cfg.terms_version === "string" ? !!cfg.terms_version : typeof cfg.terms_version === "number");
+      typeof cfg.terms_version === "string" && cfg.terms_version.trim().length > 0;
   }
 
   function priceLine(cfg, publicBody) {
@@ -206,7 +206,7 @@
   function hasToken(state) { return state.kind === "confirm" || state.kind === "credit" || state.kind === "badlink"; }
 
   // The Worker's 400s name the field; this is the box on the page that shows its message.
-  var FIELD_FOR = { name: "name", email: "email", company: "company", pilot_code: "pilot", start: "start", terms: "terms",
+  var FIELD_FOR = { name: "name", email: "email", company: "company", pilot_code: "pilot", start: "start", terms: "terms", terms_version: "terms",
     roles: "roles", ids: "roles", package: "roles", shard: "roles", public_body: "roles", employer: "co-q" };
   function errorTarget(field) { return Object.prototype.hasOwnProperty.call(FIELD_FOR, field) ? FIELD_FOR[field] : null; }
   function serverMessage(out) {
@@ -217,7 +217,7 @@
   function orderBody(o) {
     return {
       name: o.name, email: o.email, company: o.company, public_body: !!o.publicBody, package: packageFor(o.roles.length),
-      shard: o.shard, roles: o.roles.map(function (r) { return r.id; }), start: o.start, terms: true,
+      shard: o.shard, roles: o.roles.map(function (r) { return r.id; }), start: o.start, terms: true, terms_version: o.cfg && o.cfg.terms_version,
       pilot_code: o.pilot || "", website: o.website || "",
     };
   }
@@ -570,6 +570,7 @@
           return;
         }
         var msg = serverMessage(res.out), target = res.status === 400 ? errorTarget(res.out.field) : null;
+        if (res.status === 400 && res.out.field === "terms_version") $("terms").checked = false;
         if (target) { mark(target, msg || "Check this."); focusFor(target); }
         else if (res.status === 404) { form.hidden = true; show("closed", true); }
         else if (msg && (res.status === 400 || res.status === 409 || res.status === 429)) status.textContent = msg;

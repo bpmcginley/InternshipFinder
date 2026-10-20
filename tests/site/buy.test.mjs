@@ -118,6 +118,7 @@ test("the page sells nothing unless the config is enabled and complete", () => {
   assert.equal(B.configOk({ ...CFG, prices: { one: 2900, three: 6900 } }), false);
   assert.equal(B.configOk({ ...CFG, days: 0 }), false);
   assert.equal(B.configOk({ ...CFG, terms_version: "" }), false);
+  for (const version of [" ", 0, 20261019, null, undefined]) assert.equal(B.configOk({ ...CFG, terms_version: version }), false);
   assert.equal(B.configOk(null), false);
 });
 
@@ -169,6 +170,7 @@ test("server errors go to the field the Worker names", () => {
   assert.equal(B.errorTarget("pilot_code"), "pilot");
   assert.equal(B.errorTarget("roles"), "roles");
   assert.equal(B.errorTarget("terms"), "terms");
+  assert.equal(B.errorTarget("terms_version"), "terms");
   assert.equal(B.errorTarget("start"), "start");
   assert.equal(B.errorTarget("toString"), null);
   assert.equal(B.errorTarget("nope"), null);
@@ -181,7 +183,9 @@ test("the order body has exactly the fields the Worker reads", () => {
   const body = B.orderBody({ name: "Ann", email: "ann@acme.com", company: "Acme", publicBody: false, shard: "a",
     roles: [{ id: 11 }, { id: 12 }, { id: 13 }], start: "2026-11-03", cfg: CFG, pilot: "", website: "" });
   assert.deepEqual(plain(body), { name: "Ann", email: "ann@acme.com", company: "Acme", public_body: false, package: "three", shard: "a",
-    roles: [11, 12, 13], start: "2026-11-03", terms: true, pilot_code: "", website: "" });
+    roles: [11, 12, 13], start: "2026-11-03", terms: true, terms_version: CFG.terms_version, pilot_code: "", website: "" });
+  const newer = B.orderBody({ roles: [{ id: 11 }], cfg: { ...CFG, terms_version: "2026-10-20-revised" } });
+  assert.equal(newer.terms_version, "2026-10-20-revised");
 });
 
 test("only a Stripe checkout address is followed, and only http(s) posting links are shown", () => {
@@ -344,7 +348,7 @@ test("an order: search, pick three roles (an unpaid one only as a nonprofit), a 
   $("order").fire("submit");
   await tick();
   assert.deepEqual(order, { name: "Ann Lee", email: "ann@acme.com", company: "Acme <Robotics>", public_body: true, package: "three", shard: "a",
-    roles: [12, 11, 13], start: B.addDays(today, 5), terms: true, pilot_code: "", website: "" });
+    roles: [12, 11, 13], start: B.addDays(today, 5), terms: true, terms_version: CFG.terms_version, pilot_code: "", website: "" });
   assert.equal($("sent").hidden, false);
   assert.equal($("sent-text").textContent, "We sent a link to ann@acme.com. It works for 48 hours.");
 });
@@ -376,14 +380,26 @@ test("an order that fits is sent once with the Worker's fields, and the 400 mess
   await tick();
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0], { name: "Ann", email: "ann@gmail.com", company: "Acme", public_body: false, package: "one", shard: "a", roles: ["r1"],
-    start: today, terms: true, pilot_code: "", website: "" });
+    start: today, terms: true, terms_version: CFG.terms_version, pilot_code: "", website: "" });
   assert.equal($("email-err").textContent, "Use your company email address, not a free one.");
   assert.equal($("email").getAttribute("aria-invalid"), "true");
   assert.equal(p.doc.activeElement, $("email"));
   assert.equal($("send").disabled, false);
 
-  answer = () => reply(200, { ok: true });
   $("email").value = "ann@acme.com";
+  answer = () => reply(400, { field: "terms_version", message: "The terms changed. Reload the page and review them before ordering." });
+  $("order").fire("submit");
+  await tick();
+  assert.equal($("terms").checked, false, "stale terms acceptance is cleared");
+  assert.match($("terms-err").textContent, /terms changed.*Reload/);
+  assert.equal(p.doc.activeElement, $("terms"));
+  assert.equal(sent.length, 2);
+  $("order").fire("submit");
+  await tick();
+  assert.equal(sent.length, 2, "do not resubmit without explicit terms acceptance");
+
+  answer = () => reply(200, { ok: true });
+  $("terms").checked = true;
   $("order").fire("submit");
   await tick();
   assert.equal($("order").hidden, true);
