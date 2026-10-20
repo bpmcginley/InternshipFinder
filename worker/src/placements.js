@@ -66,8 +66,10 @@ export async function requireAdmin(request, env) {
 }
 
 export const dayOf = (now) => now.toISOString().slice(0, 10);
-const addDays = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400e3).toISOString().slice(0, 10);
-const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400e3);
+// addDays and daysBetween are exported (2026-10-19) for the paid listing orders (orders.js).
+// was: const addDays = ...; const daysBetween = ...
+export const addDays = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400e3).toISOString().slice(0, 10);
+export const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400e3);
 
 // One text field: a string (or absent), control characters gone, trimmed, inside its limit.
 function text(body, field, { required = false } = {}) {

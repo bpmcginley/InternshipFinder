@@ -405,3 +405,107 @@ CREATE TABLE IF NOT EXISTS placement_runs (
   updated TEXT,
   PRIMARY KEY (placement_id, day)
 );
+
+-- Paid listings bought on the site (added 2026-10-19; src/orders.js, worker/ORDERS.md). New tables only:
+-- this file runs on every deploy and CREATE TABLE IF NOT EXISTS never changes a live one.
+--
+-- One row per order. Private, like employer_leads: the buyer's name, work email and the company they
+-- typed, which terms version they accepted and when (the clickwrap), the Stripe ids and the amounts in
+-- cents. Kept 7 years as the business record of a sale (docs/privacy.html#employers). An order never
+-- confirmed (`unverified`) is deleted by the daily cron after 7 days. The email link is kept only as the
+-- SHA-256 (hex) of its token. Status: unverified -> verified (email confirmed) -> paid (Stripe or a pilot
+-- code) -> approved or refused (Bruce's one decision). `price` is the list price at order time (0 for a
+-- pilot); `paid_amount` what Stripe says was paid (after any promotion code). GET /admin/orders never
+-- returns the name or the email.
+-- Read with: npx wrangler d1 execute internscout --remote --command "SELECT id, created, status, company FROM employer_orders ORDER BY created DESC"
+CREATE TABLE IF NOT EXISTS employer_orders (
+  id TEXT PRIMARY KEY,                       -- "o-" + 16 hex
+  created TEXT NOT NULL,
+  updated TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('unverified', 'verified', 'paid', 'approved', 'refused')),
+  package TEXT NOT NULL CHECK (package IN ('one', 'three')),
+  public_body INTEGER NOT NULL DEFAULT 0 CHECK (public_body IN (0, 1)),   -- claimed nonprofit or public body
+  start_day TEXT NOT NULL,                   -- as asked; approval moves the placements if it has passed
+  employer_key TEXT NOT NULL,                -- the role index's employer key
+  employer TEXT NOT NULL,                    -- the role index's company name
+  company TEXT NOT NULL,                     -- as the buyer typed it
+  name TEXT NOT NULL,                        -- private
+  email TEXT NOT NULL,                       -- private: the work address the link went to
+  email_domain TEXT NOT NULL,
+  terms_version TEXT NOT NULL,
+  terms_at TEXT NOT NULL,
+  token_hash TEXT,                           -- sha256 hex of the email link's token
+  token_expires TEXT,
+  verified_at TEXT,
+  pilot_code TEXT,
+  price INTEGER NOT NULL,
+  checkout_session TEXT,                     -- the latest Checkout opened, and when (the field cap holds it 35 minutes)
+  checkout_url TEXT,
+  checkout_at TEXT,
+  paid_session TEXT,
+  payment_intent TEXT,
+  paid_ref TEXT,                             -- "stripe:pi_..." or "pilot:CODE", copied to each placement's paid_ref
+  paid_amount INTEGER,
+  paid_at TEXT,
+  review_sent_at TEXT,                       -- empty: the daily cron sends Bruce's review email again
+  reminder_sent_at TEXT,
+  decided_at TEXT,
+  decided_reason TEXT,                       -- a refusal's reason, as the employer was told
+  refund_id TEXT,
+  refunded_amount INTEGER NOT NULL DEFAULT 0,
+  disputed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS employer_orders_status ON employer_orders (status, created);
+CREATE INDEX IF NOT EXISTS employer_orders_payment ON employer_orders (payment_intent);
+
+-- The roles of an order as the site's role index showed them when it was made (/data/roles/<shard>.json),
+-- and the placement made for each once it was paid. `fields` is the comma list of field tags ("other" when
+-- the listing had none), which the per-field cap counts.
+CREATE TABLE IF NOT EXISTS employer_order_roles (
+  order_id TEXT NOT NULL,
+  listing_id TEXT NOT NULL,
+  employer_key TEXT NOT NULL,
+  company TEXT NOT NULL,
+  title TEXT NOT NULL,
+  location TEXT NOT NULL DEFAULT '',
+  apply_url TEXT NOT NULL,
+  fields TEXT NOT NULL DEFAULT 'other',
+  unpaid INTEGER NOT NULL DEFAULT 0 CHECK (unpaid IN (0, 1)),
+  placement_id TEXT,                         -- placements.id, once made
+  PRIMARY KEY (order_id, listing_id)
+);
+
+CREATE INDEX IF NOT EXISTS employer_order_roles_placement ON employer_order_roles (placement_id);
+
+-- What a role that closed early still had unused (the daily cron), and what the employer chose: a refund
+-- of `amount` cents, or a one-time Stripe promotion code worth it. No answer in 30 days becomes a refund
+-- (`chosen_by` "default"). The email link is kept only as the SHA-256 of its token.
+CREATE TABLE IF NOT EXISTS employer_credits (
+  id TEXT PRIMARY KEY,                       -- "c-" + 16 hex
+  order_id TEXT NOT NULL,
+  placement_id TEXT NOT NULL UNIQUE,
+  created TEXT NOT NULL,
+  updated TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  unused_days INTEGER NOT NULL,
+  token_hash TEXT NOT NULL,
+  offer_sent_at TEXT,                        -- empty: the daily cron sends the offer again
+  status TEXT NOT NULL CHECK (status IN ('offered', 'refund', 'credit')),
+  chosen_at TEXT,
+  chosen_by TEXT,                            -- "employer" or "default"
+  refund_id TEXT,
+  promotion_code TEXT
+);
+
+CREATE INDEX IF NOT EXISTS employer_credits_status ON employer_credits (status, created);
+
+-- The free pilot: at most 5 codes ever (src/orders.js PILOT_MAX), made with
+-- `node scripts/placement.mjs pilot-code`. `order_id` is the order using it; a refused order frees it.
+CREATE TABLE IF NOT EXISTS pilot_codes (
+  code TEXT PRIMARY KEY,
+  created TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  order_id TEXT,
+  used_at TEXT
+);
