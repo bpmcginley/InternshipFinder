@@ -242,6 +242,7 @@
     return {
       cents: cents, title: typeof role.title === "string" ? role.title : "", company: typeof role.company === "string" ? role.company : "",
       choice: chose, code: typeof out.code === "string" ? out.code : "",
+      processing: out.processing == null ? null : out.processing === "running" ? "running" : "unknown",
     };
   }
 
@@ -607,7 +608,16 @@
     }
     var contact = function (prefix) { return el("p", {}, prefix, el("a", { href: "mailto:" + CONTACT }, CONTACT), "."); };
     var again = el("p", {}, el("a", { href: "/employers/buy/" }, "Start a new order"));
-    var failed = "That didn't go through. Check your connection and reload the page, or email " + CONTACT + ".";
+    var failed = "We couldn't read the result. Reopen the original link from your email to check its status, or email " + CONTACT + ".";
+
+    function choicePending() {
+      say("Your choice is being checked", "The result of your earlier choice is still being confirmed. Please don't choose again or try the other option.",
+        "Reopen the original unused-days offer email link later to check the status.", contact("Questions? Email "));
+    }
+    function choiceUnknown() {
+      say("Check your offer status", "We couldn't confirm the result of your choice. It may already have gone through. Please don't resend it or try the other option.",
+        "Reopen the original unused-days offer email link to check the current status before doing anything else.", contact("If you can't find that email, contact "));
+    }
 
     if (state.kind === "badlink") {
       say("This link doesn't look complete", "Open the link from your email again. If you copied it, check you copied all of it.", contact("If it still doesn't work, email "));
@@ -637,6 +647,7 @@
       call("GET", "/employer/credit?" + qs).then(function (res) {
         if (!res.ok) return say("This link doesn't work any more", serverMessage(res.out) || "It may have expired or already been used.", contact("Questions? Email "));
         var c = readCredit(res.out);
+        if (c.processing) return choicePending();
         if (c.choice) return result(c.choice, c.cents, c.code);
         var amount = money(c.cents);
         if (!amount) return say("Your unused days", failed);
@@ -651,12 +662,15 @@
           el("p", { className: "choices" }, refund, " ", credit),
           "If you don't choose within 30 days, we refund it.");
         var pick = function (choice) {
+          if (refund.disabled || credit.disabled) return;
           refund.disabled = credit.disabled = true;
           call("POST", "/employer/credit", { credit: state.credit, token: state.token, choice: choice }).then(function (r) {
-            if (!r.ok) { refund.disabled = credit.disabled = false; return say("That didn't go through", serverMessage(r.out) || failed, contact("Questions? Email ")); }
+            if (!r.ok) return choiceUnknown();
             var out = readCredit(r.out);
-            result(out.choice || choice, out.cents != null ? out.cents : c.cents, out.code);
-          }).catch(function () { refund.disabled = credit.disabled = false; say("That didn't go through", failed); });
+            if (out.processing) return choicePending();
+            if (!out.choice) return choiceUnknown();
+            result(out.choice, out.cents != null ? out.cents : c.cents, out.code);
+          }).catch(choiceUnknown);
         };
         refund.addEventListener("click", function () { pick("refund"); });
         credit.addEventListener("click", function () { pick("credit"); });

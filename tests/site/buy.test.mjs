@@ -196,8 +196,10 @@ test("only a Stripe checkout address is followed, and only http(s) posting links
 });
 
 test("the credit offer reads cents and any choice already made", () => {
-  assert.deepEqual(plain(B.readCredit({ amount_cents: 1450, title: "Intern", company: "Acme" })), { cents: 1450, title: "Intern", company: "Acme", choice: null, code: "" });
-  assert.deepEqual(plain(B.readCredit({ amount: 900, choice: "credit", code: "ABC" })), { cents: 900, title: "", company: "", choice: "credit", code: "ABC" });
+  assert.deepEqual(plain(B.readCredit({ amount_cents: 1450, title: "Intern", company: "Acme" })), { cents: 1450, title: "Intern", company: "Acme", choice: null, code: "", processing: null });
+  assert.deepEqual(plain(B.readCredit({ amount: 900, choice: "credit", code: "ABC" })), { cents: 900, title: "", company: "", choice: "credit", code: "ABC", processing: null });
+  assert.equal(B.readCredit({ status: "offered", processing: "running" }).processing, "running");
+  assert.equal(B.readCredit({ status: "offered", processing: "unknown" }).processing, "unknown");
 });
 
 // ---------- the page, against a stand-in DOM ----------
@@ -463,6 +465,57 @@ test("the credit link offers a refund or a code, then shows the code", async () 
   assert.deepEqual(p.calls[1], { url: API + "/employer/credit", method: "POST", body: { credit: "c1", token: "tok2", choice: "credit" } });
   assert.equal(p.$("landing-h").textContent, "Your code");
   assert.match(body.textContent, /IS-7QX2/);
+});
+
+test("an ambiguous credit choice gives a safe email recovery step without retrying or offering the other choice", async () => {
+  for (const answer of [() => reply(500, {}), () => Promise.reject(new Error("lost response")), () => reply(200, {})]) {
+    const p = page({ search: "?credit=c1&t=tok2", routes: {
+      [API + "/employer/credit?"]: () => reply(200, { status: "offered", amount: 1450, role: { title: "Data Intern", company: "Acme" } }),
+      [API + "/employer/credit"]: answer,
+    } });
+    await tick();
+    const body = p.$("landing-body");
+    const [refund, credit] = body.all((n) => n.tagName === "BUTTON");
+    refund.fire("click");
+    credit.fire("click");  // a queued event must not switch choices while the first is unresolved
+    await tick();
+    assert.equal(p.calls.filter((c) => c.method === "POST").length, 1);
+    assert.equal(refund.disabled, true);
+    assert.equal(credit.disabled, true);
+    assert.equal(body.all((n) => n.tagName === "BUTTON").length, 0);
+    assert.equal(p.$("landing-h").textContent, "Check your offer status");
+    assert.match(body.textContent, /may already have gone through/);
+    assert.match(body.textContent, /Reopen the original unused-days offer email link/);
+    assert.doesNotMatch(body.textContent, /reload|refund failed|Nothing was charged|Refund on its way/i);
+    assert.deepEqual(p.replaced, ["/employers/buy/"]);
+  }
+});
+
+test("reopening an in-progress credit offer never presents another financial choice", async () => {
+  for (const processing of ["running", "unknown"]) {
+    const p = page({ search: "?credit=c1&t=tok2", routes: {
+      [API + "/employer/credit?"]: () => reply(200, { status: "offered", amount: 1450, processing }),
+    } });
+    await tick();
+    assert.equal(p.$("landing-h").textContent, "Your choice is being checked");
+    assert.equal(p.$("landing-body").all((n) => n.tagName === "BUTTON").length, 0);
+    assert.match(p.$("landing-body").textContent, /don't choose again or try the other option/);
+    assert.equal(p.calls.length, 1);
+  }
+  const confirmed = page({ search: "?credit=c1&t=tok2", routes: {
+    [API + "/employer/credit?"]: () => reply(200, { status: "refund", amount: 1450 }),
+  } });
+  await tick();
+  assert.equal(confirmed.$("landing-h").textContent, "Refund on its way");
+  assert.equal(confirmed.$("landing-body").all((n) => n.tagName === "BUTTON").length, 0);
+});
+
+test("a failed token-link read points to the original email instead of a stripped-URL reload", async () => {
+  const p = page({ search: "?credit=c1&t=tok2" });
+  await tick();
+  assert.match(p.$("landing-body").textContent, /Reopen the original link from your email/);
+  assert.doesNotMatch(p.$("landing-body").textContent, /reload/i);
+  assert.deepEqual(p.replaced, ["/employers/buy/"]);
 });
 
 // ---------- the HTML ----------
