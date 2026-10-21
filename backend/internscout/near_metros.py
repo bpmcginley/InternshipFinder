@@ -14,8 +14,10 @@ How a listing is matched to a metro (what the export supports):
     states AND its location names one of that state's towns. "Portland, ME" is never Portland, OR;
     "Birmingham, MI" counts for Detroit and never for Birmingham, AL.
   * New York is the one metro the export does measure: region.py gives a location within 50 miles of
-    Midtown Manhattan (by coordinates) the kind "nyc_metro". New York uses that radius, plus the five
-    boroughs by name. Washington, DC counts any location in the District itself.
+    Midtown Manhattan (by coordinates) the kind "nyc_metro". Connecticut locations instead keep
+    "new_england", so their known town coordinates are checked against the same radius here.
+    New York uses that radius, plus the five boroughs by name. Washington, DC counts any location
+    in the District itself.
   * Never counted as local: a location that only names a state or the country ("Colorado", "United
     States"), any location that says remote, work from home or virtual ("Remote, TX" too, since it is
     remote within a state), and anything in Canada. US-remote roles are shown in a section of their own.
@@ -32,7 +34,8 @@ import json
 import re
 from pathlib import Path
 
-from .geo import REMOTE_RE, STATE_NAMES
+from .config import REGION
+from .geo import GAZETTEER, REMOTE_RE, STATE_NAMES, haversine_miles
 
 _HERE = Path(__file__).parent
 METROS = tuple(json.loads((_HERE / "us_top50_metros.json").read_text(encoding="utf-8"))["metros"])
@@ -763,6 +766,14 @@ TOWNS: dict[str, dict[str, frozenset]] = {
     cbsa: {st: frozenset(t.strip() for t in towns.split("|") if t.strip()) for st, towns in by_state.items()}
     for cbsa, by_state in _TOWNS.items()
 }
+# Connecticut's baseline-region kind takes precedence over "nyc_metro" in region.py. Recover
+# radius membership from the existing offline gazetteer rather than changing that precedence
+# or treating all Connecticut towns as local. These names go through the same state-qualified
+# matching and remote exclusions as every other metro town; no geocoding requests are made.
+TOWNS["35620"]["CT"] = frozenset(
+    city for key, coords in GAZETTEER.items() for city, state in [key.rsplit("|", 1)]
+    if state == "CT" and haversine_miles(*REGION.nyc_center, *coords) <= REGION.nyc_radius_miles
+)
 
 # A town name is read only as a whole token or at the end of one ("downtown denver", "ste 7 huntsville"),
 # and not after these words, so "fort washington" is not "washington", "new boston" is not "boston" and

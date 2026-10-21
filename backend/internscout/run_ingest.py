@@ -250,7 +250,11 @@ def main():
         from .export_static import export
         # The same evidence pipeline.run closed by: CI's database is new every run, so without it
         # the export's carry rules could put a closed posting straight back on the site.
-        exported = export(args.export, completed_boards=completed_boards)
+        # The list can confirm a posting whose detail/location enrichment failed.
+        # Its missing normalized row must not be mistaken for an absent posting.
+        observed_urls = {raw_item[key] for raw_item in raw if raw_item.get("active", True)
+                         for key in ("apply_url", "url", "source_url") if raw_item.get(key)}
+        exported = export(args.export, completed_boards=completed_boards, observed_urls=observed_urls)
         metrics.export_result(exported["total"], open_count=exported["open"], held=exported["held"])
     metrics_path = args.metrics or (os.path.join(args.export, "ingest-report.json") if args.export else None)
     if metrics_path:

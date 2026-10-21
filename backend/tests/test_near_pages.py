@@ -147,6 +147,24 @@ def test_new_york_is_the_50_mile_radius_and_washington_the_district():
     assert _in("Laurel, MD", "MD") == {"Washington", "Baltimore"}       # the one postal town in two metros
 
 
+def test_new_york_radius_includes_connecticut_without_changing_region_kind(monkeypatch):
+    from internscout import geo, region
+
+    # Metro matching must stay offline even when a town is not in the gazetteer.
+    monkeypatch.setattr(geo, "locate", lambda *a: (_ for _ in ()).throw(AssertionError("geocoding called")))
+    for city in ("Stamford", "Greenwich", "Norwalk", "Darien", "Westport", "Wilton"):
+        loc = f"{city}, CT"
+        classified = region.classify_location(loc)
+        assert classified["kind"] == "new_england"
+        assert _in(loc, "CT", classified["kind"]) == {"New York"}
+    for loc in ("Hartford, CT", "New Haven, CT", "Unknown Town, CT", "CT", "Connecticut"):
+        assert "New York" not in _in(loc, "CT", "new_england")
+    assert _in("Stamford, NY", "NY", "us") == set()
+    assert _in("Stamford, CT (Remote)", "CT", "new_england") == set()
+    assert _in("Greenwich, CT - Working at Home", "CT", "new_england") == set()
+    assert set(nm.metro_states("35620")) == {"NY", "NJ", "CT"}
+
+
 def test_the_many_ways_boards_write_a_town():
     for loc in ("Denver, CO, 80205", "Downtown Denver, CO", "US.CO.Denver", "USA - Denver", "Denver CO USA",
                 "Hybrid - Denver, CO", "Greater Denver Area", "CO-Denver", "Denver, Colorado, United States"):
@@ -188,6 +206,23 @@ def test_a_city_page_lists_only_its_local_roles_with_real_counts(tmp_path):
     assert "Business here means the roles InternScout tags Business, Finance, Accounting" in html
     # Portland, Maine is not near Portland, Oregon.
     assert not built[_path("Portland", "engineering")]["items"]
+
+
+def test_new_york_page_lists_nearby_connecticut_roles_and_links_their_state(tmp_path):
+    from html import unescape
+    from urllib.parse import parse_qs, urlsplit
+
+    rows = [_row(i, loc=f"{city}, CT", state="CT", kind="new_england")
+            for i, city in enumerate(("Stamford", "Greenwich", "Norwalk"))]
+    rows += [_row(10, loc="Hartford, CT", state="CT", kind="new_england"),
+             _row(11, loc="New Haven, CT", state="CT", kind="new_england"),
+             _row(12, loc="Stamford, CT (Remote)", state="CT", kind="new_england")]
+    page = _built(_site(tmp_path, rows))[_path("New York", "business")]
+    assert {x["id"] for x in page["items"]} == {"n0", "n1", "n2"}
+    assert "3 open student roles in business near New York, NY." in page["html"]
+    assert "Stamford (1)" in page["html"] and "Norwalk (1)" in page["html"]
+    dash = re.search(r'<a class="cta" href="([^"]+)">', page["html"]).group(1)
+    assert set(parse_qs(urlsplit(unescape(dash)).query)["state"][0].split(",")) == {"NY", "NJ", "CT"}
 
 
 def test_the_page_links_the_dashboard_the_citys_other_fields_and_the_fields_other_cities(tmp_path):

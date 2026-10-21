@@ -49,13 +49,15 @@ def fake_workday(titles, mode="complete"):
             rows += ["Internal Audit Manager"] * 500   # the read stops early, before the total
         off, lim = body["offset"], body["limit"]
         page = [{"title": t, "externalPath": f"/job/Boston/{t.replace(' ', '-')}_R{i}",
-                 "locationsText": "Boston, MA"} for i, t in enumerate(rows[off:off + lim], off)]
+                 "locationsText": ("2 Locations" if mode == "detail_failed" or
+                                   (mode == "one_detail_failed" and i == 0) else "Boston, MA")}
+                for i, t in enumerate(rows[off:off + lim], off)]
         return httpx.Response(200, json={"total": len(rows), "jobPostings": page} if off == 0
                               else {"total": 0, "jobPostings": page})
     return handle
 
 
-def ingest(monkeypatch, tmp_path, run_no, titles, mode="complete"):
+def ingest(monkeypatch, tmp_path, run_no, titles, mode="complete", community=None):
     """One CI run: a new database, the Workday board answering as told, then the export."""
     engine = create_engine(f"sqlite:///{tmp_path / f'run{run_no}.db'}")
     Base.metadata.create_all(engine)
@@ -68,7 +70,10 @@ def ingest(monkeypatch, tmp_path, run_no, titles, mode="complete"):
     monkeypatch.setattr(run_ingest, "client",
                         lambda: httpx.Client(transport=httpx.MockTransport(fake_workday(titles, mode))))
     out = tmp_path / "site"
-    monkeypatch.setattr(sys, "argv", ["run_ingest", "--ats", "--export", str(out)])
+    if community is not None:
+        monkeypatch.setattr(run_ingest, "fetch_github_lists", lambda **kw: community)
+    monkeypatch.setattr(sys, "argv", ["run_ingest", "--lists" if community is not None else "--ats",
+                                     "--export", str(out)])
     run_ingest.main()
     engine.dispose()
     published = {x["title"]: x for x in previous_export(str(out)) if x.get("status") == "open"}
@@ -108,13 +113,80 @@ def test_a_fully_scanned_empty_board_empties_on_the_site(monkeypatch, tmp_path):
     assert published == {}
 
 
+@pytest.mark.parametrize("mode,held", [("detail_failed", 4), ("one_detail_failed", 1)])
+def test_observed_postings_survive_detail_failure_even_without_board_collapse(monkeypatch, tmp_path, mode, held):
+    before, _ = ingest(monkeypatch, tmp_path, 1, ROLES)
+    assert all(row["scan_sources"] == ["workday"] for row in before.values())
+    after, report = ingest(monkeypatch, tmp_path, 2, ROLES, mode=mode)
+    assert set(after) == set(ROLES)
+    assert report["export"]["held"] == held
+    assert report["boards"]["workday"]["complete"] == 1
+    for title, row in after.items():
+        if row.get("carried"):
+            assert row["last_seen"] == before[title]["last_seen"]
+
+
+def test_observed_metadata_failure_does_not_save_genuinely_absent_roles(monkeypatch, tmp_path, capsys):
+    ingest(monkeypatch, tmp_path, 1, ROLES)
+    after, report = ingest(monkeypatch, tmp_path, 2, ROLES[:2], mode="detail_failed")
+    assert set(after) == set(ROLES[:2])
+    assert report["export"]["held"] == 2
+    assert "[export] 2 listings from the last export left the site" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("count", [1, 4])
+def test_community_only_roles_survive_keyword_scan_in_fresh_database(monkeypatch, tmp_path, count):
+    raw = [{"company_name": "Acme", "title": f"Summer Analyst {i}",
+            "locations": ["Boston, MA"], "source": "vanshb03",
+            "url": f"https://acme.wd1.myworkdayjobs.com/Careers/job/Boston/Analyst_R{i}"}
+           for i in range(count)]
+    before, _ = ingest(monkeypatch, tmp_path, 1, [], community=raw)
+    assert len(before) == count
+    assert all(row["scan_sources"] == [] for row in before.values())
+    after, report = ingest(monkeypatch, tmp_path, 2, [])
+    assert set(after) == set(before)
+    assert report["export"]["held"] == count
+
+
+def test_a_full_board_scan_still_closes_community_only_finds():
+    from datetime import date
+    prev = [_row(1, "https://boards.greenhouse.io/acme/jobs/1", ats="greenhouse", scan_sources=[])]
+    rows = []
+    assert carry_open_boards(rows, "unused", today=date(2026, 10, 18), prev=prev,
+                             completed_boards={("greenhouse", "acme")}) == 0
+    assert export_static.closed_by_scan(rows, prev, {("greenhouse", "acme")}) == 1
+
+
+def test_scope_unknown_in_legacy_export_is_retained_but_not_counted_closed():
+    from datetime import date
+    row = _row(1, "https://acme.wd1.myworkdayjobs.com/Careers/job/Boston/Intern_R1")
+    row.pop("scan_sources")
+    rows = []
+    evidence = {("workday", TOKEN)}
+    assert carry_open_boards(rows, "unused", today=date(2026, 10, 18), prev=[row],
+                             completed_boards=evidence) == 1
+    assert export_static.closed_by_scan([], [row], evidence) == 0
+
+
+def test_raw_observations_match_locale_and_tracking_variants():
+    from datetime import date
+    url = "https://acme.wd1.myworkdayjobs.com/Careers/job/Boston/Intern_R1"
+    row = _row(1, url)
+    observed = {url.replace("/Careers/", "/en-US/Careers/") + "?source=community"}
+    evidence = {("workday", TOKEN)}
+    assert carry_open_boards([], "unused", today=date(2026, 10, 18), prev=[row],
+                             completed_boards=evidence, observed_urls=observed) == 1
+    assert export_static.closed_by_scan([], [row], evidence, observed_urls=observed) == 0
+
+
 # Unit level: the carry rules with and without evidence.
 
 def _row(i, url, **over):
     row = {"id": str(i), "apply_url": url, "ats": "workday", "company_name": "Acme",
            "status": "open", "first_seen": "2026-10-16T00:00:00+00:00",
            "last_seen": "2026-10-18T00:00:00+00:00", "regions": [], "state": "MA",
-           "title": f"Software Engineer Intern {i}", "stage": ["internship"]}
+           "title": f"Software Engineer Intern {i}", "stage": ["internship"],
+           "scan_sources": [] if over.get("via_search") else ["workday"]}
     row.update(over)
     return row
 

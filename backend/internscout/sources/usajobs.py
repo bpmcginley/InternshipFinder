@@ -4,7 +4,7 @@ key was requested with; USAJOBS requires it as the User-Agent). Skipped when eit
 from __future__ import annotations
 import os
 from .base import client
-from .common import ScanCounts, board_item, html_to_text, report_source, reported_count
+from .common import ScanCounts, board_item, html_to_text, report_source, reported_count, rows_of
 from ..classify import is_internship
 
 API = "https://data.usajobs.gov/api/search"
@@ -104,11 +104,16 @@ def fetch_usajobs(api_key: str | None = None, email: str | None = None, report=N
                 payload = r.json()
                 if not isinstance(payload, dict):
                     raise ValueError("USAJOBS search response is not an object")
-                res = payload.get("SearchResult") if isinstance(payload.get("SearchResult"), dict) else {}
-                rows = res.get("SearchResultItems")
+                res = payload.get("SearchResult")
+                if not isinstance(res, dict):
+                    raise ValueError("USAJOBS response is missing its search result")
+                rows = rows_of(res, "SearchResultItems")
+                reported = reported_count(res.get("SearchResultCountAll"))
+                if rows is None or reported is None:
+                    raise ValueError("USAJOBS search result is missing its rows or total")
                 if page == 1:
-                    counts.reported(reported_count(res.get("SearchResultCountAll")))
-                counts.rows(len(rows) if isinstance(rows, list) else 0)
+                    counts.reported(reported)
+                counts.rows(len(rows))
                 items, total = parse_usajobs(payload, counts)
                 out += items
                 if page * PAGE >= total:
