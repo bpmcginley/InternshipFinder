@@ -24,6 +24,12 @@ calling Buttondown. It also exits 2, sending nothing, in a week with no field to
 Buttondown already has an email sent or scheduled this week (same_week, below; --allow-same-week
 skips that check). When Buttondown refuses a request or can't be reached, it exits 1.
 
+--skip-if-sent (2026-10-21) turns that last refusal into exit 0: this week's email is already out,
+so there is nothing to do. The Email digest workflow passes it only on GitHub's scheduled run, which
+often turns up hours late, after Keep schedule has started the send (on 2026-10-19 the scheduled run
+came at 18:18 UTC, 14 minutes after the email went, and failed). A run started by hand still exits 2,
+so a person who sends twice by mistake sees it.
+
 If the last step (the send itself) gets no answer, or a 5xx answer from Buttondown or a gateway in
 front of it, whether the email is going out is UNKNOWN: the request may have been queued before the
 error. The script says so and tells the operator to look at Buttondown's sent and scheduled emails
@@ -35,6 +41,7 @@ makes no draft, needs no postal address, and never prints the key.
 
 Run from the repo root:
   python growth/digest_send.py [docs] [--send] [--test-to ADDRESS] [--public-archive] [--allow-same-week]
+                                [--skip-if-sent]
   python growth/digest_send.py --check
 """
 from __future__ import annotations
@@ -314,6 +321,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--allow-same-week", action="store_true",
                     help="send to every subscriber even though Buttondown already has an email sent or "
                          "scheduled this week (only after checking it in the dashboard)")
+    ap.add_argument("--skip-if-sent", action="store_true",
+                    help="when Buttondown already has this week's email, say so and exit 0 instead of 2 "
+                         "(for the late scheduled run)")
     ap.add_argument("--check", action="store_true",
                     help="only check that BUTTONDOWN_API_KEY works (one read, nothing sent); not with --send")
     args = ap.parse_args(argv[1:])
@@ -383,6 +393,10 @@ def main(argv: list[str]) -> int:
             return EXIT_PROVIDER
         if earlier:
             when = earlier.get("publish_date") or earlier.get("creation_date") or "no date"
+            if args.skip_if_sent:
+                print(f"[digest] Nothing to send: Buttondown already has {earlier.get('id')} "
+                      f"({earlier.get('status')}, {when}): {earlier.get('subject')!r}. This week's email is out.")
+                return 0
             print(f"[digest] Not sent: Buttondown already has {earlier.get('id')} ({earlier.get('status')}, "
                   f"{when}): {earlier.get('subject')!r}. Subscribers get one digest a week. If that email "
                   "really did not go out, check it in the dashboard, then run this again with --allow-same-week.")

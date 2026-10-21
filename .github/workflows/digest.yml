@@ -77,6 +77,10 @@ jobs:
         # A send to everyone refuses (exit 2) when Buttondown already has an email sent or scheduled in
         # the last six days, so a rerun can't send subscribers a second copy; the override,
         # --allow-same-week, is left for a person to run by hand after checking the dashboard.
+        # GitHub's scheduled run adds --skip-if-sent (2026-10-21): it often arrives hours late, after
+        # Keep schedule has started the send, and finding the email already out is then the expected
+        # result, not a failure (was: exit 2, a red run every such Monday). Runs started by hand,
+        # including Keep schedule's, still refuse with exit 2.
         # --public-archive (2026-10-06) puts each week's email on the newsletter's public web archive at
         # Buttondown, which every sign-up form links as "See last Monday's email". Only the send to
         # everyone has it: a test copy's draft stays off the archive. The email is the same for every
@@ -88,8 +92,11 @@ jobs:
           DIGEST_POSTAL_ADDRESS: ${{ secrets.DIGEST_POSTAL_ADDRESS }}
           DIGEST_TEST_TO: ${{ vars.DIGEST_TEST_TO }}
           EVERYONE: ${{ github.event_name == 'schedule' || inputs.everyone }}
+          SCHEDULED: ${{ github.event_name == 'schedule' }}
         run: |
-          if [ "$EVERYONE" = "true" ]; then
+          if [ "$SCHEDULED" = "true" ]; then
+            python growth/digest_send.py docs --send --public-archive --skip-if-sent
+          elif [ "$EVERYONE" = "true" ]; then
             python growth/digest_send.py docs --send --public-archive
           else
             python growth/digest_send.py docs --send --test-to "$DIGEST_TEST_TO"
