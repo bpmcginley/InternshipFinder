@@ -12074,8 +12074,9 @@
   "alston|wd1|ExternalCareer": {
    "name": "Alston & Bird Law Firm",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-06"
+   "fails": 1,
+   "added": "2026-10-06",
+   "last_fail": "2026-10-21"
   },
   "altasciences|wd1|Careers": {
    "name": "Altasciences",
