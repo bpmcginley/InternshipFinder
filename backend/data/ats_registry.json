@@ -355,13 +355,6 @@
    "fails": 0,
    "added": "2026-09-18"
   },
-  "chainlink-labs": {
-   "name": "Chainlink Labs",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-10-18",
-   "last_fail": "2026-10-20"
-  },
   "charge-robotics": {
    "name": "Charge Robotics",
    "quant": false,
@@ -397,6 +390,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "clickhouse": {
+   "name": "ClickHouse",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
   },
   "clipboard": {
    "name": "Clipboard Health",
@@ -1101,6 +1100,12 @@
    "added": "2026-09-18",
    "sector": "education_research"
   },
+  "integrate": {
+   "name": "Integrate",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
+  },
   "interplay": {
    "name": "Internship",
    "quant": false,
@@ -1316,6 +1321,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "metamorphic": {
+   "name": "Metamorphic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
   },
   "meter": {
    "name": "Meter",
@@ -9068,6 +9079,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "humble-robotics": {
+   "name": "Humble Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
+  },
   "ibility": {
    "name": "Ibility",
    "quant": false,
@@ -10530,6 +10547,12 @@
    "fails": 0,
    "added": "2026-10-06"
   },
+  "iaziqy.fa.ocs.oraclecloud.com|CX_1": {
+   "name": "Uber",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
+  },
   "ibqbjb.fa.ocs.oraclecloud.com|Honeywell": {
    "name": "Honeywell",
    "quant": false,
@@ -11297,6 +11320,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "commonai": {
+   "name": "CommonAI C.I.C.",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
+  },
   "connectprep": {
    "name": "ConnectPrep",
    "quant": false,
@@ -11767,9 +11796,9 @@
   "accenture|wd103|AccentureCareers": {
    "name": "Accenture",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-18",
-   "last_fail": "2026-10-20"
+   "last_fail": "2026-10-21"
   },
   "accenture|wd103|AvanadeCareers": {
    "name": "Avanade",
@@ -15579,9 +15608,8 @@
   "kcura|wd1|External_Career_Site": {
    "name": "Relativity",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-20"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "kengarff|wd1|external_site": {
    "name": "Ken Garff Auto Group",
@@ -17858,6 +17886,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "sonyglobal|wd1|Sony_Europe_Careers": {
+   "name": "Sony",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
+  },
   "sonyglobal|wd1|SonyGlobalCareers": {
    "name": "Sony",
    "quant": false,
@@ -18434,6 +18468,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "toyota|wd503|tmna": {
+   "name": "Toyota",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
   },
   "transamerica|wd5|US": {
    "name": "Transamerica",
@@ -19238,6 +19278,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "younglife|wd5|YoungLife_Careers": {
+   "name": "Young Life",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
   },
   "zayo|wd1|zayo_careers": {
    "name": "Zayo",

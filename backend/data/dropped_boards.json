@@ -4,6 +4,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "chainlink-labs": {
+   "on": "2026-10-21",
+   "why": "dead"
+  },
   "conductorone": {
    "on": "2026-10-01",
    "why": "dead"
@@ -772,6 +776,10 @@
   },
   "leger2": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "linkedin3": {
+   "on": "2026-10-21",
    "why": "robots"
   },
   "llnl": {
