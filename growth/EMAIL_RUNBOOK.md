@@ -10,7 +10,12 @@ with Buttondown. The owner/test preview drafts are not broadcasts to publish.
 - Subsequent runs: Mondays at 12:00 UTC. This becomes **7 a.m. EST** in winter; the schedule does not
   promise 8 a.m. Eastern year-round.
 - GitHub can start late. Metrics allow two hours of scheduling grace, then flag the missing or stuck
-  run. They never start, retry, or catch up a digest. The existing Keep schedule job does not send email.
+  run. They never start, retry, or catch up a digest.
+- Keep schedule (growth/catchup.py) does: since 2026-10-19, if no digest run has started by its next
+  check after 12:00 UTC on a Monday (until 22:00), it starts one for every subscriber. When GitHub's
+  late scheduled run turns up afterwards, it finds the email already out and ends green without
+  sending (`--skip-if-sent`), so the metrics row reads `success` for that Monday.
+  was: "The existing Keep schedule job does not send email."
 - A manual workflow run defaults to an owner-only test. It does not establish that a scheduled
   subscriber broadcast happened. Do not tick “Send to every subscriber” just to check deployment.
 

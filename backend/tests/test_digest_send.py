@@ -433,6 +433,22 @@ def test_allow_same_week_skips_the_check(site, ready, api):
     assert [r.get_method() for r in api.requests] == ["POST", "PATCH"]
 
 
+def test_skip_if_sent_ends_quietly_when_this_weeks_email_is_out(site, ready, api, capsys):
+    # GitHub's late scheduled run, after Keep schedule already sent: nothing to do, and not a failure.
+    out_already = {"id": "em_k", "status": "sent", "subject": "x", "publish_date": _stamp(timedelta(minutes=14))}
+    api.answers = [{"results": [out_already], "next": None}]
+    assert digest_send.main(["digest_send.py", site, "--send", "--public-archive", "--skip-if-sent"]) == 0
+    assert [r.get_method() for r in api.requests] == ["GET"]                     # no draft, no send
+    out = capsys.readouterr().out
+    assert "Nothing to send: Buttondown already has em_k" in out and KEY not in out
+
+
+def test_skip_if_sent_still_sends_when_nothing_went_this_week(site, ready, api):
+    api.answers = [{"results": [], "next": None}, {"id": "em_n", "status": "draft"}, {}]
+    assert digest_send.main(["digest_send.py", site, "--send", "--skip-if-sent"]) == 0
+    assert [r.get_method() for r in api.requests] == ["GET", "POST", "PATCH"]
+
+
 def test_a_test_copy_is_not_checked_against_this_weeks_sends(site, ready, api):
     # One copy to the owner's own inbox; a week's real send must not stop the owner testing.
     api.answers = [{"id": "em_t", "status": "draft"}, {}]
