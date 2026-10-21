@@ -216,6 +216,35 @@ def test_digest_health_needs_a_successful_subscriber_send_step(status, conclusio
     assert got["delivery_confirmed"] is False
 
 
+def _catchup(**changes):
+    return _email_run(**{"id": 200, "event": "workflow_dispatch", "created_at": "2026-10-19T12:04:00Z",
+                         "triggering_actor": {"login": "github-actions[bot]"}, **changes})
+
+
+def test_keep_schedules_catch_up_counts_when_github_drops_the_scheduled_run():
+    got = metrics.digest_health([_catchup()], metrics._timestamp("2026-10-19T15:00:00Z"), "success")
+    assert got["health"] == "success" and got["run_id"] == 200 and got["event"] == "workflow_dispatch"
+
+
+def test_a_persons_run_to_everyone_still_does_not_count():
+    mine = _email_run(id=201, event="workflow_dispatch", triggering_actor={"login": "bpmcginley"})
+    got = metrics.digest_health([mine], metrics._timestamp("2026-10-19T15:00:00Z"), "success")
+    assert got["health"] == "overdue"
+
+
+def test_a_late_scheduled_run_that_fails_cannot_hide_the_catch_up_that_sent():
+    # 2026-10-19: the catch-up sent at 18:04, GitHub's scheduled run came at 18:18 and failed.
+    late = _email_run(id=124, created_at="2026-10-19T18:18:00Z", conclusion="failure")
+    got = metrics.digest_health([late, _catchup(created_at="2026-10-19T18:04:00Z")],
+                                metrics._timestamp("2026-10-19T19:00:00Z"), "success")
+    assert got["health"] == "success" and got["run_id"] == 200
+
+
+def test_a_failed_catch_up_alone_is_still_failed():
+    got = metrics.digest_health([_catchup(conclusion="failure")], metrics._timestamp("2026-10-19T15:00:00Z"))
+    assert got["health"] == "failed"
+
+
 def test_digest_health_flags_stuck_run_without_proposing_another_broadcast():
     got = metrics.digest_health([_email_run(status="in_progress", conclusion=None)],
                                metrics._timestamp("2026-10-19T14:00:00Z"))
@@ -248,7 +277,10 @@ def test_automation_separates_manual_tests_and_checks_scheduled_send_step(monkey
         seen.append(req.full_url)
         if "/runs/123/jobs?" in req.full_url:
             return Resp({"jobs": [{"steps": [{"name": "Send the digest", "conclusion": step}]}]})
-        return Resp({"workflow_runs": [_email_run(conclusion=conclusion)] if "event=schedule" in req.full_url else [manual]})
+        if "status=completed&per_page=1" in req.full_url:
+            return Resp({"workflow_runs": [manual]})
+        # The subscriber read now lists every event; the owner's own run must still not count.
+        return Resp({"workflow_runs": [manual, _email_run(conclusion=conclusion)]})
     monkeypatch.setattr(metrics.urllib.request, "urlopen", fake)
     got = next(r for r in metrics.automation(metrics._timestamp("2026-10-19T13:00:00Z"))
                if r["file"] == "digest.yml")
@@ -266,9 +298,9 @@ def test_overdue_email_is_reported_in_snapshot_problems(monkeypatch, capsys):
     for name in ("search_console", "bing"):
         monkeypatch.setattr(metrics, name, lambda *args: {"queries": []})
     monkeypatch.setattr(metrics, "automation", lambda now: [{"file": "digest.yml", "health": "overdue",
-                                                             "detail": "No scheduled subscriber run."}])
+                                                             "detail": "No subscriber run."}])
     assert metrics.main(["metrics.py"]) == 0
-    assert "weekly email: No scheduled subscriber run." in json.loads(capsys.readouterr().out)["problems"]
+    assert "weekly email: No subscriber run." in json.loads(capsys.readouterr().out)["problems"]
 
 
 GSC_ROWS = {

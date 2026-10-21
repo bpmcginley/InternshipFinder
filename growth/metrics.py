@@ -50,6 +50,10 @@ JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metr
         ("catchup.yml", "Keep schedule"), ("digest.yml", "Weekly email")]
 DIGEST_FIRST_DUE = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
 DIGEST_SCHEDULE_GRACE = timedelta(hours=2)
+# Keep schedule (growth/catchup.py) starts a late Monday email with the workflow's own GITHUB_TOKEN, so
+# GitHub records that run's triggering actor as this bot. A person's run, test copy or not, shows the
+# person's login. Nothing else in the repo starts digest.yml with the token.
+CATCHUP_ACTOR = "github-actions[bot]"
 RECENT = 8                                  # recent posts kept per account
 GSC_SITE = os.environ.get("GSC_SITE") or "sc-domain:internscout.org"
 GSC_DAYS = 28
@@ -224,11 +228,23 @@ def _timestamp(value) -> datetime | None:
         return None
 
 
+def subscriber_run(run: dict) -> bool:
+    """A run meant for every subscriber: GitHub's schedule, or Keep schedule's catch-up of it
+    (2026-10-21; was: the schedule only, so a Monday GitHub dropped read "overdue" after the
+    catch-up had sent the email). A person's run never counts: its audience isn't inferred."""
+    if run.get("event") == "schedule":
+        return True
+    return (run.get("event") == "workflow_dispatch" and
+            (run.get("triggering_actor") or {}).get("login") == CATCHUP_ACTOR)
+
+
 def digest_health(runs: list[dict], now: datetime, send_step: str | None = None) -> dict:
     """Weekly schedule health, not delivery confirmation. Manual tests never satisfy a broadcast.
 
     Allow two hours for GitHub's best-effort scheduler. Never dispatch or retry a send from here.
-    A successful scheduled workflow must also have run its send step (DIGEST_ENABLED can skip it).
+    A successful subscriber run must also have run its send step (DIGEST_ENABLED can skip it).
+    When a Monday has more than one (a catch-up, then GitHub's late scheduled run), the newest that
+    succeeded decides: a later run that fails can't hide an email that went.
     """
     now = now.astimezone(timezone.utc)
     monday = (now - timedelta(days=now.weekday())).replace(hour=12, minute=0, second=0, microsecond=0)
@@ -243,22 +259,24 @@ def digest_health(runs: list[dict], now: datetime, send_step: str | None = None)
               "delivery_confirmed": False}
     if first_pending:
         return result
-    eligible = [r for r in runs if r.get("event") == "schedule" and
+    eligible = [r for r in runs if subscriber_run(r) and
                 (created := _timestamp(r.get("created_at"))) is not None and due <= created <= now]
-    run = max(eligible, key=lambda r: _timestamp(r["created_at"])) if eligible else None
+    # was: the newest scheduled run, whatever its result.
+    run = max(eligible, key=lambda r: (r.get("conclusion") == "success", _timestamp(r["created_at"]))) \
+        if eligible else None
     if not run:
         if now >= due + DIGEST_SCHEDULE_GRACE:
-            result.update(health="overdue", detail="No scheduled subscriber run for this Monday. Inspect Actions and Buttondown before any manual send.")
+            result.update(health="overdue", detail="No scheduled or Keep schedule subscriber run for this Monday. Inspect Actions and Buttondown before any manual send.")
         return result
-    result.update(run_id=run.get("id"), run_url=run.get("html_url"), event="schedule")
+    result.update(run_id=run.get("id"), run_url=run.get("html_url"), event=run.get("event"))
     if run.get("status") != "completed":
-        result.update(health="in_progress", detail="Scheduled subscriber run is queued or running; do not start another send.")
+        result.update(health="in_progress", detail="Subscriber run is queued or running; do not start another send.")
         if now >= due + DIGEST_SCHEDULE_GRACE:
-            result.update(health="overdue", detail="Scheduled subscriber run is still queued or running after the grace period. Inspect it; do not start a second send.")
+            result.update(health="overdue", detail="Subscriber run is still queued or running after the grace period. Inspect it; do not start a second send.")
     elif run.get("conclusion") != "success":
-        result.update(health="failed", detail="Scheduled subscriber run failed or was cancelled. Check Buttondown sent/scheduled status before retrying: delivery may be unknown.")
+        result.update(health="failed", detail="Subscriber run failed or was cancelled. Check Buttondown sent/scheduled status before retrying: delivery may be unknown.")
     elif send_step == "success":
-        result.update(health="success", detail="Scheduled send step succeeded: provider handoff, not proof of recipient delivery. Check Buttondown delivery results.")
+        result.update(health="success", detail="Subscriber send step succeeded: provider handoff, not proof of recipient delivery. Check Buttondown delivery results.")
     elif send_step == "skipped":
         result.update(health="blocked", detail="Workflow succeeded but the subscriber send step was skipped. Check DIGEST_ENABLED; no broadcast is established.")
     else:
@@ -286,7 +304,9 @@ def automation(now: datetime | None = None) -> list[dict]:
         row = {"job": name, "file": file, "conclusion": run.get("conclusion"), "at": run.get("updated_at"),
                "event": run.get("event"), "url": run.get("html_url")}
         if file == "digest.yml":
-            scheduled = read(f"workflows/{file}/runs?branch=main&event=schedule&per_page=15").get("workflow_runs") or []
+            # Every event, so Keep schedule's catch-up is seen; digest_health keeps only subscriber runs.
+            # was: ...&event=schedule&per_page=15
+            scheduled = read(f"workflows/{file}/runs?branch=main&per_page=30").get("workflow_runs") or []
             health = digest_health(scheduled, now)
             current = next((r for r in scheduled if r.get("id") == health.get("run_id")), {}) if health.get("run_id") else {}
             step = None
@@ -298,7 +318,7 @@ def automation(now: datetime | None = None) -> list[dict]:
             # Existing row fields describe the subscriber run, never the last owner-only test.
             row.update({"conclusion": current.get("conclusion"), "at": current.get("updated_at"),
                         "event": current.get("event"), "url": current.get("html_url"), **health})
-            if run.get("event") == "workflow_dispatch":
+            if run.get("event") == "workflow_dispatch" and not subscriber_run(run):   # a person's run
                 row["last_manual_run"] = {"at": run.get("updated_at"), "conclusion": run.get("conclusion"),
                                           "url": run.get("html_url"), "audience": "not_inferred_from_manual_run"}
         out.append(row)

@@ -22,8 +22,10 @@ with Buttondown. The owner/test preview drafts are not broadcasts to publish.
 ## What health establishes
 
 The existing hourly metrics snapshot includes a `digest.yml` automation row. Its original
-`conclusion`, `at`, `event`, and `url` fields describe the current Monday's scheduled subscriber run,
-not the last manual test. Additional fields are:
+`conclusion`, `at`, `event`, and `url` fields describe the current Monday's subscriber run: GitHub's
+scheduled run, or Keep schedule's catch-up of it (started by `github-actions[bot]`; counted since
+2026-10-21). A run a person starts never counts, test copy or not. When a Monday has both, the newest
+that succeeded is the one shown. Additional fields are:
 
 | Field | Meaning |
 |---|---|
