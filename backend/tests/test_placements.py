@@ -176,7 +176,8 @@ def test_importing_the_pipeline_never_loads_the_placements_module():
 # such as "sponsored" can never slip into the records the scorer and the filters read.
 LISTING_KEYS = {"id", "company_name", "title", "field_tags", "sector", "stage", "years", "term", "salary",
                 "duration", "posted_at", "location_raw", "is_remote", "state", "region_locations", "regions",
-                "ats", "apply_url", "description", "status", "score_parts", "insights", "is_new", "first_seen"}
+                "ats", "apply_url", "description", "status", "score_parts", "insights", "is_new", "first_seen",
+                "scan_sources"}
 LISTING_OPTIONAL = {"via_search"}
 
 

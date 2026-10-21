@@ -25,9 +25,10 @@ from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, non_cyber_security, stage_of, years_of
 from .majors import majors_export
 from .normalize import listing_id
+from .dedupe import _canon_job
 from .score import W
 from .region import evaluate_locations
-from .scan_evidence import FULL_LIST, canonical, export_board
+from .scan_evidence import FULL_LIST, SEARCH_SCOPED, canonical, export_board
 
 DESC_CHARS = 1500
 
@@ -188,6 +189,10 @@ def _listing_dict(row: Listing) -> dict:
         "insights": ins,
         "is_new": row.is_new,
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
+        # The CI database is rebuilt every run. Preserve which keyword adapters
+        # actually found this role so a later export can assess their scan scope.
+        "scan_sources": sorted({link.source for link in row.source_links
+                                if link.source in SEARCH_SCOPED}),
         **({"via_search": True} if _search_only(row) else {}),
     }
 
@@ -410,8 +415,27 @@ def board_of(x: dict) -> tuple:
     return (x.get("ats"), x.get("company_name"), f"{host}/{token}")
 
 
+def _observed_keys(urls) -> set[str]:
+    return {key for url in urls or () if (key := _canon_job(url))}
+
+
+def _absent_from_scan(listing: dict, completed: set, observed: set) -> bool:
+    """Completion proves absence only for unobserved records within its scope.
+
+    Older exports lack scope provenance; do not guess that a keyword search
+    could have returned them. A full-board list does not need that provenance.
+    """
+    if _canon_job(listing.get("apply_url")) in observed:
+        return False
+    board = export_board(listing, completed)
+    if not board:
+        return False
+    sources = listing.get("scan_sources")
+    return board[0] in FULL_LIST or (isinstance(sources, list) and board[0] in sources)
+
+
 def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
-                      completed_boards=None) -> int:
+                      completed_boards=None, observed_urls=None) -> int:
     """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
 
     An export is only what this run managed to fetch, so a board that timed out deletes all of
@@ -432,15 +456,16 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
     fetch it, so a board that is genuinely gone empties out after CARRY_DAYS and stays empty.
     Carried listings are marked, so the dashboard can say the board did not answer this time.
 
-    A collapse is only a guess at a failed fetch, and completed_boards replaces the guess with a
-    fact. Those are the boards this run read to the end (scan_evidence, the same set pipeline.run
-    closes by), so their missing rows are closed and are not carried, however far the count fell.
+    Complete scans close missing rows only within their scope. Observed posting URLs survive
+    missing detail metadata, and keyword scans retain community/legacy rows with unknown scope.
+    These cases do not require a board-wide collapse, but keep the existing freshness bound.
     A board that failed, hit a page cap, or has no way to prove a full read keeps the old rule.
     """
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
     completed = canonical(completed_boards)
+    observed = _observed_keys(observed_urls)
 
     # One stable listing can move between an employer's boards or change its URL.
     # A failed old board must not append a stale copy over the freshly fetched ID.
@@ -462,16 +487,21 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
 
     held = 0
     for key, rows in was_open.items():
-        if len(rows) < COLLAPSE_FLOOR or now_open.get(key, 0) > COLLAPSE_RATIO * len(rows):
-            continue
+        collapsed = len(rows) >= COLLAPSE_FLOOR and now_open.get(key, 0) <= COLLAPSE_RATIO * len(rows)
         for it in rows:
             url = it.get("apply_url")
             if not url or url in have or (it.get("id") and it["id"] in have_ids):
                 continue
             if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
                 continue   # the board has been quiet for days; it is not coming back
-            if completed and export_board(it, completed):
-                continue   # read to the end this run and not there: closed, not missing
+            if _absent_from_scan(it, completed, observed):
+                continue
+            board = export_board(it, completed)
+            seen = _canon_job(url) in observed
+            # Positive URL observations and out-of-scope keyword scans do not
+            # depend on an employer losing at least half of three postings.
+            if not (collapsed or seen or (board and board[0] in SEARCH_SCOPED)):
+                continue
             kept = dict(it)
             kept["carried"] = True
             listings.append(kept)
@@ -483,7 +513,7 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
 
 
 def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None,
-                       completed_boards=None) -> int:
+                       completed_boards=None, observed_urls=None) -> int:
     """Keep what the Google Jobs searches found until they have had a chance to find it again.
 
     Those searches cost money and run once a day, on the first run after midnight UTC; the three
@@ -496,23 +526,23 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     So such a listing is carried from the last export for CARRY_DAYS after a search last saw it,
     the same bound a board that failed to answer gets.
 
-    Except when the posting's own board was read whole this run and it was not there. That only
-    counts for a FULL_LIST board: a keyword-scoped scan (Workday, Oracle...) may never have asked
-    for a title a search engine found, so its evidence leaves these rows alone, as pipeline.run does.
+    Except when the posting's own board proves absence within the row's scope and the posting
+    was not observed in raw input. Google-only rows have no keyword-adapter provenance, so a
+    keyword-scoped scan cannot close them, as pipeline.run also requires.
     """
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
     have_ids = {x["id"] for x in listings if x.get("id")}
     completed = canonical(completed_boards)
+    observed = _observed_keys(observed_urls)
     held = 0
     for it in prev:
         url = it.get("apply_url")
         if (not it.get("via_search") or it.get("status") != "open" or not url or url in have
                 or (it.get("id") and it["id"] in have_ids)):
             continue
-        board = export_board(it, completed) if completed else None
-        if board and board[0] in FULL_LIST:
+        if _absent_from_scan(it, completed, observed):
             continue
         if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
             continue
@@ -527,14 +557,15 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     return held
 
 
-def closed_by_scan(listings: list[dict], prev: list[dict], completed_boards) -> int:
+def closed_by_scan(listings: list[dict], prev: list[dict], completed_boards, observed_urls=None) -> int:
     """How many of the last export's open rows this run's complete scans closed, for the log."""
     completed = canonical(completed_boards)
     if not completed:
         return 0
     have = {x.get("apply_url") for x in listings}
+    observed = _observed_keys(observed_urls)
     return sum(1 for it in prev if it.get("status") == "open" and it.get("apply_url")
-               and it["apply_url"] not in have and export_board(it, completed))
+               and it["apply_url"] not in have and _absent_from_scan(it, completed, observed))
 
 
 def correct_non_cyber_security_tags(listings: list[dict]) -> None:
@@ -550,13 +581,15 @@ def correct_non_cyber_security_tags(listings: list[dict]) -> None:
             x["field_tags"] = [t for t in tags if t != "security"] or ["other"]
 
 
-def export(out_dir: str, completed_boards=None) -> dict:
+def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
     """Write the static site data.
 
     completed_boards is the (ats, token) evidence run_ingest.scan_boards collected this run. CI
     rebuilds its database every run, so the carry rules below, not the database, decide whether
     a missing posting stays on the site; passing the evidence makes them close what the scans
     proved closed. Without it (a standalone export) every board keeps the carry rules as before.
+    observed_urls holds raw posting URLs seen this run, even when normalization could not place
+    them; a complete list is not proof that those postings disappeared.
     """
     init_db()
     os.makedirs(out_dir, exist_ok=True)
@@ -574,9 +607,11 @@ def export(out_dir: str, completed_boards=None) -> dict:
         # first saw any of this and of what the boards held, because the db does not outlive a run.
         prev = previous_export(out_dir)
         carried = carry_first_seen(listings, out_dir, prev=prev)
-        held = carry_open_boards(listings, out_dir, prev=prev, completed_boards=completed_boards)
-        held += carry_search_finds(listings, out_dir, prev=prev, completed_boards=completed_boards)
-        closed = closed_by_scan(listings, prev, completed_boards)
+        held = carry_open_boards(listings, out_dir, prev=prev, completed_boards=completed_boards,
+                                 observed_urls=observed_urls)
+        held += carry_search_finds(listings, out_dir, prev=prev, completed_boards=completed_boards,
+                                  observed_urls=observed_urls)
+        closed = closed_by_scan(listings, prev, completed_boards, observed_urls=observed_urls)
         correct_non_cyber_security_tags(listings)
         # Again, now the carried rows are in: they came with the is_new the last export gave them.
         # Dated from generated_at, the "today" seo_pages.fresh uses for /internships/new/.
