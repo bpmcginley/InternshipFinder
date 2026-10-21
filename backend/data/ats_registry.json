@@ -5256,9 +5256,10 @@
   "oldmissioncapital": {
    "name": "Old Mission Capital",
    "quant": true,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-13",
-   "sector": "quant_finance"
+   "sector": "quant_finance",
+   "last_fail": "2026-10-21"
   },
   "olsson": {
    "name": "Olsson",
@@ -9205,6 +9206,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "massschoolbuildings": {
+   "name": "Massachusetts School Building Authority",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
+  },
   "MBRDNA": {
    "name": "Mercedes-Benz",
    "quant": false,
@@ -9732,6 +9739,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "wisdomtree": {
+   "name": "WisdomTree",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-21"
   },
   "woven-by-toyota": {
    "name": "Woven",
