@@ -1322,6 +1322,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "metalenz": {
+   "name": "Metalenz",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
+  },
   "metamorphic": {
    "name": "Metamorphic",
    "quant": false,
@@ -1520,6 +1526,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "openart": {
+   "name": "OpenArt AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "opengov": {
    "name": "OpenGov",
@@ -2300,6 +2312,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "walrusfi": {
+   "name": "Walrus",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "watershed": {
    "name": "Watershed",
@@ -3200,6 +3218,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "brunswickgroup": {
+   "name": "Brunswick Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "bti36021": {
    "name": "BTI360",
@@ -5256,10 +5280,10 @@
   "oldmissioncapital": {
    "name": "Old Mission Capital",
    "quant": true,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
    "sector": "quant_finance",
-   "last_fail": "2026-10-21"
+   "last_fail": "2026-10-22"
   },
   "olsson": {
    "name": "Olsson",
@@ -6293,6 +6317,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "trace3": {
+   "name": "Trace3",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "tradingacademy2025": {
    "name": "Optiver",
@@ -7699,6 +7729,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "education_research"
+  },
+  "careers.kentro.us": {
+   "name": "Kentro",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "careers.kindermorgan.com": {
    "name": "Kinder Morgan",
@@ -11539,6 +11575,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "phasorengineering": {
+   "name": "Phasor Engineering Inc",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
+  },
   "pony-dot-ai": {
    "name": "Pony.ai",
    "quant": false,
@@ -11809,9 +11851,9 @@
   "accenture|wd103|AccentureCareers": {
    "name": "Accenture",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18",
-   "last_fail": "2026-10-21"
+   "last_fail": "2026-10-22"
   },
   "accenture|wd103|AvanadeCareers": {
    "name": "Avanade",
@@ -12074,9 +12116,8 @@
   "alston|wd1|ExternalCareer": {
    "name": "Alston & Bird Law Firm",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-06",
-   "last_fail": "2026-10-21"
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "altasciences|wd1|Careers": {
    "name": "Altasciences",
@@ -19151,6 +19192,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-15"
+  },
+  "whitecap|wd1|Careers": {
+   "name": "White Cap",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "wilburellis|wd12|wilbur-ellis": {
    "name": "Wilbur-Ellis",
