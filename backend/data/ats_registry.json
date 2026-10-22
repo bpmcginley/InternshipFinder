@@ -14072,6 +14072,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "draftkings|wd1|draftkings": {
+   "name": "DraftKings",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
+  },
   "draper|wd5|draper_careers": {
    "name": "Draper",
    "quant": false,
