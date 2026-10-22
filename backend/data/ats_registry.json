@@ -16246,6 +16246,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "microchiphr|wd5|External": {
+   "name": "Microchip Technology",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
+  },
   "micron|wd1|External": {
    "name": "Micron Technology",
    "quant": false,
