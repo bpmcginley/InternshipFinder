@@ -8888,6 +8888,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "colibrigroup": {
+   "name": "Colibri Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
+  },
   "coupa": {
    "name": "Coupa Software",
    "quant": false,
@@ -13919,13 +13925,6 @@
    "fails": 0,
    "added": "2026-09-18"
   },
-  "dallascollege|wd1|Dallas_College_Careers": {
-   "name": "Dallas College",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-18",
-   "sector": "education_research"
-  },
   "danaher|wd1|DanaherJobs": {
    "name": "Danaher Corporation",
    "quant": false,
@@ -14592,6 +14591,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-16"
+  },
+  "freight|wd108|FXF_External_Career_Site": {
+   "name": "FedEx Freight",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-22"
   },
   "freseniusglobal|wd3|FK_Careers": {
    "name": "Fresenius Kabi",
