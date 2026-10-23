@@ -18,22 +18,47 @@ from internscout import seo_pages
 
 
 class _Visible(HTMLParser):
+    # 2026-10-23: hidden ancestors must not make an invisible answer pass the schema check.
+    # was: only head/script/style/template were excluded, using a tag counter.
+    # Revert: restore the counter and remove the hidden-subtree regression cases below.
+    VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+            "param", "source", "track", "wbr"}
+
     def __init__(self, html):
         super().__init__()
-        self.hidden = 0
+        self.stack = []
         self.text = []
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
-        if tag in {"head", "script", "style", "template"}:
-            self.hidden += 1
+        attrs = dict(attrs)
+        style = dict((key.strip().lower(), re.sub(r"\s*!important\s*$", "", value.strip(),
+                                                 flags=re.I).lower())
+                     for declaration in (attrs.get("style") or "").split(";")
+                     if ":" in declaration
+                     for key, value in [declaration.split(":", 1)])
+        hidden = (bool(self.stack and self.stack[-1][1])
+                  or tag in {"head", "script", "style", "template"}
+                  or "hidden" in attrs or (attrs.get("aria-hidden") or "").strip().lower() == "true"
+                  or style.get("display") == "none"
+                  or style.get("visibility") in {"hidden", "collapse"}
+                  or style.get("content-visibility") == "hidden")
+        # Void elements have no subtree, so a hidden input cannot hide its following siblings.
+        if tag not in self.VOID:
+            self.stack.append((tag, hidden))
+
+    def handle_startendtag(self, tag, attrs):
+        # Self-closing elements have no text or descendants to include.
+        pass
 
     def handle_endtag(self, tag):
-        if tag in {"head", "script", "style", "template"}:
-            self.hidden = max(0, self.hidden - 1)
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index][0] == tag:
+                del self.stack[index:]
+                break
 
     def handle_data(self, text):
-        if not self.hidden:
+        if not self.stack or not self.stack[-1][1]:
             self.text.append(text)
 
 
@@ -189,3 +214,29 @@ def test_invisible_faq_answer_is_rejected():
     bad = seo_pages.ld_script(seo_pages.faq_ld([("A visible question?", "An invisible answer.")]))
     with pytest.raises(AssertionError):
         _assert_collection_schema(bad + "<h2>A visible question?</h2>", "/internships/")
+
+
+@pytest.mark.parametrize("attrs", [
+    "hidden", 'hidden=""', 'aria-hidden="true"', 'aria-hidden=" TRUE "',
+    'style="display: none"', 'style="DISPLAY: NONE !important; color: red"',
+    'style="visibility: hidden"', 'style="visibility: collapse"',
+    'style="content-visibility: hidden"',
+])
+def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
+    question, answer = "A visible question?", "An answer readers cannot see."
+    ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
+    # The question is visible, but a nested paragraph's text inherits its ancestor's hidden state.
+    html = ld + f'<h2>{question}</h2><div {attrs}><section><p>{answer}</p></section></div>'
+    with pytest.raises(AssertionError):
+        _assert_collection_schema(html, "/internships/")
+
+
+@pytest.mark.parametrize("prefix", [
+    '<input type="hidden">', '<img hidden src="x.png">', '<br hidden>', '<img hidden />',
+    '<div hidden><input type="hidden"><p>Do not include this.</p></div>',
+    '<div aria-hidden="true"><span>Do not include this.</span></div>',
+])
+def test_hidden_void_elements_and_closed_subtrees_do_not_hide_visible_siblings(prefix):
+    question, answer = "A visible question?", "A visible answer."
+    ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
+    _assert_collection_schema(ld + prefix + f'<h2>{question}</h2><p>{answer}</p>', "/internships/")

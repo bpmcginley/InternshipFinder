@@ -33,6 +33,8 @@ The homepage retains the Product description, Organization and WebSite, but omit
 
 Offline regression coverage checks the homepage and generated field, place, field-in-place, employer, main hub, employer hub, major hub, pricing, about, comparison and numbers pages. It recursively inspects JSON-LD, checks breadcrumb and FAQ visibility, CollectionPage identity and description, ISO dates, HTTPS URLs, and the emitted Offer and UnitPriceSpecification value types. Adversarial tests ensure a nested JobPosting and an invisible FAQ answer fail.
 
+The visible-text parser follows hidden ancestors, excluding `hidden`, `aria-hidden="true"`, and inline `display:none`, `visibility:hidden` or `collapse`, and `content-visibility:hidden`. Hidden void elements and closed hidden subtrees cannot suppress visible siblings. Nine hidden-ancestor cases and six sibling cases protect these boundaries. This offline check does not compute arbitrary stylesheets or replace a rendered browser inspection.
+
 Only `index.html` differs among the 2,163 built HTML files. The sitemap and `noindex-pages.txt` are byte-identical. No PR #140 indexing symbols, thresholds, noindex rules, sitemap inclusion logic, or `backend/data/search_console_pages.json` were changed.
 
 ## Revert
@@ -41,10 +43,10 @@ Restore the homepage Product offers from `seo_pages.PRODUCT`, restore its full e
 
 ## Validation
 
-- `cd backend && python -m pytest tests/ -q`: 1,156 passed, two skipped.
+- `cd backend && python -m pytest tests/ -q`: 1,171 passed, two skipped on the final hidden-aware source.
 - `node --test tests/site/*.test.mjs`: 214 passed.
-- `python -m pytest tests/test_structured_data.py -q`: four passed, including the final expanded value checks.
-- Local build: 2,155 pages generated; full-build semantic schema checks pass.
+- `python -m pytest tests/test_structured_data.py -q`: 19 passed, including hidden-ancestor and visible-sibling cases.
+- Local build: 2,155 pages generated; all 2,159 schema-bearing HTML files pass the final hidden-aware semantic checks.
 - `git diff --check`: passes.
 
 Performance findings are kept outside this focused change. The measured template review found no clear performance source change to justify.
