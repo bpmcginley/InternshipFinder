@@ -1960,6 +1960,52 @@ def employer_facts(name: str, items: list[dict], fields_main: list[str]) -> tupl
     return facts, questions
 
 
+def employer_breakdown(name: str, items: list[dict], fields_main: list[str]) -> str:
+    """2026-10-23: facts for each actual hiring field, beyond the employer-wide totals.
+
+    was: each employer had only the same aggregate fact labels and FAQ prompts. Count intersections
+    from its own deduplicated open roles; quote example pay rather than blend currencies or periods.
+    Revert: remove this function and its call when constructing employer related content.
+    """
+    if not items:
+        return ""
+    groups = [(field_title(t), [x for x in items if t in (x.get("field_tags") or [])])
+              for t in dict.fromkeys(fields_main)]
+    groups = [(label, rows) for label, rows in groups if rows] or [("Open roles", items)]
+    rows_html = []
+    for label, rows in groups:
+        terms = sorted(dated_terms(rows).items(), key=lambda kv: (-kv[1], kv[0]))
+        where = places(rows)
+        details = [plural(len(rows), "open role") + "."]
+        if terms:
+            details.append("Start terms: " + counted(terms, 2).replace("more place", "more term") + ".")
+        missing = len(rows) - sum(k for _, k in terms)
+        if missing:
+            details.append(f"{plural(missing, 'posting')} " + ("does" if missing == 1 else "do")
+                           + " not name a start term with a year.")
+        if where:
+            details.append("Locations: " + counted(where, 2) + ".")
+        # Only quote a posting with a working web destination. Pay is copied as written, including annual amounts,
+        # currency labels and ranges; a Canadian rate never becomes a US hourly comparison.
+        # was: every valid URL was an example, but upstream title=None is accepted by well_formed.
+        # Revert: drop the title check only if missing titles can no longer reach this renderer.
+        examples = [x for x in rows if str(x.get("title") or "").strip() and safe_url(x.get("apply_url"))]
+        examples.sort(key=lambda x: (not bool(real_salary(x)), str(x.get("title") or "").casefold(), str(x["id"])))
+        example_html = ""
+        if examples:
+            example = examples[0]
+            salary = real_salary(example)
+            pay = " Listed pay: " + esc(salary) + "." if salary else ""
+            # 2026-10-23: was: a second outbound link. Keep application actions in the listing rows,
+            # preserving their Auto-Apply and paid-placement contracts. Revert: use a separate anchor.
+            example_html = (f'<p>Example posting: <span class="example-title">{esc(example["title"])}</span>.'
+                            + pay + '</p>')
+        rows_html.append(f'<li><h3>{esc(label)}</h3><p>{esc(" ".join(details))}</p>' + example_html + '</li>')
+    return (f'<section class="employer-breakdown"><h2>From {esc(name)}\'s current postings</h2>'
+            '<p>Counts below cover the fields shown. A role can name more than one field or location. '
+            'Example pay is shown as listed.</p><ul>' + ''.join(rows_html) + '</ul></section>')
+
+
 # ---------------------------------------------------------------- questions on the listing pages
 # Added 2026-10-05. The employer pages have answered "when, where, does it pay" from their own roles
 # since 2026-10-01; the field, state and field-in-state pages now answer the questions a student (or
@@ -3561,7 +3607,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         similar = sorted(((len(set(main) & set(f)), len(by_company[o]), o) for o, f in company_fields.items()
                           if o != name and set(main) & set(f)), key=lambda t: (-t[0], -t[1], t[2]))[:RELATED]
         # was: related = note + link_list("Related fields", ...)
-        related = (questions + note
+        # 2026-10-23: was: questions + note, with no field-by-field facts. Revert: omit this call.
+        related = (employer_breakdown(name, items, main) + questions + note
                    + link_list("Similar employers", [(EMPLOYERS[o], o, k) for _, k, o in similar])
                    + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
                                                   for t in main if t in fields])
