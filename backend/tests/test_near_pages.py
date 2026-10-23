@@ -254,7 +254,21 @@ def test_an_empty_page_says_so_truthfully_and_is_kept_out_of_search(tmp_path):
     assert desc.startswith("No open education internships near Fresno, CA right now.")
 
 
-def test_below_the_threshold_a_page_is_noindex_and_out_of_the_sitemap_but_still_built(tmp_path):
+def test_no_near_page_or_their_hub_is_indexed_while_near_index_is_off(tmp_path):
+    assert seo_pages.NEAR_INDEX is False                                # 2026-10-23
+    site = _denver_site(tmp_path, 20)
+    built = _built(site)
+    near = {p: v for p, v in built.items() if p.startswith(NEAR)}
+    assert near and all(v["thin"] and not v["index"] and "noindex, follow" in v["html"] for v in near.values())
+    assert not _built(site, live={_path("Denver", "business"), NEAR})[_path("Denver", "business")]["index"]
+    seo_pages.write(site, list(built.values()))
+    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
+    held = open(os.path.join(site, seo_pages.HELD_FILE), encoding="utf-8").read().splitlines()
+    assert "/internships/near/" not in sitemap and set(near) <= set(held)
+
+
+def test_below_the_threshold_a_page_is_noindex_and_out_of_the_sitemap_but_still_built(tmp_path, monkeypatch):
+    monkeypatch.setattr(seo_pages, "NEAR_INDEX", True)       # NEAR_INDEX_MIN decides only while it is on
     need = seo_pages.NEAR_INDEX_MIN
     assert need == 5
     path = _path("Denver", "business")
@@ -310,7 +324,8 @@ def test_titles_and_descriptions_come_from_the_pages_own_data(tmp_path):
 def test_the_hub_links_every_one_of_the_500_pages_and_is_linked_from_the_browse_hub(tmp_path):
     built = _built(_denver_site(tmp_path))
     hub = built[NEAR]
-    assert hub["index"] and "<h1>Internships near 50 US cities</h1>" in hub["html"]
+    # was: hub["index"]. A hub of noindex pages is noindex too (2026-10-23), still built and linked.
+    assert hub["thin"] and not hub["index"] and "<h1>Internships near 50 US cities</h1>" in hub["html"]
     links = set(re.findall(r'href="(/internships/near/[^"]+/[^"]+/)"', hub["html"]))
     assert links == {p for p in built if p.startswith(NEAR) and p != NEAR}
     assert hub["html"].count("<h2>Near ") == 50
