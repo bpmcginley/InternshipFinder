@@ -211,7 +211,9 @@ TAIL = "from internships to co-ops and research"      # what the opening paragra
 # 14 of them) and 63 descriptions outside 110-160. fit_title and fit_description keep every page in.
 TITLE_MAX = 60
 TITLE_SUFFIX = " | InternScout"
-DESC_MIN, DESC_MAX = 110, 160
+# 2026-10-23: 23 indexed descriptions in the local production build exceeded 155 characters.
+# was: DESC_MIN, DESC_MAX = 110, 160. Revert: restore DESC_MAX to 160.
+DESC_MIN, DESC_MAX = 110, 155
 
 US_STATES = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
@@ -677,7 +679,9 @@ def fit_description(text: str) -> str:
         if ends:
             text = text[:max(ends)]
         else:
-            text = text[:DESC_MAX].rsplit(" ", 1)[0].rstrip(" ,;:–-(") + "…"
+            # 2026-10-23: reserve the ellipsis even when an upstream name has no spaces.
+            # was: text[:DESC_MAX]. Revert: restore that slice if the extra character is acceptable.
+            text = text[:DESC_MAX - 1].rsplit(" ", 1)[0].rstrip(" ,;:–-(") + "…"
     for pad, marker in DESC_PADS:
         if len(text) >= DESC_MIN:
             break
@@ -704,7 +708,7 @@ def fit_description(text: str) -> str:
 COUNT_STEPS = (10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750,
                1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000)
 # The length the new descriptions aim for: a desktop result shows about 155 characters before it cuts
-# (DESC_MAX, 160, stays the hard limit fit_description holds every page to).
+# (DESC_MAX is also 155 since 2026-10-23; was: a 160-character fallback).
 DESC_AIM = 155
 
 
@@ -845,7 +849,9 @@ def listing_description(n: int, what: str, where: str, items: list[dict], update
     `what` is the plural noun phrase ("machine learning and AI internships and co-ops"), `where` the
     place after it ("in California", or "")."""
     term = main_term(items)
-    tail = f", most for {term}" if term else ""
+    # 2026-10-23: term hubs already name their term in `what`; do not repeat it as a majority claim.
+    # was: tail = f", most for {term}" if term else "". Revert: remove the subject check.
+    tail = f", most for {term}" if term and term.casefold() not in what.casefold() else ""
     noun = what if n != 1 else re.sub(r"\binternships\b", "internship", what, count=1)
     full = f"{n:,} open {noun}{' for college students' if audience else ''}{' ' + where if where else ''}{tail}."
     short = f"{n:,} open {noun}{' ' + where if where else ''}{tail}."
@@ -853,6 +859,21 @@ def listing_description(n: int, what: str, where: str, items: list[dict], update
     # ("Internal Revenue Service, Aramco Americas, ...") would otherwise crowd out the employers entirely.
     leads = [" ".join([lead, hiring_words(items, k)]) for k in (3, 2, 1) for lead in (full, short)] + [full, short]
     return pack(leads, [f"Updated {updated}.", "Free, no sign-up."], need=0)
+
+
+def kind_description(kind: dict, items: list[dict], updated: str) -> str:
+    """A term or eligibility hub's own count, hiring employers and start term, when supplied."""
+    # 2026-10-23: boilerplate made the term hubs nearly identical despite different roles.
+    # was: kind["desc"].format(n=n, updated=updated). Revert: use that template at the caller.
+    subjects = {
+        "paid": "student roles that list pay or say they are paid",
+        "co-op": "co-ops",
+        "research": "research positions for undergraduates",
+        "for-freshmen": "roles whose postings accept first-year college students",
+        "for-sophomores": "roles whose postings accept sophomores",
+    }
+    subject = subjects.get(kind["slug"], f"{kind['crumb']} student roles")
+    return listing_description(len(items), subject, "", items, updated, audience=False)
 
 
 EMPLOYERS: dict[str, str] = {}   # every spelling of a company's name -> its employer page, set by build()
@@ -1469,6 +1490,9 @@ TRACKER: tuple[str, str] | None = None
 # set by build(): the dashboard's crawlable "Browse" section (home_browse), which write() puts into the
 # site's index.html between HOME_START and HOME_END (2026-10-07).
 HOME = ""
+# 2026-10-23: the dashboard's live date is a floor of its own, not the browse hub's first_seen.
+# Revert: remove HOME_LIVE_DATE and the page_dates home_floor argument.
+HOME_LIVE_DATE = None
 
 
 def ld_script(obj) -> str:
@@ -2109,8 +2133,11 @@ def _offer(name: str, price: str) -> dict:
 
 
 # The product and its three offers, for answer engines asked "how much does InternScout cost" (the audit
-# of 2026-10-05: Organization and WebSite were there, no Product or Offer). On /pricing/ and, the same
-# object, in docs/index.html; backend/tests/test_seo_pages.py checks the two agree.
+# of 2026-10-05: Organization and WebSite were there, no Product or Offer).
+# 2026-10-23: Product belongs on /pricing/, where its offer allowances are visible. A homepage
+# Product without offers or ratings would fail Google product snippet requirements.
+# was: the identical PRODUCT object on both pages.
+# Revert: restore the full homepage Product and the equality assertion in test_seo_pages.py.
 PRODUCT = {"@context": "https://schema.org", "@type": "Product", "@id": SITE + "/#product",
            "name": "InternScout Auto-Apply",
            "description": "A free internship search for college students, with a Chrome extension that "
@@ -3370,6 +3397,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                                                  feed=items is not None, ld=ld, thin=thin),
                       "items": items, "h1": h1, "state": state, "lastmod": lastmod, "index": index and not thin,
                       "thin": thin, "kind": kind})
+        # 2026-10-23: retain the real live date separately from first_seen for monotonic migration.
+        # was: both collapsed into lastmod; revert: remove this metadata with page_dates.
+        pages[-1]["lastmod_floor"] = live.get(path) if isinstance(live, dict) else None
         # was: ... page(..., ld=ld), ..., "index": index})
 
     # Each listing page's src (2026-10-04, see autoapply_card): seo-field for a field and a field in a
@@ -3502,8 +3532,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                             [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t])) for t in rel_tags[:RELATED]])
         # was: add(path, f"Internships for {name} Majors – {len(items):,} Open | InternScout", ...
         add(path, [f"Internships for {name} Majors – {len(items):,} Open", f"Internships for {name} Majors"],
-            f"{len(items):,} open internships, co-ops and research roles that fit {name} majors, updated "
-            f"{updated}. Built for UMass Amherst students; free, no sign-up.",
+            # 2026-10-23: identify who is hiring from this major's actual roles, rather than boilerplate.
+            # was: count/name/date plus "Built for UMass Amherst students; free, no sign-up."
+            # Revert: restore that description template; page selection is unchanged.
+            listing_description(len(items), f"student roles for {name} majors", "", items, updated, audience=False),
             f"Internships for {name} majors",
             [root, ("/internships/for/", "By major"), (path, name)],
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
@@ -3609,7 +3641,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # [full, full up to the count, full.split(" – ")[0]].
         floor = count_floor(len(items))
         add(path, fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
-            k["desc"].format(n=n, updated=updated),
+            kind_description(k, items, updated),  # 2026-10-23; was: k["desc"].format(n=n, updated=updated)
             k["h1"], [root, (path, k["crumb"])],
             listing_body(items, k["what"], "", now, related, dash=dash_link(**k["dash"]),
                          tail=k.get("tail", TAIL), about=k.get("about", frozenset()), src="seo-hub"), items)
@@ -3752,7 +3784,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     # Revert: remove these two lines; no page's eligibility, canonical or sitemap inclusion changes.
     from .related_pages import prefer_indexed
     prefer_indexed(pages)
-    global TEXTS, HOME
+    global TEXTS, HOME, HOME_LIVE_DATE
+    HOME_LIVE_DATE = live.get("/") if isinstance(live, dict) else None
     HOME = home_browse(pages, by_company, fields, states, trackers, len(new) >= MIN_OPEN, len(majors_made))
     # llms.txt names only pages search engines are asked to index (2026-10-13): not /digest/ before it has a
     # form, nor a thin page. was: every page made.
@@ -3928,6 +3961,12 @@ def today_utc() -> str:
 
 
 def write(site_dir: str, pages: list[dict]) -> None:
+    # 2026-10-23: date real visible changes, including corrections and closures, after all page
+    # decisions. was: only max(first_seen, live lastmod); see page_dates for the one-line revert.
+    from . import page_dates
+    now = GENERATED or datetime.now(timezone.utc)
+    content_dates, home_lastmod = page_dates.refresh(site_dir, pages, now, HOME, HOME_START, HOME_END,
+                                                    LISTINGS, home_floor=HOME_LIVE_DATE)
     for p in pages:
         folder = os.path.join(site_dir, p["path"].strip("/").replace("/", os.sep))
         os.makedirs(folder, exist_ok=True)
@@ -3936,8 +3975,8 @@ def write(site_dir: str, pages: list[dict]) -> None:
     now = GENERATED or datetime.now(timezone.utc)     # was: now = datetime.now(timezone.utc)
     with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(not_found(f"{now:%B} {now.day}, {now.year}"))
-    # The dashboard changes with every data refresh; the other static pages carry no lastmod rather
-    # than a made-up one.
+    # The dashboard gets its own content date below (2026-10-23); was: the browse hub's date. Other
+    # static pages still carry no lastmod rather than a made-up one. Revert: remove the '/' override.
     hub = next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None)
     # /employers/ (2026-10-13) is hand-written in docs/employers/index.html, like install.html.
     # was: urls = [("/", hub), ("/install.html", None), ("/privacy", None), ("/terms", None)] + \
@@ -3949,6 +3988,8 @@ def write(site_dir: str, pages: list[dict]) -> None:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
         for u, mod in urls:
+            if u == "/":
+                mod = home_lastmod
             f.write(f"  <url><loc>{esc(SITE + u)}</loc>" + (f"<lastmod>{mod}</lastmod>" if mod else "") + "</url>\n")
         f.write("</urlset>\n")
     with open(os.path.join(site_dir, "robots.txt"), "w", encoding="utf-8", newline="\n") as f:
@@ -3980,6 +4021,7 @@ def write(site_dir: str, pages: list[dict]) -> None:
     for name, text in TEXTS.items():
         with open(os.path.join(site_dir, name), "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
+    page_dates.write(site_dir, content_dates)  # 2026-10-23: persist hashes, not page membership.
     # The thin pages this deploy serves (INDEX_COMBO), for the next deploy's held_paths (2026-10-13).
     with open(os.path.join(site_dir, HELD_FILE), "w", encoding="utf-8", newline="\n") as f:
         f.write("# InternScout pages served with noindex, follow (too few roles to ask search engines to index).\n"
