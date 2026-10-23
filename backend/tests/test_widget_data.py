@@ -74,7 +74,7 @@ def test_output_is_deterministic_and_bounded_before_a_file_is_written(tmp_path, 
 def test_pages_build_writes_the_feed_from_its_complete_listing_set(tmp_path, monkeypatch):
     from internscout import seo_pages, feeds
 
-    monkeypatch.setattr(seo_pages, "build", lambda *args: {})
+    monkeypatch.setattr(seo_pages, "build", lambda *args, **kwargs: {})
     monkeypatch.setattr(seo_pages, "write", lambda *args: None)
     monkeypatch.setattr(feeds, "write_all", lambda *args: None)
     monkeypatch.setattr(seo_pages, "LISTINGS", [row(1, ["civil"])])
