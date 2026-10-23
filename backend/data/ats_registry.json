@@ -19455,8 +19455,9 @@
   "zebra|wd501|Zebra_careers": {
    "name": "Zebra Technologies",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-20"
+   "fails": 1,
+   "added": "2026-10-20",
+   "last_fail": "2026-10-23"
   },
   "zeissgroup|wd3|External": {
    "name": "Zeiss",
