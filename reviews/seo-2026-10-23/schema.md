@@ -54,3 +54,9 @@ Restore the full homepage Product node from `seo_pages.PRODUCT`, restore its ful
 - `git diff --check`: passes.
 
 Performance findings are kept outside this focused change. The measured template review found no clear performance source change to justify.
+
+## Integration with merged PR #140
+
+Merged `origin/main` at `ddfa0288e6671878c0df2401e85384abac09e412` using `git merge`, without rebasing or changing PR #140's indexing rules. The before/after table and byte-identical sitemap comparison above describe the historical schema-only change against `99eb99b9`; they do not attribute PR #140's separate indexing changes to this work.
+
+The combined branch passes 185 focused tests across `test_structured_data.py`, `test_seo_pages.py`, `test_near_pages.py` and `test_widget_data.py`. The post-merge local build still produces 2,155 generated pages plus eight static HTML files. Its 2,159 schema-bearing HTML files pass the same semantic contracts, retaining one Product, three offers and zero JobPosting nodes. Full combined-head suites are checked by PR CI; the full local suite results above were recorded before this integration.
