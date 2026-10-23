@@ -2782,6 +2782,12 @@
    "fails": 0,
    "added": "2026-09-30"
   },
+  "amendconsulting": {
+   "name": "AMEND Consulting",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
+  },
   "americaninstitutesforresearch": {
    "name": "American Institutes for Research",
    "quant": false,
@@ -4082,6 +4088,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "freestonecapitalmanagement": {
+   "name": "Freestone Capital Management",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "fsastorecom": {
    "name": "Health-E Commerce",
@@ -11303,9 +11315,8 @@
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-10-23"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",
@@ -16825,6 +16836,12 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "health"
+  },
+  "oatey|wd5.myworkdaysite.com|Oatey_External_": {
+   "name": "OATEY",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "oceanspray|wd5|OceanSprayJobs": {
    "name": "Ocean Spray",
