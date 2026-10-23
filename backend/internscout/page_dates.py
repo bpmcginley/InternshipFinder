@@ -53,23 +53,58 @@ def read(site_dir: str, ceiling: str) -> dict:
 
 
 class _Content(HTMLParser):
-    def __init__(self, stamp: datetime):
+    def __init__(self, stamp: datetime, path: str):
         super().__init__(convert_charrefs=True)
         self.parts = []
         self.stack = []
         self.body = False
         self.title = False
+        self.path = path
         day = f"{stamp:%B} {stamp.day}, {stamp.year}"
-        # Only export-date labels are routine. Posting dates, opening dates, comparator source dates
-        # and relative freshness/count changes remain significant. was: every new first_seen dated it.
+        # 2026-10-23: match the generator's own count/date sentences, not arbitrary date wording.
+        # was: generic "as of DATE" also hid COMPARE_AS_OF and redated unchanged source citations.
+        # Revert: remove these sentence rules to count export-label changes as content changes.
         date_text = re.escape(day)
-        self.routine = re.compile(
-            r"\b(updated\s+|as of\s+|week to\s+|InternScout on\s+|open roles on\s+|listings open on\s+|"
-            r"open roles by US state on\s+|"
-            r"on\s+(?=" + date_text + r"\s+InternScout listed\b))" + date_text, re.I)
+        contexts = []
+        if path.startswith("/internships/"):
+            # The first listing FAQ answer, whose subject changes with its field/place.
+            contexts.append((r"^([\d,]+ open [^.!?]* as of\s+)", r"(?=, from [\d,]+ employers?\.)"))
+        if path.startswith("/internships/") and path.endswith("/open/"):
+            contexts.append((r"^(As of\s+)", r"(?=, [\d,]+ employers? (?:has|have) opened )"))
+        if path == "/about/":
+            contexts.extend([
+                (r"^(As of\s+)", r"(?=, [\d,]+ open )"),
+                # About's opening coverage sentence, not its separate competitor-pricing answer.
+                (r"^(InternScout is a free internship search for [^.!?]*, as of\s+)", r"(?=\.)"),
+            ])
+        if path == "/internships/by-the-numbers/":
+            # These exact aggregate sentences are emitted only by numbers_page.
+            contexts.extend([
+                (r"^(As of\s+)", r"(?=, InternScout lists )"),
+                (r"^(On\s+)", r"(?= InternScout listed )"),
+                (r"^(InternScout on\s+)", r"(?=: [\d,]+ open )"),
+                (r"\b([\d,]+ of them (?:was|were) found in the week to\s+)", r"(?=\.)"),
+                (r"\b(Among them, as of\s+)", r"(?=:)"),
+                (r"\b(list pay or say they are paid, as of\s+)", r"(?=\.)"),
+                (r"\b(an hour, as of\s+)", r"(?=\.)"),
+                (r"\b(own applicant tracking systems, as of\s+)", r"(?=;)"),
+                (r"^((?:The [\d,]+ largest of the [\d,]+ fields|Every field|The one field), by open roles on\s+)", r"(?=:)"),
+                (r"^((?:The [\d,]+ US states with the most open roles|Open roles by US state) on\s+)", r"(?=:)"),
+                (r"^(Every figure is counted from the listings open on\s+)", r"(?=, the same export )"),
+            ])
+        self.routine = [re.compile(prefix + date_text + tail) for prefix, tail in contexts]
+        self.updated = re.compile(r"((?:^|[.,]\s+)[Uu]pdated\s+)" + date_text + r"(?=\.)")
 
-    def _text(self, text: str) -> str:
-        return " ".join(self.routine.sub(r"\1[export date]", text).split())
+    def _text(self, text: str, *, description: bool = False, export_label: bool = False) -> str:
+        for pattern in self.routine:
+            text = pattern.sub(r"\1[export date]", text)
+        # "Updated" is routine only in the common template label or an actual generated listing
+        # description. A source citation such as "Source updated DATE" remains a real fact.
+        listing_description = (description and self.path.startswith("/internships/")
+                               and re.match(r"(?:[\d,]+ |No open |The highest hourly pay listed on )", text))
+        if export_label or listing_description:
+            text = self.updated.sub(r"\1[export date]", text)
+        return " ".join(text.split())
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -81,13 +116,14 @@ class _Content(HTMLParser):
         hidden = hidden or "hidden" in a or a.get("aria-hidden") == "true" or (tag == "input" and a.get("type") == "hidden")
         hidden = hidden or bool(re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", a.get("style", ""), re.I))
         if tag == "meta" and a.get("name", "").lower() == "description":
-            self.parts.append(["description", self._text(a.get("content", ""))])
+            self.parts.append(["description", self._text(a.get("content", ""), description=True)])
         if self.body and not hidden:
-            meaningful = {k: self._text(v or "") for k, v in a.items()
+            meaningful = {k: " ".join((v or "").split()) for k, v in a.items()
                           if k in {"href", "src", "alt", "aria-label", "placeholder", "datetime", "type", "value"}}
             self.parts.append([tag, meaningful])
         if tag not in _VOID:
-            self.stack.append((tag, hidden))
+            export_label = bool(self.stack and self.stack[-1][2]) or (tag == "p" and "updated" in a.get("class", "").split())
+            self.stack.append((tag, hidden, export_label))
 
     def handle_endtag(self, tag):
         for i in range(len(self.stack) - 1, -1, -1):
@@ -101,13 +137,13 @@ class _Content(HTMLParser):
 
     def handle_data(self, data):
         if (self.body or self.title) and not (self.stack and self.stack[-1][1]):
-            text = self._text(data)
+            text = self._text(data, export_label=bool(self.stack and self.stack[-1][2]))
             if text:
                 self.parts.append(["text", text])
 
 
 def fingerprint(path: str, html: str, stamp: datetime, data=None) -> str:
-    parser = _Content(stamp)
+    parser = _Content(stamp, path)
     parser.feed(_PAID.sub("", html))
     # The URL is part of the identity: copying a record from another page cannot preserve its date.
     payload = json.dumps([VERSION, path, parser.parts, data], ensure_ascii=False, sort_keys=True, separators=(",", ":"))

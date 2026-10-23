@@ -118,6 +118,73 @@ def test_visible_copy_links_facts_and_posting_dates_are_meaningful():
         "/pricing/", opening.replace("Opens on September 24", "Opens on September 25"), next_day)
 
 
+@pytest.mark.parametrize("html", [
+    '<p>Competitor facts as of October 23, 2026, from the sources below.</p>',
+    '<meta name="description" content="Sources as of October 23, 2026.">',
+    '<p>Plans cost $39.99 a month (as of October 23, 2026).</p>',
+    '<p>Prices as of October 23, 2026.</p>',
+    '<p>Source updated October 23, 2026.</p>',
+    '<p>Open for applications as of October 23, 2026.</p>',
+    '<p>The programme runs in the week to October 23, 2026.</p>',
+    '<a href="/sources/?date=October 23, 2026" aria-label="Source updated October 23, 2026">Sources</a>',
+])
+def test_real_source_dates_are_stable_across_exports_and_meaningful_when_changed(html):
+    first_stamp, next_stamp = datetime(2026, 10, 23), datetime(2026, 10, 24)
+    def document(fragment):
+        return "<html><head></head><body>" + fragment + "</body></html>"
+    before = page_dates.fingerprint("/compare/", document(html), first_stamp)
+    # The review's regression: unchanged citations must not acquire a different hash when an
+    # export stops sharing their date. Conversely, moving both dates must not hide a citation edit.
+    assert page_dates.fingerprint("/compare/", document(html), next_stamp) == before
+    changed = html.replace("October 23, 2026", "October 24, 2026")
+    assert page_dates.fingerprint("/compare/", document(changed), next_stamp) != before
+
+
+def test_real_comparison_source_dates_on_about_pricing_and_compare(tmp_path, monkeypatch):
+    _site(tmp_path)
+    monkeypatch.setattr(seo_pages, "COMPARE_AS_OF", "September 23, 2026")
+    first = _build(tmp_path)
+    _export_day(tmp_path)
+    unchanged = _build(tmp_path)
+    for path in ("/about/", "/pricing/", "/compare/"):
+        assert unchanged[path]["lastmod"] == first[path]["lastmod"]
+    monkeypatch.setattr(seo_pages, "COMPARE_AS_OF", "September 24, 2026")
+    monkeypatch.setattr(page_dates, "observed_day", lambda: "2026-09-25")
+    changed = _build(tmp_path)
+    for path in ("/about/", "/pricing/", "/compare/"):
+        assert changed[path]["lastmod"] == "2026-09-25"
+
+
+def test_numeric_listing_description_does_not_hide_a_source_updated_date():
+    path = "/internships/mechanical-engineering/"
+    html = '<head><meta name="description" content="30 open roles. Source updated October 23, 2026."></head><body></body>'
+    first = page_dates.fingerprint(path, html, datetime(2026, 10, 23))
+    assert page_dates.fingerprint(path, html, datetime(2026, 10, 24)) == first
+    assert page_dates.fingerprint(path, html.replace("October 23", "October 24"), datetime(2026, 10, 24)) != first
+
+
+def test_actual_template_export_labels_stay_stable_with_source_date_collision(tmp_path, monkeypatch):
+    rows = _site(tmp_path)
+    employers = ["Aster Labs", "Birch Engineering", "Cedar Systems", "Dover Manufacturing", "Elm Robotics", "Fir Research"]
+    specialties = ["Controls", "Quality", "Design", "Materials", "Systems", "Testing"]
+    rows = [dict(copy.deepcopy(rows[i % 6]), id=f"role-{i}", company_name=employers[i // 6],
+                 title=f"Mechanical {specialties[i % 6]} Intern", salary=f"${30 + i}/hr", apply_url=f"https://jobs.example.com/{i}",
+                 regions=[{"loc": "Boston, MA", "state": "MA", "kind": "x"}]) for i in range(36)]
+    (tmp_path / "data/listings/MA.json").write_text(json.dumps(rows), encoding="utf-8")
+    monkeypatch.setattr(seo_pages, "NEAR_ON", True)
+    monkeypatch.setattr(seo_pages, "COMPARE_AS_OF", "September 23, 2026")
+    first = seo_pages.build(str(tmp_path))
+    _export_day(tmp_path)
+    later = seo_pages.build(str(tmp_path))
+    old = {p["path"]: page_dates.fingerprint(p["path"], p["html"], datetime(2026, 9, 23)) for p in first}
+    new = {p["path"]: page_dates.fingerprint(p["path"], p["html"], datetime(2026, 9, 24)) for p in later}
+    assert old.keys() == new.keys()
+    assert "/internships/highest-paying/" in old and "/internships/summer-2027/open/" in old
+    assert any(p["kind"] == "employer" for p in first)
+    assert {p for p in old if p.startswith("/internships/near/")}
+    assert [path for path in old if old[path] != new[path]] == []
+
+
 def test_next_day_copy_correction_uses_observation_day_with_unchanged_export(tmp_path, monkeypatch):
     _site(tmp_path)
     _build(tmp_path)
