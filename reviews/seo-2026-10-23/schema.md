@@ -4,6 +4,8 @@
 
 The homepage included three detailed `Offer` objects with exact monthly allowances, although its anonymous visible copy only described a monthly allowance. The pricing page displays the actual tiers and allowances. Google requires structured data to describe content visible on the same page: https://developers.google.com/search/docs/appearance/structured-data/sd-policies.
 
+Removing only the offers would leave a Product missing Google's required `offers`, `review` or `aggregateRating` property. The homepage Product is therefore omitted entirely; no ratings or reviews are invented. The complete Product remains on pricing. Required properties: https://developers.google.com/search/docs/appearance/structured-data/product-snippet#product.
+
 This is a content-consistency correction. The review does not establish that structured data caused the October ranking decline.
 
 The baseline and changed builds both use main `99eb99b9`, the committed listing export dated `2026-10-23T16:05:29.162621+00:00`, and the same saved live sitemap and noindex list. They contain 15,036 usable roles and 2,155 generated pages, plus eight static HTML files.
@@ -13,7 +15,7 @@ The baseline and changed builds both use main `99eb99b9`, the committed listing 
 | HTML files | 2,163 | 2,163 |
 | Files with JSON-LD | 2,159 | 2,159 |
 | Parseable JSON-LD blocks | 7,174 | 7,174 |
-| Product nodes | 2 | 2 |
+| Product nodes | 2 | 1 |
 | Offer nodes | 6 | 3 |
 | UnitPriceSpecification nodes | 4 | 2 |
 | JobPosting nodes | 0 | 0 |
@@ -29,9 +31,11 @@ An independent check against the official current schema.org vocabulary found no
 
 ## Change
 
-The homepage retains the Product description, Organization and WebSite, but omits detailed offers. The full Product offers on `/pricing/` are unchanged. No visible product copy changes.
+The homepage retains Organization and WebSite, but omits Product and its detailed offers. The full Product offers on `/pricing/` are unchanged. No visible product copy changes.
 
 Offline regression coverage checks the homepage and generated field, place, field-in-place, employer, main hub, employer hub, major hub, pricing, about, comparison and numbers pages. It recursively inspects JSON-LD, checks breadcrumb and FAQ visibility, CollectionPage identity and description, ISO dates, HTTPS URLs, and the emitted Offer and UnitPriceSpecification value types. Adversarial tests ensure a nested JobPosting and an invisible FAQ answer fail.
+
+A required-property guard rejects any Product without offers, reviews or an aggregate rating, including the otherwise valid schema.org Product that an offers-only removal would have left on the homepage.
 
 The visible-text parser follows hidden ancestors, excluding `hidden`, `aria-hidden="true"`, and inline `display:none`, `visibility:hidden` or `collapse`, and `content-visibility:hidden`. Hidden void elements and closed hidden subtrees cannot suppress visible siblings. Nine hidden-ancestor cases and six sibling cases protect these boundaries. This offline check does not compute arbitrary stylesheets or replace a rendered browser inspection.
 
@@ -39,13 +43,13 @@ Only `index.html` differs among the 2,163 built HTML files. The sitemap and `noi
 
 ## Revert
 
-Restore the homepage Product offers from `seo_pages.PRODUCT`, restore its full equality assertion, and remove the new schema contracts if reverting the entire rule.
+Restore the full homepage Product node from `seo_pages.PRODUCT`, restore its full equality assertion, and remove the new schema contracts if reverting the entire rule.
 
 ## Validation
 
-- `cd backend && python -m pytest tests/ -q`: 1,171 passed, two skipped on the final hidden-aware source.
+- `cd backend && python -m pytest tests/ -q`: 1,172 passed, two skipped on the final source, including the Google Product required-property guard.
 - `node --test tests/site/*.test.mjs`: 214 passed.
-- `python -m pytest tests/test_structured_data.py -q`: 19 passed, including hidden-ancestor and visible-sibling cases.
+- `python -m pytest tests/test_structured_data.py tests/test_seo_pages.py -q`: 155 passed, including hidden-ancestor, visible-sibling and missing Product property cases.
 - Local build: 2,155 pages generated; all 2,159 schema-bearing HTML files pass the final hidden-aware semantic checks.
 - `git diff --check`: passes.
 

@@ -745,11 +745,10 @@ def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
     strip = lambda o: {k: v for k, v in o.items() if k != "@context"}          # noqa: E731
     # was: == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]; the Product with its three
     # offers joined them on 2026-10-05, so the prices are machine-readable on the page students land on.
-    # 2026-10-23: offers describe visible pricing tiers, so only /pricing/ carries their details.
-    # was: the full PRODUCT, including allowances absent from the anonymous homepage.
-    # Revert: restore homepage offers and compare against strip(seo_pages.PRODUCT).
-    home_product = {k: v for k, v in strip(seo_pages.PRODUCT).items() if k != "offers"}
-    assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE), home_product]
+    # 2026-10-23: only /pricing/ shows exact allowances; a Product without offers or ratings
+    # also fails Google snippet requirements. was: PRODUCT in the homepage graph too.
+    # Revert: restore the full homepage Product and append strip(seo_pages.PRODUCT) here.
+    assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]
 
 
 # ---- /pricing/ (2026-10-05)

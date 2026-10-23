@@ -102,6 +102,9 @@ def _assert_collection_schema(html, path):
         if "dateModified" in node:
             assert date.fromisoformat(node["dateModified"]), path
         if "Product" in types:
+            # 2026-10-23: valid schema.org alone is insufficient for Google product snippets.
+            # was: a Product without all three could pass. Revert: remove this required-field guard.
+            assert any(node.get(key) for key in ("offers", "review", "aggregateRating")), path
             assert node["brand"] == {"@id": seo_pages.ORG_ID}, path
             assert node["url"] == seo_pages.SITE + "/pricing/", path
             if "offers" in node:
@@ -183,13 +186,12 @@ def test_all_generated_page_schemas_and_required_page_types(collection_pages):
                 )
 
 
-def test_homepage_describes_product_without_invisible_tier_details(collection_pages):
+def test_homepage_has_only_site_identity_and_pricing_keeps_visible_product_offers(collection_pages):
     root = Path(__file__).resolve().parents[2]
     home = (root / "docs" / "index.html").read_text(encoding="utf-8")
     _assert_collection_schema(home, "/")
     home_nodes = list(_nodes(_blocks(home)))
-    product = next(node for node in home_nodes if node.get("@type") == "Product")
-    assert "offers" not in product
+    assert [node["@type"] for node in home_nodes if "@type" in node] == ["Organization", "WebSite"]
     assert not any(node.get("@type") == "Offer" for node in home_nodes)
     pricing = collection_pages["/pricing/"]["html"]
     product = next(node for node in _nodes(_blocks(pricing)) if node.get("@type") == "Product")
@@ -200,6 +202,12 @@ def test_homepage_describes_product_without_invisible_tier_details(collection_pa
         assert offer["priceCurrency"] == "USD"
         if offer["price"] != "0":
             assert "$" + offer["price"] + " a month" in visible
+
+
+def test_product_without_google_required_offers_or_ratings_is_rejected():
+    product = {key: value for key, value in seo_pages.PRODUCT.items() if key != "offers"}
+    with pytest.raises(AssertionError):
+        _assert_collection_schema(seo_pages.ld_script(product), "/pricing/")
 
 
 def test_nested_job_posting_is_rejected():
