@@ -3779,6 +3779,11 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     t_, d_, b_ = digest_page(digest_new, digest_by_field, len(new) >= MIN_OPEN)
     add(DIGEST_PATH, t_, d_, "New internships in your inbox every Monday. Free.",
         [("/", "InternScout"), (DIGEST_PATH, "Weekly email")], b_, index=bool(DIGEST_FORM))
+    # 2026-10-23: was: related sections recommended noindex destinations without consulting the
+    # finished page list. Prefer indexed recommendations, retaining the full browsing catalogues.
+    # Revert: remove these two lines; no page's eligibility, canonical or sitemap inclusion changes.
+    from .related_pages import prefer_indexed
+    prefer_indexed(pages)
     global TEXTS, HOME, HOME_LIVE_DATE
     HOME_LIVE_DATE = live.get("/") if isinstance(live, dict) else None
     HOME = home_browse(pages, by_company, fields, states, trackers, len(new) >= MIN_OPEN, len(majors_made))
