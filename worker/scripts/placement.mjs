@@ -48,6 +48,7 @@ Commands:
                             rounded down to 10, "fewer than 10" below that (admin)
   orders                    recent paid listing orders bought on the site: id, date, status, package,
                             start, amount in cents, number of roles, company (admin; no name or email)
+  metrics                   aggregate employer funnel and payment cohort for the last 28 complete UTC days
   pilot-code                [--note TEXT]   a new free pilot code (at most 5 ever) (admin)
 
 Every change takes --by LABEL (default "bruce"). End is the first day it no longer shows.
@@ -120,6 +121,8 @@ export function toRequest({ cmd, id, extra, flags }) {
       return { method: "POST", path: "/admin/placements/on", admin: true, body: { id, by, paid_ref: flags.ref } };
     // Paid listing orders (2026-10-19; src/orders.js, worker/ORDERS.md).
     case "orders": return { method: "GET", path: "/admin/orders", admin: true };
+    // 2026-10-23: was: no repeatable employer funnel read. Revert: remove this read-only command.
+    case "metrics": return { method: "GET", path: "/admin/employer-metrics", admin: true };
     case "pilot-code":
       return { method: "POST", path: "/admin/pilot-codes", admin: true, body: pick({ note: flags.note }) };
     case "report":

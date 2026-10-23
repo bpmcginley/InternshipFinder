@@ -234,3 +234,65 @@ exactly-once guarantee. Review responses say the notice is recorded for delivery
 Confirmed order contacts, credits, related jobs and pending mail are removed after seven calendar
 years by the existing daily cron, including while new checkout is off. Anonymous placement history
 retains its existing policy.
+
+## Employer revenue sprint, 2026-10-23
+
+The sales page leads with the existing $29 / 30-day offer, a labeled illustration and gated role
+picker links. Bundle/public-body prices, the first-five pilot and student protections are unchanged.
+Company pages pass a public employer key to prefill the picker; the employer still chooses roles,
+dates, email and consent. No automatic order, purchase or renewal is added.
+
+### Anonymous measurement
+
+`node scripts/placement.mjs metrics` reads the last 28 complete UTC days through the existing terminal
+admin token. `GET /admin/employer-metrics?days=7` supports 1 to 90 complete UTC days. It is no-store,
+refuses browser Origins and returns totals only. Browser exposure/click, picker and submit counts
+measure intent, not unique people or sales. Server transitions count transactionally once per order
+and step: created, verified, positive paid, pilot, comped and repeat positive paid for an employer key.
+Creation includes attempts whose confirmation email failed. Pilots and zero-dollar checkouts cannot
+inflate positive paid counts. Existing orders are not backfilled. No contact, employer key, order ID,
+query token or visitor identifier is copied into anonymous event totals.
+
+Cash metrics use the cohort paid during the window, with refunds recorded to date (both refusal and
+early-closure refunds), issued credits, pending compensation and original amounts of disputed orders.
+The remainder after recorded refunds is not profit or a Stripe balance. Reconcile payment fees,
+actual dispute losses, credits and staff time privately before assessing profitability.
+
+### Completed campaign reports
+
+`EMPLOYER_REPORTS=1` enables report delivery in a dedicated daily cron at 07:47 UTC, after the existing
+07:17 financial cleanup. The later schedule does not guarantee that cleanup succeeded. Its own bounded
+invocation keeps database work separate; stored state is rechecked before sending. Only naturally
+ended, approved, undisputed, uninterrupted campaigns qualify. The
+last month containing a campaign day must have ended: a role ending October 23 is first eligible
+November 1; an exclusive end boundary of November 1 is also eligible November 1. The report covers
+whole ended calendar months, preserves existing monthly/daily rollups, rounds down to 10, and has no
+audience/page slices or application/hire claims. It states the campaign window, report period and
+generation snapshot separately. Its link opens the normal picker for an intentional next purchase.
+
+`employer_campaign_reports` is a durable per-placement outbox. At most 3 new and 3 due messages
+are processed per invocation. Leases prevent concurrent sends, with up to 8 attempts and at most 30
+queued days. Provider acceptance followed by a database failure can still duplicate mail; do not
+promise exactly once. Success, cancellation, expiry and exhaustion erase queued addresses/bodies,
+leaving idempotency tombstones. Seven-year order retention deletes linked rows. Independent PII
+expiry runs even if checkout/reports are disabled or order reconciliation fails. The small batch
+stays within the Free plan's database-call budget; a backlog carries to the next daily run. Do not
+raise it without measuring queries and verifying the account's limits. See
+https://developers.cloudflare.com/d1/platform/limits/.
+
+Set `EMPLOYER_REPORTS=0` to pause discovery/delivery, leaving tombstones intact. Inspect aggregate
+queue states with `metrics`; inspect skipped reasons privately through existing D1 maintenance access:
+
+```sql
+SELECT state, skipped_reason, COUNT(*) AS n FROM employer_campaign_reports GROUP BY state, skipped_reason;
+```
+
+Do not clear tombstones to force another send. For interrupted campaigns or invalid-count skips,
+inspect placement logs and use the existing owner-requested whole-month `report` command. Never
+substitute custom daily ranges. Follow `ORDER_CONTACT_REMOVAL.md` to erase buyer contacts.
+
+Deploy schema before Worker code (`npm run deploy` already does so), then publish the site. No
+provider calls, real orders or customer emails are needed for local tests. Revert site/Worker hooks
+to roll back; retain outbox tombstones. To disable server event counting too, remove the named
+`employer_funnel_*` triggers rather than deleting financial records. Full sprint plan:
+`growth/EMPLOYER-REVENUE-SPRINT.md`.

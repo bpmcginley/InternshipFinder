@@ -10,6 +10,8 @@ import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, month
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
+import { employerMetrics } from "./employer-metrics.js";
+import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
 import { socialVideo } from "./social-video.js";
@@ -363,6 +365,13 @@ async function route(request, env, ctx, d) {
       return json(await listLeads(db));
     }
 
+    // 2026-10-23: aggregate employer funnel for the owner's terminal. Revert: remove this route.
+    case "GET /admin/employer-metrics": {
+      await requireAdmin(request, env);
+      return json(await employerMetrics(db, Number(new URL(request.url).searchParams.get("days") || 28), now),
+        200, { "Cache-Control": "no-store" });
+    }
+
     // The employer report (S9): one placement, one ended month, rounded counts only (placements.js).
     case "POST /admin/placements/report": {
       await requireAdmin(request, env);
@@ -498,6 +507,17 @@ export default {
       ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
       return;
     }
+    // 2026-10-23: was: reports shared financial cleanup's D1 budget. A separate bounded invocation
+    // keeps report work below the Free plan's limit without relying on the account's plan.
+    // Revert: remove this cron branch and its trigger, retaining report outbox tombstones.
+    if (event && event.cron === CAMPAIGN_REPORT_CRON) {
+      const reportJob = async () => {
+        await expireCampaignReportMail(env.DB, new Date());
+        if (env.EMPLOYER_REPORTS === "1") await processCampaignReports(env.DB, env, new Date());
+      };
+      ctx.waitUntil(reportJob());
+      return;
+    }
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
@@ -510,8 +530,14 @@ export default {
     // ordersCron (2026-10-19, orders.js): drops orders never confirmed; and while orders are on, resends
     // review emails, reminds Bruce once, closes roles every build dropped and settles unused-day offers.
     // was: ctx.waitUntil(Promise.all([..., endExpiredPlacements(env.DB, now), rollupPlacementCounts(env.DB, now)]));
+    // 2026-10-23: was: expiry and order reconciliation raced. Keep the two in order; reports have
+    // their own later daily trigger and recheck final state. Revert: restore the parallel cleanup.
+    const employerJobs = async () => {
+      await endExpiredPlacements(env.DB, now);
+      await ordersCron(env.DB, env, now);
+      await rollupPlacementCounts(env.DB, now);
+    };
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
-      dropOldLeads(env.DB, now), endExpiredPlacements(env.DB, now), rollupPlacementCounts(env.DB, now),
-      ordersCron(env.DB, env, now)]));
+      dropOldLeads(env.DB, now), expireCampaignReportMail(env.DB, now), employerJobs()]));
   },
 };

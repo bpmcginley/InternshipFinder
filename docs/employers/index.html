@@ -8,19 +8,21 @@
      sitemap.xml and page() links it from every landing page's footer. Its shell (header, nav, footer,
      colours) is copied from page() and its CSS, so it looks like /about/ and /pricing/.
      It started (2026-10-13) as a test of whether employers would pay for a clearly labelled paid listing.
-     Since 2026-10-19 the prices below are final and /employers/buy/ sells one; the "Buy a paid listing"
-     link shows only when the Worker's GET /employer/config says enabled (worker/ORDERS.md), so until then
-     the page reads as before. The interest form stays for questions and free requests.
+     Since 2026-10-19 the prices below are final and /employers/buy/ sells paid listings.
+     2026-10-23: the sales page now leads with prices, packages and an illustrative ad. Every buying
+     link stays hidden unless GET /employer/config says enabled; the fallback and free requests stay open.
+     was: one buy link after a long policy list. Revert: restore the previous sales content and gate.
+     The interest form stays for questions and free requests.
      was: Its job is a test: would employers pay for a clearly labelled paid listing? Nothing is sold here yet;
      the planned price is stated below. Every line must fit the placement rule: payment never changes any score, order,
      filter, count or Auto-Apply behaviour, nothing is targeted at students, and nothing says or implies
      that paying brings more applicants. Adding a board and fixing a listing are free for every employer. The form posts to the Worker (worker/src/leads.js, POST /employer-interest), which keeps the
      lead in D1 for Bruce to read. What is kept and for how long: /privacy#employers. -->
-<title>For Employers: How Listings Work | InternScout</title>
-<meta name="description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours for free, and ask about a paid listing."/>
+<title>Paid Internship Listings for Employers | InternScout</title>
+<meta name="description" content="A clearly labelled paid listing for your open role: $29 for 30 days, or $69 for three roles. Free board additions and corrections stay available."/>
 <link rel="canonical" href="https://internscout.org/employers/"/>
-<meta property="og:title" content="For Employers: How Listings Work | InternScout"/>
-<meta property="og:description" content="Your internships may already be on InternScout, free. See how listings work, how to add or fix yours for free, and ask about a paid listing."/>
+<meta property="og:title" content="Paid Internship Listings for Employers | InternScout"/>
+<meta property="og:description" content="A clearly labelled paid listing for your open role: $29 for 30 days, or $69 for three roles. Free board additions and corrections stay available."/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://internscout.org/employers/"/>
 <meta property="og:image" content="https://internscout.org/og-preview.png"/>
@@ -34,7 +36,7 @@
 <!-- The same two blocks a generated page carries: its breadcrumb trail and the Organization, here by
      its @id (the full Organization is on / and /about/). -->
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"InternScout","item":"https://internscout.org/"},{"@type":"ListItem","position":2,"name":"For employers","item":"https://internscout.org/employers/"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://internscout.org/employers/#webpage","url":"https://internscout.org/employers/","name":"InternScout for employers","description":"How internships get listed on InternScout, how to add or correct a listing for free, and a form to ask about a paid listing.","inLanguage":"en-US","isPartOf":{"@id":"https://internscout.org/#website"},"publisher":{"@id":"https://internscout.org/#organization"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://internscout.org/employers/#webpage","url":"https://internscout.org/employers/","name":"InternScout for employers","description":"A clearly labelled paid listing for your open role: $29 for 30 days, or $69 for three roles. Free board additions and corrections stay available.","inLanguage":"en-US","isPartOf":{"@id":"https://internscout.org/#website"},"publisher":{"@id":"https://internscout.org/#organization"}}</script>
 <style>
 @font-face{font-family:"IBM Plex Sans";src:url(/fonts/ibm-plex-sans-latin.woff2) format("woff2");font-weight:100 700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:"Source Serif 4";src:url(/fonts/source-serif-4-latin.woff2) format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
@@ -93,6 +95,23 @@ footer a{color:var(--ink2)}
 .i{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.125em;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
 .i-chevron{--i:var(--i-chevron)}.i-search{--i:var(--i-search)}.i-check{--i:var(--i-check)}.i-cross{--i:var(--i-cross)}.i-alert{--i:var(--i-alert)}.i-external{--i:var(--i-external)}
 input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-color:var(--sunk);cursor:default}
+/* 2026-10-23: bounded price cards and a labelled illustration make the offer readable on a phone.
+   was: one long prose section. Revert: remove these sales layout rules with the sales content. */
+[hidden]{display:none!important}
+.sales-hero{padding:26px 0 8px}.eyebrow{text-transform:uppercase;letter-spacing:.04em;font-size:var(--fs-2);color:var(--ink3);margin:0 0 8px}
+.hero-price{font-size:var(--fs-5);margin:14px 0 10px}.hero-price strong,.amount strong{font:600 var(--fs-8)/1.2 var(--serif);color:var(--ink)}
+.hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px 18px;margin:20px 0 10px}.quiet{font-weight:500;text-underline-offset:3px}
+.availability{padding:12px 14px;border:1px solid var(--rule);border-radius:var(--r);background:var(--sunk);color:var(--ink2)}
+.packages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:18px 0}
+.package{padding:20px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg);min-width:0}
+.package h3{font:600 var(--fs-6)/1.3 var(--serif);margin:0 0 12px}.package .amount{margin:0 0 12px}.package .discount{font-size:var(--fs-3);min-height:3em}.package .cta{margin-top:8px}
+.pilot{padding:16px 18px;background:var(--accent-soft);border:1px solid var(--rule);border-radius:var(--r-lg)}
+.ad-preview{margin:18px 0;padding:20px;background:var(--sunk);border:1px solid var(--field-border);border-radius:var(--r-lg);max-width:680px}
+.preview-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:16px}.preview-label,figcaption{font-size:var(--fs-2);color:var(--ink3)}
+.preview-company{font-weight:600}.ad-tag{display:inline-block;padding:1px 6px;border:1px solid var(--field-border);border-radius:var(--r-sm);font-size:var(--fs-2);margin-right:8px}
+.preview-role{font-weight:500}.preview-meta{font-size:var(--fs-3)}.preview-action{display:inline-block;padding:6px 12px;border:1px solid var(--field-border);border-radius:var(--r);color:var(--ink2)}
+.ad-preview figcaption{margin-top:14px}.process li{margin:12px 0}.process{color:var(--ink2);max-width:680px;padding-left:20px}
+@media (max-width:560px){.packages{grid-template-columns:1fr}.package .discount{min-height:0}.hero-actions{align-items:flex-start;flex-direction:column}.sales-hero{padding-top:22px}}
 </style>
 </head>
 <body>
@@ -100,47 +119,93 @@ input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-co
 <header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
 <main>
 <p class="crumbs"><a href="/">InternScout</a> › For employers</p>
-<h1>Your internships on InternScout</h1>
-<!-- The number: "14,000+" as written (docs/data/stats.json said 14,653 open on 2026-10-13), and the
-     script at the bottom puts the current count, rounded down to the thousand, in its place. -->
-<p class="lede">InternScout is a free internship search for college students in the US and Canada. It lists <span id="open-count">14,000+</span> open internships, co-ops and research roles in every major, collected several times a day from employers' own job boards. Students search it for free, with no account.</p>
+<!-- 2026-10-23: show the fixed price, example format and buying path before background details.
+     was: a long introduction followed by a price inside a policy list.
+     Revert: restore the previous main content before the unchanged interest form. -->
+<section class="sales-hero" aria-labelledby="employer-title">
+<p class="eyebrow">InternScout for employers</p>
+<h1 id="employer-title">Give an open role a clearly labelled paid listing.</h1>
+<p class="hero-price"><strong>$29</strong> per role for 30 days</p>
+<p class="lede">A separate ad for your internship, co-op or research role on InternScout, a free search for college students in the US and Canada. Students apply through your original posting.</p>
+<div class="hero-actions">
+<div id="buy-link" data-employer-buy hidden><a class="cta" href="/employers/buy/" data-employer-entry="hero">Choose a role</a></div>
+<a class="quiet" href="#packages">See packages and the free pilot</a>
+</div>
+<p class="fine">US dollars. One payment. No automatic renewal. Every paid listing is reviewed before it goes live.</p>
+<p id="buy-unavailable" class="availability">If online ordering is unavailable, <a href="#interest" data-employer-entry="contact">ask about a paid listing or the free pilot</a>. Free board additions and corrections are open below.</p>
+</section>
 
-<section class="prose">
-<h2>Your internships may already be here</h2>
-<p>If your company posts internships on a public job board, such as Workday, Greenhouse, iCIMS, Ashby or Lever, InternScout probably lists them already. You don't need to do anything, and it costs nothing.</p>
-<p>Each listing links to the posting on your own careers site, so students apply through your system. InternScout takes no applications and doesn't stand between you and an applicant. To check, search for your company on the <a href="/">dashboard</a> or in the list of <a href="/internships/at/">employers hiring now</a>.</p>
-
-<h2>Add a missing board, or fix or remove a listing</h2>
-<p>If your internships aren't showing up, send us the address of your careers page or job board and we'll look at adding it. If a listing is wrong, has closed, or shouldn't be there, send its link and we'll correct or remove it. That includes the company name, location, pay or dates on a listing.</p>
-<p>All of this is free for every employer, whether or not you ever pay for anything. Adding your job board doesn't depend on payment and is never part of what we sell.</p>
-<p>Email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>, or use the <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">feedback form</a>. InternScout is run by one student, so expect a reply within a few days.</p>
-
-<h2>What students use it for</h2>
-<ul class="plain">
-<li>Searching every listing and ranking it for their major, class year and the states they pick.</li>
-<li>Browsing pages for each field, state, major and employer, each linking to the original postings.</li>
-<li>Filling in applications with the optional, free <a href="/install.html">Auto-Apply</a> Chrome extension. It never submits: the student reviews every answer and presses Submit.</li>
+<section class="prose" aria-labelledby="preview-title">
+<h2 id="preview-title">A separate space for a relevant role</h2>
+<p>A paid listing is eligible to appear alongside matching searches and on relevant field or location pages. It stays separate from the regular results, with at most one paid listing on a page.</p>
+<figure class="ad-preview" aria-labelledby="preview-caption">
+<div class="preview-top"><strong>Paid listing</strong><span class="preview-label">Illustrative preview</span></div>
+<p class="preview-company"><span class="ad-tag">Ad</span> Your company name</p>
+<p class="preview-role">Your internship title</p>
+<p class="preview-meta">Location and pay from your real posting</p>
+<span class="preview-action">Open posting</span>
+<figcaption id="preview-caption">Illustration only, not a live role. Your posting supplies the title, location and any listed pay.</figcaption>
+</figure>
+<ul class="plain benefits">
+<li><strong>Relevant placement.</strong> Placement follows a student's search or selected field, and a role's field or location. It is not selected using a student's personal profile.</li>
+<li><strong>Your own application process.</strong> The listing points to your original posting. InternScout does not collect applications.</li>
+<li><strong>Fixed price and a clear end date.</strong> No bidding and no automatic renewal. If your role closes early, choose a refund or credit for the unused days.</li>
 </ul>
+</section>
 
-<!-- was: <h2 id="interest">Paid listings: would you want one?</h2> -->
-<h2 id="interest">Paid listings</h2>
-<!-- was: <p>We're planning one paid option: a paid listing. It would show one of your open roles in a separate box headed "Paid listing", with "Ad" before your company name. Here's how it would work, so you know before you ask:</p> -->
-<p>We offer one paid option: a paid listing. It shows one of your open roles in a separate box headed "Paid listing", with "Ad" before your company name. Here's how it works, so you know before you buy or ask:</p>
+<section class="prose" id="packages" aria-labelledby="packages-title">
+<h2 id="packages-title">Choose one role or three</h2>
+<p>Each role runs for 30 days. All prices are in US dollars.</p>
+<div class="packages">
+<article class="package" aria-labelledby="one-title">
+<h3 id="one-title">One role</h3>
+<p class="amount"><strong>$29</strong> for 30 days</p>
+<p>A paid listing for one open role.</p>
+<p class="discount">Nonprofits, government and public university programs: <strong>$15</strong>.</p>
+<div data-employer-buy hidden><a class="cta" href="/employers/buy/" data-employer-entry="packages">Choose one role</a></div>
+</article>
+<article class="package" aria-labelledby="three-title">
+<h3 id="three-title">Three roles</h3>
+<p class="amount"><strong>$69</strong> for three roles</p>
+<p>Three paid listings, 30 days each.</p>
+<p class="discount">Nonprofits, government and public university programs: <strong>$35</strong> for three.</p>
+<div data-employer-buy hidden><a class="cta" href="/employers/buy/" data-employer-entry="packages">Choose three roles</a></div>
+</article>
+</div>
+<p class="pilot"><strong>First-five employer pilot:</strong> one role free for 30 days. <a href="#interest" data-employer-entry="contact">Ask about availability and a pilot code</a> before ordering.</p>
+</section>
+
+<section class="prose" aria-labelledby="process-title">
+<h2 id="process-title">From your posting to a paid listing</h2>
+<ol class="plain process">
+<li><strong>Choose an open role.</strong> Find your company and select one or three roles. If a posting is missing, ask us to add your board for free.</li>
+<li><strong>Choose dates and confirm your email.</strong> Review the price and terms, then pay through Stripe after email confirmation. A valid pilot code makes the order free.</li>
+<li><strong>We review it before it runs.</strong> If we cannot approve your order, you get a full refund. You can also cancel by email for a full refund before approval.</li>
+</ol>
+</section>
+
+<section class="prose" aria-labelledby="rules-title">
+<h2 id="rules-title">What payment changes</h2>
+<p>It pays for the separate, labelled box. It does not buy a better ranking.</p>
 <ul class="plain">
-<li>It shows only when a student has searched for something the role matches or picked its field, and on our pages for its field or location. There's at most one paid listing on a page.</li>
-<li>Paying never changes where any listing ranks, how it's scored, which filters it passes or how many results a student sees. Your role also stays in its usual place in the results. Auto-Apply works the same for every listing, paid or not.</li>
-<li>It isn't aimed at students by their profile, school, major, class year or anything else about them. It follows only what a student has searched for or picked. Students can hide paid listings, and a student's own saved profile can hide one that doesn't fit them (class year, citizenship, eligibility or season).</li>
-<!-- was: <li>We don't promise views, clicks or applicants. You'd get a monthly count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li> (2026-10-19: the terms say you can ask for it after each month) -->
-<li>We don't promise views, clicks or applicants. After each month you can ask for a count of how often the box was shown and opened, rounded, with nothing about any student. We don't see applications, so we can't count them.</li>
-<li>Your listings, board additions and corrections stay free whether or not you buy a paid listing.</li>
-<!-- was: <li>Planned price: $29 per role for 30 days, or $69 for three role-months. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. Your invoice states the price and dates that apply. If the role closes early, you get the unused days back, as credit or a refund, whichever you choose.</li> -->
-<li>Price: $29 per role for 30 days, or $69 for three roles, 30 days each. Nonprofits, government and public university programs: $15, or $35 for three. No bidding and no automatic renewal. Your invoice states the price and dates that apply. If the role closes early, you get the unused days back, as credit or a refund, whichever you choose.</li>
-<li>The first five employers get a free 30-day pilot for one role.</li>
+<li>Paying never changes where any listing ranks, how it is scored, which filters it passes or how many results a student sees. Your role stays in its usual place in the results. Auto-Apply works the same for every listing, paid or not.</li>
+<li>Students can hide paid listings. Their saved profile can hide a role that does not fit, but is never used to select a paid listing. When several paid listings fit, each has the same chance of appearing.</li>
+<li>We do not promise views, clicks or applicants. After an uninterrupted campaign and its final calendar month end, we email rounded counts of how often the box was shown and opened. You can also ask for whole-month counts. We do not see applications, so we cannot count or attribute them.</li>
+<li>Your checkout or invoice states the price and dates. If the role closes, changes or leaves InternScout, it stops showing and the unused days are returned as a refund or credit, your choice.</li>
 </ul>
-<!-- The link shows only when GET /employer/config says buying is open (the script at the bottom). -->
-<p id="buy-link" hidden><a class="cta" href="/employers/buy/">Buy a paid listing</a></p>
-<!-- was: <p>There's nothing to buy yet. This form only tells us you're interested. You can also use it to ask us to add your job board or correct your details, which is free.</p> -->
-<p>This form doesn't buy anything. Use it to tell us you're interested in a paid listing or to ask about one, or to ask us to add your job board or correct your details, which is free.</p>
+<p>Read the <a href="/terms#employers">paid listing terms</a> and <a href="/privacy#paid-listings">how paid listing counts work</a>.</p>
+</section>
+
+<section class="prose" id="free-help" aria-labelledby="free-title">
+<h2 id="free-title">Free listings, board additions and corrections</h2>
+<p>Your internships may already be here. Check the <a href="/">dashboard</a> or the list of <a href="/internships/at/">employers hiring now</a>. Ordinary listings stay free whether or not you buy a paid listing.</p>
+<p>Send your careers page or job board if roles are missing. Send a posting link to correct the company name, location, pay or dates, or ask us to remove a closed or incorrect listing. All of this is free for every employer, whether or not you ever pay for anything. Board additions and corrections are always free, with no purchase required.</p>
+<p>Use the form below, email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>, or use the <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">feedback form</a>. InternScout is run by one student, so expect a reply within a few days.</p>
+</section>
+
+<section class="prose" aria-labelledby="interest">
+<h2 id="interest">Questions, the free pilot or a free correction</h2>
+<p>This form does not buy anything. Ask about a paid listing, check pilot availability, request a free board addition or correct a listing.</p>
 </section>
 
 <form class="lead" id="lead" novalidate aria-labelledby="interest">
@@ -200,22 +265,15 @@ input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-co
 <footer><strong>Built by one student, made for all students.</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. <a href="/internships/at/">Employers hiring now</a> · <a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" aria-current="page">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 <script>
-// The open-role count from the dashboard's own stats file, rounded down to the thousand ("14,000+"),
-// so the line stays true if the count falls. If the file can't be read, the written number stays.
-(function () {
-  if (!window.fetch) return;
-  fetch("/data/stats.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
-    var n = s && Number(s.open);
-    if (n >= 1000) document.getElementById("open-count").textContent = (Math.floor(n / 1000) * 1000).toLocaleString("en-US") + "+";
-  }).catch(function () {});
-})();
-
-// The "Buy a paid listing" link, shown only when the Worker says buying on the site is open
-// (worker/ORDERS.md, GET /employer/config). Until then, or if the Worker can't be reached, it stays hidden.
+// 2026-10-23: all purchase links stay closed until the same enabled flag permits buying.
+// was: only #buy-link was gated. Revert: restore the single-link gate with the previous layout.
 (function () {
   if (!window.fetch) return;
   fetch("https://internscout-api.bpmcginley.workers.dev/employer/config").then(function (r) { return r.ok ? r.json() : null; }).then(function (c) {
-    if (c && c.enabled === true) document.getElementById("buy-link").hidden = false;
+    if (c && c.enabled === true) {
+      Array.prototype.forEach.call(document.querySelectorAll("[data-employer-buy]"), function (box) { box.hidden = false; });
+      document.getElementById("buy-unavailable").hidden = true;
+    }
   }).catch(function () {});
 })();
 
