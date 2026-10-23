@@ -65,6 +65,9 @@ jobs:
         run: |
           curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
           curl -sfL --max-time 20 https://internscout.org/noindex-pages.txt -o live-noindex.txt || rm -f live-noindex.txt
+          # 2026-10-23: keep content dates across fresh checkouts; was: only the sitemap/noindex list.
+          # Revert: remove this fetch and the copy below to stop using the content-date manifest.
+          curl -sfL --max-time 20 https://internscout.org/data/page-content-dates.json -o live-content-dates.json || rm -f live-content-dates.json
 
       - name: Fetch the paid listings that are on
         # Paid listings (backend/internscout/placements.py, 2026-10-14). Off unless the repo variable
@@ -97,10 +100,14 @@ jobs:
           PYTHONHASHSEED: "0"
         run: |
           cp -r docs _site
+          if [ -f live-content-dates.json ]; then cp live-content-dates.json _site/data/page-content-dates.json; fi
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
           # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
           # outside _site, so it is never published.
           (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
+          # 2026-10-23: fail before publishing missing links/canonicals or directory redirects.
+          # was: no whole-build link check. Revert: remove this site_links command.
+          (cd backend && python -m internscout.site_links ../_site)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)

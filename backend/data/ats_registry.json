@@ -2709,6 +2709,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "aidashinc": {
+   "name": "AiDASH",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
+  },
   "airbnb": {
    "name": "Airbnb",
    "quant": false,
@@ -12322,6 +12328,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "aoins|wd5|concord": {
+   "name": "Auto-Owners Insurance",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
+  },
   "applebank|wd5|applebankcareers": {
    "name": "Apple Bank",
    "quant": false,
@@ -13084,6 +13096,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-17"
+  },
+  "bracco|wd103|braccocareers": {
+   "name": "Bracco",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "brambles|wd5|Brambles_Careers": {
    "name": "CHEP",
@@ -19040,6 +19058,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "veteransunited|wd1|vuhl": {
+   "name": "Veterans United Home Loans",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "vfc|wd5|vfc_careers": {
    "name": "VF",
