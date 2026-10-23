@@ -105,6 +105,9 @@ jobs:
           # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
           # outside _site, so it is never published.
           (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
+          # 2026-10-23: fail before publishing missing links/canonicals or directory redirects.
+          # was: no whole-build link check. Revert: remove this site_links command.
+          (cd backend && python -m internscout.site_links ../_site)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt)
           # was: (cd backend && python -m internscout.seo_pages ../_site ../live-sitemap.xml)
