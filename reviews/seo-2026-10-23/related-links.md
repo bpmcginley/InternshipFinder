@@ -62,7 +62,8 @@ deployment of the stricter employer bar. Both main and this branch build 2,163 H
 The remaining 260 primary noindex links now belong to the complete employer catalogue. The near
 catalogue is no longer an indexed source under #140. Individual indexed pages still have zero
 noindex primary recommendations. All browsing destinations remain reachable.
-The merged-tree recommendation/SEO/near suites pass: 166 tests.
+The merged-tree recommendation/SEO/near suites pass: 166 tests. The new build changes 987 HTML
+files, zero heads and zero job-list sections; sitemap and noindex files remain byte-identical.
 
 ## Validation and revert
 
