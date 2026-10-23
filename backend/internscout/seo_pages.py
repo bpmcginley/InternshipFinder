@@ -211,7 +211,9 @@ TAIL = "from internships to co-ops and research"      # what the opening paragra
 # 14 of them) and 63 descriptions outside 110-160. fit_title and fit_description keep every page in.
 TITLE_MAX = 60
 TITLE_SUFFIX = " | InternScout"
-DESC_MIN, DESC_MAX = 110, 160
+# 2026-10-23: 23 indexed descriptions in the local production build exceeded 155 characters.
+# was: DESC_MIN, DESC_MAX = 110, 160. Revert: restore DESC_MAX to 160.
+DESC_MIN, DESC_MAX = 110, 155
 
 US_STATES = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
@@ -677,7 +679,9 @@ def fit_description(text: str) -> str:
         if ends:
             text = text[:max(ends)]
         else:
-            text = text[:DESC_MAX].rsplit(" ", 1)[0].rstrip(" ,;:–-(") + "…"
+            # 2026-10-23: reserve the ellipsis even when an upstream name has no spaces.
+            # was: text[:DESC_MAX]. Revert: restore that slice if the extra character is acceptable.
+            text = text[:DESC_MAX - 1].rsplit(" ", 1)[0].rstrip(" ,;:–-(") + "…"
     for pad, marker in DESC_PADS:
         if len(text) >= DESC_MIN:
             break
@@ -704,7 +708,7 @@ def fit_description(text: str) -> str:
 COUNT_STEPS = (10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750,
                1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000)
 # The length the new descriptions aim for: a desktop result shows about 155 characters before it cuts
-# (DESC_MAX, 160, stays the hard limit fit_description holds every page to).
+# (DESC_MAX is also 155 since 2026-10-23; was: a 160-character fallback).
 DESC_AIM = 155
 
 
@@ -845,7 +849,9 @@ def listing_description(n: int, what: str, where: str, items: list[dict], update
     `what` is the plural noun phrase ("machine learning and AI internships and co-ops"), `where` the
     place after it ("in California", or "")."""
     term = main_term(items)
-    tail = f", most for {term}" if term else ""
+    # 2026-10-23: term hubs already name their term in `what`; do not repeat it as a majority claim.
+    # was: tail = f", most for {term}" if term else "". Revert: remove the subject check.
+    tail = f", most for {term}" if term and term.casefold() not in what.casefold() else ""
     noun = what if n != 1 else re.sub(r"\binternships\b", "internship", what, count=1)
     full = f"{n:,} open {noun}{' for college students' if audience else ''}{' ' + where if where else ''}{tail}."
     short = f"{n:,} open {noun}{' ' + where if where else ''}{tail}."
@@ -853,6 +859,21 @@ def listing_description(n: int, what: str, where: str, items: list[dict], update
     # ("Internal Revenue Service, Aramco Americas, ...") would otherwise crowd out the employers entirely.
     leads = [" ".join([lead, hiring_words(items, k)]) for k in (3, 2, 1) for lead in (full, short)] + [full, short]
     return pack(leads, [f"Updated {updated}.", "Free, no sign-up."], need=0)
+
+
+def kind_description(kind: dict, items: list[dict], updated: str) -> str:
+    """A term or eligibility hub's own count, hiring employers and start term, when supplied."""
+    # 2026-10-23: boilerplate made the term hubs nearly identical despite different roles.
+    # was: kind["desc"].format(n=n, updated=updated). Revert: use that template at the caller.
+    subjects = {
+        "paid": "student roles that list pay or say they are paid",
+        "co-op": "co-ops",
+        "research": "research positions for undergraduates",
+        "for-freshmen": "roles whose postings accept first-year college students",
+        "for-sophomores": "roles whose postings accept sophomores",
+    }
+    subject = subjects.get(kind["slug"], f"{kind['crumb']} student roles")
+    return listing_description(len(items), subject, "", items, updated, audience=False)
 
 
 EMPLOYERS: dict[str, str] = {}   # every spelling of a company's name -> its employer page, set by build()
@@ -3505,8 +3526,10 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                             [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t])) for t in rel_tags[:RELATED]])
         # was: add(path, f"Internships for {name} Majors – {len(items):,} Open | InternScout", ...
         add(path, [f"Internships for {name} Majors – {len(items):,} Open", f"Internships for {name} Majors"],
-            f"{len(items):,} open internships, co-ops and research roles that fit {name} majors, updated "
-            f"{updated}. Built for UMass Amherst students; free, no sign-up.",
+            # 2026-10-23: identify who is hiring from this major's actual roles, rather than boilerplate.
+            # was: count/name/date plus "Built for UMass Amherst students; free, no sign-up."
+            # Revert: restore that description template; page selection is unchanged.
+            listing_description(len(items), f"student roles for {name} majors", "", items, updated, audience=False),
             f"Internships for {name} majors",
             [root, ("/internships/for/", "By major"), (path, name)],
             listing_body(items, f"that fit {name} majors", "", now, related, dash=dash_link(tags),
@@ -3612,7 +3635,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         # [full, full up to the count, full.split(" – ")[0]].
         floor = count_floor(len(items))
         add(path, fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
-            k["desc"].format(n=n, updated=updated),
+            kind_description(k, items, updated),  # 2026-10-23; was: k["desc"].format(n=n, updated=updated)
             k["h1"], [root, (path, k["crumb"])],
             listing_body(items, k["what"], "", now, related, dash=dash_link(**k["dash"]),
                          tail=k.get("tail", TAIL), about=k.get("about", frozenset()), src="seo-hub"), items)

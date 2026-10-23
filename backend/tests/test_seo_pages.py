@@ -833,11 +833,14 @@ def test_fit_description_cuts_at_a_sentence_and_pads_a_short_one():
     # The pad never repeats what the text already says.
     assert fit("Free, no sign-up. Each role links straight to its posting.").endswith("Updated several times a day.")
     assert fit(long)[:40] == fit("   " + long.replace(". ", ".  "))[:40]       # whitespace is normalised
+    # 2026-10-23: the final ellipsis counts towards the limit, including unbroken upstream names.
+    assert len(fit("x" * 400)) == seo_pages.DESC_MAX == 155
 
 
 def test_every_generated_title_and_description_is_within_a_search_results_limits(tmp_path):
     # A long field name in a long state, long employer names, a Canadian metro and province, and
-    # every browse page: all built, and every title 30-60 characters, every description 110-160.
+    # every browse page: all built, and every title 30-60 characters, every description 110-155.
+    # 2026-10-23: was 110-160; the shared limit now also covers the final ellipsis.
     rows = [_row(i, state="PA", tags=("environmental", "ml")) for i in range(seo_pages.MIN_COMBO)]
     rows += [_row(100 + i, company_name="National Information Solutions Cooperative (NISC)", salary="$25/hr",
                   regions=[{"loc": "Lake Saint Louis, MO", "kind": "us", "state": "MO"}]) for i in range(10)]
@@ -873,6 +876,52 @@ def test_every_generated_title_and_description_is_within_a_search_results_limits
     # The employer description drops places until it fits, rather than being cut mid-address.
     nisc = _head(by_path["/internships/at/national-information-solutions-cooperative-nisc/"], r'<meta name="description" content="(.*?)"/>')
     assert nisc.startswith("10 open National Information Solutions Cooperative (NISC) internships for Summer 2027") and "…" not in nisc
+
+
+def test_indexed_metadata_is_unique_and_major_descriptions_use_their_own_roles(tmp_path):
+    # 2026-10-23: catch exact duplicates across indexed page types; length checks alone missed this risk.
+    # Revert: remove this regression test with the metadata formatter changes.
+    rows = []
+    for group, company, state, tag in ((0, "Apollo", "MA", "mechanical"), (1, "Beacon", "NY", "swe"),
+                                       (2, "Cedar", "PA", "research"), (3, "Delta", "CA", "swe")):
+        rows += [_row(group * 100 + i, state=state, tags=(tag,), company_name=company,
+                      stage=["research"] if tag == "research" else ["internship"])
+                 for i in range(20)]
+    site = _site(tmp_path, {"all": rows}, majors=[
+        {"name": "Systems Studies", "tags": ["mechanical", "swe"], "related": [], "level": "undergrad"},
+        {"name": "Planet Studies", "tags": ["mechanical", "research"], "related": [], "level": "undergrad"},
+    ])
+    pages = seo_pages.build(site)
+    for pattern in (r"<title>(.*?)</title>", r'<meta name="description" content="(.*?)"/>'):
+        seen = {}
+        for p in pages:
+            if not p["index"]:
+                continue
+            value = " ".join(_head(p["html"], pattern).split())
+            assert value not in seen, (value, seen.get(value), p["path"])
+            seen[value] = p["path"]
+    major = next(p for p in pages if p["path"] == "/internships/for/systems-studies-majors/")
+    desc = _head(major["html"], r'<meta name="description" content="(.*?)"/>')
+    assert "60 open student roles for Systems Studies majors" in desc
+    assert "Apollo" in desc and "Beacon" in desc and "Cedar" not in desc
+    assert "Built for UMass" not in desc
+
+
+def test_kind_descriptions_keep_eligibility_and_use_only_their_actual_employers():
+    # 2026-10-23: shortening metadata must retain paid/eligibility qualifications from the postings.
+    # Revert: remove this test when reverting kind_description.
+    rows = [_row(i, company_name="Apollo", years=["first_year", "sophomore"], salary="$25/hr") for i in range(30)]
+    kinds = {k["slug"]: k for k in seo_pages.kinds(rows)}
+    term = seo_pages.fit_description(seo_pages.kind_description(kinds["summer-2027"], rows, "October 23, 2026"))
+    assert term.startswith("30 open Summer 2027 student roles.")
+    assert "Hiring now: Apollo." in term and "most for Summer 2027" not in term
+    for slug, qualifier in (("paid", "list pay or say they are paid"),
+                            ("for-freshmen", "postings accept first-year college students"),
+                            ("for-sophomores", "postings accept sophomores")):
+        desc = seo_pages.fit_description(seo_pages.kind_description(kinds[slug], rows, "October 23, 2026"))
+        assert qualifier in desc
+        assert "Apollo" in desc and "Beacon" not in desc
+        assert len(desc) <= 155
 
 
 def test_every_page_carries_the_organization_once_with_the_brands_profiles(tmp_path):
