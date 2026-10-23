@@ -1,6 +1,6 @@
 # Built-site crawl audit, 2026-10-23
 
-Baseline: origin/main `99eb99b9`, committed listing export, and the live sitemap/noindex list
+Historical baseline before PR #140: origin/main `99eb99b9`, committed listing export, and the live sitemap/noindex list
 downloaded on October 23. The local build contains 2,163 HTML files and 1,705 sitemap URLs.
 
 | Check | Before | After |
@@ -34,3 +34,11 @@ sensitivity, and a complete generated fixture alongside the real static pages an
 
 Revert: remove the `site_links` command from `.github/workflows/pages.yml`; the checker and its tests
 can remain available for manual audits.
+
+## Compatibility after PR #140
+
+2026-10-23: merged origin/main `ddfa0288` with `git merge origin/main`, preserving PR #140's
+eligibility and noindex rules. The counts above describe the historical pre-#140 build, not the
+smaller sitemap selected by #140. Focused combined-head validation:
+`python -m pytest tests/test_site_links.py tests/test_seo_pages.py -q`: **145 passed**.
+The full-suite results above were recorded before that merge; CI checks the combined PR head.
