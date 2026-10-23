@@ -43,6 +43,13 @@ export const DIGEST_PLACEMENTS = ["footer", "results_inline", "digest_page", "la
 for (const step of ["view", "click", "submit"]) {
   for (const placement of DIGEST_PLACEMENTS) EVENTS.add(`digest_${step}_${placement}`);
 }
+// 2026-10-23: fixed employer positions and intent steps only; no company, order or token dimensions.
+// was: employer traffic had no anonymous funnel. Revert: remove this whitelist and its client emitters.
+export const EMPLOYER_ENTRIES = ["hero", "packages", "contact", "nav", "employer", "footer", "report"];
+for (const step of ["view", "click"]) {
+  for (const entry of EMPLOYER_ENTRIES) EVENTS.add(`employer_${step}_${entry}`);
+}
+for (const event of ["employer_buy_open", "employer_company_pick", "employer_company_prefill", "employer_roles_pick", "employer_order_submit"]) EVENTS.add(event);
 // Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
 // table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
 //   new_account     the Worker saw an account for the first time (an accounts row was made)
@@ -53,7 +60,8 @@ for (const step of ["view", "click", "submit"]) {
 //   employer_interest  the employer form on /employers/ stored a lead (added 2026-10-13; leads.js);
 //                   page is "employers". Not counted for a honeypot catch, a refusal or a bad field.
 // was: export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid"]);
-export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid", "employer_interest"]);
+export const SERVER_EVENTS = new Set(["new_account", "ext_signin", "first_autofill", "cap_hit", "paid", "employer_interest",
+  "employer_order_created", "employer_email_verified", "employer_paid", "employer_pilot", "employer_comped", "employer_repeat_paid"]);
 // utm_source values our own links use (growth/digest.py, growth/outreach.py) and the usual social names.
 const UTM_SOCIAL = /^(linkedin|instagram|facebook|fb|ig|reddit|bluesky|bsky|mastodon|x|twitter|threads|tiktok|youtube|discord)$/;
 // Which social site (added 2026-10-05; the `visit_channels` table). `source` folds every social site
@@ -123,6 +131,8 @@ export function pageKind(path) {
   if (p === "/digest") return "digest";
   // The employer page (2026-10-13), apart from "other" so its visits can be read on their own.
   if (p === "/employers") return "employers";
+  // 2026-10-23: was: "other". Revert: remove this exact route classification.
+  if (p === "/employers/buy") return "employer_buy";
   return "other";
 }
 

@@ -1580,13 +1580,13 @@ def page(path: str, title: str, description: str, h1: str, crumbs: list[tuple[st
 </head>
 <body>
 <div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a></nav></header>
+<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a><a href="/employers/" data-employer-entry="nav">Hire interns</a></nav></header>
 <main>
 {crumb_html}<h1>{esc(h1)}</h1>
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
 </div>
 {BEACON}
 {OFFER_TAG if OFFER_MARK in body else ""}
@@ -1958,6 +1958,20 @@ def employer_facts(name: str, items: list[dict], fields_main: list[str]) -> tupl
     questions = ("<section class=\"faq\">" + "".join(f"<h2>{esc(q)}</h2><p>{esc(a)}</p>" for q, a in qa)
                  + "</section>")
     return facts, questions
+
+
+def employer_offer(name: str) -> str:
+    """2026-10-23: was: employer pages only linked sales in the footer. Revert: omit this call.
+
+    The public employer key preselects a company, never a role, price, consent or order.
+    """
+    key = quote(employer_key(name), safe="")
+    return (f'<section class="prose employer-offer"><h2>Hiring for {esc(name)}?</h2>'
+            '<p>Promote an eligible open role in a clearly labeled paid listing. '
+            'One role costs $29 for 30 days. Payment never changes organic search rankings.</p>'
+            f'<p><a href="/employers/buy/?company={key}" data-employer-entry="employer">Choose a role</a>'
+            ' or <a href="/employers/">see how paid listings work</a>. '
+            '<a href="/employers/#free-help">Board additions and corrections are free</a>.</p></section>')
 
 
 def employer_breakdown(name: str, items: list[dict], fields_main: list[str]) -> str:
@@ -3608,7 +3622,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
                           if o != name and set(main) & set(f)), key=lambda t: (-t[0], -t[1], t[2]))[:RELATED]
         # was: related = note + link_list("Related fields", ...)
         # 2026-10-23: was: questions + note, with no field-by-field facts. Revert: omit this call.
-        related = (employer_breakdown(name, items, main) + questions + note
+        related = (employer_breakdown(name, items, main) + questions + note + employer_offer(name)
                    + link_list("Similar employers", [(EMPLOYERS[o], o, k) for _, k, o in similar])
                    + link_list("Related fields", [(f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
                                                   for t in main if t in fields])

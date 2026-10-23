@@ -575,3 +575,75 @@ CREATE TABLE IF NOT EXISTS employer_order_mail (
   PRIMARY KEY (order_id, kind)
 );
 CREATE INDEX IF NOT EXISTS employer_order_mail_pending ON employer_order_mail(sent_at, sending_until);
+
+-- 2026-10-23: was: employer checkout had no durable aggregate conversion counts. Count a transition
+-- in the same transaction, once per order/step, without copying contacts to analytics. Existing orders
+-- are not backfilled or presented as today's sales. Revert: drop employer_funnel_* triggers and marks.
+CREATE TABLE IF NOT EXISTS employer_funnel_marks (
+  order_id TEXT NOT NULL,
+  step TEXT NOT NULL CHECK (step IN ('employer_order_created', 'employer_email_verified', 'employer_paid',
+    'employer_pilot', 'employer_comped', 'employer_repeat_paid')),
+  created TEXT NOT NULL,
+  package TEXT NOT NULL CHECK (package IN ('one', 'three')),
+  PRIMARY KEY (order_id, step)
+);
+CREATE TRIGGER IF NOT EXISTS employer_funnel_count AFTER INSERT ON employer_funnel_marks
+BEGIN
+  INSERT INTO event_counts (day, event, page, n) VALUES (substr(NEW.created, 1, 10), NEW.step, NEW.package, 1)
+    ON CONFLICT(day, event, page) DO UPDATE SET n = n + 1;
+END;
+CREATE TRIGGER IF NOT EXISTS employer_funnel_created AFTER INSERT ON employer_orders
+WHEN NEW.status = 'unverified'
+BEGIN
+  INSERT OR IGNORE INTO employer_funnel_marks VALUES (NEW.id, 'employer_order_created', NEW.created, NEW.package);
+END;
+CREATE TRIGGER IF NOT EXISTS employer_funnel_verified AFTER UPDATE OF status ON employer_orders
+WHEN OLD.status = 'unverified' AND NEW.status = 'verified'
+BEGIN
+  INSERT OR IGNORE INTO employer_funnel_marks VALUES (NEW.id, 'employer_email_verified', COALESCE(NEW.verified_at, NEW.updated), NEW.package);
+END;
+CREATE TRIGGER IF NOT EXISTS employer_funnel_paid AFTER UPDATE OF status ON employer_orders
+WHEN OLD.status = 'verified' AND NEW.status = 'paid'
+BEGIN
+  INSERT OR IGNORE INTO employer_funnel_marks VALUES (NEW.id,
+    CASE WHEN COALESCE(NEW.pilot_code, '') != '' THEN 'employer_pilot'
+      WHEN NEW.paid_amount > 0 THEN 'employer_paid' ELSE 'employer_comped' END, COALESCE(NEW.paid_at, NEW.updated), NEW.package);
+  INSERT OR IGNORE INTO employer_funnel_marks
+    SELECT NEW.id, 'employer_repeat_paid', NEW.paid_at, NEW.package
+    WHERE NEW.paid_amount > 0 AND COALESCE(NEW.pilot_code, '') = '' AND EXISTS
+      (SELECT 1 FROM employer_orders WHERE id != NEW.id AND employer_key = NEW.employer_key
+        AND paid_amount > 0 AND paid_at IS NOT NULL AND paid_at <= NEW.paid_at);
+END;
+CREATE TRIGGER IF NOT EXISTS employer_funnel_forget AFTER DELETE ON employer_orders
+BEGIN
+  DELETE FROM employer_funnel_marks WHERE order_id = OLD.id;
+END;
+-- 2026-10-23: finished self-serve campaigns get one durable transactional results message per role.
+-- was: only an admin-requested monthly report; provider failures lost an automatic end report.
+-- Revert: disable processCampaignReports in cron; retain this table to avoid duplicate deliveries.
+-- Successful, skipped and exhausted messages retain only their business idempotency record. Delivery
+-- content is erased on success/cancellation and after at most 30 queued days. Delete linked rows before
+-- seven-year employer order retention deletes the corresponding order. No visitor identity is stored.
+CREATE TABLE IF NOT EXISTS employer_campaign_reports (
+  placement_id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  start_day TEXT NOT NULL,
+  end_day TEXT NOT NULL,
+  created TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('queued', 'sent', 'skipped')),
+  sent_at TEXT,
+  terminal_at TEXT,
+  skipped_reason TEXT,
+  attempted_at TEXT,
+  sending_until TEXT,
+  lease_token TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT,
+  to_address TEXT,
+  subject TEXT,
+  body TEXT,
+  reply_to TEXT
+);
+CREATE INDEX IF NOT EXISTS employer_campaign_reports_order ON employer_campaign_reports (order_id);
+CREATE INDEX IF NOT EXISTS employer_campaign_reports_due
+  ON employer_campaign_reports (state, next_attempt_at, sending_until);

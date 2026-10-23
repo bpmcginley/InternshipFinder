@@ -64,6 +64,14 @@
     return hits.slice(0, limit || 8).map(function (h) { return h.e; });
   }
 
+  // 2026-10-23: employer-page links may name an exact public role-index key, never a shard or URL.
+  // was: every visit started with an empty company picker. Revert: remove this helper and its open() call.
+  function companyPrefill(list, search) {
+    var key = new URLSearchParams(search || "").get("company");
+    if (!key || key.length > 200) return null;
+    return (list || []).filter(function (e) { return e.k === key; })[0] || null;
+  }
+
   // One employer's open roles from its shard file, by title.
   function rolesFor(shard, key) {
     var list = shard && Array.isArray(shard.roles) ? shard.roles : [];
@@ -247,7 +255,7 @@
   }
 
   var B = {
-    API: API, norm: norm, prepareIndex: prepareIndex, searchEmployers: searchEmployers, rolesFor: rolesFor, fieldLabel: fieldLabel,
+    API: API, norm: norm, prepareIndex: prepareIndex, searchEmployers: searchEmployers, companyPrefill: companyPrefill, rolesFor: rolesFor, fieldLabel: fieldLabel,
     roleFields: roleFields, locText: locText, canPick: canPick, packageFor: packageFor, priceCents: priceCents, money: money,
     configOk: configOk, priceLine: priceLine, pickMessage: pickMessage, buttonText: buttonText, addDays: addDays, validIso: validIso,
     fmtDate: fmtDate, isoLocal: isoLocal, startRange: startRange, inRange: inRange, runText: runText, readAvailability: readAvailability,
@@ -261,6 +269,14 @@
 
   // ---------- the page ----------
   function start() {
+    // 2026-10-23: count only fixed anonymous intent names; ISCount retains opt-out and bot suppression.
+    // No form value, query, employer key or order ID is sent. Revert: remove these calls and countStep.
+    function countStep(event) {
+      try {
+        if (typeof root.ISCount === "function") root.ISCount(event);
+        else (root.ISCountQ = root.ISCountQ || []).push(event);
+      } catch (e) {} // Counting is optional and can never prevent an order or company choice.
+    }
     var $ = function (id) { return doc.getElementById(id); };
     // An element with text children only: data is only ever set as text, never parsed as markup.
     function el(tag, props) {
@@ -308,6 +324,7 @@
       var cfg = S.cfg;
       show("boot", false);
       form.hidden = false;
+      countStep("employer_buy_open");
       if (Number.isInteger(cfg.field_cap) && cfg.field_cap > 0) $("cap").textContent = String(cfg.field_cap);
       Array.prototype.forEach.call(doc.querySelectorAll(".days"), function (n) { n.textContent = String(cfg.days); });
       $("pub-hint").textContent = "Then: " + money(priceCents(cfg, "one", true)) + " for one role, " + money(priceCents(cfg, "three", true)) + " for three.";
@@ -319,7 +336,10 @@
       fetch("/data/roles/index.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
         S.index = prepareIndex(d);
         q.disabled = false;
-        if (q.value.trim()) search();
+        var prefill = companyPrefill(S.index, root.location.search);
+        // Prefill shows existing roles only. It never picks a role, sends an order or opens checkout.
+        if (prefill) choose(prefill, true);
+        else if (q.value.trim()) search();
       }).catch(function () {
         coMsg.textContent = "";
         coMsg.appendChild(el("span", {}, "We couldn't load the list of employers. Reload the page to try again, or email "));
@@ -377,7 +397,8 @@
     });
     q.addEventListener("blur", function () { closeList(); });
 
-    function choose(e) {
+    function choose(e, prefilled) {
+      countStep(prefilled ? "employer_company_prefill" : "employer_company_pick");
       q.value = e.n;
       closeList();
       coMsg.textContent = "";
@@ -450,6 +471,7 @@
     }
     function updatePick() {
       if (!S.emp) return;
+      if (packageFor(S.picked.length)) countStep("employer_roles_pick");
       pickMsg.textContent = S.roles.length ? pickMessage(S.picked.length, S.cfg, S.pub) : "";
       updateButton();
       checkAvail();
@@ -559,6 +581,8 @@
       var body = orderBody({ name: v("name"), email: v("email"), company: v("company"), publicBody: S.pub, shard: S.emp.s, roles: S.picked,
         start: startIn.value, cfg: S.cfg, pilot: v("pilot"), website: form.elements.website.value });
       var label = send.textContent;
+      // Intent only: a rejected request, failed email or pilot is not a paid purchase.
+      countStep("employer_order_submit");
       send.disabled = true;
       send.textContent = "Sending";
       call("POST", "/employer/order", body).then(function (res) {

@@ -695,7 +695,9 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     assert "<loc>https://internscout.org/about/</loc>" in sitemap and "<loc>https://internscout.org/compare/</loc>" in sitemap
     # Every page's footer reaches both, and the employer page (2026-10-13).
     assert all('href="/about/"' in h and 'href="/compare/"' in h for h in by_path.values())
-    assert all('<a href="/employers/">For employers</a>' in h.split("<footer>")[1] for h in by_path.values())
+    # 2026-10-23: was: exact anchor markup, before anonymous entry attributes. Keep testing the destination.
+    assert all(re.search(r'<a href="/employers/"[^>]*>For employers</a>', h.split("<footer>")[1])
+               for h in by_path.values())
 
 
 def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):

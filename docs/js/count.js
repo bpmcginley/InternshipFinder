@@ -39,12 +39,22 @@
     try { navigator.sendBeacon(API, new Blob([JSON.stringify(data)], { type: "text/plain" })); } catch (e) {}
   };
   var done = {};
+  // 2026-10-23: new employer steps use fixed paths, so even public employer keys stay out of pings.
+  // was: every step sent location.pathname. Revert: use the ordinary path for employer steps too.
+  var employerPage = function () {
+    var path = String(location.pathname || "/").replace(/\/index\.html$/, "/").replace(/\.html$/, "").replace(/\/+$/, "") || "/";
+    if (path === "/employers/buy") return "/employers/buy/";
+    if (path === "/employers") return "/employers/";
+    if (path === "/internships" || path.indexOf("/internships/") === 0) return "/internships/";
+    if (path === "/" || path === "/install" || path === "/privacy" || path === "/terms" || path === "/digest") return path;
+    return "/other";
+  };
   // Steps asked for before this file ran (core.js IS.count queues them) are sent now.
   var queued = window.ISCountQ || [];
   window.ISCount = function (event) {
     if (!live || done[event]) return;   // local copies and automated browsers count nothing
     done[event] = true;
-    beacon({ e: event, p: location.pathname });
+    beacon({ e: event, p: /^employer_/.test(event) ? employerPage() : location.pathname });
   };
   queued.forEach(function (e) { window.ISCount(e); });
   window.ISCountQ = { push: window.ISCount };
@@ -72,6 +82,17 @@
   if (plQueued.forEach) plQueued.forEach(plWatch);
   if (document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll("[data-placement]"), plWatch);
   var digestPlacements = ["footer", "results-inline", "digest-page", "landing", "contextual", "nav"];
+  // 2026-10-23: employer entry totals are finite anonymous steps, not unique people or purchases.
+  // was: no employer entry attribution. Revert: remove employerEntry/employerCount and their calls.
+  var employerEntries = ["hero", "packages", "contact", "nav", "employer", "footer", "report"];
+  var employerEntry = function (el) {
+    var value = el && el.getAttribute ? el.getAttribute("data-employer-entry") : "";
+    return employerEntries.indexOf(value) >= 0 ? value : "";
+  };
+  var employerCount = function (step, el) {
+    var entry = employerEntry(el);
+    if (entry) window.ISCount("employer_" + step + "_" + entry);
+  };
   var digestPlacement = function (el) {
     var value = el && el.getAttribute ? el.getAttribute("data-digest-placement") : "";
     return digestPlacements.indexOf(value) >= 0 ? value.replace(/-/g, "_") : "";
@@ -89,21 +110,22 @@
       entries.forEach(function (entry) {
         if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
           digestCount("view", entry.target);
+          employerCount("view", entry.target);
           views.unobserve(entry.target);
         }
       });
     }, { threshold: 0.25 });
     var watch = function (el) {
-      if (!digestPlacement(el) || observed.has(el)) return;
+      if ((!digestPlacement(el) && !employerEntry(el)) || observed.has(el)) return;
       observed.add(el);
       views.observe(el);
     };
     var scan = function (node) {
       if (!node || node.nodeType !== 1) return;
       watch(node);
-      if (node.querySelectorAll) node.querySelectorAll("[data-digest-placement]").forEach(watch);
+      if (node.querySelectorAll) node.querySelectorAll("[data-digest-placement], [data-employer-entry]").forEach(watch);
     };
-    document.querySelectorAll("[data-digest-placement]").forEach(watch);
+    document.querySelectorAll("[data-digest-placement], [data-employer-entry]").forEach(watch);
     if (window.MutationObserver && document.body) {
       var mounts = new MutationObserver(function (changes) {
         changes.forEach(function (change) {
@@ -111,7 +133,7 @@
             if (node.nodeType !== 1) return;
             views.unobserve(node);
             observed.delete(node);
-            if (node.querySelectorAll) node.querySelectorAll("[data-digest-placement]").forEach(function (el) { views.unobserve(el); observed.delete(el); });
+            if (node.querySelectorAll) node.querySelectorAll("[data-digest-placement], [data-employer-entry]").forEach(function (el) { views.unobserve(el); observed.delete(el); });
           });
           change.addedNodes.forEach(scan);
         });
@@ -127,6 +149,7 @@
     var t = ev.target && ev.target.closest ? ev.target : null;
     var a = t ? t.closest("a[href]") : null;
     if (a) digestCount("click", a);
+    if (a) employerCount("click", a);
     // was: if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
     // Since 2026-10-07 a link to the listing's reviews page (".../reviews") is a "review_click" instead:
     // someone who already has the extension going to review it, not someone going to install it.

@@ -1803,7 +1803,9 @@
             h("a", { href: "install.html?from=dashboard-nav" }, "Auto-Apply (free)"),
             h("a", { href: "pricing/" }, "Pricing"),
             h("a", { href: "compare/" }, "Compare"),
-            h("a", { href: "about/" }, "About"))),
+            h("a", { href: "about/" }, "About"),
+            // 2026-10-23: was: employers could only find the footer link. Revert: omit this anchor.
+            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns"))),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
         // header keeps the everyday actions and the account details live in the Account menu.
@@ -2049,7 +2051,7 @@
           h("a", { href: "privacy.html" }, "Privacy"),
           h("a", { href: "terms.html" }, "Terms"),
           // The employer page (2026-10-13; docs/employers/index.html), as in every landing page's footer.
-          h("a", { href: "employers/" }, "For employers"),
+          h("a", { href: "employers/", "data-employer-entry": "footer" }, "For employers"),
           h("a", { href: feedbackUrl, target: "_blank", rel: "noopener" }, "Feedback"),
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
           // was: h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),

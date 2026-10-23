@@ -553,10 +553,16 @@ test("buy page and script: no hard-coded prices, no innerHTML, no em dashes", ()
 test("employers page: final prices, the buy link hidden until the config says enabled, the form kept", () => {
   const visible = noComments(EMPLOYERS);
   assert.doesNotMatch(visible, /Planned price|There's nothing to buy yet/);
-  assert.match(visible, /<li>Price: \$29 per role for 30 days, or \$69 for three roles, 30 days each\. Nonprofits, government and public university programs: \$15, or \$35 for three\./);
-  assert.match(EMPLOYERS, /<!-- was: <li>Planned price:/);
-  assert.match(visible, /<p id="buy-link" hidden><a class="cta" href="\/employers\/buy\/">Buy a paid listing<\/a><\/p>/);
-  assert.match(EMPLOYERS, /fetch\("https:\/\/internscout-api\.bpmcginley\.workers\.dev\/employer\/config"\)[\s\S]{0,200}c\.enabled === true\) document\.getElementById\("buy-link"\)\.hidden = false/);
+  // 2026-10-23: prices now have separate package cards; keep the same public prices and strict gate.
+  assert.match(visible, /<strong>\$29<\/strong> for 30 days/);
+  assert.match(visible, /<strong>\$69<\/strong> for three roles/);
+  assert.match(visible, /Nonprofits, government and public university programs: <strong>\$15<\/strong>/);
+  assert.match(visible, /Nonprofits, government and public university programs: <strong>\$35<\/strong> for three/);
+  assert.match(visible, /<div id="buy-link" data-employer-buy hidden><a class="cta" href="\/employers\/buy\/" data-employer-entry="hero">Choose a role<\/a><\/div>/);
+  assert.equal((visible.match(/data-employer-buy hidden/g) || []).length, 3);
+  assert.match(EMPLOYERS, /fetch\("https:\/\/internscout-api\.bpmcginley\.workers\.dev\/employer\/config"\)[\s\S]{0,200}c\.enabled === true/);
+  assert.match(EMPLOYERS, /querySelectorAll\("\[data-employer-buy\]"\)[\s\S]{0,100}box\.hidden = false/);
+  assert.match(EMPLOYERS, /getElementById\("buy-unavailable"\)\.hidden = true/);
   assert.match(visible, /<form class="lead" id="lead"/);
   assert.match(EMPLOYERS, /\/employer-interest"/);
   assert.doesNotMatch(visible, /[\u2013\u2014]/);

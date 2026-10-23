@@ -86,6 +86,8 @@ export async function dropRetainedOrders(db, now) {
     db.prepare(`DELETE FROM employer_capacity_reservations WHERE order_id IN (${expired})`).bind(cutoff.toISOString()),
     db.prepare(`DELETE FROM employer_decisions WHERE order_id IN (${expired})`).bind(cutoff.toISOString()),
     db.prepare(`DELETE FROM employer_order_mail WHERE order_id IN (${expired})`).bind(cutoff.toISOString()),
+    // 2026-10-23: campaign mail follows the same business-record retention. Revert: remove with its hook.
+    db.prepare(`DELETE FROM employer_campaign_reports WHERE order_id IN (${expired})`).bind(cutoff.toISOString()),
     db.prepare(`DELETE FROM employer_order_roles WHERE order_id IN (${expired})`).bind(cutoff.toISOString()),
     db.prepare(`UPDATE pilot_codes SET order_id = NULL, used_at = NULL WHERE order_id IN (${expired})`).bind(cutoff.toISOString()),
     db.prepare(`DELETE FROM employer_orders WHERE id IN (${expired})`).bind(cutoff.toISOString()),

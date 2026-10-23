@@ -13,7 +13,8 @@ enabled = false
 # GITHUB_DISPATCH_TOKEN secret, and does nothing without it).
 [triggers]
 # was: crons = ["17 7 * * *"]
-crons = ["17 7 * * *", "4,34 * * * *"]
+# 2026-10-23: reports get a separate small D1 budget after daily financial cleanup. Revert: omit 07:47.
+crons = ["17 7 * * *", "4,34 * * * *", "47 7 * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -95,5 +96,7 @@ SITE_URL = "https://internscout.org"
 # secrets above (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, ADMIN_TOKEN, REVIEW_TO) and the [[send_email]]
 # binding are set. While off, every /employer/* route but GET /employer/config answers 404.
 EMPLOYER_CHECKOUT = "1"
+# 2026-10-23: was: campaign reports were manual. Set 0 to pause delivery without losing tombstones.
+EMPLOYER_REPORTS = "1"
 # The sender of every order email. Must be an address at a domain onboarded to Email Sending.
 ORDER_FROM = "InternScout <listings@internscout.org>"
