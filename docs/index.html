@@ -650,14 +650,15 @@
 </style>
 <!-- Who runs this site, for search and answer engines (added 2026-10-02). Data only: the browser
      never runs a JSON-LD block, so it cannot touch the app below. The same objects as
-     backend/internscout/seo_pages.py ORGANIZATION, WEBSITE and (since 2026-10-05, so the prices are
-     machine-readable: the audit found none) PRODUCT with its three offers, which the /internships/ hub,
-     /about/ and /pricing/ carry; backend/tests/test_seo_pages.py checks they agree. -->
+     backend/internscout/seo_pages.py ORGANIZATION, WEBSITE and PRODUCT description.
+     2026-10-23: exact plan allowances are not visible on this page, so detailed offers stay on
+     /pricing/, where every tier is shown. was: PRODUCT with all three offers here too.
+     Revert: restore PRODUCT.offers here and the matching homepage schema assertion. -->
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
 {"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/","logo":"https://internscout.org/icon512.png","slogan":"Built by one student, made for all students.","description":"A free internship search for college students in the US and Canada.","sameAs":["https://mastodon.social/@internscout","https://www.instagram.com/internscout/","https://www.youtube.com/channel/UCnGXwtRhylBhkb8X6e_2uFg","https://www.facebook.com/profile.php?id=61595289743197","https://x.com/useinternscout","https://www.tiktok.com/@useinternscout","https://www.reddit.com/user/InternScout/"]},
 {"@type":"WebSite","@id":"https://internscout.org/#website","name":"InternScout","url":"https://internscout.org/","inLanguage":"en-US","publisher":{"@id":"https://internscout.org/#organization"}},
-{"@type":"Product","@id":"https://internscout.org/#product","name":"InternScout Auto-Apply","description":"A free internship search for college students, with a Chrome extension that fills in applications from your resume and never submits them. Search needs no account; the extension has a free monthly allowance, and two paid plans raise it.","brand":{"@id":"https://internscout.org/#organization"},"url":"https://internscout.org/pricing/","image":"https://internscout.org/icon512.png","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD","url":"https://internscout.org/pricing/#free","availability":"https://schema.org/InStock","description":"25 Auto-Apply runs and 10 tailored resumes a month with a school .edu email (12 and 5 otherwise)"},{"@type":"Offer","name":"Supporter","price":"4","priceCurrency":"USD","url":"https://internscout.org/pricing/#supporter","availability":"https://schema.org/InStock","description":"50 Auto-Apply runs and 20 tailored resumes a month with a school .edu email (25 and 10 otherwise)","priceSpecification":{"@type":"UnitPriceSpecification","price":"4","priceCurrency":"USD","billingIncrement":1,"unitCode":"MON"}},{"@type":"Offer","name":"Pro","price":"8","priceCurrency":"USD","url":"https://internscout.org/pricing/#pro","availability":"https://schema.org/InStock","description":"100 Auto-Apply runs and 40 tailored resumes a month with a school .edu email (50 and 20 otherwise)","priceSpecification":{"@type":"UnitPriceSpecification","price":"8","priceCurrency":"USD","billingIncrement":1,"unitCode":"MON"}}]}
+{"@type":"Product","@id":"https://internscout.org/#product","name":"InternScout Auto-Apply","description":"A free internship search for college students, with a Chrome extension that fills in applications from your resume and never submits them. Search needs no account; the extension has a free monthly allowance, and two paid plans raise it.","brand":{"@id":"https://internscout.org/#organization"},"url":"https://internscout.org/pricing/","image":"https://internscout.org/icon512.png"}
 ]}
 </script>
 <script>

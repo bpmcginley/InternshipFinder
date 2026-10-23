@@ -2055,8 +2055,10 @@ def _offer(name: str, price: str) -> dict:
 
 
 # The product and its three offers, for answer engines asked "how much does InternScout cost" (the audit
-# of 2026-10-05: Organization and WebSite were there, no Product or Offer). On /pricing/ and, the same
-# object, in docs/index.html; backend/tests/test_seo_pages.py checks the two agree.
+# of 2026-10-05: Organization and WebSite were there, no Product or Offer).
+# 2026-10-23: detailed offers belong on /pricing/, where the allowances are visible; the homepage
+# keeps the product description only. was: the identical PRODUCT object on both pages.
+# Revert: restore homepage offers and the full-object equality assertion in test_seo_pages.py.
 PRODUCT = {"@context": "https://schema.org", "@type": "Product", "@id": SITE + "/#product",
            "name": "InternScout Auto-Apply",
            "description": "A free internship search for college students, with a Chrome extension that "
