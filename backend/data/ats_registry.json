@@ -2271,6 +2271,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "veeda-ai": {
+   "name": "Veeda AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
+  },
   "vega": {
    "name": "Vega Investment Technologies",
    "quant": false,
@@ -3176,6 +3182,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "bozzuto": {
+   "name": "The Bozzuto Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
+  },
   "bracebridgecapital": {
    "name": "Bracebridge Capital",
    "quant": false,
@@ -4058,6 +4070,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "hospitality_sports"
+  },
+  "fox": {
+   "name": "Fox Corporation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "freeformfuturecorp": {
    "name": "Freeform",
@@ -5280,10 +5298,10 @@
   "oldmissioncapital": {
    "name": "Old Mission Capital",
    "quant": true,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
    "sector": "quant_finance",
-   "last_fail": "2026-10-22"
+   "last_fail": "2026-10-23"
   },
   "olsson": {
    "name": "Olsson",
@@ -5309,6 +5327,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "nonprofit"
+  },
+  "opensesame": {
+   "name": "OpenSesame",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "opentable": {
    "name": "OpenTable",
@@ -6152,6 +6176,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "systemstechnologyresearch": {
+   "name": "STR",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "tanium": {
    "name": "Tanium",
@@ -8407,6 +8437,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
+  },
+  "reingoldinc": {
+   "name": "Reingold Inc",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "rjleegroupinc": {
    "name": "RJ Lee Group",
@@ -11267,8 +11303,9 @@
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-10-23"
   },
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",
@@ -11647,6 +11684,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "rokt": {
+   "name": "Rokt",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
+  },
   "rystad-energy": {
    "name": "Rystad Energy",
    "quant": false,
@@ -11853,13 +11896,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "accenture|wd103|AccentureCareers": {
-   "name": "Accenture",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-22"
   },
   "accenture|wd103|AvanadeCareers": {
    "name": "Avanade",
@@ -13942,6 +13978,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "davidyurman|wd1|DavidYurmanCareers": {
+   "name": "David Yurman",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-23"
   },
   "deckers|wd5|Deckers": {
    "name": "Deckers Brands",

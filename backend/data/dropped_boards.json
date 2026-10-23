@@ -1092,6 +1092,10 @@
   }
  },
  "workday": {
+  "accenture|wd103|accenturecareers": {
+   "on": "2026-10-23",
+   "why": "dead"
+  },
   "activision|wd1|external": {
    "on": "2026-10-01",
    "why": "dead"
