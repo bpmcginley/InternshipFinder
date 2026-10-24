@@ -6,6 +6,7 @@
 import { HttpError } from "./http.js";
 import { countEvent } from "./visits.js";
 import { listingEvent } from "./orders.js";
+import { studentCheckout, completeStudentCheckout } from "./student-checkout.js";
 
 const API = "https://api.stripe.com/v1/";
 // The same version the webhook endpoint is set to, so events and API replies share one shape.
@@ -13,8 +14,9 @@ const STRIPE_API_VERSION = "2026-08-26.dahlia";
 const ACTIVE = new Set(["active", "trialing"]);
 // Stripe rejects a signature this far from its timestamp; the same window stops a replayed webhook.
 const SIG_TOLERANCE_S = 300;
-// Checkouts for the same student and plan inside this window share one Stripe session.
-const CHECKOUT_WINDOW_MS = 10 * 60_000;
+// 2026-10-23: isolate recovery from employer cleanup and bound combined D1/provider requests.
+// Revert: remove this cron and use an independently budgeted owner-triggered reconciliation.
+export const STUDENT_BILLING_CRON = "27 7 * * *";
 
 // A paid plan is on offer only when its own Stripe Price id is set, so one tier can go live first.
 export const priceIdOf = (env, config, plan) => {
@@ -88,13 +90,15 @@ export async function planOf(db, user) {
   return { plan: row.plan, status: row.status, customer: row.customer, periodEnd: row.period_end };
 }
 
-async function savePlan(db, user, { plan, status, customer, subscription, periodEnd }, now) {
-  await db.prepare(
+async function savePlan(db, user, { plan, status, customer, subscription, periodEnd }, now, claim = false) {
+  const r = await db.prepare(
     "INSERT INTO plans (user_hash, plan, status, customer, subscription, period_end, updated) VALUES (?, ?, ?, ?, ?, ?, ?) " +
     "ON CONFLICT(user_hash) DO UPDATE SET plan = excluded.plan, status = excluded.status, " +
     "customer = COALESCE(excluded.customer, plans.customer), subscription = COALESCE(excluded.subscription, plans.subscription), " +
-    "period_end = excluded.period_end, updated = excluded.updated",
+    "period_end = excluded.period_end, updated = excluded.updated" + (claim
+      ? " WHERE (plans.subscription IS NULL OR plans.subscription = excluded.subscription OR plans.status IN ('canceled', 'incomplete_expired')) AND NOT EXISTS (SELECT 1 FROM student_billing_recovery WHERE subscription = excluded.subscription)" : ""),
   ).bind(user, plan, status, customer || null, subscription || null, periodEnd || null, now.toISOString()).run();
+  return r.meta.changes > 0;
 }
 
 const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
@@ -119,7 +123,7 @@ export async function checkout(db, env, config, user, plan, now, fetchImpl) {
   // planOf() calls a subscription whose payment failed "free", and it is: nothing extra is granted.
   // But Stripe still holds it and is still retrying the card, so a second checkout here would leave
   // the student with two subscriptions once the retry goes through.
-  if (await liveSubscription(db, user)) {
+  if (await liveSubscription(db, user) || await billingRecoveryPending(db, user)) {
     throw new HttpError(409, "already", "Your last payment did not go through, and Stripe is still retrying it. Use Manage plan to update your card or cancel.");
   }
   const form = {
@@ -138,13 +142,9 @@ export async function checkout(db, env, config, user, plan, now, fetchImpl) {
   // activates it at dashboard.stripe.com/settings/managed-payments, or Stripe rejects the session.
   if (managedPayments(env)) form["managed_payments[enabled]"] = "true";
   if (existing.customer) form.customer = existing.customer;
-  // Two tabs (or a double click) each used to get their own session, and paying both left two
-  // subscriptions with only the second on file. The same student, plan and customer within one
-  // ten-minute window now get Stripe's same session back, which can only be paid once.
-  const windowId = Math.floor(now.getTime() / CHECKOUT_WINDOW_MS);
-  const key = ["checkout", user, plan, existing.customer || "new", windowId].join(":");
-  const session = await stripe(env, "checkout/sessions", form, fetchImpl, key);
-  return { url: session.url };
+  return studentCheckout(db, user, plan, form, now,
+    (savedForm, key) => stripe(env, "checkout/sessions", savedForm, fetchImpl, key),
+    (id) => stripe(env, "checkout/sessions/" + encodeURIComponent(id), {}, fetchImpl, null, "GET"));
 }
 
 // Stripe's own page for changing or cancelling. We build no billing screens.
@@ -241,6 +241,51 @@ export async function applyEvent(db, env, config, event, now, fetchImpl) {
   }
 }
 
+const objectId = (value) => typeof value === "string" ? value : value && value.id;
+const billingRetry = () => new HttpError(502, "billing", "Payment reconciliation is unavailable right now. Try again later.");
+
+// 2026-10-23: was Dispute.customer (not a Stripe field), or a customer-only refund match.
+// Follow the disputed/refunded payment to its invoice subscription, never a newer unrelated plan.
+// Modern Stripe links payment intents via invoice_payments; older Charge.invoice is accepted too.
+// Revert: remove this helper and restore the customer-only lookup in the refund/dispute branch.
+async function reversedStudentPayment(db, env, event, fetchImpl) {
+  const o = event.data.object;
+  let charge = o;
+  if (event.type === "charge.dispute.created") {
+    const id = objectId(o.charge);
+    if (!id) return null;
+    charge = typeof o.charge === "object" && o.charge.customer !== undefined
+      ? o.charge : await stripe(env, "charges/" + encodeURIComponent(id), {}, fetchImpl, null, "GET");
+    if (!charge || charge.id !== id) throw billingRetry();
+  }
+  const customer = objectId(charge.customer);
+  if (!customer) return null;
+  const held = await db.prepare("SELECT user_hash, subscription FROM plans WHERE customer = ?").bind(customer).first();
+  if (!held || !held.subscription) return null;
+  let invoices = charge.invoice ? [charge.invoice] : [];
+  if (!invoices.length) {
+    const pi = objectId(charge.payment_intent) || objectId(o.payment_intent);
+    if (!pi) return null; // a non-subscription/legacy charge with no resolvable payment identity
+    const query = new URLSearchParams({ "payment[type]": "payment_intent", "payment[payment_intent]": pi, limit: "100" });
+    const payments = await stripe(env, "invoice_payments?" + query, {}, fetchImpl, null, "GET");
+    if (!payments || !Array.isArray(payments.data) || payments.has_more) throw billingRetry();
+    invoices = payments.data.filter(p => objectId(p.payment && p.payment.payment_intent) === pi).map(p => p.invoice);
+  }
+  for (const value of invoices) {
+    const id = objectId(value);
+    if (!id) throw billingRetry();
+    const invoice = typeof value === "object" ? value
+      : await stripe(env, "invoices/" + encodeURIComponent(id), {}, fetchImpl, null, "GET");
+    if (!invoice || invoice.id !== id) throw billingRetry();
+    const subscription = objectId(invoice.parent && invoice.parent.subscription_details && invoice.parent.subscription_details.subscription)
+      || objectId(invoice.subscription);
+    if (subscription === held.subscription && (!invoice.customer || objectId(invoice.customer) === customer)) {
+      return { row: held, customer };
+    }
+  }
+  return null;
+}
+
 async function applyFresh(db, env, config, event, now, fetchImpl) {
   const o = (event.data && event.data.object) || {};
 
@@ -249,6 +294,15 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
   // never a student's plan, and everything below is left exactly as it was. null means "not a listing".
   const listing = await listingEvent(db, env, event, now, fetchImpl);
   if (listing) return listing;
+  const subscriptionId = event.type === "checkout.session.completed" ? o.subscription
+    : event.type.startsWith("customer.subscription.") ? o.id : null;
+  if (typeof subscriptionId === "string") {
+    const recovery = await db.prepare("SELECT * FROM student_billing_recovery WHERE subscription = ?").bind(subscriptionId).first();
+    if (recovery) {
+      if (recovery.state !== "resolved") await recoverStudentBilling(db, env, recovery, now, fetchImpl);
+      return { ok: true, reconciled: true };
+    }
+  }
 
   if (event.type === "checkout.session.completed") {
     const user = o.client_reference_id;
@@ -260,7 +314,8 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
       // an empty UPDATE of the subscription. A restricted key with read-only Subscriptions (the right
       // key for this Worker) answers 403, the catch swallowed it, and the plan was saved "active" with
       // no renewal date and without ever looking at which price was bought.
-      const sub = await stripe(env, "subscriptions/" + encodeURIComponent(o.subscription), {}, fetchImpl, null, "GET").catch(() => null);
+      const sub = await stripe(env, "subscriptions/" + encodeURIComponent(o.subscription), {}, fetchImpl, null, "GET");
+      if (!sub || sub.id !== o.subscription) throw new HttpError(502, "billing", "Could not confirm the paid subscription.");
       if (sub) {
         periodEnd = endOf(sub);
         status = sub.status || status;
@@ -268,7 +323,15 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
       }
     }
     if (!plan || !config.PLANS[plan] || plan === "free") plan = (config.PAID_PLANS || ["supporter"])[0];
-    await savePlan(db, user, { plan, status, customer: o.customer, subscription: o.subscription, periodEnd }, now);
+    if (!o.subscription) return { ok: true, ignored: true };
+    // 2026-10-23: atomically retain the first live subscription, including concurrent old sessions.
+    // was: every completion overwrote the only reference (W2). Revert: remove claim and recovery.
+    const accepted = await savePlan(db, user, { plan, status, customer: o.customer, subscription: o.subscription, periodEnd }, now, true);
+    if (!accepted) {
+      await cancelStudentPlan(db, env, user, o.customer, o.subscription, "duplicate", now, fetchImpl);
+      return { ok: true, reconciled: true };
+    }
+    await completeStudentCheckout(db, user, o.id).run();
     // The last funnel step (visits.js, added 2026-10-04): a checkout that left a plan active, counted
     // by plan. Live mode only, so Bruce's test-mode checkouts stay out of it. applyEvent() only gets
     // here for an event id it has not seen (firstTime), so a Stripe retry is not counted again, and
@@ -285,25 +348,29 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
     // ended and they bought another; a late "deleted" or "updated" for the first one (a new event id,
     // so the repeat check does not stop it) used to overwrite the row and put a paying student on free.
     const held = await db.prepare("SELECT subscription, status FROM plans WHERE user_hash = ?").bind(user).first();
-    if (held && held.subscription && o.id && held.subscription !== o.id && ACTIVE.has(held.status)) {
+    if (held && held.subscription && o.id && held.subscription !== o.id && !ENDED.has(held.status)) {
       return { ok: true, ignored: true };
     }
     // Stripe does not promise events in order, and a retried "updated: active" can land hours after
     // the "deleted" that ended the subscription, which would hand the plan back for good. So an
-    // update is only a nudge: what the subscription is now is read from Stripe. If that read fails,
-    // the event's own copy is the best we have.
+    // update is only a nudge: what the subscription is now is read from Stripe.
+    // 2026-10-23: was fallback to the stale event during an outage, restoring canceled access.
+    // Throwing leaves the plan unchanged and applyEvent releases the receipt for Stripe's retry.
+    // Revert: restore catch-to-null/event fallback, accepting stale entitlements during outages.
     const live = event.type === "customer.subscription.updated" && o.id
-      ? await stripe(env, "subscriptions/" + encodeURIComponent(o.id), {}, fetchImpl, null, "GET").catch(() => null)
+      ? await stripe(env, "subscriptions/" + encodeURIComponent(o.id), {}, fetchImpl, null, "GET")
       : null;
+    if (event.type === "customer.subscription.updated" && (!live || live.id !== o.id || !live.status)) throw billingRetry();
     const sub = live && live.id === o.id ? live : o;
     const status = event.type === "customer.subscription.deleted" ? "canceled" : (sub.status || "canceled");
-    await savePlan(db, user, {
+    const accepted = await savePlan(db, user, {
       plan: ACTIVE.has(status) ? planFrom(env, config, sub) : "free",
       status,
       customer: sub.customer || o.customer,
       subscription: o.id,
       periodEnd: endOf(sub),
-    }, now);
+    }, now, true);
+    if (!accepted && !ENDED.has(status)) await cancelStudentPlan(db, env, user, sub.customer || o.customer, o.id, "duplicate", now, fetchImpl);
     return { ok: true };
   }
 
@@ -314,26 +381,112 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
   // and so is a dispute that Stripe later decides in our favour, which arrives as its own event and
   // does not restore the plan; the student can subscribe again.
   if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
-    const charge = event.type === "charge.dispute.created" ? { customer: o.customer } : o;
     if (event.type === "charge.refunded" && !(o.refunded || (o.amount_refunded && o.amount_refunded >= o.amount))) {
       return { ok: true, ignored: true };
     }
-    const row = charge.customer
-      ? await db.prepare("SELECT user_hash, subscription FROM plans WHERE customer = ?").bind(charge.customer).first()
-      : null;
+    const resolved = await reversedStudentPayment(db, env, event, fetchImpl);
+    const row = resolved && resolved.row;
     if (!row || !row.user_hash) return { ok: true, ignored: true };
-    // Ends it now rather than at the period end: they have their money back already.
-    if (row.subscription) {
-      await stripe(env, "subscriptions/" + encodeURIComponent(row.subscription), {}, fetchImpl, null, "DELETE")
-        .catch(() => null);
-    }
-    await savePlan(db, row.user_hash, {
-      plan: "free", status: "canceled", customer: charge.customer, subscription: row.subscription, periodEnd: null,
-    }, now);
+    await cancelStudentPlan(db, env, row.user_hash, resolved.customer, row.subscription, "refund_or_dispute", now, fetchImpl);
     return { ok: true };
   }
 
   return { ok: true, ignored: true };
+}
+
+// 2026-10-23: cancellation is a durable task, not a best-effort provider request (W1/W2).
+// was: a failed DELETE was swallowed and the plan was marked canceled. Revert: retain unresolved rows.
+export async function cancelStudentPlan(db, env, user, customer, subscription, reason, now, fetchImpl) {
+  if (!subscription) throw new HttpError(502, "billing", "Missing subscription to reconcile.");
+  await db.batch([
+    db.prepare("INSERT OR IGNORE INTO student_billing_recovery (subscription, user_hash, customer, reason, state, created, updated) VALUES (?, ?, ?, ?, 'cancel_pending', ?, ?)")
+      .bind(subscription, user, customer || null, reason, now.toISOString(), now.toISOString()),
+    db.prepare("UPDATE plans SET plan = 'free', status = 'cancel_pending', period_end = NULL, updated = ? WHERE user_hash = ? AND subscription = ? AND status NOT IN ('canceled', 'incomplete_expired')")
+      .bind(now.toISOString(), user, subscription),
+  ]);
+  const row = await db.prepare("SELECT * FROM student_billing_recovery WHERE subscription = ?").bind(subscription).first();
+  await recoverStudentBilling(db, env, row, now, fetchImpl);
+}
+
+const reconciliationError = () => new HttpError(502, "billing", "Payment reconciliation is pending. Please try again later.");
+
+async function recoverStudentBilling(db, env, row, now, fetchImpl) {
+  if (row.state === "resolved") return;
+  if (row.state === "cancel_pending") {
+    // Read before cancellation to retain the extra subscription's exact paid invoice, never a customer's unrelated charge.
+    const before = await stripe(env, "subscriptions/" + encodeURIComponent(row.subscription), {}, fetchImpl, null, "GET");
+    if (!before || before.id !== row.subscription) throw reconciliationError();
+    const canceled = before.status === "canceled" ? before
+      : await stripe(env, "subscriptions/" + encodeURIComponent(row.subscription), {}, fetchImpl, null, "DELETE");
+    if (!canceled || canceled.id !== row.subscription || canceled.status !== "canceled") throw reconciliationError();
+    const next = row.reason === "duplicate" ? "refund_pending" : "resolved";
+    const invoice = row.invoice || objectId(before && before.latest_invoice) || null;
+    await db.batch([
+      db.prepare("UPDATE student_billing_recovery SET state = ?, invoice = ?, updated = ? WHERE subscription = ?")
+        .bind(next, invoice, now.toISOString(), row.subscription),
+      db.prepare("UPDATE plans SET plan = 'free', status = 'canceled', period_end = NULL, updated = ? WHERE user_hash = ? AND subscription = ?")
+        .bind(now.toISOString(), row.user_hash, row.subscription),
+    ]);
+    row = { ...row, state: next, invoice };
+  }
+  if (row.state !== "refund_pending") return;
+  if (!row.invoice) throw reconciliationError(); // retain a visible recovery task instead of guessing
+  const invoice = await stripe(env, "invoices/" + encodeURIComponent(row.invoice), {}, fetchImpl, null, "GET");
+  const invoiceSub = objectId(invoice && (invoice.subscription || invoice.parent?.subscription_details?.subscription));
+  if (!invoice || invoice.id !== row.invoice || invoiceSub !== row.subscription ||
+      (row.customer && objectId(invoice.customer) !== row.customer) || !Number.isSafeInteger(invoice.amount_paid)) throw reconciliationError();
+  if (invoice.amount_paid > 0) {
+    const payments = await stripe(env, "invoice_payments?invoice=" + encodeURIComponent(row.invoice) + "&limit=100", {}, fetchImpl, null, "GET");
+    const paid = (payments?.data || []).filter(p => p.status === "paid");
+    // Conservative automatic compensation: a single proven invoice payment. Anything else remains pending for owner reconciliation.
+    if (payments.has_more || paid.length !== 1 || paid[0].amount_paid !== invoice.amount_paid || objectId(paid[0].invoice) !== invoice.id ||
+        paid[0].payment?.type !== "payment_intent") throw reconciliationError();
+    const intentId = objectId(paid[0].payment.payment_intent);
+    const intent = await stripe(env, "payment_intents/" + encodeURIComponent(intentId || ""), {}, fetchImpl, null, "GET");
+    if (!intent || intent.id !== intentId || intent.status !== "succeeded" || intent.amount_received !== invoice.amount_paid || intent.currency !== invoice.currency ||
+        (row.customer && objectId(intent.customer) !== row.customer) || !objectId(intent.latest_charge)) throw reconciliationError();
+    const chargeId = objectId(intent.latest_charge);
+    const charge = await stripe(env, "charges/" + encodeURIComponent(chargeId), {}, fetchImpl, null, "GET");
+    if (!charge || charge.id !== chargeId || objectId(charge.payment_intent) !== intentId || charge.amount !== invoice.amount_paid ||
+        charge.currency !== invoice.currency || (row.customer && objectId(charge.customer) !== row.customer)) throw reconciliationError();
+    if (!charge.refunded && charge.amount_refunded !== charge.amount) {
+      // Do not infer a new amount after a partial or uncertain refund.
+      if (charge.amount_refunded !== 0) throw reconciliationError();
+      if (!row.refund) {
+        await db.prepare("UPDATE student_billing_recovery SET refund_started = COALESCE(refund_started, ?) WHERE subscription = ?")
+          .bind(now.toISOString(), row.subscription).run();
+        const started = await db.prepare("SELECT refund_started FROM student_billing_recovery WHERE subscription = ?").bind(row.subscription).first();
+        // A lost response must not become a new refund after Stripe has pruned its idempotency key.
+        if (!started || now.getTime() - Date.parse(started.refund_started) >= 23 * 60 * 60_000) throw reconciliationError();
+      }
+      const refund = row.refund
+        ? await stripe(env, "refunds/" + encodeURIComponent(row.refund), {}, fetchImpl, null, "GET")
+        : await stripe(env, "refunds", { charge: chargeId, reason: "duplicate" }, fetchImpl, "student-duplicate-refund:" + row.subscription);
+      if (!refund || !refund.id || objectId(refund.charge) !== chargeId || refund.amount !== charge.amount || refund.currency !== charge.currency) throw reconciliationError();
+      await db.prepare("UPDATE student_billing_recovery SET refund = ?, updated = ? WHERE subscription = ?")
+        .bind(refund.id, now.toISOString(), row.subscription).run();
+      if (refund.status !== "succeeded") throw reconciliationError();
+    }
+  } else if (invoice.amount_paid !== 0) throw reconciliationError();
+  await db.prepare("UPDATE student_billing_recovery SET state = 'resolved', updated = ? WHERE subscription = ?")
+    .bind(now.toISOString(), row.subscription).run();
+}
+
+// Bounded daily retry also covers Stripe's finite webhook retry window. No customer content is logged.
+export async function reconcileStudentBilling(db, env, now, fetchImpl = fetch) {
+  if (!env.STRIPE_SECRET_KEY) return;
+  const rows = await db.prepare("SELECT * FROM student_billing_recovery WHERE state != 'resolved' ORDER BY updated LIMIT 2").all();
+  for (const row of rows.results) {
+    try {
+      // 2026-10-23: rotate failures too, so five manual-review refunds cannot starve cancellation.
+      // was: updated changed only on successful progress. Revert: remove this attempt stamp.
+      // refund_started remains unchanged: retry fairness must never reset Stripe's key-age guard.
+      await db.prepare("UPDATE student_billing_recovery SET updated = ? WHERE subscription = ? AND state != 'resolved'")
+        .bind(now.toISOString(), row.subscription).run();
+      await recoverStudentBilling(db, env, row, now, fetchImpl);
+    }
+    catch { console.error("student billing reconciliation remains pending"); }
+  }
 }
 
 // DELETE /me while a subscription is live would leave Stripe billing a card for an account that no
@@ -342,9 +495,24 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
 // active and trialing, so a subscription whose renewal had failed (past_due, unpaid, incomplete) did
 // not block: the row was deleted, Stripe's retry then charged the card, and the next event re-created
 // a row for someone who had asked to be forgotten. What matters is whether Stripe still holds one.
-export async function blocksDeletion(db, user) {
+export async function blocksDeletion(db, user, env, fetchImpl = fetch) {
   const { plan } = await planOf(db, user);
-  return plan !== "free" || (await liveSubscription(db, user));
+  if (plan !== "free" || (await liveSubscription(db, user)) || (await billingRecoveryPending(db, user))) return true;
+  const pending = await db.prepare("SELECT * FROM student_checkouts WHERE user_hash = ? AND state IN ('creating', 'open')").bind(user).first();
+  if (!pending) return false;
+  if (pending.session && env) {
+    const session = await stripe(env, "checkout/sessions/" + encodeURIComponent(pending.session), {}, fetchImpl, null, "GET");
+    if (session && session.id === pending.session && session.status === "expired") {
+      await db.prepare("UPDATE student_checkouts SET state = 'expired' WHERE user_hash = ? AND attempt = ? AND state IN ('creating', 'open')")
+        .bind(user, pending.attempt).run();
+      return false;
+    }
+  }
+  return true;
+}
+
+async function billingRecoveryPending(db, user) {
+  return !!(await db.prepare("SELECT 1 FROM student_billing_recovery WHERE user_hash = ? AND state != 'resolved'").bind(user).first());
 }
 
 const ENDED = new Set(["canceled", "incomplete_expired"]);
@@ -354,5 +522,9 @@ async function liveSubscription(db, user) {
 }
 
 export async function deletePlan(db, user) {
+  await db.batch([
+    db.prepare("DELETE FROM student_checkouts WHERE user_hash = ? AND state IN ('expired', 'completed')").bind(user),
+    db.prepare("DELETE FROM student_billing_recovery WHERE user_hash = ? AND state = 'resolved'").bind(user),
+  ]);
   await db.prepare("DELETE FROM plans WHERE user_hash = ?").bind(user).run();
 }

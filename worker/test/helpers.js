@@ -131,10 +131,10 @@ export function geminiReply(url) {
 }
 
 // stripe(url, init) answers api.stripe.com; the default pretends every call succeeds.
-export function stripeReply(url) {
-  if (url.includes("checkout/sessions")) return Response.json({ id: "cs_test_1", url: "https://checkout.stripe.test/pay/cs_test_1" });
+export function stripeReply(url, init = {}) {
+  if (url.includes("checkout/sessions")) return Response.json({ id: "cs_test_1", status: "open", url: "https://checkout.stripe.test/pay/cs_test_1" });
   if (url.includes("billing_portal/sessions")) return Response.json({ id: "bps_1", url: "https://billing.stripe.test/p/1" });
-  if (url.includes("subscriptions/")) return Response.json({ id: "sub_1", status: "active", current_period_end: 1794000000 });
+  if (url.includes("subscriptions/")) return Response.json({ id: url.split("subscriptions/")[1], status: init.method === "DELETE" ? "canceled" : "active", current_period_end: 1794000000 });
   return Response.json({ error: { type: "invalid_request_error" } }, { status: 400 });
 }
 

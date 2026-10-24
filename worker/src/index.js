@@ -18,7 +18,7 @@ import { socialVideo } from "./social-video.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
   livePlacements, pausePlacement, placementReport, refusePlacement, requireAdmin, rollupPlacementCounts, switchOn,
   updatePlacement } from "./placements.js";
-import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook } from "./billing.js";
+import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook, reconcileStudentBilling, STUDENT_BILLING_CRON } from "./billing.js";
 import { MAX_ORDER_BYTES, availability, chooseCredit, confirmOrder, createPilotCode, creditInfo, listOrders, orderConfig,
   notePlacementFields, ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
 
@@ -226,7 +226,7 @@ async function route(request, env, ctx, d) {
 
     case "DELETE /me": {
       const user = await signIn();
-      if (await blocksDeletion(db, user)) {
+      if (await blocksDeletion(db, user, env, d.fetch)) {
         throw new HttpError(409, "subscribed", "Cancel your paid plan first, then delete your data.");
       }
       await deleteUser(db, user, now);
@@ -505,6 +505,10 @@ export default {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
     if (event && event.cron === CLOCK_CRON) {
       ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
+      return;
+    }
+    if (event && event.cron === STUDENT_BILLING_CRON) {
+      ctx.waitUntil(reconcileStudentBilling(env.DB, env, new Date()));
       return;
     }
     // 2026-10-23: was: reports shared financial cleanup's D1 budget. A separate bounded invocation

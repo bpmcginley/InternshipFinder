@@ -1,6 +1,9 @@
 // Lets `node --test worker/test/` run the whole folder (Node resolves a directory to index.js).
 import "./auth.test.js";
 import "./billing.test.js";
+import "./billing-safety.test.js";
+// 2026-10-23: audit event regressions must be included by npm test's directory entry point.
+import "./billing-audit-events.test.js";
 import "./ai.test.js";
 import "./demand.test.js";
 import "./gemini.test.js";
@@ -27,3 +30,6 @@ import "./employer-funnel.test.js";
 import "./employer-metrics.test.js";
 import "./campaign-reports.test.js";
 import "./employer-revenue-cron.test.js";
+
+// 2026-10-23: include atomic checkout-settlement regressions in the directory CI entry point (W3).
+import "./settlement-race.test.js";

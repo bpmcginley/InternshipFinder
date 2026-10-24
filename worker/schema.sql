@@ -173,6 +173,31 @@ CREATE TABLE IF NOT EXISTS stripe_events (
 CREATE INDEX IF NOT EXISTS plans_subscription ON plans (subscription);
 CREATE INDEX IF NOT EXISTS stripe_events_seen ON stripe_events (seen);
 
+-- 2026-10-23: W2 reservations survive request loss and distinguish unresolved extra subscriptions.
+-- Revert: revert billing callers first; keep these rows until every provider outcome is reconciled.
+CREATE TABLE IF NOT EXISTS student_checkouts (
+  user_hash TEXT PRIMARY KEY,
+  attempt TEXT NOT NULL UNIQUE,
+  plan TEXT NOT NULL,
+  form TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('creating', 'open', 'completed', 'expired')),
+  session TEXT,
+  created TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS student_billing_recovery (
+  subscription TEXT PRIMARY KEY,
+  user_hash TEXT NOT NULL,
+  customer TEXT,
+  reason TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('cancel_pending', 'refund_pending', 'resolved')),
+  invoice TEXT,
+  refund TEXT,
+  refund_started TEXT,
+  created TEXT NOT NULL,
+  updated TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS student_billing_recovery_user ON student_billing_recovery (user_hash, state);
+
 -- Referral credits (src/referral.js, REFERRAL in src/config.js). Hashed ids and counts only, like the
 -- rest of this file. A student's own invite code: random, so it says nothing about who owns it.
 CREATE TABLE IF NOT EXISTS invite_codes (

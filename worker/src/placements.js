@@ -202,7 +202,7 @@ export async function listLeads(db) {
 }
 
 // POST /admin/placements: a new draft.
-export async function createPlacement(db, body, now) {
+export async function createPlacement(db, body, now, orderId = null) {
   const who = by(body);
   const listing = listingId(body);
   const url = applyUrl(body);
@@ -223,14 +223,36 @@ export async function createPlacement(db, body, now) {
   if (!employer) throw bad("employer", "employer is required when there is no lead_id");
 
   const prefix = `p-${start.slice(0, 7)}-${slug(employer)}-`;
-  const taken = await db.prepare("SELECT COUNT(*) AS n FROM placements WHERE id LIKE ?").bind(prefix + "%").first("n");
+  // 2026-10-23: checkout drafts have one identity per order/role, with attachment in the same D1 batch (W3).
+  // was: a random/count draft and a later attachment could leave an orphan after concurrent settlement.
+  // Revert: remove orderId support and return to standalone creation only, then disable checkout settlement.
+  if (orderId != null && !/^o-[0-9a-f]{16}$/.test(orderId)) throw bad("order", "Invalid order identity");
+  const taken = orderId ? 0 : await db.prepare("SELECT COUNT(*) AS n FROM placements WHERE id LIKE ?").bind(prefix + "%").first("n");
   const at = now.toISOString();
   const row = {
-    id: prefix + (Number(taken) + 1), lead_id: lead, employer, listing_id: listing, apply_url: url,
+    id: orderId ? `p-order-${orderId.slice(2)}-${listing}` : prefix + (Number(taken) + 1), lead_id: lead, employer, listing_id: listing, apply_url: url,
     start_day: start, end_day: end, page_cap: PAGE_CAP, status: "draft", checks: "", checked_day: null,
     unpaid_ok: 0, paid_ref: "", note, ended_reason: "", created: at, created_by: who, updated: at, updated_by: who,
   };
   const cols = Object.keys(row);
+  if (orderId) {
+    await db.batch([
+      db.prepare(`INSERT INTO placements (${cols.join(", ")}) SELECT ${cols.map(() => "?").join(", ")} ` +
+        "WHERE EXISTS (SELECT 1 FROM employer_order_roles WHERE order_id = ? AND listing_id = ? AND placement_id IS NULL) " +
+        "AND NOT EXISTS (SELECT 1 FROM placements WHERE id = ?)")
+        .bind(...cols.map(c => row[c]), orderId, listing, row.id),
+      db.prepare("INSERT INTO placement_log (placement, at, by, action, reason, before, after) " +
+        "SELECT ?, ?, ?, 'create', '', NULL, ? WHERE EXISTS (SELECT 1 FROM placements WHERE id = ?) " +
+        "AND NOT EXISTS (SELECT 1 FROM placement_log WHERE placement = ? AND action = 'create')")
+        .bind(row.id, at, who, JSON.stringify(row), row.id, row.id),
+      db.prepare("UPDATE employer_order_roles SET placement_id = ? WHERE order_id = ? AND listing_id = ? AND placement_id IS NULL " +
+        "AND EXISTS (SELECT 1 FROM placements WHERE id = ?)").bind(row.id, orderId, listing, row.id),
+    ]);
+    const attached = await db.prepare("SELECT placement_id FROM employer_order_roles WHERE order_id = ? AND listing_id = ?")
+      .bind(orderId, listing).first();
+    if (!attached?.placement_id) throw conflict("This order role is no longer available for settlement");
+    return load(db, attached.placement_id);
+  }
   try {
     await db.batch([
       db.prepare(`INSERT INTO placements (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...cols.map((c) => row[c])),

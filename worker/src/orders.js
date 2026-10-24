@@ -665,12 +665,10 @@ async function settle(db, env, order, now) {
 async function ensurePlacements(db, order, now) {
   for (const role of await orderRoles(db, order.id)) {
     if (role.placement_id) continue;
-    const p = await createPlacement(db, {
+    await createPlacement(db, {
       employer: role.company, listing_id: role.listing_id, apply_url: role.apply_url,
       start: order.start_day, end: addDays(order.start_day, DAYS), note: `order ${order.id}`, by: "checkout",
-    }, now);
-    await db.prepare("UPDATE employer_order_roles SET placement_id = ? WHERE order_id = ? AND listing_id = ? AND placement_id IS NULL")
-      .bind(p.id, order.id, role.listing_id).run();
+    }, now, order.id); // 2026-10-23: creation and attachment are atomic; was: a second, racy UPDATE (W3).
   }
 }
 
