@@ -25,7 +25,7 @@ from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, non_cyber_security, stage_of, years_of
 from .majors import majors_export
 from .normalize import listing_id
-from .dedupe import _canon_job, requisition_identity
+from .dedupe import _canon_job, posting_key, recognized_icims_hosts, recognized_greenhouse_tenants
 from .pay import only_placeholder_amounts
 from .score import W
 from .region import evaluate_locations
@@ -450,9 +450,8 @@ def _absent_from_scan(listing: dict, completed: set, observed: set) -> bool:
     return board[0] in FULL_LIST or (isinstance(sources, list) and board[0] in sources)
 
 
-def _requisition_key(row: dict):
-    identity = requisition_identity(row.get("apply_url"))
-    return ((row.get("company_name") or "").casefold(), identity) if identity else None
+def _requisition_key(row: dict, icims_hosts=frozenset(), gh_tenants=None):
+    return posting_key(row, icims_hosts=icims_hosts, gh_tenants=gh_tenants)
 
 
 def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
@@ -487,7 +486,9 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
     # 2026-10-23: was exact URLs only; a renamed/locale copy must not resurrect stale facts.
     # Revert: remove have_requisitions and its checks in both carry functions.
-    have_requisitions = {_requisition_key(x) for x in listings} - {None}
+    icims_hosts = recognized_icims_hosts([*listings, *prev])
+    gh_tenants = recognized_greenhouse_tenants([*listings, *prev])
+    have_requisitions = {_requisition_key(x, icims_hosts, gh_tenants) for x in listings} - {None}
     completed = canonical(completed_boards)
     observed = _observed_keys(observed_urls)
 
@@ -514,7 +515,7 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
         collapsed = len(rows) >= COLLAPSE_FLOOR and now_open.get(key, 0) <= COLLAPSE_RATIO * len(rows)
         for it in rows:
             url = it.get("apply_url")
-            if (not url or url in have or _requisition_key(it) in have_requisitions
+            if (not url or url in have or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
                     or (it.get("id") and it["id"] in have_ids)):
                 continue
             if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
@@ -531,7 +532,7 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
             kept["carried"] = True
             listings.append(kept)
             have.add(url)
-            identity = _requisition_key(it)
+            identity = _requisition_key(it, icims_hosts, gh_tenants)
             if identity:
                 have_requisitions.add(identity)
             if it.get("id"):
@@ -561,7 +562,9 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
-    have_requisitions = {_requisition_key(x) for x in listings} - {None}
+    icims_hosts = recognized_icims_hosts([*listings, *prev])
+    gh_tenants = recognized_greenhouse_tenants([*listings, *prev])
+    have_requisitions = {_requisition_key(x, icims_hosts, gh_tenants) for x in listings} - {None}
     have_ids = {x["id"] for x in listings if x.get("id")}
     completed = canonical(completed_boards)
     observed = _observed_keys(observed_urls)
@@ -569,7 +572,7 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     for it in prev:
         url = it.get("apply_url")
         if (not it.get("via_search") or it.get("status") != "open" or not url or url in have
-                or _requisition_key(it) in have_requisitions
+                or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
                 or (it.get("id") and it["id"] in have_ids)):
             continue
         if _absent_from_scan(it, completed, observed):
@@ -581,7 +584,7 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
             continue
         listings.append({**it, "stage": stage, "carried": True})
         have.add(url)
-        identity = _requisition_key(it)
+        identity = _requisition_key(it, icims_hosts, gh_tenants)
         if identity:
             have_requisitions.add(identity)
         if it.get("id"):

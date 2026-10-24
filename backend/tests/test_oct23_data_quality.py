@@ -72,7 +72,7 @@ def test_greenhouse_host_embed_and_custom_aliases_reconcile_without_other_employ
     stale = {**fresh, "id": "stale", "apply_url": aliases[1], "via_search": True, "stage": ["internship"],
              "title": "Software Intern", "last_seen": "2026-10-23"}
     assert carry_search_finds([fresh], "unused", today=date(2026, 10, 23), prev=[stale]) == 0
-    other = {**stale, "company_name": "Other Employer"}
+    other = {**stale, "company_name": "Other Employer", "apply_url": aliases[1].replace("/acme/", "/other/")}
     assert carry_search_finds([fresh], "unused", today=date(2026, 10, 23), prev=[other]) == 1
 
 
