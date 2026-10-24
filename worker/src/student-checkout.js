@@ -52,5 +52,7 @@ export async function studentCheckout(db, user, plan, form, now, create, read) {
 }
 
 export const completeStudentCheckout = (db, user, session) => db.prepare(
-  "UPDATE student_checkouts SET state = 'completed', session = COALESCE(session, ?) WHERE user_hash = ? AND (session = ? OR session IS NULL)"
-).bind(session || null, user, session || null);
+  // 2026-10-23: an old completion cannot claim a newer session-null creation attempt.
+  // was: session IS NULL matched any legacy completion. Revert: restore only with proven attempt identity.
+  "UPDATE student_checkouts SET state = 'completed' WHERE user_hash = ? AND session = ?"
+).bind(user, session || null);

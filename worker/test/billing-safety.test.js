@@ -96,6 +96,23 @@ test("a lost creation response retries the same stored form and idempotency key"
   assert.equal(creates[0].init.headers["Idempotency-Key"], creates[1].init.headers["Idempotency-Key"]);
 });
 
+test("a delayed old completion cannot clear a newer uncertain session-null checkout attempt", async () => {
+  const s = await fixture();
+  await event(s, paid(s.user, "evt_old_paid", "sub_one", "cs_old"));
+  s.subs.get("sub_one").status = "canceled";
+  await event(s, { id: "evt_old_end", type: "customer.subscription.deleted", data: { object: {
+    id: "sub_one", status: "canceled", metadata: { user_hash: s.user },
+  } } });
+  s.control.lostCreate = true;
+  await assert.rejects(buy(s));
+  await event(s, paid(s.user, "evt_late_old_paid", "sub_one", "cs_old"));
+  const pending = await s.db.prepare("SELECT * FROM student_checkouts").first();
+  assert.equal(pending.state, "creating");
+  assert.equal(pending.session, null);
+  await buy(s);
+  assert.equal(s.keys.size, 1, "the retry must use the one new payable session");
+});
+
 test("an uncertain creation is not retried after Stripe can prune its idempotency key", async () => {
   const s = await fixture(); s.control.lostCreate = true;
   await assert.rejects(buy(s));
