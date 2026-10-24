@@ -25,12 +25,16 @@ from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, non_cyber_security, stage_of, years_of
 from .majors import majors_export
 from .normalize import listing_id
-from .dedupe import _canon_job
+from .dedupe import _canon_job, requisition_identity
+from .pay import only_placeholder_amounts
 from .score import W
 from .region import evaluate_locations
 from .scan_evidence import FULL_LIST, SEARCH_SCOPED, canonical, export_board
 
 DESC_CHARS = 1500
+# 2026-10-23: distinguish pre-truncation extraction from legacy exported eligibility (DQ-1).
+# Revert: remove this marker and discard_legacy_grad_windows together.
+INSIGHTS_TEXT_VERSION = 2
 
 
 def _regions(row: Listing) -> list[dict]:
@@ -155,7 +159,16 @@ def write_first_screen(listings: list[dict], out_dir: str) -> dict:
 
 def _listing_dict(row: Listing) -> dict:
     regions = _regions(row)
+    # 2026-10-23: adapters now retain full fetched text (was: capped at 4000).
+    # Extract before the public-description cap below; carried exports keep their saved insights.
+    # Revert: restore source caps, leaving this extraction order unchanged (DQ-1).
     ins = extract(row.description) if row.status == "open" else None
+    # 2026-10-23: an impossible salary must not create a Paid badge through dollar detection.
+    # Raw salary remains in Listing for source investigation. Revert: remove this suppression.
+    if (ins and ins.get("pay") == "paid"
+            and (placeholder_pay(row.salary) or only_placeholder_amounts(row.description))
+            and not re.search(r"\bpaid (?:internship|position|opportunity|role|co-?op)", row.description or "", re.I)):
+        ins.pop("pay", None)
     # A placeholder salary ("$0.00 /Yr", "$0.00 - $999.99 Hour") is a board with no pay to show, not
     # a paid role (seo_pages.placeholder_pay); the dashboard's pay badge reads this flag.
     if ins is not None and "pay" not in ins and row.salary and not placeholder_pay(row.salary):
@@ -171,7 +184,9 @@ def _listing_dict(row: Listing) -> dict:
         "stage": merged_stages(row.stage, row.title),
         "years": years_of(row.title, ins),
         "term": row.term,
-        "salary": row.salary,
+        # 2026-10-23: was raw salary; keep raw provenance in the DB, omit malformed public pay.
+        # Revert: publish row.salary directly again.
+        "salary": row.salary if not placeholder_pay(row.salary) else None,
         "duration": row.duration,
         "posted_at": row.posted_at.isoformat() if row.posted_at else None,
         "location_raw": row.location_raw,
@@ -187,6 +202,7 @@ def _listing_dict(row: Listing) -> dict:
         "score_parts": row.score_parts,
         # requirements, eligibility limits and deadline parsed from the full description
         "insights": ins,
+        "insights_text_version": INSIGHTS_TEXT_VERSION if ins is not None else None,
         "is_new": row.is_new,
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
         # The CI database is rebuilt every run. Preserve which keyword adapters
@@ -434,6 +450,11 @@ def _absent_from_scan(listing: dict, completed: set, observed: set) -> bool:
     return board[0] in FULL_LIST or (isinstance(sources, list) and board[0] in sources)
 
 
+def _requisition_key(row: dict):
+    identity = requisition_identity(row.get("apply_url"))
+    return ((row.get("company_name") or "").casefold(), identity) if identity else None
+
+
 def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
                       completed_boards=None, observed_urls=None) -> int:
     """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
@@ -464,6 +485,9 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
+    # 2026-10-23: was exact URLs only; a renamed/locale copy must not resurrect stale facts.
+    # Revert: remove have_requisitions and its checks in both carry functions.
+    have_requisitions = {_requisition_key(x) for x in listings} - {None}
     completed = canonical(completed_boards)
     observed = _observed_keys(observed_urls)
 
@@ -490,7 +514,8 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
         collapsed = len(rows) >= COLLAPSE_FLOOR and now_open.get(key, 0) <= COLLAPSE_RATIO * len(rows)
         for it in rows:
             url = it.get("apply_url")
-            if not url or url in have or (it.get("id") and it["id"] in have_ids):
+            if (not url or url in have or _requisition_key(it) in have_requisitions
+                    or (it.get("id") and it["id"] in have_ids)):
                 continue
             if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
                 continue   # the board has been quiet for days; it is not coming back
@@ -506,6 +531,9 @@ def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
             kept["carried"] = True
             listings.append(kept)
             have.add(url)
+            identity = _requisition_key(it)
+            if identity:
+                have_requisitions.add(identity)
             if it.get("id"):
                 have_ids.add(it["id"])
             held += 1
@@ -533,6 +561,7 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
     have = {x["apply_url"] for x in listings if x.get("apply_url")}
+    have_requisitions = {_requisition_key(x) for x in listings} - {None}
     have_ids = {x["id"] for x in listings if x.get("id")}
     completed = canonical(completed_boards)
     observed = _observed_keys(observed_urls)
@@ -540,6 +569,7 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
     for it in prev:
         url = it.get("apply_url")
         if (not it.get("via_search") or it.get("status") != "open" or not url or url in have
+                or _requisition_key(it) in have_requisitions
                 or (it.get("id") and it["id"] in have_ids)):
             continue
         if _absent_from_scan(it, completed, observed):
@@ -551,6 +581,9 @@ def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None
             continue
         listings.append({**it, "stage": stage, "carried": True})
         have.add(url)
+        identity = _requisition_key(it)
+        if identity:
+            have_requisitions.add(identity)
         if it.get("id"):
             have_ids.add(it["id"])
         held += 1
@@ -579,6 +612,32 @@ def correct_non_cyber_security_tags(listings: list[dict]) -> None:
         tags = x.get("field_tags") or []
         if "security" in tags and non_cyber_security(x.get("title") or ""):
             x["field_tags"] = [t for t in tags if t != "security"] or ["other"]
+
+
+def discard_legacy_grad_windows(listings: list[dict]) -> None:
+    """Old carried excerpts cannot prove that a graduation window was read to its end.
+
+    2026-10-23: was: every carried grad_years remained a hard eligibility restriction,
+    including the known CVS false blocker. Keep unrelated insights and dates; a fresh
+    source read restores this field with versioned evidence. Never infer a wider range.
+    Revert: remove this call and the insights_text_version marker together (DQ-1).
+    """
+    for listing in listings:
+        if (listing.get("carried") and listing.get("insights_text_version") != INSIGHTS_TEXT_VERSION
+                and isinstance(listing.get("insights"), dict) and "grad_years" in listing["insights"]):
+            listing["insights"] = {k: v for k, v in listing["insights"].items() if k != "grad_years"}
+
+
+def discard_placeholder_paid_claims(listings: list[dict]) -> None:
+    """Keep carried raw pay provenance, but discard its old inferred Paid badge."""
+    # 2026-10-23: was only sanitizing newly fetched rows in _listing_dict. Legacy carryover
+    # can contain the same malformed salary and old promoted insights.pay for two more days.
+    # Revert: remove this post-carry helper and call together.
+    for listing in listings:
+        ins = listing.get("insights")
+        if (placeholder_pay(listing.get("salary")) and isinstance(ins, dict) and ins.get("pay") == "paid"
+                and not re.search(r"\bpaid (?:internship|position|opportunity|role|co-?op)", listing.get("description") or "", re.I)):
+            listing["insights"] = {key: value for key, value in ins.items() if key != "pay"}
 
 
 def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
@@ -613,6 +672,8 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
                                   observed_urls=observed_urls)
         closed = closed_by_scan(listings, prev, completed_boards, observed_urls=observed_urls)
         correct_non_cyber_security_tags(listings)
+        discard_legacy_grad_windows(listings)
+        discard_placeholder_paid_claims(listings)
         # Again, now the carried rows are in: they came with the is_new the last export gave them.
         # Dated from generated_at, the "today" seo_pages.fresh uses for /internships/new/.
         mark_new(listings, datetime.fromisoformat(generated_at).date())

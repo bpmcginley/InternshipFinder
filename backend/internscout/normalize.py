@@ -97,7 +97,9 @@ _SALARY_RE = re.compile(
     r'(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?'
     r'(?:\s?(?:/|per\s)?\s?(?:hour|hr|year|yr|annum|annually|month|mo|week|wk|day))?',
     re.I)
-_DURATION_RE = re.compile(r'\b(\d{1,2})\s?[-\u2013]?\s?week', re.I)
+# 2026-10-23: was integer-only and matched the 5 in 10.5-week. Keep explicit ranges too.
+# Revert: restore the integer-only expression and extract_duration formatter together.
+_DURATION_RE = re.compile(r'(?<![\w.])(\d{1,2}(?:\.\d+)?)\s*(?:(?:[-\u2013]|to)\s*(\d{1,2}(?:\.\d+)?)\s*)?[-\u2013]?\s*weeks?\b', re.I)
 
 
 # The first dollar figure in a posting is often not the pay: "401(k) match up to $5,000", "$2,500
@@ -114,26 +116,34 @@ _PAY_NEAR = re.compile(r"(salary|pay\b|paid|compensation|wage|rate|range|stipend
 
 def _is_pay(text: str, m, has_unit: bool) -> bool:
     before, after = text[max(0, m.start() - 60):m.start()], text[m.end():m.end() + 30]
+    if before.endswith("-") and (len(before) < 2 or not before[-2].isdigit()):
+        return False  # 2026-10-23: was stripping a negative sign from -$20/hour.
     if _NOT_PAY_AFTER.search(after) or _NOT_PAY_BEFORE.search(before):
         return False
     return has_unit or bool(_PAY_NEAR.search(text[max(0, m.start() - 80):m.end() + 40]))
 
 
 def extract_salary(text: str):
+    from .pay import placeholder_pay
     text = text or ""
     for m in _SALARY_RE.finditer(text):
         val = re.sub(r"\s+", " ", m.group(0)).strip()
         low = val.lower()
         has_unit = any(u in low for u in ("hour", "hr", "year", "yr", "annum", "month", "mo", "week", "wk", "day", "k"))
         digits = re.sub(r"[^\d]", "", val.split("-")[0])
-        if (has_unit or (digits.isdigit() and int(digits) >= 1000)) and _is_pay(text, m, has_unit):
+        if (has_unit or (digits.isdigit() and int(digits) >= 1000)) and _is_pay(text, m, has_unit) and not placeholder_pay(val):
             return val[:120]
     return None
 
 
 def extract_duration(text: str):
     m = _DURATION_RE.search(text or "")
-    return f"{m.group(1)} weeks" if m else None
+    if not m:
+        return None
+    lo, hi = m.group(1), m.group(2)
+    if float(lo) <= 0 or (hi and float(hi) < float(lo)):
+        return None
+    return f"{lo}-{hi} weeks" if hi else f"{lo} weeks"
 
 _WS = re.compile(r"\s+")
 _NOISE = re.compile(r"[\(\)\[\]\-–—:,/|]+")

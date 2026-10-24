@@ -211,7 +211,9 @@ def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | N
                         "season": None, "year": None,
                         "url": link, "apply_url": link,
                         "posted_at": None,
-                        "description": (j.get("description") or "")[:3000],
+                        # 2026-10-23: keep all text the feed provided; was: [:3000].
+                        # Revert: restore [:3000] here (DQ-1).
+                        "description": (j.get("description") or ""),
                         "active": True,
                         "source": "google_jobs",
                         "source_url": link,

@@ -10,7 +10,10 @@ import httpx
 from ..config import USER_AGENT
 from ..geo import REMOTE_RE, _NON_US, state_of
 
-DESC_CHARS = 4000
+# 2026-10-23: retain complete fetched text until export extracts eligibility (DQ-1).
+# was: DESC_CHARS = 4000, which could cut a graduation range halfway through.
+# Public descriptions remain capped by export_static.DESC_CHARS.
+# Revert: restore the adapter caps (reintroduces false eligibility blockers).
 
 
 class RobotsDisallowed(Exception):
@@ -142,7 +145,7 @@ def board_item(co: dict, *, source: str, title: str, locations: list, url: str |
         "url": url,
         "apply_url": apply_url or url,
         "posted_at": posted_at,
-        "description": (description or "")[:DESC_CHARS],
+        "description": description or "",  # was: [:DESC_CHARS]; see retention rule above
         "employment_type": employment_type or "",
         "active": True,
         "source": source,

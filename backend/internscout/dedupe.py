@@ -16,6 +16,46 @@ _APPLY_TAIL = re.compile(r"/appl(?:y|ication)/?$")
 _ID_PARAMS = frozenset({"job", "pid", "jobid", "job_id", "reqid", "req_id", "requisitionid", "jk"})
 
 
+def requisition_identity(url: str | None) -> str | None:
+    """Only recognized individual ATS destinations, never a shared careers/board URL."""
+    # 2026-10-23: was generic canonical URL equality, which cannot prove one requisition.
+    # Revert: remove this helper and its batch/carryover callers together.
+    if not url:
+        return None
+    s = urlsplit(url)
+    host, path = s.netloc.lower(), _LOCALE.sub("", s.path).rstrip("/")
+    if not host:
+        return None
+    query = dict(parse_qsl(s.query))
+    gh = query.get("gh_jid")
+    if not gh and (host == "greenhouse.io" or host.endswith(".greenhouse.io")) and "/embed/job_app" in path:
+        gh = query.get("token")
+    if gh and gh.isdigit():
+        return "gh:" + gh
+    patterns = [
+        ("oraclecloud.com", r"/job/(\d+)(?:/|$)"),
+        ("icims.com", r"/jobs/(\d+)(?:/|$)"),
+        ("greenhouse.io", r"/jobs/(\d+)(?:/|$)"),
+        ("lever.co", r"/([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})(?:/|$)"),
+        ("ashbyhq.com", r"/([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})(?:/|$)"),
+        ("smartrecruiters.com", r"/(\d{8,})[^/]*(?:/|$)"),
+    ]
+    for domain, pattern in patterns:
+        if host == domain or host.endswith("." + domain):
+            match = re.search(pattern, path, re.I)
+            if match:
+                if domain == "greenhouse.io":
+                    # 2026-10-23: Greenhouse job numbers are shared across its host aliases,
+                    # custom gh_jid links and embeds. Company scope belongs at the row boundary.
+                    return "gh:" + match.group(1)
+                return host + ":" + match.group(1).lower()
+    if host.endswith((".myworkdayjobs.com", ".myworkdaysite.com")) and "/job/" in path:
+        match = re.search(r"_([A-Za-z]{0,8}[-_]?\d[\w-]*)(?:/apply)?$", path)
+        if match:
+            return host + path.split("/job/", 1)[0] + ":" + match.group(1).lower()
+    return None
+
+
 def same_job(a: str | None, b: str | None) -> bool:
     """Do these two apply URLs open the same posting?
 
@@ -50,9 +90,25 @@ def _canon_job(url: str | None) -> str | None:
 
 def merge_batch(items: list[dict]) -> dict[str, dict]:
     """Return {dedupe_key: merged_item}. Keeps all source links; best fields win."""
+    from .sources import BOARD_FETCHERS
+    # 2026-10-23: was input order. Employer facts must win even when keys already coincide.
+    # Revert: iterate items in their original order again.
+    items = sorted(items, key=lambda it: it.get("source") not in BOARD_FETCHERS)
     out: dict[str, dict] = {}
+    identities = defaultdict(set)
+    for it in items:
+        identity = requisition_identity(it.get("apply_url"))
+        if identity:
+            identities[it["dedupe_key"]].add(identity)
     for it in items:
         k = it["dedupe_key"]
+        identity = requisition_identity(it.get("apply_url"))
+        if identity and len(identities[k]) > 1:
+            # 2026-10-23: equal titles/terms with different requisitions were collapsed first.
+            # Revert: remove this disambiguation; URL reconciliation remains independent.
+            prefix, season, year = k.rsplit("|", 2)
+            k = f"{prefix} [req:{identity}]|{season}|{year}"
+            it = {**it, "dedupe_key": k}
         if k not in out:
             it = dict(it)
             it["_sources"] = [(it["source"], it.get("source_url"))]
@@ -75,7 +131,8 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
             # region locations can differ per source: keep the union
             g = cur["geo"] = dict(cur["geo"])
             g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
-    return _fold_same_url(_fold_untermed(out))   # was: return _fold_untermed(out)
+    # Reconcile source authority before a missing term can donate a board's provenance to a list.
+    return _fold_untermed(_fold_same_url(out))   # was: _fold_same_url(_fold_untermed(out))
 
 
 def _fold_untermed(out: dict[str, dict]) -> dict[str, dict]:
@@ -100,7 +157,8 @@ def _fold_untermed(out: dict[str, dict]) -> dict[str, dict]:
             continue
         termed = [k for k, season, year in rows if season or year]
         for key in [k for k, season, year in rows if not season and not year]:
-            match = [t for t in termed if same_job(out[key].get("apply_url"), out[t].get("apply_url"))]
+            identity = requisition_identity(out[key].get("apply_url"))
+            match = [t for t in termed if identity and identity == requisition_identity(out[t].get("apply_url"))]
             if len(match) != 1:
                 continue
             cur, it = out[match[0]], out.pop(key)
@@ -126,40 +184,42 @@ def _fold_same_url(out: dict[str, dict]) -> dict[str, dict]:
     BS/MS", both pointing at the one Workday URL. Two keys, so the student saw the job twice - 540
     apply URLs carried two or three open rows in the 2026-09-19 export, 4% of the board.
 
-    A row is folded only into a row that a board fetcher produced for the same URL. That is what
-    makes the URL a single posting's own page rather than a careers page several list entries
-    share, so two list rows that merely share a link are left alone, and so are two board rows.
-    The employer's title, company name and key win (the id stays what the board gives it), and a
-    term the board row could not read is taken from the list row. Rows whose terms disagree are
-    not the same thing to apply to and are left as they were.
+    2026-10-23: recognized individual ATS identities establish one application independently
+    of title spelling, locale and guessed community term. Employer source rows win; generic
+    shared boards remain separate. Only compatible missing term information is borrowed.
     """
     from .sources import BOARD_FETCHERS   # here, not at the top: sources imports half the package
 
     def from_board(it):
         return any(src in BOARD_FETCHERS for src, _ in it["_sources"])
 
-    by_url: dict[str, list[str]] = defaultdict(list)
+    by_url: dict[tuple[str, str], list[str]] = defaultdict(list)
     for k, it in out.items():
-        canon = _canon_job(it.get("apply_url"))
+        canon = requisition_identity(it.get("apply_url"))
         if canon:
-            by_url[canon].append(k)
+            by_url[(canon, (it.get("company_name") or "").casefold())].append(k)
     for keys in by_url.values():
         boards = [k for k in keys if from_board(out[k])]
-        if len(keys) < 2 or len(boards) != 1:
+        if len(keys) < 2:
             continue
-        cur = out[boards[0]]
-        for key in [k for k in keys if k != boards[0]]:
+        # 2026-10-23: was exactly one board row with no conflicting term. A verified single
+        # requisition cannot become two applications because a community title guesses a term.
+        # Employer facts win, then source posting date and deterministic title for locale copies.
+        # Revert: restore the one-board/no-term-conflict gate in this loop.
+        winner = max(boards or keys, key=lambda k: (str(out[k].get("posted_at") or ""),
+                                                   len(out[k].get("description") or ""), out[k].get("title") or ""))
+        cur = out[winner]
+        for key in [k for k in keys if k != winner]:
             it = out[key]
-            if any(cur.get(f) and it.get(f) and cur[f] != it[f] for f in ("season", "year")):
-                continue
+            conflict = any(cur.get(f) and it.get(f) and cur[f] != it[f] for f in ("season", "year"))
             out.pop(key)
             cur["_sources"].extend(it["_sources"])
             for f in ("season", "year"):           # "Summer" from the board, "Summer 2027" from the list
-                if not cur.get(f) and it.get(f):
+                if not conflict and not cur.get(f) and it.get(f):
                     cur[f] = it[f]
             season, year = cur.get("season"), cur.get("year")   # the same wording normalize() gives a term
             cur["term"] = (f"{season} {year}" if year else str(season)).strip() if season else None
-            for f in ("sector", "description", "salary", "duration", "posted_at"):
+            for f in ("sector",):
                 if not cur.get(f) and it.get(f):
                     cur[f] = it[f]
             g = cur["geo"] = dict(cur["geo"])

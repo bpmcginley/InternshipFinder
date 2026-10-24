@@ -10,6 +10,9 @@ fellowship, REU, ...). New-grad and early-career jobs are dropped.
 from __future__ import annotations
 import re
 
+# 2026-10-23: was bare test engineer and crypto. Physical testing and cryptography are not
+# software/finance without domain evidence. Explicit software and crypto-asset roles still match.
+# Revert: restore the three title patterns for swe, materials and finance below.
 RULES = [
     # Several rules end with the plain name of a function the tag already covers, found in titles
     # that fell to "other": accounts payable, payroll, attorney, HRIS, learning & development,
@@ -41,7 +44,7 @@ RULES = [
      # security job; plain "Forensic Accounting" stays accounting.
      r"digital forensic"),
     ("hardware", r"\bhardware\b|\basic\b|\bfpga\b|embedded|\bvlsi\b|firmware|silicon|chip design|analog|circuit|semiconductor|robotics|mechatronic|advanced packaging|design verification|digital logic"),
-    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien|site reliability|systems? administrat|systems analyst|application analyst"),
+    ("swe", r"digital innovation|applied technolog|extended reality|\bxr\b|algorithm develop|digital labs|software|\bswe\b|\bsde\b|developer|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|web dev|mobile|\bios\b|android|platform|infrastructur|devops|\bsre\b|(?<!\bst\. )(?<!\bst )\bcloud|distributed|compiler|graphics|game dev|\bqa\b|quality assurance|software test engineer|application develop|technical staff|supercomputing|high performance computing|\bhpc\b|systems engineer|solutions engineer|forward deployed|technology|\bit\b|information technology|(?<![,;/] )(?<!/)(?<!and )(?<!or )(?<!in )(?<!as )(?<!ing )computer scien|site reliability|systems? administrat|systems analyst|application analyst"),
     ("pm", r"\bproduct (intern|specialist|development intern)|digital product|product manage|program manage|technical program|\btpm\b|product owner|product analyst|product strateg"),
 
     # --- engineering (non-software) ---
@@ -54,7 +57,7 @@ RULES = [
      r"(?<!business )\bsurvey (student )?(intern|internship|technician|crew|co-?op)\b|internship\s*[-:]\s*survey\b"),
     ("aerospace", r"aerospace|aeronautic|astronautic|propulsion|avionics|flight (test|science)"),
     ("chemical", r"chemical engineer|process engineer|petroleum|refin|(process|drug product|drug substance|analytical|formulation) development"),
-    ("materials", r"materials (science|engineer)|metallurg|polymer"),
+    ("materials", r"materials (science|test|engineer)|metallurg|polymer"),
     ("industrial", r"industrial engineer|systems engineering|operations research|supply chain|logistics|manufacturing engineer|human factors engineer|continuous improvement|operational excellence|(industrial|metrology|mes (&|and) industrial) automation|automation (technician|equipment|(&|and) test (intern|co-?op))|simulation (&|and) (analysis|optimization)|modeling, simulation|simulation and modeling"),
     # EHS - environment, health and safety - is the compliance arm of an environmental team, and a
     # student who wants it is an environmental science or public health major. None of its titles say
@@ -105,7 +108,7 @@ RULES = [
     # is capital planning, and in "Social/Community Investments", which is giving. Together with the
     # financial-reporting phrases and engineering's R&D, test, reliability and maintenance words
     # below, this took 132 of the ~2,700 "other" titles in one export into a field.
-    ("finance", r"fraud analyst|commodit|\bmortgage|\blending\b|student loans?|banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|crypto|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)|\bpricing\b|capital markets|private markets|emerging markets|portfolio (analyst|management|implementation|and relationship)|(?<!security )\brisk (intern|internship|group)\b|corporate risk(?! (and|&) broking)|third party risk|trade risk"),
+    ("finance", r"fraud analyst|commodit|\bmortgage|\blending\b|student loans?|banking|fixed income|summer analyst|markets group|global markets|portfolio solutions|cryptocurrency|crypto (asset|currency|inventory|trading|operations|finance|market)|investment operations|revenue management|\bfinance\b|financial (analyst|planning)|investment (bank|analy)|\bibd\b|equity research|private equity|venture capital|\bm&a\b|asset manage|wealth manage|credit|treasury|\bfp&a\b|risk (analyst|manage)|\b(market|operational|liquidity|counterparty|payment|price|fraud) risk( \w+){0,2} (intern|co-?op|analyst)|(intern|internship)\s*[-–,:|]\s*(\w+ ){0,2}(market|operational|payment|price|fraud) risk\b|fraud (&|and) risk|risk (and|&) valuation intern|financial (reporting|model|due diligence|management|systems|crimes|services|development program)|(?<!non-)(?<!social )(?<!community )\binvestments?\b(?! planning)|\bpricing\b|capital markets|private markets|emerging markets|portfolio (analyst|management|implementation|and relationship)|(?<!security )\brisk (intern|internship|group)\b|corporate risk(?! (and|&) broking)|third party risk|trade risk"),
     ("accounting", r"(?<!quality )assurance|risk advisory|claim auditor|\baccount(ing|ant)\b|\baudit\b|\btax\b|controller|bookkeep|accounts (payable|receivable)|\bpayroll\b|cost (management|accounting)|expense management|transfer pricing"),
     ("consulting", r"customer transformation|client solutions|business resilience|governance|consult|strategy (intern|analyst)|business analyst|management trainee"),
     ("marketing", r"\bcrm (intern|co-?op|marketing|analyst|coordinator)|\bad ?ops\b|\bcontent (intern|support)|publicist|pricing (strategy|&|and)|web content|marketing|brand|advertis|\bseo\b|social media|content (market|strateg)|\bcommunications|public relations|\bpr\b intern|growth|customer (experience|insights?)( \w+){0,3} (intern|co-?op|researcher)|customer insights? intern|"

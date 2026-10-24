@@ -104,7 +104,9 @@ def fetch_adp_board(c, co: dict) -> list[dict]:
         try:
             d = c.get(f"{API}/{it['_adp_id']}", params={"cid": cid, **PARAMS})
             if d.status_code == 200:
-                it["description"] = html_to_text(d.json().get("requisitionDescription"))[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = html_to_text(d.json().get("requisitionDescription"))
         except Exception:
             pass
     # Every requisition up to meta.totalNumber, not stopped at MAX_SKIP (1,000).

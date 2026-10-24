@@ -381,7 +381,9 @@ def test_rows_that_share_a_link_but_no_board_row_are_left_alone():
     a = _posting("Software Engineer Intern", page, source="simplify")
     b = _posting("Product Manager Intern", page, source="simplify")
     assert len(merge_batch([a, b])) == 2
-    # Two terms of one posting are two things to apply to, board row or not.
+    # 2026-10-23: was two rows; a verified identical requisition's employer term wins.
     fall = _posting("Data Intern - Fall 2026", WAYMO)
     spring = _posting("Data Analyst Intern, Spring 2027", WAYMO, source="simplify")
-    assert len(merge_batch([fall, spring])) == 2
+    merged = merge_batch([fall, spring])
+    assert len(merged) == 1
+    assert next(iter(merged.values()))["term"] == "Fall 2026"

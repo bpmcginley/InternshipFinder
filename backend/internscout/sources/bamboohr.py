@@ -74,7 +74,9 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
             d = c.get(DETAIL_URL.format(token=token, id=it["_bh_id"]), headers={"Accept": "application/json"})
             if d.status_code == 200:
                 job = (d.json().get("result") or {}).get("jobOpening") or {}
-                it["description"] = html_to_text(job.get("description"))[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = html_to_text(job.get("description"))
                 it["posted_at"] = job.get("datePosted") or it["posted_at"]
         except Exception:
             pass
