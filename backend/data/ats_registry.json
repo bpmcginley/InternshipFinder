@@ -14227,9 +14227,8 @@
   "flir|wd1|flircareers": {
    "name": "Teledyne Technologies Incorporated",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-24"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "floridatech|wd5|FloridaTechCareers": {
    "name": "Florida Institute of Technology",
