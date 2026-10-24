@@ -17,8 +17,8 @@ test("on the review step an unfamiliar button is refused whatever its type", () 
     assert.equal(v.allowed, false, JSON.stringify(d.text));
     // the same button with no review heading and nothing filled is still usable
   }
-  assert.equal(G.allowClick(btn("Let's make it official"), { filledFields: 0, runFilled: true, reviewStep: false }).allowed, true);
-  assert.equal(G.allowClick(btn("Go", { type: "" }), { filledFields: 2 }).allowed, true);
+  assert.equal(G.allowClick(btn("Let's make it official"), { filledFields: 0, runFilled: true, reviewStep: false }).allowed, false);
+  assert.equal(G.allowClick(btn("Go", { type: "" }), { filledFields: 2 }).allowed, false);
 });
 
 test("on the review step the ways back, forward and the account buttons still work", () => {
@@ -75,4 +75,14 @@ test("consent buttons never become a way round the final Submit", () => {
   assert.equal(G.allowClick(btn("I Agree", { automationId: "submitApplication" }), mid).allowed, false);
   assert.equal(G.isConsent(btn("I Agree", { automationId: "submitApplication" })), false);
   assert.equal(G.isConsent(btn("Accept offer and send")), false);
+});
+
+// 2026-10-23: all labels must agree; a safe-looking text must not hide a consent label.
+test("safe words do not rescue conflicting consent or an unfamiliar account action", () => {
+  const ctx = { filledFields: 2, runFilled: true, reviewStep: false };
+  for (const d of [btn("Next", { ariaLabel: "I agree" }), btn("Let's make this account official"),
+    btn("I agree to account terms"), btn("->", { ariaLabel: "Go" })]) {
+    assert.equal(G.allowClick(d, ctx).allowed, false, JSON.stringify(d));
+  }
+  assert.equal(G.allowClick(btn("->", { ariaLabel: "Next" }), ctx).allowed, true);
 });

@@ -69,6 +69,7 @@ const store = emptyStore();
 store.ai = { provider: "anthropic", apiKey: "test-key", geminiKey: "", model: "claude-sonnet-5" };
 store.settings.tailor_resume = "off";
 store.settings.onboarded = true;
+store.files.resume = { name: "test.pdf", type: "application/pdf", b64: "AA==", size: 1 };
 data.store = store;
 
 let n = 0;
@@ -240,7 +241,7 @@ test("a queued job whose resume is still being reviewed ends Needs you and fills
     chrome.tabs.create = create; window.ISDom.fastFill = fastFill;
     data.store.settings.resume_details_ready = true;
     data.store.settings.resume_import = null;
-    data.store.files.resume = null;
+    data.store.files.resume = { name: "test.pdf", type: "application/pdf", b64: "AA==", size: 1 };
   }
 });
 
@@ -258,7 +259,7 @@ test("a resume replaced while a job is running stops it before the next page is 
     assert.equal(j.reason, RESUME_REVIEW_HELP);
   } finally {
     data.store.settings.resume_details_ready = true;
-    data.store.files.resume = null;
+    data.store.files.resume = { name: "test.pdf", type: "application/pdf", b64: "AA==", size: 1 };
   }
 });
 
@@ -479,4 +480,21 @@ test("a job paused for missing manual details says to add them in Quick facts", 
     assert.doesNotMatch(j.reason, /reviewing your resume/);
     assert.equal(calls, 0);
   } finally { s.settings.resume_details_manual = false; s.profile.facts = facts; }
+});
+
+// 2026-10-23: restored interview completion cannot start a queue without local resume bytes (EXT-5).
+test("a completed restored profile without its local resume makes no tab, model call or page mutation", async () => {
+  const id = await newJob();
+  const saved = data.store.files.resume, create = chrome.tabs.create;
+  let tabs = 0;
+  data.store.files.resume = null;
+  chrome.tabs.create = async o => { tabs++; return create(o); };
+  replies = [FILL_CLICK_READY];
+  try {
+    await runJob(id);
+    assert.equal((await getJob(id)).status, "needs_you");
+    assert.match((await getJob(id)).reason, /Add your resume/);
+    assert.equal(calls, 0); assert.equal(tabs, 0); assert.deepEqual(actions, []);
+    assert.equal(data.store.settings.onboarded, true);
+  } finally { data.store.files.resume = saved; chrome.tabs.create = create; }
 });

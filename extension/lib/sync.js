@@ -165,6 +165,10 @@ export function restoredMessage(r) {
 // ---------- chrome-backed (background) ----------
 const local = async (k) => (await chrome.storage.local.get(k))[k] || null;
 const nowIso = () => new Date().toISOString();
+// 2026-10-23: consent changes invalidate even already queued replies (EXT-2).
+// was: consent was checked only before network I/O. Revert: remove epoch checks and consent queue.
+let syncEpoch = 0;
+const allowed = (s, epoch) => epoch === syncEpoch && s.settings.cloud_sync !== false;
 
 // { status, ok, data } of a Worker reply; status 0 when there was none (signed out or offline).
 async function answer(res) {
@@ -175,66 +179,92 @@ const failState = (status) => (status === 401 || status === 0 ? "signed_out_or_o
 
 // Moves a noted edit time into settings.profile_updated_at.
 async function stampPending() {
-  const pend = await local(PENDING_KEY);
-  if (!pend) return;
-  await updateStore((s) => {
+  // 2026-10-23: consume the edit marker under the same store lock used by noteEdit (EXT-3).
+  // was: read outside the lock and remove afterward, which could delete a newer edit's marker.
+  // Revert: move marker I/O outside this callback and restore noteEdit's standalone marker write.
+  let pend;
+  await updateStore(async (s) => {
+    pend = await local(PENDING_KEY);
+    if (!pend) return;
     if (time(pend.dirty_at) > time(s.settings.profile_updated_at)) s.settings.profile_updated_at = pend.dirty_at;
+  }, {
+    afterSave: async () => { if (pend) await chrome.storage.local.remove(PENDING_KEY); },
   });
-  await chrome.storage.local.remove(PENDING_KEY);
 }
 
-async function restore(serverProfile, updated) {
-  let changed = false;
+async function restore(serverProfile, updated, expectedHash, epoch, expectedUpdated) {
+  let changed = false, localChanged = false, stopped = false;
   await updateStore((s) => {
+    if (!allowed(s, epoch)) { stopped = true; return; }
     const before = hashOf(syncedSubset(s));
+    // 2026-10-23: a network reply must not replace edits made while it was pending (EXT-3).
+    // was: restore unconditionally used the profile read before GET/PUT. Revert: remove this check.
+    // 2026-10-23: a just-stamped manual edit may have the same hash as the GET snapshot.
+    // was: hash alone; a delayed timestamp could let an older remote copy overwrite that edit.
+    // Revert: remove the expectedUpdated comparison and its call arguments.
+    if (before !== expectedHash || (s.settings.profile_updated_at ?? null) !== (expectedUpdated ?? null)) {
+      localChanged = true; return;
+    }
     applyServer(s, serverProfile, updated);
     // The account's own hash, not the merged one: when this device kept something the account lacks
     // (a finished Deep Dive), the difference shows up as an edit and is pushed.
     s.settings.profile_synced_hash = hashOf(serverSubset(serverProfile));
     changed = hashOf(syncedSubset(s)) !== before;
   });
+  if (stopped) return { state: "off" };
+  if (localChanged) return { state: "local_changed" };
   if (changed) await chrome.storage.local.set({ [RESTORED_KEY]: { updated, at: nowIso(), shown: false } });
   return { state: changed ? "restored" : "same", updated };
 }
 
-async function push(token) {
+async function push(token, epoch) {
   const s = await loadStore();
+  if (!allowed(s, epoch)) return { state: "off" };
   const sub = syncedSubset(s), h = hashOf(sub);
   if (h === EMPTY_HASH) return { state: "none" };
   const updated = s.settings.profile_updated_at || nowIso();
   const r = await answer(await workerFetch("/profile", {
     method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ profile: toServer(sub), updated }),
   }, token));
+  if (epoch !== syncEpoch) return { state: "off" };
   if (r.ok) {
     await updateStore((x) => {
+      if (!allowed(x, epoch)) return;
       x.settings.profile_synced_hash = h;
       // Only when nothing newer was stamped meanwhile.
       if (time(x.settings.profile_updated_at) <= time(updated)) x.settings.profile_updated_at = r.data.updated || updated;
     });
     return { state: "pushed" };
   }
-  if (r.status === 409 && r.data && r.data.profile) return restore(r.data.profile, r.data.updated);
+  if (r.status === 409 && r.data && r.data.profile) return restore(r.data.profile, r.data.updated, h, epoch, s.settings.profile_updated_at);
   return { state: failState(r.status) };
 }
 
-async function run({ pushOnly = false } = {}) {
+async function run({ pushOnly = false } = {}, epoch = syncEpoch) {
+  if (epoch !== syncEpoch) return { state: "off" };
   await stampPending();
   const s = await loadStore();
-  if (s.settings.cloud_sync === false) return { state: "off" };
+  if (!allowed(s, epoch)) return { state: "off" };
   const token = await ensureToken();
+  if (epoch !== syncEpoch) return { state: "off" };
   if (!token) return { state: "signed_out" };
   // A push without a pull first only when this device has matched the account before; otherwise the
   // account may hold a newer Deep Dive that a blind push would bury.
   if (pushOnly && s.settings.profile_synced_hash != null) {
-    return hashOf(syncedSubset(s)) === s.settings.profile_synced_hash ? { state: "same" } : push(token);
+    return hashOf(syncedSubset(s)) === s.settings.profile_synced_hash ? { state: "same" } : push(token, epoch);
   }
   const r = await answer(await workerFetch("/profile", {}, token));
+  if (epoch !== syncEpoch) return { state: "off" };
   if (!r.ok) return { state: failState(r.status) };
   switch (decide(s, r.data)) {
-    case "restore": return restore(r.data.profile, r.data.updated);
-    case "push": return push(token);
+    case "restore": return restore(r.data.profile, r.data.updated, hashOf(syncedSubset(s)), epoch, s.settings.profile_updated_at);
+    case "push": return push(token, epoch);
     case "same":
       await updateStore((x) => {
+        if (!allowed(x, epoch)) return;
+        // 2026-10-23: only acknowledge the revision actually compared with the server (EXT-3).
+        // was: a newer manual edit could be falsely marked synced. Revert: remove this check.
+        if (hashOf(syncedSubset(x)) !== hashOf(syncedSubset(s))) return;
         x.settings.profile_synced_hash = hashOf(syncedSubset(x));
         if (!x.settings.profile_updated_at) x.settings.profile_updated_at = r.data.updated || null;
       });
@@ -245,10 +275,14 @@ async function run({ pushOnly = false } = {}) {
 
 // One sync at a time: a pull and a flush must not interleave their reads and writes.
 let chain = Promise.resolve();
-function queued(opts) {
-  const p = chain.then(() => run(opts));
+function queueOperation(work) {
+  const p = chain.then(work);
   chain = p.catch(() => {});
   return p;
+}
+function queued(opts) {
+  const epoch = syncEpoch;
+  return queueOperation(() => run(opts, epoch));
 }
 
 // Pull (and push when ours is newer). After sign-in, at browser startup, on install or update.
@@ -260,7 +294,16 @@ export const flush = () => queued({ pushOnly: true });
 let timer = null;
 // A local edit to the synced subset: note the time now (survives the worker stopping), send it shortly.
 export async function noteEdit() {
-  await chrome.storage.local.set({ [PENDING_KEY]: { dirty_at: nowIso() } });
+  const dirty = nowIso();
+  // 2026-10-23: publish the local revision and its pending marker as one locked edit.
+  // was: only the marker was saved; stampPending could erase it while a sync was starting.
+  // Revert: restore the standalone marker write together with stampPending's old implementation.
+  await updateStore(async (s) => {
+    const previous = await local(PENDING_KEY);
+    const dirty_at = time(previous?.dirty_at) > time(dirty) ? previous.dirty_at : dirty;
+    if (time(dirty_at) > time(s.settings.profile_updated_at)) s.settings.profile_updated_at = dirty_at;
+    await chrome.storage.local.set({ [PENDING_KEY]: { dirty_at } });
+  });
   clearTimeout(timer);
   timer = setTimeout(() => { flush().catch(() => {}); }, DEBOUNCE_MS);
 }
@@ -274,25 +317,51 @@ export async function flushPending() {
 // The Deep Dive's switch. Off: the account's copy is deleted first (DELETE /profile), then syncing stops.
 // On: syncing starts again and this device's copy is sent (or the account's newer one taken).
 export async function setCloudSync(on) {
+  const epoch = ++syncEpoch;
+  clearTimeout(timer);
+  // 2026-10-23: DELETE must finish after every older PUT, including a PUT already in flight.
+  // was: DELETE ran beside sync, allowing PUT to recreate the deleted copy. Revert: remove queue.
+  return queueOperation(async () => {
   if (!on) {
     const r = await answer(await workerFetch("/profile", { method: "DELETE" }));
-    // 404 (older Worker) and 503 sync_off: the account holds no copy, so there is nothing to delete.
-    if (!r.ok && r.status !== 404 && r.status !== 503) {
+    // 2026-10-23: 503 cannot prove deletion, even sync_off may leave an existing encrypted row.
+    // was: every 503 counted as deleted. Revert: restore the old 503 exception.
+    if (!r.ok && r.status !== 404) {
       return { ok: false, error: r.status === 401 || r.status === 0 ? "auth_or_network" : r.data.error || String(r.status), message: r.data.message || "" };
     }
     await updateStore((s) => { s.settings.cloud_sync = false; s.settings.profile_synced_hash = null; });
     return { ok: true };
   }
   await updateStore((s) => { s.settings.cloud_sync = true; s.settings.profile_synced_hash = null; });
-  return { ok: true, ...(await syncNow().catch(() => ({ state: "unavailable" }))) };
+  return { ok: true, ...(await run({}, epoch).catch(() => ({ state: "unavailable" }))) };
+  });
 }
 
 // Signed out (or the server data deleted): what the account holds is no longer known here, so the next
 // sign-in (maybe another account) pulls before it pushes.
-export async function forgetSynced({ stop = false } = {}) {
-  await updateStore((s) => {
-    s.settings.profile_synced_hash = null;
-    if (stop) s.settings.cloud_sync = false;
+export async function forgetSynced({ stop = false, finish } = {}) {
+  ++syncEpoch;
+  clearTimeout(timer);
+  await queueOperation(async () => {
+    await updateStore((s) => {
+      s.settings.profile_synced_hash = null;
+      if (stop) s.settings.cloud_sync = false;
+    });
+    // 2026-10-23: fresh sync requests must also wait until sign-out removes the token.
+    // was: only older replies were invalidated. Revert: sign out after forgetSynced returns.
+    if (finish) await finish();
+  });
+}
+
+// 2026-10-23: account deletion shares the upload barrier, so an older PUT cannot recreate its data.
+// was: DELETE /me ran beside profile sync. Revert: call the deletion directly in background/index.js.
+export async function deleteSyncedAccount(removeAccount) {
+  ++syncEpoch;
+  clearTimeout(timer);
+  return queueOperation(async () => {
+    const result = await removeAccount();
+    if (result.ok) await updateStore((s) => { s.settings.cloud_sync = false; s.settings.profile_synced_hash = null; });
+    return result;
   });
 }
 

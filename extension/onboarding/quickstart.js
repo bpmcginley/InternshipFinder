@@ -1,7 +1,7 @@
 // The Deep Dive's quick start (2026-10-04): sign in, add a resume, and Auto-Apply can be turned on from
 // the Files step. Quick facts, Interview and Voice stay in the Deep Dive as optional extras that make the
 // answers better. Kept out of onboarding.js, which needs a page to run, so the tests can load it.
-import { hasKey, isWorker, resumeReviewPending, manualDetailsMissing } from "../lib/store.js";
+import { hasKey, isWorker, hasLocalResume, resumeReviewPending, manualDetailsMissing } from "../lib/store.js";
 
 // A replaced resume must finish reading/review before either finish button enables
 // Auto-Apply. Older profiles without a reading marker retain their existing setup.
@@ -28,7 +28,7 @@ const list = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", "
 // Why Auto-Apply is paused, in one or two plain sentences (Files step, Review).
 export function pausedMessage(S) {
   const missing = manualDetailsMissing(S);
-  if (!S.files.resume) return "Add your resume above, then read it and save its details. Auto-Apply starts when you do.";
+  if (!hasLocalResume(S)) return "Add your resume above, then read it and save its details. Auto-Apply starts when you do.";
   if (S.settings.resume_import) return "Review the resume updates above and save them. Auto-Apply starts when you do.";
   if (S.settings.resume_details_ready === false) return "Your resume details aren't saved yet. Read your resume above, or enter your details yourself in Quick facts. Auto-Apply starts when one of these is done.";
   if (missing.length) return `Add your ${list(missing.map((k) => NAMES[k]))} in Quick facts. Auto-Apply starts when they are filled in.`;

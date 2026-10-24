@@ -26,7 +26,7 @@ test("U1: the bridge's pages come from the manifest, and its match is the host a
   assert.ok(m.includes("https://internscout.org/*"));
   assert.ok(!manifest.host_permissions.some((h) => h.includes("internscout.org")), "the install prompt is unchanged");
   assert.ok(manifest.permissions.includes("scripting") && manifest.permissions.includes("tabs"));
-  assert.equal(manifest.version, "0.5.8", "manifest version is the 0.5.8 release candidate");
+  assert.equal(manifest.version, "0.5.9", "audit fixes use a new version after the submitted 0.5.8 package");
 });
 
 test("U1: every open dashboard tab gets the bridge and gives up what the offer bar remembered; one failure stops nothing", async () => {

@@ -157,7 +157,11 @@ export function factSuggestions(profile) {
 export const MANUAL_DETAILS = ["first_name", "last_name", "email"];
 export const manualDetailsMissing = (s) => (s.settings.resume_details_manual
   ? MANUAL_DETAILS.filter((k) => !String(s.profile?.facts?.[k] || "").trim()) : []);
-export const resumeReviewPending = (s) => s.settings.resume_details_ready === false || !!s.settings.resume_import
+// 2026-10-23: cloud restore deliberately omits files; completion never proves local upload bytes (EXT-5).
+// was: a restored completed profile could queue work with resume=null. Revert: remove this prerequisite.
+export const hasLocalResume = (s) => !!(s.files?.resume && String(s.files.resume.name || "").trim()
+  && typeof s.files.resume.b64 === "string" && s.files.resume.b64.trim());
+export const resumeReviewPending = (s) => !hasLocalResume(s) || s.settings.resume_details_ready === false || !!s.settings.resume_import
   || manualDetailsMissing(s).length > 0;
 // Auto-Apply may fill forms: the Deep Dive is finished and no resume is waiting to be reviewed.
 export const autoApplyReady = (s) => !!s.settings.onboarded && !resumeReviewPending(s);
@@ -283,11 +287,15 @@ export async function saveStore(s) {
   return withStoreLock(async () => { await chrome.storage.local.set({ store: s }); return s; });
 }
 
-export async function updateStore(fn) {
+// 2026-10-23: let sync consume its pending marker only after the revision is durably saved,
+// while still holding the same lock as noteEdit. was: no post-save locked callback.
+// Revert: remove the afterSave option together with sync's locked marker consumption.
+export async function updateStore(fn, { afterSave } = {}) {
   return withStoreLock(async () => {
     const s = await loadStoreUnlocked();
     const out = (await fn(s)) || s;
     await chrome.storage.local.set({ store: out });
+    if (afterSave) await afterSave(out);
     return out;
   });
 }

@@ -5,7 +5,7 @@ import { connectOpenTabs } from "./install.js";
 import { runJob, resumeJob, isRunning, stopJob, takeBack, checkSubmitted, BACKGROUND_TAB_HELP } from "./agent.js";
 import { loadStore, updateStore, hasKey, isWorker, confirmedFacts, resumeReviewPending, DASHBOARD_FACTS } from "../lib/store.js";
 import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, ensureToken, getMe, deleteServerData, holdOffer, offerWaiting, acceptOffer } from "../lib/auth.js";
-import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced } from "../lib/sync.js";
+import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced, deleteSyncedAccount } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
 import { ISEval } from "./evalrec.js";
 import { noteFilled, answerReview, loadReview, webLineOk, FILLED, FEEDBACK_URL } from "../lib/review.js";
@@ -306,15 +306,16 @@ async function handle(m, sender, fromPage) {
       return { ...(await authStatus()), restored: !!(sync && sync.state === "restored") };
     }
     case "auth:signout":
-      await signOut();
-      await forgetSynced();
+      // 2026-10-23: invalidate pending profile replies before sign-out's network wait (EXT-2).
+      // was: signOut then forgetSynced. Revert: restore that order.
+      await forgetSynced({ finish: signOut });
       return { ok: true };
     case "auth:delete": {
       // DELETE /me on the Worker (which also deletes the saved Deep Dive and every sign-in), then sign out.
       // Saving to the account is switched off too, so signing in again doesn't quietly upload it all again.
       // A refusal (a live subscription) is passed back as it is.
-      const r = await deleteServerData();
-      if (r.ok) { await signOut(); await forgetSynced({ stop: true }); }
+      const r = await deleteSyncedAccount(deleteServerData);
+      if (r.ok) await signOut();
       return r;
     }
     case "sync:set":

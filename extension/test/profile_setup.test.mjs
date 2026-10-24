@@ -143,3 +143,17 @@ test("the manual flag only matters when the student chose it", () => {
   s.settings.resume_details_manual = false;   // a later successful read clears it (onboarding.js)
   assert.deepEqual(manualDetailsMissing(s), []);
 });
+
+test("restored completion requires a local file, and PDF/DOCX resumes remain usable (EXT-5)", () => {
+  const s = student({ onboarded: true, deep_dive_at: 123, resume_details_ready: true });
+  for (const bad of [null, { name: "cv.pdf" }, { name: "cv.pdf", b64: "" }, { name: "", b64: "AA==" }]) {
+    s.files.resume = bad;
+    assert.equal(autoApplyReady(s), false); assert.equal(quickStartReady(s), false);
+    assert.match(pausedMessage(s), /Add your resume/);
+    assert.equal(s.settings.onboarded, true); assert.equal(s.settings.deep_dive_at, 123);
+  }
+  for (const [name, type] of [["cv.pdf", "application/pdf"], ["cv.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]]) {
+    s.files.resume = { name, type, size: 1, b64: "AA==" };
+    assert.equal(autoApplyReady(s), true); assert.equal(quickStartReady(s), true);
+  }
+});
