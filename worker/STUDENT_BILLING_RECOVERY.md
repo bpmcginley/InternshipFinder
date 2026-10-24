@@ -6,7 +6,7 @@ No live provider request or customer transaction was made while implementing the
 ## Invariants
 
 - One account has one pending checkout across tiers and time windows. A retry uses the stored form and attempt key.
-- Only an authoritative expired session releases an open reservation. Uncertain creation older than 23 hours requires owner reconciliation, since Stripe may prune idempotency keys after 24 hours.
+- An authoritative expired session, or a completed session whose exact matching subscription is confirmed ended, releases an old reservation. A legacy completion never claims a newer session-null attempt. Uncertain creation older than 23 hours requires owner reconciliation, since Stripe may prune idempotency keys after 24 hours.
 - Cancellation-pending grants free allowance but still blocks account deletion and another purchase.
 - Competing completed subscriptions cannot overwrite the retained live plan. The extra subscription is recorded before cancellation.
 - Duplicate automatic refunds require exact subscription, invoice, invoice payment, payment intent, charge, amount, currency and customer agreement. Ambiguous or split payments remain pending, with no guessed refund.
