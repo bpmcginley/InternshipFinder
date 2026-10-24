@@ -124,6 +124,12 @@ ul.avail li.fits .i{color:var(--green)}ul.avail li.full .i{color:var(--amber)}
 <p class="note" id="boot" role="status">Checking whether buying is open.</p>
 <noscript><p class="note">This page needs JavaScript. You can email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a> to buy a paid listing instead.</p></noscript>
 
+<!-- 2026-10-23: a failed config read is different from checkout disabled (SITE-1). Revert: remove this recovery card. -->
+<div class="done" id="load-error" hidden>
+<h2>We couldn't load buying on this page</h2>
+<p>Check your connection and <a href="/employers/buy/">reload the page</a> to try again, or email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a> for help.</p>
+</div>
+
 <div class="done" id="closed" hidden>
 <h2>Buying on the site isn't open yet</h2>
 <p>You can't buy a paid listing on this page yet. To ask for one, use the form on <a href="/employers/#interest">the employers page</a> or email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>.</p>
