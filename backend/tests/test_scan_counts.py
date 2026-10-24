@@ -13,7 +13,7 @@ import pytest
 
 from internscout import run_ingest
 from internscout.ingest_metrics import IngestMetrics
-from internscout.sources import common, github_lists, google_jobs, icims_site, nyc_jobs, uhn, usajobs
+from internscout.sources import common, github_lists, google_jobs, houseai, icims_site, nyc_jobs, uhn, usajobs
 from internscout.sources.common import ScanCounts, counts_of, report_source
 from internscout.sources.jazzhr import parse_jazzhr
 from internscout.sources.jobvite import parse_jobvite
@@ -435,10 +435,10 @@ def test_the_cli_writes_source_outcomes_to_the_report(monkeypatch, tmp_path):
     monkeypatch.setattr(run_ingest, "run", Mock())
     monkeypatch.setenv("USAJOBS_API_KEY", "k")
     monkeypatch.setenv("USAJOBS_EMAIL", "me@example.test")
-    for module in (usajobs, nyc_jobs, uhn):
+    for module in (usajobs, nyc_jobs, uhn, houseai):
         _client(monkeypatch, module, _refuse)
     run_ingest.main()
     sources = json.loads(path.read_text())["sources"]
     assert {name: (r["status"], r["cause"]) for name, r in sources.items()} == {
         "usajobs": ("failed", "ConnectError"), "nyc_jobs": ("failed", "ConnectError"),
-        "uhn": ("failed", "ConnectError")}
+        "uhn": ("failed", "ConnectError"), "houseai": ("failed", "ConnectError")}
