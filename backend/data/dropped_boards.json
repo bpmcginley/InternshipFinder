@@ -202,6 +202,18 @@
   }
  },
  "icims": {
+  "americas-cookmedical": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "analystcareers-analysisgroup": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "associatecareers-analysisgroup": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "campus-americas": {
    "on": "2026-10-01",
    "why": "dead"
@@ -210,13 +222,45 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "campus-us-corgan": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "career-schwab": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-advocatesinc": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-aeieng": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-alcami": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-aluminumdynamics": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-americas": {
    "on": "2026-10-01",
    "why": "dead"
+  },
+  "careers-apogeeusa": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-barrios": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-berkley": {
+   "on": "2026-10-24",
+   "why": "robots"
   },
   "careers-beyondsoft": {
    "on": "2026-10-01",
@@ -226,12 +270,68 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-blackhawknetwork": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-bocusa": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-brookings": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-cadent": {
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-calamp": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-concord": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-connection": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-cooperhealth": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-cotiviti": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-cvpcorp": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-daifuku-america": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-daktronics": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-daytonfreight": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-decisionpointcorp": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-eaglepicher": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-eastpennmanufacturing": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-empowerai": {
@@ -246,6 +346,10 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-eyesouthpartners": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-federatedinsurance": {
    "on": "2026-10-01",
    "why": "robots"
@@ -258,12 +362,44 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-fsg": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-fult": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-gannettfleming": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-gdms": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-geosyntec": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-growfinancial": {
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-harpercollins": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-hrblock": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-humanscale": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-i3-corps": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-ice": {
@@ -290,8 +426,20 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-kci": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-kearnybank": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-kinaxis": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-lmi": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-magaero": {
@@ -302,16 +450,40 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-nasco": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-nikkiso": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-ntrepidcorp": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-nv5": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-parkhill": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-peraton": {
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-persistentsystems": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-powerschool": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-psaairlines": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-qinetiqus": {
@@ -322,9 +494,21 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-resonetics": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-revolutioncompany": {
    "on": "2026-10-01",
    "why": "dead"
+  },
+  "careers-riversideresearch": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-sargentlundy": {
+   "on": "2026-10-24",
+   "why": "robots"
   },
   "careers-sas": {
    "on": "2026-10-03",
@@ -350,6 +534,30 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-snapon": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-springswindowfashions": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-sri": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-ssoe": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-steampunk": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-steeldynamics": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-strattec": {
    "on": "2026-09-30",
    "why": "robots"
@@ -358,8 +566,44 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-thesilverlining": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-urbanscience": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-usu": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-uuhc": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-uwcu": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-uwmcareers": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-vhb": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "careers-werfen": {
    "on": "2026-10-03",
+   "why": "robots"
+  },
+  "careers-westernsouthern": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-wilson": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "careers-wipfli": {
@@ -368,6 +612,10 @@
   },
   "careers-wseinc": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "datasciencecareers-analysisgroup": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "external-careers-friedkin": {
@@ -406,6 +654,10 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "kphcareers-kphhealthcareservices": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "main-princeton": {
    "on": "2026-10-01",
    "why": "robots"
@@ -414,12 +666,28 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "professionalcareers-analysisgroup": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "studentemployment-stthomas": {
    "on": "2026-09-30",
    "why": "robots"
   },
+  "taicareers-sbec": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
   "university-uber": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "uscareeropenings-alliancelaundry": {
+   "on": "2026-10-24",
+   "why": "robots"
+  },
+  "uscareers-lennox": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "uscareers-willkie": {
