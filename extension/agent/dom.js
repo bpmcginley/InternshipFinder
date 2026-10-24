@@ -2,7 +2,7 @@
 // snapshot() -> compact list of interactive elements with stable refs; act() runs one action
 // with verify-after-set; fastFill() fills obvious contact fields without a model call.
 (function () {
-  const V = 19; // also refresh the captured guard when its submit classification changes
+  const V = 22; // 2026-10-23: refresh filled-form guard and all cancelable selector helpers. was: 19. Revert: restore 19.
   if (window.ISDom && window.ISDom.v >= V) return;
   const A = window.ISActions, G = window.ISGuard, norm = A.norm;
   const refs = new Map();
@@ -495,7 +495,8 @@
     return { url: location.href, title: document.title, headings, step, errors, captcha, elements, buttons, text, filledFields: ctx.filledFields, reviewStep: ctx.reviewStep, busy: !elements.length && busy(), frozen: frozen() };
   }
 
-  async function fillText(rec, text, secret) {
+  async function fillText(rec, text, secret, gen) {
+    if (stale(gen)) return STOPPED();
     const el = rec.el;
     if (rec.kind === "rich_text") {
       el.focus(); el.textContent = text;
@@ -508,8 +509,8 @@
     // A plain box that wipes itself on blur is a type-ahead with no ARIA (Lever "Current location"):
     // it only keeps a value picked from its suggestion list.
     if (!v && !secret && text && el.tagName === "INPUT") {
-      const t = await A.typeahead(el, text);
-      if (t.ok || (t.options && t.options.length)) return t;
+      const t = await A.typeahead(el, text, () => stale(gen));
+      if (t.cancelled || t.ok || (t.options && t.options.length)) return t;
       v = el.value || "";
     }
     if (!v) return { ok: false, error: "Value did not stick." };
@@ -521,12 +522,13 @@
     if (stale(gen)) return STOPPED();
     switch (rec.kind) {
       case "select": return A.nativeSelect(el, value);
-      case "react_select": return A.reactSelectPick(el, value);
-      case "listbox": return A.workdayPick(el, value);
+      case "react_select": return A.reactSelectPick(el, value, () => stale(gen));
+      case "listbox": return A.workdayPick(el, value, () => stale(gen));
       case "radio_group": return A.radioPick(rec.els, rec.options, value);
       case "combobox": {
-        if (A.LIB_BOX_SEL && el.closest(A.LIB_BOX_SEL)) return A.searchSelectPick(el, value);
-        let r = await A.ariaComboPick(el, value);
+        if (A.LIB_BOX_SEL && el.closest(A.LIB_BOX_SEL)) return A.searchSelectPick(el, value, () => stale(gen));
+        let r = await A.ariaComboPick(el, value, () => stale(gen));
+        if (stale(gen) || r.cancelled) return STOPPED();
         if (!r.ok && el.getAttribute("data-uxi-widget-type")) {
           // Workday search inputs search on Enter (synthetic keys never trigger native form submit)
           el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
@@ -540,7 +542,7 @@
         return r;
       }
       case "checkbox": return A.setChecked(el, /^(y|yes|true|on|checked|agree|i agree)/i.test(String(value)));
-      default: return fillText(rec, value);
+      default: return fillText(rec, value, undefined, gen);
     }
   }
 
@@ -607,11 +609,12 @@
         if (!verdict.allowed) return { ok: false, blocked: true, error: "BLOCKED: " + verdict.reason + ". Use fill_secret on the password field itself." };
         el.setAttribute("data-is-secret", "1");
       }
-      if (action === "fill") r = ["select", "react_select", "listbox", "radio_group", "combobox"].includes(rec.kind) ? await pick(rec, p.text, p.gen) : await fillText(rec, p.text, p.secret);
-      else if (action === "select") r = ["text", "textarea", "rich_text", "password"].includes(rec.kind) ? await fillText(rec, p.option) : await pick(rec, p.option, p.gen);
+      if (action === "fill") r = ["select", "react_select", "listbox", "radio_group", "combobox"].includes(rec.kind) ? await pick(rec, p.text, p.gen) : await fillText(rec, p.text, p.secret, p.gen);
+      else if (action === "select") r = ["text", "textarea", "rich_text", "password"].includes(rec.kind) ? await fillText(rec, p.option, undefined, p.gen) : await pick(rec, p.option, p.gen);
       else if (action === "check") r = rec.kind === "radio_group" ? A.radioPick(rec.els, rec.options, p.checked ? "Yes" : "No") : A.setChecked(el, !!p.checked);
       else if (action === "upload") r = await upload(rec, p.file, p.gen);
       else return { ok: false, error: "Unknown action " + action };
+      if (stale(p.gen)) return STOPPED();
       if (r.ok) (rec.els || [el]).forEach((x) => x.setAttribute("data-is-filled", "1"));
       await A.sleep(150);
       const err = fieldError(el);
@@ -696,7 +699,7 @@
         if (!key || !facts[key]) continue;
         const value = key === "state" ? G.stateName(facts.state) : facts[key];
         const r = await A.workdayChoose(el, (opts) => G.confidentOption(opts, value) ||
-          (key === "country" && G.isUS(value) ? opts.find((o) => G.isUS(o)) || null : null));
+          (key === "country" && G.isUS(value) ? opts.find((o) => G.isUS(o)) || null : null), () => stale(gen));
         if (r.ok) { el.setAttribute("data-is-filled", "1"); done.push(`${rec.label || key} = ${r.chosen}`); }
         continue;
       }
@@ -715,7 +718,7 @@
         A.setNative(el, opt.value); A.blur(el);
         r = { ok: el.value === opt.value };
       } else if (rec.kind === "react_select") {
-        r = await A.reactSelectPick(el, want);
+        r = await A.reactSelectPick(el, want, () => stale(gen));
         // Kept only if what the widget now shows is the option chosen; anything else is left for the model.
         if (r.ok && r.chosen && r.chosen.toLowerCase() !== String(want).toLowerCase().trim()) r = { ok: false };
       } else {

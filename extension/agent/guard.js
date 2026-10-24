@@ -5,7 +5,8 @@
   // Versioned like dom.js: an open tab keeps the copy it was given, and an older guard left there by
   // the previous version of the extension must not stay in charge of the submit button.
   // was: if (root.ISGuard) return;
-  const GV = 4;
+  // 2026-10-23: refresh filled-SPA protection in already open tabs. was: 4.
+  const GV = 5;
   if (root.ISGuard && root.ISGuard.v >= GV) return;
 
   // "Confirm and send" / "I agree and apply" are the same button as "Confirm and submit"; without them
@@ -181,8 +182,17 @@
   // review step "I agree" or "OK" is the last thing between the answers and the employer.
   const REVIEW_NAV_RE = /^(save|review|preview|edit|remove|delete|cancel|close|skip|go\s+back|return)\b/i;
   const NOT_ON_REVIEW_RE = /^(i\s+)?(accept|agree|consent|ok|okay|proceed)\b/i;
-  function reviewNav(d) {
-    return labelForms(d).some((f) => (SAFE_RE.test(f) || ACCOUNT_RE.test(f) || REVIEW_NAV_RE.test(f)) && !NOT_ON_REVIEW_RE.test(f));
+  // 2026-10-23: a random reference to an account cannot make an unknown action safe.
+  // was: ACCOUNT_RE accepted any label containing "account" or "code".
+  // Revert: restore ACCOUNT_RE in reviewNav (weakens final-action protection).
+  const ACCOUNT_NAV_RE = /^(complete\s+(your\s+)?registration|done\s+creating\s+(an?\s+)?account|confirm\s+(your\s+)?e-?mail)\b/i;
+  function reviewNav(d, midApplication = false) {
+    const labels = [d.text, d.value, d.ariaLabel, d.title].map(norm).filter((l) => plainLabel(l));
+    // Every meaningful label must agree, so text "Next" cannot rescue aria-label "I agree".
+    return labels.length > 0 && labels.every((l) => readings(l).some((f) =>
+      (SAFE_RE.test(f) || ACCOUNT_NAV_RE.test(f) || REVIEW_NAV_RE.test(f) ||
+        (midApplication && /^(proceed|start|begin|get\s+started)\b/i.test(f))) &&
+      !(midApplication ? /^(i\s+)?(accept|agree|consent|ok|okay)\b/i : NOT_ON_REVIEW_RE).test(f)));
   }
 
   // ctx: {filledFields, runFilled, reviewStep}
@@ -199,6 +209,11 @@
     if (c === "ambiguous" && ctx && (ctx.filledFields > 0 || ctx.runFilled || ctx.reviewStep))
       return { allowed: false, reason: ctx.filledFields > 0 ? "this looks like the final send button on a filled form"
         : "this looks like the final send button for this application" };
+    // 2026-10-23: custom final buttons have neither submit type nor a review heading.
+    // was: the navigation-only rule applied solely on a recognised review step.
+    // Revert: remove this filled-application rule (restores EXT-1's unsafe synthetic clicks).
+    if (ctx && (ctx.filledFields > 0 || ctx.runFilled) && !reviewNav(d, !ctx.reviewStep))
+      return { allowed: false, review: true, reason: "after filling, unfamiliar actions and consent are reserved for you" };
     if (ctx && ctx.reviewStep && !reviewNav(d))
       return { allowed: false, review: true, reason: "on the review step, only Back, Edit, Next and sign-in buttons are pressed for you" };
     return { allowed: true };
@@ -325,16 +340,21 @@
   // Defense in depth: while the agent drives a tab, synthetic (untrusted) clicks on final
   // buttons are swallowed. Real clicks from the human always go through.
   function installClickBlock(doc) {
-    if (doc.__isClickBlock) return;
+    // 2026-10-23: replace a previous guard's listener as well as the exported API.
+    // was: any existing listener prevented installation of the corrected guard.
+    // Revert: restore the unconditional early return for __isClickBlock.
+    if (doc.__isClickBlock && doc.__isClickBlockVersion === GV) return;
+    if (doc.__isClickBlock) doc.removeEventListener("click", doc.__isClickBlock, true);
     const h = (e) => {
       if (e.isTrusted) return;
       if (isFinalElement(e.target, doc)) { e.preventDefault(); e.stopImmediatePropagation(); }
     };
     doc.addEventListener("click", h, true);
     doc.__isClickBlock = h;
+    doc.__isClickBlockVersion = GV;
   }
   function removeClickBlock(doc) {
-    if (doc.__isClickBlock) { doc.removeEventListener("click", doc.__isClickBlock, true); delete doc.__isClickBlock; }
+    if (doc.__isClickBlock) { doc.removeEventListener("click", doc.__isClickBlock, true); delete doc.__isClickBlock; delete doc.__isClickBlockVersion; }
   }
 
   // Which file box is unmistakably "your resume goes here". It lives here rather than in dom.js so it

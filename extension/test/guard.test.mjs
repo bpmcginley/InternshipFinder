@@ -115,9 +115,9 @@ test("a submit button in the form holding the answers is refused unless it plain
   for (const t of ["Let's go", "Go!", "Lets do this", "I'm ready", "Fertig"]) {
     assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 2 }), filled).allowed, false, t);
     assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 0 }), empty).allowed, true, t + " (nothing filled in its form)");
-    assert.equal(G.allowClick(btn(t, { type: "button", formFilled: 0 }), filled).allowed, true, t + " (not a submit button)");
+    assert.equal(G.allowClick(btn(t, { type: "button", formFilled: 0 }), filled).allowed, false, t + " (plain custom buttons can send too)");
   }
-  for (const t of ["Save", "Proceed", "Start application", "Get started", "Edit", "Cancel", "Accept and continue"]) {
+  for (const t of ["Save", "Proceed", "Start application", "Get started", "Edit", "Cancel"]) {
     assert.equal(G.allowClick(btn(t, { type: "submit", formFilled: 2 }), filled).allowed, true, t);
   }
 });

@@ -18,7 +18,7 @@ globalThis.fetch = async (url, init = {}) => {
   calls.push({ key, body, auth: init.headers && init.headers.authorization });
   const h = routes[key];
   if (!h) throw new TypeError("fetch failed");
-  const [status, reply] = h(body);
+  const [status, reply] = await h(body);
   return { ok: status >= 200 && status < 300, status, json: async () => reply };
 };
 
@@ -50,6 +50,112 @@ function reset(s, { signedIn = true } = {}) {
   if (signedIn) LOCAL["internscout.session"] = { ...SESSION_REC };
 }
 const T1 = "2026-09-20T10:00:00.000Z", T2 = "2026-09-24T10:00:00.000Z", T3 = "2026-09-28T10:00:00.000Z";
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+
+test("opt-out invalidates a pending pull and every older queued flush", async () => {
+  reset(filled({ updated: T1 }));
+  const started = deferred(), response = deferred();
+  routes = {
+    "GET /profile": async () => { started.resolve(); return response.promise; },
+    "DELETE /profile": () => [200, { ok: true }],
+    "PUT /profile": () => { assert.fail("an older sync uploaded after opt-out"); },
+  };
+  const pulling = S.syncNow();
+  await started.promise;
+  const queuedFlush = S.flush();
+  const disabling = S.setCloudSync(false);
+  response.resolve([200, { profile: null }]);
+  assert.equal((await pulling).state, "off");
+  assert.equal((await queuedFlush).state, "off");
+  assert.deepEqual(await disabling, { ok: true });
+  assert.deepEqual(calls.map(c => c.key), ["GET /profile", "DELETE /profile"]);
+  assert.equal((await loadStore()).settings.cloud_sync, false);
+});
+
+test("opt-out waits for an already dispatched upload then deletes its remote result", async () => {
+  reset(filled({ updated: T1, synced: "different" }));
+  const started = deferred(), response = deferred();
+  let remote = null;
+  routes = {
+    "PUT /profile": async body => { started.resolve(); await response.promise; remote = body.profile; return [200, { updated: T1 }]; },
+    "DELETE /profile": () => { remote = null; return [200, { ok: true }]; },
+  };
+  const uploading = S.flush();
+  await started.promise;
+  const disabling = S.setCloudSync(false);
+  await Promise.resolve();
+  assert.deepEqual(calls.map(c => c.key), ["PUT /profile"]);
+  response.resolve();
+  await uploading;
+  assert.deepEqual(await disabling, { ok: true });
+  assert.equal(remote, null);
+  assert.deepEqual(calls.map(c => c.key), ["PUT /profile", "DELETE /profile"]);
+  assert.equal((await loadStore()).settings.profile_synced_hash, null);
+});
+
+test("opt-out suppresses late restores and re-enabling runs a fresh consent generation", async () => {
+  reset(emptyStore());
+  const started = deferred(), response = deferred();
+  let gets = 0;
+  routes = {
+    "GET /profile": async () => {
+      if (++gets === 1) { started.resolve(); return response.promise; }
+      return [200, { profile: null }];
+    },
+    "DELETE /profile": () => [200, { ok: true }],
+  };
+  const pulling = S.syncNow();
+  await started.promise;
+  const disabling = S.setCloudSync(false);
+  response.resolve([200, { profile: S.toServer(S.syncedSubset(filled())), updated: T2 }]);
+  await pulling; await disabling;
+  assert.equal((await loadStore()).settings.onboarded, false);
+  assert.equal(LOCAL[S.RESTORED_KEY], undefined);
+  assert.equal((await S.setCloudSync(true)).ok, true);
+  assert.deepEqual(calls.map(c => c.key), ["GET /profile", "DELETE /profile", "GET /profile"]);
+  assert.equal((await loadStore()).settings.cloud_sync, true);
+});
+
+test("an unavailable deletion never reports that the saved profile is gone", async () => {
+  for (const error of ["sync_off", "unavailable"]) {
+    reset(filled());
+    routes = { "DELETE /profile": () => [503, { error }] };
+    assert.equal((await S.setCloudSync(false)).ok, false);
+    assert.equal((await loadStore()).settings.cloud_sync, true);
+  }
+});
+
+test("account deletion drains uploads before deleting and stops later queued sync", async () => {
+  reset(filled({ updated: T1, synced: "different" }));
+  const started = deferred(), response = deferred();
+  let remote = null;
+  routes = { "PUT /profile": async body => { started.resolve(); await response.promise; remote = body.profile; return [200, {}]; } };
+  const uploading = S.flush();
+  await started.promise;
+  const deleting = S.deleteSyncedAccount(async () => { remote = null; return { ok: true }; });
+  const queuedFlush = S.flush();
+  response.resolve();
+  await uploading;
+  assert.equal((await deleting).ok, true);
+  assert.equal((await queuedFlush).state, "off");
+  assert.equal(remote, null);
+  assert.equal((await loadStore()).settings.cloud_sync, false);
+});
+
+test("new sync requests during sign-out wait until the old token has been removed", async () => {
+  reset(filled());
+  const started = deferred(), finish = deferred();
+  const signingOut = S.forgetSynced({ finish: async () => {
+    started.resolve(); await finish.promise;
+    delete LOCAL["internscout.session"];
+  } });
+  await started.promise;
+  const newRequest = S.syncNow();
+  finish.resolve();
+  await signingOut;
+  assert.equal((await newRequest).state, "signed_out");
+  assert.deepEqual(calls, []);
+});
 
 test("the synced subset leaves out demographics, logins, keys, passwords, files, answers and the sign-up email", () => {
   const sub = S.syncedSubset(filled());
@@ -364,4 +470,99 @@ test("learned answers to self-identification questions stay on the device, and s
   assert.equal(s.profile.extra["Do you have a disability?"], "No");
   assert.ok(!("Leaked: gender" in s.profile.extra), "a demographic entry from the server is not taken");
   assert.ok(!("Desired start date" in s.profile.extra), "non-demographic entries come from the account's copy");
+});
+
+// 2026-10-23: delayed restores preserve concurrent manual edits, including a PUT conflict (EXT-3).
+for (const kind of ["GET", "PUT"]) test(`${kind} restore cannot overwrite a newer local edit`, async () => {
+  const initial = filled({ updated: T1, synced: kind === "PUT" ? "old-hash" : null });
+  reset(initial);
+  let release, reached;
+  const pending = new Promise(r => { reached = r; });
+  const gate = new Promise(r => { release = r; });
+  const remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Earlier remote edit";
+  routes[`${kind} /profile`] = async () => {
+    reached(); await gate;
+    return [kind === "PUT" ? 409 : 200, { profile: remote, updated: T2 }];
+  };
+  const operation = kind === "PUT" ? S.flush() : S.syncNow();
+  await pending;
+  const { updateStore } = await import("../lib/store.js");
+  await updateStore(s => { s.profile.goals.career = "My newer manual edit"; s.settings.profile_updated_at = T3; });
+  LOCAL[S.PENDING_KEY] = { dirty_at: T3 };
+  release();
+  assert.equal((await operation).state, "local_changed");
+  const after = await loadStore();
+  assert.equal(after.profile.goals.career, "My newer manual edit");
+  assert.equal(after.settings.profile_updated_at, T3);
+  assert.equal(after.settings.profile_synced_hash, initial.settings.profile_synced_hash);
+  assert.deepEqual(LOCAL[S.PENDING_KEY], { dirty_at: T3 });
+  assert.equal(LOCAL[S.RESTORED_KEY], undefined, "no misleading restored notice");
+});
+
+test("an edit arriving while an older pending marker is read survives stamping and remote comparison", async () => {
+  reset(filled({ updated: T1 }));
+  LOCAL[S.PENDING_KEY] = { dirty_at: T1 };
+  const originalGet = chrome.storage.local.get, began = deferred(), release = deferred();
+  let first = true;
+  chrome.storage.local.get = async k => {
+    const result = await originalGet(k);
+    if (k === S.PENDING_KEY && first) { first = false; began.resolve(); await release.promise; }
+    return result;
+  };
+  const remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Older remote edit";
+  routes = {
+    "GET /profile": () => [200, { profile: remote, updated: T2 }],
+    "PUT /profile": body => [200, { ok: true, updated: body.updated }],
+  };
+  const { updateStore } = await import("../lib/store.js");
+  try {
+    const syncing = S.syncNow();
+    await began.promise;
+    const editing = updateStore(s => { s.profile.goals.career = "My newest manual edit"; });
+    const noting = editing.then(() => S.noteEdit());
+    release.resolve();
+    await Promise.all([syncing, noting]);
+    const after = await loadStore();
+    assert.equal(after.profile.goals.career, "My newest manual edit");
+    assert.ok(Date.parse(after.settings.profile_updated_at) > Date.parse(T2));
+    assert.ok(LOCAL[S.PENDING_KEY], "the newly noted edit remains pending");
+  } finally {
+    chrome.storage.local.get = originalGet;
+    await S.forgetSynced(); // clear the real debounce timer
+  }
+});
+
+test("a revision stamped after the GET snapshot prevents an older restore even when the profile hash is unchanged", async () => {
+  reset(filled({ updated: T1 }));
+  const began = deferred(), release = deferred();
+  const remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Older remote edit";
+  routes = { "GET /profile": async () => { began.resolve(); await release.promise; return [200, { profile: remote, updated: T2 }]; } };
+  const syncing = S.syncNow();
+  await began.promise;
+  await S.noteEdit();
+  release.resolve();
+  assert.equal((await syncing).state, "local_changed");
+  assert.equal((await loadStore()).profile.goals.career, "");
+  assert.ok(LOCAL[S.PENDING_KEY]);
+  await S.forgetSynced();
+});
+
+test("a failed revision write keeps the pending marker for a later retry", async () => {
+  reset(filled({ updated: T1 }));
+  LOCAL[S.PENDING_KEY] = { dirty_at: T3 };
+  const originalSet = chrome.storage.local.set;
+  let fail = true;
+  chrome.storage.local.set = async o => {
+    if (o.store && fail) { fail = false; throw new Error("synthetic storage failure"); }
+    return originalSet(o);
+  };
+  try {
+    await assert.rejects(S.syncNow(), /synthetic storage failure/);
+    assert.deepEqual(LOCAL[S.PENDING_KEY], { dirty_at: T3 });
+    assert.equal((await loadStore()).settings.profile_updated_at, T1);
+    assert.equal(calls.length, 0);
+  } finally { chrome.storage.local.set = originalSet; }
 });

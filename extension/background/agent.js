@@ -3,7 +3,7 @@
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { hasHostAccess, hostOf } from "../lib/hosts.js";
-import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
+import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, hasLocalResume, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
@@ -551,7 +551,7 @@ const notReadyHelp = (store) => {
   if (!store.settings.onboarded) return NOT_SET_UP_HELP;
   const missing = store.settings.resume_import ? [] : manualDetailsMissing(store);
   if (missing.length) return manualDetailsHelp(missing);
-  return store.files.resume ? RESUME_REVIEW_HELP : NO_RESUME_HELP;
+  return hasLocalResume(store) ? RESUME_REVIEW_HELP : NO_RESUME_HELP;
 };
 // A page whose only held-back buttons are Accept or I agree (formatSnapshot consentOnly).
 export const CONSENT_HELP = "This page asks you to agree to something. Read it, press the button yourself, then press Resume.";

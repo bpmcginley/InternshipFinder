@@ -112,7 +112,7 @@ test("Deep Dive Next, Google sign-in and Send are primary buttons; .btn.blue is 
 });
 
 // ---------- D27 and D29: entry points ----------
-const store = (settings = {}, over = {}) => ({ ai: { provider: "internscout" }, files: { resume: { name: "r.pdf" } }, profile: { facts: {} }, settings: { onboarded: false, ...settings }, ...over });
+const store = (settings = {}, over = {}) => ({ ai: { provider: "internscout" }, files: { resume: { name: "r.pdf", b64: "AA==" } }, profile: { facts: {} }, settings: { onboarded: false, ...settings }, ...over });
 
 test("before setup: one setup button, no review link and no way to edit a setup never done", () => {
   const e = entryState(store());
@@ -177,4 +177,12 @@ test("Ready to apply is brought into view only when it turns ready on the page",
   revealQuick(box, button, true);
   assert.equal(calls[0][1].behavior, "auto", "no smooth scroll when the student asked for less motion");
   revealQuick(null, button);   // no card: nothing happens, nothing throws
+});
+
+test("a restored completed profile asks for local resume bytes without erasing completion", () => {
+  const s = store({ onboarded: true, deep_dive_at: 123, resume_details_ready: true }, { files: { resume: null } });
+  const e = entryState(s);
+  assert.equal(e.stage, "paused"); assert.equal(e.label, "Add my resume");
+  assert.match(e.note, /this device/);
+  assert.equal(s.settings.onboarded, true); assert.equal(s.settings.deep_dive_at, 123);
 });
