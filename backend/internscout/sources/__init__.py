@@ -21,6 +21,7 @@ from .google_jobs import fetch_google_jobs
 from .usajobs import fetch_usajobs
 from .nyc_jobs import fetch_nyc_jobs
 from .uhn import fetch_uhn
+from .houseai import fetch_houseai
 
 # one-board fetchers: fn(httpx.Client, {name, ats_token, is_quant_target}) -> raw items
 BOARD_FETCHERS = {
@@ -44,4 +45,4 @@ BOARD_FETCHERS = {
     "jazzhr": fetch_jazzhr_board,
 }
 __all__ = ["fetch_github_lists", "fetch_greenhouse", "fetch_lever", "fetch_google_jobs", "fetch_usajobs",
-           "fetch_nyc_jobs", "fetch_uhn", "BOARD_FETCHERS"]
+           "fetch_nyc_jobs", "fetch_uhn", "fetch_houseai", "BOARD_FETCHERS"]

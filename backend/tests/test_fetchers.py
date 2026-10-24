@@ -1003,3 +1003,53 @@ def test_a_hospital_oracle_tenant_is_also_searched_for_student_roles():
     tenant.keywords = []
     fetch_oracle_board(tenant, dict(co, sector="insurance_finance"))
     assert tenant.keywords == ["intern", "co-op", "student", "stagiaire"]
+
+
+from internscout.sources.houseai import (
+    parse_houseai_jobposting, parse_houseai_page, role_slugs)
+
+
+def _houseai_jp(**over):
+    jp = {"@type": "JobPosting", "title": "Blog Writer Intern",
+          "description": "<p>Write articles about design.</p>",
+          "datePosted": "2026-10-13", "validThrough": "2026-10-31T23:59:59-04:00",
+          "employmentType": ["INTERN", "PART_TIME"], "jobLocationType": "TELECOMMUTE",
+          "workHours": "20 hours per week",
+          "url": "https://www.houseaiapp.com/careers/blog-writer-intern"}
+    jp.update(over)
+    return jp
+
+
+def test_houseai_parses_unpaid_remote_intern():
+    from datetime import date
+    item = parse_houseai_jobposting(_houseai_jp(), date(2026, 10, 24))
+    assert item is not None
+    assert item["title"] == "Blog Writer Intern"
+    assert item["company_name"] == "House AI"
+    assert item["locations"] == ["Remote"]
+    assert item["url"] == "https://www.houseaiapp.com/careers/blog-writer-intern"
+    assert item["apply_url"] == "https://www.houseaiapp.com/careers/blog-writer-intern/apply"
+    assert item["description"].startswith("Unpaid.")
+    assert "October 31, 2026" in item["description"]
+    assert item["source"] == "houseai"
+
+
+def test_houseai_skips_expired_and_non_intern():
+    from datetime import date
+    assert parse_houseai_jobposting(_houseai_jp(), date(2026, 11, 1)) is None
+    assert parse_houseai_jobposting(_houseai_jp(title="Senior Engineer",
+                                                employmentType=["FULL_TIME"]),
+                                    date(2026, 10, 24)) is None
+
+
+def test_houseai_role_slugs_skip_hub_pages():
+    html = ('<a href="/careers/blog-writer-intern">x</a>'
+            '<a href="/careers/blog-writer-intern">x</a>'
+            '<a href="/careers/cities">x</a>'
+            '<a href="/careers/course-credit">x</a>'
+            '<a href="/careers#faq">x</a>')
+    assert role_slugs(html) == ["blog-writer-intern"]
+
+
+def test_houseai_page_without_jobposting_is_none():
+    assert parse_houseai_page("<html><body>no jobs here</body></html>") is None

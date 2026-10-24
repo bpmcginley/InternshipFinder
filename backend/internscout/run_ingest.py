@@ -15,7 +15,7 @@ import httpx
 from collections import Counter
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, fetch_uhn, BOARD_FETCHERS
+from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, fetch_uhn, fetch_houseai, BOARD_FETCHERS
 from .sources.base import client
 from .sources.common import RobotsDisallowed, ScanCounts, failure_cause
 from .sources.github_lists import parse_fixture
@@ -229,9 +229,11 @@ def main():
             raw += scan_boards(reg, args.workers, completed_boards=completed_boards, metrics=metrics)
         if args.public or do_all:  # government feeds: no ATS boards to discover from these
             # was: fetch_usajobs() + fetch_nyc_jobs(). UHN is one employer's own site, read the same way.
+            # House AI is likewise one employer's own site (custom careers pages, no ATS).
             raw += (fetch_usajobs(report=metrics.source_result)
                     + fetch_nyc_jobs(report=metrics.source_result)
-                    + fetch_uhn(report=metrics.source_result))
+                    + fetch_uhn(report=metrics.source_result)
+                    + fetch_houseai(report=metrics.source_result))
         # Boards first, so the listings below can be labelled off them in the same run.
         named = label_boards(reg)
         # Last, so it sees every item from every source in this run.
