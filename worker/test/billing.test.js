@@ -99,16 +99,15 @@ describe("checkout", () => {
   });
 
   // Two tabs, or a double click: both must land on the one session Stripe can only take payment for once.
-  it("gives a repeat checkout the same idempotency key, and a new one per plan", async () => {
+  it("reuses one pending session and refuses a second plan until expiry", async () => {
     const { api, token, fetch } = await setup({ env: BOTH });
-    for (const plan of ["supporter", "supporter", "pro"]) {
+    for (const plan of ["supporter", "supporter"]) {
       assert.equal((await api("POST", "/billing/checkout", { token: await token(), body: { plan } })).status, 200);
     }
     const keys = fetch.calls.filter((c) => c.url.includes("checkout/sessions")).map((c) => c.init.headers["Idempotency-Key"]);
-    assert.equal(keys.length, 3);
+    assert.equal((await api("POST", "/billing/checkout", { token: await token(), body: { plan: "pro" } })).status, 409);
+    assert.equal(keys.filter(Boolean).length, 1, "only one provider creation; later requests retrieve that session");
     assert.ok(keys[0] && keys[0].length <= 255);
-    assert.equal(keys[0], keys[1]);
-    assert.notEqual(keys[0], keys[2]);
   });
 });
 
@@ -239,8 +238,8 @@ describe("webhook", () => {
   // Money taken back ends the plan: Stripe cancels nothing by itself on a refund or a chargeback.
   it("drops the plan on a full refund or a dispute, and cancels the subscription", async () => {
     for (const event of [
-      { id: "evt_r", type: "charge.refunded", data: { object: { customer: "cus_1", amount: 500, amount_refunded: 500, refunded: true } } },
-      { id: "evt_d", type: "charge.dispute.created", data: { object: { customer: "cus_1", amount: 500 } } },
+      { id: "evt_r", type: "charge.refunded", data: { object: { id: "ch_1", customer: "cus_1", invoice: { id: "in_1", subscription: "sub_1" }, amount: 500, amount_refunded: 500, refunded: true } } },
+      { id: "evt_d", type: "charge.dispute.created", data: { object: { charge: { id: "ch_1", customer: "cus_1", invoice: { id: "in_1", subscription: "sub_1" } }, amount: 500 } } },
     ]) {
       const { api, db, token, fetch } = await setup({ env: PAID });
       const user = await whoami(api, token, db);
@@ -414,7 +413,7 @@ describe("what Stripe still holds", () => {
     live = "canceled";                                     // the student cancels in the portal
     await post(api, { id: "evt_end", type: "customer.subscription.deleted", data: { object: { id: "sub_1", customer: "cus_1", status: "canceled", metadata: { user_hash: user } } } });
     assert.equal((await api("POST", "/billing/checkout", { token: await token() })).status, 200);
-    assert.equal((await api("DELETE", "/me", { token: await token() })).status, 200);
+    assert.equal((await api("DELETE", "/me", { token: await token() })).status, 409, "new payable checkout must expire before deletion");
   });
 
   it("measures a request body in bytes, not characters", async () => {
