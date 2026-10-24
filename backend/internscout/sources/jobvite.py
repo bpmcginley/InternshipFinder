@@ -49,7 +49,9 @@ def fetch_jobvite_board(c, co: dict) -> list[dict]:
         try:
             d = c.get(it["url"])
             if d.status_code == 200:
-                it["description"] = parse_jobvite_detail(d.text)[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = parse_jobvite_detail(d.text)
         except Exception:
             pass
     return out

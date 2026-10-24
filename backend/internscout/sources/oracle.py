@@ -125,7 +125,9 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
         try:
             d = c.get(DETAIL.format(host=host, site=site, id=it["_req_id"]))
             if d.status_code == 200:
-                it["description"] = parse_oracle_detail(d.json())[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = parse_oracle_detail(d.json())
         except Exception:
             pass
     mark_complete(co, complete)   # every keyword read to its TotalJobsCount; see scan_evidence

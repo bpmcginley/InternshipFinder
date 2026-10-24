@@ -68,7 +68,9 @@ def fetch_rippling_board(c, co: dict) -> list[dict]:
             d = c.get(JOB_URL.format(token=token, uuid=it["_rp_uuid"]))
             if d.status_code == 200:
                 desc, posted = parse_rippling_detail(d.json())
-                it["description"] = desc[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = desc
                 it["posted_at"] = posted or it["posted_at"]
         except Exception:
             pass

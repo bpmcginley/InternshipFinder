@@ -205,7 +205,9 @@ def fetch_successfactors_board(c, co: dict) -> list[dict]:
             d = c.get(it["url"])
             if d.status_code == 200:
                 desc, posted = parse_successfactors_detail(d.text)
-                it["description"] = desc[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = desc
                 it["posted_at"] = posted or it["posted_at"]
         except Exception:
             pass

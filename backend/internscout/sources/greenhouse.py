@@ -52,7 +52,9 @@ def fetch_greenhouse_board(c, co: dict) -> list[dict]:
         try:
             d = c.get(JOB_URL.format(token=token, id=it["_gh_id"]))
             if d.status_code == 200:
-                it["description"] = html_to_text(d.json().get("content"))[:4000]
+                # 2026-10-23: extract eligibility before public trimming; was: [:4000].
+                # Revert: restore [:4000] here (DQ-1).
+                it["description"] = html_to_text(d.json().get("content"))
         except Exception:
             pass
     co["_scan_complete"] = True  # list endpoint is exhaustive; detail limits do not truncate it

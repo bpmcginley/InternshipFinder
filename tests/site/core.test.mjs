@@ -467,3 +467,16 @@ test("the dashboard reads its filters from the address and writes them back with
   const index = readFileSync(new URL("../../docs/index.html", import.meta.url), "utf8");
   assert.match(index, /data-cf-beacon='\{"token": "[0-9a-f]+", "spa": false\}'/);
 });
+
+test("annual salary placeholders neither render nor qualify a role as paid", () => {
+  const IS = loadCore(() => new Promise(() => {}));
+  for (const salary of ["$0.02 /Yr", "$20.00/Yr", "$0.00/hr", "-$20/hr", "$-20/hr"]) {
+    assert.equal(IS.realSalary({ salary }), "", salary);
+    assert.equal(IS.payOf({ salary }), null, salary);
+  }
+  for (const salary of ["$5/hour", "$0.01 - $18 Per Hour", "$120k/year", "$20 unknown units"]) {
+    assert.equal(IS.realSalary({ salary }), salary);
+    assert.equal(IS.payOf({ salary }), "paid");
+  }
+  assert.equal(IS.payOf({ salary: "$20/Yr", insights: { pay: "unpaid" } }), "unpaid");
+});

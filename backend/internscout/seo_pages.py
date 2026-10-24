@@ -512,8 +512,10 @@ _AMOUNT = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 
 def placeholder_pay(salary) -> bool:
-    nums = [float(n.replace(",", "")) for n in _AMOUNT.findall(str(salary or ""))]
-    return bool(nums) and (nums[0] == 0 or not any(nums))
+    # 2026-10-23: shared with normalization/export; was zero-only here.
+    # Revert: restore the zero-only implementation with pay.py and core.js.
+    from .pay import placeholder_pay as invalid_pay
+    return invalid_pay(salary)
 
 
 def real_salary(x: dict) -> str | None:

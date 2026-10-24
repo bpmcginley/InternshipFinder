@@ -239,8 +239,12 @@
   const inCanadaOnly = x => { const r = regs(x); return r.length > 0 && r.every(g => g.kind === "canada"); };
   const isRemote = x => !!x.is_remote || regs(x).some(g => g.kind === "remote" || g.remote || REMOTE_RE.test(g.loc || ""));
   const realSalary = x => {
-    const s = String(x.salary || "").trim(), nums = (s.match(/\d[\d,]*(?:\.\d+)?/g) || []).map(n => Number(n.replace(/,/g, "")));
-    return s && (!nums.length || (nums[0] !== 0 && nums.some(n => n !== 0))) ? s : "";
+    // 2026-10-23: was zero-only. Match backend/pay.py without inventing pay.
+    // Revert: restore the zero-only check here and in backend/pay.py together.
+    const s = String(x.salary || "").trim(), nums = (s.match(/\d[\d,]*(?:\.\d+)?\s*[kK]?/g) || []).map(n => Number(n.replace(/[,kK\s]/g, "")) * (/[kK]\s*$/.test(n) ? 1000 : 1));
+    const tinyAnnual = /\$/.test(s) && /\b(year|yr|annum|annual|annually)\b/i.test(s) && nums.length && Math.max(...nums) < 1000;
+    const negative = /^\s*(?:(?:USD|CAD|US|CA)\s*)?-\s*\$|\$\s*-\s*\d/i.test(s);
+    return s && !negative && (!nums.length || (nums[0] !== 0 && !tinyAnnual)) ? s : "";
   };
   // ---------- search (moved here from app.js 2026-10-14, so it can be tested) ----------
   // Every word must appear; -word excludes; "quoted phrase" matches as a phrase. Place names (states,
