@@ -1698,6 +1698,7 @@
 "nj - hoboken|NJ":null,
 "nj - howell|NJ":null,
 "nj - jersey city|NJ":null,
+"nj - kearny|NJ":null,
 "nj - kendall park|NJ":null,
 "nj - lakewood|NJ":null,
 "nj - lawrenceville|NJ":null,
@@ -1895,6 +1896,7 @@
 ],
 "ny-nyc (ave of americas|NY":null,
 "ny-rochester|NY":null,
+"nyc (ny|NY":null,
 "ny|NY":[
 41.6454,
 -74.8618
@@ -2576,6 +2578,7 @@
 "united states - wayne|PA":null,
 "united states of america|NJ":null,
 "united states of america|NY":null,
+"united states of america|PA":null,
 "united states-new york-ronkonkoma|NY":null,
 "united states|NY":null,
 "united states|PA":[

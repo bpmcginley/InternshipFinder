@@ -1214,6 +1214,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "linkup": {
+   "name": "Linkup",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
+  },
   "linqapp": {
    "name": "LINQ",
    "quant": false,
@@ -1941,6 +1947,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "sardine": {
+   "name": "Sardine",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
+  },
   "saronic": {
    "name": "Saronic",
    "quant": false,
@@ -2174,6 +2186,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "tracelabs": {
+   "name": "Trace Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
   },
   "treefera": {
    "name": "Treefera",
@@ -5312,14 +5330,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "oldmissioncapital": {
-   "name": "Old Mission Capital",
-   "quant": true,
-   "fails": 3,
-   "added": "2026-09-13",
-   "sector": "quant_finance",
-   "last_fail": "2026-10-23"
   },
   "olsson": {
    "name": "Olsson",
@@ -8874,6 +8884,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "bosonai": {
+   "name": "Boson Ai",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
+  },
   "brightmachines": {
    "name": "Bright Machines",
    "quant": false,
@@ -9637,6 +9653,12 @@
    "added": "2026-09-15",
    "sector": "nonprofit"
   },
+  "SimbeRobotics": {
+   "name": "Simbe Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
+  },
   "skyways": {
    "name": "Skyways",
    "quant": false,
@@ -9757,6 +9779,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "upscale-ai": {
+   "name": "Upscale AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
   },
   "veeva": {
    "name": "Veeva Systems",
@@ -12104,6 +12132,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "albertamotorassociation|wd3|ama": {
+   "name": "AMA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-24"
   },
   "alcoa|wd5|Careers": {
    "name": "Alcoa",
@@ -19455,9 +19489,8 @@
   "zebra|wd501|Zebra_careers": {
    "name": "Zebra Technologies",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-20",
-   "last_fail": "2026-10-23"
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "zeissgroup|wd3|External": {
    "name": "Zeiss",

@@ -168,6 +168,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "oldmissioncapital": {
+   "on": "2026-10-24",
+   "why": "dead"
+  },
   "optirtc": {
    "on": "2026-10-01",
    "why": "dead"
@@ -548,6 +552,10 @@
   },
   "behavioralconcepts": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "bertelsmann-jobs": {
+   "on": "2026-10-24",
    "why": "robots"
   },
   "blinqlabs": {
