@@ -226,6 +226,13 @@ const reply = (status, body) => Promise.resolve({ ok: status >= 200 && status < 
 
 function page({ search = "", routes = {} } = {}) {
   const byId = new Map(), calls = [], replaced = [], assigned = [];
+  let clock = 0, nextTimer = 0;
+  const timers = new Map();
+  const setTimer = (f, ms = 0) => {
+    if (ms < 1000) { f(); return 0; }
+    const id = ++nextTimer; timers.set(id, { at: clock + ms, f }); return id;
+  };
+  const advance = ms => { clock += ms; for (const [id, t] of [...timers]) if (t.at <= clock) { timers.delete(id); t.f(); } };
   const doc = { activeElement: null };
   Object.assign(doc, {
     getElementById: (id) => { if (!byId.has(id)) { const e = new El("div", doc); e.id = id; byId.set(id, e); } return byId.get(id); },
@@ -234,28 +241,30 @@ function page({ search = "", routes = {} } = {}) {
     querySelectorAll: () => [],
   });
   // Elements the page starts with hidden, as in the HTML.
-  for (const id of ["closed", "landing", "order", "roles-box", "step2", "step3", "sent", "co-list"]) doc.getElementById(id).hidden = true;
+  for (const id of ["closed", "load-error", "landing", "order", "roles-box", "step2", "step3", "sent", "co-list"]) doc.getElementById(id).hidden = true;
+  doc.getElementById("co-q").disabled = true;
   const fetch = (url, init = {}) => {
     calls.push({ url, method: init.method || "GET", body: init.body ? JSON.parse(init.body) : undefined });
     for (const [pat, fn] of Object.entries(routes)) if (url.startsWith(pat)) return fn(url, init);
     return Promise.reject(new Error("offline"));
   };
   const ctx = {
-    document: doc, fetch, URL, URLSearchParams, setTimeout: (f) => { f(); return 1; }, clearTimeout() {},
+    document: doc, fetch, URL, URLSearchParams, setTimeout: setTimer, clearTimeout: id => timers.delete(id), AbortController,
     location: { search, pathname: "/employers/buy/", assign: (u) => assigned.push(u) },
     history: { replaceState: (_, __, u) => replaced.push(u) },
   };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx);
-  return { $: doc.getElementById, doc, calls, replaced, assigned };
+  return { $: doc.getElementById, doc, calls, replaced, assigned, advance, timers };
 }
 
-test("closed: no config, a failed call or enabled false shows only the not-open note", async () => {
-  for (const routes of [{}, { [API + "/employer/config"]: () => reply(200, { ...CFG, enabled: false }) }, { [API + "/employer/config"]: () => reply(500, {}) }]) {
+test("disabled config shows not-open; failed config shows connection recovery", async () => {
+  for (const [routes, disabled] of [[{}, false], [{ [API + "/employer/config"]: () => reply(200, { ...CFG, enabled: false }) }, true], [{ [API + "/employer/config"]: () => reply(500, {}) }, false]]) {
     const p = page({ routes });
     await tick();
-    assert.equal(p.$("closed").hidden, false);
+    assert.equal(p.$("closed").hidden, !disabled);
+    assert.equal(p.$("load-error").hidden, disabled);
     assert.equal(p.$("order").hidden, true);
     assert.equal(p.$("boot").hidden, true);
     assert.ok(!p.calls.some((c) => c.url.includes("/data/roles/")), "the role index isn't even loaded");
@@ -608,4 +617,71 @@ test("before paying, the page says what is sold, the refund rule, cancelling and
     /Until we approve it, you can cancel it by email for a full refund/, /unused days back as a refund or a credit code/,
     /brucepmcginley@gmail\.com/]) assert.match(words, want);
   assert.ok(PAGE.indexOf('id="refunds"') < PAGE.indexOf('id="send"'), "shown before the Order button");
+});
+// 2026-10-23: fake-clock failures cover headers AND response bodies without waiting in real time (SITE-1).
+for (const part of ["headers", "body"]) test(`a stalled config ${part} exits loading and ignores a late reply`, async () => {
+  let release;
+  const pending = new Promise(r => { release = r; });
+  const p = page({ routes: { [API + "/employer/config"]: () => part === "headers" ? pending
+    : Promise.resolve({ ok: true, status: 200, json: () => pending }) } });
+  await tick(); p.advance(19999); await tick();
+  assert.equal(p.$("boot").hidden, false);
+  p.advance(1); await tick();
+  assert.equal(p.$("boot").hidden, true); assert.equal(p.$("load-error").hidden, false);
+  assert.equal(p.$("closed").hidden, true); assert.equal(p.$("order").hidden, true);
+  release(part === "headers" ? { ok: true, status: 200, json: async () => CFG } : CFG);
+  await tick(); assert.equal(p.$("order").hidden, true, "an expired response cannot reopen the form");
+  assert.equal(p.timers.size, 0);
+});
+
+test("stalled employer index and role shard offer a recovery instead of indefinite loading", async () => {
+  const index = { employers: [{ k: "acme", n: "Acme", c: 1, s: "a" }] };
+  const routes = { [API + "/employer/config"]: () => reply(200, CFG), "/data/roles/index.json": () => new Promise(() => {}) };
+  const p = page({ routes });
+  await tick(); p.advance(20000); await tick();
+  assert.match(p.$("co-msg").textContent, /couldn't load.*Reload/);
+  assert.equal(p.$("co-q").disabled, true, "no company choices are invented when the index is unavailable");
+
+  let stuck = true;
+  const q = page({ routes: { [API + "/employer/config"]: routes[API + "/employer/config"], "/data/roles/index.json": () => reply(200, index),
+    "/data/roles/a.json": () => stuck ? new Promise(() => {}) : reply(200, { roles: [{ id: "r1", k: "acme", t: "Intern", f: ["data"] }] }) } });
+  await tick(); q.$("co-q").value = "acme"; q.$("co-q").fire("input"); q.$("co-q").fire("keydown", { key: "Enter" });
+  await tick(); q.advance(20000); await tick();
+  assert.match(q.$("pick-msg").textContent, /couldn't load.*again to retry/);
+  stuck = false; q.$("co-q").fire("input"); q.$("co-q").fire("keydown", { key: "Enter" }); await tick();
+  assert.equal(q.$("role-list").all(n => n.tagName === "INPUT").length, 1, "a deliberate GET retry can recover");
+  assert.equal(q.timers.size, 0);
+});
+
+for (const failure of ["headers", "body", "network", "server", "parse", "empty"]) test(`an uncertain order ${failure} gives email recovery without another POST`, async () => {
+  let release;
+  const pending = new Promise(r => { release = r; });
+  const p = page({ routes: {
+    [API + "/employer/config"]: () => reply(200, CFG),
+    "/data/roles/index.json": () => reply(200, { employers: [{ k: "acme", n: "Acme", c: 1, s: "a" }] }),
+    "/data/roles/a.json": () => reply(200, { roles: [{ id: "r1", k: "acme", t: "Intern", f: ["data"], u: "https://acme.example/1" }] }),
+    [API + "/employer/availability"]: () => reply(200, { roles: [{ id: "r1", fits: true }] }),
+    [API + "/employer/order"]: () => failure === "headers" ? pending : failure === "body" ? Promise.resolve({ ok: true, status: 200, json: () => pending })
+      : failure === "server" ? reply(500, {}) : failure === "parse" ? Promise.resolve({ ok: true, status: 200, json: async () => { throw new Error("invalid JSON"); } })
+      : failure === "empty" ? reply(200, {}) : Promise.reject(new Error("lost response")),
+  } });
+  await tick(); p.$("co-q").value = "acme"; p.$("co-q").fire("input"); p.$("co-q").fire("keydown", { key: "Enter" });
+  await tick(); const box = p.$("role-list").all(n => n.tagName === "INPUT")[0]; box.checked = true; box.fire("change");
+  await tick(); p.$("name").value = "Synthetic"; p.$("email").value = "synthetic@acme.example"; p.$("terms").checked = true;
+  p.$("order").fire("submit"); p.$("order").fire("submit"); await tick(); p.advance(30000); await tick();
+  assert.equal(p.$("send").textContent, "Check your email"); assert.equal(p.$("send").disabled, true);
+  assert.match(p.$("status").textContent, /may already have gone through.*Check your email.*don't submit another/);
+  p.$("order").fire("submit"); await tick();
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 1);
+  release(failure === "headers" ? { ok: true, status: 200, json: async () => ({ ok: true }) } : { ok: true });
+  await tick(); assert.equal(p.$("sent").hidden, true, "late success cannot replace the uncertain outcome");
+  assert.equal(p.timers.size, 0);
+});
+
+test("a stalled confirmation link exits waiting and points to its original email", async () => {
+  const p = page({ search: "?order=o1&t=tok1", routes: { [API + "/employer/order/confirm"]: () => new Promise(() => {}) } });
+  await tick(); p.advance(30000); await tick();
+  assert.equal(p.$("landing-h").textContent, "We couldn't confirm this link");
+  assert.match(p.$("landing-body").textContent, /Reopen the original link from your email/);
+  assert.equal(p.calls.length, 1); assert.deepEqual(p.assigned, []);
 });

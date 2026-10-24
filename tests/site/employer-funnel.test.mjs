@@ -98,7 +98,8 @@ function buyPage(search = "", enabled = true, countThrows = false) {
     createElement: (tag) => new Element(tag, doc), createTextNode: (text) => ({ textContent: String(text) }), querySelectorAll: () => [] };
   const ctx = { document: doc, URL, URLSearchParams, ISCount: (event) => { if (countThrows) throw new Error("Counter unavailable"); events.push(event); },
     location: { search, pathname: "/employers/buy/", assign: (url) => redirects.push(url) },
-    history: { replaceState() {} }, setTimeout: (fn) => { fn(); return 1; }, clearTimeout() {},
+    history: { replaceState() {} }, // 2026-10-23: debounce is immediate here; request deadlines must not fire before resolved fixtures (SITE-1).
+    setTimeout: (fn, ms) => { if (ms >= 1000) return setTimeout(fn, ms); fn(); return 0; }, clearTimeout,
     fetch: async (url, init = {}) => {
       calls.push({ url, method: init.method || "GET", body: init.body });
       const data = url.endsWith("/employer/config") ? { ...CFG, enabled }

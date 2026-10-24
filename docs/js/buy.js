@@ -267,6 +267,33 @@
   var doc = root.document;
   if (doc && doc.getElementById && doc.getElementById("buy")) start();
 
+  // 2026-10-23: bound both response headers and body reads, including fetches that ignore abort (SITE-1).
+  // was: a stalled config, role or order request could keep the page waiting forever.
+  // Revert: remove requestJson and replace call/dataJson with the former unbounded fetch calls.
+  function requestJson(url, init) {
+    init = init || { method: "GET" };
+    var controller = typeof root.AbortController === "function" ? new root.AbortController() : null;
+    if (controller) init.signal = controller.signal;
+    var timer;
+    var deadline = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        reject(new Error("The request timed out."));
+        if (controller) controller.abort();
+      }, init.method === "POST" ? 30000 : 20000);
+    });
+    var response = Promise.resolve().then(function () { return fetch(url, init); }).then(function (r) {
+      return r.json().then(function (out) { return { ok: r.ok, status: r.status, out: out || {} }; });
+    });
+    return Promise.race([response, deadline]).finally(function () { clearTimeout(timer); });
+  }
+  function call(method, path, body) {
+    return requestJson(API + path, method === "GET" ? { method: "GET" }
+      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  }
+  function dataJson(path) {
+    return requestJson(path).then(function (r) { if (!r.ok) throw new Error(r.status); return r.out; });
+  }
+
   // ---------- the page ----------
   function start() {
     // 2026-10-23: count only fixed anonymous intent names; ISCount retains opt-out and bot suppression.
@@ -292,12 +319,6 @@
       }
       return n;
     }
-    function call(method, path, body) {
-      var init = method === "GET" ? { method: "GET" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
-      return fetch(API + path, init).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (out) { return { ok: r.ok, status: r.status, out: out || {} }; });
-      });
-    }
     function show(id, on) { var n = $(id); if (n) n.hidden = !on; }
 
     // ----- where Stripe and our emails send people back to -----
@@ -313,12 +334,14 @@
     var pub = $("pub"), startIn = $("start"), availBox = $("avail"), send = $("send"), status = $("status");
 
     call("GET", "/employer/config").then(function (res) {
-      if (!res.ok || !configOk(res.out)) return closed();
+      if (!res.ok) return unavailable();
+      if (!configOk(res.out)) return closed();
       S.cfg = res.out;
       open();
-    }).catch(closed);
+    }).catch(unavailable);
 
     function closed() { show("boot", false); show("closed", true); }
+    function unavailable() { show("boot", false); show("load-error", true); }
 
     function open() {
       var cfg = S.cfg;
@@ -333,7 +356,7 @@
       $("start-hint").textContent = "From today up to " + fmtDate(range.max) + ".";
       updatePrices();
       updateRun();
-      fetch("/data/roles/index.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
+      dataJson("/data/roles/index.json").then(function (d) {
         S.index = prepareIndex(d);
         q.disabled = false;
         var prefill = companyPrefill(S.index, root.location.search);
@@ -410,7 +433,7 @@
       roleList.textContent = "";
       pickMsg.textContent = "Loading the open roles at " + e.n + ".";
       var seq = ++S.rseq;
-      var got = S.shards[e.s] ? Promise.resolve(S.shards[e.s]) : fetch("/data/roles/" + e.s + ".json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+      var got = S.shards[e.s] ? Promise.resolve(S.shards[e.s]) : dataJson("/data/roles/" + e.s + ".json");
       got.then(function (d) {
         S.shards[e.s] = d;
         if (seq !== S.rseq || S.emp !== e) return;
@@ -572,8 +595,15 @@
       return bad;
     }
 
+    // 2026-10-23: a lost POST response may still have created an order; never resend automatically (SITE-1).
+    // was: network failures invited an immediate duplicate order. Revert: remove uncertain and this send guard.
+    function uncertain() {
+      S.uncertain = true;
+      status.textContent = "We couldn't confirm whether your order was received. It may already have gone through. Check your email, including spam, for the confirmation link. Please don't submit another order until you check, or email " + CONTACT + " for help.";
+    }
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
+      if (send.disabled || S.uncertain) return;
       status.textContent = "";
       var bad = check();
       if (bad.length) { focusFor(bad[0]); return; }
@@ -587,6 +617,9 @@
       send.textContent = "Sending";
       call("POST", "/employer/order", body).then(function (res) {
         if (res.ok) {
+          // 2026-10-23: only the documented acknowledgement proves acceptance; was: any 2xx (SITE-1).
+          // Revert: remove this acknowledgement check with the uncertain-outcome rule.
+          if (res.out.ok !== true) { uncertain(); return; }
           $("sent-text").textContent = "We sent a link to " + body.email + ". It works for 48 hours.";
           form.hidden = true;
           var done = $("sent");
@@ -599,10 +632,12 @@
         if (target) { mark(target, msg || "Check this."); focusFor(target); }
         else if (res.status === 404) { form.hidden = true; show("closed", true); }
         else if (msg && (res.status === 400 || res.status === 409 || res.status === 429)) status.textContent = msg;
+        else if (res.status >= 500) uncertain();
         else status.textContent = "That didn't go through. Please try again, or email " + CONTACT + ".";
-      }).catch(function () {
-        status.textContent = "That didn't go through. Check your connection and try again, or email " + CONTACT + ".";
-      }).then(function () { send.disabled = false; send.textContent = label === "Sending" ? "Order" : label; });
+      }).catch(uncertain).then(function () {
+        send.disabled = !!S.uncertain;
+        send.textContent = S.uncertain ? "Check your email" : label === "Sending" ? "Order" : label;
+      });
     });
   }
 
@@ -623,12 +658,6 @@
       body.textContent = "";
       for (var i = 1; i < arguments.length; i++) body.appendChild(typeof arguments[i] === "string" ? el("p", {}, arguments[i]) : arguments[i]);
       box.focus();
-    }
-    function call(method, path, data) {
-      var init = method === "GET" ? { method: "GET" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) };
-      return fetch(API + path, init).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (out) { return { ok: r.ok, status: r.status, out: out || {} }; });
-      });
     }
     var contact = function (prefix) { return el("p", {}, prefix, el("a", { href: "mailto:" + CONTACT }, CONTACT), "."); };
     var again = el("p", {}, el("a", { href: "/employers/buy/" }, "Start a new order"));
