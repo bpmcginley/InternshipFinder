@@ -294,7 +294,8 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
   // never a student's plan, and everything below is left exactly as it was. null means "not a listing".
   const listing = await listingEvent(db, env, event, now, fetchImpl);
   if (listing) return listing;
-  const subscriptionId = event.type === "checkout.session.completed" ? o.subscription
+  const checkoutEvent = event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded";
+  const subscriptionId = checkoutEvent ? o.subscription
     : event.type.startsWith("customer.subscription.") ? o.id : null;
   if (typeof subscriptionId === "string") {
     const recovery = await db.prepare("SELECT * FROM student_billing_recovery WHERE subscription = ?").bind(subscriptionId).first();
@@ -304,7 +305,7 @@ async function applyFresh(db, env, config, event, now, fetchImpl) {
     }
   }
 
-  if (event.type === "checkout.session.completed") {
+  if (checkoutEvent) {
     const user = o.client_reference_id;
     if (!user || o.payment_status === "unpaid") return { ok: true, ignored: true };
     // The session says nothing about when the subscription renews; read that from the subscription.
@@ -502,9 +503,13 @@ export async function blocksDeletion(db, user, env, fetchImpl = fetch) {
   if (!pending) return false;
   if (pending.session && env) {
     const session = await stripe(env, "checkout/sessions/" + encodeURIComponent(pending.session), {}, fetchImpl, null, "GET");
-    if (session && session.id === pending.session && session.status === "expired") {
-      await db.prepare("UPDATE student_checkouts SET state = 'expired' WHERE user_hash = ? AND attempt = ? AND state IN ('creating', 'open')")
-        .bind(user, pending.attempt).run();
+    const subId = typeof session?.subscription === "string" ? session.subscription : session?.subscription?.id;
+    const ended = session?.status === "complete" && subId && await db.prepare(
+      "SELECT 1 FROM plans WHERE user_hash = ? AND subscription = ? AND status IN ('canceled', 'incomplete_expired')"
+    ).bind(user, subId).first();
+    if (session && session.id === pending.session && (session.status === "expired" || ended)) {
+      await db.prepare("UPDATE student_checkouts SET state = ? WHERE user_hash = ? AND attempt = ? AND state IN ('creating', 'open')")
+        .bind(ended ? "completed" : "expired", user, pending.attempt).run();
       return false;
     }
   }

@@ -116,6 +116,20 @@ test("only authoritative expiry releases a reservation or permits account deleti
   assert.equal(s.keys.size, 2);
 });
 
+test("delayed payment success completes the reservation and an ended matching subscription releases an older one", async () => {
+  const s = await fixture(); await buy(s);
+  const session = [...s.sessions.values()][0];
+  session.status = "complete"; session.subscription = "sub_one";
+  await event(s, { ...paid(s.user, "evt_delayed_paid", "sub_one", session.id), type: "checkout.session.async_payment_succeeded" });
+  assert.equal((await s.db.prepare("SELECT state FROM student_checkouts").first()).state, "completed");
+  await event(s, { id: "evt_ended", type: "customer.subscription.deleted", data: { object: { id: "sub_one", status: "canceled", metadata: { user_hash: s.user } } } });
+  await s.db.prepare("UPDATE student_checkouts SET state = 'open'").run();
+  assert.equal(await blocksDeletion(s.db, s.user, s.env, s.fetch), false);
+  await s.db.prepare("UPDATE student_checkouts SET state = 'open'").run();
+  await buy(s, "pro");
+  assert.equal(s.keys.size, 2);
+});
+
 test("failed cancellation stays durable, blocks deletion and checkout, and retries safely", async () => {
   const s = await fixture(); await event(s, paid(s.user, "evt_paid", "sub_one"));
   s.control.failCancel = true;

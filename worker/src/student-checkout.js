@@ -16,9 +16,15 @@ export async function studentCheckout(db, user, plan, form, now, create, read) {
       if (!session.url) throw new HttpError(502, "billing", "Checkout is temporarily unavailable.");
       return { url: session.url };
     }
-    if (session.status !== "expired") throw busy(); // complete can be awaiting its payment webhook
-    await db.prepare("UPDATE student_checkouts SET state = 'expired' WHERE user_hash = ? AND attempt = ? AND state IN ('creating', 'open')")
-      .bind(user, row.attempt).run();
+    // 2026-10-23: delayed payments can leave an older completed session pending locally.
+    // Only a confirmed ended matching subscription releases it. Revert: allow expiry only.
+    const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+    const ended = session.status === "complete" && subId && await db.prepare(
+      "SELECT 1 FROM plans WHERE user_hash = ? AND subscription = ? AND status IN ('canceled', 'incomplete_expired')"
+    ).bind(user, subId).first();
+    if (session.status !== "expired" && !ended) throw busy();
+    await db.prepare("UPDATE student_checkouts SET state = ? WHERE user_hash = ? AND attempt = ? AND state IN ('creating', 'open')")
+      .bind(ended ? "completed" : "expired", user, row.attempt).run();
     row = await held(db, user);
   }
   if (!row || row.state === "expired" || row.state === "completed") {

@@ -227,7 +227,7 @@ async function route(request, env, ctx, d) {
     case "DELETE /me": {
       const user = await signIn();
       if (await blocksDeletion(db, user, env, d.fetch)) {
-        throw new HttpError(409, "subscribed", "Cancel your paid plan first, then delete your data.");
+        throw new HttpError(409, "subscribed", "Cancel any active plan and finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending.");
       }
       await deleteUser(db, user, now);
       await deletePlan(db, user);
