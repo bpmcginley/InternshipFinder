@@ -5,6 +5,8 @@ account connections, queue posts, run workflows, or grant new permissions.
 
 ## One publishing owner for each channel
 
+Updated October 25, 2026: Heycatch's subscription ends November 30, and the weekly campaign pack (`growth/campaign.py`) supplies the material for every channel. See [the social playbook](SOCIAL_PLAYBOOK.md) for the routine and the move to Zeely's Social posting after November 30.
+
 | Channel | Current evidence | Publishing owner / next decision |
 |---|---|---|
 | Bluesky | The native Brand posts workflow posted on October 15. | Keep the native workflow as publisher. Do not mirror its field posts through Heycatch. |

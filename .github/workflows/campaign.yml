@@ -1,0 +1,39 @@
+name: Campaign pack
+
+# Every Monday, growth/campaign.py writes the week's campaign pack from the data: a real-search
+# slideshow and a hand-written tip, each as a 4:5 carousel, a 9:16 slideshow and a 9:16 video, with a
+# caption per channel and the week's schedule (README.md in the pack). It is kept as a run artifact for
+# a person to review and post, or to add to Heycatch or Zeely. This workflow posts nothing and reads no
+# secrets; growth/campaign.py refuses to write a pack whose slides or captions break its rules (lint).
+on:
+  schedule:
+    - cron: "0 12 * * 1"      # Mondays, 8am US Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Fonts, Pillow and ffmpeg
+        # Without ffmpeg the pack still has its slides, and no videos.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-ibm-plex >/dev/null
+          python -m pip install -q pillow
+          sudo apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: this week's pack has no videos"
+      - name: Write the pack
+        run: python growth/campaign.py docs --out=campaign
+      - name: Keep it
+        uses: actions/upload-artifact@v7
+        with:
+          name: campaign-pack
+          path: campaign/
+          retention-days: 30
