@@ -1871,9 +1871,6 @@ def test_employer_indexed_threshold_slack_and_search_traffic():
     assert ok(need, EMPLOYER, set()) and not ok(need - 1, EMPLOYER, set())
     assert ok(seo_pages.MIN_EMPLOYER, EMPLOYER, set(), frozenset({EMPLOYER}))       # people find it in search
     assert ok(need - slack, EMPLOYER, {EMPLOYER}) and not ok(need - slack - 1, EMPLOYER, {EMPLOYER})
-    # The slack only once the live site applies the bar: before, every 5-to-9 page is in the live sitemap.
-    assert not ok(need - 1, EMPLOYER, {EMPLOYER}, slack=False)
-    assert ok(need - 1, EMPLOYER, {EMPLOYER}, frozenset({EMPLOYER}), slack=False)
 
 
 def test_an_employer_page_under_the_bar_is_built_and_linked_but_noindex(tmp_path):
@@ -1888,43 +1885,19 @@ def test_an_employer_page_under_the_bar_is_built_and_linked_but_noindex(tmp_path
     assert f"<loc>https://internscout.org{EMPLOYER}</loc>" not in sitemap
     listing = os.path.join(site, seo_pages.HELD_FILE)
     assert EMPLOYER in seo_pages.held_paths(listing)
-    # The list says which bar made it, for the next deploy's slack, and the mark is not a page.
-    assert open(listing, encoding="utf-8").read().splitlines()[1] == seo_pages.EMPLOYER_MARK
-    assert seo_pages.held_marks(listing) == {seo_pages.EMPLOYER_MARK}
-    assert seo_pages.held_marks(str(tmp_path / "missing.txt")) == frozenset()
+    lines = open(listing, encoding="utf-8").read().splitlines()
+    assert lines[0].startswith("# ") and all(s.startswith("/internships/") for s in lines[1:])
     big = _built(_employer_site(tmp_path / "big", seo_pages.INDEX_EMPLOYER))[EMPLOYER]
     assert big["index"] and not big["thin"] and "noindex" not in big["html"]
     assert _built(site, earning=frozenset({EMPLOYER}))[EMPLOYER]["index"]
 
 
-def test_the_employer_slack_waits_for_a_deploy_that_applied_the_bar(tmp_path):
+def test_the_employer_slack_holds_even_when_the_noindex_list_could_not_be_fetched(tmp_path):
+    # pages.yml deletes live-noindex.txt when its fetch fails, so build() gets no held pages. was
+    # (2026-10-23): the slack then switched off and dropped the page below for good.
     site = _employer_site(tmp_path, seo_pages.INDEX_EMPLOYER - 1)
-
-    def page(slack):
-        built = seo_pages.build(site, {EMPLOYER}, frozenset(), frozenset(), employer_slack=slack)
-        return {p["path"]: p for p in built}[EMPLOYER]
-    assert not page(False)["index"]          # first deploy: in the live sitemap only because the bar was 5
-    assert page(True)["index"]               # later: indexed under the bar, one role closed
-
-
-def test_main_reads_the_employer_mark_from_the_live_noindex_list(tmp_path, monkeypatch):
-    class Built(Exception):
-        pass
-
-    def build(*a, **k):
-        raise Built(k["employer_slack"])     # only the build call matters here
-    monkeypatch.setattr(seo_pages, "build", build)
-    sitemap = tmp_path / "live-sitemap.xml"
-    sitemap.write_text("<urlset></urlset>", encoding="utf-8")
-    old, new = tmp_path / "old.txt", tmp_path / "new.txt"
-    old.write_text("# header\n/internships/at/x/\n", encoding="utf-8")
-    new.write_text(f"# header\n{seo_pages.EMPLOYER_MARK}\n/internships/at/x/\n", encoding="utf-8")
-    seen = []
-    for args in ([str(sitemap)], [str(sitemap), str(old)], [str(sitemap), str(new)]):
-        with pytest.raises(Built) as e:
-            seo_pages.main(["x", str(tmp_path), *args])
-        seen.append(e.value.args[0])
-    assert seen == [False, False, True]
+    assert _built(site, live={EMPLOYER})[EMPLOYER]["index"]
+    assert _built(site, live={EMPLOYER}, held={COMBO})[EMPLOYER]["index"]
 
 
 def test_index_employer_at_min_employer_indexes_every_employer_page_again(tmp_path, monkeypatch):
@@ -1943,6 +1916,54 @@ def test_duplicates_keeps_the_bigger_of_two_near_same_lists():
     # Of two pages the same size, the first by path stays.
     same = {"/y/": ids(0, 20), "/x/": ids(0, 20)}
     assert seo_pages.duplicates(same, set(same), frozenset()) == {"/y/"}
+
+
+def test_duplicates_does_not_flip_a_pair_near_the_line():
+    ids = lambda a, b: frozenset(range(a, b))
+    dup = seo_pages.duplicates
+    # The page in the live sitemap stays, even when it is the smaller one: sizes that cross between two
+    # ingests do not swap which of the pair is indexed.
+    pair = {"/big/": ids(0, 20), "/small/": ids(0, 19)}
+    assert dup(pair, set(pair), frozenset()) == {"/small/"}
+    assert dup(pair, set(pair), frozenset(), live={"/small/"}) == {"/big/"}
+    # Sharing 17 of 20 (0.85): a new page is out, one in the live sitemap stays until SAME_SHARE (0.9).
+    near = {"/a/": ids(0, 20), "/b/": ids(3, 20)}
+    assert seo_pages.SAME_SHARE == 0.9 and dup(near, set(near), frozenset()) == {"/b/"}
+    assert dup(near, set(near), frozenset(), live={"/a/", "/b/"}) == set()
+    assert dup(pair, set(pair), frozenset(), live={"/big/", "/small/"}) == {"/small/"}     # 0.95: out
+
+
+TORONTO = "/internships/mechanical-engineering/toronto/"
+ONTARIO = "/internships/mechanical-engineering/ontario/"
+
+
+def _toronto_site(tmp_path):
+    """25 mechanical roles in Toronto and 25 in Vancouver: Toronto's lists are Ontario's under a second name,
+    and Vancouver's British Columbia's, as a field and as a place."""
+    def at(i, city, prov):
+        return _row(i, company_name=f"{city} Co {i}",
+                    regions=[{"loc": f"{city}, {prov}", "kind": "canada", "state": prov, "metro": city}])
+    return _site(tmp_path, {"ON": [at(i, "Toronto", "ON") for i in range(25)],
+                            "BC": [at(100 + i, "Vancouver", "BC") for i in range(25)]})
+
+
+def test_a_page_that_is_another_pages_list_is_built_and_linked_but_noindex(tmp_path):
+    site = _toronto_site(tmp_path)
+    built = _built(site)
+    thin = {p for p, v in built.items() if v["thin"] and v["kind"] in ("state", "combo")}
+    assert thin == {TORONTO, "/internships/mechanical-engineering/vancouver/",
+                    "/internships/toronto/", "/internships/vancouver/"}
+    assert built[ONTARIO]["index"] and built["/internships/canada/"]["index"]
+    assert '<meta name="robots" content="noindex, follow"/>' in built[TORONTO]["html"]
+    assert f'href="{TORONTO}"' in built["/internships/mechanical-engineering/"]["html"]   # still linked
+    seo_pages.write(site, list(built.values()))
+    assert f"<loc>https://internscout.org{TORONTO}</loc>" not in open(os.path.join(site, "sitemap.xml"),
+                                                                      encoding="utf-8").read()
+    assert TORONTO in seo_pages.held_paths(os.path.join(site, seo_pages.HELD_FILE))
+    # The one the live sitemap has stays, and one people find in search is never taken out.
+    again = _built(site, live={TORONTO})
+    assert again[TORONTO]["index"] and again[ONTARIO]["thin"]
+    assert _built(site, earning=frozenset({TORONTO}))[TORONTO]["index"]
 
 
 def test_a_page_people_find_in_search_stays_indexed_however_small(tmp_path):

@@ -149,17 +149,19 @@ def combo_indexed(n: int, path: str, live, earning: frozenset[str] = frozenset()
 # 260 of the 805 indexed employer pages out; 104 of the 364 under 10 roles stayed in as earning.
 # Revert: INDEX_EMPLOYER = MIN_EMPLOYER indexes every employer page again.
 INDEX_EMPLOYER = 10
-# INDEX_SLACK keeps an employer page that one closed role takes under the bar, but only once a deploy has
-# applied the bar: on the first one every employer page with MIN_EMPLOYER roles is in the live sitemap, and
-# the slack would keep the 8s and 9s this is meant to drop. The noindex list (HELD_FILE) carries this line
-# from the deploy that applied it, and the next deploy reads it back (held_marks).
-EMPLOYER_MARK = f"# employer-index {INDEX_EMPLOYER}"
+# INDEX_SLACK keeps an employer page that one closed role takes under the bar, as INDEX_COMBO's does.
+# was (2026-10-23): the slack only once the live noindex list carried "# employer-index 10" (EMPLOYER_MARK,
+# held_marks), so the first deploy would not keep the 8s and 9s it was meant to drop. That deploy ran on
+# 2026-10-23. After it, the switch could only do harm: a deploy whose fetch of the noindex list failed
+# turned the slack off and dropped every page the slack was holding, for good (out of the sitemap, the next
+# deploy no longer sees it live). Raising INDEX_EMPLOYER later keeps, on that first deploy, the pages within
+# INDEX_SLACK of the new bar, as raising INDEX_COMBO does.
 
 
-def employer_indexed(n: int, path: str, live, earning: frozenset[str] = frozenset(), slack: bool = True) -> bool:
+def employer_indexed(n: int, path: str, live, earning: frozenset[str] = frozenset()) -> bool:
     """Whether an employer page listing n roles is indexed (INDEX_EMPLOYER, INDEX_SLACK)."""
     return (n >= INDEX_EMPLOYER or path in earning
-            or (slack and path in live and n >= INDEX_EMPLOYER - INDEX_SLACK))
+            or (path in live and n >= INDEX_EMPLOYER - INDEX_SLACK))
 
 
 # Pages that are another page's list under a second name (2026-10-23). A page near_same as an indexed page of
@@ -174,19 +176,27 @@ def employer_indexed(n: int, path: str, live, earning: frozenset[str] = frozense
 # was, in this PR's first draft: 90% of the page's roles on the bigger page, whatever its size; that took
 # out every city and province page (Boston inside Massachusetts, Ontario inside Canada).
 # On 2026-10-23 this took 12 field-in-a-place pages out (finance in Toronto, data science in New York City...).
+# Without flipping (2026-10-24): two ingests a day move these lists, and a page whose share sat at the bar,
+# or a pair whose sizes crossed, went in and out of the index from one deploy to the next. So a page in the
+# live sitemap goes first, and stays unless SAME_SHARE of the two lists is shared (fold_at's bar for a
+# page already served); a page out of it comes back only below NEAR_SAME. was: biggest first, every page
+# at NEAR_SAME.
 # Revert: return set() from duplicates.
 
 
-def duplicates(lists: dict[str, frozenset], indexed: set[str], earning: frozenset[str]) -> set[str]:
-    """The paths of one family (path -> its role ids) near_same as a bigger or earlier indexed page of the
-    family that stays indexed. Only indexed pages are judged or counted."""
+def duplicates(lists: dict[str, frozenset], indexed: set[str], earning: frozenset[str],
+               live=frozenset()) -> set[str]:
+    """The paths of one family (path -> its role ids) near_same as an indexed page of the family that
+    stays indexed: one in the live sitemap before one out of it, then the bigger, then by path. Only
+    indexed pages are judged or counted."""
     kept: list[frozenset] = []
     out = set()
-    for path in sorted((p for p in lists if p in indexed), key=lambda p: (-len(lists[p]), p)):
+    for path in sorted((p for p in lists if p in indexed), key=lambda p: (p not in live, -len(lists[p]), p)):
         mine = lists[path]
+        bar = SAME_SHARE if path in live else NEAR_SAME
         # Only lists of about the same size can be near_same, as near_indexed checks first.
-        if path not in earning and mine and any(NEAR_SAME * len(r) <= len(mine) and near_same(mine, r)
-                                                 for r in kept):
+        if path not in earning and mine and any(bar * max(len(r), len(mine)) <= min(len(r), len(mine))
+                                                 and near_same(mine, r, bar) for r in kept):
             out.add(path)
         else:
             kept.append(mine)
@@ -3264,13 +3274,12 @@ def near_hub(hub: dict) -> tuple[list[str], str, str]:
 # ---------------------------------------------------------------- build
 
 def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
-          held: set[str] | frozenset[str] = frozenset(), earning: frozenset[str] | None = None,
-          employer_slack: bool = True) -> list[dict]:
+          held: set[str] | frozenset[str] = frozenset(), earning: frozenset[str] | None = None) -> list[dict]:
     """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
     whose lastmod the new one never goes below. held: the noindex pages it is serving now
     (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
-    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex.
-    employer_slack: whether the live site already applies INDEX_EMPLOYER (EMPLOYER_MARK)."""
+    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex, but for
+    the near pages while NEAR_INDEX is off."""
     global BEACON, BASELINE, GENERATED, DIGEST_FORM
     earning = earning_paths() if earning is None else earning
     # Served now, indexed or not: what keep_at and fold_at ask. was: path in live (no noindex pages).
@@ -3370,9 +3379,9 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     for t in sorted({t for t, _ in combos}):
         family = {combo_path[(tt, k)]: ids(v) for (tt, k), v in combos.items() if tt == t}
         inside |= duplicates(family, {p for (tt, k), p in combo_path.items() if tt == t
-                                     and combo_indexed(len(combos[(tt, k)]), p, live, earning)}, earning)
+                                     and combo_indexed(len(combos[(tt, k)]), p, live, earning)}, earning, live)
     place_lists = {f"/internships/{state_slug(k)}/": ids(v) for k, v in states.items()}
-    inside |= duplicates(place_lists, set(place_lists), earning)
+    inside |= duplicates(place_lists, set(place_lists), earning, live)
 
     # A major whose page would show what a field page, or an earlier major's page, already shows would
     # be a second URL for the same list. It gets no page of its own: the majors hub links it to that
@@ -3671,7 +3680,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             listing_body(items, f"at {name}", "", now, related,
                          dash=dash_link(state=where, companies=spellings[name]), here=path, extra=facts,
                          src="seo-employer"), items, kind="employer",
-            thin=not employer_indexed(len(items), path, live, earning, employer_slack))   # 2026-10-23
+            thin=not employer_indexed(len(items), path, live, earning))   # 2026-10-23
 
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
     # already uses is skipped, like a field slug that names a state.
@@ -4087,8 +4096,9 @@ def write(site_dir: str, pages: list[dict]) -> None:
     page_dates.write(site_dir, content_dates)  # 2026-10-23: persist hashes, not page membership.
     # The thin pages this deploy serves (INDEX_COMBO), for the next deploy's held_paths (2026-10-13).
     with open(os.path.join(site_dir, HELD_FILE), "w", encoding="utf-8", newline="\n") as f:
-        f.write("# InternScout pages served with noindex, follow (too few roles to ask search engines to index).\n"
-                + EMPLOYER_MARK + "\n"
+        # was: "...(too few roles to ask search engines to index)." and EMPLOYER_MARK's line (2026-10-24)
+        f.write("# InternScout pages served with noindex, follow: too few roles, a near page, or another page's "
+                "list under a second name.\n"
                 + "".join(p["path"] + "\n" for p in sorted(pages, key=lambda p: p["path"]) if p.get("thin")))
     # The dashboard's Browse section (home_browse), between its two markers. Only what is between them
     # changes, so writing it twice gives the same file.
@@ -4127,15 +4137,6 @@ def held_paths(listing: str) -> frozenset[str]:
         return frozenset()
 
 
-def held_marks(listing: str) -> frozenset[str]:
-    """The rule lines (EMPLOYER_MARK) of the live noindex list (HELD_FILE); empty if there was none."""
-    try:
-        with open(listing, encoding="utf-8") as f:
-            return frozenset(s for s in (line.strip() for line in f) if s.startswith("# employer-index "))
-    except (OSError, UnicodeDecodeError):
-        return frozenset()
-
-
 def main(argv: list[str]) -> None:
     """python -m internscout.seo_pages SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
     [--placements-report PATH]
@@ -4162,8 +4163,7 @@ def main(argv: list[str]) -> None:
         del argv[i:i + 2]
     site_dir = argv[1] if len(argv) > 1 else "docs"
     pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {},
-                  held_paths(argv[3]) if len(argv) > 3 else frozenset(),
-                  employer_slack=len(argv) > 3 and EMPLOYER_MARK in held_marks(argv[3]))
+                  held_paths(argv[3]) if len(argv) > 3 else frozenset())
     # was: pages = build(site_dir, live_paths(argv[2]) if len(argv) > 2 else {})
     built = pages                  # as build() made them, before any paid box, for the feeds
     today = today_utc()
