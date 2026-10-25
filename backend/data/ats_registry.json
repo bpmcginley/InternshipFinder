@@ -14137,9 +14137,8 @@
   "ferrovial|wd3|ferrovial_career_site": {
    "name": "Ferrovial",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-25"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "ffin|wd1|First_Financial_Bank": {
    "name": "First Financial ",
