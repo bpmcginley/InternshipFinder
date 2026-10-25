@@ -240,6 +240,26 @@ def publish_reel(token: str, video_url: str, caption: str, sleep=time.sleep, tim
     return _publish_container(token, ig_id, container)
 
 
+def publish_carousel(token: str, image_urls: list[str], caption: str, sleep=time.sleep,
+                     timeout: int = CONTAINER_WAIT) -> str:
+    """Post the images as one carousel (2026-10-25: Tuesday's search slides, growth/social.py carousel);
+    the new post's media id. Each image is a carousel item container, then one CAROUSEL container holds
+    them and carries the caption, as Meta's content publishing guide orders it."""
+    if not 2 <= len(image_urls) <= 10:
+        raise InstagramError("a carousel takes 2 to 10 images")
+    ig_id = _ig_id(token)
+    children = []
+    for url in image_urls:
+        item = _request("POST", f"{ig_id}/media", {"image_url": url, "is_carousel_item": "true",
+                                                   "access_token": token})["id"]
+        _wait(item, token, "carousel image", timeout, sleep, 3)
+        children.append(item)
+    container = _request("POST", f"{ig_id}/media", {"media_type": "CAROUSEL", "children": ",".join(children),
+                                                    "caption": caption, "access_token": token})["id"]
+    _wait(container, token, "carousel", timeout, sleep, 3)
+    return _publish_container(token, ig_id, container)
+
+
 def record_status(path: str | None, requested: str, outcome: str, reason: str | None = None) -> None:
     """Finite operational result only: no tokens, captions, provider errors or subscriber data."""
     status = {"channel": "instagram", "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -252,7 +272,9 @@ def record_status(path: str | None, requested: str, outcome: str, reason: str | 
             json.dump(status, f, indent=2)
             f.write("\n")
     if outcome == "card_fallback":
-        print("::warning title=Instagram Reel unavailable::Posted the picture card instead of the planned Reel. See the Instagram result artifact.")
+        # A Tuesday's carousel falls back the same way (2026-10-25). was: the Reel's words only.
+        what = {"reel": "Reel"}.get(requested, requested)
+        print(f"::warning title=Instagram {what} unavailable::Posted the picture card instead of the planned {what}. See the Instagram result artifact.")
     if outcome == "unknown":
         print("::error title=Instagram publishing outcome unknown::The final publish may have succeeded. No retry or fallback was attempted. Check the product profile and provider before any manual retry.")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -278,7 +300,8 @@ def main(argv: list[str]) -> int:
     if "--send" not in argv:
         return 0
     status_path = next((a.split("=", 1)[1] for a in argv if a.startswith("--status-file=")), None)
-    requested = "reel" if post and post.get("reel") else "card" if post else "none"
+    # was: "reel" if post and post.get("reel") else "card" if post else "none"
+    requested = ("reel" if post.get("reel") else "carousel" if post.get("carousel_urls") else "card") if post else "none"
     secret = os.environ.get("INSTAGRAM_TOKEN")
     if not secret:
         print("[instagram] no INSTAGRAM_TOKEN; nothing sent")
@@ -306,9 +329,24 @@ def main(argv: list[str]) -> int:
                 return 0
         elif post.get("reel_path"):
             fallback_reason = "missing_public_video_url"
+        if requested == "carousel":
+            try:
+                for url in post["carousel_urls"]:
+                    wait_for_image(url)
+                media_id = publish_carousel(token, post["carousel_urls"],
+                                            post.get("carousel_caption") or post["instagram_caption"])
+            except (InstagramError, urllib.error.URLError, OSError) as e:
+                # As for a Reel: only a failure before the final publish falls back to the card.
+                print(f"[instagram] carousel failed ({type(e).__name__}: {e}); posting the card instead")
+                fallback_reason = "carousel_publish_failed"
+            else:
+                print(f"[instagram] carousel posted: {media_id}")
+                record_status(status_path, requested, "published_carousel")
+                return 0
         wait_for_image(post["card_url"])
         print(f"[instagram] posted: {publish(token, post['card_url'], post['instagram_caption'])}")
-        record_status(status_path, requested, "card_fallback" if requested == "reel" else "published_card", fallback_reason)
+        # was: "card_fallback" if requested == "reel" else "published_card"
+        record_status(status_path, requested, "published_card" if requested == "card" else "card_fallback", fallback_reason)
         return 0
     except PublishOutcomeUnknown:
         record_status(status_path, requested, "unknown", "final_publish_unconfirmed")
