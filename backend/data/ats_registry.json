@@ -3152,6 +3152,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "bitgo": {
+   "name": "BitGo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-25"
+  },
   "bitmovin": {
    "name": "Bitmovin",
    "quant": false,
@@ -3357,6 +3363,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "chargepoint": {
+   "name": "ChargePoint",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-25"
   },
   "charlesriverassociates": {
    "name": "Charles River Associates",
@@ -8896,6 +8908,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "linkedin": {
+   "name": "LinkedIn",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-25"
+  },
   "longwall": {
    "name": "Long Wall",
    "quant": false,
@@ -14119,8 +14137,9 @@
   "ferrovial|wd3|ferrovial_career_site": {
    "name": "Ferrovial",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-25"
   },
   "ffin|wd1|First_Financial_Bank": {
    "name": "First Financial ",
@@ -15597,6 +15616,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "liveramp|wd5|AcxiomJPN": {
+   "name": "LiveRamp",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-25"
   },
   "llbean|wd1|LLBean_Careers": {
    "name": "L.L.Bean",
