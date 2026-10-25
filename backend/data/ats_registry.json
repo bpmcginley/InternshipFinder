@@ -4058,6 +4058,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "forcefactor": {
+   "name": "Force Factor",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-25"
+  },
   "formic": {
    "name": "Formic",
    "quant": false,
@@ -4325,6 +4331,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "goodr": {
+   "name": "goodr",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-25"
   },
   "grafanalabs": {
    "name": "Grafana Labs",
