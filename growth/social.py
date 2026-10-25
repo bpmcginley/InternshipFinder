@@ -286,12 +286,44 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
     }
 
 
-def write_out(site_dir: str, out_dir: str) -> dict | None:
-    """post.json and card.jpg into out_dir, for the workflow's picture steps."""
-    data = card_data(site_dir)
+def carousel(site_dir: str, out_dir: str, today: datetime) -> dict:
+    """The week's real-search carousel for Instagram (growth/campaign.py), drawn into out_dir: the
+    slides' file names and served URLs and its caption, or {} when there is no search to show or a
+    slide or the caption breaks campaign.lint. Since 2026-10-25 a Tuesday posts this on Instagram
+    instead of the count card: Heycatch's analytics gave the count cards 1 or 2 views each, against
+    about 900 for practical slideshows (growth/SOCIAL_PLAYBOOK.md). was: the card on every non-Reel day."""
+    import campaign
+    d = sp.load(site_dir)
+    export = sp._when(d["generated_at"]) or today
+    pick = campaign.search_pick(d["listings"], export)
+    if not pick:
+        return {}
+    slides = campaign.search_slides(pick, export, d["baseline"])
+    caption = campaign.captions(slides, campaign.search_path(pick), f"weekly-{campaign.week_tag(today)}")["instagram"]
+    if campaign.lint(caption) or any(campaign.lint(" ".join(s)) for s in slides):
+        return {}
+    stem = f"{today:%Y-%m-%d}-search-{sp.field_slug(pick['field'])}"
+    names = []
+    for i, slide in enumerate(slides, 1):
+        name = f"{stem}-{i}.jpg"
+        campaign.draw(slide, "feed", i, len(slides)).save(os.path.join(out_dir, name), "JPEG", quality=90, optimize=True)
+        names.append(name)
+    return {"carousel_names": names, "carousel_urls": [CARD_BASE + n for n in names],
+            "carousel_caption": caption[:IG_CAPTION_MAX]}
+
+
+def write_out(site_dir: str, out_dir: str, today: datetime | None = None) -> dict | None:
+    """post.json and card.jpg into out_dir, for the workflow's picture steps; on a day that is not a
+    Reel day, the search carousel's slides too (carousel)."""
+    data = card_data(site_dir, today)
     if not data:
         return None
     os.makedirs(out_dir, exist_ok=True)
+    if not data.get("reel"):
+        try:
+            data.update(carousel(site_dir, out_dir, today or datetime.now(timezone.utc)))
+        except Exception as e:      # a missing font must not stop the card or the text posts
+            print(f"[social] no carousel this time ({type(e).__name__}: {e}); Instagram gets the card")
     with open(os.path.join(out_dir, "post.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     import cards      # imported here: only the card needs Pillow, the text posts don't

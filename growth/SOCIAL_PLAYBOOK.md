@@ -44,8 +44,8 @@ utm tag.
 | Day | What | Where | Made by |
 |---|---|---|---|
 | Monday | Tip slideshow (pack: `tip`) | TikTok photo mode, Instagram and Facebook carousel | `growth/campaign.py` |
-| Tuesday | Count post | Bluesky; Instagram card | `growth/social.py` (Brand posts) |
-| Wednesday | Real-search slideshow (pack: `search`) | TikTok photo mode, Instagram and Facebook carousel | `growth/campaign.py` |
+| Tuesday | Count post; the week's real-search carousel | Bluesky; Instagram (the carousel, or the card if it can't post) | `growth/social.py` (Brand posts) |
+| Wednesday | Real-search slideshow (pack: `search`) | TikTok photo mode, Facebook carousel (Instagram had it Tuesday) | `growth/campaign.py` |
 | Thursday | Real-search video (pack: `search.mp4`) | YouTube Short, Instagram and Facebook Reel | `growth/campaign.py` |
 | Thursday | Count Reel | Bluesky; Instagram | `growth/social.py` |
 | Saturday | Tip video (pack: `tip.mp4`) | YouTube Short, TikTok | `growth/campaign.py` |
@@ -105,7 +105,7 @@ The plan is active with 12,420 credits.
    Facebook page and Instagram account instead of "Zeely Marketplace"; link to
    `https://internscout.org/?utm_source=facebook&utm_medium=paid&utm_campaign=zeely-meta`. Judge it by
    posting clicks and new accounts per dollar, not visits.
-2. **Instagram's Tuesday count card.** Recommended: replace it with the pack's carousel (count cards draw
-   1 or 2 views). That is a change to `growth/social.py`, made only after the first two packs are posted.
+2. **Instagram's Tuesday count card.** Done October 25 at the owner's word: Tuesdays post the week's
+   real-search carousel, and fall back to the card only when the carousel can't be made or published.
 3. **Approve the first pack** before anything from it is scheduled (the October 5 policy: the owner
    reviews the first queue).

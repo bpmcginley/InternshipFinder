@@ -55,7 +55,7 @@ mocked tests.
 The Instagram step writes `out/instagram-status.json`, retained as the
 `instagram-publishing-result` Actions artifact for 14 days, and a step summary. It contains only the
 requested format, timestamp, finite outcome and optional reason code, never tokens, captions or raw
-provider errors. Outcomes distinguish `published_reel`, `published_card`, `card_fallback`,
+provider errors. Outcomes distinguish `published_reel`, `published_carousel` (Tuesdays since October 25), `published_card`, `card_fallback`,
 `not_configured`, `no_post`, `unknown` and `failed`. A card replacing a planned Reel produces an Actions warning.
 The native workflow can still finish green after a successful fallback; read its result rather than
 calling green proof that every channel or format published.

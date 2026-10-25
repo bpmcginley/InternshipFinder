@@ -121,6 +121,12 @@ jobs:
           fi
           cp out/card.jpg "cards/$name"
           git -C cards add "$name"
+          # A Tuesday's search carousel (growth/social.py carousel, 2026-10-25) goes beside the card.
+          for f in $(python -c "import json; print(' '.join(json.load(open('out/post.json')).get('carousel_names', [])))"); do
+            case "$f" in *[!A-Za-z0-9._-]*) echo "unexpected carousel name"; exit 1;; esac
+            cp "out/$f" "cards/$f"
+            git -C cards add "$f"
+          done
           if [ -s out/reel.mp4 ] && [ -n "$video_name" ]; then
             cp out/reel.mp4 "cards/$video_name"
             git -C cards add "$video_name"
