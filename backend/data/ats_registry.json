@@ -2638,6 +2638,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "617mediagroup": {
+   "name": "617MediaGroup",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
+  },
   "a24": {
    "name": "A24",
    "quant": false,
@@ -8410,8 +8416,9 @@
   "aofl": {
    "name": "Age of Learning",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-26"
   },
   "appen-2": {
    "name": "Appen",
@@ -8525,8 +8532,9 @@
   "butcherbox": {
    "name": "ButcherBox",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-26"
   },
   "catalist": {
    "name": "Catalist",
@@ -14169,6 +14177,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "fhlb|wd1|FHLB_Careers": {
+   "name": "FHLBD Federal Home Loan Bank of Dallas",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
   },
   "fifththird|wd5|53careers": {
    "name": "Fifth Third Bank",
