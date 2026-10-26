@@ -1033,6 +1033,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "hookmusic": {
+   "name": "Hook Music",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
+  },
   "hubs.is": {
    "name": "Hubs.is",
    "quant": false,
@@ -5310,6 +5316,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "northmarq": {
+   "name": "Northmarq",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
   },
   "northspyre": {
    "name": "Northspyre",
@@ -11515,6 +11527,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "7eleven|wd3|7eleven": {
+   "name": "7-Eleven",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
+  },
   "aaaie|wd1|csaacareers": {
    "name": "AAA Club Alliance",
    "quant": false,
@@ -11826,6 +11844,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "allisontransmission|wd1|ATI-External": {
+   "name": "Allison Transmission",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
   },
   "allstate|wd5|allstate_careers": {
    "name": "Allstate Insurance Company",
@@ -14763,8 +14787,9 @@
   "gunvor|wd3|Gunvor_Careers": {
    "name": "Gunvor",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-26"
   },
   "habitat|wd12|External": {
    "name": "Habitat for Humanity",
@@ -15318,6 +15343,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "jainglobal|wd5|LinkedInCareerSite": {
+   "name": "Jain Global",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
+  },
   "jcdecaux|wd3|ExternalSiteJCDUK": {
    "name": "JCDecaux",
    "quant": false,
@@ -15449,8 +15480,9 @@
   "kiongroup|wd3|KION_SCS": {
    "name": "KION Group",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-26"
   },
   "kiongroup|wd3|kiongroup": {
    "name": "KION Group",
@@ -18321,6 +18353,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-21"
+  },
+  "transamerica|wd5|AUK_JobSite": {
+   "name": "Aegon Asset Management",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
   },
   "transamerica|wd5|US": {
    "name": "Transamerica",
