@@ -147,6 +147,7 @@
 "340 towne dr|NY":null,
 "345 rockaway tpke|NY":null,
 "35-05 junction blvd.|NY":null,
+"3505 junction boulevard|NY":null,
 "359 e. 204th st.|NY":null,
 "36 w 44th street|NY":null,
 "360 waterfront dr e|PA":null,
@@ -1578,6 +1579,7 @@
 41.4768,
 -74.0238
 ],
+"new york (hybrid|NY":null,
 "new york (remote|NY":null,
 "new york (usa|NY":null,
 "new york - 104 w 40th|NY":null,
@@ -2223,6 +2225,10 @@
 40.7765,
 -73.467
 ],
+"plattsburgh|NY":[
+44.6961,
+-73.4543
+],
 "plum boro|PA":null,
 "plymouth meeting|PA":[
 40.1023,
@@ -2395,6 +2401,10 @@
 "sea|NY":[
 40.8496,
 -73.6471
+],
+"selinsgrove|PA":[
+40.7994,
+-76.8619
 ],
 "sellersville|PA":[
 40.3543,
@@ -2589,6 +2599,7 @@
 -74.0238
 ],
 "union college|NY":null,
+"uniondale ny|NY":null,
 "uniontown|PA":[
 39.9009,
 -79.7259
@@ -2726,6 +2737,7 @@
 "usa) pa harborcreek 03281 wm supercenter|PA":null,
 "usa) pa hazle township 02255 wm supercenter|PA":null,
 "usa) pa moon township 04644 wm supercenter|PA":null,
+"usa) pa selinsgrove 02185 wm supercenter|PA":null,
 "usa) pa tarentum 03838 wm supercenter|PA":null,
 "usa) pa woodland 06827 dispatch trucking|PA":null,
 "usa) pa wyncote 05229 wal-mart|PA":null,

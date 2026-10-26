@@ -3060,6 +3060,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "awetomaton": {
+   "name": "Awetomaton",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
+  },
   "axiomaticai": {
    "name": "Axiomatic AI",
    "quant": false,
@@ -5038,6 +5044,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "machindustries": {
+   "name": "Mach Industries",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-26"
   },
   "madisonenergyinfrastructure": {
    "name": "Madison Energy Infrastructure",
@@ -14787,9 +14799,8 @@
   "gunvor|wd3|Gunvor_Careers": {
    "name": "Gunvor",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-26"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "habitat|wd12|External": {
    "name": "Habitat for Humanity",
@@ -15480,9 +15491,8 @@
   "kiongroup|wd3|KION_SCS": {
    "name": "KION Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-10-26"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "kiongroup|wd3|kiongroup": {
    "name": "KION Group",
