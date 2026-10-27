@@ -64,7 +64,8 @@
     return { r: String(saved.r || "").slice(0, 253), u: safeTag(saved.u), m: safeTag(saved.m),
       c: safeTag(saved.c), t: safeTag(saved.t) };
   };
-  var attribution = campaignContext();
+  var attribution = live ? campaignContext() : {};
+  var attributedEvents = { install_click: true, digest_signup: true, employer_order_submit: true };
   var addAttribution = function (data, attr) {
     ["r", "u", "m", "c", "t"].forEach(function (key) { if (attr[key]) data[key] = attr[key]; });
     return data;
@@ -85,7 +86,8 @@
   window.ISCount = function (event) {
     if (!live || done[event]) return;   // local copies and automated browsers count nothing
     done[event] = true;
-    beacon(addAttribution({ e: event, p: /^employer_/.test(event) ? employerPage() : location.pathname }, attribution));
+    var data = { e: event, p: /^employer_/.test(event) ? employerPage() : location.pathname };
+    beacon(attributedEvents[event] ? addAttribution(data, attribution) : data);
   };
   queued.forEach(function (e) { window.ISCount(e); });
   window.ISCountQ = { push: window.ISCount };

@@ -78,6 +78,15 @@ test("campaign and content tags follow conversion intents only within the same t
   assert.deepEqual(otherTab.bodies().filter((b) => b.e), [{ e: "install_click", p: "/install.html" }]);
 });
 
+test("non-attributed product steps never transmit campaign context", () => {
+  const r = load({ session: new Map(), search: "?utm_source=x&utm_medium=social&utm_campaign=weekly-2026w44&utm_content=search_card" });
+  for (const event of ["signin_start", "signin", "profile", "autoapply", "posting_click", "review_click"]) r.ctx.ISCount(event);
+  assert.deepEqual(r.bodies().filter((b) => b.e), [
+    { e: "signin_start", p: "/" }, { e: "signin", p: "/" }, { e: "profile", p: "/" },
+    { e: "autoapply", p: "/" }, { e: "posting_click", p: "/" }, { e: "review_click", p: "/" },
+  ]);
+});
+
 test("campaign context refuses URLs, email-like values and overlong tags", () => {
   const r = load({ session: new Map(), search: "?utm_source=x&utm_medium=social&utm_campaign=https%3A%2F%2Fevil.example%2Fa&utm_content=student%40school.edu" });
   r.ctx.ISCount("install_click");
@@ -106,17 +115,21 @@ test("local copies and automated browsers send nothing, and steps there are drop
 
 test("?nocount=1 stops counting this browser on every later load, and ?nocount=0 starts it again", () => {
   const storage = new Map();
-  let r = load({ storage, search: "?nocount=1" });
+  const session = new Map();
+  let r = load({ storage, session, search: "?nocount=1&utm_source=x&utm_medium=social&utm_campaign=private-test" });
   r.ctx.ISCount("signin");
   assert.equal(r.sent.length, 0, "the load that sets it is not counted");
+  assert.equal(session.size, 0, "an opted-out load does not retain campaign context");
   assert.equal(storage.get("internscout.nocount"), "1");
-  r = load({ storage, path: "/internships/ohio/" });
+  r = load({ storage, session, path: "/internships/ohio/" });
   r.ctx.ISCount("install_click");
   assert.equal(r.sent.length, 0, "a later page sends neither its load nor its steps");
   assert.throws(() => r.click("https://chromewebstore.google.com/detail/x"), TypeError, "no click listener is attached at all");
-  r = load({ storage, search: "?nocount=0" });
+  r = load({ storage, session, search: "?nocount=0" });
   assert.equal(r.sent.length, 1);
   assert.equal(storage.has("internscout.nocount"), false);
+  r.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi");
+  assert.deepEqual(r.bodies().find((b) => b.e), { e: "install_click", p: "/" }, "opted-out tags are never replayed");
 });
 
 test("steps count once per page load, queued ones included, and store links count as install clicks", () => {
