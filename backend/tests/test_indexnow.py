@@ -2,6 +2,8 @@
 import importlib.util
 import os
 
+import pytest
+
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 _spec = importlib.util.spec_from_file_location("indexnow", os.path.join(ROOT, "growth", "indexnow.py"))
 indexnow = importlib.util.module_from_spec(_spec)
@@ -33,3 +35,21 @@ def test_first_deploy_sends_everything_and_other_hosts_never(tmp_path):
 def test_the_key_file_is_published_with_the_key():
     with open(os.path.join(ROOT, "docs", f"{indexnow.KEY}.txt"), encoding="utf-8") as f:
         assert f.read().strip() == indexnow.KEY
+
+
+@pytest.mark.parametrize("statuses", [[200], [202], [200, 202]])
+def test_an_accepted_submission_keeps_the_notify_job_green(tmp_path, monkeypatch, statuses):
+    old = _sitemap(tmp_path, "old.xml", {})
+    new = _sitemap(tmp_path, "new.xml", {"https://internscout.org/": "2026-10-27"})
+    monkeypatch.setattr(indexnow, "submit", lambda urls: statuses)
+    assert indexnow.main(["indexnow.py", old, new, "--submit"]) == 0
+
+
+@pytest.mark.parametrize("statuses", [[500], [0], [200, 429]])
+def test_a_rejected_submission_fails_only_the_notify_job(tmp_path, monkeypatch, capsys, statuses):
+    old = _sitemap(tmp_path, "old.xml", {})
+    new = _sitemap(tmp_path, "new.xml", {"https://internscout.org/": "2026-10-27"})
+    monkeypatch.setattr(indexnow, "submit", lambda urls: statuses)
+    assert indexnow.main(["indexnow.py", old, new, "--submit"]) == 1
+    out = capsys.readouterr().out
+    assert "::error::" in out and str(statuses) in out
