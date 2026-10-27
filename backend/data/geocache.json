@@ -2002,6 +2002,7 @@
 "pa - butler|PA":null,
 "pa - carbondale|PA":null,
 "pa - carlisle|PA":null,
+"pa - chalfont|PA":null,
 "pa - chambersburg|PA":null,
 "pa - clarks summit|PA":null,
 "pa - coatesville|PA":null,
@@ -2047,6 +2048,7 @@
 "pa - homestead|PA":null,
 "pa - honesdale|PA":null,
 "pa - hummelstown|PA":null,
+"pa - huntingdon valley|PA":null,
 "pa - indiana|PA":null,
 "pa - jenkintown|PA":null,
 "pa - jersey shore|PA":null,
@@ -2116,6 +2118,7 @@
 "pa - swarthmore|PA":null,
 "pa - thorndale|PA":null,
 "pa - titusville|PA":null,
+"pa - warminster|PA":null,
 "pa - warren|PA":null,
 "pa - wayne|PA":null,
 "pa - wellsboro|PA":null,
@@ -2425,6 +2428,10 @@
 ],
 "sf-hq|NY":null,
 "sf|NY":null,
+"shady grove|PA":[
+39.7779,
+-77.6686
+],
 "sharon hill|PA":[
 39.9063,
 -75.2721
@@ -2722,6 +2729,8 @@
 "usa) 121 hoboken nj hoboken home office|NJ":null,
 "usa) nj east windsor 03266 wm supercenter|NJ":null,
 "usa) nj freehold 03236 wm supercenter|NJ":null,
+"usa) nj north brunswick 02003 wm supercenter|NJ":null,
+"usa) nj phillipsburg 02497 wm supercenter|NJ":null,
 "usa) ny albion 03607 wm supercenter|NY":null,
 "usa) ny brockport 01993 wm supercenter|NY":null,
 "usa) ny clifton park 02844 wm supercenter|NY":null,
@@ -2802,6 +2811,7 @@
 40.2068,
 -75.0996
 ],
+"warren - nj - us|NJ":null,
 "warrendale|PA":[
 40.6534,
 -80.0795

@@ -8031,6 +8031,12 @@
    "added": "2026-09-18",
    "sector": "education_research"
   },
+  "lowrisc": {
+   "name": "lowRISC CIC",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-27"
+  },
   "luzco": {
    "name": "LUZCO",
    "quant": false,
@@ -18182,10 +18188,9 @@
   "tamus|wd1|System-wide_External": {
    "name": "Texas A&M University System",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "education_research",
-   "last_fail": "2026-10-27"
+   "sector": "education_research"
   },
   "tamus|wd1|TAMIU_Student_Employment": {
    "name": "Texas A&M International University",
