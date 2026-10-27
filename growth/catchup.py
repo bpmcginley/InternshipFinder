@@ -108,7 +108,25 @@ def post_due(rs: list[dict], now: datetime) -> bool:
     return not any(_when(r["created_at"]) >= since for r in rs)
 
 
-def digest_due(rs: list[dict], now: datetime) -> bool:
+def _step_conclusion(jobs: list[dict], name: str) -> str | None:
+    return next((step.get("conclusion") for job in jobs for step in job.get("steps", [])
+                 if step.get("name") == name), None)
+
+
+def digest_run_active(run: dict, jobs_of=None) -> bool:
+    """A scheduled run is inactive only when its digest-writing step is proven skipped.
+
+    GitHub can start the active cron hours late, so created_at cannot identify which UTC slot won.
+    A queued or failed run is not proven inactive and keeps the existing do-not-retry behavior.
+    """
+    if (run.get("event") != "schedule" or run.get("status") != "completed" or
+            run.get("conclusion") != "success"):
+        return True
+    jobs_of = jobs_of or (lambda r: _call("GET", f"runs/{r['id']}/jobs").get("jobs") or [])
+    return _step_conclusion(jobs_of(run), "Write the digest") != "skipped"
+
+
+def digest_due(rs: list[dict], now: datetime, jobs_of=None) -> bool:
     """A Monday after 8am Eastern and before 22:00 UTC, with no run since its local due time.
 
     At most one catch-up runs per Monday, however the day's runs ended. A failed send is not retried.
@@ -118,7 +136,9 @@ def digest_due(rs: list[dict], now: datetime) -> bool:
         return False
     since = local.replace(hour=DIGEST_LOCAL_HOUR, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     since -= timedelta(minutes=5)
-    return not any(_when(r["created_at"]) >= since for r in rs)
+    # 2026-10-27: was: every run after `since` blocked catch-up. The spare UTC cron is a successful
+    # no-op, so only its proven-skipped write step is ignored. Revert with the former one-line any().
+    return not any(_when(r["created_at"]) >= since and digest_run_active(r, jobs_of) for r in rs)
 
 
 def post_done_today(rs: list[dict], now: datetime, this_id, jobs_of=None) -> bool:

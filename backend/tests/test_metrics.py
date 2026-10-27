@@ -266,15 +266,19 @@ def test_the_extra_utc_cron_run_is_identified_by_its_skipped_write_step():
     assert metrics.step_conclusion(jobs, "Write the digest") == "skipped"
 
 
-def test_automation_ignores_the_successful_spare_cron_run(monkeypatch):
+@pytest.mark.parametrize("active_at,spare_at,now", [
+    ("2026-10-26T12:04:00Z", "2026-10-26T13:04:00Z", "2026-10-26T15:00:00Z"),
+    ("2026-11-02T13:04:00Z", "2026-11-02T12:04:00Z", "2026-11-02T15:00:00Z"),
+])
+def test_automation_ignores_the_successful_spare_cron_run(monkeypatch, active_at, spare_at, now):
     class Resp:
         def __init__(self, body): self.body = body
         def __enter__(self): return self
         def __exit__(self, *a): return False
         def read(self): return json.dumps(self.body).encode()
 
-    active = _email_run(id=123, created_at="2026-10-26T12:04:00Z")
-    spare = _email_run(id=126, created_at="2026-10-26T13:04:00Z")
+    active = _email_run(id=123, created_at=active_at)
+    spare = _email_run(id=126, created_at=spare_at)
     monkeypatch.setattr(metrics, "JOBS", [("digest.yml", "Weekly email")])
 
     def fake(req, timeout=30):
@@ -288,7 +292,7 @@ def test_automation_ignores_the_successful_spare_cron_run(monkeypatch):
         return Resp({"workflow_runs": [spare, active]})
 
     monkeypatch.setattr(metrics.urllib.request, "urlopen", fake)
-    got = metrics.automation(metrics._timestamp("2026-10-26T15:00:00Z"))[0]
+    got = metrics.automation(metrics._timestamp(now))[0]
     assert got["health"] == "success" and got["run_id"] == 123
 
 

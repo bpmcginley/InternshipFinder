@@ -338,7 +338,8 @@ def automation(now: datetime | None = None) -> list[dict]:
             for candidate in scheduled:
                 created = _timestamp(candidate.get("created_at"))
                 if (candidate.get("event") == "schedule" and candidate.get("status") == "completed" and
-                        candidate.get("conclusion") == "success" and created is not None and due <= created <= now):
+                        candidate.get("conclusion") == "success" and created is not None and
+                        due - timedelta(hours=1) <= created <= now):
                     jobs_cache[candidate.get("id")] = read(f"runs/{candidate['id']}/jobs?per_page=100").get("jobs") or []
                     if step_conclusion(jobs_cache[candidate.get("id")], "Write the digest") == "skipped":
                         continue

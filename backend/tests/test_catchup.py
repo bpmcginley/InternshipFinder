@@ -139,6 +139,18 @@ def test_the_weekly_email_is_started_once_after_eight_eastern_and_before_ten_pm_
     assert not cu.digest_due([_run(10, winter.replace(minute=1))], winter)
 
 
+def test_a_summer_spare_cron_does_not_hide_a_missing_active_send():
+    now = datetime(2026, 10, 26, 13, 34, tzinfo=timezone.utc)   # 9:34am EDT
+    spare = {**_run(40, now.replace(minute=4)), "event": "schedule"}
+    skipped = lambda run: [{"steps": [{"name": "Write the digest", "conclusion": "skipped"}]}]
+    assert cu.digest_due([spare], now, skipped)
+
+    # An active run remains authoritative even when GitHub launched it hours late.
+    delayed = {**_run(41, now.replace(hour=16)), "event": "schedule"}
+    wrote = lambda run: [{"steps": [{"name": "Write the digest", "conclusion": "success"}]}]
+    assert not cu.digest_due([delayed], now.replace(hour=17), wrote)
+
+
 def test_the_email_catch_up_asks_for_everyone_explicitly(monkeypatch):
     # A dispatch sends only a test copy unless everyone is true; the schedule it stands in for sends to all.
     sent = []
