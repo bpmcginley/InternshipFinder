@@ -116,7 +116,9 @@ test("local copies and automated browsers send nothing, and steps there are drop
 test("?nocount=1 stops counting this browser on every later load, and ?nocount=0 starts it again", () => {
   const storage = new Map();
   const session = new Map();
-  let r = load({ storage, session, search: "?nocount=1&utm_source=x&utm_medium=social&utm_campaign=private-test" });
+  load({ storage, session, search: "?utm_source=x&utm_medium=social&utm_campaign=private-test" });
+  assert.equal(session.size, 1, "the live tagged visit begins with campaign context");
+  let r = load({ storage, session, search: "?nocount=1" });
   r.ctx.ISCount("signin");
   assert.equal(r.sent.length, 0, "the load that sets it is not counted");
   assert.equal(session.size, 0, "an opted-out load does not retain campaign context");

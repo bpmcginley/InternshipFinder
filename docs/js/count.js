@@ -47,6 +47,8 @@
     value = String(value || "").toLowerCase().trim();
     return /^[a-z0-9][a-z0-9_-]{0,47}$/.test(value) ? value : "";
   };
+  // Counting off means attribution off too: erase a campaign retained earlier in this tab.
+  if (!live) { try { sessionStorage.removeItem(ATTR_KEY); } catch (e) {} }
   var campaignContext = function () {
     var q = new URLSearchParams(location.search), ref = "", saved = {};
     try { ref = document.referrer ? new URL(document.referrer).hostname : ""; } catch (e) {}
