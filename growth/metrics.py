@@ -36,6 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 ACCOUNT = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "d4a5640a67faee275d9df91204c4ec59")
 SITE_TAG = os.environ.get("CLOUDFLARE_SITE_TAG", "54f99780d57f4ae2a55182b44b082e0a")
@@ -50,6 +51,7 @@ JOBS = [("ingest.yml", "Listings refresh"), ("pages.yml", "Site deploy"), ("metr
         ("catchup.yml", "Keep schedule"), ("digest.yml", "Weekly email")]
 DIGEST_FIRST_DUE = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
 DIGEST_SCHEDULE_GRACE = timedelta(hours=2)
+DIGEST_EASTERN = ZoneInfo("America/New_York")
 # Keep schedule (growth/catchup.py) starts a late Monday email with the workflow's own GITHUB_TOKEN, so
 # GitHub records that run's triggering actor as this bot. A person's run, test copy or not, shows the
 # person's login. Nothing else in the repo starts digest.yml with the token.
@@ -238,6 +240,24 @@ def subscriber_run(run: dict) -> bool:
             (run.get("triggering_actor") or {}).get("login") == CATCHUP_ACTOR)
 
 
+def digest_due_times(now: datetime) -> tuple[datetime, datetime]:
+    """The most recent and next Monday 8 a.m. Eastern slots around `now`, returned in UTC."""
+    local = now.astimezone(DIGEST_EASTERN)
+    monday = local.date() - timedelta(days=local.weekday())
+    due_local = datetime.combine(monday, datetime.min.time(), DIGEST_EASTERN).replace(hour=8)
+    due = due_local.astimezone(timezone.utc)
+    if now < due:
+        due_local -= timedelta(days=7)
+        due = due_local.astimezone(timezone.utc)
+    return due, (due_local + timedelta(days=7)).astimezone(timezone.utc)
+
+
+def step_conclusion(jobs: list[dict], name: str) -> str | None:
+    """Conclusion of one named step across a run's jobs, if GitHub has reported it."""
+    return next((step.get("conclusion") for job in jobs for step in job.get("steps", [])
+                 if step.get("name") == name), None)
+
+
 def digest_health(runs: list[dict], now: datetime, send_step: str | None = None) -> dict:
     """Weekly schedule health, not delivery confirmation. Manual tests never satisfy a broadcast.
 
@@ -247,13 +267,14 @@ def digest_health(runs: list[dict], now: datetime, send_step: str | None = None)
     succeeded decides: a later run that fails can't hide an email that went.
     """
     now = now.astimezone(timezone.utc)
-    monday = (now - timedelta(days=now.weekday())).replace(hour=12, minute=0, second=0, microsecond=0)
-    due = monday if now >= monday else monday - timedelta(days=7)
+    # 2026-10-27: compute the wall-clock slot in America/New_York. was: Monday 12:00 UTC.
+    # Revert: restore the fixed-UTC monday/due calculation and due + seven days below.
+    due, next_due = digest_due_times(now)
     first_pending = due < DIGEST_FIRST_DUE
     due = max(due, DIGEST_FIRST_DUE)
     iso = lambda value: value.strftime("%Y-%m-%dT%H:%M:%SZ")
     result = {"health": "not_due" if first_pending else "waiting", "due_at": iso(due),
-              "next_due_at": iso(due if first_pending else due + timedelta(days=7)),
+              "next_due_at": iso(due if first_pending else next_due),
               "detail": "Scheduled subscriber send not due yet." if first_pending else
                         "Waiting for GitHub's scheduled subscriber send; two-hour scheduling grace.",
               "delivery_confirmed": False}
@@ -307,13 +328,31 @@ def automation(now: datetime | None = None) -> list[dict]:
             # Every event, so Keep schedule's catch-up is seen; digest_health keeps only subscriber runs.
             # was: ...&event=schedule&per_page=15
             scheduled = read(f"workflows/{file}/runs?branch=main&per_page=30").get("workflow_runs") or []
+            # 2026-10-27: two UTC cron entries bracket 8am Eastern. The local-time guard makes the
+            # other run skip "Write the digest". Exclude only that proven inactive run; do not infer
+            # from created_at because GitHub can start the active schedule hours late.
+            # Revert: remove this filtering when digest.yml returns to one fixed UTC cron.
+            due, _ = digest_due_times(now)
+            jobs_cache = {}
+            active = []
+            for candidate in scheduled:
+                created = _timestamp(candidate.get("created_at"))
+                if (candidate.get("event") == "schedule" and candidate.get("status") == "completed" and
+                        candidate.get("conclusion") == "success" and created is not None and
+                        due - timedelta(hours=1) <= created <= now):
+                    jobs_cache[candidate.get("id")] = read(f"runs/{candidate['id']}/jobs?per_page=100").get("jobs") or []
+                    if step_conclusion(jobs_cache[candidate.get("id")], "Write the digest") == "skipped":
+                        continue
+                active.append(candidate)
+            scheduled = active
             health = digest_health(scheduled, now)
             current = next((r for r in scheduled if r.get("id") == health.get("run_id")), {}) if health.get("run_id") else {}
             step = None
             if current.get("status") == "completed" and current.get("conclusion") == "success":
-                jobs = read(f"runs/{current['id']}/jobs?per_page=100").get("jobs") or []
-                step = next((s.get("conclusion") for j in jobs for s in j.get("steps", [])
-                             if s.get("name") == "Send the digest"), None)
+                jobs = jobs_cache.get(current.get("id"))
+                if jobs is None:
+                    jobs = read(f"runs/{current['id']}/jobs?per_page=100").get("jobs") or []
+                step = step_conclusion(jobs, "Send the digest")
                 health = digest_health(scheduled, now, step)
             # Existing row fields describe the subscriber run, never the last owner-only test.
             row.update({"conclusion": current.get("conclusion"), "at": current.get("updated_at"),

@@ -63,6 +63,11 @@ def submit(urls: list[str]) -> list[int]:
     return statuses
 
 
+def accepted(statuses: list[int]) -> bool:
+    """Every IndexNow batch was accepted for processing (200 or 202)."""
+    return bool(statuses) and all(status in (200, 202) for status in statuses)
+
+
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     if len(args) != 2:
@@ -77,8 +82,14 @@ def main(argv: list[str]) -> int:
     gone = sum(1 for u in urls if u not in new)
     print(f"[indexnow] {len(urls)} changed: {added} new, {gone} removed, {len(urls) - added - gone} updated")
     if urls and "--submit" in argv:
-        # 200 and 202 are accepted. A failure is reported, never raised: the deploy already happened.
-        print(f"[indexnow] submitted, HTTP {submit(urls)}")
+        # 2026-10-27: the deploy is already safe, but a rejected notification must make the notify
+        # job red so it is visible and retryable. was: report the codes and always exit zero.
+        # Revert: remove the accepted() branch to restore best-effort, non-signalling submission.
+        statuses = submit(urls)
+        print(f"[indexnow] submitted, HTTP {statuses}")
+        if not accepted(statuses):
+            print("::error::IndexNow did not accept every batch; the site deployed, but recrawl notification needs attention")
+            return 1
     return 0
 
 

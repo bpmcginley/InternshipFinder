@@ -252,12 +252,48 @@ def test_digest_health_flags_stuck_run_without_proposing_another_broadcast():
     assert "do not start a second send" in got["detail"]
 
 
-def test_digest_schedule_is_utc_and_accepts_timezone_offsets():
-    # November's Monday slot remains 12 UTC (7am EST), not an invented 8am local promise.
-    run = _email_run(created_at="2026-11-02T07:10:00-05:00")
-    got = metrics.digest_health([run], metrics._timestamp("2026-11-02T08:00:00-05:00"), "success")
-    assert got["health"] == "success" and got["due_at"] == "2026-11-02T12:00:00Z"
-    assert got["next_due_at"] == "2026-11-09T12:00:00Z"
+def test_digest_schedule_stays_at_eight_eastern_and_accepts_timezone_offsets():
+    run = _email_run(created_at="2026-11-02T08:10:00-05:00")
+    got = metrics.digest_health([run], metrics._timestamp("2026-11-02T09:00:00-05:00"), "success")
+    assert got["health"] == "success" and got["due_at"] == "2026-11-02T13:00:00Z"
+    assert got["next_due_at"] == "2026-11-09T13:00:00Z"
+
+
+def test_the_extra_utc_cron_run_is_identified_by_its_skipped_write_step():
+    jobs = [{"steps": [{"name": "Keep the 8am Eastern schedule slot", "conclusion": "success"},
+                        {"name": "Write the digest", "conclusion": "skipped"},
+                        {"name": "Send the digest", "conclusion": "skipped"}]}]
+    assert metrics.step_conclusion(jobs, "Write the digest") == "skipped"
+
+
+@pytest.mark.parametrize("active_at,spare_at,now", [
+    ("2026-10-26T12:04:00Z", "2026-10-26T13:04:00Z", "2026-10-26T15:00:00Z"),
+    ("2026-11-02T13:04:00Z", "2026-11-02T12:04:00Z", "2026-11-02T15:00:00Z"),
+])
+def test_automation_ignores_the_successful_spare_cron_run(monkeypatch, active_at, spare_at, now):
+    class Resp:
+        def __init__(self, body): self.body = body
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return json.dumps(self.body).encode()
+
+    active = _email_run(id=123, created_at=active_at)
+    spare = _email_run(id=126, created_at=spare_at)
+    monkeypatch.setattr(metrics, "JOBS", [("digest.yml", "Weekly email")])
+
+    def fake(req, timeout=30):
+        if "/runs/126/jobs?" in req.full_url:
+            return Resp({"jobs": [{"steps": [{"name": "Write the digest", "conclusion": "skipped"}]}]})
+        if "/runs/123/jobs?" in req.full_url:
+            return Resp({"jobs": [{"steps": [{"name": "Write the digest", "conclusion": "success"},
+                                              {"name": "Send the digest", "conclusion": "success"}]}]})
+        if "status=completed&per_page=1" in req.full_url:
+            return Resp({"workflow_runs": [spare]})
+        return Resp({"workflow_runs": [spare, active]})
+
+    monkeypatch.setattr(metrics.urllib.request, "urlopen", fake)
+    got = metrics.automation(metrics._timestamp(now))[0]
+    assert got["health"] == "success" and got["run_id"] == 123
 
 
 @pytest.mark.parametrize("step,conclusion,expected", [("success", "success", "success"),
