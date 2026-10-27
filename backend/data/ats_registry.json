@@ -5239,9 +5239,10 @@
   "msgsports": {
    "name": "MSG Sports",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "hospitality_sports"
+   "sector": "hospitality_sports",
+   "last_fail": "2026-10-27"
   },
   "mthreerecruitingportal": {
    "name": "mthree",
