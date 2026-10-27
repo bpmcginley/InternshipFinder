@@ -24,7 +24,7 @@ from internscout.sources.icims import parse_icims, parse_icims_detail
 from internscout.sources.icims_site import parse_icims_site
 from internscout.sources.successfactors import parse_successfactors, parse_successfactors_detail
 from internscout.sources.eightfold import parse_eightfold, host_of as ef_host
-from internscout.sources.jazzhr import parse_jazzhr
+from internscout.sources.jazzhr import fetch_jazzhr_board, parse_jazzhr, parse_jazzhr_detail
 from internscout.sources.usajobs import parse_usajobs
 from internscout.sources.nyc_jobs import parse_nyc_jobs
 from internscout.sources.github_lists import _parse
@@ -569,6 +569,51 @@ def test_jazzhr():
     assert items[0]["description"] == ""
     # an employer with nothing open serves the page with no items at all
     assert parse_jazzhr("<div class='list-group'></div>", CO) == []
+
+
+def test_jazzhr_detail_reads_the_public_jobposting_not_the_application_form():
+    page = '''
+    <script type="application/ld+json">{"@type":"Organization","name":"Acme"}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting",
+      "title":"AI Intern","datePosted":"2026-10-25T13:00:00Z",
+      "description":"<p>Build tools &amp; measure results.</p><p>Rising juniors.</p>"}</script>
+    <form><label>Why do you want this job?</label></form>'''
+    assert parse_jazzhr_detail(page) == ("Build tools & measure results.\n Rising juniors.", "2026-10-25")
+    assert parse_jazzhr_detail('<script type="application/ld+json">not json</script>') == ("", None)
+    older_theme = '''<script type="application/ld+json">{"@type":"Organization"}</script>
+      <div class='page-body job-details'><div class='container'>
+      <div class='description' id="job-description"><p>Build climate tools.</p>
+      <div class="requirements"><p>Rising juniors.</p></div></div>
+      <div class="job-application-form">Tell us about yourself.</div></div></div>'''
+    assert parse_jazzhr_detail(older_theme) == ("Build climate tools.\n Rising juniors.", None)
+
+
+def test_jazzhr_fetch_adds_the_detail_description():
+    board = '''<li class="list-group-item"><h3 class="list-group-item-heading">
+      <a href="https://acme.applytojob.com/apply/aB1/Engineering-Intern">Engineering Intern</a>
+      </h3><ul><li><i class='fa fa-map-marker'></i>Boston, MA</li></ul></li>'''
+    detail = '''<script type="application/ld+json">{"@type":"JobPosting",
+      "datePosted":"2026-10-26","description":"<p>Test real systems.</p>"}</script>'''
+
+    class Response:
+        def __init__(self, text):
+            self.text, self.status_code = text, 200
+        def raise_for_status(self):
+            return None
+
+    class Client:
+        def get(self, url):
+            return Response(board if url.endswith("/apply") else detail)
+
+    import internscout.sources.jazzhr as jazzhr
+    old = jazzhr.require_robots
+    jazzhr.require_robots = lambda *args: None
+    try:
+        item = fetch_jazzhr_board(Client(), {**CO, "ats_token": "acme"})[0]
+    finally:
+        jazzhr.require_robots = old
+    assert item["description"] == "Test real systems."
+    assert item["posted_at"] == "2026-10-26"
 
 
 def test_usajobs():
