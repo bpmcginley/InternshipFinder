@@ -50,6 +50,11 @@ for (const step of ["view", "click"]) {
   for (const entry of EMPLOYER_ENTRIES) EVENTS.add(`employer_${step}_${entry}`);
 }
 for (const event of ["employer_buy_open", "employer_company_pick", "employer_company_prefill", "employer_roles_pick", "employer_order_submit"]) EVENTS.add(event);
+// 2026-10-27: these browser-observed conversion intents get a second anonymous aggregate row with
+// their bounded campaign tags. This does not claim a store install, confirmed subscriber or paid
+// employer; those final outcomes stay in their providers. Revert: remove ATTRIBUTED_EVENTS,
+// addAttributedEvent, event_attribution and the event-branch call.
+export const ATTRIBUTED_EVENTS = new Set(["install_click", "digest_signup", "employer_order_submit"]);
 // Steps only the Worker itself sees (added 2026-10-04), counted by countEvent() below into the same
 // table. They are never taken from /hit, so a browser cannot send "paid" and make it so.
 //   new_account     the Worker saw an account for the first time (an accounts row was made)
@@ -94,6 +99,13 @@ const FLYER_ROWS_PER_DAY = 40;
 const BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|monitor|facebookexternalhit|embedly|curl|wget|python|node-fetch|axios/i;
 
 export const DAY_CAP = 50_000;            // views counted per day; past it, a flood cannot run up the table
+export const ATTRIBUTION_ROWS_PER_DAY = 200;
+const CAMPAIGN_TAG = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+
+export function campaignTag(value) {
+  const tag = String(value || "").toLowerCase().trim();
+  return CAMPAIGN_TAG.test(tag) ? tag : "";
+}
 
 // Paid listings (S9, added 2026-10-14; docs/js/count.js). A box shown or its posting opened, per placement.
 // The id must look like one the Worker makes, and the row is only added for a placement that is on today
@@ -188,6 +200,22 @@ async function addEvent(db, day, event, page) {
   return ev.meta.changes > 0;
 }
 
+async function addAttributedEvent(db, day, event, page, body) {
+  if (!ATTRIBUTED_EVENTS.has(event)) return false;
+  const source = sourceOf(body.r, body.u, body.m);
+  const channel = source === "social" || source === "print" ? channelOf(body.r, body.u) : "";
+  const campaign = campaignTag(body.c), content = campaignTag(body.t);
+  if (source === "direct" && !channel && !campaign && !content) return false;
+  const result = await db.prepare(
+    "INSERT INTO event_attribution (day,event,page,source,channel,campaign,content,n) " +
+    "SELECT ?1,?2,?3,?4,?5,?6,?7,1 WHERE EXISTS (SELECT 1 FROM event_attribution " +
+    "WHERE day=?1 AND event=?2 AND page=?3 AND source=?4 AND channel=?5 AND campaign=?6 AND content=?7) " +
+    "OR (SELECT COUNT(*) FROM event_attribution WHERE day=?1) < ?8 " +
+    "ON CONFLICT(day,event,page,source,channel,campaign,content) DO UPDATE SET n=n+1",
+  ).bind(day, event, page, source, channel, campaign, content, ATTRIBUTION_ROWS_PER_DAY).run();
+  return result.meta.changes > 0;
+}
+
 // A step the Worker saw for itself (SERVER_EVENTS), added to the same daily total as a browser's step.
 // Nothing about the account goes in: the day, the event, a page or plan or task name, and one more.
 // Never throws, so counting cannot fail the request or the webhook it rides on; false if not counted.
@@ -229,7 +257,12 @@ export async function countHit(db, request, body, now) {
     // Browser steps only: SERVER_EVENTS are not in EVENTS, so they stop here.
     if (!EVENTS.has(body.e)) return { counted: false };
     // was: the INSERT inline here; it moved to addEvent() so countEvent() writes the same row.
-    return { counted: await addEvent(db, day, body.e, page) };
+    const counted = await addEvent(db, day, body.e, page);
+    if (counted) {
+      try { await addAttributedEvent(db, day, body.e, page, body); }
+      catch (e) { console.error("event attribution failed:", e && e.name); }
+    }
+    return { counted };
   }
   const source = sourceOf(body.r, body.u, body.m);
   const visit = source === "internal" ? 0 : 1;

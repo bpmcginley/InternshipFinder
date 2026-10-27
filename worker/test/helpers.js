@@ -51,7 +51,7 @@ export function fakeD1() {
     exec: async (query) => (sql.exec(query), { count: 1 }),
     dump() {
       const out = {};
-      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events", "spend", "tokens", "task_tokens", "forget", "invite_codes", "referrals", "bonus", "accounts", "inviters", "sessions", "session_copies", "profiles", "visit_counts", "visit_channels", "event_counts", "run_hist", "placements", "placement_log", "placement_counts",
+      for (const t of ["usage", "runs", "rate", "demand", "budget", "plans", "stripe_events", "spend", "tokens", "task_tokens", "forget", "invite_codes", "referrals", "bonus", "accounts", "inviters", "sessions", "session_copies", "profiles", "visit_counts", "visit_channels", "event_counts", "event_attribution", "run_hist", "placements", "placement_log", "placement_counts",
         // Paid listing orders (2026-10-19, orders.js).
         "employer_orders", "employer_order_roles", "placement_fields", "employer_credits", "pilot_codes"]) {
         out[t] = sql.prepare(`SELECT * FROM ${t}`).all().map((r) => ({ ...r }));

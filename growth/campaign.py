@@ -18,7 +18,8 @@ writes the two kinds that worked, both showing what InternScout does for a stude
 
 Each comes as a 4:5 carousel (Instagram, Facebook), a 9:16 slideshow (TikTok photo mode) and, when
 ffmpeg is installed, a 9:16 video of the same slides (YouTube Shorts, Reels, TikTok). captions.json has
-each channel's caption, its link tagged utm_source=<channel>&utm_campaign=weekly-<year>w<week> (the
+each channel's caption, its link tagged utm_source=<channel>&utm_campaign=weekly-<year>w<week> and
+utm_content=<piece> (the
 Worker's UTM_SOCIAL spellings), and README.md the schedule and the checks before posting.
 
 The AI rules (Bruce, 2026-10-25: "subtle AI usage to not appear as slop"). Every number comes from the
@@ -145,10 +146,11 @@ def week_tag(now: datetime) -> str:
     return f"{year}w{week:02d}"
 
 
-def tagged(path: str, channel: str, campaign: str) -> str:
+def tagged(path: str, channel: str, campaign: str, content: str = "post") -> str:
     """SITE+path with the channel's utm tags, keeping a query the path already has."""
     sep = "&" if "?" in path else "?"
-    return f"{SITE}{path}{sep}utm_source={channel}&utm_medium=social&utm_campaign={campaign}"
+    return (f"{SITE}{path}{sep}utm_source={channel}&utm_medium=social&utm_campaign={campaign}"
+            f"&utm_content={content}")
 
 
 def place_words(k: str) -> str:
@@ -209,7 +211,7 @@ def search_path(pick: dict) -> str:
     return f"/?field={quote(pick['field'])}&state={quote(sp._dash_state(k), safe=',')}"
 
 
-def captions(slides: list[tuple[str, str]], path: str, campaign: str) -> dict[str, str]:
+def captions(slides: list[tuple[str, str]], path: str, campaign: str, content: str = "post") -> dict[str, str]:
     """Each channel's caption: the slides' words as plain sentences, the link tagged for that channel."""
     words = [said(slide) for slide in slides]
     head, body, last = words[0], " ".join(words[1:-1]), words[-1]
@@ -218,10 +220,10 @@ def captions(slides: list[tuple[str, str]], path: str, campaign: str) -> dict[st
         "tiktok": f"{head}. {body} {last}\n\n{tags}",
         # Instagram doesn't link an address in a caption; the profile's link carries utm_source=instagram.
         "instagram": f"{head}.\n\n{body}\n\n{last} Link in bio.\n\n{tags}",
-        "facebook": f"{head}.\n\n{body}\n\n{tagged(path, 'facebook', campaign)}",
+        "facebook": f"{head}.\n\n{body}\n\n{tagged(path, 'facebook', campaign, content)}",
         "youtube_title": clip(f"{head}", 95),
-        "youtube": f"{body} {last}\n\n{tagged(path, 'youtube', campaign)}\n\n{tags}",
-        "x": clip(f"{head}. {body}", 280 - 25) + f" {tagged(path, 'x', campaign)}",
+        "youtube": f"{body} {last}\n\n{tagged(path, 'youtube', campaign, content)}\n\n{tags}",
+        "x": clip(f"{head}. {body}", 280 - 25) + f" {tagged(path, 'x', campaign, content)}",
     }
 
 
@@ -364,7 +366,7 @@ def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict | No
     search = search_slides(pick, export, d["baseline"])
     tip = tip_pick(now)
     pieces = {"search": (search, search_path(pick)), "tip": (tip["slides"], tip["path"])}
-    caps = {kind: captions(slides, path, campaign) for kind, (slides, path) in pieces.items()}
+    caps = {kind: captions(slides, path, campaign, kind) for kind, (slides, path) in pieces.items()}
     problems = [(kind, where, found) for kind, (slides, _) in pieces.items()
                 for where, text in [(f"slide {i}", " ".join(slide)) for i, slide in enumerate(slides, 1)]
                 + list(caps[kind].items()) if (found := lint(text))]

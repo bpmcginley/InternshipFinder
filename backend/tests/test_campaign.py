@@ -85,8 +85,9 @@ def test_search_slides_say_only_what_the_listings_show():
 
 def test_captions_tag_each_channel_and_fit_x():
     slides = [("A", "Finance internships in New York"), ("B", "151 open roles. " * 30, "151"), ("C", "Search it.")]
-    caps = campaign.captions(slides, "/?field=finance&state=NY", "weekly-2026w44")
+    caps = campaign.captions(slides, "/?field=finance&state=NY", "weekly-2026w44", "search")
     assert "utm_source=facebook&utm_medium=social&utm_campaign=weekly-2026w44" in caps["facebook"]
+    assert "utm_content=search" in caps["facebook"]
     assert "?field=finance&state=NY&utm_source=youtube" in caps["youtube"]
     assert "http" not in caps["instagram"] and "Link in bio" in caps["instagram"]
     # X counts any link as 23 characters.
@@ -110,6 +111,8 @@ def test_the_pack_is_written_in_both_sizes_with_captions_and_a_readme(tmp_path):
         assert Image.open(out / pack[kind]["tall"][-1]).size == (1080, 1920)
     caps = json.loads((out / "captions.json").read_text(encoding="utf-8"))
     assert set(caps) == {"search", "tip"} and "utm_campaign=weekly-2026w44" in caps["search"]["facebook"]
+    assert "utm_content=search" in caps["search"]["facebook"]
+    assert "utm_content=tip" in caps["tip"]["facebook"]
     readme = (out / "README.md").read_text(encoding="utf-8")
     assert "Nothing here has been posted." in readme and "Before posting" in readme
 

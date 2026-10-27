@@ -555,6 +555,9 @@ const RUN_BUCKET = "CASE WHEN calls <= 1 THEN '1' WHEN calls = 2 THEN '2' WHEN c
 export async function cleanup(db, now) {
   const day = new Date(now.getTime() - 2 * 86400e3).toISOString().slice(0, 10);
   const yearAgo = monthOf(new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), 1)));
+  // 2026-10-27: campaign intent is useful for current experiments, not a permanent visitor record.
+  // Revert: remove this deletion if event_attribution itself is removed.
+  const attributionCutoff = new Date(now.getTime() - 400 * 86400e3).toISOString().slice(0, 10);
   await db.batch([
     db.prepare("DELETE FROM rate WHERE bucket >= 'd:' AND bucket < ?").bind("d:" + day),
     db.prepare("DELETE FROM rate WHERE bucket >= 'm:' AND bucket < ?").bind("m:" + day),
@@ -572,5 +575,6 @@ export async function cleanup(db, now) {
     db.prepare("DELETE FROM usage WHERE month < ?").bind(yearAgo),
     // Webhook ids are only needed for as long as Stripe retries an event (hours, not weeks).
     db.prepare("DELETE FROM stripe_events WHERE seen < ?").bind(new Date(now.getTime() - 30 * 86400e3).toISOString()),
+    db.prepare("DELETE FROM event_attribution WHERE day < ?").bind(attributionCutoff),
   ]);
 }

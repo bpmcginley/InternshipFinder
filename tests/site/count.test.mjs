@@ -7,7 +7,7 @@ import vm from "node:vm";
 
 const COUNT = readFileSync(new URL("../../docs/js/count.js", import.meta.url), "utf8");
 
-function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage, placements } = {}) {
+function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage, session, placements } = {}) {
   const sent = [], listeners = {};
   let intersection, mutation;
   const observing = new Set();
@@ -33,6 +33,7 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
     };
   }
   if (storage) ctx.localStorage = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
+  if (session) ctx.sessionStorage = { getItem: (k) => session.get(k) ?? null, setItem: (k, v) => session.set(k, String(v)), removeItem: (k) => session.delete(k) };
   if (queued) ctx.ISCountQ = queued;
   vm.createContext(ctx);
   vm.runInContext(COUNT, ctx);
@@ -60,6 +61,38 @@ test("one page load sends the path, the referring host and the campaign tag", ()
   assert.equal(sent.length, 1);
   assert.equal(sent[0].url, "https://internscout-api.bpmcginley.workers.dev/hit");
   assert.deepEqual(bodies()[0], { p: "/internships/ohio/", r: "www.google.com", u: "digest", m: "email" }, "only the host, never the search");
+});
+
+test("campaign and content tags follow conversion intents only within the same tab", () => {
+  const session = new Map();
+  const first = load({ session, path: "/internships/software-engineering/",
+    search: "?utm_source=x&utm_medium=social&utm_campaign=weekly-2026w44&utm_content=search_card" });
+  assert.deepEqual(first.bodies()[0], { p: "/internships/software-engineering/", r: "", u: "x", m: "social",
+    c: "weekly-2026w44", t: "search_card" });
+  const later = load({ session, path: "/install.html", referrer: "https://internscout.org/internships/software-engineering/" });
+  later.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi");
+  assert.deepEqual(later.bodies().filter((b) => b.e), [{ e: "install_click", p: "/install.html", u: "x", m: "social",
+    c: "weekly-2026w44", t: "search_card" }]);
+  const otherTab = load({ path: "/install.html" });
+  otherTab.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi");
+  assert.deepEqual(otherTab.bodies().filter((b) => b.e), [{ e: "install_click", p: "/install.html" }]);
+});
+
+test("campaign context refuses URLs, email-like values and overlong tags", () => {
+  const r = load({ session: new Map(), search: "?utm_source=x&utm_medium=social&utm_campaign=https%3A%2F%2Fevil.example%2Fa&utm_content=student%40school.edu" });
+  r.ctx.ISCount("install_click");
+  assert.deepEqual(r.bodies().filter((b) => b.e), [{ e: "install_click", p: "/", u: "x", m: "social" }]);
+});
+
+test("a new external referral replaces an older tab campaign, while an auth round trip keeps it", () => {
+  const session = new Map();
+  load({ session, search: "?utm_source=x&utm_medium=social&utm_campaign=weekly-2026w44" });
+  const auth = load({ session, path: "/", referrer: "https://accounts.google.com/" });
+  auth.ctx.ISCount("install_click");
+  assert.equal(auth.bodies().find((b) => b.e).c, "weekly-2026w44");
+  const newer = load({ session, path: "/", referrer: "https://example.edu/resources" });
+  newer.ctx.ISCount("install_click");
+  assert.deepEqual(newer.bodies().find((b) => b.e), { e: "install_click", p: "/", r: "example.edu" });
 });
 
 test("local copies and automated browsers send nothing, and steps there are dropped", () => {
