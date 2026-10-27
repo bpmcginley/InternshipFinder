@@ -18182,9 +18182,10 @@
   "tamus|wd1|System-wide_External": {
    "name": "Texas A&M University System",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15",
-   "sector": "education_research"
+   "sector": "education_research",
+   "last_fail": "2026-10-27"
   },
   "tamus|wd1|TAMIU_Student_Employment": {
    "name": "Texas A&M International University",
