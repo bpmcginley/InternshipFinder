@@ -50,3 +50,13 @@ Validation: extension 218 passed; dashboard 62 passed; Worker 166 passed; backen
 Remaining: obtain PR/CI review and release authorization. Before release, use offline Workday/Greenhouse/iCIMS fixtures to check legitimate unknown-label navigation and human final submission; validate resume replacement in an installed extension. Gemini's additional source concerns about the legacy FastAPI path, ranking limits, and ingest history are not verified findings and are not claimed fixed. Do not merge/deploy or submit real applications as part of this review.
 
 Codex configuration is unchanged. An unused, incomplete proxy environment remains inactive outside the repository because automatic approval review rejected its cleanup; do not work around that rejection.
+
+## October 27 operational hardening candidate
+
+An isolated branch fixes clean legal-page canonicals, makes IndexNow rejection visible, and keeps
+the weekly digest at 8 a.m. America/New_York through DST in its workflow, catch-up and monitoring
+paths. Direct GitHub Pages hosting cannot apply repository response headers, so the header gap is
+documented as an edge/hosting task instead of adding an ineffective `_headers` file. Installed
+authentication/update, Stripe lifecycle, recovery, CWV and inbox-delivery checks remain external
+acceptance gates. No deployment, broadcast, payment or live configuration change occurred. Full
+scope and verification boundary: `reviews/2026-10-27-ops-hardening/README.md`.

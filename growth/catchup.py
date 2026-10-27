@@ -25,6 +25,7 @@ import os
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 REPO = os.environ.get("GITHUB_REPOSITORY") or "bpmcginley/InternshipFinder"
 API = f"https://api.github.com/repos/{REPO}/actions"
@@ -40,11 +41,14 @@ EVERY = {
 INGEST_GUARD = timedelta(hours=4)
 # Brand posts: Tuesdays and Thursdays (weekday 1 and 3), from 15:00 UTC, once that day.
 POST_DAYS, POST_HOUR = (1, 3), 15
-# The weekly email: Mondays (weekday 0) from 12:00 UTC. GitHub dropped the first scheduled send on
+# The weekly email: Mondays from 8:00 America/New_York. GitHub dropped the first scheduled send on
 # 2026-10-19 entirely, so it is caught up like the posts, but only until 22:00 UTC: an email that
 # would land in the middle of the night waits for a person instead. digest_send.py's six-day check
 # is the backstop if GitHub's late scheduled run turns up after a catch-up.
-DIGEST_DAY, DIGEST_HOUR, DIGEST_LAST_HOUR = 0, 12, 22
+# 2026-10-27: was: fixed 12:00 UTC, which became 7am Eastern in winter.
+# Revert: restore DIGEST_HOUR=12 and the UTC-based digest_due implementation.
+DIGEST_DAY, DIGEST_LOCAL_HOUR, DIGEST_LAST_HOUR = 0, 8, 22
+EASTERN = ZoneInfo("America/New_York")
 BUSY = ("queued", "in_progress", "waiting", "pending", "requested")
 
 
@@ -105,11 +109,15 @@ def post_due(rs: list[dict], now: datetime) -> bool:
 
 
 def digest_due(rs: list[dict], now: datetime) -> bool:
-    """A Monday between 12:00 and 22:00 UTC, and no run of any kind started since 11:55: at most one
-    catch-up per Monday, however the day's runs ended (a send that failed is not retried by this)."""
-    if now.weekday() != DIGEST_DAY or not DIGEST_HOUR <= now.hour < DIGEST_LAST_HOUR:
+    """A Monday after 8am Eastern and before 22:00 UTC, with no run since its local due time.
+
+    At most one catch-up runs per Monday, however the day's runs ended. A failed send is not retried.
+    """
+    local = now.astimezone(EASTERN)
+    if local.weekday() != DIGEST_DAY or local.hour < DIGEST_LOCAL_HOUR or now.hour >= DIGEST_LAST_HOUR:
         return False
-    since = now.replace(hour=DIGEST_HOUR, minute=0, second=0, microsecond=0) - timedelta(minutes=5)
+    since = local.replace(hour=DIGEST_LOCAL_HOUR, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    since -= timedelta(minutes=5)
     return not any(_when(r["created_at"]) >= since for r in rs)
 
 

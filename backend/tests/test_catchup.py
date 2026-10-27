@@ -121,7 +121,7 @@ def test_a_catch_up_asks_for_the_guard_explicitly(monkeypatch):
 MON = datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc)    # the Monday GitHub dropped the first send
 
 
-def test_the_weekly_email_is_started_once_on_a_monday_between_noon_and_ten_pm_utc():
+def test_the_weekly_email_is_started_once_after_eight_eastern_and_before_ten_pm_utc():
     assert cu.digest_due([], MON)
     assert cu.digest_due([], MON.replace(hour=12, minute=4))
     assert not cu.digest_due([], MON.replace(hour=11, minute=59))          # before the hour
@@ -132,6 +132,11 @@ def test_the_weekly_email_is_started_once_on_a_monday_between_noon_and_ten_pm_ut
     assert not cu.digest_due([_run(9, MON.replace(hour=11, minute=56))], MON)
     # Last week's run doesn't count.
     assert cu.digest_due([_run(8, MON - timedelta(days=7))], MON)
+
+    winter = datetime(2026, 11, 2, 13, 4, tzinfo=timezone.utc)
+    assert not cu.digest_due([], winter.replace(hour=12, minute=59))     # 7:59am EST
+    assert cu.digest_due([], winter)                                    # 8:04am EST
+    assert not cu.digest_due([_run(10, winter.replace(minute=1))], winter)
 
 
 def test_the_email_catch_up_asks_for_everyone_explicitly(monkeypatch):
