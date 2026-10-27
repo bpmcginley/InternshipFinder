@@ -2,7 +2,10 @@
 // loads, about one in ten, so small visit numbers came in steps of 10. This sends one ping per page
 // load to the InternScout Worker, which adds one to a daily total by page kind and where the visit came
 // from. Sent: this page's path, the referring site's host name (never its full address) and any
-// utm_source / utm_medium on the link. No cookie, no ID, nothing kept in the browser.
+// utm_source / utm_medium on the link. No cookie or ID is used. Since 2026-10-27, a campaign's
+// short source/medium/campaign/content tags stay only in this tab's session storage so a later
+// install, digest form submission or employer order attempt can still be counted under the link
+// that brought the visitor here. Closing the tab clears them.
 //
 // Since 2026-10-01 it also counts steps toward using InternScout (window.ISCount("signin") and the
 // rest of worker/src/visits.js EVENTS), the same way: a daily total per step, nothing about who.
@@ -38,6 +41,37 @@
   var beacon = function (data) {
     try { navigator.sendBeacon(API, new Blob([JSON.stringify(data)], { type: "text/plain" })); } catch (e) {}
   };
+  // 2026-10-27: keep only bounded UTM slugs, never a URL, form value or visitor id. Revert: remove
+  // ATTR_KEY/campaignContext and send ordinary event beacons again.
+  var ATTR_KEY = "internscout.campaign", safeTag = function (value) {
+    value = String(value || "").toLowerCase().trim();
+    return /^[a-z0-9][a-z0-9_-]{0,47}$/.test(value) ? value : "";
+  };
+  // Counting off means attribution off too: erase a campaign retained earlier in this tab.
+  if (!live) { try { sessionStorage.removeItem(ATTR_KEY); } catch (e) {} }
+  var campaignContext = function () {
+    var q = new URLSearchParams(location.search), ref = "", saved = {};
+    try { ref = document.referrer ? new URL(document.referrer).hostname : ""; } catch (e) {}
+    try { saved = JSON.parse(sessionStorage.getItem(ATTR_KEY) || "{}") || {}; } catch (e) {}
+    var tagged = ["utm_source", "utm_medium", "utm_campaign", "utm_content"].some(function (key) { return q.get(key); });
+    var continuing = /(^|\.)(internscout\.org|bpmcginley\.github\.io)$|^(accounts\.google\.com|login\.microsoftonline\.com|login\.live\.com|checkout\.stripe\.com|billing\.stripe\.com)$/.test(ref);
+    if (tagged) {
+      saved = { r: ref, u: safeTag(q.get("utm_source")), m: safeTag(q.get("utm_medium")),
+        c: safeTag(q.get("utm_campaign")), t: safeTag(q.get("utm_content")) };
+      try { sessionStorage.setItem(ATTR_KEY, JSON.stringify(saved)); } catch (e) {}
+    } else if (ref && !continuing) {
+      saved = { r: ref, u: "", m: "", c: "", t: "" };
+      try { sessionStorage.setItem(ATTR_KEY, JSON.stringify(saved)); } catch (e) {}
+    }
+    return { r: String(saved.r || "").slice(0, 253), u: safeTag(saved.u), m: safeTag(saved.m),
+      c: safeTag(saved.c), t: safeTag(saved.t) };
+  };
+  var attribution = live ? campaignContext() : {};
+  var attributedEvents = { install_click: true, digest_signup: true, employer_order_submit: true };
+  var addAttribution = function (data, attr) {
+    ["r", "u", "m", "c", "t"].forEach(function (key) { if (attr[key]) data[key] = attr[key]; });
+    return data;
+  };
   var done = {};
   // 2026-10-23: new employer steps use fixed paths, so even public employer keys stay out of pings.
   // was: every step sent location.pathname. Revert: use the ordinary path for employer steps too.
@@ -54,7 +88,8 @@
   window.ISCount = function (event) {
     if (!live || done[event]) return;   // local copies and automated browsers count nothing
     done[event] = true;
-    beacon({ e: event, p: /^employer_/.test(event) ? employerPage() : location.pathname });
+    var data = { e: event, p: /^employer_/.test(event) ? employerPage() : location.pathname };
+    beacon(attributedEvents[event] ? addAttribution(data, attribution) : data);
   };
   queued.forEach(function (e) { window.ISCount(e); });
   window.ISCountQ = { push: window.ISCount };
@@ -176,7 +211,9 @@
     var q = new URLSearchParams(location.search), ref = "";
     try { ref = document.referrer ? new URL(document.referrer).hostname : ""; } catch (e) {}
     // text/plain keeps this a simple request: no CORS preflight, and the page never waits on it.
-    beacon({ p: location.pathname, r: ref, u: q.get("utm_source") || "", m: q.get("utm_medium") || "" });
+    var data = { p: location.pathname, r: ref, u: safeTag(q.get("utm_source")), m: safeTag(q.get("utm_medium")) };
+    addAttribution(data, { c: safeTag(q.get("utm_campaign")), t: safeTag(q.get("utm_content")) });
+    beacon(data);
   };
   // A page Chrome prerenders in case it is opened counts only if it is actually shown.
   if (document.prerendering) document.addEventListener("prerenderingchange", send, { once: true });

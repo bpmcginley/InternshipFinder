@@ -129,6 +129,22 @@ CREATE TABLE IF NOT EXISTS event_counts (
   PRIMARY KEY (day, event, page)
 );
 
+-- 2026-10-27: anonymous campaign totals for three browser-observed conversion intents. Values are
+-- bounded slugs from UTM tags and grouped by day; there is no visitor id, cookie, email or order id.
+-- These rows mean store click, digest form submit and employer order submit, not provider-confirmed
+-- install, subscription or payment. Revert: drop the table after reverting src/visits.js/count.js.
+CREATE TABLE IF NOT EXISTS event_attribution (
+  day TEXT NOT NULL,
+  event TEXT NOT NULL,
+  page TEXT NOT NULL,
+  source TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT '',
+  campaign TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, event, page, source, channel, campaign, content)
+);
+
 -- How many calls runs took, kept when the daily cron drops a past month's `runs` (added 2026-10-04;
 -- src/limits.js cleanup()). `n` runs of `task` in `month` took a number of calls in `bucket`: "1", "2",
 -- "3-4", "5-8", "9-15", "16-30" or "31+". Counts only: no account, no run id.

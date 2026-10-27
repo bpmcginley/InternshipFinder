@@ -299,7 +299,7 @@ def carousel(site_dir: str, out_dir: str, today: datetime) -> dict:
     if not pick:
         return {}
     slides = campaign.search_slides(pick, export, d["baseline"])
-    caption = campaign.captions(slides, campaign.search_path(pick), f"weekly-{campaign.week_tag(today)}")["instagram"]
+    caption = campaign.captions(slides, campaign.search_path(pick), f"weekly-{campaign.week_tag(today)}", "search")["instagram"]
     if campaign.lint(caption) or any(campaign.lint(" ".join(s)) for s in slides):
         return {}
     stem = f"{today:%Y-%m-%d}-search-{sp.field_slug(pick['field'])}"

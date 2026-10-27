@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers.js";
-import { DAY_CAP, DIGEST_PLACEMENTS, EVENTS, SERVER_EVENTS, channelOf, countEvent, pageKind, sourceOf } from "../src/visits.js";
+import { ATTRIBUTED_EVENTS, DAY_CAP, DIGEST_PLACEMENTS, EVENTS, SERVER_EVENTS, campaignTag, channelOf, countEvent, pageKind, sourceOf } from "../src/visits.js";
 
 const SITE = { Origin: "https://internscout.org", "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130" };
 const hit = (w, body, headers = SITE) => w.api("POST", "/hit", { body, headers });
@@ -234,6 +234,36 @@ test("a weekly email sign-up is a step the site sends, counted by the page the f
   ]);
   assert.ok(!JSON.stringify(await w.db.dump()).includes("someone@school.edu"), "nothing but the count is kept");
   assert.deepEqual(await rows(w), [], "a step is not a page load");
+});
+
+test("three conversion intents keep bounded anonymous campaign totals", async () => {
+  const w = await setup();
+  assert.deepEqual([...ATTRIBUTED_EVENTS].sort(), ["digest_signup", "employer_order_submit", "install_click"]);
+  const tags = { r: "x.com", u: "x", m: "social", c: "weekly-2026w44", t: "search_card" };
+  await hit(w, { e: "install_click", p: "/install.html", ...tags });
+  await hit(w, { e: "digest_signup", p: "/digest/", ...tags });
+  await hit(w, { e: "employer_order_submit", p: "/employers/buy/", ...tags });
+  await hit(w, { e: "posting_click", p: "/", ...tags });
+  assert.deepEqual((await w.db.dump()).event_attribution.map(({ day, event, page, source, channel, campaign, content, n }) =>
+    ({ day, event, page, source, channel, campaign, content, n })).sort((a, b) => a.event.localeCompare(b.event)), [
+    { day: "2026-09-14", event: "digest_signup", page: "digest", source: "social", channel: "x", campaign: "weekly-2026w44", content: "search_card", n: 1 },
+    { day: "2026-09-14", event: "employer_order_submit", page: "employer_buy", source: "social", channel: "x", campaign: "weekly-2026w44", content: "search_card", n: 1 },
+    { day: "2026-09-14", event: "install_click", page: "install", source: "social", channel: "x", campaign: "weekly-2026w44", content: "search_card", n: 1 },
+  ]);
+  assert.equal((await events(w)).find((r) => r.event === "posting_click").n, 1, "ordinary event total is unchanged");
+});
+
+test("campaign attribution rejects identifying-looking or oversized values and never blocks the event", async () => {
+  assert.equal(campaignTag(" Weekly-2026W44 "), "weekly-2026w44");
+  for (const bad of ["student@school.edu", "https://example.com", "x".repeat(49), "", null]) assert.equal(campaignTag(bad), "");
+  const w = await setup();
+  await hit(w, { e: "install_click", p: "/install.html", u: "x", m: "social", c: "student@school.edu", t: "https://example.com" });
+  assert.deepEqual((await w.db.dump()).event_attribution.map(({ campaign, content, source, channel }) =>
+    ({ campaign, content, source, channel })), [{ campaign: "", content: "", source: "social", channel: "x" }]);
+  await w.db.exec("DROP TABLE event_attribution");
+  assert.equal((await hit(w, { e: "digest_signup", p: "/digest/", u: "x", m: "social", c: "weekly-2026w44" })).status, 204);
+  assert.equal((await w.db.prepare("SELECT n FROM event_counts WHERE event='digest_signup'").first()).n, 1,
+    "analytics side table cannot break the primary count");
 });
 
 test("digest placement events are finite anonymous totals, never subscriber confirmations", async () => {

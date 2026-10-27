@@ -7,7 +7,7 @@ import vm from "node:vm";
 
 const COUNT = readFileSync(new URL("../../docs/js/count.js", import.meta.url), "utf8");
 
-function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage, placements } = {}) {
+function load({ host = "internscout.org", path = "/", search = "", referrer = "", webdriver = false, queued, storage, session, placements } = {}) {
   const sent = [], listeners = {};
   let intersection, mutation;
   const observing = new Set();
@@ -33,6 +33,7 @@ function load({ host = "internscout.org", path = "/", search = "", referrer = ""
     };
   }
   if (storage) ctx.localStorage = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
+  if (session) ctx.sessionStorage = { getItem: (k) => session.get(k) ?? null, setItem: (k, v) => session.set(k, String(v)), removeItem: (k) => session.delete(k) };
   if (queued) ctx.ISCountQ = queued;
   vm.createContext(ctx);
   vm.runInContext(COUNT, ctx);
@@ -62,6 +63,47 @@ test("one page load sends the path, the referring host and the campaign tag", ()
   assert.deepEqual(bodies()[0], { p: "/internships/ohio/", r: "www.google.com", u: "digest", m: "email" }, "only the host, never the search");
 });
 
+test("campaign and content tags follow conversion intents only within the same tab", () => {
+  const session = new Map();
+  const first = load({ session, path: "/internships/software-engineering/",
+    search: "?utm_source=x&utm_medium=social&utm_campaign=weekly-2026w44&utm_content=search_card" });
+  assert.deepEqual(first.bodies()[0], { p: "/internships/software-engineering/", r: "", u: "x", m: "social",
+    c: "weekly-2026w44", t: "search_card" });
+  const later = load({ session, path: "/install.html", referrer: "https://internscout.org/internships/software-engineering/" });
+  later.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi");
+  assert.deepEqual(later.bodies().filter((b) => b.e), [{ e: "install_click", p: "/install.html", u: "x", m: "social",
+    c: "weekly-2026w44", t: "search_card" }]);
+  const otherTab = load({ path: "/install.html" });
+  otherTab.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi");
+  assert.deepEqual(otherTab.bodies().filter((b) => b.e), [{ e: "install_click", p: "/install.html" }]);
+});
+
+test("non-attributed product steps never transmit campaign context", () => {
+  const r = load({ session: new Map(), search: "?utm_source=x&utm_medium=social&utm_campaign=weekly-2026w44&utm_content=search_card" });
+  for (const event of ["signin_start", "signin", "profile", "autoapply", "posting_click", "review_click"]) r.ctx.ISCount(event);
+  assert.deepEqual(r.bodies().filter((b) => b.e), [
+    { e: "signin_start", p: "/" }, { e: "signin", p: "/" }, { e: "profile", p: "/" },
+    { e: "autoapply", p: "/" }, { e: "posting_click", p: "/" }, { e: "review_click", p: "/" },
+  ]);
+});
+
+test("campaign context refuses URLs, email-like values and overlong tags", () => {
+  const r = load({ session: new Map(), search: "?utm_source=x&utm_medium=social&utm_campaign=https%3A%2F%2Fevil.example%2Fa&utm_content=student%40school.edu" });
+  r.ctx.ISCount("install_click");
+  assert.deepEqual(r.bodies().filter((b) => b.e), [{ e: "install_click", p: "/", u: "x", m: "social" }]);
+});
+
+test("a new external referral replaces an older tab campaign, while an auth round trip keeps it", () => {
+  const session = new Map();
+  load({ session, search: "?utm_source=x&utm_medium=social&utm_campaign=weekly-2026w44" });
+  const auth = load({ session, path: "/", referrer: "https://accounts.google.com/" });
+  auth.ctx.ISCount("install_click");
+  assert.equal(auth.bodies().find((b) => b.e).c, "weekly-2026w44");
+  const newer = load({ session, path: "/", referrer: "https://example.edu/resources" });
+  newer.ctx.ISCount("install_click");
+  assert.deepEqual(newer.bodies().find((b) => b.e), { e: "install_click", p: "/", r: "example.edu" });
+});
+
 test("local copies and automated browsers send nothing, and steps there are dropped", () => {
   for (const opts of [{ host: "localhost" }, { webdriver: true }]) {
     const { ctx, sent } = load(opts);
@@ -73,17 +115,23 @@ test("local copies and automated browsers send nothing, and steps there are drop
 
 test("?nocount=1 stops counting this browser on every later load, and ?nocount=0 starts it again", () => {
   const storage = new Map();
-  let r = load({ storage, search: "?nocount=1" });
+  const session = new Map();
+  load({ storage, session, search: "?utm_source=x&utm_medium=social&utm_campaign=private-test" });
+  assert.equal(session.size, 1, "the live tagged visit begins with campaign context");
+  let r = load({ storage, session, search: "?nocount=1" });
   r.ctx.ISCount("signin");
   assert.equal(r.sent.length, 0, "the load that sets it is not counted");
+  assert.equal(session.size, 0, "an opted-out load does not retain campaign context");
   assert.equal(storage.get("internscout.nocount"), "1");
-  r = load({ storage, path: "/internships/ohio/" });
+  r = load({ storage, session, path: "/internships/ohio/" });
   r.ctx.ISCount("install_click");
   assert.equal(r.sent.length, 0, "a later page sends neither its load nor its steps");
   assert.throws(() => r.click("https://chromewebstore.google.com/detail/x"), TypeError, "no click listener is attached at all");
-  r = load({ storage, search: "?nocount=0" });
+  r = load({ storage, session, search: "?nocount=0" });
   assert.equal(r.sent.length, 1);
   assert.equal(storage.has("internscout.nocount"), false);
+  r.click("https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi");
+  assert.deepEqual(r.bodies().find((b) => b.e), { e: "install_click", p: "/" }, "opted-out tags are never replayed");
 });
 
 test("steps count once per page load, queued ones included, and store links count as install clicks", () => {

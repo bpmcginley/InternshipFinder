@@ -214,3 +214,15 @@ test("the monthly cleanup keeps how many calls each past run took before it dele
   assert.equal(hist().length, 8);
   assert.ok(hist().includes("2026-09 autofill 1 2"));
 });
+
+test("daily cleanup keeps recent campaign intent and drops detail older than 400 days", async () => {
+  const db = fakeD1();
+  const add = (day, campaign) => db.prepare("INSERT INTO event_attribution " +
+    "(day,event,page,source,channel,campaign,content,n) VALUES (?, 'install_click', 'install', 'social', 'x', ?, '', 1)")
+    .bind(day, campaign).run();
+  await add("2025-08-27", "old");
+  await add("2025-08-28", "edge");
+  await add("2026-10-01", "recent");
+  await cleanup(db, new Date("2026-10-02T00:10:00Z"));
+  assert.deepEqual(db.dump().event_attribution.map((r) => r.campaign).sort(), ["edge", "recent"]);
+});

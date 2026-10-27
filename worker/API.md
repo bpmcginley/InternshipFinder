@@ -322,8 +322,8 @@ Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (ma
 
 ### `POST /hit` (site only, no auth)
 One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
-`{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email" }` (path, referring
-host, utm_source, utm_medium; all optional). Answers `204` and adds one to `visit_counts` for the UTC
+`{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email", "c": "weekly-2026w44", "t": "search-card" }` (path, referring
+host, utm_source, utm_medium, utm_campaign and utm_content; all optional). Answers `204` and adds one to `visit_counts` for the UTC
 day, the page kind (`dashboard`, `landing`, `install`, `legal`, `digest`, `employers`, `other`) and the source (`direct`,
 `search`, `social`, `email`, `extension`, `print` (a flyer's QR code), `other`, or `internal` for a load from another page of the
 site, which counts as a view but not a visit). Nothing about the visitor is stored.
@@ -365,6 +365,14 @@ A load arriving from Google or Microsoft sign-in or from Stripe counts as `inter
 minute from one address (counted in memory only), and anything past 50,000 views in a day are
 answered `204` but not counted. The Worker's own steps are not under that daily cap (2026-10-04), so a
 flood of forged browser steps cannot stop a real sign-in or sale from being counted.
+Since 2026-10-27, `install_click`, `digest_signup` and `employer_order_submit` also add an anonymous
+row to `event_attribution` when a source, channel, campaign or content tag is available. The page
+keeps the five bounded tags only in the current tab's session storage so a later InternScout page can
+attribute its intent event; closing the tab clears them. Campaign and content must be lowercase
+letters, digits, `_` or `-`, at most 48 characters. A day accepts at most 200 distinct attribution
+rows. These are intent events, not Chrome-confirmed installs, Buttondown-confirmed subscribers or
+Stripe-confirmed employer payments. The provider totals remain the truth for those outcomes. See
+[`growth/ATTRIBUTION.md`](../growth/ATTRIBUTION.md) for safe queries and interpretation.
 With `"s"` it is a paid listing's box (added 2026-10-14, S9; `docs/js/count.js`): `{ "s": "p-2026-11-acme-1",
 "e": "shown", "p": "/" }`, where `e` is `shown` (the box was at least half on screen, once per page load)
 or `open` (its posting link was pressed, once per page load). It adds one to `placement_counts` for the
