@@ -24,3 +24,10 @@ def test_robinhood_the_trading_app_is_not_a_nonprofit():
     assert _greenhouse()["robinhood"].get("sector") != "nonprofit"
     seeded = [c for c in companies_seed.GREENHOUSE if c["ats_token"].lower() == "robinhood"]
     assert seeded and all(c.get("sector") != "nonprofit" for c in seeded)
+
+
+def test_axon_talent_community_is_not_renderatl():
+    # 2026-10-27: the board's live advert says "Axon's AfroTech recruiting experience" and
+    # "Join Axon". The old RenderATL label put another company on a current Axon listing.
+    # Revert: remove this guard only if Axon moves the token to a different employer.
+    assert _greenhouse()["axontalentcommunity"]["name"] == "Axon"

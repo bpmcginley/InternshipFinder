@@ -20,24 +20,73 @@ Works, Stellar Science and ARM. Worth knowing before touching this:
 """
 from __future__ import annotations
 import html
+import json
 import re
 
-from .common import board_item, counts_of, require_robots
+from .common import board_item, counts_of, html_to_text, require_robots
 from ..classify import is_internship
-from ..region import board_state, place_bare_cities
+from ..region import board_state, maybe_in_region, place_bare_cities
 
 URL = "https://{tenant}.applytojob.com/apply"
+MAX_DETAIL = 25
 
 # Job entries are the only list-group-items on the page; splitting on the opening tag is steadier
 # than matching a balanced <li>, because the entry itself contains nested <li>s for the location.
 _ITEM_SPLIT = re.compile(r'<li class="list-group-item">')
 _LINK_RE = re.compile(r'<a\s+href="(?P<url>https://[^"]*?/apply/[^"]+)"\s*>(?P<title>.*?)</a>', re.S)
 _LOC_RE = re.compile(r"fa-map-marker'></i>(?P<loc>.*?)</li>", re.S)
+_JSON_LD_RE = re.compile(
+    r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S | re.I)
+_DESC_OPEN_RE = re.compile(r'<div[^>]*\bid=["\']job-description["\'][^>]*>', re.I)
+_DIV_RE = re.compile(r"<(/?)div\b[^>]*>", re.I)
 
 
 def _text(s: str) -> str:
     """'AlphaLab &amp; Portfolio  Operations' -> 'AlphaLab & Portfolio Operations'."""
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+
+
+def parse_jazzhr_detail(page: str) -> tuple[str, str | None]:
+    """Read JazzHR's public JobPosting block without mixing in the application form.
+
+    2026-10-27: every sampled JazzHR job page carries the full advert and posting date in
+    JSON-LD. The board page has neither, which left all 194 current JazzHR roles without a
+    description even though the employer exposes one on the student's destination page.
+    Revert: remove this parser and the bounded detail pass below to restore board-only reads.
+    """
+    def postings(value):
+        if isinstance(value, dict):
+            kinds = value.get("@type")
+            if kinds == "JobPosting" or isinstance(kinds, list) and "JobPosting" in kinds:
+                yield value
+            for child in value.values():
+                yield from postings(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from postings(child)
+
+    for raw in _JSON_LD_RE.findall(page or ""):
+        try:
+            payload = json.loads(html.unescape(raw))
+        except (TypeError, ValueError):
+            continue
+        job = next(postings(payload), None)
+        if not job:
+            continue
+        posted = str(job.get("datePosted") or "")[:10] or None
+        return html_to_text(job.get("description")), posted
+    # Older JazzHR themes publish only Organization JSON-LD, but keep the same explicit visible
+    # advert container. Balance divs so an embedded layout block cannot cut the description short.
+    opened = _DESC_OPEN_RE.search(page or "")
+    if opened:
+        depth, body = 1, page[opened.end():]
+        for tag in _DIV_RE.finditer(body):
+            depth += -1 if tag.group(1) else 1
+            if depth == 0:
+                body = body[:tag.start()]
+                break
+        return html_to_text(body), None
+    return "", None
 
 
 def parse_jazzhr(page: str, co: dict) -> list[dict]:
@@ -74,4 +123,17 @@ def fetch_jazzhr_board(c, co: dict) -> list[dict]:
                    co["ats_token"])
     r = c.get(URL.format(tenant=co["ats_token"]))
     r.raise_for_status()
-    return parse_jazzhr(r.text, co)
+    items = parse_jazzhr(r.text, co)
+    # The current corpus has no JazzHR board above 23 internships. Keep a ceiling anyway so a
+    # newly discovered giant tenant cannot turn one board into an unbounded crawl.
+    wanted = [i for i in items if not i["locations"] or any(maybe_in_region(l) for l in i["locations"])]
+    for it in wanted[:MAX_DETAIL]:
+        try:
+            d = c.get(it["url"])
+            if d.status_code == 200:
+                desc, posted = parse_jazzhr_detail(d.text)
+                it["description"] = desc
+                it["posted_at"] = posted or it["posted_at"]
+        except Exception:
+            pass
+    return items
