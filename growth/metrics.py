@@ -59,6 +59,13 @@ CATCHUP_ACTOR = "github-actions[bot]"
 RECENT = 8                                  # recent posts kept per account
 GSC_SITE = os.environ.get("GSC_SITE") or "sc-domain:internscout.org"
 GSC_DAYS = 28
+# 2026-10-28: Google dates are Pacific and newest dates are preliminary. was: UTC today.
+# Revert: remove the explicit Pacific/final windows and comparison fields below.
+GSC_PACIFIC = ZoneInfo("America/Los_Angeles")
+GSC_WEEK_PAGES = 500
+GSC_WEEK_QUERIES = 250
+GSC_INSPECTION_PAGES = ("under-armour", "medtronic", "lyft", "bose")
+GSC_CONTROL_PAGES = ("sonos", "stryker", "pinterest", "urbn")
 # was: 15 queries and 10 pages. With ~1,264 generated pages, the top 10 said nothing about which of
 # them Google shows but nobody clicks (2026-10-04). LOW_CTR_* pick those out for the snapshot.
 GSC_QUERIES = 100
@@ -80,6 +87,10 @@ SEARCH = re.compile(r"(^|\.)(google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.y
 SOCIAL = re.compile(r"(^|\.)(bsky\.app|t\.co|x\.com|twitter\.com|reddit\.com|instagram\.com|linkedin\.com|lnkd\.in|"
                     r"facebook\.com|discord\.com|discordapp\.com|mastodon\.social|threads\.net|youtube\.com|"
                     r"tiktok\.com|snapchat\.com)$")
+# 2026-10-28: distinguish Google search from mail/auth and growing Bing traffic.
+# was: every Google subdomain joined one search bucket. Revert: restore SEARCH-only classification.
+GOOGLE_SEARCH = re.compile(r"^(?:www\.)?google\.(?:com|[a-z]{2}|(?:com|co)\.[a-z]{2})$")
+BING_SEARCH = re.compile(r"^(?:(?:www|cn)\.)?bing\.com$")
 
 QUERY = """
 query($account: string!, $site: string!, $start: Time!, $end: Time!, $weekStart: Time!) {
@@ -101,6 +112,18 @@ query($account: string!, $site: string!, $start: Time!, $end: Time!, $weekStart:
 }
 """
 
+# 2026-10-28: a bounded referrer query uses the same Pacific week boundaries as Google.
+# Revert: remove the optional matched comparison; the legacy daily search total remains combined.
+SEARCH_WEEK_QUERY = """
+query($account: string!, $site: string!, $start: Time!, $end: Time!) {
+  viewer { accounts(filter: {accountTag: $account}) {
+    refs: rumPageloadEventsAdaptiveGroups(limit: 5000,
+      filter: {siteTag: $site, bot: 0, datetime_geq: $start, datetime_lt: $end}) {
+      sum { visits } dimensions { refererHost } }
+  } }
+}
+"""
+
 
 def _json(url: str, body: dict | None = None, token: str | None = None, timeout: int = 30):
     headers = {"Content-Type": "application/json", **UA}
@@ -114,8 +137,10 @@ def _json(url: str, body: dict | None = None, token: str | None = None, timeout:
 
 def source(host: str | None) -> str:
     host = (host or "").lower()
-    if not host or host.endswith("internscout.org"):
+    if not host or host == "internscout.org" or host.endswith(".internscout.org"):
         return "direct"
+    if re.search(r"(^|\.)google\.", host) and not GOOGLE_SEARCH.fullmatch(host):
+        return "other"
     if SEARCH.search(host):
         return "search"
     if SOCIAL.search(host):
@@ -123,34 +148,102 @@ def source(host: str | None) -> str:
     return "other"
 
 
+def search_engine(host: str | None) -> str | None:
+    host = (host or "").lower()
+    if source(host) != "search":
+        return None
+    if GOOGLE_SEARCH.fullmatch(host):
+        return "google"
+    if BING_SEARCH.fullmatch(host):
+        return "bing"
+    return "other_search"
+
+
 def visits(token: str, now: datetime) -> tuple[list[dict], dict]:
     """(one row per day, the week's top pages/referrers/countries)."""
-    end = now.replace(minute=0, second=0, microsecond=0)
+    end = now.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    # 2026-10-28: replace omitted sample dates with labelled estimates instead of leaving stale rows.
+    # was: only returned dates were rewritten. Revert: initialize rows from acct['days'] again.
+    start = (end - timedelta(days=DAYS - 1 if end.hour else DAYS)).replace(hour=0)
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
     r = _json("https://api.cloudflare.com/client/v4/graphql",
-              {"query": QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG, "start": iso(end - timedelta(days=DAYS)),
+              {"query": QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG, "start": iso(start),
                                              "end": iso(end), "weekStart": iso(end - timedelta(days=7))}}, token)
+    if not isinstance(r, dict):
+        raise RuntimeError("Cloudflare: incomplete analytics response")
     if r.get("errors"):
         raise RuntimeError("Cloudflare: " + r["errors"][0].get("message", "unknown error"))
     acct = r["data"]["viewer"]["accounts"][0]
+    if not isinstance(acct, dict) or any(not isinstance(acct.get(key), list)
+                                       for key in ("days", "landing", "refs", "pages", "topRefs", "countries")):
+        raise RuntimeError("Cloudflare: incomplete analytics response")
     rows: dict[str, dict] = {}
+    day = start
+    while day < end:
+        key = day.date().isoformat()
+        rows[key] = {"day": key, "visits": 0, "landing": 0, "search": 0, "social": 0, "direct": 0}
+        day += timedelta(days=1)
+    engines = {day: {"day": day, "google": 0, "bing": 0, "other_search": 0} for day in rows}
+    observed = set()
     for g in acct["days"]:
-        rows[g["dimensions"]["date"]] = {"day": g["dimensions"]["date"], "visits": g["sum"]["visits"],
-                                         "landing": 0, "search": 0, "social": 0, "direct": 0}
+        key = g["dimensions"]["date"]
+        if key in rows:
+            observed.add(key)
+            rows[key]["visits"] = g["sum"]["visits"]
     for g in acct["landing"]:
-        rows.setdefault(g["dimensions"]["date"], {"day": g["dimensions"]["date"], "visits": 0, "landing": 0,
-                                                  "search": 0, "social": 0, "direct": 0})["landing"] = g["sum"]["visits"]
+        if g["dimensions"]["date"] in rows:
+            rows[g["dimensions"]["date"]]["landing"] = g["sum"]["visits"]
     for g in acct["refs"]:
-        kind = source(g["dimensions"]["refererHost"])
-        if kind != "other" and g["dimensions"]["date"] in rows:
-            rows[g["dimensions"]["date"]][kind] += g["sum"]["visits"]
+        host, day = g["dimensions"]["refererHost"], g["dimensions"]["date"]
+        kind, engine = source(host), search_engine(host)
+        if day in rows:
+            if kind != "other":
+                rows[day][kind] += g["sum"]["visits"]
+            if engine:
+                engines[day][engine] += g["sum"]["visits"]
     week = {
         "pages": [{"path": g["dimensions"]["requestPath"], "visits": g["sum"]["visits"]} for g in acct["pages"]],
         "referrers": [{"host": g["dimensions"]["refererHost"] or "(direct)", "visits": g["sum"]["visits"],
                        "kind": source(g["dimensions"]["refererHost"])} for g in acct["topRefs"]],
         "countries": [{"country": g["dimensions"]["countryName"], "visits": g["sum"]["visits"]} for g in acct["countries"]],
+        "search_engines": {"timezone": "UTC", "days": list(engines.values()),
+                           "basis": "referring_host; not confirmed organic clicks"},
+        "coverage": {"timezone": "UTC", "start": iso(start), "end_exclusive": iso(end),
+                     "measurement": "adaptive_sample_estimates", "omitted_days": sorted(set(rows) - observed),
+                     "omitted_day_value": "zero estimate, not proof of zero visitors",
+                     "referrer_limit": 5000, "referrers_may_be_truncated": len(acct["refs"]) >= 5000,
+                     "partial_days": [end.date().isoformat()] if end.hour else []},
     }
     return sorted(rows.values(), key=lambda x: x["day"]), week
+
+
+def cloudflare_search_comparison(token: str, weeks: list[dict]) -> dict:
+    """Estimated arrivals for Google's two complete Pacific weeks, never mixed with all-source visits."""
+    out = []
+    for period in weeks[:2]:
+        start = datetime.strptime(period["start"], "%Y-%m-%d").replace(tzinfo=GSC_PACIFIC)
+        end = datetime.strptime(period["end"], "%Y-%m-%d").replace(tzinfo=GSC_PACIFIC) + timedelta(days=1)
+        iso = lambda d: d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        reply = _json("https://api.cloudflare.com/client/v4/graphql",
+                      {"query": SEARCH_WEEK_QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG,
+                         "start": iso(start), "end": iso(end)}}, token)
+        if not isinstance(reply, dict):
+            raise RuntimeError("Cloudflare comparison: incomplete response")
+        if reply.get("errors"):
+            raise RuntimeError("Cloudflare comparison: " + reply["errors"][0].get("message", "unknown error"))
+        refs = reply["data"]["viewer"]["accounts"][0]["refs"]
+        if not isinstance(refs, list):
+            raise RuntimeError("Cloudflare comparison: incomplete response")
+        totals = {"google": 0, "bing": 0, "other_search": 0}
+        for row in refs:
+            engine = search_engine(row["dimensions"]["refererHost"])
+            if engine:
+                totals[engine] += row["sum"]["visits"]
+        out.append({"start": period["start"], "end": period["end"], "start_utc": iso(start),
+                    "end_exclusive_utc": iso(end), "visits": totals, "returned_referrers": len(refs),
+                    "at_row_limit": len(refs) >= 5000})
+    return {"status": "available", "timezone": "America/Los_Angeles", "measurement": "adaptive_sample_estimates",
+            "basis": "referring_host; not confirmed organic clicks", "weeks": out}
 
 
 def _clip(text: str | None, n: int = 110) -> str:
@@ -400,14 +493,21 @@ def _google_error(e: urllib.error.HTTPError) -> str:
         return f"HTTP {e.code}"
 
 
-def _gsc_rows(token: str, body: dict) -> list[dict]:
+def _gsc_response(token: str, body: dict) -> dict:
     url = ("https://searchconsole.googleapis.com/webmasters/v3/sites/"
            f"{urllib.parse.quote(GSC_SITE, safe='')}/searchAnalytics/query")
     try:
-        return _json(url, body, token).get("rows") or []
+        reply = _json(url, body, token)
+        if not isinstance(reply, dict) or not isinstance(reply.get("rows", []), list):
+            raise RuntimeError("Search Console: unexpected response")
+        return reply
     except urllib.error.HTTPError as e:
         # 403 here usually means the service account's email isn't a user on the property yet.
         raise RuntimeError("Search Console: " + _google_error(e)) from None
+
+
+def _gsc_rows(token: str, body: dict) -> list[dict]:
+    return _gsc_response(token, body).get("rows") or []
 
 
 def _gsc_totals(rows: list[dict]) -> dict:
@@ -419,13 +519,109 @@ def _gsc_totals(rows: list[dict]) -> dict:
             "position": round(position, 1) if position is not None else None}
 
 
+def _gsc_end(now: datetime, metadata: dict):
+    """Do not slide a window back merely because its last complete day had no impressions."""
+    today = now.astimezone(GSC_PACIFIC).date()
+    try:
+        incomplete = datetime.strptime(metadata.get("first_incomplete_date"), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        incomplete = None
+    if incomplete is not None and incomplete <= today:
+        return min(today - timedelta(days=1), incomplete - timedelta(days=1)), "google_first_incomplete_date"
+    # Optional metadata absent: an explicit lag, never the last nonzero row, sets the window.
+    return today - timedelta(days=3), "conservative_three_day_lag_metadata_unavailable"
+
+
+def _gsc_cell(row: dict) -> dict:
+    return {"clicks": row.get("clicks", 0), "impressions": row.get("impressions", 0),
+            "position": round(row.get("position", 0), 1)}
+
+
+def _gsc_details(token: str, base: dict, dimension: str, limit: int) -> tuple[list[dict], dict]:
+    reply = _gsc_response(token, {**base, "dimensions": [dimension], "rowLimit": limit})
+    rows = reply.get("rows") or []
+    if dimension == "page":
+        # 2026-10-28: retain canonical identity beside the old path key. was: discard host/scheme.
+        # Revert: remove url while retaining path.
+        out = [{"url": r["keys"][0], "path": urllib.parse.urlparse(r["keys"][0]).path or "/", **_gsc_cell(r)}
+               for r in rows]
+    else:
+        out = [{"query": r["keys"][0], **_gsc_cell(r)} for r in rows]
+    return out, {"requested_limit": limit, "returned": len(rows), "at_row_limit": len(rows) >= limit,
+                 "exhaustive": False, "basis": "Google top rows; privacy/internal limits can omit rows",
+                 "aggregation": reply.get("responseAggregationType")}
+
+
+def inspect_search_pages(token: str, now: datetime) -> dict:
+    """Read Google's last observed crawl for four treatment pages; this never requests indexing.
+
+    2026-10-28: bounded 4x10-second read-only requests using the existing token, stop on 403.
+    was: no crawl-pickup evidence. Revert: remove this optional snapshot field and calls.
+    """
+    fields = ("lastCrawlTime", "coverageState", "verdict", "googleCanonical", "userCanonical",
+              "indexingState", "pageFetchState")
+    results = []
+    for slug in GSC_INSPECTION_PAGES:
+        url = f"{SITE}/internships/at/{slug}/"
+        try:
+            reply = _json("https://searchconsole.googleapis.com/v1/urlInspection/index:inspect",
+                          {"inspectionUrl": url, "siteUrl": GSC_SITE, "languageCode": "en-US"}, token, timeout=10)
+            index = reply["inspectionResult"]["indexStatusResult"]
+            if not isinstance(index, dict) or not any(index.get(field) for field in fields):
+                raise ValueError("unexpected response")
+            results.append({"url": url, "status": "available", **{f: index.get(f) for f in fields}})
+        except urllib.error.HTTPError as e:
+            results.append({"url": url, "status": "unavailable", "error": f"HTTP {e.code}"})
+            if e.code == 403:
+                break  # no permission changes, escalation or repeated rejected requests
+        except (OSError, urllib.error.URLError, ValueError, KeyError, IndexError, TypeError, RuntimeError) as e:
+            results.append({"url": url, "status": "unavailable", "error": type(e).__name__})
+    available = sum(r["status"] == "available" for r in results)
+    return {"checked_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "status": "available" if available == len(results) else "partial" if available else "unavailable",
+            "operation": "read_only_url_inspection; not an indexing request", "results": results}
+
+
+def fixed_search_cohort(token: str, weeks: list[dict]) -> dict:
+    """One bounded request preserves the same eight page identities across both full weeks.
+
+    2026-10-28: top-page caps must not hide the fixed treatment/control experiment.
+    was: no fixed page/date cohort. Revert: remove this optional field/call.
+    """
+    groups = {"treatment": [f"{SITE}/internships/at/{slug}/" for slug in GSC_INSPECTION_PAGES],
+              "control": [f"{SITE}/internships/at/{slug}/" for slug in GSC_CONTROL_PAGES]}
+    urls = set(groups["treatment"] + groups["control"])
+    expression = "^(?:" + "|".join(re.escape(url) for url in sorted(urls)) + ")$"
+    request = {"startDate": weeks[0]["start"], "endDate": weeks[-1]["end"],
+               "dataState": "final", "type": "web", "aggregationType": "auto",
+               "dimensions": ["date", "page"], "rowLimit": 1000,
+               "dimensionFilterGroups": [{"groupType": "and", "filters": [
+                   {"dimension": "page", "operator": "includingRegex", "expression": expression}]}]}
+    result = {"start": request["startDate"], "end": request["endDate"], "timezone": "America/Los_Angeles",
+              "data_state": "final", "search_type": "web", "groups": groups,
+              "filters": request["dimensionFilterGroups"], "row_limit": 1000, "max_possible_page_days": 112,
+              "exhaustive": False, "omitted_rows": "Google can omit zero-data/privacy-limited rows; not proof of deindexing"}
+    try:
+        reply = _gsc_response(token, request)
+        rows = [{"day": r["keys"][0], "url": r["keys"][1], **_gsc_cell(r)} for r in reply.get("rows") or []]
+        if any(r["url"] not in urls or not request["startDate"] <= r["day"] <= request["endDate"] for r in rows):
+            raise RuntimeError("unexpected fixed cohort keys")
+        if len({(r["day"], r["url"]) for r in rows}) != len(rows) or len(rows) > 112:
+            raise RuntimeError("unexpected fixed cohort row count")
+        result.update(status="available", rows=rows, returned=len(rows), at_row_limit=len(rows) >= 1000,
+                      aggregation=reply.get("responseAggregationType"))
+    except (OSError, urllib.error.URLError, ValueError, KeyError, IndexError, TypeError, RuntimeError) as e:
+        result.update(status="unavailable", error=str(e))
+    return result
+
+
 def search_console(now: datetime) -> dict:
-    """The last 28 days of Google searches for the site: clicks, impressions and average position by
-    day, and the top queries and pages. dataState "all" includes the last two days, which Google
-    finalises later, so the newest days can still move a little.
-    low_ctr_pages (2026-10-04): pages Google showed at least LOW_CTR_MIN_IMPRESSIONS times that were
-    clicked under LOW_CTR_BELOW of the time, most shown first, at most LOW_CTR_KEEP: the titles and
-    descriptions most worth rewriting."""
+    """Final-only, explicitly dated Google headlines and private matched-week diagnostics.
+
+    A companion all/date request preserves Google's completeness boundary. If Google omits it,
+    a labelled three-day lag is used; a missing impression day never shifts the date window.
+    The bounded query/page lists are not exhaustive and never calculate site totals.
+    """
     key = os.environ.get("GSC_SERVICE_ACCOUNT")
     if not key:
         raise ValueError("no GSC_SERVICE_ACCOUNT")
@@ -435,20 +631,54 @@ def search_console(now: datetime) -> dict:
     except (ValueError, KeyError, TypeError):
         raise ValueError("GSC_SERVICE_ACCOUNT is not a service account key file's JSON") from None
     token = _gsc_token(info)
-    end = now.date()
-    base = {"startDate": (end - timedelta(days=GSC_DAYS - 1)).isoformat(), "endDate": end.isoformat(), "dataState": "all"}
-    cell = lambda r: {"clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),  # noqa: E731
-                      "position": round(r.get("position", 0), 1)}
-    days = [{"day": r["keys"][0], **cell(r)} for r in _gsc_rows(token, {**base, "dimensions": ["date"], "rowLimit": 100})]
-    queries = [{"query": r["keys"][0], **cell(r)}
-               for r in _gsc_rows(token, {**base, "dimensions": ["query"], "rowLimit": GSC_QUERIES})]   # was: 15
-    pages = [{"path": urllib.parse.urlparse(r["keys"][0]).path or "/", **cell(r)}
-             for r in _gsc_rows(token, {**base, "dimensions": ["page"], "rowLimit": GSC_PAGES})]    # was: 10
+    today = now.astimezone(GSC_PACIFIC).date()
+    probe = {"startDate": (today - timedelta(days=34)).isoformat(), "endDate": today.isoformat(),
+             "type": "web", "aggregationType": "auto", "dataState": "all", "dimensions": ["date"], "rowLimit": 100}
+    preliminary = _gsc_response(token, probe)
+    metadata = preliminary.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise RuntimeError("Search Console: unexpected completeness metadata")
+    end, boundary = _gsc_end(now, metadata)
+    start = end - timedelta(days=GSC_DAYS - 1)
+    base = {"startDate": start.isoformat(), "endDate": end.isoformat(), "dataState": "final",
+            "type": "web", "aggregationType": "auto"}
+    final = _gsc_response(token, {**base, "dimensions": ["date"], "rowLimit": 100})
+    days = [{"day": r["keys"][0], **_gsc_cell(r)} for r in final.get("rows") or []
+            if start.isoformat() <= r["keys"][0] <= end.isoformat()]
+    queries, query_limit = _gsc_details(token, base, "query", GSC_QUERIES)
+    pages, page_limit = _gsc_details(token, base, "page", GSC_PAGES)
     since7 = (end - timedelta(days=6)).isoformat()
-    # was: return {..., "queries": queries, "pages": pages}
+    # 2026-10-28: collect matched Monday-Sunday cohorts instead of subtracting rolling top lists.
+    # Revert: omit comparison; retain final headline keys for existing dashboards.
+    sunday = end - timedelta(days=(end.weekday() + 1) % 7)
+    weeks = []
+    for week_end in (sunday - timedelta(days=7), sunday):
+        week_start = week_end - timedelta(days=6)
+        request = {**base, "startDate": week_start.isoformat(), "endDate": week_end.isoformat()}
+        week = {"start": week_start.isoformat(), "end": week_end.isoformat(),
+                "totals": _gsc_totals([d for d in days if week_start.isoformat() <= d["day"] <= week_end.isoformat()])}
+        try:
+            week_pages, page_bounds = _gsc_details(token, request, "page", GSC_WEEK_PAGES)
+            week_queries, query_bounds = _gsc_details(token, request, "query", GSC_WEEK_QUERIES)
+            week.update(pages=week_pages, queries=week_queries,
+                        limits={"pages": page_bounds, "queries": query_bounds}, status="available")
+        except (OSError, urllib.error.URLError, ValueError, KeyError, IndexError, TypeError, RuntimeError) as e:
+            # Optional detail failure must not discard successful final site totals or invent zeros.
+            week.update(status="unavailable", error=str(e))
+        weeks.append(week)
     return {"site": GSC_SITE, "days": sorted(days, key=lambda d: d["day"]), "totals_28d": _gsc_totals(days),
             "totals_7d": _gsc_totals([d for d in days if d["day"] >= since7]), "queries": queries, "pages": pages,
-            "low_ctr_pages": low_ctr_pages(pages)}
+            "low_ctr_pages": low_ctr_pages(pages),
+            "reporting": {"timezone": "America/Los_Angeles", "data_state": "final", "search_type": "web",
+                          "filters": [], "aggregation": final.get("responseAggregationType"),
+                          "start": start.isoformat(), "end": end.isoformat(), "seven_day_start": since7,
+                          "boundary_basis": boundary, "completeness_metadata": metadata,
+                          "probe_start": probe["startDate"], "probe_end": probe["endDate"],
+                          "omitted_days": "Google omits dates without data; no row is not a collection failure",
+                          "limits": {"pages": page_limit, "queries": query_limit}},
+            "comparison": {"timezone": "America/Los_Angeles", "data_state": "final", "search_type": "web",
+                           "filters": [], "weeks": weeks},
+            "url_inspection": inspect_search_pages(token, now), "fixed_page_cohort": fixed_search_cohort(token, weeks)}
 
 
 def low_ctr_pages(pages: list[dict]) -> list[dict]:
@@ -555,10 +785,32 @@ def printable(snap: dict) -> dict:
     """The snapshot as the run log shows it. The repository is public, so its Actions logs are too:
     search queries are counted there, never listed (they go only to the private database).
     was: Search Console only; Bing's queries are kept out the same way (2026-10-14)."""
-    out = dict(snap)
+    # 2026-10-28: redact nested weekly queries too. was: only top-level queries were hidden.
+    # Revert: restore shallow redaction only if comparison is removed from the collector.
+    def redact(value):
+        if isinstance(value, dict):
+            return {k: (f"{len(v)} queries" if k == "queries" and isinstance(v, list) else redact(v))
+                    for k, v in value.items()}
+        if isinstance(value, list):
+            return [redact(v) for v in value]
+        return value
+    out = redact(snap)
     for src in ("search_console", "bing"):
+        if isinstance(out.get(src), dict) and isinstance(out[src].get("comparison"), dict):
+            for week in out[src]["comparison"].get("weeks", []):
+                if "pages" in week:
+                    week["pages"] = f"{len(week['pages'])} canonical URLs"
         if isinstance(out.get(src), dict):
-            out[src] = {**out[src], "queries": f"{len(out[src]['queries'])} queries"}
+            for page in out[src].get("pages", []) + out[src].get("low_ctr_pages", []):
+                page.pop("url", None)
+            if isinstance(out[src].get("url_inspection"), dict):
+                inspection = out[src]["url_inspection"]
+                out[src]["url_inspection"] = {"checked_at": inspection["checked_at"], "status": inspection["status"],
+                                              "checked_pages": len(inspection["results"])}
+            if isinstance(out[src].get("fixed_page_cohort"), dict):
+                cohort = out[src]["fixed_page_cohort"]
+                out[src]["fixed_page_cohort"] = {key: cohort.get(key) for key in
+                                                ("status", "start", "end", "returned", "row_limit", "at_row_limit")}
     return out
 
 
@@ -665,8 +917,18 @@ def main(argv: list[str]) -> int:
             snap[key] = fn()
         # RuntimeError includes instagram.InstagramError, which carries Meta's message, never the token.
         # ImportError: the cryptography package isn't installed (Search Console only).
-        except (OSError, urllib.error.URLError, ValueError, KeyError, RuntimeError, ImportError) as e:
+        except (OSError, urllib.error.URLError, ValueError, KeyError, IndexError, TypeError, RuntimeError, ImportError) as e:
             problems.append(f"{key}: {e}")
+    if token and "week" in snap and "comparison" in snap.get("search_console", {}):
+        try:
+            snap["week"]["search_engines"]["comparison"] = cloudflare_search_comparison(
+                token, snap["search_console"]["comparison"]["weeks"])
+        except (OSError, urllib.error.URLError, ValueError, KeyError, IndexError, TypeError, RuntimeError) as e:
+            snap["week"]["search_engines"]["comparison"] = {"status": "unavailable", "error": str(e)}
+            problems.append(f"search comparison: {e}")
+    problems.extend(f"Search Console week {week['start']}: {week['error']}"
+                    for week in snap.get("search_console", {}).get("comparison", {}).get("weeks", [])
+                    if week.get("status") == "unavailable")
     problems.extend(f"weekly email: {job['detail']}" for job in snap.get("automation", [])
                     if job.get("file") == "digest.yml" and
                     job.get("health") in {"overdue", "failed", "blocked", "unknown"})

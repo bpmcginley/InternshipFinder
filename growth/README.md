@@ -3,6 +3,10 @@
 How InternScout finds students, and how that improves itself. This folder is not published: GitHub
 Pages serves `docs/` only.
 
+For Google-versus-Cloudflare comparisons, use [Search reporting](SEARCH_REPORTING.md): Google
+headlines use final Pacific dates, while Cloudflare daily totals are sampled UTC estimates. The
+private snapshot also carries separate engines and two matched complete weeks.
+
 ## Who the audience is (measured 2026-09-23)
 
 InternScout is only as good as the listings a student sees on their first visit, so the audience is
