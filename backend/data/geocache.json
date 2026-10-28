@@ -769,6 +769,10 @@
 ],
 "east farmingdale (tr)|NY":null,
 "east farmingdale (tr|NY":null,
+"east fishkill|NY":[
+41.5533,
+-73.7956
+],
 "east northport|NY":[
 40.8768,
 -73.3246
@@ -1172,6 +1176,10 @@
 40.623,
 -79.1547
 ],
+"irvington|NJ":[
+40.7264,
+-74.2289
+],
 "islip|NY":[
 40.7301,
 -73.2107
@@ -1515,6 +1523,10 @@
 "mt laurel township|NJ":[
 39.934,
 -74.891
+],
+"mt vernon|NY":[
+40.9125,
+-73.8387
 ],
 "multiple locations considered|NY":null,
 "muncy|PA":[

@@ -35,6 +35,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "42dot": {
+   "name": "42dot",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "8vc": {
    "name": "8VC",
    "quant": false,
@@ -337,11 +343,23 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "bridgeneurotech": {
+   "name": "Bridge Neurotech",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "brightstar-ai": {
    "name": "Brightstar.AI",
    "quant": false,
    "fails": 0,
    "added": "2026-09-25"
+  },
+  "build-ai": {
+   "name": "Build AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "cartesia": {
    "name": "Cartesia",
@@ -612,6 +630,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "drivewealth": {
+   "name": "DriveWealth",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "droyd": {
    "name": "Droyd Robotics",
@@ -1075,6 +1099,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "hyphenate": {
+   "name": "Hyphenate",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "ibotta": {
    "name": "ibotta",
    "quant": false,
@@ -1225,6 +1255,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-09"
+  },
+  "light-inc": {
+   "name": "Light",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "linear": {
    "name": "Linear",
@@ -1527,6 +1563,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "old-mission-capital": {
+   "name": "Old Mission",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "oligo": {
    "name": "Oligo Space",
    "quant": false,
@@ -1755,6 +1797,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "powertown": {
+   "name": "Powertown",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "pressw": {
    "name": "PressW",
    "quant": false,
@@ -1862,6 +1910,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "relling": {
+   "name": "Relling",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "remarcable-inc": {
    "name": "Remarcable",
@@ -2030,6 +2084,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "skyband%20systems": {
+   "name": "Skyband Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "skydio": {
    "name": "Skydio",
@@ -2444,6 +2504,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "zus-health": {
+   "name": "Zus Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   }
  },
  "bamboohr": {
@@ -2531,6 +2597,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "nomadgcs": {
+   "name": "Nomad GCS",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "pictonmahoney": {
    "name": "Picton Mahoney Asset Management",
@@ -3169,6 +3241,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "bettermentcampusrecruiting": {
+   "name": "Betterment",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "bgeinc": {
    "name": "BGE",
@@ -4350,6 +4428,12 @@
    "fails": 0,
    "added": "2026-10-02"
   },
+  "glencoreuk": {
+   "name": "Glencore",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "globalizationpartners": {
    "name": "Globalization Partners",
    "quant": false,
@@ -5239,10 +5323,10 @@
   "msgsports": {
    "name": "MSG Sports",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-18",
    "sector": "hospitality_sports",
-   "last_fail": "2026-10-27"
+   "last_fail": "2026-10-28"
   },
   "mthreerecruitingportal": {
    "name": "mthree",
@@ -5723,6 +5807,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "media"
+  },
+  "protagonist": {
+   "name": "Protagonist",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "purestorage": {
    "name": "Pure Storage",
@@ -8115,6 +8205,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "perspectivetherapeutics": {
+   "name": "Perspective Therapeutics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "phase2": {
    "name": "Phase 2",
    "quant": false,
@@ -8477,9 +8573,9 @@
   "aofl": {
    "name": "Age of Learning",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-27"
+   "last_fail": "2026-10-28"
   },
   "appen-2": {
    "name": "Appen",
@@ -8593,9 +8689,9 @@
   "butcherbox": {
    "name": "ButcherBox",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-27"
+   "last_fail": "2026-10-28"
   },
   "catalist": {
    "name": "Catalist",
@@ -8820,6 +8916,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "futo-org": {
+   "name": "FUTO",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "genbio": {
    "name": "GenBio AI",
