@@ -379,6 +379,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "certa": {
+   "name": "Certa",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "charge-robotics": {
    "name": "Charge Robotics",
    "quant": false,
@@ -631,6 +637,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "dmodel": {
+   "name": "dmodel",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "drivewealth": {
    "name": "DriveWealth",
    "quant": false,
@@ -757,6 +769,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "f7d8749a-72d6-407c-bf98-292ea630c73a": {
+   "name": "Shield AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "fab2": {
    "name": "fab2",
    "quant": false,
@@ -876,6 +894,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "generalmagic": {
+   "name": "General Magic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "genesis-molecular-ai": {
    "name": "Genesis Molecular AI",
@@ -1166,6 +1190,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ixianrobotics": {
+   "name": "Ixian Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "junior": {
    "name": "Junior AI",
    "quant": false,
@@ -1237,6 +1267,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "laminar-jobs": {
+   "name": "Laminar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "leantechniques": {
    "name": "Lean TECHniques",
@@ -1581,6 +1617,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "onerobot": {
+   "name": "One Robot",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "Ontic": {
    "name": "Ontic",
    "quant": false,
@@ -1604,6 +1646,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "openmind": {
+   "name": "OpenMind",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "opusclip": {
    "name": "OpusClip",
@@ -1803,6 +1851,12 @@
    "fails": 0,
    "added": "2026-10-28"
   },
+  "pramaana-labs": {
+   "name": "Pramaana Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "pressw": {
    "name": "PressW",
    "quant": false,
@@ -1838,6 +1892,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "quadric": {
+   "name": "Quadric",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "quadrillion-labs": {
    "name": "Quadrillion Labs",
@@ -2474,6 +2534,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "xterra%20ai": {
+   "name": "Xterra AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "yotta": {
    "name": "Yotta Labs",
@@ -8692,6 +8758,12 @@
    "fails": 3,
    "added": "2026-09-13",
    "last_fail": "2026-10-28"
+  },
+  "camstex": {
+   "name": "CAMS",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "catalist": {
    "name": "Catalist",
@@ -18953,8 +19025,9 @@
   "verabradley|wd5|vbcareers": {
    "name": "Vera Bradley",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-28"
   },
   "veralto|wd1|hachjobs": {
    "name": "Veralto",
