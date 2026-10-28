@@ -65,7 +65,9 @@ GSC_PACIFIC = ZoneInfo("America/Los_Angeles")
 GSC_WEEK_PAGES = 500
 GSC_WEEK_QUERIES = 250
 GSC_INSPECTION_PAGES = ("under-armour", "medtronic", "lyft", "bose")
-GSC_CONTROL_PAGES = ("sonos", "stryker", "pinterest", "urbn")
+# 2026-10-28: unchanged comparators with baseline impressions, not zero-traffic pages.
+# was: Sonos/Stryker/Pinterest/URBN. Revert: restore that tuple; collection only, no page selection.
+GSC_CONTROL_PAGES = ("shure", "sun-life", "ul-solutions", "capital-one")
 # was: 15 queries and 10 pages. With ~1,264 generated pages, the top 10 said nothing about which of
 # them Google shows but nobody clicks (2026-10-04). LOW_CTR_* pick those out for the snapshot.
 GSC_QUERIES = 100
