@@ -228,6 +228,12 @@
    "fails": 0,
    "added": "2026-10-27"
   },
+  "axiommath": {
+   "name": "Axiom Math",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "barnes": {
    "name": "Barnes & Thornburg",
    "quant": false,
@@ -1274,6 +1280,12 @@
    "fails": 0,
    "added": "2026-10-28"
   },
+  "latent%20defense": {
+   "name": "Latent Defense",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "leantechniques": {
    "name": "Lean TECHniques",
    "quant": false,
@@ -2247,6 +2259,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "sycamore": {
+   "name": "Sycamore",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "taaraconnect": {
    "name": "Taara",
    "quant": false,
@@ -2312,6 +2330,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "the-robotics-company": {
+   "name": "The Robotics Company",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "tilderesearch": {
    "name": "Tilde Research",
@@ -2517,6 +2541,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "webfx": {
+   "name": "WebFX",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "windborne-systems": {
    "name": "WindBorne Systems",
    "quant": false,
@@ -2528,6 +2558,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "worldengine": {
+   "name": "WorldEngine AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
   },
   "worldly": {
    "name": "Worldly",
@@ -9441,6 +9477,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "rosaiclabs": {
+   "name": "RosaicLabs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "runlaminar": {
    "name": "Laminar",
    "quant": false,
@@ -15003,9 +15045,10 @@
   "guidehouse|wd1|external": {
    "name": "Guidehouse",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "government_policy"
+   "sector": "government_policy",
+   "last_fail": "2026-10-28"
   },
   "guidestone|wd1|guidestone": {
    "name": "GuideStone",
@@ -19025,9 +19068,8 @@
   "verabradley|wd5|vbcareers": {
    "name": "Vera Bradley",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-28"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "veralto|wd1|hachjobs": {
    "name": "Veralto",
