@@ -360,15 +360,20 @@ def test_search_console_reads_days_queries_and_pages(monkeypatch):
     monkeypatch.setenv("GSC_SERVICE_ACCOUNT", json.dumps({"client_email": "bot@x.iam.gserviceaccount.com",
                                                           "private_key": "k"}))
     monkeypatch.setattr(metrics, "_gsc_token", lambda info: "tok")
+    monkeypatch.setattr(metrics, "inspect_search_pages", lambda *args: {"status": "available"})
     bodies = []
 
     def fake_json(url, body=None, token=None, timeout=30):
         assert token == "tok" and "sc-domain%3Ainternscout.org" in url
+        if body.get("dimensions") == ["date", "page"]:
+            return {"rows": []}
         bodies.append(body)
-        return {"rows": GSC_ROWS[body["dimensions"][0]]}
+        return {"rows": GSC_ROWS[body["dimensions"][0]], "metadata": {"first_incomplete_date": "2026-09-28"}}
     monkeypatch.setattr(metrics, "_json", fake_json)
     got = metrics.search_console(NOW)
-    assert bodies[0]["startDate"] == "2026-09-02" and bodies[0]["endDate"] == "2026-09-29"
+    assert bodies[0]["dataState"] == "all" and bodies[0]["endDate"] == "2026-09-29"
+    assert bodies[1]["startDate"] == "2026-08-31" and bodies[1]["endDate"] == "2026-09-27"
+    assert all(body["dataState"] == "final" for body in bodies[1:])
     assert [d["day"] for d in got["days"]] == ["2026-09-10", "2026-09-27"]
     # Position is averaged by impressions, as Search Console does: (10*100 + 30*300) / 400.
     assert got["totals_28d"] == {"clicks": 3, "impressions": 400, "ctr": 0.0075, "position": 25.0}
@@ -376,7 +381,8 @@ def test_search_console_reads_days_queries_and_pages(monkeypatch):
     assert got["queries"][0] == {"query": "finance internships boston", "clicks": 2, "impressions": 40, "position": 8.2}
     assert got["pages"][0]["path"] == "/internships/finance/"
     # 2026-10-04: more rows asked for, and 2 clicks in 90 is not a low click-through page.
-    assert [b["rowLimit"] for b in bodies[1:]] == [100, 200]
+    assert [b["rowLimit"] for b in bodies[2:]] == [100, 200, 500, 250, 500, 250]
+    assert got["pages"][0]["url"] == "https://internscout.org/internships/finance/"
     assert got["low_ctr_pages"] == []
 
 
