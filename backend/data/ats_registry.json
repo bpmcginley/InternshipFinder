@@ -261,8 +261,9 @@
   "beaconsoftware": {
    "name": "Beacon Software",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-28"
   },
   "bedrock-robotics": {
    "name": "Bedrock Robotics",
@@ -9007,6 +9008,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "filevine": {
+   "name": "Filevine",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-28"
+  },
   "firemon": {
    "name": "Firemon",
    "quant": false,
@@ -15045,10 +15052,9 @@
   "guidehouse|wd1|external": {
    "name": "Guidehouse",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "government_policy",
-   "last_fail": "2026-10-28"
+   "sector": "government_policy"
   },
   "guidestone|wd1|guidestone": {
    "name": "GuideStone",
