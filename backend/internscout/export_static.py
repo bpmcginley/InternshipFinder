@@ -80,7 +80,9 @@ def _dump(obj, path: str, indent=None) -> None:
 # dashboard scores with score_parts["source"] alone, and reads location_raw only as the fallback
 # when a listing has no regions. The description is still needed - for the search box and the
 # Auto-Apply payload - so it moves to a sidecar the dashboard fetches only when it needs one.
-ROW_ONLY_IN_SIDECAR = ("description", "region_locations")
+# 2026-10-28: four employer pages can use full-source factual details without enlarging dashboard
+# rows or public description excerpts. Revert: remove posting_details and the sidecar writer below.
+ROW_ONLY_IN_SIDECAR = ("description", "region_locations", "posting_details")
 
 
 def shard_row(x: dict) -> dict:
@@ -102,6 +104,25 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
     """Write <ST>.json (slim rows) and <ST>.desc.json ({id: description} for its open rows)."""
     shard_dir = os.path.join(out_dir, "listings")
     os.makedirs(shard_dir, exist_ok=True)
+    from . import seo_role_details, seo_pages
+    # This sidecar is replaced on every export. Only an unchanged carried row may keep an existing
+    # check for up to seven days; its original check date/hash are never refreshed from an excerpt.
+    # Freshly fetched source without supported details removes any old record. At most 160 records.
+    previous_details = seo_role_details.read_records(os.path.join(out_dir, seo_role_details.FILE))
+    cohorts = defaultdict(list)
+    for x in listings:
+        name = str(x.get("company_name") or "").casefold()
+        if (name in seo_role_details.COHORT_EMPLOYERS and x.get("status") == "open"
+                and seo_pages.well_formed(x) and seo_pages.safe_url(x.get("apply_url"))):
+            cohorts[name].append(dict(x, keys=shard_keys(x)))
+    visible = [x for name in sorted(cohorts) for x in seo_pages.shown(seo_pages.dedupe_roles(cohorts[name]))]
+    details = {}
+    for x in visible:
+        packet = x.get("posting_details") or (previous_details.get(str(x["id"])) if x.get("carried") else None)
+        if seo_role_details.recorded_facts(x, packet):
+            details[str(x["id"])] = packet
+    _dump({"version": 1, "records": details},
+          os.path.join(out_dir, seo_role_details.FILE))
     shards: dict[str, list] = defaultdict(list)
     for x in listings:
         for k in shard_keys(x):
@@ -174,7 +195,7 @@ def _listing_dict(row: Listing) -> dict:
     if ins is not None and "pay" not in ins and row.salary and not placeholder_pay(row.salary):
         # was: if ins is not None and "pay" not in ins and row.salary:
         ins["pay"] = "paid"
-    return {
+    result = {
         # Not row.id: the database is rebuilt every run, so that was the insert order.
         "id": listing_id(row.dedupe_key),
         "company_name": row.company_name,
@@ -211,6 +232,14 @@ def _listing_dict(row: Listing) -> dict:
                                 if link.source in SEARCH_SCOPED}),
         **({"via_search": True} if _search_only(row) else {}),
     }
+    from . import seo_role_details
+    # 2026-10-28: extract only for the four named employers from actual full fetched source, before
+    # DESC_CHARS discards its tail. Revert: remove this optional sidecar-only field.
+    if str(row.company_name or "").casefold() in seo_role_details.COHORT_EMPLOYERS:
+        detail = seo_role_details.record(result, row.description or "")
+        if detail:
+            result["posting_details"] = detail
+    return result
 
 
 def _search_only(row: Listing) -> bool:

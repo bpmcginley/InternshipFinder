@@ -162,7 +162,7 @@ def test_fixed_page_date_cohort_has_exact_eight_urls_and_both_complete_weeks(mon
     assert request["startDate"] == "2026-10-12" and request["endDate"] == "2026-10-25"
     assert request["dataState"] == "final" and request["rowLimit"] == 1000
     regex = re.compile(request["dimensionFilterGroups"][0]["filters"][0]["expression"])
-    for slug in ("under-armour", "medtronic", "lyft", "bose", "sonos", "stryker", "pinterest", "urbn"):
+    for slug in ("under-armour", "medtronic", "lyft", "bose", "shure", "sun-life", "ul-solutions", "capital-one"):
         assert regex.fullmatch(f"https://internscout.org/internships/at/{slug}/")
     for url in ("https://evil.example/internships/at/bose/", "https://internscout.org/internships/at/bose/extra/",
                 "https://internscout.org/internships/at/bose/?email=private", "http://internscout.org/internships/at/bose/"):

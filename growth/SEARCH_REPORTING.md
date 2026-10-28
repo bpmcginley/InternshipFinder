@@ -15,7 +15,7 @@ Google documents Pacific dates, final data, optional incomplete-date metadata an
 | `snapshot.search_console.totals_7d` and `totals_28d` | Google finalized search clicks, impressions, CTR and weighted position. Use the explicit Pacific date range in `search_console.reporting`, not "through today". |
 | `snapshot.search_console.reporting` | Show timezone, start/end, seven-day start, final data state and completeness boundary. If Google's optional metadata is absent, the stated conservative three-day lag applies. |
 | `snapshot.search_console.comparison.weeks` | Two complete Monday-Sunday Pacific weeks, oldest first. These contain final site totals and private, bounded page and query breakdowns. |
-| `snapshot.search_console.fixed_page_cohort` | A page-by-date query for those same two weeks keeps the same eight employer URLs: treatments Under Armour, Medtronic, Lyft and Bose; controls Sonos, Stryker, Pinterest and URBN. Check status before comparing the groups. |
+| `snapshot.search_console.fixed_page_cohort` | A page-by-date query for those same two weeks keeps the same eight employer URLs: treatments Under Armour, Medtronic, Lyft and Bose; unchanged comparators Shure, Sun Life, UL Solutions and Capital One. Check status before comparing the groups. |
 | `snapshot.week.search_engines.comparison.weeks` | Cloudflare estimated Google/Bing/other-search arrivals for the exact same Pacific weeks. UTC bounds account for daylight-saving changes. Check `status` before rendering. |
 | `snapshot.search_console.url_inspection` | Google's last observed crawl/indexing status for Under Armour, Medtronic, Lyft and Bose treatment pages. A later `lastCrawlTime` is evidence of recrawling, not a ranking or indexing guarantee. |
 
@@ -26,6 +26,12 @@ Existing dashboard keys and the `metrics_daily` schema remain compatible. The Go
 Compare Google's complete week with the previous complete week. Compare its clicks with the Google-only Cloudflare estimate, then check Bing, social and direct traffic separately. A rise in total or combined-search visits can coexist with a real Google loss.
 
 Use `comparison.weeks[].pages[].url` for canonical URL identity. The old `path` remains for existing consumers, but path alone can combine different hosts or schemes. Both weekly page lists and query lists have explicit limits, returned counts, cap flags and `exhaustive: false`. Google can omit rows for privacy/internal limits even below our cap. Absence from a returned cohort does not mean zero impressions or deindexing. Site totals come from a separate date-only query, never from summing the bounded page/query lists. Average positions must be compared for the same query/page cohort before attributing every movement to ranking.
+
+The October 28 content cohort uses comparators with returned October 12-18 impressions: Shure 76,
+Sun Life 54, UL Solutions 52 and Capital One 46. These replace the initially proposed low-traffic
+Sonos/Stryker/Pinterest/URBN set. They are observational comparisons across different employers,
+not randomized controls. The exposure rules, initial factual coverage and revert are documented
+in `reviews/2026-10-28-search-content-cohort/README.md`.
 
 If Google supplies `metadata.first_incomplete_date`, every headline date ends before that boundary. The collector still requests `dataState: final` explicitly. When metadata is absent, it reports the three-day fallback instead of assuming the last nonzero row marks finalization. A zero-impression final day never slides the reporting window backward.
 

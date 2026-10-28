@@ -1142,7 +1142,7 @@ def same_list(owner: frozenset, mine: frozenset) -> bool:
 
 
 def listing_rows(items: list[dict], now: datetime, state: str | None = None, here: str | None = None,
-                 src: str = "seo-field") -> str:
+                 src: str = "seo-field", details: dict | None = None) -> str:
     """src: where the page sits (seo-employer, seo-state, ...), carried into the install page's ?from=
     by each row's "Auto-Apply this" link, so its store link's utm_source says which pages install."""
     rows = []
@@ -1158,12 +1158,18 @@ def listing_rows(items: list[dict], now: datetime, state: str | None = None, her
         # through. was: href="/install.html?from={src}-row", the same for every row.
         aa = (f' <a class="aa" href="/install.html?from={esc(src)}-row&amp;listing={esc(quote(str(x["id"]), safe=""))}">'
               'Auto-Apply this</a>' if autofills(x) and x.get("id") is not None else "")
+        # 2026-10-28: was: title/place/term/pay only. Four employer pages get concise source-backed
+        # mentions; details is empty everywhere else. Revert: omit this optional block.
+        detail = ((details or {}).get(str(x.get("id"))) or ())
+        detail_html = ('<div class="meta posting-details">' + '<br/>'.join(
+            f'{esc(label)}: {esc(value)}.' for label, value in detail) + '</div>') if detail else ""
         # data-aa (2026-10-13): js/offer.js may offer the extension when this posting is opened.
         rows.append(
             '<li class="job">'
             f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{row_meta(x, state)}</div>'
+            + detail_html +
             # The two actions sit on one line in .acts (2026-10-14, D21): "Open posting" a secondary button,
             # "Auto-Apply this" a quiet link after it, as on the dashboard's rows.
             # was: f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
@@ -1702,7 +1708,7 @@ def chart_figure(items: list[dict], state: str | None = None) -> str:
 def listing_body(items: list[dict], what: str, where: str, now: datetime, related: str,
                  state: str | None = None, dash: str = "/", fits: list[str] | None = None,
                  here: str | None = None, tail: str = TAIL, about: frozenset = frozenset(), extra: str = "",
-                 src: str = "seo-field", faq: str = "", signup: str = "") -> str:
+                 src: str = "seo-field", faq: str = "", signup: str = "", details: dict | None = None) -> str:
     more = len(items) - PER_PAGE
     order = "newest" if state else "newest, Northeast and remote first,"
     # `extra`: the employer pages' "at a glance" list, under the opening paragraph (2026-10-01).
@@ -1710,10 +1716,17 @@ def listing_body(items: list[dict], what: str, where: str, now: datetime, relate
     # (2026-10-04; see autoapply_card).
     # `faq`: the field, state and field-in-state pages' questions section (faq_section, 2026-10-05),
     # after the chart and before the follow lines; the employer pages carry theirs in `related`.
+    # 2026-10-28: was: no per-role source detail. The note only appears where a cohort card has facts.
+    # Revert: omit detail_note and details from listing_rows; index decisions are independent.
+    detail_count = sum(bool((details or {}).get(str(x["id"]))) for x in shown(items, state))
+    detail_note = (f'<p class="more">Brief posting details are shown for {detail_count} of '
+                   f'{len(shown(items, state))} roles below. These are not a complete eligibility check. '
+                   'Open the employer\'s posting for full requirements. Unverified details are omitted.</p>'
+                   if detail_count else "")
     return (f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>" + fits_line(fits or []) + extra +
             f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
             + autoapply_card(items, src, state)
-            + f"<ul class=\"jobs\">{listing_rows(items, now, state, here, src)}</ul>"
+            + detail_note + f"<ul class=\"jobs\">{listing_rows(items, now, state, here, src, details)}</ul>"
             + (f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
                f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>" if more > 0 else "")
             # `signup`: the weekly email's form (signup_form, 2026-10-06), on the field pages and
@@ -3616,6 +3629,13 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
     company_fields = {nm: top(Counter(t for x in its for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
                       for nm, its in by_company.items()}
 
+    # 2026-10-28: small, explicit content cohort; was: no description sidecars were read here.
+    # Read only the displayed cohort rows once, without changing any page/index membership.
+    # Revert: empty seo_role_details.COHORT_PATHS or remove this load and the details argument below.
+    from . import seo_role_details
+    cohort_details = seo_role_details.load(site_dir, [x for nm, its in by_company.items()
+        if EMPLOYERS[nm] in seo_role_details.COHORT_PATHS for x in shown(its)])
+
     for name, items in sorted(by_company.items()):
         path = EMPLOYERS[name]
         main = company_fields[name]
@@ -3679,7 +3699,8 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
             f"Internships at {name}", [root, ("/internships/at/", "By employer"), (path, name)],
             listing_body(items, f"at {name}", "", now, related,
                          dash=dash_link(state=where, companies=spellings[name]), here=path, extra=facts,
-                         src="seo-employer"), items, kind="employer",
+                         src="seo-employer", details=cohort_details if path in seo_role_details.COHORT_PATHS else None),
+            items, kind="employer",
             thin=not employer_indexed(len(items), path, live, earning))   # 2026-10-23
 
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page

@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "records": {
+    "3ed825e7686f5ebb": {
+      "version": 1,
+      "row_sha256": "d03a85408474dcc15a8c7054bfa2a89f2e1a4fd6144242e425dab4b3e90aa44c",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-AI-Automation-MD-21230/1434354900/",
+      "source_sha256": "a5ab9a8ad3bf4378a5d4ebb543b99e3e5512337b0547883f732584c77b8352ff",
+      "source_chars": 3731,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "ddeaa2eac5cc1545": {
+      "version": 1,
+      "row_sha256": "9c44b07424424d755f5a0ae47f4c377a63d31d878ee7b63d4c8c9e124509cc6f",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Team-SportsSales-MD-21230/1434355500/",
+      "source_sha256": "e44c9cc7ed6ef0b9df59ad44a54dcdba7ea9e479267421003fc8e832f454db0b",
+      "source_chars": 3795,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "00077e90fe83181d": {
+      "version": 1,
+      "row_sha256": "18c78fac3aad7b7fc784f711524cf83c17a1e44364857a8ee907817793277968",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Merchandising-MD-21230/1434378900/",
+      "source_sha256": "3d869d50da2f11713d18b247f5c6c5413f8baee9ce9e2855167d71104db29c70",
+      "source_chars": 3745,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "eea455fb65c89f2d": {
+      "version": 1,
+      "row_sha256": "9d686b20677f68eac6543685efb754e08dba0f592f58108cae5b4ef6233492a6",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Community-Impact-MD-21230/1434384000/",
+      "source_sha256": "f9a633f9f039ddbe3e1389d302ec212e584d8bc8a021484b300a088f16b6e467",
+      "source_chars": 3969,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "0fac6fa8fab7ceb1": {
+      "version": 1,
+      "row_sha256": "eda37f4ee73334e2b91cd4be465838c4466ef8c1bb81aa11cd3907aed7e1ad0d",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Product-Line-Management-MD-21230/1434387800/",
+      "source_sha256": "1449bbe3011257cd213b07b823fd28874ea5d0878d9836af6f2fb2f1ab63d71e",
+      "source_chars": 5886,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "159882df52573db3": {
+      "version": 1,
+      "row_sha256": "fba4b7df3c1f141266cba729143e5c225832a3f8b2ee65292a134f83cef7b13f",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Finance-and-Accounting-MD-21230/1434330100/",
+      "source_sha256": "98a59be8f4a0b016714f5d7917ad86a51d1f4b441bb1e08ad21514b01a5497e0",
+      "source_chars": 4623,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ],
+        [
+          "Skills mentioned",
+          "Accounting"
+        ]
+      ]
+    },
+    "3aa5193ce34e0f19": {
+      "version": 1,
+      "row_sha256": "bc25db3096d8e19432139e7ed02bf3a63761e47d585a54459591cc0c6e82cce4",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Marketing-and-Communications-MD-21230/1434386400/",
+      "source_sha256": "a9b8d6e72f6c73d65ab7c682c467cffcc7727a121df9f963b23f2822300a2026",
+      "source_chars": 5778,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "4073fe4285992623": {
+      "version": 1,
+      "row_sha256": "208cae22a7a280425a7860e9362e00095d0a88907b8209265690614b77ec7e07",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Product-Innovation-%28Material-Development-and-Material-Lab%29-MD-21230/1434382800/",
+      "source_sha256": "1381908ab539b0832b4c087080f6f9d7dcb9dcd8e31c4affa76648cf63a1d017",
+      "source_chars": 4539,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ],
+        [
+          "Skills mentioned",
+          "Statistics"
+        ]
+      ]
+    },
+    "83247ea2d7c9e06e": {
+      "version": 1,
+      "row_sha256": "d6b3794080bf37cd0cd28a05795d81ae5d936d21b09b550e72aeb8df42fa8d37",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Design-%28Apparel-and-Footwear%29-MD-21230/1434389000/",
+      "source_sha256": "f3c7507adbfeed38163e89c11ac7e2a3e100915d56a03e07fbe706627d4205ce",
+      "source_chars": 3632,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "96d5437c8ee8e207": {
+      "version": 1,
+      "row_sha256": "99be55d0feb04074252c5ee9eea6fcf44d7faa28e2a943ed9cb24534f46aad43",
+      "source_url": "https://careers.underarmour.com/job/Baltimore-2027-Summer-Internship%2C-Human-Resources-MD-21230/1434321700/",
+      "source_sha256": "cf1cbff2f2e6593f06147c5e15afe1b4d6881098c527a266166bea6a0708c4bf",
+      "source_chars": 4557,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    },
+    "b219282a6e2283fd": {
+      "version": 1,
+      "row_sha256": "b0152a82957dc59e7ac17c843ab6dbd166a1e643774f54e0a6e3f708d85ea110",
+      "source_url": "https://medtronic.wd1.myworkdayjobs.com/redeploymentmedtroniccareers/job/State-of-Minnesota-United-States-of-America/Associate-Clinical-Experience--ACE--Intern---Summer-2027_R78501",
+      "source_sha256": "862354dc680dba8173bc77e38a212b731d3e9ce33caa6af431d094e8fe5a84cb",
+      "source_chars": 11326,
+      "checked_on": "2026-10-28",
+      "facts": [
+        [
+          "Graduation years mentioned",
+          "2027, 2028"
+        ]
+      ]
+    }
+  }
+}
