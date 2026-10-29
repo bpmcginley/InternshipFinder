@@ -3574,6 +3574,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "castelioncorporation": {
+   "name": "Castelion",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "cc": {
    "name": "Climate Corps",
    "quant": false,
@@ -11338,8 +11344,9 @@
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-10-29"
   }
  },
  "workable": {
