@@ -261,9 +261,9 @@
   "beaconsoftware": {
    "name": "Beacon Software",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-28"
+   "last_fail": "2026-10-29"
   },
   "bedrock-robotics": {
    "name": "Bedrock Robotics",
@@ -2236,6 +2236,12 @@
    "fails": 0,
    "added": "2026-10-08"
   },
+  "subtotal": {
+   "name": "Subtotal",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "super.com": {
    "name": "Super",
    "quant": false,
@@ -2963,6 +2969,12 @@
    "added": "2026-09-13",
    "sector": "quant_finance"
   },
+  "akunacapitaloci": {
+   "name": "Akuna Capital",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "alamarbiosciences": {
    "name": "Alamar Biosciences",
    "quant": false,
@@ -2998,6 +3010,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "altmansoloncampus": {
+   "name": "Altman Solon",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "amarok": {
    "name": "AMAROK Security",
@@ -4385,6 +4403,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ftsp27co-ops": {
+   "name": "Flow Traders",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "galaxydigitalservices": {
    "name": "Galaxy",
    "quant": false,
@@ -4585,6 +4609,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "graphcore-early-careers": {
+   "name": "Graphcore",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "grassrootsanalytics": {
    "name": "Grassroots Analytics",
    "quant": false,
@@ -4767,6 +4797,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "hpsinterns": {
+   "name": "HPS Investment Partners",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "hubblenetwork": {
    "name": "Hubble Network Inc.",
    "quant": false,
@@ -4853,6 +4889,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "indieinterns": {
+   "name": "Indie",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "industrialelectricmanufacturing": {
    "name": "IEM",
@@ -5426,10 +5468,10 @@
   "msgsports": {
    "name": "MSG Sports",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-18",
    "sector": "hospitality_sports",
-   "last_fail": "2026-10-28"
+   "last_fail": "2026-10-29"
   },
   "mthreerecruitingportal": {
    "name": "mthree",
@@ -5558,6 +5600,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "nyisocoops": {
+   "name": "New York ISO",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "oceanx": {
    "name": "OceanX",
@@ -6476,6 +6524,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sxinternships": {
+   "name": "SoundExchange",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "symphony": {
    "name": "Symphony",
@@ -7491,6 +7545,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15",
+   "sector": "education_research"
+  },
+  "tcnycareers-touro": {
+   "name": "Touro University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29",
    "sector": "education_research"
   },
   "us-erac": {
@@ -8673,13 +8734,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "aofl": {
-   "name": "Age of Learning",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-28"
-  },
   "appen-2": {
    "name": "Appen",
    "quant": false,
@@ -8788,13 +8842,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "butcherbox": {
-   "name": "ButcherBox",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-28"
   },
   "camstex": {
    "name": "CAMS",
@@ -10236,6 +10283,12 @@
    "fails": 0,
    "added": "2026-09-14",
    "sector": "health"
+  },
+  "epyc.fa.us2.oraclecloud.com|CX_1001": {
+   "name": "Clean Harbors",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "erqh.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Atlantic Health System",
@@ -14633,6 +14686,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "formfactor|wd1|FFI-Careers": {
+   "name": "FormFactor",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "fortrea|wd1|Fortrea": {
    "name": "Fortrea",
    "quant": false,
@@ -18864,6 +18923,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "umchealthsystem|wd1|External": {
+   "name": "UMC Health System",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "umd|wd1|UMCP": {
    "name": "University of Maryland - College Park",

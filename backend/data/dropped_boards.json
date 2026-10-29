@@ -696,6 +696,14 @@
   }
  },
  "lever": {
+  "aofl": {
+   "on": "2026-10-29",
+   "why": "dead"
+  },
+  "butcherbox": {
+   "on": "2026-10-29",
+   "why": "dead"
+  },
   "calstart": {
    "on": "2026-10-01",
    "why": "dead"
