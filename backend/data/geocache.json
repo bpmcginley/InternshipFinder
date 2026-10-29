@@ -2274,6 +2274,7 @@
 "philadelphia area|PA":null,
 "philadelphia clinic|PA":null,
 "philadelphia county|PA":null,
+"philadelphia pa/onsite|PA":null,
 "phillipsburg|NJ":[
 40.6916,
 -75.1953
@@ -2706,7 +2707,9 @@
 -74.2698
 ],
 "united states - new jersey - parsippany|NJ":null,
+"united states - new york - albany|NY":null,
 "united states - new york - new york city|NY":null,
+"united states - new york - remote|NY":null,
 "united states - wayne|PA":null,
 "united states of america|NJ":null,
 "united states of america|NY":null,

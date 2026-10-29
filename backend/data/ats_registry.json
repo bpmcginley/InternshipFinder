@@ -17613,12 +17613,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "rbc|wd3|RBCEARLYTALENT1": {
-   "name": "Royal Bank of Canada",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
-  },
   "rbc|wd3|rbcglobal1": {
    "name": "Royal Bank of Canada",
    "quant": false,
