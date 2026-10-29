@@ -285,6 +285,7 @@
 40.6102,
 -80.2677
 ],
+"all burns locations|PA":null,
 "altamont|NY":[
 42.7006,
 -74.0337
@@ -1365,6 +1366,7 @@
 "long beach island|NJ":null,
 "long island ny|NY":null,
 "long island|NY":null,
+"los angeles|PA":null,
 "luzerne county|PA":null,
 "lyndhurst|NJ":[
 40.8123,
@@ -1668,6 +1670,7 @@
 "new york city or chicago or los angeles|NY":null,
 "new york city \u00b7 full-time|NY":null,
 "new york city \u00b7 san francisco \u00b7 full-time|NY":null,
+"new york city \u00b7 san francisco \u00b7 remote \u00b7 full-time|NY":null,
 "new york city-remote|NY":null,
 "new york hauppauge|NY":null,
 "new york metro area|NY":null,
@@ -2957,6 +2960,10 @@
 "west conshohocken|PA":[
 40.0698,
 -75.3163
+],
+"west harrison|NY":[
+41.0389,
+-73.7476
 ],
 "west hempstead|NY":[
 40.7048,

@@ -1624,6 +1624,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "olix": {
+   "name": "OLIX",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "oneapp": {
    "name": "ONE Finance",
    "quant": false,
@@ -3205,6 +3211,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "astronicscorporation": {
+   "name": "Astronics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "athinkingape": {
    "name": "A Thinking Ape",
    "quant": false,
@@ -3526,6 +3538,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "burnsengineeringinc": {
+   "name": "Burns Engineering",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "businessolverinvitationonly": {
    "name": "Businessolver",
    "quant": false,
@@ -3555,6 +3573,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-10"
+  },
+  "capitalderecherchetower": {
+   "name": "Capital de Recherche Tower",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "capstoneinvestmentadvisors": {
    "name": "Capstone Investment Advisors",
@@ -3592,6 +3616,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "centerforstrategicandinternationalstudiesinc": {
+   "name": "Center for Strategic and International Studies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "centriaautism": {
    "name": "Centria Autism",
    "quant": false,
@@ -3610,6 +3640,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-25"
+  },
+  "charlesriveranalytics90": {
+   "name": "Charles River Analytics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "charlesriverassociates": {
    "name": "Charles River Associates",
@@ -3832,6 +3868,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "crystaldynamics": {
+   "name": "Crystal Dynamics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "cssmerge": {
    "name": "Atoms",
    "quant": false,
@@ -3933,6 +3975,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "divcowest": {
+   "name": "DivcoWest",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "docugami": {
    "name": "Docugami",
@@ -5336,6 +5384,12 @@
    "added": "2026-09-18",
    "sector": "government_policy"
   },
+  "mantari": {
+   "name": "Mantari",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "markforged": {
    "name": "Markforged",
    "quant": false,
@@ -5528,6 +5582,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "netcraft": {
+   "name": "Netcraft",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "neuralink": {
    "name": "Neuralink",
    "quant": false,
@@ -5681,6 +5741,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "nonprofit"
+  },
+  "oneethos": {
+   "name": "OneEthos",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "opensesame": {
    "name": "OpenSesame",
@@ -5934,6 +6000,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "procogia": {
+   "name": "ProCogia",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "profluent": {
    "name": "Profluent",
    "quant": false,
@@ -5982,6 +6054,18 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "quantiq": {
+   "name": "Quantiq",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
+  "quberesearchandtechnologies": {
+   "name": "Qube Research & Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "queracomputinginc": {
    "name": "QuEra Computing",
@@ -6085,6 +6169,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "riverlane": {
+   "name": "Riverlane",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "riversidenaturalfoodsltd": {
    "name": "Riverside Natural Foods",
@@ -6213,6 +6303,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "scmaea": {
+   "name": "SCM",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "scopely": {
    "name": "Scopely",
    "quant": false,
@@ -6296,6 +6392,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "sitimecorporation": {
+   "name": "SiTime",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "skhynixamerica": {
    "name": "SK hynix",
@@ -6397,6 +6499,12 @@
    "added": "2026-09-15",
    "sector": "nonprofit"
   },
+  "spaceium": {
+   "name": "Spaceium",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
+  },
   "spacekinetic": {
    "name": "Space Kinetic",
    "quant": false,
@@ -6414,6 +6522,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sparxlearning": {
+   "name": "Sparx Learning",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "specterops": {
    "name": "SpecterOps",
@@ -6688,6 +6802,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "tobogganlabs": {
+   "name": "TobogganLabs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "togetherai": {
    "name": "Together AI",
@@ -11344,9 +11464,8 @@
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-10-29"
+   "fails": 0,
+   "added": "2026-09-15"
   }
  },
  "workable": {
@@ -17158,6 +17277,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "pernodricard|wd3|pernod-ricard": {
+   "name": "Pernod Ricard, créateurs de convivialité",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-29"
   },
   "petermillarllc|wd12|PMI": {
    "name": "Peter Millar",
