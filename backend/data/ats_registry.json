@@ -261,9 +261,9 @@
   "beaconsoftware": {
    "name": "Beacon Software",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-10-29"
+   "last_fail": "2026-10-30"
   },
   "bedrock-robotics": {
    "name": "Bedrock Robotics",
@@ -913,6 +913,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-25"
+  },
+  "geniusai": {
+   "name": "Genius AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "genmd": {
    "name": "GenMD",
@@ -2559,6 +2565,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-28"
+  },
+  "westmag": {
+   "name": "Western Magnetics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "windborne-systems": {
    "name": "WindBorne Systems",
@@ -5525,14 +5537,6 @@
    "added": "2026-09-13",
    "sector": "nonprofit"
   },
-  "msgsports": {
-   "name": "MSG Sports",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-18",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-10-29"
-  },
   "mthreerecruitingportal": {
    "name": "mthree",
    "quant": false,
@@ -5845,6 +5849,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "pathrobotics": {
+   "name": "Path Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "patientpoint": {
    "name": "PatientPoint",
@@ -9373,6 +9383,12 @@
    "fails": 0,
    "added": "2026-10-25"
   },
+  "loftorbital": {
+   "name": "Loft Orbital",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "longwall": {
    "name": "Long Wall",
    "quant": false,
@@ -11002,6 +11018,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "golden": {
+   "name": "Golden Analytics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "greengas": {
    "name": "Mobius Renewables",
    "quant": false,
@@ -11115,6 +11137,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "overland-ai": {
+   "name": "Overland AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "pathos": {
    "name": "Pathos",
@@ -11420,9 +11448,10 @@
   "hyatt|10780": {
    "name": "Hyatt",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-15",
-   "sector": "hospitality_sports"
+   "sector": "hospitality_sports",
+   "last_fail": "2026-10-30"
   },
   "lbl|5": {
    "name": "Lawrence Berkeley National Laboratory",
@@ -11681,6 +11710,12 @@
    "fails": 0,
    "added": "2026-10-06"
   },
+  "freshcutpaper": {
+   "name": "FreshCut Paper",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "generation-west-virginia-1": {
    "name": "Generation West Virginia",
    "quant": false,
@@ -11771,6 +11806,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "palona": {
+   "name": "Palona AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "perryhomes": {
    "name": "Perry Homes",
@@ -11880,6 +11921,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "smartflower-solar-llc": {
+   "name": "SmartFlower Solar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "somerce": {
    "name": "Somerce",
    "quant": false,
@@ -11897,6 +11944,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-14"
+  },
+  "synthesisim": {
+   "name": "Synthesis",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "syntiant": {
    "name": "Syntiant",
@@ -11970,11 +12023,23 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "waggoner-financial": {
+   "name": "Waggoner Financial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "wallstreetquants": {
    "name": "WallStreetQuants",
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "waterworth": {
+   "name": "Waterworth",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "western-magnetics": {
    "name": "Western Magnetics",
@@ -12930,6 +12995,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "barings|wd1|Barings": {
+   "name": "Barings",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "barrywehmiller|wd1|BWCareers": {
    "name": "Barry-Wehmiller",
@@ -14598,6 +14669,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "faithtechnologies|wd1|fti": {
+   "name": "Faith Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "faithtechnologies|wd1|FTI_Engineering": {
    "name": "Faith Technologies",
    "quant": false,
@@ -15018,8 +15095,9 @@
   "gensler|wd1|genslercareers": {
    "name": "Gensler",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-30"
   },
   "gentex|wd5|Gentex": {
    "name": "Gentex Corporation",
@@ -19205,6 +19283,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "valeris|wd108|Valeris": {
+   "name": "Valeris",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "valmont|wd1|ValmontCareers": {
    "name": "Valmont",
