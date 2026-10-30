@@ -885,6 +885,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "gearset": {
+   "name": "Gearset",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "gecko-robotics": {
    "name": "Gecko Robotics",
    "quant": false,
@@ -3771,6 +3777,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-25"
+  },
+  "co-op_intern": {
+   "name": "AtriCure",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "cobaltio": {
    "name": "Cobalt",
