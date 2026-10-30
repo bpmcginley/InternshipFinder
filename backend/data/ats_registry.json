@@ -1029,6 +1029,12 @@
    "fails": 0,
    "added": "2026-10-08"
   },
+  "harmonic": {
+   "name": "Harmonic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "harvey": {
    "name": "Harvey",
    "quant": false,
@@ -2366,8 +2372,9 @@
   "tilderesearch": {
    "name": "Tilde Research",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-30"
   },
   "tldraw": {
    "name": "tldraw",
@@ -4201,6 +4208,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-30"
+  },
+  "ensco": {
+   "name": "Ensco",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "ensono": {
    "name": "Ensono",
