@@ -821,8 +821,9 @@
   "firetiger": {
    "name": "Firetiger",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-30"
   },
   "flagright.com": {
    "name": "Flagright",
@@ -3417,6 +3418,12 @@
    "fails": 0,
    "added": "2026-10-25"
   },
+  "bitgowinter2027": {
+   "name": "BitGo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "bitmovin": {
    "name": "Bitmovin",
    "quant": false,
@@ -3561,6 +3568,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "c3ascend": {
+   "name": "C3.ai",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "c3iot": {
    "name": "C3 AI",
@@ -4068,6 +4081,12 @@
    "added": "2026-09-13",
    "sector": "quant_finance"
   },
+  "drwfr": {
+   "name": "DRW",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "drwuniversityjobs": {
    "name": "DRW",
    "quant": false,
@@ -4297,6 +4316,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "fidelityguarantylifeinternships": {
+   "name": "F&G",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "figma": {
    "name": "Figma",
@@ -5034,6 +5059,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "internrecruiting": {
+   "name": "Vestmark",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "internshiplist2000": {
    "name": "Geotab",
    "quant": false,
@@ -5580,6 +5611,12 @@
    "added": "2026-09-13",
    "sector": "media"
   },
+  "ncinoearlytalent": {
+   "name": "Ncino",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
+  },
   "neo4j": {
    "name": "Neo4j",
    "quant": false,
@@ -5676,6 +5713,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-29"
+  },
+  "nyisointernships": {
+   "name": "New York ISO",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "oceanx": {
    "name": "OceanX",
@@ -6624,6 +6667,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "stratolaunch": {
+   "name": "Stratolaunch",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "stripe": {
    "name": "Stripe",
@@ -11448,10 +11497,9 @@
   "hyatt|10780": {
    "name": "Hyatt",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-10-30"
+   "sector": "hospitality_sports"
   },
   "lbl|5": {
    "name": "Lawrence Berkeley National Laboratory",
