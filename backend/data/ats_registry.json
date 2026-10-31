@@ -7887,6 +7887,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "careers.axa.com": {
+   "name": "AXA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "careers.cdmsmith.com": {
    "name": "CDM Smith",
    "quant": false,
@@ -13511,8 +13517,9 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-10-31"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
@@ -16871,9 +16878,8 @@
   "mii|wd5|MiTek": {
    "name": "MiTek",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-31"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "millerknoll|wd1|MillerKnoll": {
    "name": "MillerKnoll",
