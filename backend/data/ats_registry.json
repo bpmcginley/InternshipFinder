@@ -258,13 +258,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "beaconsoftware": {
-   "name": "Beacon Software",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-10-30"
-  },
   "bedrock-robotics": {
    "name": "Bedrock Robotics",
    "quant": false,
@@ -626,6 +619,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "designrulesco": {
+   "name": "The Design Rules Company",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "dexmate": {
    "name": "Dexmate",
    "quant": false,
@@ -821,9 +820,9 @@
   "firetiger": {
    "name": "Firetiger",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-30"
+   "last_fail": "2026-10-31"
   },
   "flagright.com": {
    "name": "Flagright",
@@ -1546,6 +1545,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "nexttoken": {
+   "name": "NextToken",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "niantic-spatial": {
    "name": "Niantic Spatial",
@@ -2315,6 +2320,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "teamworks": {
+   "name": "Teamworks",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "telus-digital": {
    "name": "TELUS Digital",
    "quant": false,
@@ -2372,9 +2383,9 @@
   "tilderesearch": {
    "name": "Tilde Research",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-30"
+   "last_fail": "2026-10-31"
   },
   "tldraw": {
    "name": "tldraw",
@@ -2874,6 +2885,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-26"
+  },
+  "a16z": {
+   "name": "Andreessen Horowitz",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "a24": {
    "name": "A24",
@@ -4026,6 +4043,12 @@
    "fails": 0,
    "added": "2026-10-29"
   },
+  "divergent": {
+   "name": "Divergent Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "docugami": {
    "name": "Docugami",
    "quant": false,
@@ -4311,6 +4334,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "farmersmutualhailinsurancecompany": {
+   "name": "Farmers Mutual Hail",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "fastly": {
    "name": "Fastly",
@@ -5126,6 +5155,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "isam": {
+   "name": "iSAM",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "ispottv": {
    "name": "iSpot.tv",
    "quant": false,
@@ -5702,6 +5737,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "nintendo": {
+   "name": "Nintendo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "nisc": {
    "name": "National Information Solutions Cooperative (NISC)",
@@ -6404,6 +6445,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sesco": {
+   "name": "SESCO",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "seurat": {
    "name": "Seurat Technologies",
@@ -8219,6 +8266,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "apollotheater": {
+   "name": "Apollo Theater",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "aramcoservices": {
    "name": "Aramco Americas",
    "quant": false,
@@ -8352,6 +8405,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "elucid": {
+   "name": "Elucid",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "emergingtech": {
    "name": "Emerging Tech",
@@ -8559,6 +8618,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "government_policy"
+  },
+  "obsidian": {
+   "name": "Obsidian Entertainment",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "oneworldglobalservices": {
    "name": "oneworldglobalservices",
@@ -9277,6 +9342,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "fireworkhq": {
+   "name": "Firework",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "fluxergy-2": {
    "name": "Fluxergy",
    "quant": false,
@@ -9882,6 +9953,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "stradaeducation": {
+   "name": "Strada Education Foundation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "sunsrce": {
    "name": "SunSource",
@@ -10779,6 +10856,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "hckd.fa.us2.oraclecloud.com|CX_1": {
+   "name": "Molina Healthcare",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "hckz.fa.us2.oraclecloud.com|CX_1": {
    "name": "Seaspan",
@@ -12005,6 +12088,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "sophinea": {
+   "name": "Sophinea",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "sorting-robotics": {
    "name": "Sorting Robotics",
@@ -15168,9 +15257,9 @@
   "gensler|wd1|genslercareers": {
    "name": "Gensler",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-10-30"
+   "last_fail": "2026-10-31"
   },
   "gentex|wd5|Gentex": {
    "name": "Gentex Corporation",
@@ -15680,6 +15769,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "hysteryale|wd1|hyster-yalecareers": {
+   "name": "Hyster-Yale Materials Handling",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "hyvee|wd1|HyVeeCareers": {
    "name": "Hy-Vee",
@@ -16410,6 +16505,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "macfound|wd1|MAC_FOUND_EXT_CAREERS": {
+   "name": "John D. and Catherine T. MacArthur Foundation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "maersk|wd3|APMT_Careers": {
    "name": "APM Terminals",
    "quant": false,
@@ -16788,6 +16889,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "morningstar|wd5|Americas": {
+   "name": "Morningstar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "mosaic|wd5|mosaic": {
    "name": "The Mosaic Company",
@@ -19212,6 +19319,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13",
+   "sector": "education_research"
+  },
+  "umiami|wd1|UMCareerStaff": {
+   "name": "University of Miami",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31",
    "sector": "education_research"
   },
   "ummh|wd1|Careers": {

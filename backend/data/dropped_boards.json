@@ -4,6 +4,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "beaconsoftware": {
+   "on": "2026-10-31",
+   "why": "dead"
+  },
   "chainlink-labs": {
    "on": "2026-10-21",
    "why": "dead"
@@ -1160,6 +1164,10 @@
   },
   "publicisgroupe": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "pyrotek3": {
+   "on": "2026-10-31",
    "why": "robots"
   },
   "redbull": {
