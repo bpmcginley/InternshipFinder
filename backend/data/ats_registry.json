@@ -5608,6 +5608,12 @@
    "added": "2026-09-18",
    "sector": "hospitality_sports"
   },
+  "morph": {
+   "name": "Morph Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "morsecorpcoop": {
    "name": "MORSE Corp",
    "quant": false,
@@ -6118,6 +6124,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "pretiuminternships2027": {
+   "name": "Pretium",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "procogia": {
    "name": "ProCogia",
@@ -6971,6 +6983,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "tpgcareers": {
+   "name": "TPG",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "trace3": {
    "name": "Trace3",
    "quant": false,
@@ -7215,6 +7233,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "vmax": {
+   "name": "Vmax",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "voloridgeinvestmentmanagement": {
    "name": "Voloridge",
@@ -7551,12 +7575,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-gdeb": {
-   "name": "General Dynamics",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-gotyto": {
    "name": "TALON",
    "quant": false,
@@ -7831,6 +7849,12 @@
   }
  },
  "icims_site": {
+  "blackhawknetwork.jibeapply.com": {
+   "name": "Blackhawk Network Holdings",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "careers.aarp.org": {
    "name": "AARP",
    "quant": false,
@@ -8116,6 +8140,13 @@
    "fails": 0,
    "added": "2026-09-25"
   },
+  "emory.jibeapply.com": {
+   "name": "Emory University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31",
+   "sector": "education_research"
+  },
   "firstcitizens.jibeapply.com": {
    "name": "First Citizens BancShares",
    "quant": false,
@@ -8127,6 +8158,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "ice.jibeapply.com": {
+   "name": "Intercontinental Exchange",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "jobportal.reyesbeveragegroup.com": {
    "name": "Reyes Beverage Group",
@@ -8214,6 +8251,30 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "kinaxis.jibeapply.com": {
+   "name": "Kinaxis",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
+  "peraton.jibeapply.com": {
+   "name": "Peraton",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
+  "publicisgroupe.jibeapply.com": {
+   "name": "Publicis Groupe",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
+  "se.jibeapply.com": {
+   "name": "Schneider Electric",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
+  },
   "simventions.jibeapply.com": {
    "name": "SimVentions",
    "quant": false,
@@ -8225,6 +8286,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "stifel.jibeapply.com": {
+   "name": "Stifel",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "xanterra.jibeapply.com": {
    "name": "Windstar Cruises",
@@ -16804,8 +16871,9 @@
   "mii|wd5|MiTek": {
    "name": "MiTek",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-10-31"
   },
   "millerknoll|wd1|MillerKnoll": {
    "name": "MillerKnoll",
