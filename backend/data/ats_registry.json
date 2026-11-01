@@ -14949,6 +14949,12 @@
    "fails": 0,
    "added": "2026-09-17"
   },
+  "fedex|wd1|FXE-LAC_External_Career_Site": {
+   "name": "FedEx",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-01"
+  },
   "fenwick|wd1|Fenwick_External_Careers": {
    "name": "Fenwick & West",
    "quant": false,
