@@ -21,6 +21,13 @@ Google documents Pacific dates, final data, optional incomplete-date metadata an
 
 Existing dashboard keys and the `metrics_daily` schema remain compatible. The Google headline range intentionally ends on a finalized date rather than the current partial day. A private dashboard hosted outside this repository must use the date and measurement labels above when it adopts the new fields.
 
+2026-11-02: the collector accepts the REST API's `firstIncompleteDate` as well as the documented
+`first_incomplete_date` spelling. Previously the wire spelling fell back to a three-day lag even
+when Google supplied a completeness boundary. Both spellings are validated; conflicting valid
+boundaries use the earlier date. This corrects reporting freshness, not rankings. Revert: restore
+the previous `_gsc_end` implementation and its tests. The [REST discovery schema](https://searchconsole.googleapis.com/$discovery/rest?version=v1)
+defines the wire spelling.
+
 ## Compare like with like
 
 Compare Google's complete week with the previous complete week. Compare its clicks with the Google-only Cloudflare estimate, then check Bing, social and direct traffic separately. A rise in total or combined-search visits can coexist with a real Google loss.

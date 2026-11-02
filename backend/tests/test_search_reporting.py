@@ -102,14 +102,17 @@ def stub_google(monkeypatch, metadata=None, final_rows=None, fail_week=False):
     return calls
 
 
-def test_final_google_windows_use_pacific_metadata_and_keep_zero_final_day(monkeypatch):
-    calls = stub_google(monkeypatch, {"first_incomplete_date": "2026-10-27"},
+@pytest.mark.parametrize("metadata_key", ["firstIncompleteDate", "first_incomplete_date"])
+def test_final_google_windows_use_pacific_metadata_and_keep_zero_final_day(monkeypatch, metadata_key):
+    metadata = {metadata_key: "2026-10-27"}
+    calls = stub_google(monkeypatch, metadata,
         [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20, "position": 9}])
     got = metrics.search_console(NOW)
     assert got["reporting"]["end"] == "2026-10-26"  # zero-impression final day does not shift the end
     assert got["reporting"]["seven_day_start"] == "2026-10-20"
     assert got["reporting"]["timezone"] == "America/Los_Angeles"
-    assert got["reporting"]["completeness_metadata"] == {"first_incomplete_date": "2026-10-27"}
+    assert got["reporting"]["completeness_metadata"] == metadata
+    assert got["reporting"]["boundary_basis"] == "google_first_incomplete_date"
     assert got["totals_7d"]["clicks"] == 2
     assert got["totals_28d"]["impressions"] == 20  # preliminary probe never contaminates totals
     assert all(c["dataState"] == "final" and c["type"] == "web" for c in calls[1:])
@@ -118,6 +121,55 @@ def test_final_google_windows_use_pacific_metadata_and_keep_zero_final_day(monke
     assert got["pages"][0]["url"].startswith("https://internscout.org/")
     assert got["reporting"]["limits"]["queries"]["exhaustive"] is False
     assert len(calls) == 9
+
+
+def test_actual_wire_metadata_removes_extra_reporting_lag_without_including_preliminary_rows(monkeypatch):
+    calls = stub_google(monkeypatch, {"firstIncompleteDate": "2026-10-29"}, [
+        {"keys": ["2026-10-28"], "clicks": 2, "impressions": 20, "position": 9},
+        {"keys": ["2026-10-29"], "clicks": 99, "impressions": 9999, "position": 1}])
+    got = metrics.search_console(datetime(2026, 10, 30, 22, tzinfo=timezone.utc))
+    assert got["reporting"]["end"] == "2026-10-28"
+    assert got["totals_28d"]["impressions"] == 20
+    assert all(c["endDate"] <= "2026-10-28" and c["dataState"] == "final" for c in calls[1:])
+
+
+@pytest.mark.parametrize("metadata", [
+    {"firstIncompleteDate": "2026-10-28", "first_incomplete_date": "2026-10-26"},
+    {"firstIncompleteDate": "2026-10-26", "first_incomplete_date": "2026-10-28"},
+    {"firstIncompleteDate": "2026-10-26", "first_incomplete_date": "2026-10-26"},
+])
+def test_conflicting_metadata_uses_the_earliest_incomplete_boundary(metadata):
+    end, basis = metrics._gsc_end(NOW, metadata)
+    assert end.isoformat() == "2026-10-25"
+    assert basis == "google_first_incomplete_date"
+
+
+@pytest.mark.parametrize("invalid", [None, "", 20261027, [], {}, "2026-10-29", "2026-02-30",
+    "2026-10-7", "2026-10-27T00:00:00Z", " 2026-10-27", "2026-10-27\n", "0001-01-01"])
+@pytest.mark.parametrize("metadata_key", ["firstIncompleteDate", "first_incomplete_date"])
+def test_invalid_metadata_never_advances_the_conservative_window(metadata_key, invalid):
+    end, basis = metrics._gsc_end(NOW, {metadata_key: invalid})
+    assert end.isoformat() == "2026-10-25"
+    assert basis == "conservative_three_day_lag_metadata_unavailable"
+
+
+@pytest.mark.parametrize("valid_key", ["firstIncompleteDate", "first_incomplete_date"])
+@pytest.mark.parametrize("valid_date,expected,basis", [
+    ("2026-10-28", "2026-10-25", "conservative_three_day_lag_metadata_unavailable"),
+    ("2026-10-24", "2026-10-23", "google_first_incomplete_date"),
+])
+def test_invalid_alias_cannot_override_a_more_conservative_boundary(valid_key, valid_date, expected, basis):
+    other_key = "first_incomplete_date" if valid_key == "firstIncompleteDate" else "firstIncompleteDate"
+    end, actual_basis = metrics._gsc_end(NOW, {valid_key: valid_date, other_key: "invalid"})
+    assert end.isoformat() == expected
+    assert actual_basis == basis
+
+
+def test_completeness_today_excludes_the_current_pacific_day():
+    end, basis = metrics._gsc_end(datetime(2026, 10, 28, 1, tzinfo=timezone.utc),
+                                 {"firstIncompleteDate": "2026-10-27"})
+    assert end.isoformat() == "2026-10-26"  # UTC Oct 28 is still Oct 27 Pacific
+    assert basis == "google_first_incomplete_date"
 
 
 def test_metadata_absent_uses_explicit_lag_not_latest_nonzero_date(monkeypatch):
