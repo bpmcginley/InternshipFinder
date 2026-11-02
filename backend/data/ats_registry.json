@@ -12198,6 +12198,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "tecsys": {
+   "name": "Tecsys",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-02"
+  },
   "terabase-energy": {
    "name": "Terabase",
    "quant": false,
@@ -16959,8 +16965,9 @@
   "moog|wd5|moog_external_career_site": {
    "name": "Moog",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-02"
   },
   "morningstar|wd5|Americas": {
    "name": "Morningstar",
