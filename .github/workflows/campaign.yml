@@ -31,6 +31,18 @@ jobs:
           sudo apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: this week's pack has no videos"
       - name: Write the pack
         run: python growth/campaign.py docs --out=campaign
+      # 2026-11-02: give students real role titles to search/share, backed by the current export.
+      # was: only the search slideshow and rotating tip. Revert: remove this step.
+      - name: Write source-backed title discovery sheets
+        id: titles
+        # A thin/stale supplemental pack must not discard the already-generated main pack.
+        continue-on-error: true
+        run: python growth/title_discovery.py docs --out=campaign/title-discovery
+      - name: Report unavailable title sheets
+        if: steps.titles.outcome == 'failure'
+        run: |
+          echo "::warning::Title discovery sheets were refused; review freshness/coverage before retrying. The original campaign pack is preserved."
+          echo "Title discovery: unavailable. Review the generation log; do not publish stale sheets." >> "$GITHUB_STEP_SUMMARY"
       - name: Keep it
         uses: actions/upload-artifact@v7
         with:

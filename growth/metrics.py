@@ -524,14 +524,29 @@ def _gsc_totals(rows: list[dict]) -> dict:
 def _gsc_end(now: datetime, metadata: dict):
     """Do not slide a window back merely because its last complete day had no impressions."""
     today = now.astimezone(GSC_PACIFIC).date()
-    try:
-        incomplete = datetime.strptime(metadata.get("first_incomplete_date"), "%Y-%m-%d").date()
-    except (TypeError, ValueError):
-        incomplete = None
-    if incomplete is not None and incomplete <= today:
-        return min(today - timedelta(days=1), incomplete - timedelta(days=1)), "google_first_incomplete_date"
+    fallback = today - timedelta(days=3)
+    ends = []
+    invalid = False
+    # The REST schema uses camelCase; Google's narrative docs and older snapshots use snake_case.
+    # Keep both. A conflicting earlier boundary must win, and malformed metadata cannot shorten
+    # the fallback lag (or override a valid boundary that requires an even earlier end date).
+    for key in ("firstIncompleteDate", "first_incomplete_date"):
+        if key not in metadata:
+            continue
+        value = metadata[key]
+        try:
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+                raise ValueError("not an ISO date")
+            incomplete = datetime.strptime(value, "%Y-%m-%d").date()
+            if incomplete > today:
+                raise ValueError("future completeness boundary")
+            ends.append(incomplete - timedelta(days=1))
+        except (ValueError, OverflowError):
+            invalid = True
+    if ends and (not invalid or min(ends) <= fallback):
+        return min(ends), "google_first_incomplete_date"
     # Optional metadata absent: an explicit lag, never the last nonzero row, sets the window.
-    return today - timedelta(days=3), "conservative_three_day_lag_metadata_unavailable"
+    return fallback, "conservative_three_day_lag_metadata_unavailable"
 
 
 def _gsc_cell(row: dict) -> dict:

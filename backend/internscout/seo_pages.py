@@ -894,6 +894,10 @@ EMPLOYERS: dict[str, str] = {}   # every spelling of a company's name -> its emp
 # Company" is Boeing. Only whole trailing words go, so "Bank of America" keeps its name.
 _SUFFIX = re.compile(r"\s+(inc|incorporated|llc|ltd|co|company|corp|corporation|international|group|holdings|plc|lp)$")
 EMPLOYER_ALIASES = {"booz allen hamilton": "booz allen"}
+# 2026-11-02: Altera Corporation and Altera alternate as the most common display name. Keep the current
+# published URL even when that count changes; the old corporation URL redirects below.
+# Revert: remove this map, restore slugify(name), and remove the alias writer below.
+EMPLOYER_SLUGS = {"altera": "altera"}
 STUDENT_STAGES = {"internship", "co_op", "research", "fellowship"}
 
 
@@ -3440,7 +3444,7 @@ def build(site_dir: str, live: dict[str, str] | set[str] | frozenset[str] = froz
         names = Counter(x["company_name"] for x in items)
         name = min(names, key=lambda n: (-names[n], len(n), n))                       # was: (-names[n], len(n))
         items = dedupe_roles(items)
-        path = f"/internships/at/{slugify(name)}/"
+        path = f"/internships/at/{EMPLOYER_SLUGS.get(key, slugify(name))}/"  # was: slugify(name)
         # was: if (not slugify(name) or ...   (real_company since 2026-10-07)
         if (not slugify(name) or not real_company(name) or path in EMPLOYERS.values() or student_share(items) < 0.5
                 or not enough(len(items), path, MIN_EMPLOYER)):
@@ -4065,6 +4069,21 @@ def write(site_dir: str, pages: list[dict]) -> None:
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, "index.html"), "w", encoding="utf-8", newline="\n") as f:
             f.write(p["html"])
+    # 2026-11-02: GitHub Pages serves static files; was: the retired URL returned 404.
+    # A zero-second meta refresh preserves the retired Altera
+    # link without creating another listing page or changing sitemap/indexing eligibility.
+    # Emit it only when the real destination survived the existing page-generation rules.
+    if any(p["path"] == "/internships/at/altera/" for p in pages):
+        folder = os.path.join(site_dir, "internships", "at", "altera-corporation")
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "index.html"), "w", encoding="utf-8", newline="\n") as f:
+            f.write('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+                    '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                    '<title>Altera internships | InternScout</title>'
+                    '<meta http-equiv="refresh" content="0;url=https://internscout.org/internships/at/altera/">'
+                    '<link rel="canonical" href="https://internscout.org/internships/at/altera/">'
+                    '</head><body><p>Altera internships have moved to '
+                    '<a href="/internships/at/altera/">Altera internships</a>.</p></body></html>\n')
     now = GENERATED or datetime.now(timezone.utc)     # was: now = datetime.now(timezone.utc)
     with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(not_found(f"{now:%B} {now.day}, {now.year}"))

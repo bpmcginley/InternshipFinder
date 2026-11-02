@@ -361,6 +361,43 @@ def test_a_work_study_board_gets_no_employer_page(tmp_path):
     assert "/internships/at/some-university/" not in _paths(seo_pages.build(site))
 
 
+@pytest.mark.parametrize("short_count,long_count", [(12, 0), (0, 12), (6, 6), (8, 4), (4, 8)])
+def test_altera_keeps_its_current_url_when_source_name_counts_flip(tmp_path, short_count, long_count):
+    rows = [_row(i, company_name="Altera") for i in range(short_count)]
+    rows += [_row(20 + i, company_name="Altera Corporation") for i in range(long_count)]
+    site = _site(tmp_path, {"MA": rows})
+    pages = {p["path"]: p for p in seo_pages.build(site)}
+    assert "/internships/at/altera-corporation/" not in pages
+    assert len(pages["/internships/at/altera/"]["items"]) == 12
+    assert set(seo_pages.EMPLOYERS.values()) == {"/internships/at/altera/"}
+    assert 'href="/internships/at/altera/"' in pages["/internships/at/"]["html"]
+
+
+@pytest.mark.parametrize("count", [6, 12])
+def test_retired_altera_url_redirects_only_to_the_existing_current_page(tmp_path, count):
+    site = _site(tmp_path, {"MA": [_row(i, company_name="Altera Corporation") for i in range(count)]})
+    pages = seo_pages.build(site)
+    target = next(p for p in pages if p["path"] == "/internships/at/altera/")
+    assert target["index"] is (count >= seo_pages.INDEX_EMPLOYER)
+    seo_pages.write(site, pages)
+    redirect = (tmp_path / "internships/at/altera-corporation/index.html").read_text(encoding="utf-8")
+    assert '<meta http-equiv="refresh" content="0;url=https://internscout.org/internships/at/altera/">' in redirect
+    assert '<link rel="canonical" href="https://internscout.org/internships/at/altera/">' in redirect
+    assert '<a href="/internships/at/altera/">Altera internships</a>' in redirect
+    assert '<script' not in redirect
+    assert '/internships/at/altera-corporation/' not in (tmp_path / 'sitemap.xml').read_text(encoding="utf-8")
+    assert '/internships/at/altera-corporation/' not in (tmp_path / seo_pages.HELD_FILE).read_text(encoding="utf-8")
+    assert '/internships/at/altera/' in _paths(pages)
+
+
+def test_altera_redirect_is_not_created_when_existing_generation_rules_omit_the_target(tmp_path):
+    site = _site(tmp_path, {"MA": [_row(i, company_name="Altera Corporation") for i in range(2)]})
+    pages = seo_pages.build(site)
+    assert '/internships/at/altera/' not in _paths(pages)
+    seo_pages.write(site, pages)
+    assert not (tmp_path / 'internships/at/altera-corporation/index.html').exists()
+
+
 def test_new_page_links_to_new_only_and_feeds_every_new_role(tmp_path):
     rows = [_row(i, first_seen="2026-09-22T00:00:00") for i in range(40)]
     rows += [_row(100 + i, first_seen="2026-09-18T00:00:00") for i in range(41)]   # the baseline day

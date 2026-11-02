@@ -4,6 +4,36 @@ Written October 25, 2026 from the accounts and the site's own numbers. It record
 used and the rules every post follows. It does not change an account, a queue, a budget or a schedule;
 each of those is the owner's decision, listed under [Decisions](#decisions-for-the-owner).
 
+## November 2 decisions
+
+Bruce paused all Meta ad spending. Keep it paused; the older campaign budgets and renewal/migration
+suggestions below are historical, not instructions to reactivate ads or buy another service.
+The November 1 audit and November 2 provider report do not establish retained acquisition or CAC.
+Do not add Heycatch and Zeely views together when they describe the same public posts.
+
+2026-11-02: the existing Campaign pack now also prepares `title-discovery/` sheets from real,
+current role titles in three well-supplied non-software fields. Previously it prepared only the
+search and tip pieces. Revert: remove the title-discovery workflow step and generator. The new
+pack is a candidate for useful student sharing, not a claim that these topics are trending.
+
+Use one sheet to answer a specific question: what titles appear in this field besides the obvious
+one? Show the real titles, current date, source employers and a working matching search link.
+Field tags do not establish degree eligibility; viewers must read the employer's requirements.
+Use the existing publisher for each destination, replacing a generic piece rather than increasing
+volume. The pack posts nothing and requires review of current sources before release.
+
+Test at most three pieces, then compare saves/shares, relevant site arrivals and confirmed email
+subscriptions over 14 days. Anonymous arrivals are not unique students and email-form submits are
+not confirmed subscribers. If there is no useful downstream evidence, revise the topic or stop;
+do not respond with more automated volume. Student research sessions are not a prerequisite and were
+declined by Bruce. New spend and privacy-policy changes require consultation.
+
+The hypothesis is consistent with [TikTok's recommendation explanation](https://support.tiktok.com/en/using-tiktok/exploring-videos/how-tiktok-recommends-content):
+watching, skipping and other interactions help determine distribution. It is not an exposure
+guarantee. [Google's core-update guidance](https://developers.google.com/search/docs/appearance/core-updates)
+similarly gives no instant recovery promise; do not promote synthetic engagement or new template
+pages as a shortcut.
+
 ## What the numbers say
 
 **Heycatch analytics, Sep 26 to Oct 25** (46 posts, 7.4K views, 6 followers across Instagram, TikTok,
