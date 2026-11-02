@@ -591,6 +591,7 @@
 40.7465,
 -74.0015
 ],
+"cherry hill - nj|NJ":null,
 "chester|PA":[
 39.8496,
 -75.3557
@@ -2499,6 +2500,10 @@
 -73.8086
 ],
 "schuylkill county/columbia county|PA":null,
+"scotch plains|NJ":[
+40.6554,
+-74.3899
+],
 "scottsville|NY":[
 43.0259,
 -77.7453
@@ -2606,6 +2611,7 @@
 40.7475,
 -74.2635
 ],
+"south pittsburgh|PA":null,
 "south plainfield|NJ":[
 40.5793,
 -74.4115
@@ -2827,6 +2833,7 @@
 "usa - remote|PA":null,
 "usa - ridley park|PA":null,
 "usa - smithfield|PA":null,
+"usa > pa > conshohocken > west first|PA":null,
 "usa nj - franklin lakes|NJ":null,
 "usa nj egg harbor township|NJ":null,
 "usa nj iselin|NJ":null,

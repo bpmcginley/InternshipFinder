@@ -5945,6 +5945,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "paretocaptiveservicesllc": {
+   "name": "ParetoHealth",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-02"
+  },
   "parkland": {
    "name": "Parkland",
    "quant": false,
@@ -11184,9 +11190,8 @@
   "cozey-internships": {
    "name": "Cozey",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-02"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "createmusicgroup": {
    "name": "Create Music Group",
@@ -15260,9 +15265,10 @@
   "gatesfoundation|wd1|Gates": {
    "name": "Gates Foundation",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "nonprofit"
+   "sector": "nonprofit",
+   "last_fail": "2026-11-02"
   },
   "gcu|wd1|GCU": {
    "name": "Grand Canyon University",
@@ -15580,8 +15586,9 @@
   "gunvor|wd3|Gunvor_Careers": {
    "name": "Gunvor",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-02"
   },
   "habitat|wd12|External": {
    "name": "Habitat for Humanity",
@@ -16060,6 +16067,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "media"
+  },
+  "intuitive|wd1|irtc_careers": {
+   "name": "Intuitive",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-02"
   },
   "invesco|wd1|IVZ": {
    "name": "Invesco",
@@ -16965,9 +16978,8 @@
   "moog|wd5|moog_external_career_site": {
    "name": "Moog",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-02"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "morningstar|wd5|Americas": {
    "name": "Morningstar",
