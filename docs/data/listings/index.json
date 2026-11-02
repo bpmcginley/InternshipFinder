@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-02T21:07:24.374460+00:00",
+ "generated_at": "2026-11-02T21:39:22.757513+00:00",
  "files": {
   "AB": {
    "file": "listings/AB.json",
@@ -101,8 +101,8 @@
     "nursing": 22,
     "industrial": 17,
     "operations": 16,
-    "health": 14,
     "data": 14,
+    "health": 14,
     "mechanical": 14,
     "environmental": 8,
     "supply_chain": 6,
@@ -221,8 +221,8 @@
   "AZ": {
    "file": "listings/AZ.json",
    "desc": "listings/AZ.desc.json",
-   "count": 482,
-   "open": 380,
+   "count": 484,
+   "open": 382,
    "by_field": {
     "swe": 60,
     "engineering": 42,
@@ -231,9 +231,9 @@
     "government": 25,
     "operations": 25,
     "sales": 24,
+    "civil": 21,
     "hardware": 21,
     "data": 20,
-    "civil": 19,
     "accounting": 14,
     "industrial": 12,
     "mechanical": 12,
@@ -270,7 +270,7 @@
     "retail": 1
    },
    "by_stage": {
-    "internship": 371,
+    "internship": 373,
     "part_time": 8,
     "co_op": 5,
     "apprenticeship": 3,
@@ -343,16 +343,16 @@
   "CA": {
    "file": "listings/CA.json",
    "desc": "listings/CA.desc.json",
-   "count": 4723,
-   "open": 3565,
+   "count": 4721,
+   "open": 3564,
    "by_field": {
-    "swe": 908,
+    "swe": 909,
     "ml": 490,
     "hardware": 379,
-    "other": 363,
+    "other": 364,
     "engineering": 274,
-    "data": 187,
-    "electrical": 184,
+    "data": 189,
+    "electrical": 185,
     "mechanical": 183,
     "operations": 120,
     "industrial": 102,
@@ -378,6 +378,7 @@
     "media": 25,
     "biology": 24,
     "business": 21,
+    "biology": 18,
     "insurance": 15,
     "lab_research": 15,
     "urban_planning": 14,
@@ -411,7 +412,7 @@
     "languages": 1
    },
    "by_stage": {
-    "internship": 3465,
+    "internship": 3464,
     "research": 295,
     "co_op": 173,
     "part_time": 46,
@@ -420,11 +421,11 @@
     "early_insight": 3
    },
    "by_sector": {
-    "engineering_manufacturing": 153,
+    "engineering_manufacturing": 154,
     "energy_environment": 76,
     "retail_consumer": 24,
     "hospitality_sports": 22,
-    "health": 19,
+    "health": 14,
     "nonprofit": 13,
     "government_policy": 9,
     "insurance_finance": 7,
@@ -441,7 +442,7 @@
    "by_field": {
     "swe": 124,
     "other": 66,
-    "hardware": 45,
+    "hardware": 46,
     "government": 44,
     "engineering": 40,
     "mechanical": 35,
@@ -449,7 +450,7 @@
     "environmental": 33,
     "electrical": 30,
     "industrial": 27,
-    "civil": 27,
+    "civil": 26,
     "finance": 23,
     "operations": 22,
     "sales": 21,
@@ -498,7 +499,7 @@
     "apprenticeship": 1
    },
    "by_sector": {
-    "engineering_manufacturing": 70,
+    "engineering_manufacturing": 71,
     "energy_environment": 11,
     "government_policy": 8,
     "retail_consumer": 4,
@@ -618,13 +619,13 @@
   "DC": {
    "file": "listings/DC.json",
    "desc": "listings/DC.desc.json",
-   "count": 372,
-   "open": 306,
+   "count": 373,
+   "open": 307,
    "by_field": {
     "government": 44,
     "other": 35,
     "law": 33,
-    "nonprofit": 25,
+    "nonprofit": 26,
     "swe": 25,
     "marketing": 21,
     "education": 18,
@@ -672,14 +673,14 @@
     "electrical": 1
    },
    "by_stage": {
-    "internship": 279,
+    "internship": 280,
     "research": 25,
     "part_time": 21,
     "fellowship": 14,
     "co_op": 4
    },
    "by_sector": {
-    "nonprofit": 46,
+    "nonprofit": 47,
     "education_research": 20,
     "energy_environment": 6,
     "retail_consumer": 3,
@@ -736,11 +737,11 @@
   "FL": {
    "file": "listings/FL.json",
    "desc": "listings/FL.desc.json",
-   "count": 945,
-   "open": 764,
+   "count": 946,
+   "open": 765,
    "by_field": {
     "other": 98,
-    "swe": 95,
+    "swe": 96,
     "engineering": 59,
     "civil": 56,
     "data": 53,
@@ -755,8 +756,8 @@
     "mechanical": 25,
     "electrical": 21,
     "insurance": 20,
+    "security": 17,
     "marketing": 17,
-    "security": 16,
     "supply_chain": 15,
     "retail": 14,
     "pm": 13,
@@ -795,7 +796,7 @@
     "music": 1
    },
    "by_stage": {
-    "internship": 745,
+    "internship": 746,
     "co_op": 16,
     "research": 15,
     "part_time": 9,
@@ -820,15 +821,15 @@
   "GA": {
    "file": "listings/GA.json",
    "desc": "listings/GA.desc.json",
-   "count": 788,
-   "open": 623,
+   "count": 789,
+   "open": 624,
    "by_field": {
     "swe": 80,
-    "other": 65,
+    "other": 66,
     "data": 50,
     "engineering": 50,
     "government": 48,
-    "operations": 44,
+    "operations": 45,
     "marketing": 30,
     "sales": 30,
     "supply_chain": 29,
@@ -840,7 +841,7 @@
     "security": 18,
     "accounting": 18,
     "ml": 18,
-    "electrical": 14,
+    "electrical": 13,
     "hr": 12,
     "mechanical": 12,
     "education": 12,
@@ -858,8 +859,8 @@
     "business": 4,
     "social_work": 4,
     "sustainability": 4,
-    "hardware": 4,
     "real_estate": 3,
+    "hardware": 3,
     "urban_planning": 2,
     "psychology": 2,
     "aerospace": 2,
@@ -881,9 +882,9 @@
     "clinical_research": 1
    },
    "by_stage": {
-    "internship": 598,
+    "internship": 599,
     "co_op": 34,
-    "part_time": 9,
+    "part_time": 8,
     "research": 7,
     "fellowship": 5
    },
@@ -944,24 +945,24 @@
   "IA": {
    "file": "listings/IA.json",
    "desc": "listings/IA.desc.json",
-   "count": 479,
-   "open": 353,
+   "count": 477,
+   "open": 351,
    "by_field": {
     "swe": 52,
     "other": 42,
     "engineering": 34,
     "mechanical": 24,
     "operations": 20,
-    "industrial": 19,
     "data": 19,
+    "industrial": 18,
     "biology": 15,
     "sales": 15,
-    "electrical": 13,
     "marketing": 13,
     "finance": 13,
     "accounting": 13,
-    "supply_chain": 12,
+    "electrical": 12,
     "insurance": 12,
+    "supply_chain": 11,
     "hr": 10,
     "health": 9,
     "retail": 9,
@@ -994,7 +995,7 @@
     "materials": 1
    },
    "by_stage": {
-    "internship": 321,
+    "internship": 319,
     "co_op": 33,
     "part_time": 15,
     "apprenticeship": 8,
@@ -1012,23 +1013,23 @@
   "ID": {
    "file": "listings/ID.json",
    "desc": "listings/ID.desc.json",
-   "count": 202,
-   "open": 170,
+   "count": 205,
+   "open": 173,
    "by_field": {
-    "other": 30,
-    "engineering": 28,
-    "swe": 14,
-    "hardware": 13,
+    "other": 32,
+    "engineering": 26,
+    "hardware": 15,
+    "swe": 15,
     "electrical": 10,
     "mechanical": 9,
-    "chemical": 8,
+    "chemical": 9,
     "data": 7,
     "ml": 7,
     "industrial": 6,
     "sales": 6,
-    "operations": 5,
     "supply_chain": 5,
     "government": 5,
+    "operations": 4,
     "environmental": 4,
     "biology": 4,
     "health": 3,
@@ -1049,7 +1050,7 @@
     "urban_planning": 1
    },
    "by_stage": {
-    "internship": 170
+    "internship": 173
    },
    "by_sector": {
     "engineering_manufacturing": 55,
@@ -1067,9 +1068,9 @@
     "swe": 170,
     "other": 100,
     "engineering": 80,
-    "finance": 77,
+    "finance": 78,
     "data": 74,
-    "operations": 69,
+    "operations": 68,
     "quant": 53,
     "consulting": 50,
     "accounting": 49,
@@ -1127,7 +1128,7 @@
     "fellowship": 3
    },
    "by_sector": {
-    "retail_consumer": 42,
+    "retail_consumer": 41,
     "energy_environment": 40,
     "quant_finance": 33,
     "engineering_manufacturing": 28,
@@ -1410,15 +1411,15 @@
   "MA": {
    "file": "listings/MA.json",
    "desc": "listings/MA.desc.json",
-   "count": 1459,
-   "open": 1108,
+   "count": 1461,
+   "open": 1110,
    "by_field": {
     "swe": 150,
     "other": 116,
     "engineering": 89,
-    "data": 78,
+    "data": 80,
     "hardware": 74,
-    "health": 66,
+    "health": 67,
     "ml": 62,
     "mechanical": 57,
     "biology": 48,
@@ -1431,8 +1432,8 @@
     "sales": 26,
     "environmental": 24,
     "accounting": 20,
+    "security": 19,
     "civil": 19,
-    "security": 18,
     "design": 16,
     "supply_chain": 15,
     "law": 14,
@@ -1440,6 +1441,7 @@
     "pm": 13,
     "chemical": 12,
     "insurance": 12,
+    "chemical": 11,
     "consulting": 10,
     "hr": 10,
     "communications": 9,
@@ -1470,14 +1472,14 @@
    },
    "by_stage": {
     "internship": 732,
-    "co_op": 412,
+    "co_op": 414,
     "research": 52,
     "part_time": 15,
     "fellowship": 10,
     "apprenticeship": 3
    },
    "by_sector": {
-    "health": 100,
+    "health": 101,
     "engineering_manufacturing": 86,
     "retail_consumer": 19,
     "education_research": 19,
@@ -1520,8 +1522,8 @@
   "MD": {
    "file": "listings/MD.json",
    "desc": "listings/MD.desc.json",
-   "count": 470,
-   "open": 381,
+   "count": 472,
+   "open": 383,
    "by_field": {
     "swe": 60,
     "engineering": 42,
@@ -1533,8 +1535,8 @@
     "mechanical": 20,
     "data": 18,
     "operations": 15,
+    "finance": 14,
     "education": 14,
-    "finance": 13,
     "civil": 11,
     "social_work": 10,
     "supply_chain": 10,
@@ -1546,14 +1548,14 @@
     "accounting": 8,
     "aerospace": 6,
     "ml": 6,
+    "retail": 5,
+    "math": 5,
+    "insurance": 5,
     "biology": 5,
     "design": 5,
     "environmental": 5,
     "communications": 5,
     "sustainability": 5,
-    "insurance": 4,
-    "math": 4,
-    "retail": 4,
     "hr": 4,
     "psychology": 4,
     "health": 3,
@@ -1575,7 +1577,7 @@
     "languages": 1
    },
    "by_stage": {
-    "internship": 360,
+    "internship": 362,
     "part_time": 59,
     "co_op": 13,
     "fellowship": 11,
@@ -1589,8 +1591,8 @@
     "hospitality_sports": 10,
     "insurance_finance": 6,
     "government_policy": 5,
-    "health": 4,
-    "retail_consumer": 3
+    "retail_consumer": 4,
+    "health": 4
    }
   },
   "ME": {
@@ -1645,12 +1647,12 @@
   "MI": {
    "file": "listings/MI.json",
    "desc": "listings/MI.desc.json",
-   "count": 749,
-   "open": 640,
+   "count": 751,
+   "open": 643,
    "by_field": {
-    "swe": 90,
+    "swe": 91,
     "other": 82,
-    "engineering": 79,
+    "engineering": 81,
     "data": 41,
     "sales": 35,
     "mechanical": 35,
@@ -1699,8 +1701,8 @@
     "public_health": 1
    },
    "by_stage": {
-    "internship": 595,
-    "co_op": 74,
+    "internship": 598,
+    "co_op": 76,
     "research": 35,
     "apprenticeship": 10,
     "part_time": 6
@@ -1718,8 +1720,8 @@
   "MN": {
    "file": "listings/MN.json",
    "desc": "listings/MN.desc.json",
-   "count": 795,
-   "open": 666,
+   "count": 796,
+   "open": 667,
    "by_field": {
     "swe": 76,
     "engineering": 61,
@@ -1732,8 +1734,8 @@
     "operations": 29,
     "data": 28,
     "electrical": 24,
+    "hr": 23,
     "hardware": 22,
-    "hr": 22,
     "civil": 21,
     "ml": 20,
     "biology": 20,
@@ -1773,7 +1775,7 @@
     "chemistry": 1
    },
    "by_stage": {
-    "internship": 570,
+    "internship": 571,
     "co_op": 92,
     "research": 38,
     "fellowship": 24,
@@ -1975,8 +1977,8 @@
   "NC": {
    "file": "listings/NC.json",
    "desc": "listings/NC.desc.json",
-   "count": 785,
-   "open": 597,
+   "count": 786,
+   "open": 598,
    "by_field": {
     "swe": 94,
     "other": 69,
@@ -1986,18 +1988,18 @@
     "civil": 34,
     "finance": 28,
     "hardware": 27,
-    "industrial": 24,
+    "industrial": 25,
+    "marketing": 23,
     "sales": 23,
-    "marketing": 22,
     "ml": 19,
     "accounting": 16,
     "electrical": 16,
     "mechanical": 16,
     "environmental": 16,
     "pm": 13,
+    "supply_chain": 12,
     "biology": 12,
     "security": 12,
-    "supply_chain": 11,
     "communications": 11,
     "retail": 11,
     "business": 10,
@@ -2026,7 +2028,7 @@
     "lab_research": 1
    },
    "by_stage": {
-    "internship": 562,
+    "internship": 563,
     "co_op": 42,
     "research": 12,
     "part_time": 10,
@@ -2162,8 +2164,8 @@
   "NH": {
    "file": "listings/NH.json",
    "desc": "listings/NH.desc.json",
-   "count": 136,
-   "open": 128,
+   "count": 135,
+   "open": 127,
    "by_field": {
     "swe": 20,
     "education": 19,
@@ -2172,11 +2174,11 @@
     "other": 9,
     "data": 7,
     "mechanical": 6,
-    "insurance": 6,
     "operations": 6,
     "sports": 6,
     "sales": 6,
     "industrial": 5,
+    "insurance": 5,
     "civil": 5,
     "environmental": 4,
     "health": 3,
@@ -2202,7 +2204,7 @@
     "security": 1
    },
    "by_stage": {
-    "internship": 124,
+    "internship": 123,
     "part_time": 13,
     "co_op": 10,
     "research": 4
@@ -2224,12 +2226,12 @@
     "other": 55,
     "swe": 54,
     "data": 40,
-    "biology": 34,
+    "biology": 35,
     "environmental": 26,
     "marketing": 24,
     "finance": 23,
-    "engineering": 22,
     "sales": 21,
+    "engineering": 21,
     "operations": 20,
     "ml": 19,
     "insurance": 17,
@@ -2269,16 +2271,16 @@
     "physics": 1
    },
    "by_stage": {
-    "internship": 418,
-    "co_op": 53,
+    "internship": 419,
+    "co_op": 52,
     "part_time": 14,
     "research": 7,
     "apprenticeship": 2,
     "fellowship": 1
    },
    "by_sector": {
-    "health": 36,
-    "engineering_manufacturing": 28,
+    "health": 37,
+    "engineering_manufacturing": 27,
     "retail_consumer": 7,
     "energy_environment": 6,
     "hospitality_sports": 3,
@@ -2465,8 +2467,8 @@
   "NY": {
    "file": "listings/NY.json",
    "desc": "listings/NY.desc.json",
-   "count": 2135,
-   "open": 1649,
+   "count": 2133,
+   "open": 1647,
    "by_field": {
     "swe": 316,
     "other": 196,
@@ -2474,13 +2476,13 @@
     "finance": 121,
     "ml": 107,
     "quant": 87,
-    "engineering": 82,
+    "engineering": 81,
     "government": 76,
     "operations": 76,
     "marketing": 68,
     "law": 59,
     "accounting": 46,
-    "mechanical": 44,
+    "mechanical": 43,
     "sales": 36,
     "civil": 34,
     "industrial": 31,
@@ -2533,9 +2535,9 @@
     "library": 1
    },
    "by_stage": {
-    "internship": 1550,
+    "internship": 1549,
     "research": 127,
-    "co_op": 124,
+    "co_op": 123,
     "part_time": 56,
     "fellowship": 14,
     "apprenticeship": 4
@@ -2558,8 +2560,8 @@
   "OH": {
    "file": "listings/OH.json",
    "desc": "listings/OH.desc.json",
-   "count": 949,
-   "open": 794,
+   "count": 948,
+   "open": 793,
    "by_field": {
     "swe": 110,
     "engineering": 109,
@@ -2606,17 +2608,17 @@
     "public_health": 2,
     "urban_planning": 2,
     "materials": 2,
-    "hospitality": 2,
     "security": 2,
     "clinical_research": 2,
     "sports": 1,
     "film": 1,
+    "nonprofit": 1,
     "social_science": 1,
     "chemistry": 1,
     "biomedical": 1
    },
    "by_stage": {
-    "internship": 706,
+    "internship": 705,
     "co_op": 135,
     "fellowship": 11,
     "part_time": 10,
@@ -2630,8 +2632,8 @@
     "energy_environment": 11,
     "government_policy": 8,
     "education_research": 6,
-    "nonprofit": 2,
-    "insurance_finance": 1
+    "insurance_finance": 1,
+    "nonprofit": 1
    }
   },
   "OK": {
@@ -2704,16 +2706,16 @@
   "ON": {
    "file": "listings/ON.json",
    "desc": "listings/ON.desc.json",
-   "count": 1667,
-   "open": 746,
+   "count": 1669,
+   "open": 748,
    "by_field": {
     "swe": 195,
     "ml": 87,
-    "hardware": 78,
-    "other": 78,
-    "engineering": 67,
+    "hardware": 79,
+    "other": 79,
+    "engineering": 68,
     "data": 50,
-    "marketing": 47,
+    "marketing": 46,
     "operations": 31,
     "finance": 27,
     "electrical": 23,
@@ -2755,14 +2757,14 @@
     "psychology": 1
    },
    "by_stage": {
-    "internship": 594,
+    "internship": 596,
     "co_op": 243,
     "research": 17,
     "apprenticeship": 6,
     "part_time": 1
    },
    "by_sector": {
-    "engineering_manufacturing": 33,
+    "engineering_manufacturing": 32,
     "hospitality_sports": 29,
     "insurance_finance": 9,
     "energy_environment": 8,
@@ -2836,8 +2838,8 @@
   "PA": {
    "file": "listings/PA.json",
    "desc": "listings/PA.desc.json",
-   "count": 1153,
-   "open": 912,
+   "count": 1155,
+   "open": 914,
    "by_field": {
     "other": 123,
     "engineering": 106,
@@ -2848,11 +2850,11 @@
     "mechanical": 46,
     "finance": 45,
     "supply_chain": 41,
-    "environmental": 40,
+    "environmental": 41,
     "health": 39,
     "biology": 35,
     "civil": 34,
-    "sales": 29,
+    "sales": 30,
     "accounting": 27,
     "electrical": 26,
     "marketing": 20,
@@ -2872,9 +2874,9 @@
     "pm": 7,
     "design": 6,
     "urban_planning": 5,
+    "hospitality": 5,
     "communications": 5,
     "education": 5,
-    "hospitality": 5,
     "chemistry": 4,
     "architecture": 4,
     "business": 4,
@@ -2893,22 +2895,22 @@
     "sports": 1
    },
    "by_stage": {
-    "internship": 817,
+    "internship": 819,
     "co_op": 130,
     "research": 35,
     "apprenticeship": 14,
     "part_time": 12
    },
    "by_sector": {
-    "energy_environment": 60,
+    "energy_environment": 61,
     "engineering_manufacturing": 44,
     "health": 43,
     "retail_consumer": 22,
     "insurance_finance": 21,
     "education_research": 12,
     "hospitality_sports": 6,
-    "government_policy": 2,
-    "nonprofit": 2
+    "nonprofit": 2,
+    "government_policy": 2
    }
   },
   "PE": {
@@ -2927,13 +2929,13 @@
   "PR": {
    "file": "listings/PR.json",
    "desc": "listings/PR.desc.json",
-   "count": 27,
-   "open": 27,
+   "count": 28,
+   "open": 28,
    "by_field": {
     "government": 7,
     "swe": 6,
+    "engineering": 4,
     "operations": 3,
-    "engineering": 3,
     "other": 3,
     "data": 2,
     "accounting": 1,
@@ -2948,7 +2950,7 @@
     "retail": 1
    },
    "by_stage": {
-    "internship": 23,
+    "internship": 24,
     "co_op": 4,
     "part_time": 1
    },
@@ -3067,6 +3069,7 @@
     "mechanical": 16,
     "civil": 15,
     "data": 15,
+    "civil": 15,
     "biology": 13,
     "supply_chain": 9,
     "industrial": 9,
@@ -3134,6 +3137,7 @@
     "supply_chain": 2,
     "nursing": 2,
     "civil": 2,
+    "sports": 1,
     "marketing": 1,
     "ml": 1,
     "law": 1,
@@ -3142,7 +3146,7 @@
     "accounting": 1
    },
    "by_stage": {
-    "internship": 70,
+    "internship": 71,
     "research": 2,
     "part_time": 1
    },
@@ -3246,20 +3250,20 @@
   "TX": {
    "file": "listings/TX.json",
    "desc": "listings/TX.desc.json",
-   "count": 2453,
-   "open": 1981,
+   "count": 2458,
+   "open": 1986,
    "by_field": {
-    "swe": 309,
-    "other": 196,
+    "swe": 310,
+    "other": 198,
     "engineering": 174,
     "civil": 121,
     "data": 109,
     "hardware": 99,
     "operations": 97,
-    "accounting": 85,
+    "accounting": 86,
     "sales": 83,
     "finance": 79,
-    "mechanical": 77,
+    "mechanical": 78,
     "ml": 74,
     "marketing": 73,
     "industrial": 71,
@@ -3270,11 +3274,11 @@
     "supply_chain": 49,
     "chemical": 31,
     "pm": 30,
-    "insurance": 27,
+    "insurance": 26,
     "hr": 26,
+    "security": 24,
     "consulting": 24,
     "sustainability": 24,
-    "security": 23,
     "urban_planning": 21,
     "law": 20,
     "business": 18,
@@ -3311,8 +3315,8 @@
     "psychology": 1
    },
    "by_stage": {
-    "internship": 1915,
-    "co_op": 121,
+    "internship": 1920,
+    "co_op": 122,
     "part_time": 61,
     "research": 40,
     "apprenticeship": 12,
@@ -3320,7 +3324,7 @@
     "early_insight": 3
    },
    "by_sector": {
-    "engineering_manufacturing": 119,
+    "engineering_manufacturing": 121,
     "energy_environment": 89,
     "retail_consumer": 51,
     "education_research": 46,
@@ -3336,18 +3340,18 @@
   "US": {
    "file": "listings/US.json",
    "desc": "listings/US.desc.json",
-   "count": 421,
-   "open": 361,
+   "count": 422,
+   "open": 362,
    "by_field": {
-    "other": 96,
-    "swe": 62,
+    "other": 95,
+    "swe": 63,
     "engineering": 51,
     "ml": 28,
     "data": 21,
     "hardware": 17,
     "mechanical": 16,
+    "security": 13,
     "electrical": 12,
-    "security": 12,
     "sales": 8,
     "operations": 8,
     "finance": 7,
@@ -3356,10 +3360,10 @@
     "hospitality": 6,
     "pm": 5,
     "supply_chain": 5,
+    "chemical": 5,
     "business": 5,
     "marketing": 4,
     "nonprofit": 4,
-    "chemical": 4,
     "law": 3,
     "accounting": 2,
     "media": 2,
@@ -3381,7 +3385,7 @@
     "biology": 1
    },
    "by_stage": {
-    "internship": 256,
+    "internship": 257,
     "apprenticeship": 76,
     "co_op": 29,
     "research": 7,
@@ -3389,7 +3393,7 @@
     "fellowship": 1
    },
    "by_sector": {
-    "engineering_manufacturing": 25,
+    "engineering_manufacturing": 26,
     "hospitality_sports": 9,
     "nonprofit": 6,
     "health": 1,
@@ -3403,9 +3407,9 @@
    "open": 254,
    "by_field": {
     "government": 30,
-    "swe": 29,
+    "swe": 30,
     "other": 25,
-    "engineering": 23,
+    "engineering": 22,
     "civil": 21,
     "industrial": 16,
     "data": 16,
@@ -3416,8 +3420,8 @@
     "supply_chain": 10,
     "environmental": 10,
     "finance": 9,
+    "security": 9,
     "electrical": 9,
-    "security": 8,
     "sales": 8,
     "insurance": 5,
     "biology": 5,
@@ -3464,14 +3468,14 @@
   "VA": {
    "file": "listings/VA.json",
    "desc": "listings/VA.desc.json",
-   "count": 926,
-   "open": 721,
+   "count": 927,
+   "open": 722,
    "by_field": {
-    "swe": 102,
+    "swe": 103,
     "other": 91,
     "government": 65,
     "data": 57,
-    "security": 51,
+    "security": 52,
     "finance": 44,
     "engineering": 43,
     "operations": 35,
@@ -3669,19 +3673,19 @@
   "WI": {
    "file": "listings/WI.json",
    "desc": "listings/WI.desc.json",
-   "count": 720,
-   "open": 617,
+   "count": 716,
+   "open": 613,
    "by_field": {
     "other": 76,
     "swe": 69,
     "engineering": 64,
-    "operations": 54,
-    "industrial": 38,
+    "operations": 53,
     "data": 36,
+    "industrial": 35,
     "mechanical": 32,
-    "supply_chain": 32,
     "finance": 31,
     "hardware": 31,
+    "supply_chain": 29,
     "sales": 28,
     "ml": 23,
     "marketing": 21,
@@ -3723,7 +3727,7 @@
     "education": 1
    },
    "by_stage": {
-    "internship": 582,
+    "internship": 578,
     "co_op": 40,
     "part_time": 18,
     "research": 8,
@@ -3791,12 +3795,12 @@
   "WY": {
    "file": "listings/WY.json",
    "desc": "listings/WY.desc.json",
-   "count": 112,
-   "open": 109,
+   "count": 110,
+   "open": 107,
    "by_field": {
     "government": 17,
-    "swe": 15,
     "education": 14,
+    "swe": 13,
     "other": 11,
     "data": 9,
     "lab_research": 9,
@@ -3834,7 +3838,7 @@
     "communications": 1
    },
    "by_stage": {
-    "internship": 77,
+    "internship": 75,
     "part_time": 34,
     "research": 5,
     "co_op": 2
@@ -3863,20 +3867,20 @@
   "remote": {
    "file": "listings/remote.json",
    "desc": "listings/remote.desc.json",
-   "count": 562,
-   "open": 400,
+   "count": 566,
+   "open": 404,
    "by_field": {
-    "swe": 89,
+    "swe": 90,
     "other": 60,
     "ml": 59,
-    "data": 33,
+    "data": 34,
     "marketing": 25,
     "operations": 22,
     "engineering": 17,
     "government": 16,
     "sales": 14,
     "law": 13,
-    "security": 12,
+    "security": 13,
     "finance": 11,
     "design": 11,
     "pm": 10,
@@ -3897,20 +3901,21 @@
     "industrial": 3,
     "mechanical": 3,
     "publishing": 2,
+    "biology": 2,
     "hr": 2,
     "arts": 2,
     "quant": 2,
     "library": 1,
-    "biology": 1,
+    "electrical": 1,
     "architecture": 1,
     "math": 1,
     "physics": 1,
     "entrepreneurship": 1
    },
    "by_stage": {
-    "internship": 367,
+    "internship": 370,
     "research": 33,
-    "co_op": 29,
+    "co_op": 30,
     "part_time": 18,
     "fellowship": 8,
     "apprenticeship": 2
