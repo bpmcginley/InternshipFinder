@@ -817,13 +817,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "firetiger": {
-   "name": "Firetiger",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-01"
-  },
   "flagright.com": {
    "name": "Flagright",
    "quant": false,
@@ -2385,13 +2378,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-28"
-  },
-  "tilderesearch": {
-   "name": "Tilde Research",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-01"
   },
   "tldraw": {
    "name": "tldraw",
@@ -11167,9 +11153,9 @@
   "citylogix": {
    "name": "Citylogix Inc.",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-14",
-   "last_fail": "2026-11-01"
+   "last_fail": "2026-11-02"
   },
   "cloud-synapps-inc": {
    "name": "Cloud SynApps",
@@ -11198,9 +11184,9 @@
   "cozey-internships": {
    "name": "Cozey",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-14",
-   "last_fail": "2026-11-01"
+   "last_fail": "2026-11-02"
   },
   "createmusicgroup": {
    "name": "Create Music Group",
@@ -15346,13 +15332,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
-  },
-  "gensler|wd1|genslercareers": {
-   "name": "Gensler",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-01"
   },
   "gentex|wd5|Gentex": {
    "name": "Gentex Corporation",

@@ -20,6 +20,10 @@
    "on": "2026-10-14",
    "why": "dead"
   },
+  "firetiger": {
+   "on": "2026-11-02",
+   "why": "dead"
+  },
   "genesis-therapeutics": {
    "on": "2026-10-01",
    "why": "dead"
@@ -62,6 +66,10 @@
   },
   "orbitalmaterials": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "tilderesearch": {
+   "on": "2026-11-02",
    "why": "dead"
   },
   "tuesday-lab": {
@@ -1575,6 +1583,10 @@
   "genmab|wd3|genmab_careers_site": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "gensler|wd1|genslercareers": {
+   "on": "2026-11-02",
+   "why": "dead"
   },
   "gfs|wd5|usprivate-gfs": {
    "on": "2026-09-30",
