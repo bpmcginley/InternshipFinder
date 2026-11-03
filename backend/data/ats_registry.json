@@ -3128,8 +3128,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-03"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -11840,6 +11841,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "botpress": {
+   "name": "Botpress Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
+  },
   "cadillacf1team": {
    "name": "Cadillac Formula 1 Team",
    "quant": false,
@@ -17615,8 +17622,9 @@
   "papajohns|wd1|papajohnscareers": {
    "name": "Papa John's",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-03"
   },
   "parexel|wd1.myworkdaysite.com|Parexel_External_Careers": {
    "name": "Parexel",

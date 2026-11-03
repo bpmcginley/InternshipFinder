@@ -16,6 +16,8 @@
 "01036 - pennsylvania cvs pharmacy|PA":null,
 "01323 - pennsylvania cvs pharmacy|PA":null,
 "01324 - pennsylvania cvs pharmacy|PA":null,
+"01665 - pennsylvania cvs pharmacy|PA":null,
+"01672 - pennsylvania cvs pharmacy|PA":null,
 "02235 - new jersey cvs pharmacy|NJ":null,
 "02784 - pennsylvania cvs pharmacy|PA":null,
 "05193 - new jersey cvs pharmacy|NJ":null,
@@ -1166,6 +1168,7 @@
 40.8154,
 -73.0451
 ],
+"holyoke|NJ":null,
 "home based-pennsylvania|PA":null,
 "homer|NY":[
 42.6369,
@@ -1383,6 +1386,7 @@
 -75.5877
 ],
 "long beach island|NJ":null,
+"long island & queens|NY":null,
 "long island ny|NY":null,
 "long island|NY":null,
 "los angeles|PA":null,
