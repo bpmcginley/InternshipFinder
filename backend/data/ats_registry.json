@@ -185,6 +185,12 @@
    "fails": 0,
    "added": "2026-09-28"
   },
+  "ariesglobal": {
+   "name": "Aries Global",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
+  },
   "armadin": {
    "name": "Armadin",
    "quant": false,
@@ -209,6 +215,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "astro-mechanica": {
+   "name": "Astro Mechanica",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
   },
   "astronomer": {
    "name": "Astronomer",
@@ -895,6 +907,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "generalastronautics": {
+   "name": "General Astronautics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
+  },
   "generalintuition-medal": {
    "name": "General Intuition &amp; Medal",
    "quant": false,
@@ -1429,6 +1447,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "menlo": {
+   "name": "Menlo Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
   },
   "mercor": {
    "name": "Mercor",
@@ -6492,6 +6516,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "shield": {
+   "name": "Shield",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
+  },
   "sigmacomputing": {
    "name": "Sigma Computing",
    "quant": false,
@@ -10482,6 +10512,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "ehtl.fa.us6.oraclecloud.com|CX": {
+   "name": "Resideo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
+  },
   "ehzq.fa.us2.oraclecloud.com|CX_1": {
    "name": "Grant Thornton",
    "quant": false,
@@ -11159,9 +11195,9 @@
   "citylogix": {
    "name": "Citylogix Inc.",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-14",
-   "last_fail": "2026-11-02"
+   "last_fail": "2026-11-03"
   },
   "cloud-synapps-inc": {
    "name": "Cloud SynApps",
@@ -15265,10 +15301,9 @@
   "gatesfoundation|wd1|Gates": {
    "name": "Gates Foundation",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "nonprofit",
-   "last_fail": "2026-11-02"
+   "sector": "nonprofit"
   },
   "gcu|wd1|GCU": {
    "name": "Grand Canyon University",
@@ -15586,9 +15621,8 @@
   "gunvor|wd3|Gunvor_Careers": {
    "name": "Gunvor",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-02"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "habitat|wd12|External": {
    "name": "Habitat for Humanity",
