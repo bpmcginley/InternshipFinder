@@ -3128,9 +3128,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-03"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -4734,6 +4733,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "globalrelay": {
+   "name": "Global Relay",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
   },
   "glossier": {
    "name": "Glossier",
@@ -13577,8 +13582,9 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-03"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
@@ -17622,9 +17628,8 @@
   "papajohns|wd1|papajohnscareers": {
    "name": "Papa John's",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-03"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "parexel|wd1.myworkdaysite.com|Parexel_External_Careers": {
    "name": "Parexel",
