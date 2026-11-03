@@ -1677,6 +1677,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "onepot": {
+   "name": "onepot",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-03"
+  },
   "onerobot": {
    "name": "One Robot",
    "quant": false,
