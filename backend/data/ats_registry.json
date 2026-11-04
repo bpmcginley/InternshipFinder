@@ -2945,6 +2945,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "acadianassetmanagementllc": {
+   "name": "Acadian Asset Management",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "accuweather": {
    "name": "AccuWeather",
    "quant": false,
@@ -5319,6 +5325,12 @@
    "fails": 0,
    "added": "2026-10-05"
   },
+  "keenfootwear": {
+   "name": "KEEN Footwear",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "keepersecurity": {
    "name": "Keeper Security",
    "quant": false,
@@ -6304,6 +6316,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "redventures": {
+   "name": "Red Ventures",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "redwoodmaterials": {
    "name": "Redwood Materials",
    "quant": false,
@@ -7084,6 +7102,12 @@
    "added": "2026-09-13",
    "sector": "quant_finance"
   },
+  "triafederal": {
+   "name": "Tria Federal",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "tribalscale": {
    "name": "TribalScale",
    "quant": false,
@@ -7162,6 +7186,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "udig": {
+   "name": "Udig",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "unilever": {
    "name": "Unilever",
    "quant": false,
@@ -7174,6 +7204,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "upstart": {
+   "name": "Upstart",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
   },
   "upstreamusa": {
    "name": "Upstream USA",
@@ -14145,8 +14181,9 @@
   "cibc|wd3|search": {
    "name": "CIBC",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-04"
   },
   "ciena|wd5|careers": {
    "name": "Ciena",
@@ -14420,9 +14457,8 @@
   "costar|wd1|CoStarCareers": {
    "name": "CoStar Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-04"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "countryfinancial|wd5|COUNTRYCorporateExternal": {
    "name": "COUNTRY Financial",
