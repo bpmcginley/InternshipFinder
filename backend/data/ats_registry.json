@@ -721,6 +721,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "engramme": {
+   "name": "Engramme",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "envoy": {
    "name": "Envoy",
    "quant": false,
@@ -2030,6 +2036,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "regent": {
+   "name": "REGENT",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
   },
   "relayfi": {
    "name": "Relay Financial",
@@ -5153,6 +5165,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "interstates": {
+   "name": "Interstates",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "intersystems": {
    "name": "InterSystems",
    "quant": false,
@@ -5245,6 +5263,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "jomboymedia": {
+   "name": "Jomboy Media",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
   },
   "judihealth": {
    "name": "Judi Health",
@@ -5752,6 +5776,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "nex": {
+   "name": "Nex",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
   },
   "nexamp": {
    "name": "Nexamp",
@@ -6821,6 +6851,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "superior": {
+   "name": "Superior",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
   },
   "supplyhouse": {
    "name": "SupplyHouse.com",
@@ -8899,6 +8935,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "xanadu": {
+   "name": "Xanadu",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
   },
   "zgfarchitects": {
    "name": "ZGF Architects",
@@ -11204,13 +11246,6 @@
    "fails": 0,
    "added": "2026-09-14"
   },
-  "citylogix": {
-   "name": "Citylogix Inc.",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-03"
-  },
   "cloud-synapps-inc": {
    "name": "Cloud SynApps",
    "quant": false,
@@ -12860,6 +12895,12 @@
    "fails": 0,
    "added": "2026-10-23"
   },
+  "apacheip|wd1|apache_careers": {
+   "name": "Apache Industrial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-04"
+  },
   "applebank|wd5|applebankcareers": {
    "name": "Apple Bank",
    "quant": false,
@@ -13582,9 +13623,8 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-03"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
