@@ -14420,8 +14420,9 @@
   "costar|wd1|CoStarCareers": {
    "name": "CoStar Group",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-04"
   },
   "countryfinancial|wd5|COUNTRYCorporateExternal": {
    "name": "COUNTRY Financial",
