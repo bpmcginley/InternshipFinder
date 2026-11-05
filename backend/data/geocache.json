@@ -370,6 +370,10 @@
 40.6687,
 -74.1143
 ],
+"beacon|NY":[
+41.5048,
+-73.9695
+],
 "beaver|PA":[
 40.6954,
 -80.3048
@@ -863,6 +867,10 @@
 39.3821,
 -74.6171
 ],
+"eighty four|PA":[
+40.1827,
+-80.1331
+],
 "elmira|NY":[
 42.0898,
 -76.8077
@@ -1289,6 +1297,10 @@
 -74.0024
 ],
 "kornberg medical research building|NY":null,
+"kutztown|PA":[
+40.5173,
+-75.7774
+],
 "laboratory for laser energetics|NY":null,
 "lackawanna county|PA":null,
 "lackawaxen|PA":[
@@ -1725,6 +1737,7 @@
 40.6379,
 -74.1856
 ],
+"new york office (hybrid|NY":null,
 "new york office|NY":null,
 "new york privy hq|NY":null,
 "new york remote office (ny99|NY":null,
@@ -2623,6 +2636,10 @@
 "skaneateles|NY":[
 42.947,
 -76.4291
+],
+"slippery rock|PA":[
+41.0663,
+-80.0569
 ],
 "smithtown|NY":[
 40.8559,
