@@ -3158,8 +3158,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-05"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -3457,6 +3458,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "baringa": {
+   "name": "Baringa",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -8607,6 +8614,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "concordadvice": {
+   "name": "Concord Advice",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
+  },
   "contactlinksolutions": {
    "name": "ContactLink Solutions LLC",
    "quant": false,
@@ -9031,6 +9044,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "trilogyinnovations": {
+   "name": "Trilogy Innovations",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
   },
   "versa": {
    "name": "VersaDesk",
@@ -16124,6 +16143,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ilitch|wd5|lc": {
+   "name": "Little Caesars Enterprises",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
+  },
   "imcoinvest|wd3|IMCO": {
    "name": "Investment Management Corporation of Ontario",
    "quant": false,
@@ -16517,14 +16542,16 @@
   "kla|wd1|search": {
    "name": "KLA Corporation",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-05"
   },
   "kla|wd1|UR": {
    "name": "KLA",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-05"
   },
   "kokosing|wd5|Kokosing_External_Career_Site": {
    "name": "Kokosing",
@@ -17676,6 +17703,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "omya|wd3|Omya": {
+   "name": "Omya",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
   },
   "onehealthineers|wd3|SHSJB": {
    "name": "Varian",
@@ -19740,10 +19773,9 @@
   "utaustin|wd1|UTstaff": {
    "name": "University of Texas - Austin",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "education_research",
-   "last_fail": "2026-11-05"
+   "sector": "education_research"
   },
   "utaustin|wd1|utstudent": {
    "name": "University of Texas at Austin",

@@ -1343,6 +1343,10 @@
 40.3062,
 -80.1206
 ],
+"lebanon|NJ":[
+40.6418,
+-74.836
+],
 "lebanon|PA":[
 40.343,
 -76.4234
@@ -1990,6 +1994,7 @@
 "ny - fishkill|NY":null,
 "ny - forest hills|NY":null,
 "ny - glendale|NY":null,
+"ny - glenville|NY":null,
 "ny - goshen|NY":null,
 "ny - greece|NY":null,
 "ny - greenwich|NY":null,
@@ -2039,6 +2044,7 @@
 "ny - staten island|NY":null,
 "ny - sunnyside|NY":null,
 "ny - tarrytown|NY":null,
+"ny - troy|NY":null,
 "ny - valatie|NY":null,
 "ny - walton|NY":null,
 "ny - wantagh|NY":null,
