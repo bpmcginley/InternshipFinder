@@ -1364,6 +1364,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "logiqal": {
+   "name": "Logiqal",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
+  },
   "lovable": {
    "name": "Lovable",
    "quant": false,
@@ -6822,6 +6828,12 @@
    "added": "2026-09-18",
    "sector": "insurance_finance"
   },
+  "sterling": {
+   "name": "Sterling Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
+  },
   "stockx": {
    "name": "StockX",
    "quant": false,
@@ -7669,26 +7681,8 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-enfra": {
-   "name": "Bernhard",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-filtrationgroupcorp": {
-   "name": "Filtration Group",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-gd-ots": {
    "name": "General Dynamics",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-gotyto": {
-   "name": "TALON",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -9270,8 +9264,9 @@
   "beta": {
    "name": "Beta Technologies",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-05"
   },
   "bhvr": {
    "name": "Behaviour Interactive",
@@ -14181,9 +14176,8 @@
   "cibc|wd3|search": {
    "name": "CIBC",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-04"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "ciena|wd5|careers": {
    "name": "Ciena",
@@ -18561,8 +18555,9 @@
   "sentara|wd1|SCS": {
    "name": "Sentara Health",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-05"
   },
   "sentryinsurance|wd1|SentryCareers": {
    "name": "Sentry Insurance",
@@ -20048,6 +20043,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "wk|wd3|External": {
+   "name": "Wolters Kluwer",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
   },
   "wmg|wd1|WMGUS": {
    "name": "Warner Music Group",
