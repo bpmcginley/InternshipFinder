@@ -834,6 +834,10 @@
 40.834,
 -74.0971
 ],
+"east setauket|NY":[
+40.921,
+-73.0937
+],
 "east syracuse|NY":[
 43.0653,
 -76.0785
@@ -880,6 +884,10 @@
 "elysburg|PA":[
 40.8647,
 -76.5524
+],
+"emmaus|PA":[
+40.535,
+-75.4919
 ],
 "empire state building|NY":null,
 "endicott|NY":[
@@ -2958,6 +2966,7 @@
 "us|NY":null,
 "us|PA":null,
 "utica-rome ny hybrid|NY":null,
+"utica-rome ny|NY":null,
 "utica|NY":[
 43.1009,
 -75.2327

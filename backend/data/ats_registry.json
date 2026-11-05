@@ -3158,9 +3158,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-05"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -5519,6 +5518,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "lumbermens": {
+   "name": "Lumbermen's",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-05"
   },
   "lumosfiber": {
    "name": "Lumos",
@@ -16542,16 +16547,14 @@
   "kla|wd1|search": {
    "name": "KLA Corporation",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-05"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "kla|wd1|UR": {
    "name": "KLA",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-05"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "kokosing|wd5|Kokosing_External_Career_Site": {
    "name": "Kokosing",
