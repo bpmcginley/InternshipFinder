@@ -3133,8 +3133,9 @@
   "altmansoloncampus": {
    "name": "Altman Solon",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-29"
+   "fails": 1,
+   "added": "2026-10-29",
+   "last_fail": "2026-11-06"
   },
   "amarok": {
    "name": "AMAROK Security",
@@ -3176,8 +3177,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-06"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -5012,6 +5014,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "hootsuite": {
+   "name": "Hootsuite",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
+  },
   "horacemannservicecorporation": {
    "name": "Horace Mann",
    "quant": false,
@@ -6252,8 +6260,9 @@
   "pretiuminternships2027": {
    "name": "Pretium",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-31"
+   "fails": 1,
+   "added": "2026-10-31",
+   "last_fail": "2026-11-06"
   },
   "procogia": {
    "name": "ProCogia",
@@ -12652,12 +12661,6 @@
   },
   "acehardware|wd1|External": {
    "name": "Ace Hardware",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
-  },
-  "ace|wd5|careers": {
-   "name": "AAA Club Alliance",
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"

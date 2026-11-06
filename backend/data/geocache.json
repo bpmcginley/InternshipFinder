@@ -1305,6 +1305,10 @@
 -74.0024
 ],
 "kornberg medical research building|NY":null,
+"kulpsville|PA":[
+40.2429,
+-75.3366
+],
 "kutztown|PA":[
 40.5173,
 -75.7774
@@ -2240,6 +2244,7 @@
 "pa - monroeville|PA":null,
 "pa - mount holly springs|PA":null,
 "pa - mount pleasant|PA":null,
+"pa - natrona heights|PA":null,
 "pa - nazareth|PA":null,
 "pa - nesquehoning|PA":null,
 "pa - new castle|PA":null,
@@ -2786,6 +2791,10 @@
 40.1393,
 -74.981
 ],
+"tribeca|NY":[
+40.7154,
+-74.0093
+],
 "turnersville|NJ":[
 39.7732,
 -75.0513
@@ -2876,6 +2885,7 @@
 "us.ny.new york.10 east 40 street|NY":null,
 "us.pa.philadelphia|PA":null,
 "us: sf bay area|NY":null,
+"usa - chambersburg pa 17202|PA":null,
 "usa - hoboken|NJ":null,
 "usa - holtsville|NY":null,
 "usa - new jersey - rahway|NJ":null,
