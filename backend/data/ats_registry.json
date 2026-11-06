@@ -1599,6 +1599,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "nooks": {
+   "name": "Nooks",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
+  },
   "normalcomputing": {
    "name": "Normal Computing",
    "quant": false,
@@ -2450,6 +2456,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-24"
+  },
+  "trajectory": {
+   "name": "Trajectory",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
   },
   "treefera": {
    "name": "Treefera",
@@ -3847,6 +3859,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "clutch": {
+   "name": "Clutch",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
   },
   "cmt": {
    "name": "Cambridge Mobile Telematics",
@@ -9174,6 +9192,12 @@
    "fails": 0,
    "added": "2026-10-17"
   },
+  "starwoodcapitalgroup": {
+   "name": "Starwood Capital Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
+  },
   "tylertech": {
    "name": "Tyler Technologies",
    "quant": false,
@@ -9360,9 +9384,9 @@
   "beta": {
    "name": "Beta Technologies",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-05"
+   "last_fail": "2026-11-06"
   },
   "bhvr": {
    "name": "Behaviour Interactive",
@@ -11989,6 +12013,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "ballotpedia": {
+   "name": "Ballotpedia",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
   },
   "bassett-healthcare-network": {
    "name": "Bassett Healthcare Network",
