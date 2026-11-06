@@ -9882,6 +9882,12 @@
    "fails": 0,
    "added": "2026-10-21"
   },
+  "matchgroup": {
+   "name": "Tinder",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-06"
+  },
   "MBRDNA": {
    "name": "Mercedes-Benz",
    "quant": false,
