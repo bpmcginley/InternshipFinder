@@ -306,6 +306,10 @@
    "on": "2026-10-24",
    "why": "robots"
   },
+  "careers-cfins": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
   "careers-concord": {
    "on": "2026-10-24",
    "why": "robots"
@@ -348,6 +352,10 @@
   },
   "careers-eastpennmanufacturing": {
    "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-ebscoind": {
+   "on": "2026-11-07",
    "why": "robots"
   },
   "careers-empowerai": {
@@ -418,8 +426,16 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-gtsx": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
   "careers-harpercollins": {
    "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-heart": {
+   "on": "2026-11-07",
    "why": "robots"
   },
   "careers-hrblock": {
@@ -490,6 +506,10 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careers-novelis": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
   "careers-ntrepidcorp": {
    "on": "2026-10-24",
    "why": "robots"
@@ -510,6 +530,10 @@
    "on": "2026-10-24",
    "why": "robots"
   },
+  "careers-pgworks": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
   "careers-powerschool": {
    "on": "2026-10-01",
    "why": "robots"
@@ -520,6 +544,10 @@
   },
   "careers-qinetiqus": {
    "on": "2026-10-01",
+   "why": "robots"
+  },
+  "careers-rambus": {
+   "on": "2026-11-07",
    "why": "robots"
   },
   "careers-rcm": {
@@ -554,6 +582,10 @@
    "on": "2026-09-30",
    "why": "robots"
   },
+  "careers-sentinel": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
   "careers-sharpusa": {
    "on": "2026-10-01",
    "why": "dead"
@@ -564,6 +596,10 @@
   },
   "careers-sig": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "careers-slco": {
+   "on": "2026-11-07",
    "why": "robots"
   },
   "careers-snapon": {
@@ -646,12 +682,24 @@
    "on": "2026-10-01",
    "why": "robots"
   },
+  "careersen-mackenzieinvestments": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
+  "careersenus-itt-inc": {
+   "on": "2026-11-07",
+   "why": "robots"
+  },
   "datasciencecareers-analysisgroup": {
    "on": "2026-10-24",
    "why": "robots"
   },
   "external-careers-friedkin": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "externalhourly-highgate": {
+   "on": "2026-11-07",
    "why": "robots"
   },
   "globalcareers-atlassian": {
@@ -712,6 +760,10 @@
   },
   "university-uber": {
    "on": "2026-09-30",
+   "why": "robots"
+  },
+  "us-erac": {
+   "on": "2026-11-07",
    "why": "robots"
   },
   "uscareeropenings-alliancelaundry": {

@@ -379,6 +379,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "category-labs": {
+   "name": "Category Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
+  },
   "centerfield": {
    "name": "Centerfield",
    "quant": false,
@@ -3346,8 +3352,9 @@
   "atlassand": {
    "name": "Atlas Energy Solutions",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-07"
   },
   "atoms": {
    "name": "Atoms",
@@ -7677,8 +7684,9 @@
   "careers-benjaminmoore": {
    "name": "Benjamin Moore",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-07"
   },
   "careers-berrydunn": {
    "name": "BerryDunn",
@@ -7689,9 +7697,10 @@
   "careers-bgca": {
    "name": "Boys & Girls Clubs of America",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "nonprofit"
+   "sector": "nonprofit",
+   "last_fail": "2026-11-07"
   },
   "careers-brewers": {
    "name": "Milwaukee Brewers",
@@ -7702,17 +7711,12 @@
   "careers-canada-secure": {
    "name": "SECURE",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-07"
   },
   "careers-centricbrands": {
    "name": "Centric Brands",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-cfins": {
-   "name": "Crum & Forster Insurance",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -7749,12 +7753,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-ebscoind": {
-   "name": "EBSCO",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careers-empiricalfoods": {
    "name": "Empirical Foods",
    "quant": false,
@@ -7763,18 +7761,6 @@
   },
   "careers-gd-ots": {
    "name": "General Dynamics",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-gtsx": {
-   "name": "GTS",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careers-heart": {
-   "name": "American Heart Association",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
@@ -7819,8 +7805,9 @@
   "careers-mercuryinsurance": {
    "name": "Mercury Insurance",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-07"
   },
   "careers-mineralstech": {
    "name": "Minerals Technologies",
@@ -7839,12 +7826,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
-  },
-  "careers-novelis": {
-   "name": "Novelis",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-10-02"
   },
   "careers-nrdc": {
    "name": "NRDC",
@@ -7866,18 +7847,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-pgworks": {
-   "name": "Philadelphia Gas Works",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-11-05"
-  },
-  "careers-rambus": {
-   "name": "Rambus",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-11-05"
-  },
   "careers-rovisys": {
    "name": "RoviSys",
    "quant": false,
@@ -7889,12 +7858,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
-  },
-  "careers-sentinel": {
-   "name": "Sentinel Technologies",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-10-06"
   },
   "careers-sevenhills": {
    "name": "Seven Hills Foundation",
@@ -7908,12 +7871,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-05"
-  },
-  "careers-slco": {
-   "name": "Salt Lake County",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "careers-sscgp": {
    "name": "Southern Star Central Gas Pipeline",
@@ -7930,8 +7887,9 @@
   "careers-stifel": {
    "name": "Stifel",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-07"
   },
   "careers-stonex": {
    "name": "StoneX Group",
@@ -7976,18 +7934,6 @@
    "fails": 0,
    "added": "2026-11-05"
   },
-  "careersen-mackenzieinvestments": {
-   "name": "Mackenzie Investments",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
-  "careersenus-itt-inc": {
-   "name": "ITT",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
-  },
   "careersus-maxlinear": {
    "name": "MaxLinear",
    "quant": false,
@@ -8018,13 +7964,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "externalhourly-highgate": {
-   "name": "Highgate",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15",
-   "sector": "hospitality_sports"
-  },
   "gsk-us-earlytalent": {
    "name": "GSK",
    "quant": false,
@@ -8050,12 +7989,6 @@
    "fails": 0,
    "added": "2026-10-29",
    "sector": "education_research"
-  },
-  "us-erac": {
-   "name": "Enterprise Mobility",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "uscareers-idemia": {
    "name": "IDEMIA",
