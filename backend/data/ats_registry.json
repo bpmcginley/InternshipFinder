@@ -3045,6 +3045,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "aechelontechnology": {
+   "name": "Aechelon Technology",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
+  },
   "aegworldwide": {
    "name": "AEG",
    "quant": false,
@@ -7684,9 +7690,8 @@
   "careers-benjaminmoore": {
    "name": "Benjamin Moore",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-07"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-berrydunn": {
    "name": "BerryDunn",
@@ -7697,10 +7702,9 @@
   "careers-bgca": {
    "name": "Boys & Girls Clubs of America",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "nonprofit",
-   "last_fail": "2026-11-07"
+   "sector": "nonprofit"
   },
   "careers-brewers": {
    "name": "Milwaukee Brewers",
@@ -7711,9 +7715,8 @@
   "careers-canada-secure": {
    "name": "SECURE",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-07"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-centricbrands": {
    "name": "Centric Brands",
@@ -7805,9 +7808,8 @@
   "careers-mercuryinsurance": {
    "name": "Mercury Insurance",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-07"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-mineralstech": {
    "name": "Minerals Technologies",
@@ -7887,9 +7889,8 @@
   "careers-stifel": {
    "name": "Stifel",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-07"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-stonex": {
    "name": "StoneX Group",
@@ -12179,6 +12180,12 @@
    "fails": 0,
    "added": "2026-11-07"
   },
+  "highgate": {
+   "name": "Highgate",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
+  },
   "hyperlight": {
    "name": "HyperLight",
    "quant": false,
@@ -12551,8 +12558,9 @@
   "aah|wd5|External": {
    "name": "Atrium Health",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-07"
   },
   "aba|wd1|aba": {
    "name": "American Bankers Association",
@@ -13908,8 +13916,9 @@
   "cadence|wd1|external_careers": {
    "name": "Cadence",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-07"
   },
   "cadence|wd1|OpenEye_Careers": {
    "name": "Cadence Design Systems",
@@ -13938,8 +13947,9 @@
   "cadence|wd1|University_Talent_NCG": {
    "name": "Cadence Design Systems",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-03"
+   "fails": 1,
+   "added": "2026-10-03",
+   "last_fail": "2026-11-07"
   },
   "cae|wd3|career": {
    "name": "CAE",
