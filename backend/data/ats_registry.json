@@ -1412,6 +1412,12 @@
    "fails": 0,
    "added": "2026-10-09"
   },
+  "machinacognita": {
+   "name": "Machina Cognita Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
+  },
   "Marathon%20Fusion": {
    "name": "Marathon Fusion",
    "quant": false,
@@ -3133,9 +3139,9 @@
   "altmansoloncampus": {
    "name": "Altman Solon",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-10-29",
-   "last_fail": "2026-11-06"
+   "last_fail": "2026-11-07"
   },
   "amarok": {
    "name": "AMAROK Security",
@@ -3177,9 +3183,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-06"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -4066,6 +4071,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "deeplocal": {
+   "name": "Deeplocal",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
   },
   "defenseunicorns": {
    "name": "Defense Unicorns",
@@ -6260,9 +6271,9 @@
   "pretiuminternships2027": {
    "name": "Pretium",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-10-31",
-   "last_fail": "2026-11-06"
+   "last_fail": "2026-11-07"
   },
   "procogia": {
    "name": "ProCogia",
@@ -9399,9 +9410,9 @@
   "beta": {
    "name": "Beta Technologies",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-11-06"
+   "last_fail": "2026-11-07"
   },
   "bhvr": {
    "name": "Behaviour Interactive",
@@ -12228,6 +12239,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "helical": {
+   "name": "Helical",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
   },
   "hyperlight": {
    "name": "HyperLight",
@@ -17921,6 +17938,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "petronascanada|wd3|PETRONASCanada": {
+   "name": "PETRONAS Canada",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-07"
   },
   "pewtrusts|wd5|CenterExternal": {
    "name": "Pew Research Center",
