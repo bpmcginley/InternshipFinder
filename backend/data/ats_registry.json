@@ -3157,9 +3157,9 @@
   "altmansoloncampus": {
    "name": "Altman Solon",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-10-29",
-   "last_fail": "2026-11-07"
+   "last_fail": "2026-11-08"
   },
   "amarok": {
    "name": "AMAROK Security",
@@ -3364,9 +3364,9 @@
   "atlassand": {
    "name": "Atlas Energy Solutions",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-07"
+   "last_fail": "2026-11-08"
   },
   "atoms": {
    "name": "Atoms",
@@ -6290,9 +6290,9 @@
   "pretiuminternships2027": {
    "name": "Pretium",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-10-31",
-   "last_fail": "2026-11-07"
+   "last_fail": "2026-11-08"
   },
   "procogia": {
    "name": "ProCogia",
@@ -7430,9 +7430,9 @@
   "viseai": {
    "name": "Vise",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-07"
+   "last_fail": "2026-11-08"
   },
   "vixxo": {
    "name": "Vixxo",
@@ -9347,13 +9347,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "beta": {
-   "name": "Beta Technologies",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-07"
   },
   "bhvr": {
    "name": "Behaviour Interactive",
@@ -12565,9 +12558,9 @@
   "aah|wd5|External": {
    "name": "Atrium Health",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-07"
+   "last_fail": "2026-11-08"
   },
   "aba|wd1|aba": {
    "name": "American Bankers Association",
@@ -13971,9 +13964,8 @@
   "calibercollision|wd1|caliber": {
    "name": "Caliber",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-07"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "calibercollision|wd1|protech": {
    "name": "Protech Automotive Solutions",
@@ -14672,10 +14664,9 @@
   "cvshealth|wd1|CVS_Health_Careers": {
    "name": "CVS Health",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "health",
-   "last_fail": "2026-11-07"
+   "sector": "health"
   },
   "cvshealth|wd1|Private_Postings_Intern_Conversion_ONLY": {
    "name": "CVS Health",
@@ -17647,9 +17638,9 @@
   "nxp|wd3|careers": {
    "name": "NXP Semiconductors",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-07"
+   "last_fail": "2026-11-08"
   },
   "nyp|wd1|nypcareers": {
    "name": "NewYork-Presbyterian",
