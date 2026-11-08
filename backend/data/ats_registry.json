@@ -13687,14 +13687,16 @@
   "blackstone|wd1|Blackstone_Campus_Careers": {
    "name": "Blackstone",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-08"
   },
   "blackstone|wd1|bx_external_site": {
    "name": "Blackstone",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-08"
   },
   "bloomberg|wd1|Bloombergindustrygroup_External_Career_Site": {
    "name": "Bloomberg Industry Group",
@@ -14109,9 +14111,10 @@
   "ccf|wd1|ClevelandClinicCareers": {
    "name": "Cleveland Clinic",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "health"
+   "sector": "health",
+   "last_fail": "2026-11-08"
   },
   "cc|wd3|ChanelCareers": {
    "name": "Chanel",
@@ -16908,9 +16911,8 @@
   "mars|wd3|external": {
    "name": "Mars",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-08"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "marvell|wd1|MarvellCareers": {
    "name": "Marvell",
