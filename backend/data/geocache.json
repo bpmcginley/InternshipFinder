@@ -1090,6 +1090,10 @@
 40.1002,
 -75.1539
 ],
+"goshen|NY":[
+41.4021,
+-74.3242
+],
 "grand island|NY":[
 43.0183,
 -78.9636
@@ -1110,6 +1114,10 @@
 "greensburg|PA":[
 40.3025,
 -79.5443
+],
+"gregg township|PA":[
+40.8573,
+-77.5814
 ],
 "grove city|PA":[
 41.1579,
@@ -1783,6 +1791,7 @@
 "new york/los angeles united states|NY":null,
 "newark nj|NJ":null,
 "newark riverfront nj|NJ":null,
+"newark-wayne community hospital|NY":null,
 "newark|NY":[
 43.0467,
 -77.0953
@@ -2156,6 +2165,10 @@
 -76.5094
 ],
 "other remote ny|NY":null,
+"otisville|NY":[
+41.4734,
+-74.5385
+],
 "oxford|NJ":[
 40.8032,
 -74.9896
@@ -2367,6 +2380,10 @@
 "pennington|NJ":[
 40.3281,
 -74.791
+],
+"pennsville|NJ":[
+39.6534,
+-75.5166
 ],
 "pennsylvania (remote|PA":null,
 "pennsylvania (usa|PA":null,

@@ -4548,9 +4548,8 @@
   "focusfinancialpartners": {
    "name": "Focus Financial Partners",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-09"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "foleyhoag": {
    "name": "Foley Hoag",
@@ -6457,6 +6456,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ritual": {
+   "name": "Ritual",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-09"
+  },
   "riverlane": {
    "name": "Riverlane",
    "quant": false,
@@ -6643,6 +6648,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sharpelectronics": {
+   "name": "Sharp Electronics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-09"
   },
   "shein": {
    "name": "SHEIN",
@@ -8141,6 +8152,12 @@
    "added": "2026-09-18",
    "sector": "government_policy"
   },
+  "careers.haskell.com": {
+   "name": "Haskell",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-09"
+  },
   "careers.herzog.com": {
    "name": "Herzog Railroad Services",
    "quant": false,
@@ -8326,6 +8343,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "haskell.jibeapply.com": {
+   "name": "Haskell",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-09"
   },
   "ice.jibeapply.com": {
    "name": "Intercontinental Exchange",
@@ -13222,6 +13245,12 @@
    "added": "2026-09-15",
    "sector": "media"
   },
+  "atriumhospitality|wd5|atriumhospitality": {
+   "name": "Atrium Hospitality",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-09"
+  },
   "att|wd1|ATTCollege": {
    "name": "AT&T",
    "quant": false,
@@ -13673,16 +13702,14 @@
   "blackstone|wd1|Blackstone_Campus_Careers": {
    "name": "Blackstone",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-09"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "blackstone|wd1|bx_external_site": {
    "name": "Blackstone",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-09"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "bloomberg|wd1|Bloombergindustrygroup_External_Career_Site": {
    "name": "Bloomberg Industry Group",
@@ -18122,8 +18149,9 @@
   "pwc|wd3|Global_Experienced_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-09"
   },
   "pwc|wd3|US_Entry_Level_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
