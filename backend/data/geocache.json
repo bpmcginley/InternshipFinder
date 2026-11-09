@@ -463,6 +463,7 @@
 41.1464,
 -74.7524
 ],
+"bratislava|PA":null,
 "brewster|NY":[
 41.3944,
 -73.6171
@@ -491,6 +492,10 @@
 "bronx & far rockaway|NY":null,
 "brookfield place fka 3 world financial center|NY":null,
 "brookfield place|NY":null,
+"brookhaven|PA":[
+39.8691,
+-75.3821
+],
 "brooklawn|NJ":[
 39.8783,
 -75.1205
@@ -990,6 +995,10 @@
 -73.8174
 ],
 "fnb financial center|PA":null,
+"folsom|PA":[
+39.8898,
+-75.3252
+],
 "forest city|PA":[
 41.6515,
 -75.4666
@@ -1376,6 +1385,7 @@
 40.834,
 -75.7136
 ],
+"leverkusen|PA":null,
 "levittown|NY":[
 40.726,
 -73.5145
@@ -1785,6 +1795,10 @@
 "newton|NJ":[
 41.0583,
 -74.7531
+],
+"newtown square|PA":[
+39.9868,
+-75.4008
 ],
 "newtown|PA":[
 40.2294,
@@ -2702,6 +2716,10 @@
 "spring house|PA":[
 40.1854,
 -75.2277
+],
+"springfield|PA":[
+39.9307,
+-75.3202
 ],
 "springville|NY":[
 42.5087,
