@@ -96,6 +96,10 @@
   }
  },
  "greenhouse": {
+  "altmansoloncampus": {
+   "on": "2026-11-09",
+   "why": "dead"
+  },
   "appliedintuition": {
    "on": "2026-10-01",
    "why": "dead"
@@ -194,6 +198,10 @@
   },
   "postman": {
    "on": "2026-10-02",
+   "why": "dead"
+  },
+  "pretiuminternships2027": {
+   "on": "2026-11-09",
    "why": "dead"
   },
   "rdccareers": {
