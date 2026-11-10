@@ -44,7 +44,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
 | 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
-| 1 | WP-0.6 Shared CI setup | Unassigned | - | - | Queued | Preserve all effective workflow behavior; coordinate CI file ownership. |
+| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | Pending PR | In review | Composite setup in all 12 existing workflows; preserve scheduling, access, and commands. |
 | 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
 | 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
@@ -206,3 +206,12 @@ None. No worker refactor PR has merged, and no production action has been taken.
 ## Next update
 
 Finish WP-0.1 validation and independent review, merge under the rules above, then verify Pages before the next merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.
+
+## WP-0.6 validation and coordination
+
+- Product-session coordination read from PR #170 (`notes/product/HANDOFF.md` section 3 and the new refactor section 4 bullet). Refactor has structural right of way; inspect product draft PR claims before each wave. Before formatting, publish "Formatting PRs next" at the top of this tracker and allow a few hours for product PRs to clear. Do not alter product-owned work.
+- WP-0.1 merged as `9f739770`; [Pages run 42863632275](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) is green, including the publication boundary tests.
+- WP-0.6 adds Python 3.12/optional-backend-install and Node 22 composite actions. Sparse checkouts using a local action include `.github/actions`. Each of the 12 existing workflows uses shared setup. New wave-1 report workflows have separate owners and are not edited by this package.
+- Parsed before/after YAML: workflow/job metadata (including triggers, conditions, permissions, concurrency, schedules, environment, timeouts) unchanged. Expanded shared actions and compared effective steps after ignoring comment-only lines; commands, environments, conditions, and order match. The deliberate setup difference is release.yml now explicitly selects Python 3.12 and Node 22, matching the existing test workflow rather than inheriting runner defaults. No extension release was run.
+- Relevant workflow-contract tests: 39 passed. The first test invocation from the repository root failed collection because the package is not installed yet; rerunning from the documented backend directory passed. This was invocation context, not a main failure or code change.
+- No runtime source, public output, or dependency versions used by product code changed. Golden validation will be run if WP-0.2 lands before this PR.

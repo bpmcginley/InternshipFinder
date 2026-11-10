@@ -62,10 +62,8 @@ jobs:
           token: ${{ secrets.EVERY_MAJOR_LIST_TOKEN }}
           path: list
 
-      - uses: actions/setup-python@v7
+      - uses: ./.github/actions/python
         if: steps.token.outputs.ready == 'true'
-        with:
-          python-version: "3.12"
 
       - name: Build the list
         if: steps.token.outputs.ready == 'true'
