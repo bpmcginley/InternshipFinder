@@ -105,9 +105,12 @@ def test_attribute_entities_and_unquoted_whitespace_stay_valid(tmp_path):
         '<a href="app.js">app.js</a><img src="app.js"><link rel="preload" href="app.js">',
         '<!-- <script src="missing.js"></script> -->&lt;script src="missing.js"&gt;',
         '<script>const sample = \'<script src="missing.js">\';</script>',
+        '<script>const sample = "<script/>";</script>',
         '<textarea><script src="missing.js"></script></textarea>',
+        '<textarea><script src="missing.js"/></textarea>',
         '<title><script src="missing.js"></script></title>',
         '<template>&lt;script src="missing.js"&gt;</template>',
+        '<plaintext><script src="missing.js"/>',
     ],
 )
 def test_non_resources_and_inert_text_are_exactly_unchanged(tmp_path, source):
@@ -127,6 +130,39 @@ def test_real_script_after_textarea_and_inline_script_is_still_versioned(tmp_pat
     path = _put(tmp_path, "index.html", source)
     version_assets(tmp_path)
     assert path.read_text() == source.replace('src="app.js"', f'src="app.js?v={_hash(b"app")}"')
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        "script",
+        "style",
+        "textarea",
+        "title",
+        "xmp",
+        "iframe",
+        "noembed",
+        "noframes",
+        "plaintext",
+        "noscript",
+    ],
+)
+def test_self_closing_text_container_rejects_before_any_write(tmp_path, tag):
+    _put(tmp_path, "app.js", b"app")
+    first = _put(tmp_path, "a.html", '<script src="app.js"></script>')
+    inline = f'<{tag}/>const sample = \'<script src="app.js">\';</{tag}>'
+    last = _put(tmp_path, "z.html", inline)
+    before = first.read_bytes(), last.read_bytes()
+    with pytest.raises(AssetVersionError, match="Self-closing text containers"):
+        version_assets(tmp_path)
+    assert (first.read_bytes(), last.read_bytes()) == before
+
+
+def test_self_closing_void_stylesheet_tag_is_still_versioned(tmp_path):
+    _put(tmp_path, "site.css", b"body{}")
+    path = _put(tmp_path, "index.html", '<link rel="stylesheet" href="site.css"/>')
+    version_assets(tmp_path)
+    assert path.read_text() == f'<link rel="stylesheet" href="site.css?v={_hash(b"body{}")}"/>'
 
 
 @pytest.mark.parametrize(

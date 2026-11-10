@@ -115,6 +115,7 @@ def _quoted_url(url: str, quote: str) -> str:
 class _AssetTags(HTMLParser):
     # HTMLParser handles script/style raw text itself; these elements also contain text, not tags.
     _TEXT_ONLY = frozenset({"textarea", "title", "xmp", "iframe", "noembed", "noframes"})
+    _NO_SELF_CLOSE = _TEXT_ONLY | {"script", "style", "plaintext", "noscript"}
 
     def __init__(
         self, root: Path, path: Path, source: str, hashes: dict[Path, str], names: set[str]
@@ -125,6 +126,15 @@ class _AssetTags(HTMLParser):
         self.lines = [0] + [match.end() for match in re.finditer("\n", source)]
         self.edits: list[tuple[int, int, str]] = []
         self.references, self.plaintext = 0, False
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.plaintext:
+            return
+        # HTMLParser treats <script/> as closed; HTML browsers keep its raw-text body open.
+        # Refuse that unsupported spelling rather than rewriting what may be inline source text.
+        if tag in self._NO_SELF_CLOSE:
+            raise AssetVersionError("Self-closing text containers are unsupported")
+        super().handle_startendtag(tag, attrs)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if self.plaintext:
