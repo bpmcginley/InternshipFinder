@@ -63,7 +63,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
 | 3 | WP-2.3 Worker contract | Unassigned | - | - | Queued | Inventory code routes and clients, not prose alone; include missing metrics route. |
 | 3 | WP-4.1 Migrations | Unassigned | - | - | Queued / operator gate | Deduplicated baseline and local tests; no remote action or deploy-script change. |
-| 3 | WP-4.4 Runner documentation | Unassigned | - | - | Queued | Preserve intentional Node/Workers scenario overlap. |
+| 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | Pending PR | In review | Document Node/SQLite versus local workerd/D1; intentional shared scenarios preserved; no test moves. |
 | 4 | WP-1.4 Logging foundation/sources | Unassigned | - | - | Queued | Shared helper plus source adapters; preserve default output text and stream. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
@@ -342,3 +342,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - All four retained PRs (#165, #175, #177, #178) remain merged with green Pages. The counter worker changes await approved disclosure and operator deployment; design-note implementation choices remain gated.
 
 - Recovery Pages run 42890454209 passed all jobs. JavaScript formatting #189 merged as `da5bc492` after independent final review and all nine checks passed; its Pages run must pass before this retry merges. Integrated its exact source and all tracker evidence by normal merge.
+
+## WP-4.4 worker test runners
+
+- Added worker/TESTING.md and linked it from the local setup section of worker/README.md. Corrected the testing prerequisite to Node 22, matching CI and the built-in node:sqlite dependency; pinned dependency setup uses npm ci. All other README sections remain unchanged.
+- Verified the Node directory entry point imports all 27 existing test files. The Node suite runs real in-memory SQLite through a D1-shaped adapter as well as pure logic and provider doubles; local workerd/D1 coverage belongs to the Vitest suite. The shared settlement-race scenario intentionally runs under both adapters, so no tests were moved or removed.
+- Read the actual runner configuration, fixtures and runtime cases, including the pending WP-4.1 migration configuration. The guide describes both suites without hard-coding counts that will change when that package lands. No test, runner, package, workflow, schema, or runtime code changed.
+- Validation: full Node directory suite passed under Node 22; all Node test files are registered, documentation links resolve, and git diff --check passes. Golden inputs/outputs/manifests are untouched; the documentation-only scope does not require another golden build. Independent review and all CI checks remain required before lead merge.
