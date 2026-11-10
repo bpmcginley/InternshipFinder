@@ -1,0 +1,98 @@
+[
+  {
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "light",
+    "documentWidth": 1280,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "name": "compare",
+    "width": 1280,
+    "colorScheme": "light",
+    "documentWidth": 1280,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "blockedExistingBeaconRequests": 2,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "dark",
+    "documentWidth": 1280,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "name": "compare",
+    "width": 1280,
+    "colorScheme": "dark",
+    "documentWidth": 1280,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "blockedExistingBeaconRequests": 2,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "field",
+    "width": 375,
+    "colorScheme": "light",
+    "documentWidth": 375,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "name": "compare",
+    "width": 375,
+    "colorScheme": "light",
+    "documentWidth": 375,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "blockedExistingBeaconRequests": 2,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "field",
+    "width": 375,
+    "colorScheme": "dark",
+    "documentWidth": 375,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "name": "compare",
+    "width": 375,
+    "colorScheme": "dark",
+    "documentWidth": 375,
+    "dimensions": [],
+    "keyboardReachable": false,
+    "builderAndCopyVerified": false
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "blockedExistingBeaconRequests": 2,
+    "externalRequestsAllowed": 0
+  }
+]

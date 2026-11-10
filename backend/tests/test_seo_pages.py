@@ -1114,7 +1114,10 @@ def test_nothing_built_names_the_founder(tmp_path):
         open(os.path.join(site, n), encoding="utf-8").read()
         for n in ("llms.txt", "llms-full.txt", "robots.txt", "404.html")
     ]
-    assert not [t[:80] for t in texts if re.search(r"bruce|mcginley", t, re.I)]
+    # The requested public list link names its repository owner only in this exact href.
+    # Keep rejecting founder names in visible text, metadata and every other attribute.
+    public_list = 'href="https://github.com/bpmcginley/internships-every-major"'
+    assert not [t[:80] for t in texts if re.search(r"bruce|mcginley", t.replace(public_list, ""), re.I)]
 
 
 def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
