@@ -116,11 +116,6 @@ jobs:
           cp _site/sitemap.xml sitemaps/new.xml
           if [ -f live-sitemap.xml ]; then cp live-sitemap.xml sitemaps/old.xml; fi
 
-      - name: Check public site contents before publishing
-        run: |
-          python -m unittest discover -s scripts -p 'test_site_contents.py'
-          python scripts/check_site_contents.py _site --list
-
       - name: Record which paid listings this build kept or dropped
         # Added 2026-10-14 (backend/internscout/placements.py record_runs). Adds today's kept and dropped
         # placements to the Worker's placement_runs table over Cloudflare's D1 HTTP API, so refunds for
@@ -135,6 +130,11 @@ jobs:
           # The same token growth/metrics.py uses; it needs D1: Edit.
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: (cd backend && python -m internscout.placements record ../placements-report.json)
+
+      - name: Check public site contents before publishing
+        run: |
+          python -m unittest discover -s scripts -p 'test_site_contents.py'
+          python scripts/check_site_contents.py _site --list
 
       - uses: actions/configure-pages@v6
 
