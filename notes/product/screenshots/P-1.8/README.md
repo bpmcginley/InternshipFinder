@@ -32,7 +32,7 @@ The capture script covers four before/after combinations and bonus, unlimited, p
 
 Run with isolated `CAPTURE_TOOLS` containing playwright-core and React 18.3.1: `node notes/product/screenshots/P-1.8/capture.cjs before` or `after`. The browser never uses the user's profile.
 
-Baseline: 294 site tests passed. Final full suite: 312 passed, including eighteen focused arrival tests and actual callback race/timeout tests. ESLint, pinned Prettier for the new test and the startup report pass. Full-suite and final CI/review outcomes are recorded in the PR. Golden writes remain paused until the coordinated #205 window explicitly releases; later refresh uses this stacked branch, followed by fresh integration validation when ancestors are accepted.
+Baseline: 294 site tests passed. Final full suite: 312 passed, including eighteen focused arrival tests and actual callback race/timeout tests. ESLint, pinned Prettier for the new test and the startup report pass. Full-suite and final CI/review outcomes are recorded in the PR. After the explicit #205 fixture-window release, both golden outputs were refreshed with this stacked branch harness. Both golden tests pass (2/2); all 695 archive hashes match the manifest, and only index.html and js/app.js differ from frozen #210. Fresh integration validation against stamped main still follows ancestor acceptance.
 
 ## Screenshots
 
