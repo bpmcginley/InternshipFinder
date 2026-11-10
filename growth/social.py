@@ -46,6 +46,10 @@ sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import seo_pages as sp  # noqa: E402
 import digest  # noqa: E402
+if __package__:
+    from .public_config import WORKER_URL
+else:
+    from public_config import WORKER_URL
 
 LIMIT = 300  # Bluesky's limit, in characters; Mastodon's is 500 and Discord's 2,000
 MIN_NEW = 5  # a field needs this many new nearby roles to be worth a post
@@ -242,7 +246,7 @@ def draft(site_dir: str, channel: str = "") -> tuple[str, str] | None:
 # is pushed (Instagram fetches a post's image from a public URL; it takes no upload).
 CARD_BRANCH = "social-cards"
 CARD_BASE = f"https://raw.githubusercontent.com/bpmcginley/InternshipFinder/{CARD_BRANCH}/"
-VIDEO_BASE = "https://internscout-api.bpmcginley.workers.dev/social-video/"
+VIDEO_BASE = WORKER_URL + "/social-video/"
 IG_CAPTION_MAX = 2200  # Instagram's caption limit, in characters
 LINKEDIN_MAX = 3000  # a LinkedIn post's limit
 # Thursdays post a Reel instead of the picture card (growth/reels.py, added 2026-10-01); Tuesdays stay a

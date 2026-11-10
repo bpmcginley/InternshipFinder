@@ -64,12 +64,13 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-2.3 Worker contract | wp23_contract | `refactor/wp-2.3-api-contract` | [#207](https://github.com/bpmcginley/InternshipFinder/pull/207) | Merged | Independent review, green CI, Pages 42911710045 and backend verified. The runtime router is unchanged. |
 | 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | Independent review, green CI, Pages 42900208315 plus data-follow run 42900434412/backend verified. Operator adoption remains gated. |
 | 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review, green CI, Pages 42903653178 and backend verified. |
-| 4 | WP-1.4 Logging foundation/sources | Unassigned | - | - | Queued | Shared helper plus source adapters; preserve default output text and stream. |
+| 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary in review | Default text and streams preserved. Remaining sources follow the canary review. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
-| 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | In review | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Q4 gates DC label normalization. |
-| 4 | WP-2.4 Config | Unassigned | - | - | Queued | Inventory worker URL consumers before generating area modules. |
+| 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
+| 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
+| 4 | WP-2.4 Config: site and Worker | Unassigned | - | - | Queued | Nine production consumers were verified. This PR covers the three extension and growth files. Dashboard, counter, buy, employer page, orders, and placement CLI remain. Coordinate the site files with Product and preserve the Worker environment overrides. |
 | 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Merged as `9ea5bc0a` after review and CI. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | In review | File moves for the admin list and pilot code handlers. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
@@ -426,6 +427,14 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Final normal main integration includes product generated-phone PR #194. Its authoritative public assets and golden fixture pair are preserved unchanged; this package did not regenerate fixtures. Contract source, generator, parser dependency, prerequisite docs and worker install-before-Node order are unchanged from the independently approved corrected head.
 
 - Independent second review approved corrected head 724db507f52bac3f3ea28ed042975fcee6ef7a3d. Final main integration preserved that authored source byte-for-byte outside this tracker; generation freshness and all six focused contract tests passed again. No package-owned public or golden-file diff exists against current main.
+
+## WP-1.4 sources logging canary
+
+- Before this PR, main `53008e6c` had 181 direct `print()` calls (55 in backend package code and 126 in growth code, excluding tests) and 45 broad exception handlers (32 backend and 13 growth). This count includes the two new asset-stamping CLI messages.
+- The helper honors the current stdout or an explicit stream, separator, terminator and flush setting in default mode, regardless of the process's logging suppression or record factory. Set `INTERNSCOUT_LOG_FORMAT=json` to opt in to one JSON object per diagnostic with the level and message. Google Jobs uses it for all ten existing diagnostics. Its broad account and search handlers add exception class names as structured fields, with no exception bodies or tracebacks.
+- Leave machine-readable stdout payloads on their own paths when migrating growth logging: the directory monitor writes JSON, the growth report writes Markdown, the digest schedule writes a GitHub Actions output, and the metrics CLI emits JSON consumed by tests.
+- Source follow-up question for Bruce: may the existing raw provider exception messages in NYC Jobs, Lever, GitHub lists, Greenhouse and USAJOBS be replaced in default console output with safe status or class names? Raw exception text can include request details. These call sites await that decision because safe replacement would change their existing text. Other source diagnostics can be migrated independently.
+- Focused validation passed 16 logging and Google Jobs tests plus all nine packaging tests with an editable install. Ruff and targeted Pyright had zero findings. Comparing the Google Jobs syntax trees after removing logging metadata confirms all ten message arguments and the original control flow match main.
 
 ## WP-1.5 asset-version build integration
 
