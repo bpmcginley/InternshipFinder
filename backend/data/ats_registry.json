@@ -3242,9 +3242,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -16667,14 +16666,16 @@
   "kiongroup|wd3|KION_SCS": {
    "name": "KION Group",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-10"
   },
   "kiongroup|wd3|kiongroup": {
    "name": "KION Group",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "kla|wd1|AnnArbor": {
    "name": "KLA",
@@ -16926,10 +16927,9 @@
   "lsu|wd1|lsuwaiver": {
    "name": "Louisiana State University (LSU)",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-10"
+   "sector": "education_research"
   },
   "lthc|wd1|ExcellusBCBSCareers": {
    "name": "Excellus BCBS",
@@ -17849,8 +17849,9 @@
   "onehealthineers|wd3|SHSJB": {
    "name": "Varian",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "onto|wd1|onto_careers": {
    "name": "Onto Innovation",
@@ -18741,8 +18742,9 @@
   "scj|wd5|External_Career_Site": {
    "name": "SC Johnson",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "scottishwater|wd3|External_Careers": {
    "name": "Scottish Water",
@@ -19131,9 +19133,8 @@
   "starrcompanies|wd1|careers": {
    "name": "Starr Insurance",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "starz|wd5|Starz": {
    "name": "Starz",
