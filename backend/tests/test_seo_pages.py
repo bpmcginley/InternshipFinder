@@ -1106,6 +1106,53 @@ def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
 
 
 def test_nothing_built_names_the_founder(tmp_path):
+    from html.parser import HTMLParser
+
+    public_list = "https://github.com/bpmcginley/internships-every-major"
+
+    class FounderGuard(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.parts = []
+
+        def handle_starttag(self, tag, attrs):
+            self.parts.append(tag)
+            for name, value in attrs:
+                self.parts.append(name)
+                # Only an actual anchor href to the exact requested public list is exempt.
+                if value and not (tag == "a" and name == "href" and value == public_list):
+                    self.parts.append(value)
+
+        def handle_data(self, data):
+            self.parts.append(data)
+
+        handle_endtag = handle_data
+        handle_comment = handle_data
+        handle_decl = handle_data
+        handle_pi = handle_data
+        unknown_decl = handle_data
+
+    def names_founder(text):
+        parser = FounderGuard()
+        parser.feed(text)
+        parser.close()
+        return bool(re.search(r"bruce|mcginley", "\n".join(parser.parts), re.I))
+
+    assert not names_founder(f'<a href="{public_list}">GitHub list</a>')
+    for prohibited in [
+        f'<p>href="{public_list}"</p>',
+        f'<a data-href="{public_list}">GitHub list</a>',
+        f'<a href="{public_list}" title="Bruce">GitHub list</a>',
+        f'<a href="{public_list}">McGinley</a>',
+        f'<!-- href="{public_list}" -->',
+        f'<link href="{public_list}">',
+        f'<a href="{public_list}/other">GitHub list</a>',
+        '<meta content="BRUCE">',
+        '<script>McGinley</script>',
+        '<p>Mc&#71;inley</p>',
+    ]:
+        assert names_founder(prohibited)
+
     # The brand stays one student's, unnamed, on the site and in what answer engines read.
     site = _pay_site(tmp_path)
     pages = seo_pages.build(site)
@@ -1114,7 +1161,7 @@ def test_nothing_built_names_the_founder(tmp_path):
         open(os.path.join(site, n), encoding="utf-8").read()
         for n in ("llms.txt", "llms-full.txt", "robots.txt", "404.html")
     ]
-    assert not [t[:80] for t in texts if re.search(r"bruce|mcginley", t, re.I)]
+    assert not [t[:80] for t in texts if names_founder(t)]
 
 
 def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
