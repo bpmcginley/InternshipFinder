@@ -2328,7 +2328,7 @@
         `Sign in with your school (.edu) email (Google works for most schools) and you'll both get ${inviteWords}. Searching needs no account.`),
       !showAllowance && auth.token && inviteStatus !== "idle" && h("div", { className: "notice" },
         h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => openInvite(true), onCopy: copyInvite })),
-      !showAllowance && cfgStatus === "error" && h("div", { className: "notice", role: "status" }, "Couldn't load account options. ",
+      !showAllowance && !arrivalDismissed && new URLSearchParams(arrival.search).get("upgrade") && cfgStatus === "error" && h("div", { className: "notice", role: "status" }, "Couldn't load account options. ",
         h("button", { type: "button", className: "btn", onClick: loadConfig }, "Retry account options")),
 
       h("section", { id: "results", "aria-labelledby": "listings" },
