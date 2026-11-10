@@ -24,10 +24,11 @@ outreach draft.
 
 Each draft has two links to the dashboard filtered to that major's fields. Email and community links
 use `utm_source=campus_partner`, their respective `utm_medium`, a month-based campaign, and the major
-in `utm_content`. They do not identify an individual club, officer, or student. **[Cloudflare Web
-Analytics does not record query strings or UTM parameters](https://developers.cloudflare.com/web-analytics/faq/#does-cloudflare-web-analytics-support-utm-parameters)**, so the current growth report cannot
-separate these links by medium. The tags are ready for a future attribution setup; until then, record
-which groups shared the link and use overall site visits and feedback as directional signals. The
+in `utm_content`. They do not identify an individual club, officer, or student. Cloudflare Web
+Analytics does not record query strings. Since October 27 the existing first-party counter separately
+records bounded, anonymous campaign tags for selected intent events; see [attribution](ATTRIBUTION.md).
+These are sampled or opt-out-affected counts, and form submits and store clicks are not confirmed
+subscriptions or installs. Record which groups shared the link and use feedback too. The
 example job URLs in `drafts.json` link directly
 to employer postings for checking. The browse link remains useful if an example closes.
 
@@ -41,9 +42,9 @@ to employer postings for checking. The browse link remains useful if an example 
    Do not imply an affiliation with UMass, a department, club, or employer.
 3. Send the partner email personally. Use the community version only where its members or moderators
    welcome it. Do not automate messages to class lists, scraped addresses, or groups.
-4. Compare overall visits in the next growth report and record which groups shared the link, when,
-   and any feedback on listing relevance. Do not infer channel conversions from the UTM tags: the
-   current analytics cannot read them, and neither visits nor replies prove applications or sales.
+4. Record which groups shared the link, when, and any feedback on listing relevance. Review anonymous
+   campaign intent totals as described in ATTRIBUTION.md. Do not label them confirmed conversions;
+   neither visits nor replies prove applications or sales.
 
 This channel sits alongside existing SEO pages, RSS feeds, brand posts, and the opt-in digest. It is
 separate from the brand-post workflow, which publishes only to InternScout's own accounts.
