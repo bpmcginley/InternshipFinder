@@ -7,12 +7,24 @@ const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "ut
 const APP = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
 const memory = () => {
   const map = new Map();
-  return { map, getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  return {
+    map,
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => map.set(k, String(v)),
+    removeItem: (k) => map.delete(k),
+  };
 };
 function load(local = memory()) {
   const ctx = {
-    CONFIG: {}, localStorage: local, sessionStorage: memory(),
-    addEventListener() {}, postMessage() {}, setTimeout, clearTimeout, AbortController, URLSearchParams,
+    CONFIG: {},
+    localStorage: local,
+    sessionStorage: memory(),
+    addEventListener() {},
+    postMessage() {},
+    setTimeout,
+    clearTimeout,
+    AbortController,
+    URLSearchParams,
     location: { origin: "https://internscout.org", pathname: "/", search: "", hash: "" },
     document: { documentElement: { dataset: {} } },
   };
@@ -39,19 +51,48 @@ test("a cached pre-invitation core leaves the optional prompt disabled without b
 test("contextual email invitation waits for a deliberate useful action and never consumes a blocked opportunity", () => {
   const { IS, local } = load();
   const prompt = IS.createDigestNudge();
-  for (const action of ["render", "applied", "sync", "profile-import", "queued", undefined]) assert.equal(prompt.claim(action, eligible), false);
-  assert.equal(prompt.claim("interested", { enabled: true }), false, "a background status update is not a manual action");
-  assert.equal(prompt.claim("profile", { ...eligible, blocked: true }), false, "another prompt keeps priority");
-  assert.equal(prompt.claim("profile", { manual: true }), false, "disabled email signup stays hidden");
+  for (const action of ["render", "applied", "sync", "profile-import", "queued", undefined])
+    assert.equal(prompt.claim(action, eligible), false);
+  assert.equal(
+    prompt.claim("interested", { enabled: true }),
+    false,
+    "a background status update is not a manual action",
+  );
+  assert.equal(
+    prompt.claim("profile", { ...eligible, blocked: true }),
+    false,
+    "another prompt keeps priority",
+  );
+  assert.equal(
+    prompt.claim("profile", { manual: true }),
+    false,
+    "disabled email signup stays hidden",
+  );
   assert.equal(local.map.size, 0);
   assert.equal(prompt.claim("interested", eligible), true);
-  assert.equal(local.getItem(IS.DIGEST_NUDGE_KEY), null, "not used up until it is actually on screen");
-  assert.equal(IS.createDigestNudge().claim("interested", eligible), true, "a reload before it showed can still offer it");
+  assert.equal(
+    local.getItem(IS.DIGEST_NUDGE_KEY),
+    null,
+    "not used up until it is actually on screen",
+  );
+  assert.equal(
+    IS.createDigestNudge().claim("interested", eligible),
+    true,
+    "a reload before it showed can still offer it",
+  );
   prompt.shown();
   assert.equal(local.getItem(IS.DIGEST_NUDGE_KEY), "shown");
   assert.equal(prompt.claim("profile", eligible), false);
-  assert.equal(IS.createDigestNudge().claim("interested", eligible), false, "a reload cannot repeat the invitation");
-  assert.deepEqual([...local.map.keys()], [IS.DIGEST_NUDGE_KEY], "no listing, profile or email is stored");
+  assert.equal(
+    IS.createDigestNudge().claim("interested", eligible),
+    false,
+    "a reload cannot repeat the invitation",
+  );
+  assert.deepEqual(
+    [...local.map.keys()],
+    [IS.DIGEST_NUDGE_KEY],
+    "no listing, profile or email is stored",
+  );
 });
 
 test("dismissal and opening persist without treating either as a subscription", () => {
@@ -68,9 +109,28 @@ test("dismissal and opening persist without treating either as a subscription", 
 
 test("blocked, full or non-persistent storage suppresses the invitation without breaking student actions", () => {
   for (const storage of [
-    { getItem() { throw Error("SecurityError"); }, setItem() { throw Error("SecurityError"); } },
-    { getItem() { return null; }, setItem() { throw Error("QuotaExceededError"); } },
-    { getItem() { return null; }, setItem() {} },
+    {
+      getItem() {
+        throw Error("SecurityError");
+      },
+      setItem() {
+        throw Error("SecurityError");
+      },
+    },
+    {
+      getItem() {
+        return null;
+      },
+      setItem() {
+        throw Error("QuotaExceededError");
+      },
+    },
+    {
+      getItem() {
+        return null;
+      },
+      setItem() {},
+    },
   ]) {
     const { IS } = load();
     const prompt = IS.createDigestNudge(storage);
@@ -81,9 +141,15 @@ test("blocked, full or non-persistent storage suppresses the invitation without 
 
 test("a browser that denies access to localStorage itself can still create the controller", () => {
   const { IS, ctx } = load();
-  Object.defineProperty(ctx, "localStorage", { get() { throw Error("SecurityError"); } });
+  Object.defineProperty(ctx, "localStorage", {
+    get() {
+      throw Error("SecurityError");
+    },
+  });
   let prompt;
-  assert.doesNotThrow(() => { prompt = IS.createDigestNudge(); });
+  assert.doesNotThrow(() => {
+    prompt = IS.createDigestNudge();
+  });
   assert.equal(prompt.claim("interested", eligible), false);
   assert.doesNotThrow(() => prompt.finish("dismissed"));
 });
@@ -101,11 +167,21 @@ test("the manual status adapter preserves tracking and only offers on a new Inte
   const start = APP.indexOf("    const offerDigestNudgeRef =");
   const end = APP.indexOf("    const upd =", start);
   assert.ok(start > -1 && end > start);
-  const offers = [], updates = [], current = { a: "interested" };
+  const offers = [],
+    updates = [],
+    current = { a: "interested" };
   const ctx = {
-    appStatesRef: { current }, offerDigestNudge: v => offers.push(v),
-    setAppState: (id, v) => { updates.push([id, v]); current[id] = v; },
-    useRef: v => ({ current: v }), useCallback: (fn, deps) => { ctx.deps = deps; return fn; },
+    appStatesRef: { current },
+    offerDigestNudge: (v) => offers.push(v),
+    setAppState: (id, v) => {
+      updates.push([id, v]);
+      current[id] = v;
+    },
+    useRef: (v) => ({ current: v }),
+    useCallback: (fn, deps) => {
+      ctx.deps = deps;
+      return fn;
+    },
   };
   vm.createContext(ctx);
   vm.runInContext(APP.slice(start, end) + "globalThis.change = setManualAppState;", ctx);
@@ -114,9 +190,18 @@ test("the manual status adapter preserves tracking and only offers on a new Inte
   ctx.change("c", "none");
   ctx.change("d", "interested");
   assert.deepEqual(offers, ["interested"]);
-  assert.deepEqual(updates, [["a", "interested"], ["b", "applied"], ["c", "none"], ["d", "interested"]]);
+  assert.deepEqual(updates, [
+    ["a", "interested"],
+    ["b", "applied"],
+    ["c", "none"],
+    ["d", "interested"],
+  ]);
   assert.match(APP, /onState: setManualAppState/);
-  assert.deepEqual([...ctx.deps], [ctx.setAppState], "a stable handler, so memoized rows don't all redraw");
+  assert.deepEqual(
+    [...ctx.deps],
+    [ctx.setAppState],
+    "a stable handler, so memoized rows don't all redraw",
+  );
   assert.match(APP, /addedIds\.has\(String\(r\.id\)\).*setAppState\(r\.id, "interested"\)/);
   assert.match(APP, /j\.status === "submitted".*setAppState\(id, "applied"\)/);
 });
@@ -125,12 +210,32 @@ test("first manual profile save gives an existing invite priority; later edits n
   const start = APP.indexOf("    function saveProfile(d) {");
   const end = APP.indexOf("    // Focus goes back", start);
   assert.ok(start > -1 && end > start);
-  for (const [profile, invite, expected] of [[null, true, []], [null, false, ["profile"]], [{ majors: [] }, false, []]]) {
-    const offers = [], saved = [], counted = [];
+  for (const [profile, invite, expected] of [
+    [null, true, []],
+    [null, false, ["profile"]],
+    [{ majors: [] }, false, []],
+  ]) {
+    const offers = [],
+      saved = [],
+      counted = [];
     const ctx = {
-      p: profile, PAGE: 150, IS: { count: x => counted.push(x), saveProfile: d => { saved.push(d); return d; } },
-      offerNudge: () => invite, offerDigestNudge: action => offers.push(action),
-      setP() {}, setSetupOpen() {}, setLimit() {}, setF() {}, setNote() {}, setTimeout() {},
+      p: profile,
+      PAGE: 150,
+      IS: {
+        count: (x) => counted.push(x),
+        saveProfile: (d) => {
+          saved.push(d);
+          return d;
+        },
+      },
+      offerNudge: () => invite,
+      offerDigestNudge: (action) => offers.push(action),
+      setP() {},
+      setSetupOpen() {},
+      setLimit() {},
+      setF() {},
+      setNote() {},
+      setTimeout() {},
     };
     vm.createContext(ctx);
     vm.runInContext(APP.slice(start, end), ctx);

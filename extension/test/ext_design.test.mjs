@@ -37,10 +37,10 @@ export function emDashesShown(src, kind) {
   s.split("\n").forEach((line, i) => {
     let code = line;
     if (kind === "js" || kind === "html") {
-      const c = code.search(/(^|\s)\/\/(?!\/)/);   // a // comment; "https://" has a ":" before it
+      const c = code.search(/(^|\s)\/\/(?!\/)/); // a // comment; "https://" has a ":" before it
       if (c >= 0) code = code.slice(0, c);
     }
-    code = code.replace(/\[[^\]\n]*—[^\]\n]*\]/g, "");   // regex character classes
+    code = code.replace(/\[[^\]\n]*—[^\]\n]*\]/g, ""); // regex character classes
     if (code.includes("—")) found.push(`${i + 1}: ${line.trim().slice(0, 100)}`);
   });
   return found;
@@ -48,10 +48,20 @@ export function emDashesShown(src, kind) {
 
 test("no em dash in any text the extension can show a student", () => {
   const files = shipped();
-  assert.ok(files.includes("background/agent.js") && files.includes("popup/popup.html") && files.includes("manifest.json"));
+  assert.ok(
+    files.includes("background/agent.js") &&
+      files.includes("popup/popup.html") &&
+      files.includes("manifest.json"),
+  );
   const bad = [];
   for (const f of files) {
-    const kind = f.endsWith(".html") ? "html" : f.endsWith(".json") ? "json" : f.endsWith(".css") ? "css" : "js";
+    const kind = f.endsWith(".html")
+      ? "html"
+      : f.endsWith(".json")
+        ? "json"
+        : f.endsWith(".css")
+          ? "css"
+          : "js";
     for (const hit of emDashesShown(read(f), kind)) bad.push(`${f}:${hit}`);
   }
   assert.deepEqual(bad, [], "use a colon, a comma or a full stop instead of an em dash");
@@ -60,47 +70,85 @@ test("no em dash in any text the extension can show a student", () => {
 test("the em dash check catches a string and ignores comments and character classes", () => {
   assert.equal(emDashesShown('const a = "busy right now — try later";', "js").length, 1);
   assert.equal(emDashesShown("const t = `closed — look at the tab`;", "js").length, 1);
-  assert.equal(emDashesShown("// a comment — fine\n/* also — fine */\nx.replace(/\\s[-–—|]\\s/g, ' ');", "js").length, 0);
+  assert.equal(
+    emDashesShown("// a comment — fine\n/* also — fine */\nx.replace(/\\s[-–—|]\\s/g, ' ');", "js")
+      .length,
+    0,
+  );
   assert.equal(emDashesShown('const u = "https://x.org"; const b = "a — b";', "js").length, 1);
   assert.equal(emDashesShown("<!-- was — fine --><p>Seen — here</p>", "html").length, 1);
 });
 
 // ---------- D25: job card and button order ----------
-const job = (status, extra = {}) => ({ id: "j1", status, company: "Northwind Labs", title: "Software Engineering Intern", location: "Boston, MA", log: [], ...extra });
+const job = (status, extra = {}) => ({
+  id: "j1",
+  status,
+  company: "Northwind Labs",
+  title: "Software Engineering Intern",
+  location: "Boston, MA",
+  log: [],
+  ...extra,
+});
 
 test("Ready to submit: I submitted it (main), Review and submit, Check the form again, then Remove", () => {
-  assert.deepEqual(jobActions(job("ready_to_submit")).map(([a, t, c]) => [a, t, c || ""]), [
-    ["submitted", "I submitted it", "primary"],
-    ["focus", "Review and submit", ""],
-    ["resume", "Check the form again", "quiet"],
-    ["remove", "Remove", "quiet"],
-  ]);
+  assert.deepEqual(
+    jobActions(job("ready_to_submit")).map(([a, t, c]) => [a, t, c || ""]),
+    [
+      ["submitted", "I submitted it", "primary"],
+      ["focus", "Review and submit", ""],
+      ["resume", "Check the form again", "quiet"],
+      ["remove", "Remove", "quiet"],
+    ],
+  );
   assert.equal(READY_ACTIONS[0][1], "I submitted it");
   const html = jobCard(job("ready_to_submit"));
   assert.doesNotMatch(html, /Keep going/);
-  const order = ["I submitted it", "Review and submit", "Check the form again"].map((t) => html.indexOf(`>${t}</button>`));
+  const order = ["I submitted it", "Review and submit", "Check the form again"].map((t) =>
+    html.indexOf(`>${t}</button>`),
+  );
   assert.ok(order.every((i) => i > 0) && order[0] < order[1] && order[1] < order[2], String(order));
 });
 
 test("a job card is company and title, then the status chip, then one row of small buttons", () => {
   const html = jobCard(job("needs_you", { question: "Why us?", reason: "Not in your profile." }));
-  const co = html.indexOf('class="co"'), title = html.indexOf('class="title"'), chip = html.indexOf('class="st"'), row = html.indexOf('class="row"');
+  const co = html.indexOf('class="co"'),
+    title = html.indexOf('class="title"'),
+    chip = html.indexOf('class="st"'),
+    row = html.indexOf('class="row"');
   assert.ok(co > 0 && co < title && title < chip && chip < row, [co, title, chip, row].join(","));
-  assert.match(html, /<div class="head"><span class="co">Northwind Labs<\/span> <span class="title">Software Engineering Intern · Boston, MA<\/span><\/div>/);
+  assert.match(
+    html,
+    /<div class="head"><span class="co">Northwind Labs<\/span> <span class="title">Software Engineering Intern · Boston, MA<\/span><\/div>/,
+  );
   assert.equal((html.match(/class="row"/g) || []).length, 1);
   const buttons = html.match(/<button [^>]*>/g);
-  assert.ok(buttons.length >= 2 && buttons.every((b) => /class="btn small( primary| quiet)?"/.test(b)), buttons.join(" "));
+  assert.ok(
+    buttons.length >= 2 && buttons.every((b) => /class="btn small( primary| quiet)?"/.test(b)),
+    buttons.join(" "),
+  );
   assert.doesNotMatch(html, /class="b[ "]/, "the side panel's own 26px button.b is gone");
   // Job text is escaped.
-  assert.match(jobCard(job("failed", { company: "<b>x</b>", reason: "a & b" })), /&lt;b&gt;x&lt;\/b&gt;[\s\S]*a &amp; b/);
+  assert.match(
+    jobCard(job("failed", { company: "<b>x</b>", reason: "a & b" })),
+    /&lt;b&gt;x&lt;\/b&gt;[\s\S]*a &amp; b/,
+  );
 });
 
 test("the in-tab card puts I submitted it first and says Check the form again", () => {
   const src = read("agent/overlay.js");
-  const ready = src.slice(src.indexOf('j.status === "ready_to_submit"'), src.indexOf('j.status === "submitted"')).replace(/^\s*\/\/.*$/gm, "");
+  const ready = src
+    .slice(src.indexOf('j.status === "ready_to_submit"'), src.indexOf('j.status === "submitted"'))
+    .replace(/^\s*\/\/.*$/gm, "");
   assert.doesNotMatch(ready, /Keep going/);
-  assert.match(ready, /<button class="primary" id="done">I submitted it<\/button><button class="quiet" id="more">Check the form again<\/button>/);
-  assert.match(src, /on\("more", \(\) => send\("resume"\)\)/, "Check the form again still starts another pass");
+  assert.match(
+    ready,
+    /<button class="primary" id="done">I submitted it<\/button><button class="quiet" id="more">Check the form again<\/button>/,
+  );
+  assert.match(
+    src,
+    /on\("more", \(\) => send\("resume"\)\)/,
+    "Check the form again still starts another pass",
+  );
 });
 
 test("Deep Dive Next, Google sign-in and Send are primary buttons; .btn.blue is gone", () => {
@@ -108,11 +156,20 @@ test("Deep Dive Next, Google sign-in and Send are primary buttons; .btn.blue is 
   assert.doesNotMatch(src, /btn blue/);
   assert.match(src, /<button class="btn primary" data-go="\$\{next\}">/);
   assert.doesNotMatch(read("lib/theme.css").replace(/\/\*[\s\S]*?\*\//g, ""), /\.btn\.blue/);
-  assert.doesNotMatch(read("sidepanel/sidepanel.html").replace(/\/\*[\s\S]*?\*\//g, ""), /button\.b\b/);
+  assert.doesNotMatch(
+    read("sidepanel/sidepanel.html").replace(/\/\*[\s\S]*?\*\//g, ""),
+    /button\.b\b/,
+  );
 });
 
 // ---------- D27 and D29: entry points ----------
-const store = (settings = {}, over = {}) => ({ ai: { provider: "internscout" }, files: { resume: { name: "r.pdf", b64: "AA==" } }, profile: { facts: {} }, settings: { onboarded: false, ...settings }, ...over });
+const store = (settings = {}, over = {}) => ({
+  ai: { provider: "internscout" },
+  files: { resume: { name: "r.pdf", b64: "AA==" } },
+  profile: { facts: {} },
+  settings: { onboarded: false, ...settings },
+  ...over,
+});
 
 test("before setup: one setup button, no review link and no way to edit a setup never done", () => {
   const e = entryState(store());
@@ -126,31 +183,58 @@ test("before setup: one setup button, no review link and no way to edit a setup 
 
 test("after setup: Edit setup and the review link show; a replaced resume asks for its review", () => {
   const ready = entryState(store({ onboarded: true, resume_details_ready: true }));
-  assert.deepEqual([ready.stage, ready.label, ready.showReview, ready.showEdit], ["ready", EDIT_LABEL, true, true]);
+  assert.deepEqual(
+    [ready.stage, ready.label, ready.showReview, ready.showEdit],
+    ["ready", EDIT_LABEL, true, true],
+  );
   const paused = entryState(store({ onboarded: true, resume_details_ready: false }));
-  assert.deepEqual([paused.stage, paused.label, paused.showReview], ["paused", "Review my resume", true]);
+  assert.deepEqual(
+    [paused.stage, paused.label, paused.showReview],
+    ["paused", "Review my resume", true],
+  );
 });
 
 test("entering details by hand with the name or email blank asks for them, not for a resume review", () => {
-  const e = entryState(store({ onboarded: true, resume_details_ready: true, resume_details_manual: true }, { profile: { facts: { first_name: "Ada" } } }));
+  const e = entryState(
+    store(
+      { onboarded: true, resume_details_ready: true, resume_details_manual: true },
+      { profile: { facts: { first_name: "Ada" } } },
+    ),
+  );
   assert.equal(e.stage, "paused");
   assert.equal(e.label, "Add my details");
   assert.doesNotMatch(e.note, /resume/);
-  const done = entryState(store({ onboarded: true, resume_details_ready: true, resume_details_manual: true },
-    { profile: { facts: { first_name: "Ada", last_name: "L", email: "a@x.edu" } } }));
+  const done = entryState(
+    store(
+      { onboarded: true, resume_details_ready: true, resume_details_manual: true },
+      { profile: { facts: { first_name: "Ada", last_name: "L", email: "a@x.edu" } } },
+    ),
+  );
   assert.equal(done.stage, "ready");
 });
 
 test("popup and side panel follow entryState: review link hidden until set up, no Start Deep Dive", () => {
-  const html = read("popup/popup.html"), js = read("popup/popup.js");
+  const html = read("popup/popup.html"),
+    js = read("popup/popup.js");
   assert.match(html, /<div class="foot" id="foot" hidden>/);
-  assert.match(html, /<button class="btn primary" id="setup" hidden>Set up Auto-Apply \(about 2 minutes\)<\/button>/);
+  assert.match(
+    html,
+    /<button class="btn primary" id="setup" hidden>Set up Auto-Apply \(about 2 minutes\)<\/button>/,
+  );
   assert.match(js, /\$\("foot"\)\.hidden = !e\.showReview/);
   const panel = read("sidepanel/sidepanel.js");
   assert.match(panel, /if \(e\.showReview\) h \+= `<div class="foot">/);
   assert.match(panel, /e\.showEdit \? `<button class="btn small quiet" id="dive2">/);
-  for (const [f, src] of [["popup.html", html], ["popup.js", js], ["sidepanel.js", panel]]) {
-    assert.doesNotMatch(src.replace(/\/\/.*|<!--[\s\S]*?-->/g, ""), /Start Deep Dive|Redo Deep Dive|Open Deep Dive/, f);
+  for (const [f, src] of [
+    ["popup.html", html],
+    ["popup.js", js],
+    ["sidepanel.js", panel],
+  ]) {
+    assert.doesNotMatch(
+      src.replace(/\/\/.*|<!--[\s\S]*?-->/g, ""),
+      /Start Deep Dive|Redo Deep Dive|Open Deep Dive/,
+      f,
+    );
   }
 });
 
@@ -165,24 +249,40 @@ test("the setup page is called Set up Auto-Apply; Deep Dive names the optional I
 // ---------- D28: Ready to apply ----------
 test("Ready to apply is brought into view only when it turns ready on the page", () => {
   assert.equal(shouldRevealQuick(false, true), true);
-  assert.equal(shouldRevealQuick(null, true), false, "arriving on Files with it already ready keeps the heading's focus");
+  assert.equal(
+    shouldRevealQuick(null, true),
+    false,
+    "arriving on Files with it already ready keeps the heading's focus",
+  );
   assert.equal(shouldRevealQuick(true, true), false, "a redraw while ready does not jump again");
   assert.equal(shouldRevealQuick(false, false), false);
   const calls = [];
   const box = { scrollIntoView: (o) => calls.push(["scroll", o]) };
   const button = { focus: (o) => calls.push(["focus", o]) };
   revealQuick(box, button);
-  assert.deepEqual(calls, [["scroll", { block: "center", behavior: "smooth" }], ["focus", { preventScroll: true }]]);
+  assert.deepEqual(calls, [
+    ["scroll", { block: "center", behavior: "smooth" }],
+    ["focus", { preventScroll: true }],
+  ]);
   calls.length = 0;
   revealQuick(box, button, true);
-  assert.equal(calls[0][1].behavior, "auto", "no smooth scroll when the student asked for less motion");
-  revealQuick(null, button);   // no card: nothing happens, nothing throws
+  assert.equal(
+    calls[0][1].behavior,
+    "auto",
+    "no smooth scroll when the student asked for less motion",
+  );
+  revealQuick(null, button); // no card: nothing happens, nothing throws
 });
 
 test("a restored completed profile asks for local resume bytes without erasing completion", () => {
-  const s = store({ onboarded: true, deep_dive_at: 123, resume_details_ready: true }, { files: { resume: null } });
+  const s = store(
+    { onboarded: true, deep_dive_at: 123, resume_details_ready: true },
+    { files: { resume: null } },
+  );
   const e = entryState(s);
-  assert.equal(e.stage, "paused"); assert.equal(e.label, "Add my resume");
+  assert.equal(e.stage, "paused");
+  assert.equal(e.label, "Add my resume");
   assert.match(e.note, /this device/);
-  assert.equal(s.settings.onboarded, true); assert.equal(s.settings.deep_dive_at, 123);
+  assert.equal(s.settings.onboarded, true);
+  assert.equal(s.settings.deep_dive_at, 123);
 });
