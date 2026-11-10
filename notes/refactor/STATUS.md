@@ -5,7 +5,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 0: status tracker merged; WP-0.1 implementation and local validation are complete, awaiting independent review and green PR checks. All six baseline suites passed, with two documented local backend skips. Independent full-file audit results are recorded below.
+- Wave 0 is complete; WP-0.1 merged and its Pages run passed. Wave 1 coverage reporting is implemented and locally validated, awaiting independent review and green PR checks. All six baseline suites passed, with two documented local backend skips. Independent full-file audit results are recorded below.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
@@ -40,10 +40,10 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | Wave | Package | Owner | Branch | PR | State | Next step / constraint |
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
-| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | In review | Local validation passed; independent review and green CI before lead merges. |
+| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI and green Pages. |
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
-| 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
+| 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | Pending PR | Validated locally | Source-free Python and Node artifacts; no thresholds; independent review and CI pending. |
 | 1 | WP-0.6 Shared CI setup | Unassigned | - | - | Queued | Preserve all effective workflow behavior; coordinate CI file ownership. |
 | 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
@@ -180,6 +180,16 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 - First PR CI found one introduced workflow-contract failure: [run 42862662508](https://github.com/bpmcginley/InternshipFinder/actions/runs/42862662508) reported 1,479 passed and one failed. `test_placement_runs.py` requires the existing paid-listing report step immediately after the build. Moved only the new validation step after that report and before Pages configuration/upload, preserving the original adjacency and leaving the financial code, report step, and contract test unchanged. Reran `python -m pytest tests/test_placement_runs.py -q`: all 14 passed; checker tests and the 4,334-file artifact check also passed again. New-head CI and independent review are required before merge.
 - Golden output comparison is not yet available: WP-0.2 follows this package. Public source assets and generator code are unchanged; the planned output difference is removal of the two internal-note trees.
 
+### WP-0.5 Coverage reports
+
+- Added a separate, read-only-permission coverage workflow on main pushes and pull requests. Existing workflows and normal test commands are unchanged. Coverage has no minimum thresholds; failing tests still fail the job. Artifact upload runs after failures to retain available diagnostics, without swallowing the failed test step.
+- Pinned `pytest-cov` 7.1.0, coverage.py 7.17.2, and `c8` 12.0.0. The worker lockfile adds coverage-only development dependencies; no existing package versions changed or packages were removed. A clean Node 22 `npm ci --ignore-scripts` succeeded locally.
+- Python command from backend: `COVERAGE_FILE=../coverage/python/.coverage python -m pytest tests/ -q --tb=no --show-capture=no --cov=internscout --cov=../growth --cov-report=term --cov-report=xml:../coverage/python/coverage.xml` (set the environment variable using the current shell). Python 3.12.10: 1,478 passed, two known missing-cryptography/ffmpeg skips in 174.62s. Line coverage: 9,897 / 11,227, or 88.15%, across 87 backend/growth files, including unexecuted modules. Branch coverage is not collected for Python in this initial report.
+- Node command from worker: `npm run test:coverage` under Node 22.23.4. The existing worker, extension, and site suites passed. C8 includes all production JS in the three areas, excludes tests and extension vendor code, and includes unexecuted files in the denominator. Line coverage: worker 5,394 / 5,473 (98.56%, 22 files); extension 6,532 / 9,103 (71.76%, 37 files); site 2,499 / 4,690 (53.28%, six files). Combined: 14,425 / 19,266 (74.87%). These are coverage-run measurements, not production usage or browser coverage.
+- Existing VM tests often omit filenames. A coverage-only preload supplies a filename only when the entire source string exactly matches one unique production file. It does not modify source, guard code/tests, or test behavior. Modified scripts and snippets remain unattributed; notably, app.js reports zero despite component tests. Three focused attribution tests passed. A deliberately failing child process returned its original exit code through c8, confirming failures are not converted to success.
+- Artifacts are explicitly limited to Python Cobertura XML, Node LCOV, and Node JSON summary. Their structures contain paths, names, line numbers, and counters, not source bodies. No HTML reports, raw V8 data, source maps, coverage databases, or test-output logs are uploaded. Generated files stay ignored under coverage/. Node uses the dot reporter and Python suppresses tracebacks/captured output to avoid copying legacy source values into diagnostics.
+- Golden comparison is not yet available while WP-0.2 is in progress. Runtime sources, public assets, generators, and test assertions are unchanged; expected public output difference: none.
+
 ## Questions and external gates
 
 | ID | Affected scope | Question / gate | Current handling |
@@ -202,7 +212,8 @@ None. No worker refactor PR has merged, and no production action has been taken.
 |---|---|---|---|---|
 | [#167 Hand-offs](https://github.com/bpmcginley/InternshipFinder/pull/167) | `00cf10e0` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42859546750) | Merged; documentation only. |
 | [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | `64fd6400` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42861453089) | Merged; documentation only. |
+| [#169 Internal notes](https://github.com/bpmcginley/InternshipFinder/pull/169) | `9f739770` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) | Merged; approved internal-note URL removal. |
 
 ## Next update
 
-Finish WP-0.1 validation and independent review, merge under the rules above, then verify Pages before the next merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.
+Complete Wave 1 package reviews and CI, merge under the rules above, and verify Pages after each merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.
