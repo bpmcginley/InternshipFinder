@@ -11,6 +11,7 @@ it), or when its lastmod moved.
 Run from the repo root:  python growth/indexnow.py OLD_SITEMAP NEW_SITEMAP [--submit]
 Without --submit it only prints what it would send.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,7 @@ HOST = "internscout.org"
 # only if it holds this same text, which is what shows the pages are ours to submit.
 KEY = "internscout-org-indexnow"
 ENDPOINT = "https://api.indexnow.org/indexnow"
-BATCH = 10_000                  # the protocol's limit per request
+BATCH = 10_000  # the protocol's limit per request
 NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 
 
@@ -49,10 +50,18 @@ def changed(old: dict[str, str], new: dict[str, str]) -> list[str]:
 def submit(urls: list[str]) -> list[int]:
     statuses = []
     for i in range(0, len(urls), BATCH):
-        body = {"host": HOST, "key": KEY, "keyLocation": f"https://{HOST}/{KEY}.txt",
-                "urlList": urls[i:i + BATCH]}
-        req = urllib.request.Request(ENDPOINT, data=json.dumps(body).encode(), method="POST",
-                                     headers={"Content-Type": "application/json; charset=utf-8"})
+        body = {
+            "host": HOST,
+            "key": KEY,
+            "keyLocation": f"https://{HOST}/{KEY}.txt",
+            "urlList": urls[i : i + BATCH],
+        }
+        req = urllib.request.Request(
+            ENDPOINT,
+            data=json.dumps(body).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json; charset=utf-8"},
+        )
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 statuses.append(r.status)
@@ -80,7 +89,9 @@ def main(argv: list[str]) -> int:
     urls = changed(old, new)
     added = sum(1 for u in urls if u not in old)
     gone = sum(1 for u in urls if u not in new)
-    print(f"[indexnow] {len(urls)} changed: {added} new, {gone} removed, {len(urls) - added - gone} updated")
+    print(
+        f"[indexnow] {len(urls)} changed: {added} new, {gone} removed, {len(urls) - added - gone} updated"
+    )
     if urls and "--submit" in argv:
         # 2026-10-27: the deploy is already safe, but a rejected notification must make the notify
         # job red so it is visible and retryable. was: report the codes and always exit zero.
@@ -88,7 +99,9 @@ def main(argv: list[str]) -> int:
         statuses = submit(urls)
         print(f"[indexnow] submitted, HTTP {statuses}")
         if not accepted(statuses):
-            print("::error::IndexNow did not accept every batch; the site deployed, but recrawl notification needs attention")
+            print(
+                "::error::IndexNow did not accept every batch; the site deployed, but recrawl notification needs attention"
+            )
             return 1
     return 0
 

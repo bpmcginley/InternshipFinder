@@ -1,4 +1,5 @@
 """Ashby public job-board API."""
+
 from __future__ import annotations
 from .common import board_item, counts_of, stamp_board_newest
 from ..classify import is_internship
@@ -29,16 +30,30 @@ def parse_ashby(payload: dict, co: dict) -> list[dict]:
         locs = [j.get("location"), _addr(j.get("address"))]
         for s in j.get("secondaryLocations") or []:
             locs += [s.get("location"), _addr(s.get("address"))]
-        country = (((j.get("address") or {}).get("postalAddress") or {}).get("addressCountry") or "").lower()
+        country = (
+            ((j.get("address") or {}).get("postalAddress") or {}).get("addressCountry") or ""
+        ).lower()
         if (j.get("isRemote") or j.get("workplaceType") == "Remote") and not any(
-                l and "remote" in l.lower() for l in locs):
+            l and "remote" in l.lower() for l in locs
+        ):
             locs.append("Remote - US" if country in _US else f"Remote - {country}")
-        out.append(board_item(co, source="ashby", title=title, locations=list(dict.fromkeys(locs)),
-                              url=j.get("jobUrl"), apply_url=j.get("applyUrl") or j.get("jobUrl"),
-                              posted_at=j.get("publishedAt"), description=j.get("descriptionPlain") or "",
-                              employment_type=emp))
+        out.append(
+            board_item(
+                co,
+                source="ashby",
+                title=title,
+                locations=list(dict.fromkeys(locs)),
+                url=j.get("jobUrl"),
+                apply_url=j.get("applyUrl") or j.get("jobUrl"),
+                posted_at=j.get("publishedAt"),
+                description=j.get("descriptionPlain") or "",
+                employment_type=emp,
+            )
+        )
     place_bare_cities(out, board_state(board))
-    stamp_board_newest(out, [j.get("publishedAt") for j in payload.get("jobs", [])])   # see normalize._zombie
+    stamp_board_newest(
+        out, [j.get("publishedAt") for j in payload.get("jobs", [])]
+    )  # see normalize._zombie
     return out
 
 
@@ -46,12 +61,15 @@ def fetch_ashby_board(c, co: dict) -> list[dict]:
     resp = c.get(URL.format(token=co["ats_token"]))
     resp.raise_for_status()
     payload = resp.json()
-    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list) or not all(
-            isinstance(job, dict) for job in payload["jobs"]):
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("jobs"), list)
+        or not all(isinstance(job, dict) for job in payload["jobs"])
+    ):
         raise ValueError("Ashby response is missing its complete jobs list")
     counts = counts_of(co)
     counts.rows(len(payload["jobs"]))
-    counts.reported(len(payload["jobs"]))   # unpaged: the list is everything the board listed
+    counts.reported(len(payload["jobs"]))  # unpaged: the list is everything the board listed
     items = parse_ashby(payload, co)
     co["_scan_complete"] = True
     return items

@@ -1,4 +1,5 @@
 """Collapse the same role seen across sources by dedupe_key (in a single batch)."""
+
 from __future__ import annotations
 import re
 from collections import defaultdict
@@ -31,7 +32,11 @@ def requisition_identity(url: str | None, *, icims_hosts=frozenset()) -> str | N
     gh_board = _greenhouse_board(url)
     if gh_board and gh and gh != gh_board[1]:
         return None  # conflicting URL identities are not proof of one posting
-    if not gh and (host == "greenhouse.io" or host.endswith(".greenhouse.io")) and "/embed/job_app" in path:
+    if (
+        not gh
+        and (host == "greenhouse.io" or host.endswith(".greenhouse.io"))
+        and "/embed/job_app" in path
+    ):
         gh = query.get("token")
     if gh and gh.isdigit():
         return "gh:" + gh
@@ -42,11 +47,19 @@ def requisition_identity(url: str | None, *, icims_hosts=frozenset()) -> str | N
         if match:
             return host + ":" + match.group(1)
     uuid = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
-    for domain, job in (("lever.co", uuid), ("ashbyhq.com", uuid), ("smartrecruiters.com", r"\d{8,}[^/]*")):
+    for domain, job in (
+        ("lever.co", uuid),
+        ("ashbyhq.com", uuid),
+        ("smartrecruiters.com", r"\d{8,}[^/]*"),
+    ):
         if host == domain or host.endswith("." + domain):
             match = re.fullmatch(r"/([^/]+)/(" + job + r")(?:/application|/apply)?", path, re.I)
             if match:
-                job_id = re.match(r"\d+", match.group(2)).group(0) if domain == "smartrecruiters.com" else match.group(2).lower()
+                job_id = (
+                    re.match(r"\d+", match.group(2)).group(0)
+                    if domain == "smartrecruiters.com"
+                    else match.group(2).lower()
+                )
                 return host + "/" + match.group(1) + ":" + job_id
             return None
     patterns = [
@@ -97,7 +110,9 @@ def recognized_icims_hosts(items) -> frozenset[str]:
     for item in items:
         url = item.get("apply_url") or ""
         parsed = urlsplit(url)
-        if parsed.scheme not in ("http", "https") or not re.match(r"^/jobs/\d+(?:/|$)", parsed.path):
+        if parsed.scheme not in ("http", "https") or not re.match(
+            r"^/jobs/\d+(?:/|$)", parsed.path
+        ):
             continue
         sources = {item.get("source"), item.get("ats"), *(item.get("scan_sources") or [])}
         sources.update(source for source, _ in item.get("_sources", []))
@@ -129,8 +144,10 @@ def _legacy_suffix(identity):
     """Separate matching scope from the existing public ID disambiguation spelling."""
     value = identity[0]
     host = value.split("/", 1)[0].split(":", 1)[0]
-    if any(host == domain or host.endswith("." + domain)
-           for domain in ("lever.co", "ashbyhq.com", "smartrecruiters.com")):
+    if any(
+        host == domain or host.endswith("." + domain)
+        for domain in ("lever.co", "ashbyhq.com", "smartrecruiters.com")
+    ):
         return host + ":" + value.rsplit(":", 1)[1]
     return value
 
@@ -170,10 +187,18 @@ def _canon_job(url: str | None) -> str | None:
 def merge_batch(items: list[dict]) -> dict[str, dict]:
     """Return {dedupe_key: merged_item}. Keeps all source links; best fields win."""
     from .sources import BOARD_FETCHERS
+
     # 2026-10-23: was input order. Employer facts must win even when keys already coincide.
     # Revert: iterate items in their original order again.
-    items = sorted(items, key=lambda it: (it.get("source") not in BOARD_FETCHERS,
-        (it.get("company_name") or "").casefold(), it.get("dedupe_key") or "", it.get("source") or ""))
+    items = sorted(
+        items,
+        key=lambda it: (
+            it.get("source") not in BOARD_FETCHERS,
+            (it.get("company_name") or "").casefold(),
+            it.get("dedupe_key") or "",
+            it.get("source") or "",
+        ),
+    )
     icims_hosts = recognized_icims_hosts(items)
     gh_tenants = recognized_greenhouse_tenants(items)
     out: dict[str, dict] = {}
@@ -189,9 +214,15 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
         collisions = defaultdict(list)
         for identity in keys:
             collisions[_legacy_suffix(identity)].append(identity)
-        suffixes[base] = {identity: (legacy if len(values) == 1 else
-            identity[0] + (":" + identity[1] if identity[1] else ""))
-            for legacy, values in collisions.items() for identity in values}
+        suffixes[base] = {
+            identity: (
+                legacy
+                if len(values) == 1
+                else identity[0] + (":" + identity[1] if identity[1] else "")
+            )
+            for legacy, values in collisions.items()
+            for identity in values
+        }
     for it in items:
         k = it["dedupe_key"]
         identity = posting_key(it, icims_hosts=icims_hosts, gh_tenants=gh_tenants)
@@ -211,8 +242,15 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
             # prefer a named place (baseline area first) over a remote-only geo
             rank = lambda x: (x["within_radius"], x["geo"].get("on_site", False))
             if rank(it) > rank(cur):
-                for f in ("geo", "location_raw", "lat", "lng", "is_remote",
-                          "within_radius", "distance_miles"):
+                for f in (
+                    "geo",
+                    "location_raw",
+                    "lat",
+                    "lng",
+                    "is_remote",
+                    "within_radius",
+                    "distance_miles",
+                ):
                     cur[f] = it[f]
             if not cur.get("apply_url") and it.get("apply_url"):
                 cur["apply_url"] = it["apply_url"]
@@ -222,13 +260,20 @@ def merge_batch(items: list[dict]) -> dict[str, dict]:
                 cur["description"] = it["description"]
             # region locations can differ per source: keep the union
             g = cur["geo"] = dict(cur["geo"])
-            g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
+            g["region_locations"] = list(
+                dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"])
+            )
     # Reconcile source authority before a missing term can donate a board's provenance to a list.
-    return _fold_untermed(_fold_same_url(out, icims_hosts=icims_hosts, gh_tenants=gh_tenants),
-                         icims_hosts=icims_hosts, gh_tenants=gh_tenants)
+    return _fold_untermed(
+        _fold_same_url(out, icims_hosts=icims_hosts, gh_tenants=gh_tenants),
+        icims_hosts=icims_hosts,
+        gh_tenants=gh_tenants,
+    )
 
 
-def _fold_untermed(out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=None) -> dict[str, dict]:
+def _fold_untermed(
+    out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=None
+) -> dict[str, dict]:
     """Fold a listing whose term we could not read into the same posting where we could.
 
     The dedupe key ends in the season and year, which is right - a company's "Data Intern" for
@@ -251,25 +296,41 @@ def _fold_untermed(out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=
         termed = [k for k, season, year in rows if season or year]
         for key in [k for k, season, year in rows if not season and not year]:
             identity = posting_key(out[key], icims_hosts=icims_hosts, gh_tenants=gh_tenants)
-            match = [t for t in termed if identity and identity == posting_key(out[t], icims_hosts=icims_hosts, gh_tenants=gh_tenants)]
+            match = [
+                t
+                for t in termed
+                if identity
+                and identity == posting_key(out[t], icims_hosts=icims_hosts, gh_tenants=gh_tenants)
+            ]
             if len(match) != 1:
                 continue
             cur, it = out[match[0]], out.pop(key)
             cur["_sources"].extend(it["_sources"])
             rank = lambda x: (x["within_radius"], x["geo"].get("on_site", False))
             if rank(it) > rank(cur):
-                for f in ("geo", "location_raw", "lat", "lng", "is_remote",
-                          "within_radius", "distance_miles"):
+                for f in (
+                    "geo",
+                    "location_raw",
+                    "lat",
+                    "lng",
+                    "is_remote",
+                    "within_radius",
+                    "distance_miles",
+                ):
                     cur[f] = it[f]
             for f in ("apply_url", "sector", "description"):
                 if not cur.get(f) and it.get(f):
                     cur[f] = it[f]
             g = cur["geo"] = dict(cur["geo"])
-            g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
+            g["region_locations"] = list(
+                dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"])
+            )
     return out
 
 
-def _fold_same_url(out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=None) -> dict[str, dict]:
+def _fold_same_url(
+    out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=None
+) -> dict[str, dict]:
     """Fold a curated list's copy of a posting into the employer's own row for it.
 
     The dedupe key is built from the title, and the GitHub lists write their own: Waymo's board says
@@ -281,7 +342,7 @@ def _fold_same_url(out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=
     of title spelling, locale and guessed community term. Employer source rows win; generic
     shared boards remain separate. Only compatible missing term information is borrowed.
     """
-    from .sources import BOARD_FETCHERS   # here, not at the top: sources imports half the package
+    from .sources import BOARD_FETCHERS  # here, not at the top: sources imports half the package
 
     def from_board(it):
         return any(src in BOARD_FETCHERS for src, _ in it["_sources"])
@@ -299,23 +360,35 @@ def _fold_same_url(out: dict[str, dict], *, icims_hosts=frozenset(), gh_tenants=
         # requisition cannot become two applications because a community title guesses a term.
         # Employer facts win, then source posting date and deterministic title for locale copies.
         # Revert: restore the one-board/no-term-conflict gate in this loop.
-        winner = max(boards or keys, key=lambda k: (str(out[k].get("posted_at") or ""),
-            len(out[k].get("description") or ""), out[k].get("title") or "",
-            (out[k].get("company_name") or "").casefold(), k))
+        winner = max(
+            boards or keys,
+            key=lambda k: (
+                str(out[k].get("posted_at") or ""),
+                len(out[k].get("description") or ""),
+                out[k].get("title") or "",
+                (out[k].get("company_name") or "").casefold(),
+                k,
+            ),
+        )
         cur = out[winner]
         for key in [k for k in keys if k != winner]:
             it = out[key]
             conflict = any(cur.get(f) and it.get(f) and cur[f] != it[f] for f in ("season", "year"))
             out.pop(key)
             cur["_sources"].extend(it["_sources"])
-            for f in ("season", "year"):           # "Summer" from the board, "Summer 2027" from the list
+            for f in ("season", "year"):  # "Summer" from the board, "Summer 2027" from the list
                 if not conflict and not cur.get(f) and it.get(f):
                     cur[f] = it[f]
-            season, year = cur.get("season"), cur.get("year")   # the same wording normalize() gives a term
+            season, year = (
+                cur.get("season"),
+                cur.get("year"),
+            )  # the same wording normalize() gives a term
             cur["term"] = (f"{season} {year}" if year else str(season)).strip() if season else None
             for f in ("sector",):
                 if not cur.get(f) and it.get(f):
                     cur[f] = it[f]
             g = cur["geo"] = dict(cur["geo"])
-            g["region_locations"] = list(dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"]))
+            g["region_locations"] = list(
+                dict.fromkeys(g["region_locations"] + it["geo"]["region_locations"])
+            )
     return out

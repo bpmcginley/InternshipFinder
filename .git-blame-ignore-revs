@@ -1,6 +1,7 @@
-# Historical WP-0.3 Python formatting, reverted by PR #191; literal values preserved.
+# Historical Python formatting (reverted by #191).
 c3c803fc29377cf4042f1aa1d937034b95676840
 119ab41ac88260f736c597acc397e37acfed88d1
-
-# WP-0.3: mechanical JavaScript formatting with Prettier 3.9.10.
+# Mechanical JavaScript formatting.
 403d4c9490a72f185f7894a06b28cce9c28b0ab1
+# Reviewed Python formatting retry.
+c18c6884636296fdde41e7d594488b210bad2b92

@@ -18,6 +18,7 @@ knowing before touching this:
   - There is no description in the payload and no detail endpoint under the allowed paths, so
     neither a description nor a snippet is reported.
 """
+
 from __future__ import annotations
 from .common import board_item, counts_of, mark_complete, reported_count, require_robots, rows_of
 from ..classify import is_internship
@@ -79,25 +80,36 @@ def parse_eightfold(payload: dict, co: dict) -> list[dict]:
         # positionUrl is site-relative ('/careers/job/137482769212'); build the same link from the
         # id when it is missing, which is the form every tenant checked serves.
         path = p.get("positionUrl") or ""
-        url = (f"https://{tenant}.eightfold.ai{path}" if path.startswith("/")
-               else path or JOB_URL.format(tenant=tenant, id=p.get("id")))
-        out.append(board_item(co, source="eightfold", title=title, locations=locs, url=url,
-                              posted_at=p.get("postedTs") or None,
-                              employment_type=p.get("workLocationOption") or ""))
+        url = (
+            f"https://{tenant}.eightfold.ai{path}"
+            if path.startswith("/")
+            else path or JOB_URL.format(tenant=tenant, id=p.get("id"))
+        )
+        out.append(
+            board_item(
+                co,
+                source="eightfold",
+                title=title,
+                locations=locs,
+                url=url,
+                posted_at=p.get("postedTs") or None,
+                employment_type=p.get("workLocationOption") or "",
+            )
+        )
     return out
 
 
 def fetch_eightfold_board(c, co: dict) -> list[dict]:
     tenant, domain = host_of(co["ats_token"])
-    require_robots(c, f"https://{tenant}.eightfold.ai", "/api/pcsx/search",
-                   co["ats_token"])
+    require_robots(c, f"https://{tenant}.eightfold.ai", "/api/pcsx/search", co["ats_token"])
     seen, items, complete, counts = set(), [], True, counts_of(co)
     for kw in KEYWORDS:
         reported, rows, well_formed = None, 0, True
         for page in range(MAX_PAGES):
-            r = c.get(SEARCH_URL.format(tenant=tenant),
-                      params={"domain": domain, "query": kw, "start": page * PAGE_SIZE,
-                              "num": PAGE_SIZE})
+            r = c.get(
+                SEARCH_URL.format(tenant=tenant),
+                params={"domain": domain, "query": kw, "start": page * PAGE_SIZE, "num": PAGE_SIZE},
+            )
             # 422 means the domain guess was wrong, which is worth raising rather than reading as
             # an employer with no internships: scan_boards then reports the board as failed and the
             # token shows up in the run summary asking for its real domain.
@@ -124,7 +136,7 @@ def fetch_eightfold_board(c, co: dict) -> list[dict]:
             if len(got) < PAGE_SIZE or (page + 1) * PAGE_SIZE >= (data.get("count") or 0):
                 break
         else:
-            counts.stop("page_cap")   # every page was full and the count ran past them
+            counts.stop("page_cap")  # every page was full and the count ran past them
         # MAX_PAGES caps a keyword at 120 results, and a short page before `count` is a gap.
         complete = complete and well_formed and reported is not None and rows == reported
     mark_complete(co, complete)

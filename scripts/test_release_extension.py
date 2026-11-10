@@ -1,4 +1,5 @@
 """Offline package reproducibility and provenance checks; no external services."""
+
 import hashlib
 import json
 import os
@@ -20,16 +21,31 @@ class ReleasePackageTests(unittest.TestCase):
             root = Path(tmp)
             ext = root / "extension"
             ext.mkdir()
-            manifest = {"manifest_version": 3, "version": "0.5.8", "key": "developer identity",
-                        "permissions": ["storage"], "content_scripts": [{"matches": [
-                            "https://internscout.org/*", "http://localhost/*", "http://127.0.0.1/*"]}]}
+            manifest = {
+                "manifest_version": 3,
+                "version": "0.5.8",
+                "key": "developer identity",
+                "permissions": ["storage"],
+                "content_scripts": [
+                    {
+                        "matches": [
+                            "https://internscout.org/*",
+                            "http://localhost/*",
+                            "http://127.0.0.1/*",
+                        ]
+                    }
+                ],
+            }
             (ext / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             runtime = ext / "runtime.js"
             runtime.write_bytes(b"const candidate = true;\n")
             (ext / "test").mkdir()
             (ext / "test" / "fixture.js").write_text("must not ship", encoding="utf-8")
             (ext / "README.md").write_text("developer notes", encoding="utf-8")
-            with patch.object(package_extension, "EXT", ext), patch.object(package_extension, "DIST", root / "dist"):
+            with (
+                patch.object(package_extension, "EXT", ext),
+                patch.object(package_extension, "DIST", root / "dist"),
+            ):
                 developer = package_extension.build()
                 first = developer.read_bytes()
                 for p in ext.rglob("*"):
@@ -45,7 +61,9 @@ class ReleasePackageTests(unittest.TestCase):
                         self.assertEqual("key" in packaged, key_expected)
                         self.assertEqual(packaged["version"], "0.5.8")
                         self.assertEqual(packaged["permissions"], manifest["permissions"])
-                        self.assertEqual(packaged["content_scripts"][0]["matches"], ["https://internscout.org/*"])
+                        self.assertEqual(
+                            packaged["content_scripts"][0]["matches"], ["https://internscout.org/*"]
+                        )
                 output = root / "record.json"
                 record = write_record([developer, webstore], "a" * 40, output)
                 self.assertEqual(json.loads(output.read_text(encoding="utf-8")), record)
@@ -53,7 +71,11 @@ class ReleasePackageTests(unittest.TestCase):
                 self.assertEqual(record["assets"][0]["sha256"], hashlib.sha256(first).hexdigest())
                 runtime.write_bytes(b"const candidate = false;\n")
                 changed = package_extension.build()
-                self.assertNotEqual(first, changed.read_bytes(), "changed source must not look like an identical retry")
+                self.assertNotEqual(
+                    first,
+                    changed.read_bytes(),
+                    "changed source must not look like an identical retry",
+                )
 
     def test_publish_retry_verifies_existing_assets_before_any_upload(self):
         bash = shutil.which("bash")
@@ -94,7 +116,10 @@ class ReleasePackageTests(unittest.TestCase):
         '''
         publisher = Path(__file__).with_name("publish_extension_release.sh").resolve()
         for scenario in ["identical", "changed-zip", "changed-source", "missing", "new"]:
-            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory(prefix="extension release ") as tmp:
+            with (
+                self.subTest(scenario=scenario),
+                tempfile.TemporaryDirectory(prefix="extension release ") as tmp,
+            ):
                 root = Path(tmp)
                 remote = root / "remote"
                 remote.mkdir()
@@ -109,11 +134,18 @@ class ReleasePackageTests(unittest.TestCase):
                 if scenario == "missing":
                     (remote / "webstore.zip").unlink()
                 calls = root / "calls.log"
-                env = {**os.environ, "DEVELOPER": files[0].as_posix(), "WEBSTORE": files[1].as_posix(),
-                       "RECORD": files[2].as_posix(), "RUNNER_TEMP": root.as_posix(),
-                       "REMOTE": remote.as_posix(), "CALL_LOG": calls.as_posix(),
-                       "PUBLISHER": publisher.as_posix(), "GITHUB_REF_NAME": "ext-v0.5.8",
-                       "RELEASE_EXISTS": "no" if scenario == "new" else "yes"}
+                env = {
+                    **os.environ,
+                    "DEVELOPER": files[0].as_posix(),
+                    "WEBSTORE": files[1].as_posix(),
+                    "RECORD": files[2].as_posix(),
+                    "RUNNER_TEMP": root.as_posix(),
+                    "REMOTE": remote.as_posix(),
+                    "CALL_LOG": calls.as_posix(),
+                    "PUBLISHER": publisher.as_posix(),
+                    "GITHUB_REF_NAME": "ext-v0.5.8",
+                    "RELEASE_EXISTS": "no" if scenario == "new" else "yes",
+                }
                 result = subprocess.run([bash, "-c", stub], env=env, capture_output=True, text=True)
                 log = calls.read_text(encoding="utf-8") if calls.exists() else ""
                 if scenario.startswith("changed"):

@@ -11,6 +11,7 @@ of it. The glyph already sits inside the 40%-radius safe zone Android keeps, so 
 Run: python scripts/make_app_icons.py
 Writes: docs/icon180.png, docs/icon192.png, docs/icon512.png, docs/icon-maskable512.png
 """
+
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -18,18 +19,18 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 
-INK = (23, 25, 28)           # the icon's background
+INK = (23, 25, 28)  # the icon's background
 DOT = (124, 195, 161)
-CREAM = (246, 244, 239)      # --paper #f6f4ef
+CREAM = (246, 244, 239)  # --paper #f6f4ef
 
-RADIUS = 28                  # corner radius of the rounded square, in the 128px grid
-GLYPH = [                    # boxes in the 128px grid: top serif, stem, bottom serif
+RADIUS = 28  # corner radius of the rounded square, in the 128px grid
+GLYPH = [  # boxes in the 128px grid: top serif, stem, bottom serif
     (47, 53, 74, 59),
     (54, 53, 74, 93),
     (44, 93, 84, 100),
 ]
 DOT_BOX = (53, 23.25, 75, 45.75)
-SS = 4                       # drawn this many times larger, then scaled down, for smooth edges
+SS = 4  # drawn this many times larger, then scaled down, for smooth edges
 
 
 def draw(size: int, full_bleed: bool) -> Image.Image:
@@ -49,8 +50,12 @@ def draw(size: int, full_bleed: bool) -> Image.Image:
 
 def build() -> list[Path]:
     out = []
-    for name, size, full in (("icon180.png", 180, True), ("icon192.png", 192, False),
-                             ("icon512.png", 512, False), ("icon-maskable512.png", 512, True)):
+    for name, size, full in (
+        ("icon180.png", 180, True),
+        ("icon192.png", 192, False),
+        ("icon512.png", 512, False),
+        ("icon-maskable512.png", 512, True),
+    ):
         p = DOCS / name
         draw(size, full).save(p, "PNG", optimize=True)
         out.append(p)
