@@ -35,7 +35,7 @@ class _ConsoleHandler(logging.Handler):
             print(*line.values, sep=line.sep, end=line.end, file=line.file, flush=line.flush)
 
 
-# A private logger keeps application diagnostics independent of root logging configuration.
+# Keep these diagnostics off the process's root logger.
 _logger = logging.Logger("internscout.console", level=logging.INFO)
 _logger.addHandler(_ConsoleHandler())
 _logger.propagate = False
@@ -55,5 +55,9 @@ def console(
     Pass only console-safe values. For an exception, pass its class name and safe
     context. JSON output records the class name as a separate field.
     """
+    if level < _logger.level:
+        return
     line = _ConsoleLine(values, sep, end, file, flush, exception_type)
-    _logger.log(level, line)
+    # These were unconditional prints. Global logging filters and factories are for other loggers.
+    record = logging.LogRecord(_logger.name, level, "", 0, line, (), None)
+    _logger.handle(record)

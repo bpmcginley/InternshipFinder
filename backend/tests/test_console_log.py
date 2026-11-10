@@ -34,6 +34,28 @@ def test_default_output_uses_print_options_and_the_current_stream(monkeypatch, c
     assert caplog.records == []
 
 
+def test_global_logging_settings_cannot_suppress_console(monkeypatch, capsys):
+    monkeypatch.delenv("INTERNSCOUT_LOG_FORMAT", raising=False)
+    previous = logging.root.manager.disable
+    factory = logging.getLogRecordFactory()
+
+    def unexpected_factory(*args, **kwargs):
+        raise AssertionError("console diagnostic used the global logging factory")
+
+    console("before")
+    try:
+        logging.disable(logging.CRITICAL)
+        logging.setLogRecordFactory(unexpected_factory)
+        console("cached info")
+        console("first error", level=logging.ERROR)
+    finally:
+        logging.setLogRecordFactory(factory)
+        logging.disable(previous)
+    console("after", level=logging.ERROR)
+
+    assert capsys.readouterr().out == "before\ncached info\nfirst error\nafter\n"
+
+
 def test_json_is_one_record_even_for_multiline_text(monkeypatch, capsys):
     monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
     console('quote "\nnewline', "café", sep=" / ", end="", file=sys.stderr)
