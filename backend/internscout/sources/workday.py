@@ -4,12 +4,21 @@ Token: "tenant|wdN|site", e.g. "modernatx|wd1|M_tx". Workday serves the same boa
 second domain, where the tenant is a path segment rather than a subdomain; those tokens carry
 that domain in the middle field: "wf|wd1.myworkdaysite.com|WellsFargoJobs".
 """
+
 from __future__ import annotations
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from .common import (RobotsDisallowed, ScanCounts, board_item, counts_of, html_to_text,
-                     mark_complete, reported_count, rows_of)
+from .common import (
+    RobotsDisallowed,
+    ScanCounts,
+    board_item,
+    counts_of,
+    html_to_text,
+    mark_complete,
+    reported_count,
+    rows_of,
+)
 from .common import robots_allows as _host_allows
 from ..classify import is_internship
 from ..region import maybe_in_region
@@ -117,8 +126,12 @@ def board_locations(tenant: str, locations: list[str]) -> list[str]:
     only to that employer: a general 'UT' replacement would corrupt Utah roles.
     See https://www.utexas.edu/about-texas for the university's campus location.
     """
-    return ["Austin, TX" if tenant.lower() == "utaustin" and
-            " ".join(loc.upper().split()) == "UT MAIN CAMPUS" else loc for loc in locations]
+    return [
+        "Austin, TX"
+        if tenant.lower() == "utaustin" and " ".join(loc.upper().split()) == "UT MAIN CAMPUS"
+        else loc
+        for loc in locations
+    ]
 
 
 # Hospitals rarely write "intern". Their student jobs are "Student Nurse Technician", "PACU
@@ -171,8 +184,11 @@ def _search(c, api: str, text: str, counts: ScanCounts | None = None) -> tuple[l
     postings, offset, total, dry = [], 0, None, 0
     reported, rows, well_formed, complete = None, 0, True, False
     while True:
-        r = c.post(f"{api}/jobs", headers=HEADERS,
-                   json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": text})
+        r = c.post(
+            f"{api}/jobs",
+            headers=HEADERS,
+            json={"appliedFacets": {}, "limit": PAGE, "offset": offset, "searchText": text},
+        )
         r.raise_for_status()
         data = r.json()
         if not isinstance(data, dict):
@@ -183,7 +199,7 @@ def _search(c, api: str, text: str, counts: ScanCounts | None = None) -> tuple[l
         if total is None:
             reported = reported_count(data.get("total"))
             counts.reported(reported)
-            total = data.get("total") or 0   # only reported on the first page
+            total = data.get("total") or 0  # only reported on the first page
         rows += len(page)
         counts.rows(len(page))
         found = parse_workday_list(data)
@@ -198,7 +214,7 @@ def _search(c, api: str, text: str, counts: ScanCounts | None = None) -> tuple[l
             break
         if offset >= CORE_OFFSET and dry >= DRY_PAGES:
             counts.stop("dry_pages")
-            break   # the matches have run out; the rest of this board is "internal" and "overseas"
+            break  # the matches have run out; the rest of this board is "internal" and "overseas"
     return postings, complete
 
 
@@ -233,7 +249,7 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
         url = f"{base}{path}"
         text = p.get("locationsText") or ""
         locs, desc = board_locations(tenant, [text]), ""
-        multi = "location" in text.lower()   # "3 Locations"
+        multi = "location" in text.lower()  # "3 Locations"
         wanted = multi or any(maybe_in_region(loc) for loc in locs)
         if wanted and (calls < MAX_DETAIL or (multi and multi_calls < MAX_DETAIL)):
             calls += 1
@@ -245,10 +261,18 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                     locs = board_locations(tenant, dl) or locs
             except Exception:
                 pass
-        out.append(board_item(co, source="workday", title=p.get("title", ""), locations=locs,
-                              url=url, description=desc,
-                              posted_at=parse_posted_on(p.get("postedOn")),
-                              employment_type=" ".join(p.get("bulletFields") or [])))
+        out.append(
+            board_item(
+                co,
+                source="workday",
+                title=p.get("title", ""),
+                locations=locs,
+                url=url,
+                description=desc,
+                posted_at=parse_posted_on(p.get("postedOn")),
+                employment_type=" ".join(p.get("bulletFields") or []),
+            )
+        )
     # Every search this run made read to its reported total. The detail budget above trims descriptions, never
     # postings, so it does not affect this. The evidence covers what these searches return, not
     # the whole board: scan_evidence.SEARCH_SCOPED keeps that limit in view.

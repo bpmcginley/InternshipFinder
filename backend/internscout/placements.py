@@ -23,6 +23,7 @@ the Worker's placement_runs table over Cloudflare's D1 HTTP API (record_runs), s
 paid box was not on the site can be worked out. That step can never fail or hold up a deploy: any
 problem is one ::warning:: line naming no secret and no address.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,16 @@ from datetime import datetime, timezone
 MAX_PER_PAGE = 1
 
 # Why a placement was dropped, as resolve() reports it.
-REASONS = ("malformed", "duplicate", "dates", "listing_gone", "closed", "url_changed", "deadline", "unpaid")
+REASONS = (
+    "malformed",
+    "duplicate",
+    "dates",
+    "listing_gone",
+    "closed",
+    "url_changed",
+    "deadline",
+    "unpaid",
+)
 
 # The fields of a kept placement, the ones written to /data/placements.json. All public.
 PUBLIC_KEYS = ("id", "listing_id", "apply_url", "employer", "start", "end")
@@ -85,7 +95,9 @@ def _well_formed(p) -> bool:
     return all(isinstance(p.get(k), str) and _DAY.match(p[k]) for k in ("start", "end"))
 
 
-def resolve(raw, listings_by_id: dict, today: str, by_url: bool = True) -> tuple[list[dict], list[dict]]:
+def resolve(
+    raw, listings_by_id: dict, today: str, by_url: bool = True
+) -> tuple[list[dict], list[dict]]:
     """(kept, dropped) for the placements in raw on today (YYYY-MM-DD, UTC).
 
     listings_by_id: listing id -> listing, the listings the site kept (seo_pages.load). kept: dicts with
@@ -107,9 +119,13 @@ def resolve(raw, listings_by_id: dict, today: str, by_url: bool = True) -> tuple
     def drop(p, reason):
         ok = isinstance(p, dict) and isinstance(p.get("id"), str) and _ID.match(p["id"])
         lid = p.get("listing_id") if isinstance(p, dict) else None
-        dropped.append({"id": p["id"] if ok else None,
-                        "listing_id": lid if isinstance(lid, str) and _LISTING_ID.match(lid) else None,
-                        "reason": reason})
+        dropped.append(
+            {
+                "id": p["id"] if ok else None,
+                "listing_id": lid if isinstance(lid, str) and _LISTING_ID.match(lid) else None,
+                "reason": reason,
+            }
+        )
 
     for p in raw if isinstance(raw, list) else []:
         if not _well_formed(p):
@@ -125,8 +141,11 @@ def resolve(raw, listings_by_id: dict, today: str, by_url: bool = True) -> tuple
         x = listings_by_id.get(p["listing_id"])
         note = None
         if x is None and by_url:
-            same = [y for y in by_url_index.get(p["apply_url"].strip().rstrip("/"), [])
-                    if _company(y.get("company_name")) == _company(p.get("employer"))]
+            same = [
+                y
+                for y in by_url_index.get(p["apply_url"].strip().rstrip("/"), [])
+                if _company(y.get("company_name")) == _company(p.get("employer"))
+            ]
             if len(same) == 1 and _company(p.get("employer")):
                 x, note = same[0], "matched by URL only; update its listing_id"
         if x is None:
@@ -148,7 +167,9 @@ def resolve(raw, listings_by_id: dict, today: str, by_url: bool = True) -> tuple
         out["listing_id"] = str(x["id"])
         out["employer"] = str(p.get("employer") or x.get("company_name") or "")
         if p.get("unpaid_ok"):
-            out["unpaid_ok"] = 1       # Bruce confirmed a nonprofit or government role; the digest reads it
+            out["unpaid_ok"] = (
+                1  # Bruce confirmed a nonprofit or government role; the digest reads it
+            )
         if note:
             out["note"] = note
         kept.append(out)
@@ -158,10 +179,16 @@ def resolve(raw, listings_by_id: dict, today: str, by_url: bool = True) -> tuple
 def warnings(kept: list[dict], dropped: list[dict]) -> list[str]:
     """GitHub Actions ::warning:: lines for the build log: every dropped placement with its reason,
     and every one kept only by its apply link. Ids and reasons only, all public."""
-    lines = [f"::warning::placement {p['id']} matched by URL only; update its listing_id to {p['listing_id']}"
-             for p in kept if p.get("note")]
-    lines += [f"::warning::placement {d['id'] or '(unreadable)'} dropped: {d['reason']}"
-              + (f" (listing {d['listing_id']})" if d.get("listing_id") else "") for d in dropped]
+    lines = [
+        f"::warning::placement {p['id']} matched by URL only; update its listing_id to {p['listing_id']}"
+        for p in kept
+        if p.get("note")
+    ]
+    lines += [
+        f"::warning::placement {d['id'] or '(unreadable)'} dropped: {d['reason']}"
+        + (f" (listing {d['listing_id']})" if d.get("listing_id") else "")
+        for d in dropped
+    ]
     return lines
 
 
@@ -202,15 +229,22 @@ ROWS_PER_STATEMENT = 16
 def report(kept: list[dict], dropped: list[dict], today: str) -> dict:
     """What one build did with the placements, for record_runs: {"day": today, "kept": [id, ...],
     "dropped": [{"id", "reason"}, ...]}. A dropped entry with no readable id is left out."""
-    return {"day": today, "kept": [p["id"] for p in kept],
-            "dropped": [{"id": d["id"], "reason": d["reason"]} for d in dropped if d.get("id")]}
+    return {
+        "day": today,
+        "kept": [p["id"] for p in kept],
+        "dropped": [{"id": d["id"], "reason": d["reason"]} for d in dropped if d.get("id")],
+    }
 
 
 def runs_rows(rep, now: datetime) -> list[tuple]:
     """(placement_id, day, shown, dropped, reason, updated) per placement in a report: shown 1 for each
     kept id, dropped 1 with its reason for each id dropped while it was live (NOT_A_PAID_DAY left out,
     and so is an id the same build also kept). Anything malformed in the report is skipped."""
-    if not isinstance(rep, dict) or not isinstance(rep.get("day"), str) or not _DAY.match(rep["day"]):
+    if (
+        not isinstance(rep, dict)
+        or not isinstance(rep.get("day"), str)
+        or not _DAY.match(rep["day"])
+    ):
         raise ValueError("report has no day")
     day, updated = rep["day"], now.strftime("%Y-%m-%dT%H:%M:%SZ")
     kept = [i for i in rep.get("kept") or [] if isinstance(i, str) and _ID.match(i)]
@@ -222,7 +256,12 @@ def runs_rows(rep, now: datetime) -> list[tuple]:
     for d in rep.get("dropped") or []:
         i = d.get("id") if isinstance(d, dict) else None
         reason = d.get("reason") if isinstance(d, dict) else None
-        if not (isinstance(i, str) and _ID.match(i)) or reason not in REASONS or reason in NOT_A_PAID_DAY or i in seen:
+        if (
+            not (isinstance(i, str) and _ID.match(i))
+            or reason not in REASONS
+            or reason in NOT_A_PAID_DAY
+            or i in seen
+        ):
             continue
         seen.add(i)
         rows.append((i, day, 0, 1, reason, updated))
@@ -235,20 +274,31 @@ def runs_sql(rows: list[tuple]) -> list[tuple[str, list]]:
     is the latest build's time."""
     out = []
     for n in range(0, len(rows), ROWS_PER_STATEMENT):
-        chunk = rows[n:n + ROWS_PER_STATEMENT]
-        out.append(("INSERT INTO placement_runs (placement_id, day, shown, dropped, reason, updated) VALUES "
-                    + ", ".join(["(?, ?, ?, ?, ?, ?)"] * len(chunk))
-                    + " ON CONFLICT(placement_id, day) DO UPDATE SET shown = shown + excluded.shown, "
-                    "dropped = dropped + excluded.dropped, reason = COALESCE(excluded.reason, placement_runs.reason), "
-                    "updated = excluded.updated",
-                    [v for row in chunk for v in row]))
+        chunk = rows[n : n + ROWS_PER_STATEMENT]
+        out.append(
+            (
+                "INSERT INTO placement_runs (placement_id, day, shown, dropped, reason, updated) VALUES "
+                + ", ".join(["(?, ?, ?, ?, ?, ?)"] * len(chunk))
+                + " ON CONFLICT(placement_id, day) DO UPDATE SET shown = shown + excluded.shown, "
+                "dropped = dropped + excluded.dropped, reason = COALESCE(excluded.reason, placement_runs.reason), "
+                "updated = excluded.updated",
+                [v for row in chunk for v in row],
+            )
+        )
     return out
 
 
 def _post(url: str, body: dict, token: str) -> dict:
-    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}",
-                                          "User-Agent": "InternScout-build"})
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "InternScout-build",
+        },
+    )
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.load(r)
 
@@ -294,8 +344,11 @@ def main(argv: list[str]) -> int:
         return 0
     try:
         n = record_runs(argv[2], token)
-    except Exception as e:          # noqa: BLE001 - nothing here may stop a deploy
-        print("::warning::paid listing runs not recorded: " + _why(e).replace(token, "[token]").replace("\n", " "))
+    except Exception as e:  # noqa: BLE001 - nothing here may stop a deploy
+        print(
+            "::warning::paid listing runs not recorded: "
+            + _why(e).replace(token, "[token]").replace("\n", " ")
+        )
         return 0
     print(f"[placements] recorded today's runs for {n} placement(s)")
     return 0

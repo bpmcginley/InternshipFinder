@@ -18,6 +18,7 @@ Works, Stellar Science and ARM. Worth knowing before touching this:
     an Organization block, but the registry already has a name from wherever the board was
     discovered, so that is left alone and only used when a seed gave us nothing.
 """
+
 from __future__ import annotations
 import html
 import json
@@ -33,10 +34,13 @@ MAX_DETAIL = 25
 # Job entries are the only list-group-items on the page; splitting on the opening tag is steadier
 # than matching a balanced <li>, because the entry itself contains nested <li>s for the location.
 _ITEM_SPLIT = re.compile(r'<li class="list-group-item">')
-_LINK_RE = re.compile(r'<a\s+href="(?P<url>https://[^"]*?/apply/[^"]+)"\s*>(?P<title>.*?)</a>', re.S)
+_LINK_RE = re.compile(
+    r'<a\s+href="(?P<url>https://[^"]*?/apply/[^"]+)"\s*>(?P<title>.*?)</a>', re.S
+)
 _LOC_RE = re.compile(r"fa-map-marker'></i>(?P<loc>.*?)</li>", re.S)
 _JSON_LD_RE = re.compile(
-    r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S | re.I)
+    r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S | re.I
+)
 _DESC_OPEN_RE = re.compile(r'<div[^>]*\bid=["\']job-description["\'][^>]*>', re.I)
 _DIV_RE = re.compile(r"<(/?)div\b[^>]*>", re.I)
 
@@ -54,6 +58,7 @@ def parse_jazzhr_detail(page: str) -> tuple[str, str | None]:
     description even though the employer exposes one on the student's destination page.
     Revert: remove this parser and the bounded detail pass below to restore board-only reads.
     """
+
     def postings(value):
         if isinstance(value, dict):
             kinds = value.get("@type")
@@ -79,11 +84,11 @@ def parse_jazzhr_detail(page: str) -> tuple[str, str | None]:
     # advert container. Balance divs so an embedded layout block cannot cut the description short.
     opened = _DESC_OPEN_RE.search(page or "")
     if opened:
-        depth, body = 1, page[opened.end():]
+        depth, body = 1, page[opened.end() :]
         for tag in _DIV_RE.finditer(body):
             depth += -1 if tag.group(1) else 1
             if depth == 0:
-                body = body[:tag.start()]
+                body = body[: tag.start()]
                 break
         return html_to_text(body), None
     return "", None
@@ -92,7 +97,7 @@ def parse_jazzhr_detail(page: str) -> tuple[str, str | None]:
 def parse_jazzhr(page: str, co: dict) -> list[dict]:
     out, seen, board, counts = [], set(), [], counts_of(co)
     chunks = _ITEM_SPLIT.split(page or "")[1:]
-    counts.rows(len(chunks))   # the job entries on the one board page; there is no total to compare
+    counts.rows(len(chunks))  # the job entries on the one board page; there is no total to compare
     for chunk in chunks:
         link = _LINK_RE.search(chunk)
         if not link:
@@ -112,21 +117,29 @@ def parse_jazzhr(page: str, co: dict) -> list[dict]:
             counts.discard("duplicate")
             continue
         seen.add(url)
-        out.append(board_item(co, source="jazzhr", title=title,
-                              locations=[_text(loc.group("loc"))] if loc else [], url=url))
+        out.append(
+            board_item(
+                co,
+                source="jazzhr",
+                title=title,
+                locations=[_text(loc.group("loc"))] if loc else [],
+                url=url,
+            )
+        )
     place_bare_cities(out, board_state(board))
     return out
 
 
 def fetch_jazzhr_board(c, co: dict) -> list[dict]:
-    require_robots(c, f"https://{co['ats_token']}.applytojob.com", "/apply",
-                   co["ats_token"])
+    require_robots(c, f"https://{co['ats_token']}.applytojob.com", "/apply", co["ats_token"])
     r = c.get(URL.format(tenant=co["ats_token"]))
     r.raise_for_status()
     items = parse_jazzhr(r.text, co)
     # The current corpus has no JazzHR board above 23 internships. Keep a ceiling anyway so a
     # newly discovered giant tenant cannot turn one board into an unbounded crawl.
-    wanted = [i for i in items if not i["locations"] or any(maybe_in_region(l) for l in i["locations"])]
+    wanted = [
+        i for i in items if not i["locations"] or any(maybe_in_region(l) for l in i["locations"])
+    ]
     for it in wanted[:MAX_DETAIL]:
         try:
             d = c.get(it["url"])

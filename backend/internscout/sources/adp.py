@@ -1,14 +1,17 @@
 """ADP Workforce Now public career centers (small/mid employers, schools). Token: the career
 center's cid, e.g. "89da4960-4d45-4b46-b7aa-5959c5f71827". The list has no descriptions, so
 in-region internships get one detail call each (capped)."""
+
 from __future__ import annotations
 from .common import board_item, counts_of, html_to_text, mark_complete, reported_count, rows_of
 from ..classify import is_internship
 from ..region import maybe_in_region
 
 API = "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions"
-JOB_URL = ("https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html"
-           "?cid={cid}&ccId=19000101_000001&jobId={job}&lang=en_US")
+JOB_URL = (
+    "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html"
+    "?cid={cid}&ccId=19000101_000001&jobId={job}&lang=en_US"
+)
 PARAMS = {"lang": "en_US", "locale": "en_US", "ccId": "19000101_000001"}
 PAGE, MAX_SKIP, MAX_DETAIL = 100, 1000, 25
 
@@ -60,10 +63,20 @@ def parse_adp(payload: dict, co: dict, cid: str) -> tuple[list[dict], int]:
             counts.discard("outside_region")
             continue
         job = _string_field(r, "ExternalJobID")
-        url = JOB_URL.format(cid=cid, job=job) if job else \
-            f"https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid={cid}"
-        it = board_item(co, source="adp", title=title, locations=locs, url=url,
-                        posted_at=r.get("postDate"), employment_type=emp)
+        url = (
+            JOB_URL.format(cid=cid, job=job)
+            if job
+            else f"https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid={cid}"
+        )
+        it = board_item(
+            co,
+            source="adp",
+            title=title,
+            locations=locs,
+            url=url,
+            posted_at=r.get("postDate"),
+            employment_type=emp,
+        )
         it["_adp_id"] = r.get("itemID")
         out.append(it)
     return out, int((payload.get("meta") or {}).get("totalNumber") or 0)
@@ -95,7 +108,7 @@ def fetch_adp_board(c, co: dict) -> list[dict]:
             break
     else:
         if skip < total:
-            counts.stop("page_cap")   # MAX_SKIP reached with requisitions left
+            counts.stop("page_cap")  # MAX_SKIP reached with requisitions left
     n = 0
     for it in out:
         if n >= MAX_DETAIL or not any(maybe_in_region(l) for l in it["locations"]):

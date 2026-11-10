@@ -4,6 +4,7 @@ Counts describe observed input, not a claim about all internships on the interne
 Call from the coordinator thread after fetch workers finish; this collector is not
 thread-safe. Missing stages remain absent rather than masquerading as zero.
 """
+
 from __future__ import annotations
 
 from collections import Counter
@@ -62,9 +63,17 @@ def _scan_gaps(scan: dict, returned: int) -> list[dict]:
 
 
 def _new_scan_bucket() -> dict:
-    return {"boards": 0, "read_boards": 0, "read": 0, "returned_by_read_boards": 0,
-            "discovered_boards": 0, "discovered": 0, "discarded": Counter(),
-            "capped": 0, "stops": Counter()}
+    return {
+        "boards": 0,
+        "read_boards": 0,
+        "read": 0,
+        "returned_by_read_boards": 0,
+        "discovered_boards": 0,
+        "discovered": 0,
+        "discarded": Counter(),
+        "capped": 0,
+        "stops": Counter(),
+    }
 
 
 def _add_scan(bucket: dict, scan: dict, returned: int) -> None:
@@ -88,9 +97,12 @@ def _finish_scan_bucket(bucket: dict) -> dict:
     if bucket["stops"]:
         out["stops"] = dict(bucket["stops"])
     if bucket["read_boards"]:
-        out.update(read_boards=bucket["read_boards"], read=bucket["read"],
-                   returned_by_read_boards=bucket["returned_by_read_boards"],
-                   discarded=dict(bucket["discarded"]))
+        out.update(
+            read_boards=bucket["read_boards"],
+            read=bucket["read"],
+            returned_by_read_boards=bucket["returned_by_read_boards"],
+            discarded=dict(bucket["discarded"]),
+        )
     if bucket["discovered_boards"]:
         out.update(discovered_boards=bucket["discovered_boards"], discovered=bucket["discovered"])
     return out
@@ -122,8 +134,17 @@ class IngestMetrics:
             key = f"rejected_{stage}_{reason}"
             self.by_source.setdefault(_label(source), Counter())[key] += 1
 
-    def board_result(self, source: str, board: str, status: str, *, count: int = 0,
-                     cause: str | None = None, complete: bool = False, scan: dict | None = None):
+    def board_result(
+        self,
+        source: str,
+        board: str,
+        status: str,
+        *,
+        count: int = 0,
+        cause: str | None = None,
+        complete: bool = False,
+        scan: dict | None = None,
+    ):
         """Record the FINAL outcome after retries; repeated boards replace their outcome.
 
         The board token is hashed so reports cannot accidentally publish a URL or token.
@@ -144,8 +165,15 @@ class IngestMetrics:
             result["scan"] = _scan(scan)
         self.boards[(_label(source), board_id)] = result
 
-    def source_result(self, source: str, status: str, *, count: int = 0,
-                      cause: str | None = None, scan: dict | None = None):
+    def source_result(
+        self,
+        source: str,
+        status: str,
+        *,
+        count: int = 0,
+        cause: str | None = None,
+        scan: dict | None = None,
+    ):
         """Record a whole non-board source (community list, Google Jobs, a public feed).
 
         Statuses: success, empty (ran and returned nothing), partial (some of its searches
@@ -161,8 +189,14 @@ class IngestMetrics:
             result["scan"] = _scan(scan)
         self.sources[_label(source)] = result
 
-    def export_result(self, total: int, *, open_count: int | None = None,
-                      held: int = 0, unplaced: int | None = None):
+    def export_result(
+        self,
+        total: int,
+        *,
+        open_count: int | None = None,
+        held: int = 0,
+        unplaced: int | None = None,
+    ):
         self.export = {"total": _count(total), "held": _count(held)}
         for name, value in (("open", open_count), ("unplaced", unplaced)):
             if value is not None:
@@ -186,34 +220,50 @@ class IngestMetrics:
             if scan:
                 _add_scan(scans.setdefault(source, _new_scan_bucket()), scan, result["returned"])
                 for gap in _scan_gaps(scan, result["returned"]):
-                    discrepancies.append({"between": ["scan", "returned"], "source": source,
-                                          "board_id": board_id, **gap})
+                    discrepancies.append(
+                        {
+                            "between": ["scan", "returned"],
+                            "source": source,
+                            "board_id": board_id,
+                            **gap,
+                        }
+                    )
         feeds = {}
         for source, result in sorted(self.sources.items()):
             feeds[source] = dict(result)
             for gap in _scan_gaps(result.get("scan") or {}, result["returned"]):
                 discrepancies.append({"between": ["scan", "returned"], "source": source, **gap})
-        for before, after, reject_stage in (("fetched", "parsed", "normalize"),
-                                             ("parsed", "accepted", "filter")):
+        for before, after, reject_stage in (
+            ("fetched", "parsed", "normalize"),
+            ("parsed", "accepted", "filter"),
+        ):
             if before in self.funnel and after in self.funnel:
-                difference = (self.funnel[before] - self.funnel[after]
-                              - sum(self.rejections[reject_stage].values()))
+                difference = (
+                    self.funnel[before]
+                    - self.funnel[after]
+                    - sum(self.rejections[reject_stage].values())
+                )
                 if difference:
-                    discrepancies.append({"between": [before, after],
-                                          "unaccounted": difference})
+                    discrepancies.append({"between": [before, after], "unaccounted": difference})
         # What the boards handed over has to be what the pipeline counted as fetched for them.
         # Only checked where both sides were measured for that source.
         for source, bucket in sorted(summary.items()):
             fetched = self.by_source.get(source, {}).get("fetched")
             if fetched is not None and fetched != bucket["returned"]:
-                discrepancies.append({"between": ["boards_returned", "fetched"], "source": source,
-                                      "unaccounted": bucket["returned"] - fetched})
+                discrepancies.append(
+                    {
+                        "between": ["boards_returned", "fetched"],
+                        "source": source,
+                        "unaccounted": bucket["returned"] - fetched,
+                    }
+                )
         if "accepted" in self.funnel and "unique" in self.funnel:
             duplicate_count = self.funnel["accepted"] - self.funnel["unique"]
         else:
             duplicate_count = None
         return {
-            "schema_version": 2, "started_at": self.started_at,
+            "schema_version": 2,
+            "started_at": self.started_at,
             "funnel": dict(self.funnel),
             "by_source": {s: dict(c) for s, c in sorted(self.by_source.items())},
             "rejections": {s: dict(c) for s, c in self.rejections.items()},
@@ -224,10 +274,12 @@ class IngestMetrics:
             "sources": feeds,
             "export": dict(self.export) if self.export is not None else None,
             "discrepancies": discrepancies,
-            "limits": ["board_scans covers successful board scans only. A key missing there was "
-                       "not measured, and discovered sums only the boards whose API reported a total.",
-                       "Export totals may include prior-run listings and closed listings.",
-                       "Counts do not estimate the share of all online internships covered."],
+            "limits": [
+                "board_scans covers successful board scans only. A key missing there was "
+                "not measured, and discovered sums only the boards whose API reported a total.",
+                "Export totals may include prior-run listings and closed listings.",
+                "Counts do not estimate the share of all online internships covered.",
+            ],
         }
 
     def write(self, path: str | Path):
