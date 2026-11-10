@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 import html
-import logging
-import os
 from collections import Counter
 import re
 from datetime import timezone
@@ -11,7 +9,7 @@ from datetime import timezone
 import httpx
 
 from ..config import USER_AGENT
-from ..console_log import console
+from ..console_log import console_exception
 from ..geo import REMOTE_RE, _NON_US, state_of
 
 # 2026-10-23: retain complete fetched text until export extracts eligibility (DQ-1).
@@ -71,16 +69,6 @@ def robots_blocks(rules: list[tuple[str, str]], path: str) -> bool:
     return blocked
 
 
-def log_source_failure(context: str, error: Exception) -> None:
-    """Log a previously silent failure in JSON mode using a static source and operation."""
-    if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
-        try:
-            console(context, level=logging.WARNING, exception_type=type(error).__name__)
-        except (OSError, ValueError):
-            # An unavailable console must not interrupt the source's fallback.
-            pass
-
-
 def robots_allows(c, base: str, path: str) -> bool:
     """Whether the host at `base` ("https://careers-sig.icims.com") lets us request `path`.
 
@@ -96,7 +84,7 @@ def robots_allows(c, base: str, path: str) -> bool:
                 body = ""
             _ROBOTS[base] = robots_rules(body)
         except Exception as e:
-            log_source_failure("[sources] robots lookup failed", e)
+            console_exception("[sources] robots lookup failed", type(e).__name__)
             _ROBOTS[base] = []  # nothing said is nothing forbidden
     return not robots_blocks(_ROBOTS[base], path)
 

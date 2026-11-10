@@ -3,6 +3,7 @@ center's cid, e.g. "89da4960-4d45-4b46-b7aa-5959c5f71827". The list has no descr
 in-region internships get one detail call each (capped)."""
 
 from __future__ import annotations
+from ..console_log import console_exception
 from .common import (
     board_item,
     counts_of,
@@ -10,7 +11,6 @@ from .common import (
     mark_complete,
     reported_count,
     rows_of,
-    log_source_failure,
 )
 from ..classify import is_internship
 from ..region import maybe_in_region
@@ -129,7 +129,7 @@ def fetch_adp_board(c, co: dict) -> list[dict]:
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = html_to_text(d.json().get("requisitionDescription"))
         except Exception as e:
-            log_source_failure("[adp] job detail failed", e)
+            console_exception("[adp] job detail failed", type(e).__name__)
     # Every requisition up to meta.totalNumber, not stopped at MAX_SKIP (1,000).
     mark_complete(co, well_formed and reported is not None and rows == reported)
     return out

@@ -8,7 +8,8 @@ Rippling gives a posting date. Checked live on four tenants, all the same shape.
 
 from __future__ import annotations
 import re
-from .common import board_item, counts_of, html_to_text, mark_complete, log_source_failure
+from ..console_log import console_exception
+from .common import board_item, counts_of, html_to_text, mark_complete
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -76,7 +77,7 @@ def fetch_rippling_board(c, co: dict) -> list[dict]:
                 it["description"] = desc
                 it["posted_at"] = posted or it["posted_at"]
         except Exception as e:
-            log_source_failure("[rippling] job detail failed", e)
+            console_exception("[rippling] job detail failed", type(e).__name__)
     for it in items:
         it.pop("_rp_uuid", None)
     mark_complete(co, complete)

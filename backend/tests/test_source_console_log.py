@@ -2,6 +2,7 @@ import json
 
 import httpx
 import pytest
+from internscout import console_log
 from internscout.sources import common, houseai, uhn
 
 
@@ -87,13 +88,28 @@ def test_uhn_failure_keeps_its_diagnostic_and_return(monkeypatch, capsys, log_fo
         }
 
 
-def test_unavailable_json_console_does_not_interrupt_source_fallback(monkeypatch):
+@pytest.mark.parametrize("output_error", [BrokenPipeError, RuntimeError])
+def test_unavailable_json_console_does_not_interrupt_source_fallback(monkeypatch, output_error):
     monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
     monkeypatch.setattr(common, "_ROBOTS", {})
+    attempted = []
 
     def unavailable(*args, **kwargs):
-        raise BrokenPipeError
+        attempted.append((args, kwargs))
+        raise output_error
 
-    monkeypatch.setattr(common, "console", unavailable)
-    with httpx.Client(transport=httpx.MockTransport(unavailable)) as client:
+    requests = []
+
+    def respond(request):
+        requests.append(request.url.path)
+        raise TimeoutError("synthetic private request detail")
+
+    monkeypatch.setattr(console_log, "console", unavailable)
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
         assert common.robots_allows(client, "https://board.test", "/postings")
+        assert common.robots_allows(client, "https://board.test", "/more")
+
+    assert requests == ["/robots.txt"]
+    assert len(attempted) == 1
+    assert attempted[0][0] == ("[sources] robots lookup failed",)
+    assert attempted[0][1]["exception_type"] == "TimeoutError"

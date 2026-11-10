@@ -23,8 +23,8 @@ import re
 from datetime import date, datetime
 
 from .base import client
-from ..console_log import console
-from .common import ScanCounts, board_item, html_to_text, report_source, log_source_failure
+from ..console_log import console, console_exception
+from .common import ScanCounts, board_item, html_to_text, report_source
 from ..classify import is_internship
 
 HUB_URL = "https://www.houseaiapp.com/careers"
@@ -128,7 +128,7 @@ def fetch_houseai(report=None) -> list[dict]:
                     page = c.get(f"{SITE}/careers/{slug}")
                     page.raise_for_status()
                 except Exception as e:
-                    log_source_failure("[houseai] job detail failed", e)
+                    console_exception("[houseai] job detail failed", type(e).__name__)
                     counts.discard("unreadable")
                     continue
                 item = parse_houseai_page(page.text)

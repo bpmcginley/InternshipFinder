@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from ..console_log import console_exception
 from .common import (
-    log_source_failure,
     RobotsDisallowed,
     ScanCounts,
     board_item,
@@ -261,7 +261,7 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                     dl, desc = parse_workday_detail(d.json())
                     locs = board_locations(tenant, dl) or locs
             except Exception as e:
-                log_source_failure("[workday] job detail failed", e)
+                console_exception("[workday] job detail failed", type(e).__name__)
         out.append(
             board_item(
                 co,

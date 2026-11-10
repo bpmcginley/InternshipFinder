@@ -9,8 +9,8 @@ a listing its description.
 """
 
 from __future__ import annotations
+from ..console_log import console_exception
 from .common import (
-    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -97,7 +97,7 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
                 it["description"] = html_to_text(job.get("description"))
                 it["posted_at"] = job.get("datePosted") or it["posted_at"]
         except Exception as e:
-            log_source_failure("[bamboohr] job detail failed", e)
+            console_exception("[bamboohr] job detail failed", type(e).__name__)
     for it in items:
         it.pop("_bh_id", None)
     mark_complete(co, complete)

@@ -17,8 +17,8 @@ from __future__ import annotations
 import json
 import re
 import urllib.parse
+from ..console_log import console_exception
 from .common import (
-    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -179,6 +179,6 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = parse_taleo_detail(d.text)
         except Exception as e:
-            log_source_failure("[taleo] job detail failed", e)
+            console_exception("[taleo] job detail failed", type(e).__name__)
     mark_complete(co, complete)
     return out

@@ -13,8 +13,8 @@ copy to tag a job by.
 """
 
 from __future__ import annotations
+from ..console_log import console_exception
 from .common import (
-    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -108,6 +108,6 @@ def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = parse_smartrecruiters_detail(d.json())
         except Exception as e:
-            log_source_failure("[smartrecruiters] job detail failed", e)
+            console_exception("[smartrecruiters] job detail failed", type(e).__name__)
     mark_complete(co, complete)
     return out

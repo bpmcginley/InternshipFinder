@@ -5,7 +5,8 @@ one job-page fetch for the description (capped)."""
 from __future__ import annotations
 import html
 import re
-from .common import board_item, counts_of, html_to_text, log_source_failure
+from ..console_log import console_exception
+from .common import board_item, counts_of, html_to_text
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -67,5 +68,5 @@ def fetch_jobvite_board(c, co: dict) -> list[dict]:
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = parse_jobvite_detail(d.text)
         except Exception as e:
-            log_source_failure("[jobvite] job detail failed", e)
+            console_exception("[jobvite] job detail failed", type(e).__name__)
     return out

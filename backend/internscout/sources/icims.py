@@ -20,7 +20,8 @@ health, nursing and education listings live.
 from __future__ import annotations
 import json
 import re
-from .common import board_item, counts_of, html_to_text, require_robots, log_source_failure
+from ..console_log import console_exception
+from .common import board_item, counts_of, html_to_text, require_robots
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -157,5 +158,5 @@ def fetch_icims_board(c, co: dict) -> list[dict]:
                 it["description"] = desc or it["description"]
                 it["posted_at"] = posted or it["posted_at"]
         except Exception as e:
-            log_source_failure("[icims] job detail failed", e)
+            console_exception("[icims] job detail failed", type(e).__name__)
     return items
