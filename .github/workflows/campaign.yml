@@ -19,9 +19,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - uses: ./.github/actions/python
       - name: Fonts, Pillow and ffmpeg
         # Without ffmpeg the pack still has its slides, and no videos.
         run: |
@@ -32,7 +30,6 @@ jobs:
       - name: Write the pack
         run: python growth/campaign.py docs --out=campaign
       # 2026-11-02: give students real role titles to search/share, backed by the current export.
-      # was: only the search slideshow and rotating tip. Revert: remove this step.
       - name: Write source-backed title discovery sheets
         id: titles
         # A thin/stale supplemental pack must not discard the already-generated main pack.

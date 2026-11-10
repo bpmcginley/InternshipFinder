@@ -25,14 +25,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: ./.github/actions/python
         with:
-          python-version: "3.12"
           cache: pip
-      - name: Install deps
+          install-backend: 'true'
+      - name: Install test dependencies
         working-directory: backend
         run: |
-          pip install -r requirements.txt
           # pillow: growth/cards.py's tests draw a real card (DejaVu is on the runner image).
           # cryptography: growth/metrics.py signs the Search Console sign-in with it.
           pip install pytest pillow cryptography
@@ -48,9 +47,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
+      - uses: ./.github/actions/node
       - name: Run tests
         working-directory: worker
         run: node --test test/
@@ -66,14 +63,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
+      - uses: ./.github/actions/node
       - name: Run tests
         run: node --test extension/test/*.test.mjs
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - uses: ./.github/actions/python
       - name: Verify reproducible extension packaging and safe release retries
         run: python -m unittest discover -s scripts -p 'test_release_extension.py'
 
@@ -84,8 +77,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
+      - uses: ./.github/actions/node
       - name: Run tests
         run: node --test tests/site/*.test.mjs

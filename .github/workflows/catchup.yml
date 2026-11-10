@@ -34,10 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          sparse-checkout: growth
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+          sparse-checkout: |
+            growth
+            .github/actions
+      - uses: ./.github/actions/python
       - name: Start what is overdue
         env:
           GITHUB_TOKEN: ${{ github.token }}
