@@ -27,7 +27,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-1.10 Flyer page | Unassigned | - | - | Queued | Browser-local QR; no third-party requests. |
 | A | P-1.11 Install and offer | Unassigned | - | - | Queued | Preserve permissions explanation; demo clip from Bruce. |
 | A | P-2.1 Follow design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
-| A | P-2.2 Top-up design | product lead | `codex/product-p2.2-topup-design` | - | Review; needs-bruce | [Proposed words and data lifecycle](P-2.2-topup-design.md); approve price, refunds, retention, terms and privacy before build. |
+| A | P-2.2 Top-up design | product lead | `codex/product-p2.2-topup-design` | [#178](https://github.com/bpmcginley/InternshipFinder/pull/178) | Review; needs-bruce | [Proposed words and data lifecycle](P-2.2-topup-design.md); approve price, refunds, retention, terms and privacy before build. |
 | B | P-1.5a Dashboard phone layout | Unassigned | - | - | Queued | Respect app.js and design-token ownership. |
 | B | P-1.5b Generated phone layout | Unassigned | - | - | Queued | Only before WP-3.1 or after WP-3.5; update golden if available. |
 | B | P-1.6 Checked-open evidence | audit_growth_generated | - | - | Skipped as written | last_seen proves observation, not a direct application-link check. |
