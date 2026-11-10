@@ -67,7 +67,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary in review | Default text and streams preserved. Remaining sources follow the canary review. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
-| 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
+| 4 | WP-1.4 Growth logging, operator reports | wp42_orders | `refactor/wp-1.4-logging-growth-safe` | - | Prepared locally | Audience and outreach summaries preserve default output. JSON omits the local outreach path. |
+| 4 | WP-1.4 Growth logging, remaining scopes | Unassigned | - | - | Queued / scoped holds | Preserve workflow payloads. Coordinate claimed modules and review raw provider errors and credentials separately. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | In review | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config | Unassigned | - | - | Queued | Inventory worker URL consumers before generating area modules. |
 | 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | In review | Extract three role-index helpers, retaining the orders.js exports. |
@@ -444,3 +445,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - The first file move puts `shardOf`, `cleanRole`, and `readShard` in `worker/src/orders/roles.js`. Role-only patterns move with them, and the shared listing-ID/control patterns and bad-request factory have one home in `worker/src/orders/shared.js`. `orders.js` explicitly re-exports the existing public names.
 - Compared all moved bodies and declarations to the original bytes, and checked that the rest of `orders.js` differs only by imports and re-exports. The shard reader still fetches per call through the injected fetch and reads the billing URL at call time. The Node suite passed all 342 tests under Node 22.23.4, and all 15 local Workers tests passed in six files. Golden matched all 695 files. JavaScript lint reported zero errors or warnings. The Worker type report retained 914 existing errors.
+
+## WP-1.4 growth operator diagnostics
+
+- Audited 126 direct print calls in growth production modules at main `14143d37`. Moved the four audience display call sites and the single outreach summary to the shared console helper. The weekly report consumes `audience.tiers()` directly, and the outreach workflow uploads the two draft files from its output directory. Neither reads the operator console lines.
+- Plain output preserves the report's tier order, blank lines, summary and stdout. JSON mode formats the same audience counts and published major labels, and removes the local outreach destination. Draft file content and filenames stay the same. Both commands reuse their existing imports for direct script and package entry points.
+- Deferred workflow payloads include the report Markdown, directory monitor JSON, digest schedule GitHub output and metrics JSON. Product owns digest and every-major changes, and WP-2.4 owns the social and Instagram config edits. Credential flow, raw provider error messages and remaining publish/draft diagnostics need separate review before migration.
+- Focused mocked console and existing outreach/report checks passed 28 tests. Golden matched all 695 files. Ruff correctness checks and Git diff checks passed.
