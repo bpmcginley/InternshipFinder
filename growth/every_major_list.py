@@ -230,6 +230,12 @@ def render(ctx: dict, per_field: int, repo: str = REPO) -> str:
         "UMass Amherst.\n",
         f"**Updated {updated(ctx)}.** Other start terms, or roles near you? "
         f"[Search all {ctx['total']:,} open roles on InternScout](https://internscout.org), free, no account.\n",
+        # 2026-11-04: explain the generated list before readers reach the long tables.
+        # Revert: remove this paragraph from render().
+        "**How to use this list:** Choose a field below, or open its full list for more roles. "
+        "Apply links go to employer sites. Employers can close roles after this list updates, "
+        "so check the posting before applying. [Report a problem or suggest an improvement]"
+        "(https://github.com/bpmcginley/InternshipFinder/issues).\n",
         "## Contents\n",
         f"- [New this week](#new-this-week) ({len(ctx['new']):,})\n- [About this list](#about-this-list)\n",
         f"| Field | {TERM} roles | Full list |\n|---|---:|---|",

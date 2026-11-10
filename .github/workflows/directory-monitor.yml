@@ -1,0 +1,27 @@
+name: Directory listing check
+
+# 2026-11-04: public read-only checks; an unknown response is not a lost listing.
+# Revert: remove this workflow and growth/directory_monitor.py.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '27 13 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/python
+      - run: python growth/directory_monitor.py > directory-status.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: directory-status
+          path: directory-status.json
+          retention-days: 30

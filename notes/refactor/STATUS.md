@@ -13,9 +13,9 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration merged in PR #183 with green Pages run 42871996393. Mechanical formatting remains blocked by the notice period and open PRs; later waves do not start ahead of it. All six baseline suites passed.
+- Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration merged in PR #183 with green Pages run 42871996393. Existing PR integration and subsequent mechanical formatting are now authorized without the earlier time/queue gate; later waves still follow the ordered plan. All six baseline suites passed.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
-- External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
+- [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) is now explicitly authorized for integration and lead merge. Its agent owns directory monitoring, growth documentation, and `growth/every_major_list.py` until integration finishes. Recheck open PRs and coordinate overlapping files before every wave; the authorization does not permit discarding others' work.
 - Product-session coordination: read `notes/product/HANDOFF.md` section 3 from [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170). Refactor has structural right of way; avoid hot files claimed by open `product: ...` draft PRs. The notice above announces the upcoming WP-0.3 window with several hours to clear product PRs; formatting has not started.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
 
@@ -55,8 +55,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | Merged | Independent review, green CI, and green Pages run 42867413022. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review, green CI, and green Pages run 42864974798. |
 | 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
-| 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
-| 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
+| 2 | WP-0.3 Python formatting | Unassigned | - | - | Authorized; not started | Time/queue gate lifted by Bruce; coordinate ownership, mechanical-only PR and blame-ignore entry. |
+| 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Authorized; not started | Time/queue gate lifted; separate mechanical PR, protected guard tests unchanged. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
 | 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
@@ -236,7 +236,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | Q3 | WP-4.3 financial routes; WP-5.1 buy | May checkout/refund routing move beyond file moves into new auth/limiter wrappers or module integration? Section 9 requires a decision for that scope. | Contract inventory and characterization may proceed; financial behavior restructuring remains paused. |
 | Q4 | WP-2.1 state-label normalization only | State maps use different DC display labels. Are these intentional presentation differences? | Inventory and generation may preserve distinct representations; no silent label unification or user-visible text change. |
 | G1 | WP-4.1 adoption | Bruce verifies actual production schema and marks the baseline migration applied; deployment-script change follows only afterward. | Prepare and test locally; no production commands. |
-| G2 | WP-0.3 formatting | No other PR may remain open during mechanical formatting. External PR #165 and remaining product PRs are open. Notice published 2026-11-10 12:40:47 Eastern; earliest start 16:00 Eastern (21:00 UTC). | From notice until formatting merges, product finishes/closes existing PRs and opens no new work; wait for both the notice period and a quiet window. |
+| G2 | WP-0.3 formatting | Original 16:00 Eastern and empty-queue restrictions superseded by Bruce's explicit 2026-11-10 instruction to finish queued PRs and proceed now. | Continue file ownership, separate worktrees, independent review, green CI and Pages gates. |
 | G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | No cutover yet; observation clock has not started. |
 
 ## Waiting for deploy
@@ -258,7 +258,7 @@ None. No worker/database deployment or extension release was performed.
 
 ## Next update
 
-Next implementation: the separate Python and JavaScript mechanical-formatting PRs, only after 16:00 Eastern on 2026-11-10 and a fresh open-PR check confirms the quiet window. Until then, formatting and waves 3-7 remain queued. Fetch and reread both hand-offs/status files before resuming; use separate owned worktrees, independent reviews, all-green CI, and Pages verification after each merge. Do not close unrelated PRs to manufacture a quiet window.
+Finish the explicitly authorized existing PR integrations, then the separate Python and JavaScript mechanical-formatting PRs without waiting for the superseded time/queue gates. Fetch and reread both hand-offs/status files; preserve separate ownership, independent reviews, all-green CI, Pages verification after each merge, and the ordered later waves. Do not discard unrelated work.
 
 ## WP-0.6 validation and coordination
 
@@ -281,6 +281,14 @@ Next implementation: the separate Python and JavaScript mechanical-formatting PR
 - Fetched main at `4144e5ae`. PR #180 has merged; its Pages run 42876965306 and subsequent data-refresh Pages run 42877725984 passed. Four PRs remain open: #165, #175, #177 and #178. No formatting has run. The 16:00 Eastern earliest start and empty-queue requirement remain in force.
 - **Q5, coordination:** product STATUS records Bruce's explicit instruction to retain #175, #177 and #178 for review; #165 belongs to another session. This prevents satisfying the empty-queue rule. Asked Bruce whether these four retained PRs may be exempt after the notice period or whether formatting must continue waiting. No exemption is assumed.
 - Read-only JavaScript scope audit: the pinned Prettier command covers 142 eligible tracked files; guard.js, its protected direct/transitive tests, vendor and minified assets remain excluded. Source-inferred obstacle: protected `extension/test/batch_focus.test.mjs:63,98,147` matches exact source layout in eligible implementation files. Formatting could break it; do not edit the protected test. Preserve those implementation regions or narrow scope if confirmed during an authorized formatting run.
+
+## Authorized PR #165 integration
+
+- Q5 is resolved by Bruce's subsequent instruction: finish and merge the retained existing PRs, including #165, now; the 16:00 Eastern and empty-queue gates are lifted. Other authorization boundaries and merge checks remain unchanged. The earlier waiting-state entries are historical.
+- Created a separate owned integration worktree from PR #165's existing head, then merged main normally. Read all seven original changed files in full. The new weekly directory workflow uses the shared Python action after a full checkout; its schedule, read-only permissions, command and artifact retention are unchanged by integration.
+- Explicitly authorized behavior: a weekly public-directory GET check with robots handling and unknown status for blocked/unrecognizable pages; one how-to paragraph added to the separately generated every-major README; dated research and draft guidance. No directory check, message, submission, manual workflow run, or remote write was performed during validation.
+- Focused tests: 25 passed (`test_directory_monitor.py`, `test_every_major_list.py`, `test_outreach.py`). The full offline Pages golden build matched all 695 files without a refresh. A separate network-disabled generator comparison on synthetic golden data produced 11 Markdown files: all ten field files were byte-identical; only README gained the approved paragraph. A second generator pass was identical. `git diff --check` passed.
+- Second-agent review and final-head CI are required before the lead merges PR #165; Pages verification follows that merge.
 - Golden copies public assets verbatim (`backend/tests/golden_build.py:43`), so formatting eligible `docs/js` files can alter output hashes even when runtime behavior is unchanged. Do not silently refresh the manifest. Review every affected output and resolve the hand-offs' baseline restrictions before proceeding. The blanket JavaScript command also includes financial modules, which remain subject to section 9 and Q3. These are source-inferred risks, not observed formatter or test failures.
 
 ## Retained PR #175 integration
