@@ -59,7 +59,7 @@ export const ROUTES = Object.freeze([
     "/profile",
     "user",
     "none",
-    "JSON {profile: object|null, updated: ISO|null}; unreadable saved data can return {broken: true}",
+    "JSON {profile: object|null, updated: ISO|null}",
     "sync",
   ),
   route(

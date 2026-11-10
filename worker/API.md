@@ -16,7 +16,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `GET /session` | session | none | Authorization: Bearer session token | JSON {account, provider, tier, expires, copyable: boolean} |
 | `POST /session/copy` | session | none | Authorization: Bearer session token; no body | JSON {session, account, provider, tier, expires} |
 | `DELETE /session` | optional-session | none | Optional bearer token; no body | JSON {ok: true}; unknown or absent tokens also succeed |
-| `GET /profile` | user | sync | none | JSON {profile: object\|null, updated: ISO\|null}; unreadable saved data can return {broken: true} |
+| `GET /profile` | user | sync | none | JSON {profile: object\|null, updated: ISO\|null} |
 | `PUT /profile` | user | sync | JSON {profile: object, updated: ISO}; maximum 256 KB | JSON {ok: true, updated: ISO}; stale error also includes saved profile and updated |
 | `DELETE /profile` | user | sync | none | JSON {ok: true} |
 | `DELETE /me` | user | none | none | JSON {ok: true}; 409 subscribed while billing blocks deletion |
