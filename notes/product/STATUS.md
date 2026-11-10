@@ -33,7 +33,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-2.1 Follow design | Refactor lead (integration) | `codex/product-p2.1-follow-design` | [#177](https://github.com/bpmcginley/InternshipFinder/pull/177) | Reviewed; refactor-owned merge | Refactor lead owns the design-note integration/merge. Unspecified email scope, retention and sending choices still need Bruce before build. |
 | A | P-2.2 Top-up design | Refactor lead (integration) | `codex/product-p2.2-topup-design` | [#178](https://github.com/bpmcginley/InternshipFinder/pull/178) | Reviewed; refactor-owned merge | Independent design/existing webhook-path review complete; refactor lead owns the note integration/merge. Unspecified price, grant/refund/deletion and wording choices still need Bruce before build. |
 | B | P-1.5a Dashboard phone layout | Unassigned | - | - | Queued | Respect app.js and design-token ownership. |
-| B | P-1.5b Generated phone layout | Unassigned | - | - | Queued | Only before WP-3.1 or after WP-3.5; update golden if available. |
+| B | P-1.5b Generated phone layout | audit_growth_generated | `codex/product-p1.5b-generated-phone` | Draft being opened | In progress | Refactor lead released Python after #192 Pages passed. Owns seo_pages.py table/nav changes, relevant backend tests, golden pair and screenshots; before WP-3.1. |
 | B | P-1.6 Checked-open evidence | audit_growth_generated | - | - | Skipped as written | last_seen proves observation, not a direct application-link check. |
 | B | P-1.8 Out-of-runs arrival | Unassigned | - | - | Queued | Plan text needs Bruce; top-up stays absent until supported. |
 | C | P-1.9 Employer entry | Unassigned | - | - | Queued | Generated-page hot-file rule. |
