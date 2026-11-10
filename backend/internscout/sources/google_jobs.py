@@ -8,11 +8,13 @@ free-text queries + location, so companies NOT in our ATS registry still get fou
 
 from __future__ import annotations
 import json
+import logging
 import os
 import httpx
 from .base import client
 from .common import ScanCounts, report_source
 from ..config import DATA_DIR
+from ..console_log import console
 from ..us_metros import metro_searches
 
 # Errors are logged by status or type only: httpx puts the request URL in the message, and that URL
@@ -94,7 +96,7 @@ def fetch_google_jobs(
 
     api_key = api_key or os.environ.get("SERPAPI_KEY")
     if not api_key:
-        print("[google_jobs] no SERPAPI_KEY set; skipping")
+        console("[google_jobs] no SERPAPI_KEY set; skipping")
         report_source(report, "google_jobs", skipped="no_api_key")
         return []
     if max_searches is None:
@@ -104,12 +106,12 @@ def fetch_google_jobs(
     # once-a-day test below and spent the day's paid searches a second time (and a third, for the
     # next push). The 250-search plan at 8 a day has no room for that, so a push never searches.
     if os.environ.get("GITHUB_EVENT_NAME") == "push" and not os.environ.get("SERPAPI_EVERY_RUN"):
-        print("[google_jobs] push-triggered run; paid searches are left to the scheduled run")
+        console("[google_jobs] push-triggered run; paid searches are left to the scheduled run")
         report_source(report, "google_jobs", skipped="push_run")
         return []
     today = now.date().isoformat()
     if not os.environ.get("SERPAPI_EVERY_RUN") and not is_daily_run(today):
-        print("[google_jobs] already searched today (UTC); skipping this run")
+        console("[google_jobs] already searched today (UTC); skipping this run")
         report_source(report, "google_jobs", skipped="already_searched_today")
         return []
     account = None
@@ -119,12 +121,16 @@ def fetch_google_jobs(
             r.raise_for_status()
             account = r.json()
     except Exception as e:
-        print(f"[google_jobs] account check failed ({type(e).__name__}); assuming the free plan")
+        console(
+            f"[google_jobs] account check failed ({type(e).__name__}); assuming the free plan",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
     max_searches = daily_budget(
         account, max_searches, int(os.environ.get("SERPAPI_MONTHLY_SEARCHES", "100"))
     )
     left = (account or {}).get("total_searches_left")
-    print(
+    console(
         f"[google_jobs] budget today {max_searches} (searches left this month: {left if left is not None else 'unknown'})"
     )
     if max_searches <= 0:
@@ -175,7 +181,7 @@ def fetch_google_jobs(
         + focus
         + [(q, loc) for loc in locations for q in picked][: max(0, max_searches)]
     ]
-    print(
+    console(
         f"[google_jobs] {len(national)} top-50 metro, {len(daily)} daily, {len(focus)} focus search(es), then {len(picked)} quer(ies) x "
         f"{len(locations)} location(s) (cap {max_searches})"
     )
@@ -206,7 +212,10 @@ def fetch_google_jobs(
                     # Asked again once. SerpApi keeps a finished search for an hour and a repeat of
                     # the same search is answered from that for free, so this costs nothing when the
                     # first search finished after we stopped waiting.
-                    print(f"[google_jobs] '{q}' @ {loc} timed out; asking once more")
+                    console(
+                        f"[google_jobs] '{q}' @ {loc} timed out; asking once more",
+                        level=logging.WARNING,
+                    )
                     r = c.get(URL, params=params, timeout=SEARCH_TIMEOUT)
                 r.raise_for_status()
                 payload = r.json()
@@ -259,15 +268,25 @@ def fetch_google_jobs(
             except httpx.HTTPStatusError as e:
                 metro_failed = metro_failed or bool(cbsa)
                 failed, error = failed + 1, e
-                print(f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}")
+                console(
+                    f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}",
+                    level=logging.WARNING,
+                )
                 if e.response.status_code == 429:  # quota gone: the rest will fail the same way
-                    print("[google_jobs] out of searches; stopping for this run")
+                    console(
+                        "[google_jobs] out of searches; stopping for this run",
+                        level=logging.WARNING,
+                    )
                     counts.stop("quota")
                     break
             except Exception as e:
                 metro_failed = metro_failed or bool(cbsa)
                 failed, error = failed + 1, e
-                print(f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}")
+                console(
+                    f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}",
+                    level=logging.WARNING,
+                    exception_type=type(e).__name__,
+                )
     report_source(
         report,
         "google_jobs",
