@@ -4,7 +4,7 @@ Updated: 2026-11-10. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
-- Product hand-off read in full from `origin/product/handoff-docs`; [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170) merged as `b8e08d1f` after independent review and all checks passed. Refactor hand-off and status read in full. Its Pages run is being monitored.
+- Product hand-off read in full from `origin/product/handoff-docs`; [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170) merged as `b8e08d1f` after independent review and all checks passed. Refactor hand-off and status read in full. Its [Pages run passed](https://github.com/bpmcginley/InternshipFinder/actions/runs/42864401492).
 - Initial read-only audits cover site, worker, extension, growth, generated pages, and every product hand-off verification item. Evidence below distinguishes source findings from executed checks and account settings that cannot be inferred from source.
 - Original checkout has unrelated uncommitted work and remains untouched. Each implementation package uses its own worktree, branch, PR, and independent reviewer.
 - Before each package: fetch origin, reread refactor status, and list open PRs. Refactor structure has right of way. Stop new PRs for its announced formatting window. Never force-push, rewrite history, deploy the worker, release the extension, send outreach, or submit applications. Preserve MuseWork.md and others' work.
@@ -17,8 +17,8 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
-| 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Reviewed; CI pending | Independent site-audit reviewer found no blocker. |
-| 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | - | In progress | needs-bruce: worker merge and deploy. |
+| 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged | `3eb55beb`; independent review and green CI; Pages pending verification. |
+| 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | [#175](https://github.com/bpmcginley/InternshipFinder/pull/175) | In review; needs-bruce | All 16 names and bounded-total tests; local worker suites pass. Independent review/CI, privacy approval, worker merge and deploy remain. |
 | A | P-1.1 Company runs | Unassigned | - | - | Queued | First app.js package; draft claim, screenshots, tests. |
 | A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
@@ -82,8 +82,8 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
-| 2026-11-10 | P-0.2 worker merge and deploy | Counter PR will be linked when ready. | - |
-| 2026-11-10 | P-0.2 privacy wording for new named events | Existing enumeration omits new actions; proposed wording will accompany counter PR for approval. | - |
+| 2026-11-10 | P-0.2 worker merge and deploy | [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175); independent review and green CI before Bruce merges. Deploy only after approved disclosure is published. | - |
+| 2026-11-10 | P-0.2 privacy wording for new named events | [Exact proposed wording](P-0.2-counter-review.md) is unapproved; published policy remains unchanged. | - |
 | 2026-11-10 | Approve every Stage 2 design note | Exact words, stored data, retention and deletion will be supplied before build. | - |
 | 2026-11-10 | Top-up price, size, Stripe price and secret | P-2.2 design first; never put private identifiers in the repo. | - |
 | 2026-11-10 | Postal address and follow-email wording | P-2.1 design first; account sending entitlement also needs verification. | - |
