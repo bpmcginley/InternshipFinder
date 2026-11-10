@@ -301,3 +301,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Python formatting PR #190 merged as `f38bd93e` after independent exact-AST/comment/golden review and all nine CI checks passed. Pages build succeeded, but deployment was cancelled at its ten-minute timeout: run 42887701389, deployment job 130081009359. No later main push superseded it. No source/test/build failure was reported; deployment did not finish green.
 - Per HANDOFF section 3, prepared a new revert PR immediately. It reverses merge #190 with an ordinary revert commit, preserving all four retained PR merges and history. No manual publishing workflow was dispatched. The 166-file Python formatting remains available in its original branch for a later reviewed retry.
 - JavaScript formatting PR #189 is independently approved and all nine checks passed, but remains unmerged while publishing recovery is verified. Wave 3 implementation remains queued; read-only preparation is complete. Counter deployment/disclosure and design-note implementation gates remain unchanged.
+
+
+## Python formatting retry preparation
+
+- Recovery PR #191 merged as `8cf6add6` after independent exact-tree review and all nine checks passed; its Pages run must be green before any next main merge.
+- Prepared a new retry using only the 166 previously reviewed Python files. Verified the recovered baseline source exactly matches pre-format main before reapplying, and the resulting files exactly match approved PR #190. The new pure-format SHA is recorded in blame-ignore metadata afterward. No workflow, public asset, golden fixture, or runtime behavior changes.
+- Prior full backend/golden/packaging/integrated-directory validations remain recorded in PR #190; CI reruns every suite on this retry. Independent review is required. No manual publishing workflow is dispatched, and deployment/release restrictions remain in force.
+- All four retained PRs (#165, #175, #177, #178) remain merged with green Pages. The counter worker changes await approved disclosure and operator deployment; design-note implementation choices remain gated.
