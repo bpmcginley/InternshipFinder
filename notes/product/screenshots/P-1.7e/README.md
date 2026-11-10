@@ -35,4 +35,4 @@ Reproduce with the existing golden build tooling and isolated temporary playwrig
 4. Run `node notes/product/screenshots/P-1.7e/capture.cjs <baseline-site> before` and `node notes/product/screenshots/P-1.7e/capture.cjs <current-workspace/site> after`.
 5. Run `python notes/product/screenshots/P-1.7e/verify_delta.py <baseline-site>`.
 
-The existing founder-name test now excludes only the exact requested public repository `href` attribute. It continues rejecting founder names in visible text, metadata and other attributes. No public text naming the founder was added.
+The existing founder-name test uses HTMLParser to exclude only an actual anchor's `href` value equal to the requested public repository URL. Regression cases reject the literal attribute string in visible text, `data-href`, other elements/attributes, comments, script text, case variants and escaped names. Final SEO/distribution validation passes all 158 tests; Ruff and diff checks pass. Production source, public assets, golden files and screenshots remain byte-identical to the reviewed implementation. No public text naming the founder was added.
