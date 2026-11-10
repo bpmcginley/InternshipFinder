@@ -15,6 +15,8 @@ Observed in each browser context: twelve rows before, five displayed rows after,
 
 The existing 150-result pagination remains separate from displayed counts. A collapsed button counts only the remainder of its current-page run. Loading another page grows that run; an already expanded run stays expanded. Header selection includes only displayed listings and revealing rows does not select them.
 
+Validation: 244 baseline site tests, then 251 passing updated tests under Node 22 with no skips. The startup payload report exits 0: app gzip grows by 802 bytes, dashboard HTML by 36 bytes. This is a payload measurement, not browser timing. After merging main's golden harness, the comparison detected only `index.html` and `js/app.js`; the intentional refresh updates only those hashes and corresponding archive bytes. Both golden tests pass, including deliberate template-mutation rejection. Generated page families are unchanged.
+
 Reproduce with Node and an isolated tooling directory, outside the repository:
 
 ```powershell
