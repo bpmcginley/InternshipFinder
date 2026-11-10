@@ -1,7 +1,9 @@
 """Offline checks for the ingest and export console formats."""
 
+import io
 import json
-from contextlib import nullcontext
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext, redirect_stdout
 from types import SimpleNamespace
 
 import pytest
@@ -129,3 +131,43 @@ def test_board_exception_log_is_opt_in_and_only_reports_type(monkeypatch, capsys
             },
             *({"level": "INFO", "message": line} for line in lines),
         ]
+
+
+@pytest.mark.parametrize("stream_error", [BrokenPipeError, RuntimeError])
+def test_board_diagnostic_stream_failure_keeps_results_and_shuts_down(monkeypatch, stream_error):
+    monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
+    monkeypatch.setattr(run_ingest, "ATS_WORKERS", {"separate": 1})
+    failure = ValueError("synthetic board failure")
+    success = run_ingest.BoardItems([{"title": "Example intern"}], complete=True)
+    started, stopped, writes = [], [], []
+
+    class TrackedExecutor(ThreadPoolExecutor):
+        def __init__(self, max_workers):
+            super().__init__(max_workers)
+            started.append(self)
+
+        def shutdown(self, wait=True, *, cancel_futures=False):
+            super().shutdown(wait=wait, cancel_futures=cancel_futures)
+            stopped.append(self)
+
+    class UnavailableStream(io.StringIO):
+        def write(self, text):
+            writes.append(text)
+            raise stream_error("synthetic output failure")
+
+    def fetch(c, ats, co):
+        if ats == "separate":
+            raise failure
+        return success
+
+    monkeypatch.setattr(run_ingest, "ThreadPoolExecutor", TrackedExecutor)
+    monkeypatch.setattr(run_ingest, "_fetch_board", fetch)
+    jobs = [("separate", "failure", {}), ("other", "success", {})]
+    with redirect_stdout(UnavailableStream()):
+        results = run_ingest._fetch_boards(None, jobs, workers=2)
+
+    assert results["separate", "failure"] is failure
+    assert results["other", "success"] is success
+    assert len(started) == 2
+    assert stopped == started
+    assert len(writes) == 1

@@ -10,14 +10,13 @@ Usage:
 
 from __future__ import annotations
 import argparse
-import logging
 import os
 import time
 import httpx
 from collections import Counter
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .console_log import console
+from .console_log import console, console_exception
 from .sources import (
     fetch_github_lists,
     fetch_google_jobs,
@@ -140,12 +139,7 @@ def _fetch_boards(c, jobs: list, workers: int) -> dict:
                 res[futs[f]] = f.result()
             except Exception as e:
                 res[futs[f]] = e
-                if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
-                    console(
-                        "[boards] board fetch failed",
-                        level=logging.WARNING,
-                        exception_type=type(e).__name__,
-                    )
+                console_exception("[boards] board fetch failed", type(e).__name__)
     finally:
         for ex in pools:
             ex.shutdown()
