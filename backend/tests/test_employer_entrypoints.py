@@ -29,4 +29,4 @@ def test_employer_cta_does_not_add_application_links_or_change_indexing(tmp_path
     assert h.count('data-employer-entry="footer"') == 1
     assert h.count('class="go"') == len(rows)
     assert 'class="prose employer-offer"' in h
-    assert 'Hiring for Example Co?' in h
+    assert 'Work at Example Co? See how students find your roles, and feature them.' in h
