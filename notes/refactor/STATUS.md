@@ -42,7 +42,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
 | 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI, and green Pages run 42863632275. |
-| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | Pending PR | In review | Two repeated golden passes and full local backend passed; independent exact-head review and Linux CI before merge. |
+| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | [#179](https://github.com/bpmcginley/InternshipFinder/pull/179) | In review | Two repeated golden passes and full local backend passed; independent exact-head review and Linux CI before merge. |
 | 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | Merged | Independent review and green CI; Pages confirmation pending. |
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | Pending | In progress | Report-only Python and Node artifacts; no thresholds. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review and green CI; Pages confirmation pending. |
