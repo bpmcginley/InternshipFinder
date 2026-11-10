@@ -14,6 +14,50 @@
   const PLACE_NOTICE_KEY = "internscout.placements.notice.v1";
   const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
+  const MYLIST_KEY = "internscout.mylist.v1", VISIT_KEY = "internscout.visit.v1";
+  // Saved SEARCHES keep SAVED_KEY. Membership is independent of application history in LS_KEY.
+  const publicRole = r => ({ company: typeof r.company_name === "string" ? r.company_name.slice(0, 200) : "",
+    title: typeof r.title === "string" ? r.title.slice(0, 300) : "",
+    url: typeof r.apply_url === "string" && r.apply_url.length <= 2000 && /^https?:\/\//i.test(r.apply_url) ? r.apply_url : "",
+    shards: [...IS.shardKeys(r)].filter(k => /^(?:[A-Z]{2}|remote|Canada)$/.test(k)) });
+  function readMyList(raw, states) {
+    if (!raw || raw.version !== 1 || !raw.roles || typeof raw.roles !== "object" || Array.isArray(raw.roles)) {
+      return { version: 1, roles: Object.fromEntries(Object.entries(states).filter(([, s]) => s !== "none" && APP_STATES.includes(s)).map(([id]) => [id, { saved: true }])) };
+    }
+    return { version: 1, roles: Object.fromEntries(Object.entries(raw.roles).filter(([, r]) => r && typeof r.saved === "boolean").map(([id, r]) => [id, {
+      saved: r.saved, ...publicRole({ company_name: r.company, title: r.title, apply_url: r.url }),
+      shards: Array.isArray(r.shards) ? r.shards.filter(k => typeof k === "string" && /^(?:[A-Z]{2}|remote|Canada)$/.test(k)) : [],
+    }])) };
+  }
+  function writeLocal(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; } }
+  function savedRoleRows(rows, roles) {
+    const current = new Map(rows.map(r => [String(r.id), r]));
+    return Object.entries(roles).filter(([, r]) => r.saved).map(([id, r]) => current.get(id) || {
+      id, company_name: r.company || "Saved role " + id, title: r.title || "Listing details unavailable", apply_url: r.url || "", _savedMissing: true,
+    });
+  }
+  function sinceVisit(row, previous, now) {
+    // Exported SQL timestamps omit an offset but are UTC; do not interpret them as local wall time.
+    const value = row.first_seen, seen = Date.parse(typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value) ? value + "Z" : value);
+    return row.status === "open" && Number.isFinite(previous) && previous > 0 && previous <= now && Number.isFinite(seen) && seen > previous && seen <= now;
+  }
+  // Current rows first, then one location hint per unresolved role, then the remaining public shards.
+  // Await even an in-flight key: loadedKeys() includes promises that have not settled yet.
+  async function resolveSavedRoles(store, index, roles, paint, live) {
+    const ids = Object.keys(roles).filter(id => roles[id].saved), failed = new Set();
+    const missing = () => { const known = new Set(store.all().map(r => String(r.id))); return ids.filter(id => !known.has(id)); };
+    if (!missing().length || !index || !index.files) return [];
+    const valid = new Set(Object.keys(index.files));
+    const hints = [...new Set(missing().map(id => (roles[id].shards || []).find(k => valid.has(k))).filter(Boolean))];
+    for (const phase of [hints, [...valid].filter(k => !hints.includes(k))]) {
+      for (let i = 0; i < phase.length && live() && missing().length; i += 4) {
+        const bad = await store.ensure(phase.slice(i, i + 4));
+        if (!live()) return null;
+        bad.forEach(k => failed.add(k)); paint();
+      }
+    }
+    return missing().length ? [...failed] : [];
+  }
   const STATE_LABEL = { none: "Not started", interested: "Interested", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
   const JOB_LABEL = { queued: "Queued", working: "Agent working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
   const ATS = { greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", workday: "Workday", smartrecruiters: "SmartRecruiters", icims: "iCIMS", icims_site: "iCIMS", oracle: "Oracle", bamboohr: "BambooHR", workable: "Workable", taleo: "Taleo" };
@@ -379,17 +423,18 @@
   // `needsAccess` (U11): with the extension installed, a row whose application is not on a site Auto-Apply
   // already has access to (SUPPORTED_ATS) says, quietly, that it will ask for that site first.
   // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns }) {
-  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer }) {
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer, saved, onSave, myList, fresh, missingText }) {
     const [aaOpen, setAaOpen] = useState(false);
     const whyBtn = useRef(), statusSel = useRef();
     const asking = !!ask && (state === "none" || state === "interested") && !job;
-    const needsAccess = canAuto && !!r.apply_url && !SUPPORTED_ATS.has(r.ats);
+    const needsAccess = canAuto && !r._savedMissing && !!r.apply_url && !SUPPORTED_ATS.has(r.ats);
     // Who the row is, for the names of its repeated controls (U12): "Open posting, Acme, Data Intern".
     const who = `${r.company_name}, ${r.title}`;
     // The line goes once answered; focus moves to the row's status, which now shows the answer, rather
     // than falling back to the top of the page.
-    const answer = applied => { onAnswer(r.id, applied); setTimeout(() => { if (statusSel.current && statusSel.current.focus) statusSel.current.focus(); }, 0); };
-    const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
+    const focusProgress = () => setTimeout(() => { const target = statusSel.current || document.getElementById("listings"); if (target && target.focus) target.focus(); }, 0);
+    const answer = applied => { onAnswer(r.id, applied); focusProgress(); };
+    const tryAuto = !canAuto && canTry && !r._savedMissing && r.apply_url && SUPPORTED_ATS.has(r.ats);
     const scored = !!ctx.p;
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
@@ -405,20 +450,20 @@
       h("tr", { id: "listing-" + r.id, tabIndex: -1, className: cx(checked && "sel", open && "opened", sc.mismatch && "dim") },
         // was: "aria-label": "Select " + r.company_name, the same name on every row from one employer.
         canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": `Select ${r.company_name}, ${r.title}`, checked,
-          disabled: !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
+          disabled: r._savedMissing || !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
         h("td", { className: "c-co" },
           // A badge that says New has to mean new and still open: is_new alone is only the scan window, and
           // the export keeps closed rows too.
-          h("div", { className: "li-head" }, h(CompanyTile, { name: r.company_name }), h("span", { className: "co" }, r.company_name), r.is_new && r.status === "open" && h("span", { className: "new" }, "New"),
+          h("div", { className: "li-head" }, h(CompanyTile, { name: r.company_name }), h("span", { className: "co" }, r.company_name), fresh && h("span", { className: "new" }, "New since your last visit"),
             h("span", { className: "sr" }, ", "), dot, h("span", { className: "role" }, r.title)),
           // was: the facts line built here; factsLine (above) since 2026-10-14, shared with the paid box.
-          factsLine(r, keys),
+          r._savedMissing ? h("div", { className: "meta" }, missingText) : factsLine(r, keys),
           (posted || dates || r.status === "closed") && h("div", { className: "meta" }, posted, posted && dates ? " · " : "", dates, r.status === "closed" && h("span", { className: "closed" }, (posted || dates ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
         // was: the score button (or Rank for my major and Details) built here; matchControl (above) since
         // 2026-10-14, shared with the paid box so both show the one score from the same scoreOf.
-        h("td", { className: "c-match" }, matchControl({ r, sc, scored, open, onToggle: () => onWhy(r.id), onRank, btnRef: whyBtn, onKeyDown: whyKey, panelId: "why-" + r.id })),
+        h("td", { className: "c-match" }, !r._savedMissing && matchControl({ r, sc, scored, open, onToggle: () => onWhy(r.id), onRank, btnRef: whyBtn, onKeyDown: whyKey, panelId: "why-" + r.id })),
         h("td", { className: "c-links" },
           // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
           // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
@@ -427,7 +472,7 @@
           // onOpen (U9): remembered so the page can ask "Did you apply?" when the student comes back.
           r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined, onClick: () => onOpen(r) },
             "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, `, ${who} (opens in a new tab)`)) : h("span", { className: "muted" }, "No link"),
-          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", title: "Fills from your resume. You review and submit.", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
+          !job && canAuto && !r._savedMissing && r.apply_url && h("button", { type: "button", className: "rowbtn", title: "Fills from your resume. You review and submit.", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
             "Auto-Apply", h("span", { className: "sr" }, ": " + who)),
           !job && needsAccess && h("span", { className: "aa-note", id: "acc-" + r.id, title: "This application is on the employer's own site. The first time, Auto-Apply asks you to allow that one site." }, "asks for site access"),
           tryAuto && h("button", { type: "button", className: "rowbtn try", title: "Fills from your resume. You review and submit.", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply", h("span", { className: "sr" }, ": " + who))),
@@ -435,7 +480,9 @@
         h("td", { className: "c-mine" },
           // was: "aria-label": "Your status" on all 150 selects, then "Your status for " + r.title (two employers'
           // "Software Engineering Intern" rows read the same).
-          h("select", { className: "mine", ref: statusSel, "aria-label": `Your status for ${r.title} at ${r.company_name}`, value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
+          h("button", { type: "button", className: cx("btn small save-role", saved && "on"), ref: !myList ? statusSel : undefined,
+            "aria-pressed": !!saved, "aria-label": `Save ${r.title} at ${r.company_name}`, onClick: () => onSave(r) }, saved ? "Saved" : "Save"),
+          myList && h("select", { className: "mine", ref: statusSel, "aria-label": `Your status for ${r.title} at ${r.company_name}`, value: state, onChange: e => { onState(r.id, e.target.value); focusProgress(); } }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status)))),
       // "Did you apply?" (U9): its own full-width row under the listing, like the Why panel.
       asking && h("tr", { className: "ask", id: "ask-" + r.id }, h("td", { colSpan: cols },
@@ -916,9 +963,22 @@
     const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...link }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
     const [saved, setSaved] = useState(() => IS.ls.get(SAVED_KEY, []) || []);
+    const [myList, setMyList] = useState(false), [myProgress, setMyProgress] = useState("");
+    const [myLimit, setMyLimit] = useState(PAGE), [myRetry, setMyRetry] = useState(0);
+    const [myLoad, setMyLoad] = useState({ checking: false, failed: [] });
+    const [roleBook, setRoleBook] = useState(() => readMyList(IS.ls.get(MYLIST_KEY, null), appStates));
+    const roleBookRef = useRef(roleBook); roleBookRef.current = roleBook;
+    const [trackerStored, setTrackerStored] = useState(true);
+    const [visitStart] = useState(() => Date.now());
+    const [previousVisit, setPreviousVisit] = useState(() => IS.ls.get(VISIT_KEY, null));
+    const keepRoleBook = useCallback(next => { roleBookRef.current = next; setRoleBook(next); if (!writeLocal(MYLIST_KEY, next)) setTrackerStored(false); }, []);
+    useEffect(() => { keepRoleBook(roleBookRef.current); if (!writeLocal(VISIT_KEY, visitStart)) setTrackerStored(false); }, []);
+    const savedIds = Object.keys(roleBook.roles).filter(id => roleBook.roles[id].saved), savedIdsKey = JSON.stringify(savedIds);
     const [openId, setOpenId] = useState(null);
-    const [limit, setLimit] = useState(PAGE);
-    const [sel, setSel] = useState(() => new Set());
+    const [browseLimit, setLimit] = useState(PAGE);
+    const [browseSel, setBrowseSel] = useState(() => new Set()), [mySel, setMySel] = useState(() => new Set());
+    const sel = myList ? mySel : browseSel, setSel = myList ? setMySel : setBrowseSel;
+    const selectionSetter = useRef(setSel); selectionSetter.current = setSel;
     const [note, setNote] = useState("");
     // A classmate's invite code waiting for sign-in, and the student's own invite panel (worker/src/referral.js).
     const [invited, setInvited] = useState(() => IS.ls.get(IS.INVITE_KEY, null));
@@ -1034,6 +1094,14 @@
       })();
       return () => { live = false; clearTimeout(timer); cancelAnimationFrame(frame); };
     }, [ready, planKey, retry]);
+
+    useEffect(() => {
+      if (!myList || !ready) return;
+      let live = true; setMyLoad({ checking: true, failed: [] });
+      resolveSavedRoles(store.current, index, roleBookRef.current.roles, () => setVer(store.current.version()), () => live)
+        .then(failed => { if (live) setMyLoad({ checking: false, failed: failed || [] }); });
+      return () => { live = false; };
+    }, [myList, ready, savedIdsKey, myRetry]);
 
     // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
     // Each description file is about the size of its listing file (MA: 0.9 MB), so they are fetched only
@@ -1304,6 +1372,14 @@
         if (el) el.focus();
       }, 0);
     }
+    function clearTracker() {
+      appStatesRef.current = {}; setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
+      const empty = { version: 1, roles: {} }; roleBookRef.current = empty; setRoleBook(empty); IS.ls.del(MYLIST_KEY); IS.ls.del(VISIT_KEY); setPreviousVisit(null);
+    }
+    function deleteTracker() {
+      if (!window.confirm("Delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? This cannot be undone.")) return;
+      clearTracker(); setTimeout(() => { const heading = document.getElementById("listings"); if (heading) heading.focus(); }, 0);
+    }
     async function deleteData() {
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
@@ -1313,8 +1389,8 @@
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
       setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
-      if ((Object.keys(appStates).length || saved.length || ghToken) && window.confirm("Also delete your applied/saved statuses and saved searches from this browser? Cancel keeps them.")) {
-        setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
+      if ((Object.keys(appStates).length || saved.length || ghToken || Object.keys(roleBook.roles).length || previousVisit || visitStart) && window.confirm("Also delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? Cancel keeps them.")) {
+        clearTracker();
         try { localStorage.removeItem("internscout.gh_token"); } catch (e) { } setGhToken("");
       }
       // was: setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
@@ -1326,7 +1402,18 @@
 
     // The statuses as of the last render, for listeners added once (the "Did you apply?" check below).
     const appStatesRef = useRef(appStates); appStatesRef.current = appStates;
-    const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
+    const setAppState = useCallback((id, v) => {
+      // Compose queue, prompt and Save callbacks before React renders the batch. Save must never
+      // initialize Interested over a newer Applied/Interviewing/Offer update in that same batch.
+      const n = { ...appStatesRef.current, [id]: v }; if (v === "none") delete n[id];
+      appStatesRef.current = n; setAppStates(n); IS.ls.set(LS_KEY, n);
+      // Queue and return-prompt updates preserve an explicit unsave, while new history joins My list.
+      const book = roleBookRef.current;
+      if (v !== "none" && !Object.hasOwn(book.roles, String(id))) {
+        const row = store.current.all().find(r => String(r.id) === String(id));
+        keepRoleBook({ ...book, roles: { ...book.roles, [id]: { saved: true, ...(row ? publicRole(row) : {}) } } });
+      }
+    }, [keepRoleBook]);
     // Queue updates and batch Auto-Apply also set statuses; only the student's own status control
     // can offer this invitation. Never perform prompt side effects inside a React state updater.
     // Stable, like the rows' other handlers: rows are memoized, and a new function here each render
@@ -1338,6 +1425,15 @@
       setAppState(id, v);
     }, [setAppState]);
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
+    const myListRef = useRef(myList); myListRef.current = myList;
+    const toggleSaved = useCallback(r => {
+      const book = roleBookRef.current, before = book.roles[String(r.id)], on = !(before && before.saved);
+      keepRoleBook({ ...book, roles: { ...book.roles, [r.id]: { ...(before || {}), ...(!r._savedMissing ? publicRole(r) : {}), saved: on } } });
+      if (on) { IS.count("save_role"); if (!appStatesRef.current[r.id] || appStatesRef.current[r.id] === "none") setManualAppState(r.id, "interested"); }
+      if (!on) setMySel(previous => new Set([...previous].filter(id => String(id) !== String(r.id))));
+      if (!on && myListRef.current) setTimeout(() => { const heading = document.getElementById("listings"); if (heading) heading.focus(); }, 0);
+    }, [keepRoleBook, setManualAppState]);
+    const showMyList = on => { if (on && !myList) { IS.count("mylist_open"); setMyLoad({ checking: true, failed: [] }); } setMyList(on); };
     // "More filters" remembers whether it was open; the count is how many of the controls inside it
     // are set to something other than their default, so a hidden filter is never a silent one.
     const [moreOpen, setMoreOpenRaw] = useState(() => !!IS.ls.get(MORE_KEY, false));
@@ -1365,6 +1461,15 @@
     useEffect(() => { Object.entries(jobs).forEach(([id, j]) => { if (j.status === "submitted" && (appStates[id] || "none") === "none") setAppState(id, "applied"); }); }, [jobs]);
 
     const all = useMemo(() => store.current.all(), [ver]);
+    useEffect(() => {
+      const book = roleBookRef.current; let next = book;
+      for (const row of all) {
+        const old = book.roles[String(row.id)]; if (!old || !old.saved) continue;
+        const entry = { ...publicRole(row), saved: true };
+        if (JSON.stringify(entry) !== JSON.stringify(old)) { if (next === book) next = { ...book, roles: { ...book.roles } }; next.roles[row.id] = entry; }
+      }
+      if (next !== book) keepRoleBook(next);
+    }, [all, savedIdsKey, keepRoleBook]);
     // anywhere: no states on the profile (or no profile), so no place scores above another.
     const ctx = useMemo(() => { const { direct, related } = IS.profileFields(p, majors); return { p, direct, related, keys: new Set(IS.profileKeys(p)), anywhere: !(p && p.states && p.states.length) }; }, [p, majors]);
     // Which of a listing's places the row shows first: one in the scope, or the place searched for.
@@ -1372,8 +1477,8 @@
     // was: rows in `keys` only. With every state in scope it is every row loaded (less remote-only rows
     // for a profile that turned remote off).
     const inView = useMemo(() => !viewSet
-      ? (scope.noRemote ? all.filter(x => [...IS.shardKeys(x)].some(k => k !== "remote" && k !== "US")) : all)
-      : all.filter(x => { for (const k of IS.shardKeys(x)) if (viewSet.has(k)) return true; return false; }), [all, viewSet, scope.noRemote]);
+      ? all.filter(x => [...IS.shardKeys(x)].some(k => (!scope.noRemote || (k !== "remote" && k !== "US")) && (everything || legacy || keys.includes(k))))
+      : all.filter(x => { for (const k of IS.shardKeys(x)) if (viewSet.has(k)) return true; return false; }), [all, viewSet, scope.noRemote, everything, legacy, keysKey]);
     // was: a Map of every row in view, rebuilt whenever a file landed. Kept per row now, so the 56 files
     // of a nationwide search each score only their own rows.
     const scoreOf = useMemo(() => { const m = new WeakMap(); return x => { let v = m.get(x); if (!v) { v = IS.score(x, ctx); m.set(x, v); } return v; }; }, [ctx]);
@@ -1423,7 +1528,8 @@
     // sort, and hands back each row's relevance too. was: the same code inline here, as one useMemo returning
     // rows, with `ranked` worked out just above it. It moved so tests can prove what may and may not change it.
     const listed = useMemo(() => IS.listRows(inView, f, { cq, scoreOf, p, elig, blockers, appStates, jobs }), [inView, cq, f, appStates, jobs, elig, scoreOf, p]);
-    const rows = listed.rows, ranked = listed.ranked;
+    const myRows = useMemo(() => savedRoleRows(all, roleBook.roles), [all, roleBook]);
+    const rows = myList ? myRows.filter(r => !myProgress || (appStates[r.id] || "none") === myProgress) : listed.rows, ranked = !myList && listed.ranked;
 
     // Paid listings (2026-10-14, B2 plan section 5; js/placements.js). Everything above (the list, its order,
     // every score and count) is finished before this runs, and nothing here writes to it: ISPlace.pick only
@@ -1448,14 +1554,15 @@
       || (p && p.terms && p.terms.length && IS.termFit(x, p.terms) < .8)), [scoreOf, p, placeElig]);
     // The last pick, kept while it still fits, so the box doesn't swap as files land or filters change.
     const placedRef = useRef(null);
-    const placed = useMemo(() => PL ? PL.pick({ placements, rows, rel: listed.rel, ranked, fieldsSet: f.fields.length > 0, appState: f.app_state,
+    const placed = useMemo(() => PL && !myList ? PL.pick({ placements, rows, rel: listed.rel, ranked, fieldsSet: f.fields.length > 0, appState: f.app_state,
       loading, day: new Date().toISOString().slice(0, 10), exclude, hidden: placeHidden, prev: placedRef.current, rand: Math.random }) : null,
-    [placements, listed, loading, placeHidden, exclude, f.fields.length, f.app_state]);
+    [placements, listed, loading, placeHidden, exclude, f.fields.length, f.app_state, myList]);
     if (placed) placedRef.current = placed;
 
     const [expandedRuns, setExpandedRuns] = useState(() => new Set());
+    const limit = myList ? myLimit : browseLimit;
     const pageRows = rows.slice(0, limit);
-    const { shown, moreAfter } = companyRuns(pageRows, f, expandedRuns);
+    const { shown, moreAfter } = companyRuns(pageRows, myList ? { sort: "company", q: "" } : f, expandedRuns);
     // Every file loaded: the list itself is the whole country.
     const allLoaded = everything && !loading;
     // was: stats.open, else the sum of index.files[].open, which counts a role filed in two states twice
@@ -1490,13 +1597,15 @@
     const check = useCallback((id, on) => {
       const n = new Set(selectionRef.current);
       if (on && !n.has(id) && n.size >= IS.SELECT_MAX) { flashSelNote(`Select up to ${IS.SELECT_MAX} applications at a time. Queue these first, then select more.`); return; }
-      on ? n.add(id) : n.delete(id); selectionRef.current = n; setSel(n);
+      on ? n.add(id) : n.delete(id); selectionRef.current = n; selectionSetter.current(n);
     }, []);
     const onWhy = useCallback(id => setOpenId(o => o === id ? null : id), []);
     // was: rows with no job of their own. A row whose apply link a job already holds is skipped by the
     // extension too, so the header checkbox no longer picks it.
     const held = useMemo(() => IS.heldUrls(queue), [queue]);
-    const selectable = shown.filter(r => r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url));
+    const selectable = shown.filter(r => !r._savedMissing && r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url));
+    const selectedRows = all.filter(r => sel.has(r.id) && r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url)
+      && (!myList || (roleBook.roles[String(r.id)] && roleBook.roles[String(r.id)].saved)));
     // was: selectable.slice(0, 100).every(r => sel.has(r.id)), which could stay unchecked for good (IS.headerChecked).
     const allChecked = IS.headerChecked(selectable, sel);
     const selectShown = on => {
@@ -1538,7 +1647,8 @@
       // was: the listing ids of the added and skipped jobs alone, so a listing skipped for sharing its
       // apply link with another listing's job stayed selected for good.
       const handledIds = new Set([...addedIds, ...IS.handledListingIds(batch, res, current && current.queue)]);
-      setSel(s => new Set([...s].filter(id => !handledIds.has(String(id)))));
+      const unhandled = s => new Set([...s].filter(id => !handledIds.has(String(id))));
+      setBrowseSel(unhandled); setMySel(unhandled);
       // was: if (added) IS.count("autoapply");
       if (added) { IS.count("autoapply"); offerNudge(); }
       setNote(`Queued ${plural(added, "application")}${skipped ? ` (${skipped} already queued)` : ""}.${remaining.length ? ` ${remaining.length} more remain selected; queue them in the next batch.` : ""} Each one is filled in and left for you to submit.`);
@@ -1753,7 +1863,13 @@
     // The live region (2026-10-14): the count or the empty message, said once the list has settled for
     // a moment after the student changes something, not on every key or file. was: role=status on the
     // count itself, which changed with each file landing and each pause in typing.
-    const liveText = loading || counting ? "" : rows.length ? `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${asked ? " " + asked : ""} in ${whereWords}.` : emptyText;
+    const myChecking = !ready || myLoad.checking;
+    const missingText = err || myLoad.failed.length ? "Couldn't check current listing data. Saved information is shown."
+      : myChecking ? "Checking current listing data. Saved information is shown."
+        : "Not in the current listing data. Current posting status unknown.";
+    const myListCount = `${shown.length} of ${rows.length} saved role${rows.length === 1 ? "" : "s"} shown${myProgress ? ` (${savedIds.length} total)` : ""}`;
+    const liveText = myList ? `${myListCount}.${myChecking ? " Checking current listing data." : ""}`
+      : loading || counting ? "" : rows.length ? `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${asked ? " " + asked : ""} in ${whereWords}.` : emptyText;
     const [spoken, setSpoken] = useState("");
     const expandRun = run => {
       setExpandedRuns(previous => new Set([...previous, run.key]));
@@ -1765,7 +1881,7 @@
     const firstF = useRef(f), touched = useRef(false);
     if (f !== firstF.current) touched.current = true;
     useEffect(() => {
-      if (!touched.current || !liveText) return;
+      if ((!touched.current && !myList) || !liveText) return;
       const t = setTimeout(() => setSpoken(liveText), 900);
       return () => clearTimeout(t);
     }, [liveText]);
@@ -2028,7 +2144,16 @@
           inviteNote && h("span", { className: "muted", role: "status" }, inviteNote))),
 
       h("section", { id: "results", "aria-labelledby": "listings" },
-      h("h2", { id: "listings", className: "sr", tabIndex: -1 }, "Listings"),
+      h("h2", { id: "listings", className: "sr", tabIndex: -1 }, myList ? "My list" : "Listings"),
+      h("div", { className: "list-views", role: "group", "aria-label": "Listing views" },
+        h("button", { type: "button", className: cx("btn", !myList && "on"), "aria-pressed": !myList, onClick: () => showMyList(false) }, "Browse roles"),
+        h("button", { type: "button", className: cx("btn", myList && "on"), "aria-pressed": myList, onClick: () => showMyList(true) }, `My list (${savedIds.length})`)),
+      !trackerStored && h("p", { className: "notice", role: "status" }, "Browser storage is unavailable. Changes to My list last only in this tab."),
+      myList && h("div", { className: "filters" },
+        h(Sel, { label: "My list progress", value: myProgress, onChange: v => { setMyProgress(v); setMyLimit(PAGE); } }, opt("", "Any progress"), APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
+        h("span", { className: "muted" }, "Saved roles stay in this browser."),
+        h("button", { type: "button", className: "btn quiet", onClick: deleteTracker }, "Delete browser tracker"),
+        canAuto && h("button", { type: "button", className: "btn primary", disabled: !selectedRows.length || queuing, onClick: () => autoApply(selectedRows) }, queuing ? "Adding applications…" : "Auto-Apply", selectedRows.length ? ` ${selectedRows.length} selected` : "")),
       digestVisible && h("div", { className: "notice quietnote", role: "note", "aria-label": "Weekly internship email" },
         "Want new internships in your inbox every Monday? ",
         h("a", { href: "/digest/?from=dashboard-contextual", "data-digest-placement": "contextual", onClick: () => finishDigestNudge("opened") }, "Get the free weekly email"),
@@ -2037,7 +2162,7 @@
       // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
       // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows
       // how many of them are set so nothing is hidden by surprise.
-      h("div", { className: "filters", role: "search" },
+      !myList && h("div", { className: "filters", role: "search" },
         h("div", { className: "field search" }, h(SearchBox, { value: f.q, onChange: v => upd("q", v) })),
         f.company.length > 0 && h("button", { type: "button", className: "btn", title: "Show every employer", onClick: () => upd("company", []) },
           "Employer: " + f.company[0], h("span", { className: "i i-cross", "aria-hidden": true })),
@@ -2052,8 +2177,8 @@
         h("button", { type: "button", className: cx("btn morebtn", (moreOpen || moreCount > 0) && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
           moreOpen ? "Fewer filters" : "More filters", moreCount > 0 ? ` · ${moreCount}` : ""),
         h("span", { className: "spacer" }),
-        canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size || queuing, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, queuing ? "Adding applications…" : "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
-      moreOpen && h("div", { className: "filters extra" },
+        canAuto && h("button", { type: "button", className: "btn primary", disabled: !selectedRows.length || queuing, onClick: () => autoApply(selectedRows) }, queuing ? "Adding applications…" : "Auto-Apply", selectedRows.length ? ` ${selectedRows.length} selected` : "")),
+      !myList && moreOpen && h("div", { className: "filters extra" },
         h(Sel, { label: "Stage", value: f.stage, onChange: v => upd("stage", v) }, opt("", "Any stage"), IS.STAGES.map(([k, l]) => opt(k, (IS.STAGE_LABEL[k] || l)))),
         h(Sel, { label: "Eligible year", value: f.year, onChange: v => upd("year", v) }, opt("", "Any year"), IS.YEARS.map(([k, l]) => opt(k, "Open to " + l.toLowerCase().replace("master's", "master's").replace("phd", "PhD")))),
         opts.sectors.length > 0 && h(Sel, { label: "Sector", value: f.sector, onChange: v => upd("sector", v) }, opt("", "Any sector"), opts.sectors.map(([k, n]) => opt(k, `${IS.sectorLabel(k)} (${n})`))),
@@ -2076,7 +2201,9 @@
       // 5 so far"). The clear button names what it clears. The description search is offered here, in the line,
       // instead of in a notice of its own above the list (D16).
       // was: "N listings match · loading more states (x of y)…", then "Clear filters" whenever anything was set.
-      h("div", { className: "filterbar-foot" },
+      myList ? h("div", { className: "filterbar-foot" },
+        h("span", null, myListCount, myChecking ? " · Checking current listing data…" : ""),
+        (myLoad.failed.length > 0 || err) && h("button", { type: "button", className: "btn quiet", onClick: () => { if (err) reload(false); else setMyRetry(n => n + 1); } }, "Retry saved role details")) : h("div", { className: "filterbar-foot" },
         // was: role=status on this span; the live region below says the count once it settles.
         h("span", { className: "countline" }, counting ? "Loading…" : h(F, null,
           loading ? `At least ${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""} so far` : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}`,
@@ -2093,29 +2220,30 @@
       // was: a notice above the list: "Searching titles, companies, fields and places in every state. [Search
       // descriptions too] (a larger download)". One line under the count now (D16), and the empty list offers
       // the same button as its main one (D18).
-      descOffer && rows.length > 0 && h("div", { className: "descline" }, "Searching titles, companies, fields and places. ",
+      !myList && descOffer && rows.length > 0 && h("div", { className: "descline" }, "Searching titles, companies, fields and places. ",
         h("button", { type: "button", className: "linkbtn", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)."),
-      wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
-      wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
+      !myList && wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
+      !myList && wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setDescRetry(n => n + 1) }, "Retry descriptions")),
-      failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
+      !myList && failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setRetry(n => n + 1) }, "Try again")),
-      err ? h("div", { className: "sheet empty", role: "alert" }, "Couldn't load listings. Check your connection and try again. ",
+      !myList && err ? h("div", { className: "sheet empty", role: "alert" }, "Couldn't load listings. Check your connection and try again. ",
         h("button", { type: "button", className: "btn", onClick: () => reload(false) }, "Retry listings"))
-        : loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
+        : !myList && loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
           // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
-          : rows.length === 0 ? emptyEl
+          : rows.length === 0 ? (myList ? h("div", { className: "sheet empty" }, savedIds.length ? "No saved roles have this status." : "No saved roles yet. Save a role to keep it here and track your progress.") : emptyEl)
             // was: the skip link, the table, "End of the N listings shown" and "Show N more" inline here (ListTable now).
-            : h(ListTable, { shown, rows, moreAfter, onExpand: expandRun, pageCount: pageRows.length, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
-              inlineSignup: digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
+            : h(ListTable, { shown, rows, moreAfter, onExpand: expandRun, pageCount: pageRows.length, phone: narrow, box: placeBox, onMore: () => myList ? setMyLimit(l => l + PAGE) : setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
+              inlineSignup: !myList && digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
               head: h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
                 // was: Company and role, Field, Location and term, Pay, Match, Your status, Links. Field, place, term
                 // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
-                sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
-              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns,
+                myList ? h("th", { scope: "col" }, "Company and role") : sortTh("company", "Company and role"), myList ? h("th", { scope: "col" }, "Match") : sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, myList ? "Your status" : "Save"))),
+              renderRow: r => h(Row, { key: r.id, r, sc: r._savedMissing ? { score: 0, parts: {} } : scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
+                saved: !!(roleBook.roles[String(r.id)] && roleBook.roles[String(r.id)].saved), onSave: toggleSaved, myList, fresh: sinceVisit(r, previousVisit, visitStart), missingText,
+                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: !r._savedMissing && openId === r.id, onWhy, onRank: openSetup, elig: r._savedMissing ? null : elig, patterns: stats && stats.skill_patterns,
                 ask: askId === r.id, onOpen, onAnswer }) })),
 
       // was: narrow && promoEls
