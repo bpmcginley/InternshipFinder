@@ -22,8 +22,22 @@ import { renderResume, toB64 } from "../lib/pdf.js";
 // was: import { renderLayoutFit } from "../lib/pdf_layout.js";
 import { lossless, renderLayoutFit, sameLink, siteOf, urisIn } from "../lib/pdf_layout.js";
 // was: import { applyDocTailoring, docTailorInput, layoutMatchesProfile, normalizeLayout } from "../lib/resume_doc.js";
-import { applyDocTailoring, docTailorInput, docText, layoutMatchesProfile, layoutRefusal, normalizeLayout } from "../lib/resume_doc.js";
-import { DOCX_TYPE, applyDocxTailoring, bulletGroups, docxTailorInput, openDocx, saveDocx } from "../lib/docx.js";
+import {
+  applyDocTailoring,
+  docTailorInput,
+  docText,
+  layoutMatchesProfile,
+  layoutRefusal,
+  normalizeLayout,
+} from "../lib/resume_doc.js";
+import {
+  DOCX_TYPE,
+  applyDocxTailoring,
+  bulletGroups,
+  docxTailorInput,
+  openDocx,
+  saveDocx,
+} from "../lib/docx.js";
 import { applyTailoring, tailorInput } from "../lib/tailoring.js";
 import { readTailored, tailorKey, writeTailored } from "../lib/tailor_cache.js";
 
@@ -98,11 +112,19 @@ An entry is one job, school, project or award: its header rows (usually 1 or 2),
 
 const baseName = (store) => {
   const f = store.profile.facts;
-  return [f.first_name, f.last_name].filter(Boolean).join("_").replace(/[^\w-]/g, "") || "Tailored";
+  return (
+    [f.first_name, f.last_name]
+      .filter(Boolean)
+      .join("_")
+      .replace(/[^\w-]/g, "") || "Tailored"
+  );
 };
-const jobText = (job) => `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}`;
-const voiceOf = (store) => JSON.stringify({ career_goal: store.profile.goals.career, voice: store.profile.voice.summary });
-const changesOf = (out) => (Array.isArray(out && out.changes) ? out.changes : []).slice(0, 8).map(String);
+const jobText = (job) =>
+  `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}`;
+const voiceOf = (store) =>
+  JSON.stringify({ career_goal: store.profile.goals.career, voice: store.profile.voice.summary });
+const changesOf = (out) =>
+  (Array.isArray(out && out.changes) ? out.changes : []).slice(0, 8).map(String);
 const isAccountError = (e) => NEEDS_YOU_CODES.has(e && e.code);
 
 // One cached, checked AI call. build(out) turns the model's JSON into {bytes, name, type, diff} or
@@ -120,7 +142,15 @@ async function tailorWith(store, job, system, prompt, build, extra, salt = "") {
   const key = await tailorKey(model, system, `${prompt}\n${BUILD}\n${salt}`);
   const hit = await readTailored(key);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
-  const resp = await callAI({ ai: store.ai, model, kind: "tailor", run_id: job.run_id, max_tokens: 4000, system, messages: [{ role: "user", content: prompt }] });
+  const resp = await callAI({
+    ai: store.ai,
+    model,
+    kind: "tailor",
+    run_id: job.run_id,
+    max_tokens: 4000,
+    system,
+    messages: [{ role: "user", content: prompt }],
+  });
   const out = jsonOf(resp);
   const made = await build(out);
   if (!made) return null;
@@ -142,21 +172,36 @@ async function tailorDocx(store, job, orig) {
   const opened = await openDocx(orig.b64);
   const parsed = bulletGroups(opened.xml);
   // was: ... < 3) return null;
-  if (parsed.groups.reduce((n, g) => n + g.items.length, 0) < 3) return { why: "it has fewer than three bullets that could be read" }; // not a bulleted resume we can read
+  if (parsed.groups.reduce((n, g) => n + g.items.length, 0) < 3)
+    return { why: "it has fewer than three bullets that could be read" }; // not a bulleted resume we can read
   const prompt = `${jobText(job)}\n\nCANDIDATE\n${voiceOf(store)}\n\nRESUME BULLET GROUPS (JSON)\n${JSON.stringify(docxTailorInput(parsed))}`;
-  return tailorWith(store, job, SYSTEM_DOCX, prompt, async (out) => {
-    const { xml, diff } = applyDocxTailoring(opened.xml, parsed, out);
-    const bytes = await saveDocx(opened, xml);
-    return { bytes, diff, name: `${baseName(store)}_Resume.docx`, type: DOCX_TYPE };
-  }, { format: "docx", note: "This is your own Word file with only the bullets below changed. Open it to check it still fits the page." }, await fingerprint(orig));
+  return tailorWith(
+    store,
+    job,
+    SYSTEM_DOCX,
+    prompt,
+    async (out) => {
+      const { xml, diff } = applyDocxTailoring(opened.xml, parsed, out);
+      const bytes = await saveDocx(opened, xml);
+      return { bytes, diff, name: `${baseName(store)}_Resume.docx`, type: DOCX_TYPE };
+    },
+    {
+      format: "docx",
+      note: "This is your own Word file with only the bullets below changed. Open it to check it still fits the page.",
+    },
+    await fingerprint(orig),
+  );
 }
 
 // ---------- 2. PDF original, redrawn from its own layout ----------
 const LAYOUT_KEY = "resume_layout"; // its own storage key, like tailor_cache: never races the big store write
-const MAX_PDF_B64 = 1_200_000;      // the Worker refuses a resume_tailor body over 1.5 MB
+const MAX_PDF_B64 = 1_200_000; // the Worker refuses a resume_tailor body over 1.5 MB
 
 async function fingerprint(file) {
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${SYSTEM_LAYOUT.length}:${file.b64}`));
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${SYSTEM_LAYOUT.length}:${file.b64}`),
+  );
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -173,31 +218,68 @@ const LAYOUT_RETRY_MS = 60 * 60 * 1000;
 async function layoutOf(store, job, orig) {
   const fp = await fingerprint(orig);
   let saved = null;
-  try { saved = (await chrome.storage.local.get(LAYOUT_KEY))[LAYOUT_KEY]; } catch { /* read it again below */ }
+  try {
+    saved = (await chrome.storage.local.get(LAYOUT_KEY))[LAYOUT_KEY];
+  } catch {
+    /* read it again below */
+  }
   // was: if (saved && saved.fp === fp) return { doc: saved.doc, cost_usd: 0 };
-  if (saved && saved.fp === fp && (saved.doc || saved.why || Date.now() - (saved.created || 0) < LAYOUT_RETRY_MS)) {
-    if (saved.doc && !layoutMatchesProfile(saved.doc, store)) return { doc: null, why: MISMATCH, cost_usd: 0 };
+  if (
+    saved &&
+    saved.fp === fp &&
+    (saved.doc || saved.why || Date.now() - (saved.created || 0) < LAYOUT_RETRY_MS)
+  ) {
+    if (saved.doc && !layoutMatchesProfile(saved.doc, store))
+      return { doc: null, why: MISMATCH, cost_usd: 0 };
     return { doc: saved.doc, why: saved.why || (saved.doc ? "" : UNREAD), cost_usd: 0 };
   }
   const resp = await callAI({
-    ai: store.ai, model: modelFor(store, "tailor"), kind: "tailor", run_id: job.run_id, max_tokens: 6000, system: SYSTEM_LAYOUT,
-    messages: [{ role: "user", content: [
-      { type: "document", source: { type: "base64", media_type: "application/pdf", data: orig.b64 }, title: "Resume" },
-      { type: "text", text: "Transcribe this resume into the JSON described. JSON only." },
-    ] }],
+    ai: store.ai,
+    model: modelFor(store, "tailor"),
+    kind: "tailor",
+    run_id: job.run_id,
+    max_tokens: 6000,
+    system: SYSTEM_LAYOUT,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: orig.b64 },
+            title: "Resume",
+          },
+          { type: "text", text: "Transcribe this resume into the JSON described. JSON only." },
+        ],
+      },
+    ],
   });
-  let doc = null, why = "";
+  let doc = null,
+    why = "";
   // was: try { doc = normalizeLayout(jsonOf(resp)); } catch { doc = null; }
-  try { const raw = jsonOf(resp); why = layoutRefusal(raw); doc = normalizeLayout(raw); } catch { doc = null; }
+  try {
+    const raw = jsonOf(resp);
+    why = layoutRefusal(raw);
+    doc = normalizeLayout(raw);
+  } catch {
+    doc = null;
+  }
   // was: if (doc && !layoutMatchesProfile(doc, store)) doc = null;   (before saving; see above)
-  try { await chrome.storage.local.set({ [LAYOUT_KEY]: { fp, doc, why, created: Date.now() } }); } catch { /* costs a call next time, nothing else */ }
-  if (doc && !layoutMatchesProfile(doc, store)) return { doc: null, why: MISMATCH, cost_usd: resp.cost_usd || 0 };
+  try {
+    await chrome.storage.local.set({ [LAYOUT_KEY]: { fp, doc, why, created: Date.now() } });
+  } catch {
+    /* costs a call next time, nothing else */
+  }
+  if (doc && !layoutMatchesProfile(doc, store))
+    return { doc: null, why: MISMATCH, cost_usd: resp.cost_usd || 0 };
   return { doc, why: why || (doc ? "" : UNREAD), cost_usd: resp.cost_usd || 0 };
 }
-const MISMATCH = "what was read from it does not match the name, employers and schools in your profile";
+const MISMATCH =
+  "what was read from it does not match the name, employers and schools in your profile";
 const UNREAD = "its layout could not be read";
 
-const PDF_NOTE = "Rebuilt to match your PDF's layout. Preview it and check names and dates before using it.";
+const PDF_NOTE =
+  "Rebuilt to match your PDF's layout. Preview it and check names and dates before using it.";
 async function tailorPdf(store, job, orig) {
   // was: if (orig.b64.length > MAX_PDF_B64) return null;
   if (orig.b64.length > MAX_PDF_B64) return { why: "the file is too large to read" };
@@ -206,17 +288,39 @@ async function tailorPdf(store, job, orig) {
   if (!read) return { fallthrough_cost: cost_usd, why };
   // The eight built-in PDF fonts draw Western European text only. A name or a word in any other
   // script used to come out changed or missing, silently (see lossless in lib/pdf_layout.js).
-  if (!lossless(docText(read))) return { fallthrough_cost: cost_usd, why: "it uses letters the PDF builder cannot draw; upload a Word version of it and those are kept" };
+  if (!lossless(docText(read)))
+    return {
+      fallthrough_cost: cost_usd,
+      why: "it uses letters the PDF builder cannot draw; upload a Word version of it and those are kept",
+    };
   const doc = { ...read, links: urisIn(orig.b64) };
   const prompt = `${jobText(job)}\n\nCANDIDATE\n${voiceOf(store)}\n\nRESUME (JSON)\n${JSON.stringify(docTailorInput(doc))}`;
-  const made = await tailorWith(store, job, SYSTEM_DOC, prompt, async (out) => {
-    const applied = applyDocTailoring(doc, out);
-    const { bytes, linked } = renderLayoutFit(applied.doc);
-    const lost = doc.links.filter((u) => !linked.some((l) => sameLink(l, u)));
-    const note = lost.length ? `${PDF_NOTE} ${lost.length === 1 ? "One link" : `${lost.length} links`} from your PDF could not be carried over (${[...new Set(lost.map((u) => siteOf(u) || "email"))].join(", ")}): the words are there but are not clickable.` : "";
-    return { bytes, diff: applied.diff, note, name: `${baseName(store)}_Resume.pdf`, type: "application/pdf" };
-  }, { format: "pdf_layout", note: PDF_NOTE }, `${await fingerprint(orig)}\n${JSON.stringify(doc)}`);
-  return made ? { ...made, cost_usd: (made.cost_usd || 0) + cost_usd } : { fallthrough_cost: cost_usd, why: "the reply could not be used" };
+  const made = await tailorWith(
+    store,
+    job,
+    SYSTEM_DOC,
+    prompt,
+    async (out) => {
+      const applied = applyDocTailoring(doc, out);
+      const { bytes, linked } = renderLayoutFit(applied.doc);
+      const lost = doc.links.filter((u) => !linked.some((l) => sameLink(l, u)));
+      const note = lost.length
+        ? `${PDF_NOTE} ${lost.length === 1 ? "One link" : `${lost.length} links`} from your PDF could not be carried over (${[...new Set(lost.map((u) => siteOf(u) || "email"))].join(", ")}): the words are there but are not clickable.`
+        : "";
+      return {
+        bytes,
+        diff: applied.diff,
+        note,
+        name: `${baseName(store)}_Resume.pdf`,
+        type: "application/pdf",
+      };
+    },
+    { format: "pdf_layout", note: PDF_NOTE },
+    `${await fingerprint(orig)}\n${JSON.stringify(doc)}`,
+  );
+  return made
+    ? { ...made, cost_usd: (made.cost_usd || 0) + cost_usd }
+    : { fallthrough_cost: cost_usd, why: "the reply could not be used" };
 }
 
 // ---------- 3. The fixed template, from the profile (the original path, unchanged) ----------
@@ -228,16 +332,30 @@ async function tailorFromProfile(store, job) {
   if (hit) return { ...hit, cost_usd: 0, reused: true };
 
   const resp = await callAI({
-    ai: store.ai, model, kind: "tailor", run_id: job.run_id, max_tokens: 4000, system: SYSTEM,
+    ai: store.ai,
+    model,
+    kind: "tailor",
+    run_id: job.run_id,
+    max_tokens: 4000,
+    system: SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
   const out = jsonOf(resp);
   const { resume, diff } = applyTailoring(store, out);
   const bytes = renderResume(resume);
   const f = store.profile.facts;
-  const base = [f.first_name, f.last_name].filter(Boolean).join("_").replace(/[^\w-]/g, "") || "Tailored";
+  const base =
+    [f.first_name, f.last_name]
+      .filter(Boolean)
+      .join("_")
+      .replace(/[^\w-]/g, "") || "Tailored";
   const tailored = {
-    file: { name: `${base}_Resume.pdf`, type: "application/pdf", size: bytes.length, b64: toB64(bytes) },
+    file: {
+      name: `${base}_Resume.pdf`,
+      type: "application/pdf",
+      size: bytes.length,
+      b64: toB64(bytes),
+    },
     summary: resume.summary,
     changes: (Array.isArray(out.changes) ? out.changes : []).slice(0, 8).map(String),
     diff,
@@ -249,13 +367,19 @@ async function tailorFromProfile(store, job) {
 
 export async function tailorResume(store, job) {
   const orig = store.files && store.files.resume;
-  let spent = 0, why = "", keeps = false;
+  let spent = 0,
+    why = "",
+    keeps = false;
   if (orig && orig.b64) {
     const isDocx = /\.docx$/i.test(orig.name || "") || orig.type === DOCX_TYPE;
     const isPdf = orig.type === "application/pdf" || /\.pdf$/i.test(orig.name || "");
     keeps = isDocx || isPdf;
     try {
-      const made = isDocx ? await tailorDocx(store, job, orig) : isPdf ? await tailorPdf(store, job, orig) : null;
+      const made = isDocx
+        ? await tailorDocx(store, job, orig)
+        : isPdf
+          ? await tailorPdf(store, job, orig)
+          : null;
       if (made && made.file) return made;
       if (made && made.fallthrough_cost) spent = made.fallthrough_cost;
       why = (made && made.why) || (made === null ? "the reply could not be used" : "");
@@ -271,12 +395,21 @@ export async function tailorResume(store, job) {
   // on, nobody looks before it is uploaded, and a resume in our template is not the one they chose
   // to send: their own file goes, untouched, and the template call is not made (or paid for).
   if (keeps && store.settings && store.settings.tailor_resume === "auto") {
-    const e = new Error(`your resume's own format could not be kept: ${why || "the file could not be read"}`);
+    const e = new Error(
+      `your resume's own format could not be kept: ${why || "the file could not be read"}`,
+    );
     e.cost_usd = spent;
     throw e;
   }
   const made = await tailorFromProfile(store, job);
   // was: return { ...made, cost_usd: (made.cost_usd || 0) + spent };
-  const note = keeps ? `We could not keep your own file's format for this one (${why || "the file could not be read"}). This version uses InternScout's standard layout, not yours, and is built from your profile. Use it only if you are happy with how it looks.` : "";
-  return { ...made, format: "template", ...(note ? { note } : {}), cost_usd: (made.cost_usd || 0) + spent };
+  const note = keeps
+    ? `We could not keep your own file's format for this one (${why || "the file could not be read"}). This version uses InternScout's standard layout, not yours, and is built from your profile. Use it only if you are happy with how it looks.`
+    : "";
+  return {
+    ...made,
+    format: "template",
+    ...(note ? { note } : {}),
+    cost_usd: (made.cost_usd || 0) + spent,
+  };
 }

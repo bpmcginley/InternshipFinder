@@ -16,18 +16,38 @@ const URL = "https://api.anthropic.com/v1/messages";
 export async function callAI({ ai, model, kind, task, run_id, ...opts }) {
   if (ai && ai.provider === "internscout") {
     // was: refreshToken: ensureToken. A 401 on a session token now drops that session (lib/auth.js).
-    const resp = await callWorker({ url: WORKER_URL, token: await ensureToken(), refreshToken: refreshAfter401, task: task || taskFor(kind), run_id, ...opts });
+    const resp = await callWorker({
+      url: WORKER_URL,
+      token: await ensureToken(),
+      refreshToken: refreshAfter401,
+      task: task || taskFor(kind),
+      run_id,
+      ...opts,
+    });
     resp.cost_usd = 0;
     return resp;
   }
   const resp = String(model).startsWith("gemini")
     ? await callGemini({ apiKey: ai.geminiKey, model, ...opts })
     : await callClaude({ apiKey: ai.apiKey, model, ...opts });
-  try { resp.cost_usd = await recordUsage(model, resp.usage, kind); } catch (e) { resp.cost_usd = 0; }
+  try {
+    resp.cost_usd = await recordUsage(model, resp.usage, kind);
+  } catch (e) {
+    resp.cost_usd = 0;
+  }
   return resp;
 }
 
-export async function callClaude({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {
+export async function callClaude({
+  apiKey,
+  model,
+  system,
+  messages,
+  tools,
+  max_tokens = 4096,
+  thinking,
+  signal,
+}) {
   if (!apiKey) throw new Error("No Anthropic API key. Open Auto-Apply setup → Setup.");
   const body = { model, max_tokens, messages };
   if (system) body.system = system;
@@ -67,13 +87,21 @@ export async function callClaude({ apiKey, model, system, messages, tools, max_t
       return {};
     });
     throwIfAborted(signal);
-    if (!res.ok) throw new Error(`Claude API ${res.status}: ${(data.error && data.error.message) || "request failed"}`);
+    if (!res.ok)
+      throw new Error(
+        `Claude API ${res.status}: ${(data.error && data.error.message) || "request failed"}`,
+      );
     return data;
   }
   throw new Error(`Claude API unavailable (${lastErr}). Try again shortly.`);
 }
 
-export const textOf = (resp) => (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+export const textOf = (resp) =>
+  (resp.content || [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
 
 export function jsonOf(resp) {
   const t = textOf(resp);

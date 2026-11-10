@@ -9,7 +9,14 @@ vm.runInContext(source, context);
 const { campusTag, flyerUrl } = context.ISFlyer;
 
 test("campus tags fit the existing bounded flyer channel grammar", () => {
-  for (const name of ["", "UMass Amherst", "École Montréal", "中文", "<script>alert(1)</script>", "A".repeat(100)]) {
+  for (const name of [
+    "",
+    "UMass Amherst",
+    "École Montréal",
+    "中文",
+    "<script>alert(1)</script>",
+    "A".repeat(100),
+  ]) {
     const url = new URL(flyerUrl(name));
     assert.equal(url.origin, "https://internscout.org");
     assert.equal(url.pathname, "/");
@@ -23,7 +30,10 @@ test("campus tags fit the existing bounded flyer channel grammar", () => {
 });
 
 test("bundled QR encoder handles longest flyer URLs with a four-module quiet zone", () => {
-  vm.runInContext(fs.readFileSync(new URL("../../docs/js/qrcode.min.js", import.meta.url), "utf8"), context);
+  vm.runInContext(
+    fs.readFileSync(new URL("../../docs/js/qrcode.min.js", import.meta.url), "utf8"),
+    context,
+  );
   const qr = context.qrcode(0, "M");
   qr.addData(flyerUrl("a".repeat(80)), "Byte");
   qr.make();

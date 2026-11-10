@@ -41,44 +41,79 @@
     .min .body{display:none}
   </style><div class="card" id="card"><div class="top"><span class="dot"></span><b>InternScout</b><button class="x" id="min" title="Minimize" aria-label="Minimize">–</button></div><div class="body" id="body"></div></div>`;
   const $ = (s) => root.querySelector(s);
-  let job = null, lastHtml = "";
+  let job = null,
+    lastHtml = "";
 
-  const LABEL = { queued: "Queued", working: "Working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
-  const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const LABEL = {
+    queued: "Queued",
+    working: "Working",
+    needs_you: "Needs you",
+    ready_to_submit: "Ready to submit",
+    submitted: "Submitted",
+    failed: "Failed",
+  };
+  const esc = (s) =>
+    String(s || "").replace(
+      /[&<>"]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+    );
   // After the extension is reloaded or updated, this old copy of the script stays on the page with
   // a dead connection: chrome.runtime.sendMessage throws "Extension context invalidated". Say so on
   // the card instead of failing silently. The callback also reads lastError, so a page that goes into
   // the back/forward cache doesn't log "message channel is closed".
-  const alive = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch { return false; } };
+  const alive = () => {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  };
   function stale() {
     if (!host.isConnected) return;
     $("#card").className = "card failed";
-    $("#body").innerHTML = `<div><span class="st">Reload this page</span></div><div class="msg">InternScout was updated or reloaded, so this card lost its connection. Reload this page, then use the side panel to resume.</div>`;
+    $("#body").innerHTML =
+      `<div><span class="st">Reload this page</span></div><div class="msg">InternScout was updated or reloaded, so this card lost its connection. Reload this page, then use the side panel to resume.</div>`;
   }
   function msg(m, cb) {
-    if (!alive()) { stale(); return; }
-    try { chrome.runtime.sendMessage(m, (r) => { void chrome.runtime.lastError; if (cb) cb(r); }); }
-    catch { stale(); }
+    if (!alive()) {
+      stale();
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage(m, (r) => {
+        void chrome.runtime.lastError;
+        if (cb) cb(r);
+      });
+    } catch {
+      stale();
+    }
   }
   const send = (action, extra = {}) => msg({ type: "control", id: job.id, action, ...extra });
 
   function render(j) {
     job = j;
-    if (!j) { host.remove(); return; }
+    if (!j) {
+      host.remove();
+      return;
+    }
     if (!host.isConnected) (document.body || document.documentElement).appendChild(host);
-    $("#card").className = "card " + j.status + ($("#card").classList.contains("min") ? " min" : "");
+    $("#card").className =
+      "card " + j.status + ($("#card").classList.contains("min") ? " min" : "");
     // Company and title on the first line, then the status chip, then one row of actions (A2 component 8,
     // D25). was: the status beside "InternScout" and the company and title in small grey text.
     let h = `<div class="co"><b>${esc(j.company)}</b> · ${esc(j.title)}</div><div><span class="st">${esc(LABEL[j.status] || j.status)}</span></div>`;
     if (j.status === "working") {
       h += `<div class="msg">${esc(j.activity || "Reading the page…")}</div><div class="row"><button id="pause">Pause</button><button id="take">Take over</button></div>`;
     } else if (j.status === "needs_you") {
-      if (j.question) h += `<div class="msg"><b>${esc(j.question)}</b></div><div class="muted">${esc(j.reason)}</div><textarea id="ans" placeholder="Your answer (saved to your profile)"></textarea><div class="row"><button class="primary" id="answer">Answer &amp; continue</button></div>`;
-      else h += `<div class="msg">${esc(j.reason)}</div><div class="row"><button class="primary" id="resume">Resume</button></div>`;
+      if (j.question)
+        h += `<div class="msg"><b>${esc(j.question)}</b></div><div class="muted">${esc(j.reason)}</div><textarea id="ans" placeholder="Your answer (saved to your profile)"></textarea><div class="row"><button class="primary" id="answer">Answer &amp; continue</button></div>`;
+      else
+        h += `<div class="msg">${esc(j.reason)}</div><div class="row"><button class="primary" id="resume">Resume</button></div>`;
     } else if (j.status === "ready_to_submit") {
       h += `<div class="msg"><b>Review, then press Submit yourself.</b> Green = filled by the agent, amber = still empty, red = the submit button.</div>`;
       if (j.summary) h += `<div class="muted">${esc(j.summary)}</div>`;
-      if (j.double_check && j.double_check.length) h += `<ul>${j.double_check.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>`;
+      if (j.double_check && j.double_check.length)
+        h += `<ul>${j.double_check.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>`;
       // "I submitted it" first and as the main button; "Check the form again" last and quiet. was: "Keep going"
       // first, which read like "go on and submit" at the moment the student is about to; it starts another
       // pass over the form (control "resume"). The side panel adds "Review and submit" between them
@@ -96,15 +131,22 @@
     // was: $("#body").innerHTML = h; every time.
     if (h === lastHtml) return;
     lastHtml = h;
-    const had = root.activeElement && root.activeElement.id, typed = root.getElementById("ans") && root.getElementById("ans").value;
+    const had = root.activeElement && root.activeElement.id,
+      typed = root.getElementById("ans") && root.getElementById("ans").value;
     $("#body").innerHTML = h;
     if (typed && root.getElementById("ans")) root.getElementById("ans").value = typed;
     if (had && root.getElementById(had)) root.getElementById(had).focus({ preventScroll: true });
-    const on = (id, fn) => { const b = root.getElementById(id); if (b) b.onclick = fn; };
+    const on = (id, fn) => {
+      const b = root.getElementById(id);
+      if (b) b.onclick = fn;
+    };
     on("pause", () => send("pause"));
     on("take", () => send("takeover"));
     on("resume", () => send("resume"));
-    on("answer", () => { const v = root.getElementById("ans").value.trim(); if (v) send("answer", { answer: v }); });
+    on("answer", () => {
+      const v = root.getElementById("ans").value.trim();
+      if (v) send("answer", { answer: v });
+    });
     on("more", () => send("resume"));
     on("done", () => send("submitted"));
     on("retry", () => send("retry"));
@@ -112,13 +154,22 @@
 
   $("#min").onclick = () => $("#card").classList.toggle("min");
 
-  chrome.runtime.onMessage.addListener((m) => { if (m && m.type === "overlay") render(m.job); });
-  msg({ type: "overlay_hello" }, (r) => { if (r && r.job) render(r.job); });
+  chrome.runtime.onMessage.addListener((m) => {
+    if (m && m.type === "overlay") render(m.job);
+  });
+  msg({ type: "overlay_hello" }, (r) => {
+    if (r && r.job) render(r.job);
+  });
 
   // A real click on a final-submit button starts confirmation-page detection.
-  document.addEventListener("click", (e) => {
-    if (!e.isTrusted || !job || job.status !== "ready_to_submit" || !window.ISGuard) return;
-    const t = window.ISGuard.clickTarget(e.target);
-    if (t && window.ISGuard.classify(window.ISGuard.describe(t)) !== "ok") msg({ type: "maybe_submitted" });
-  }, true);
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!e.isTrusted || !job || job.status !== "ready_to_submit" || !window.ISGuard) return;
+      const t = window.ISGuard.clickTarget(e.target);
+      if (t && window.ISGuard.classify(window.ISGuard.describe(t)) !== "ok")
+        msg({ type: "maybe_submitted" });
+    },
+    true,
+  );
 })();

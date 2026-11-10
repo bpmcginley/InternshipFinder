@@ -8,12 +8,28 @@ import vm from "node:vm";
 
 const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
 function loadCore() {
-  const store = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+  const store = () => {
+    const m = new Map();
+    return {
+      getItem: (k) => m.get(k) ?? null,
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: (k) => m.delete(k),
+    };
+  };
   const ctx = {
-    CONFIG: {}, fetch: () => new Promise(() => {}), localStorage: store(), sessionStorage: store(),
-    addEventListener() {}, postMessage() {}, setTimeout, clearTimeout, AbortController, TextDecoder,
+    CONFIG: {},
+    fetch: () => new Promise(() => {}),
+    localStorage: store(),
+    sessionStorage: store(),
+    addEventListener() {},
+    postMessage() {},
+    setTimeout,
+    clearTimeout,
+    AbortController,
+    TextDecoder,
     location: { origin: "https://internscout.org", pathname: "/", search: "", hash: "" },
-    document: { documentElement: { dataset: {} } }, console,
+    document: { documentElement: { dataset: {} } },
+    console,
   };
   ctx.window = ctx;
   vm.createContext(ctx);
@@ -21,46 +37,59 @@ function loadCore() {
   return ctx.IS;
 }
 const IS = loadCore();
-const rows = n => Array.from({ length: n }, (_, i) => ({ id: "r" + i, apply_url: "https://jobs.example/" + i }));
+const rows = (n) =>
+  Array.from({ length: n }, (_, i) => ({ id: "r" + i, apply_url: "https://jobs.example/" + i }));
 
 test("the header checkbox can always clear what it selected, even when a row past the first 100 is picked", () => {
   const shown = rows(150);
   // The student ticks row 121, then the header.
   let sel = new Set([shown[120].id]);
   assert.equal(IS.headerChecked(shown, sel), false);
-  let r = IS.selectRows(sel, shown, true); sel = r.sel;
-  assert.equal(sel.size, 100); assert.equal(r.omitted, 50);
+  let r = IS.selectRows(sel, shown, true);
+  sel = r.sel;
+  assert.equal(sel.size, 100);
+  assert.equal(r.omitted, 50);
   // was: checked only when the first 100 shown were all picked; row 100 is not (row 121 took its place),
   // so the box stayed unchecked and the next click selected again instead of clearing.
   assert.equal(IS.headerChecked(shown, sel), true);
-  r = IS.selectRows(sel, shown, false); sel = r.sel;
-  assert.equal(sel.size, 0); assert.equal(IS.headerChecked(shown, sel), false);
+  r = IS.selectRows(sel, shown, false);
+  sel = r.sel;
+  assert.equal(sel.size, 0);
+  assert.equal(IS.headerChecked(shown, sel), false);
 });
 
 test("the header checkbox is checked when every shown row is picked, and not for a selection made elsewhere", () => {
   const shown = rows(30);
   assert.equal(IS.headerChecked([], new Set()), false);
-  assert.equal(IS.headerChecked(shown, new Set(shown.map(r => r.id))), true);
-  assert.equal(IS.headerChecked(shown, new Set(shown.slice(1).map(r => r.id))), false);
+  assert.equal(IS.headerChecked(shown, new Set(shown.map((r) => r.id))), true);
+  assert.equal(IS.headerChecked(shown, new Set(shown.slice(1).map((r) => r.id))), false);
   // A full selection from another search holds none of these rows: a click has something to say (the limit).
-  const elsewhere = new Set(rows(130).slice(30).map(r => r.id));
+  const elsewhere = new Set(
+    rows(130)
+      .slice(30)
+      .map((r) => r.id),
+  );
   assert.equal(IS.headerChecked(shown, elsewhere), false);
   const r = IS.selectRows(elsewhere, shown, true);
-  assert.equal(r.sel.size, 100); assert.equal(r.omitted, 30);
+  assert.equal(r.sel.size, 100);
+  assert.equal(r.omitted, 30);
   // Clearing the shown rows leaves the rest of the selection alone.
-  const mixed = new Set(["x1", "x2", ...shown.map(r => r.id)]);
+  const mixed = new Set(["x1", "x2", ...shown.map((r) => r.id)]);
   assert.deepEqual([...IS.selectRows(mixed, shown, false).sel], ["x1", "x2"]);
 });
 
 test("a listing skipped because another listing's job holds its apply link counts as handled", () => {
-  const queue = { order: ["j1", "j2"], jobs: {
-    j1: { id: "j1", listingId: "A", apply_url: "https://jobs.example/shared", status: "queued" },
-    j2: { id: "j2", listingId: "C", apply_url: "https://jobs.example/c", status: "queued" },
-  } };
+  const queue = {
+    order: ["j1", "j2"],
+    jobs: {
+      j1: { id: "j1", listingId: "A", apply_url: "https://jobs.example/shared", status: "queued" },
+      j2: { id: "j2", listingId: "C", apply_url: "https://jobs.example/c", status: "queued" },
+    },
+  };
   const batch = [
-    { id: "B", apply_url: "https://jobs.example/shared" },  // same link as A, already queued
-    { id: "C", apply_url: "https://jobs.example/c" },       // added in this batch
-    { id: "D", apply_url: "https://jobs.example/d" },       // neither: stays selected
+    { id: "B", apply_url: "https://jobs.example/shared" }, // same link as A, already queued
+    { id: "C", apply_url: "https://jobs.example/c" }, // added in this batch
+    { id: "D", apply_url: "https://jobs.example/d" }, // neither: stays selected
   ];
   const res = { added: ["j2"], skipped: ["j1"] };
   // was: only the jobs' own listing ids (A and C), so B stayed selected however often it was queued.
@@ -71,12 +100,17 @@ test("a listing skipped because another listing's job holds its apply link count
 });
 
 test("links held by a live job are left out of the header selection; a failed job's link is free again", () => {
-  const queue = { jobs: {
-    j1: { listingId: "A", apply_url: "https://jobs.example/a", status: "queued" },
-    j2: { listingId: "B", apply_url: "https://jobs.example/b", status: "failed" },
-    j3: { listingId: "C", apply_url: "https://jobs.example/c", status: "submitted" },
-  } };
-  assert.deepEqual([...IS.heldUrls(queue)].sort(), ["https://jobs.example/a", "https://jobs.example/c"]);
+  const queue = {
+    jobs: {
+      j1: { listingId: "A", apply_url: "https://jobs.example/a", status: "queued" },
+      j2: { listingId: "B", apply_url: "https://jobs.example/b", status: "failed" },
+      j3: { listingId: "C", apply_url: "https://jobs.example/c", status: "submitted" },
+    },
+  };
+  assert.deepEqual([...IS.heldUrls(queue)].sort(), [
+    "https://jobs.example/a",
+    "https://jobs.example/c",
+  ]);
   assert.equal(IS.heldUrls(null).size, 0);
 });
 
@@ -85,7 +119,7 @@ test("the shared apply links the review counted are in the data", () => {
   const all = loadAll();
   const byUrl = new Map();
   for (const x of all) if (x.apply_url) byUrl.set(x.apply_url, (byUrl.get(x.apply_url) || 0) + 1);
-  assert.ok([...byUrl.values()].some(n => n > 1));
+  assert.ok([...byUrl.values()].some((n) => n > 1));
 });
 
 // ---------- list order ----------
@@ -94,35 +128,79 @@ function loadAll() {
   if (cached) return cached;
   const dir = new URL("../../docs/data/listings/", import.meta.url);
   const byId = new Map();
-  for (const f of readdirSync(dir).filter(f => f.endsWith(".json") && !f.endsWith(".desc.json") && f !== "index.json").sort()) {
+  for (const f of readdirSync(dir)
+    .filter((f) => f.endsWith(".json") && !f.endsWith(".desc.json") && f !== "index.json")
+    .sort()) {
     const list = JSON.parse(readFileSync(new URL(f, dir), "utf8"));
-    if (Array.isArray(list)) for (const x of list) if (x && x.id != null && !byId.has(x.id)) byId.set(x.id, x);
+    if (Array.isArray(list))
+      for (const x of list) if (x && x.id != null && !byId.has(x.id)) byId.set(x.id, x);
   }
   return (cached = [...byId.values()]);
 }
 // The comparators docs/js/app.js used before IS.sortRows, copied as they were.
 function legacySort(r, sort, S, ranked, rel) {
-  const R = (a, b) => ranked ? rel.get(b) - rel.get(a) : 0;
-  const newer = (a, b) => (b.posted_at ? 1 : 0) - (a.posted_at ? 1 : 0) || (b.posted_at || "").localeCompare(a.posted_at || "") || (b.first_seen || "").localeCompare(a.first_seen || "");
-  if (sort === "score") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || R(a, b) || (S(b).score - S(a).score) || newer(a, b));
-  else if (sort === "new") r.sort((a, b) => (S(a).mismatch - S(b).mismatch) || R(a, b) || newer(a, b));
+  const R = (a, b) => (ranked ? rel.get(b) - rel.get(a) : 0);
+  const newer = (a, b) =>
+    (b.posted_at ? 1 : 0) - (a.posted_at ? 1 : 0) ||
+    (b.posted_at || "").localeCompare(a.posted_at || "") ||
+    (b.first_seen || "").localeCompare(a.first_seen || "");
+  if (sort === "score")
+    r.sort(
+      (a, b) => S(a).mismatch - S(b).mismatch || R(a, b) || S(b).score - S(a).score || newer(a, b),
+    );
+  else if (sort === "new")
+    r.sort((a, b) => S(a).mismatch - S(b).mismatch || R(a, b) || newer(a, b));
   else if (sort === "company") r.sort((a, b) => a.company_name.localeCompare(b.company_name));
-  else if (sort === "comp") r.sort((a, b) => (IS.realSalary(b) ? 1 : 0) - (IS.realSalary(a) ? 1 : 0) || R(a, b) || S(b).score - S(a).score);
+  else if (sort === "comp")
+    r.sort(
+      (a, b) =>
+        (IS.realSalary(b) ? 1 : 0) - (IS.realSalary(a) ? 1 : 0) ||
+        R(a, b) ||
+        S(b).score - S(a).score,
+    );
   return r;
 }
-const MAJORS = JSON.parse(readFileSync(new URL("../../docs/data/majors.json", import.meta.url), "utf8"));
+const MAJORS = JSON.parse(
+  readFileSync(new URL("../../docs/data/majors.json", import.meta.url), "utf8"),
+);
 const PROFILES = {
   none: null,
-  cs: { ...IS.emptyProfile(), majors: ["Computer Science"], class_year: "junior", grad_term: "Spring 2028", states: ["MA", "NY"], work_auth: "citizen" },
-  nursing: { ...IS.emptyProfile(), majors: ["Nursing"], class_year: "sophomore", grad_term: "Spring 2029", states: [] },
+  cs: {
+    ...IS.emptyProfile(),
+    majors: ["Computer Science"],
+    class_year: "junior",
+    grad_term: "Spring 2028",
+    states: ["MA", "NY"],
+    work_auth: "citizen",
+  },
+  nursing: {
+    ...IS.emptyProfile(),
+    majors: ["Nursing"],
+    class_year: "sophomore",
+    grad_term: "Spring 2029",
+    states: [],
+  },
 };
-const scorer = p => {
+const scorer = (p) => {
   const { direct, related } = IS.profileFields(p, MAJORS);
-  const ctx = { p, direct, related, keys: new Set(IS.profileKeys(p)), anywhere: !(p && p.states && p.states.length) };
+  const ctx = {
+    p,
+    direct,
+    related,
+    keys: new Set(IS.profileKeys(p)),
+    anywhere: !(p && p.states && p.states.length),
+  };
   const m = new WeakMap();
-  return x => { let v = m.get(x); if (!v) { v = IS.score(x, ctx); m.set(x, v); } return v; };
+  return (x) => {
+    let v = m.get(x);
+    if (!v) {
+      v = IS.score(x, ctx);
+      m.set(x, v);
+    }
+    return v;
+  };
 };
-const ids = list => list.map(x => x.id);
+const ids = (list) => list.map((x) => x.id);
 
 test("the list comes out in exactly the old order for every sort, profile and search, on the real data", () => {
   const all = loadAll();
@@ -131,12 +209,21 @@ test("the list comes out in exactly the old order for every sort, profile and se
   for (const [name, p] of Object.entries(PROFILES)) {
     const S = scorer(p);
     for (const q of searches) {
-      let base = all, rel = null, ranked = false;
+      let base = all,
+        rel = null,
+        ranked = false;
       if (q) {
         const cq = IS.compileQuery(q, IS.placeWords(all));
-        rel = new Map(); base = [];
-        for (const x of all) { const m = IS.matchScore(x, cq); if (m) { rel.set(x, m); base.push(x); } }
-        ranked = cq.terms.some(t => !t.neg && !t.place);
+        rel = new Map();
+        base = [];
+        for (const x of all) {
+          const m = IS.matchScore(x, cq);
+          if (m) {
+            rel.set(x, m);
+            base.push(x);
+          }
+        }
+        ranked = cq.terms.some((t) => !t.neg && !t.place);
       }
       for (const sort of ["score", "new", "company", "comp"]) {
         const want = ids(legacySort(base.slice(), sort, S, ranked, rel));
@@ -151,11 +238,16 @@ test("rows that arrive file by file, scored once each, sort the same as all rows
   // The page keeps each row's score as its file lands and only sorts again; the result has to match a
   // fresh score of everything.
   const all = loadAll();
-  const p = PROFILES.cs, cachedS = scorer(p), seen = [];
+  const p = PROFILES.cs,
+    cachedS = scorer(p),
+    seen = [];
   const files = [];
   for (let i = 0; i < all.length; i += 2500) files.push(all.slice(i, i + 2500));
   let got = [];
-  for (const f of files) { seen.push(...f); got = ids(IS.sortRows(seen.slice(), "score", cachedS, null)); }
+  for (const f of files) {
+    seen.push(...f);
+    got = ids(IS.sortRows(seen.slice(), "score", cachedS, null));
+  }
   const want = ids(legacySort(all.slice(), "score", scorer(p), false, null));
   assert.deepEqual(got, want);
 });
@@ -170,41 +262,86 @@ test("an unknown sort leaves the order alone", () => {
 // The rows pipeline docs/js/app.js ran inline before it moved to core.js, copied as it was (with `st`
 // spelled out). IS.listRows must give the same rows, in the same order, for every filter and sort.
 function legacyRows(inView, f, { cq, scoreOf, p, elig, blockers, appStates, jobs }) {
-  const st = id => appStates[id] || "none";
-  const ranked = !!(cq && cq.terms.some(t => !t.neg && !t.place));
-  let r, rel = null;
-  if (cq) { rel = new Map(); r = []; for (const x of inView) { const m = IS.matchScore(x, cq); if (m) { rel.set(x, m); r.push(x); } } }
-  else r = inView.slice();
-  if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
-  if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
-  if (f.where === "onsite") r = r.filter(x => IS.regs(x).some(g => g.kind !== "remote"));
+  const st = (id) => appStates[id] || "none";
+  const ranked = !!(cq && cq.terms.some((t) => !t.neg && !t.place));
+  let r,
+    rel = null;
+  if (cq) {
+    rel = new Map();
+    r = [];
+    for (const x of inView) {
+      const m = IS.matchScore(x, cq);
+      if (m) {
+        rel.set(x, m);
+        r.push(x);
+      }
+    }
+  } else r = inView.slice();
+  if (f.company.length) r = r.filter((x) => f.company.includes(x.company_name));
+  if (f.fields.length) r = r.filter((x) => (x.field_tags || []).some((t) => f.fields.includes(t)));
+  if (f.where === "onsite") r = r.filter((x) => IS.regs(x).some((g) => g.kind !== "remote"));
   else if (f.where === "remote") r = r.filter(IS.isRemote);
-  if (f.stage) r = r.filter(x => (x.stage || []).includes(f.stage));
-  if (f.year) r = r.filter(x => !(x.years && x.years.length) || x.years.includes(f.year));
-  if (f.sector) r = r.filter(x => x.sector === f.sector);
-  if (f.paid === "paid") r = r.filter(x => ["paid", "stipend"].includes(IS.payOf(x)));
-  else if (f.paid === "no_unpaid") r = r.filter(x => IS.payOf(x) !== "unpaid");
-  if (f.hide_citizen) r = r.filter(x => !IS.citizenBlocked(x, p ? p.work_auth : ""));
-  if (f.eligible && elig) r = r.filter(x => !scoreOf(x).mismatch && !blockers(x, elig).length);
-  if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
-  if (f.new_only) r = r.filter(x => x.is_new);
-  if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
-  else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
+  if (f.stage) r = r.filter((x) => (x.stage || []).includes(f.stage));
+  if (f.year) r = r.filter((x) => !(x.years && x.years.length) || x.years.includes(f.year));
+  if (f.sector) r = r.filter((x) => x.sector === f.sector);
+  if (f.paid === "paid") r = r.filter((x) => ["paid", "stipend"].includes(IS.payOf(x)));
+  else if (f.paid === "no_unpaid") r = r.filter((x) => IS.payOf(x) !== "unpaid");
+  if (f.hide_citizen) r = r.filter((x) => !IS.citizenBlocked(x, p ? p.work_auth : ""));
+  if (f.eligible && elig) r = r.filter((x) => !scoreOf(x).mismatch && !blockers(x, elig).length);
+  if (f.status && !f.app_state) r = r.filter((x) => x.status === f.status);
+  if (f.new_only) r = r.filter((x) => x.is_new);
+  if (f.app_state === "auto") r = r.filter((x) => jobs[String(x.id)]);
+  else if (f.app_state) r = r.filter((x) => st(x.id) === f.app_state);
   IS.sortRows(r, f.sort, scoreOf, ranked ? rel : null);
   return r;
 }
-const BASE_F = { q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, sort: "new", hide_citizen: false, paid: "" };
+const BASE_F = {
+  q: "",
+  fields: [],
+  states: [],
+  company: [],
+  where: "",
+  stage: "",
+  year: "",
+  sector: "",
+  status: "open",
+  app_state: "",
+  new_only: false,
+  eligible: false,
+  sort: "new",
+  hide_citizen: false,
+  paid: "",
+};
 // A stand-in for app.js blockers(): any row whose description names a citizenship rule, for a visa holder.
-const fakeBlockers = (x, e) => e && e.needs_sponsorship && IS.citizenRule(x) ? ["For U.S. citizens"] : [];
-const FILTER_STATES = all => {
-  const someCo = all.find(x => x.company_name)?.company_name;
-  const someSector = all.find(x => x.sector)?.sector;
+const fakeBlockers = (x, e) =>
+  e && e.needs_sponsorship && IS.citizenRule(x) ? ["For U.S. citizens"] : [];
+const FILTER_STATES = (all) => {
+  const someCo = all.find((x) => x.company_name)?.company_name;
+  const someSector = all.find((x) => x.sector)?.sector;
   return [
-    {}, { status: "" }, { status: "closed" }, { fields: ["swe"] }, { fields: ["nursing", "health"] }, { company: [someCo] },
-    { where: "onsite" }, { where: "remote" }, { stage: "coop" }, { year: "junior" }, { sector: someSector },
-    { paid: "paid" }, { paid: "no_unpaid" }, { hide_citizen: true }, { eligible: true }, { new_only: true },
-    { app_state: "applied" }, { app_state: "interested", status: "" }, { app_state: "auto" },
-    { q: "software engineer" }, { q: "nursing" }, { q: "boston" }, { q: "marketing -unpaid", fields: ["business"] },
+    {},
+    { status: "" },
+    { status: "closed" },
+    { fields: ["swe"] },
+    { fields: ["nursing", "health"] },
+    { company: [someCo] },
+    { where: "onsite" },
+    { where: "remote" },
+    { stage: "coop" },
+    { year: "junior" },
+    { sector: someSector },
+    { paid: "paid" },
+    { paid: "no_unpaid" },
+    { hide_citizen: true },
+    { eligible: true },
+    { new_only: true },
+    { app_state: "applied" },
+    { app_state: "interested", status: "" },
+    { app_state: "auto" },
+    { q: "software engineer" },
+    { q: "nursing" },
+    { q: "boston" },
+    { q: "marketing -unpaid", fields: ["business"] },
     { q: "data", hide_citizen: true, paid: "no_unpaid", eligible: true },
   ];
 };
@@ -214,7 +351,11 @@ test("IS.listRows gives exactly the old inline list for every filter, sort, sear
   const words = IS.placeWords(all);
   const appStates = { [all[0].id]: "applied", [all[1].id]: "interested", [all[2].id]: "applied" };
   const jobs = { [String(all[3].id)]: { status: "queued" } };
-  const ELIG = { cs: { citizenship: "U.S. citizen" }, nursing: { needs_sponsorship: true }, none: null };
+  const ELIG = {
+    cs: { citizenship: "U.S. citizen" },
+    nursing: { needs_sponsorship: true },
+    none: null,
+  };
   for (const [name, p] of Object.entries(PROFILES)) {
     const scoreOf = scorer(p);
     for (const extra of FILTER_STATES(all)) {
@@ -224,8 +365,12 @@ test("IS.listRows gives exactly the old inline list for every filter, sort, sear
         const env = { cq, scoreOf, p, elig: ELIG[name], blockers: fakeBlockers, appStates, jobs };
         const got = IS.listRows(all, f, env);
         const want = legacyRows(all, f, env);
-        assert.deepEqual([...ids(got.rows)], [...ids(want)], `profile ${name}, ${JSON.stringify(extra)}, sort ${sort}`);
-        assert.equal(got.ranked, !!(cq && cq.terms.some(t => !t.neg && !t.place)));
+        assert.deepEqual(
+          [...ids(got.rows)],
+          [...ids(want)],
+          `profile ${name}, ${JSON.stringify(extra)}, sort ${sort}`,
+        );
+        assert.equal(got.ranked, !!(cq && cq.terms.some((t) => !t.neg && !t.place)));
         if (cq) for (const x of got.rows) assert.equal(got.rel.get(x), IS.matchScore(x, cq));
         else assert.equal(got.rel, null);
       }
@@ -236,7 +381,19 @@ test("IS.listRows gives exactly the old inline list for every filter, sort, sear
 test("IS.listRows leaves its input alone and takes exactly three arguments (S5)", () => {
   const all = loadAll().slice(0, 300);
   const before = ids(all);
-  const r = IS.listRows(all, { ...BASE_F, sort: "company" }, { cq: null, scoreOf: scorer(null), p: null, elig: null, blockers: fakeBlockers, appStates: {}, jobs: {} });
+  const r = IS.listRows(
+    all,
+    { ...BASE_F, sort: "company" },
+    {
+      cq: null,
+      scoreOf: scorer(null),
+      p: null,
+      elig: null,
+      blockers: fakeBlockers,
+      appStates: {},
+      jobs: {},
+    },
+  );
   assert.deepEqual(ids(all), before);
   assert.notEqual(r.rows, all);
   assert.equal(IS.listRows.length, 3);
