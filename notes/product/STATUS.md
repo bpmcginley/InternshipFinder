@@ -21,7 +21,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged; Pages green | Independent review and all CI passed; Pages 42865303436. |
 | 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | [#175](https://github.com/bpmcginley/InternshipFinder/pull/175) | Reviewed; needs-bruce | All CI passed. Approve/publish proposed privacy wording before worker deployment. Unknown events remain harmless meanwhile. |
 | A | P-1.1 Company runs | audit_site | `codex/product-p1.1-company-runs` | [#176](https://github.com/bpmcginley/InternshipFinder/pull/176) | Merged; Pages green | 251 site tests, two golden tests, eight screenshots and independent review passed; Pages 42867992902. Counter waits for P-0.2. |
-| A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
+| A | P-1.2 First screen | audit_site | `codex/product-p1.2-first-screen` | Draft claim pending | In progress; needs-bruce | Lead released app.js and dashboard HTML from formatting ownership. Existing tests/site files remain formatter-owned until release. Exact plans-sentence relocation requires Bruce; P-1.3/P-1.4 wait for this PR. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
 | A | P-1.7 Remaining non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
