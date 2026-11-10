@@ -6,13 +6,15 @@ The two suites test different execution environments; keep both green for worker
 ## Commands
 
 ```bash
-# Built-in Node runner; no npm dependency install is needed for this suite.
+# Install pinned test-only tools, including the API contract parser, for both suites.
+npm ci
+
+# Built-in Node runner with SQLite, provider mocks and contract checks.
 node --test test/
 # npm test is the same directory entry point.
 npm test
 
-# Pinned local workerd, D1 and Vitest dependencies.
-npm ci
+# Pinned local workerd, D1 and Vitest integration suite.
 npm run test:workers
 ```
 
@@ -28,8 +30,10 @@ npm run test:workers -- test-workers/smoke.test.js
 ```
 
 After a focused check, run both complete suites when a change affects their shared worker logic,
-SQL or schema. CI runs the Node suite, installs dependencies with `npm ci`, then runs the Workers
-suite. No local development server is required for either test command.
+SQL or schema. CI installs dependencies with `npm ci`, runs the Node suite, then runs the Workers
+suite. The Node suite needs the test-only Acorn parser for API/client contract checks; it still uses
+Node's built-in runner and its SQLite/provider-mock environment. No local development server is
+required for either test command.
 
 ## What each suite proves
 
