@@ -40,7 +40,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | Wave | Package | Owner | Branch | PR | State | Next step / constraint |
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
-| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | Pending PR | In review | Local validation passed; independent review and green CI before lead merges. |
+| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | In review | Local validation passed; independent review and green CI before lead merges. |
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
 | 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
