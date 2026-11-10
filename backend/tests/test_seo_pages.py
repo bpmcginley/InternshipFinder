@@ -1000,7 +1000,15 @@ def test_the_install_page_answers_first_and_is_dated():
     html = re.sub(r"<!--.*?-->", "", html, flags=re.S)        # the "was:" comments hold old copies
     main = html.split("<main>")[1]
     first = re.sub(r"<[^>]+>", "", re.search(r"<p[^>]*>(.*?)</p>", main, re.S).group(1))
-    assert first.startswith("To install the InternScout Auto-Apply extension") and 40 <= len(first.split()) <= 60
+    # The lead explains the first install action and keeps the student in control of submission.
+    assert first.startswith("Your first minute:") and len(first.split()) <= 40
+    assert "add Auto-Apply from the Chrome Web Store" in first
+    assert "laptop or desktop" in first
+    assert "you review and press Submit" in first
+    # A direct store action must appear before the longer numbered setup instructions.
+    intro = main.split('<ol class="steps">')[0]
+    assert re.search(r'<a class="btn" href="https://chromewebstore\.google\.com/detail/[^"<>]+">', intro)
+    assert "Sign in and add your resume (about 2 more minutes)." in intro
     howto = next(b for b in _ld_blocks(html.replace("\n", "")) if b["@type"] == "HowTo")
     # Visible and structured dates must agree when the instructions change; do not pin the last edit
     # date to an older copy of the page. Publication remains the original historical date.
