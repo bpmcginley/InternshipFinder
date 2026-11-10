@@ -48,7 +48,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | D | P-2.1 Follow build | Unassigned | - | - | Waiting for design | No build before approved note; worker deployment stays with Bruce. |
 | D | P-2.2 Top-up build | Unassigned | - | - | Waiting for design | No build before approved price, note, terms and secret setup. |
 | D | P-3.1 Limit card | Unassigned | - | - | Queued | needs-bruce: extension merge and release. |
-| D | P-3.2 Review ask | Unassigned | - | - | Queued | Verify existing trigger; needs-bruce: extension merge and release. |
+| D | P-3.2 Review ask | mylist_review | `codex/product-p3.2-review-ask` | Draft claim pending | In progress; needs-bruce | Third successful fill, once; preserve prior dismissals; sole proactive side-panel surface. Owns review.js, background/index.js, sidepanel.js and relevant tests/evidence only. No agent/onboarding/guard, permissions or release changes. |
 | E | P-2.4 Cross-device list | Unassigned | - | - | Waiting for observation | P-1.4 live for two weeks, approved design/privacy, then build. |
 | E | P-3.3 Resume first | Unassigned | - | - | Waiting for refactor | After WP-5.2; needs-bruce. |
 | E | P-3.4 Practice form | Unassigned | - | - | Verification | Stop if a new host permission is needed; needs-bruce for extension. |
