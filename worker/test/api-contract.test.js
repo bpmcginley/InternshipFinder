@@ -14,11 +14,31 @@ const key = (method, path) => `${method} ${path.split("?")[0].replace(/\/+$/, ""
 const declared = new Set(ROUTES.map((r) => key(r.method, r.path)));
 
 test("the contract contains every exact router case, with auth and descriptive shapes", () => {
-  const served = [...read("worker/src/index.js").matchAll(/^\s*case\s+"([A-Z]+) ([^"]+)":/gm)].map(
-    (m) => key(m[1], m[2]),
+  const served = [],
+    prefixes = new Set();
+  walk(
+    parse(read("worker/src/index.js"), { ecmaVersion: "latest", sourceType: "module" }),
+    (node) => {
+      if (node.type === "SwitchCase" && node.test?.type === "Literal") {
+        const match = /^([A-Z]+) (\/.*)$/.exec(String(node.test.value));
+        if (match) served.push(key(match[1], match[2]));
+      }
+      if (
+        node.type === "CallExpression" &&
+        name(node.callee.object) === "path" &&
+        name(node.callee.property) === "startsWith"
+      )
+        prefixes.add(node.arguments[0].value);
+    },
   );
   assert.equal(declared.size, ROUTES.length, "duplicate contract route");
   assert.deepEqual([...declared].sort(), served.sort());
+  assert.deepEqual(
+    [...prefixes].sort(),
+    [
+      ...new Set(SPECIAL_ROUTES.filter((r) => r.path !== "*").map((r) => r.path.slice(0, -1))),
+    ].sort(),
+  );
   for (const route of [...ROUTES, ...SPECIAL_ROUTES]) {
     for (const auth of route.auth.split(" + ")) assert.ok(Object.hasOwn(AUTH, auth), auth);
     assert.ok(route.request && route.response && route.gate);
@@ -125,17 +145,7 @@ function clientSources(directory) {
     } else if (/\.(js|html)$/.test(item.name) && !/\.min\.js$|pdf_fonts\.js$/.test(item.name)) {
       const text = read(path);
       const source = item.name.endsWith(".html") ? scriptsIn(text) : text;
-      const ast = parse(source, { ecmaVersion: "latest", sourceType: "module" });
-      const calls = [],
-        constants = new Map(),
-        functions = new Map();
-      walk(ast, (node, parents) => {
-        if (node.type === "CallExpression") calls.push({ node, parents });
-        if (node.type === "VariableDeclarator" && node.id.type === "Identifier")
-          constants.set(node.id.name, node.init);
-        if (node.type === "FunctionDeclaration") functions.set(node.id.name, node);
-      });
-      out.push({ path, ast, calls, constants, functions });
+      out.push(parseClient(path, source));
     }
   }
   return out;
@@ -269,15 +279,27 @@ function workerCalls(client, billingKinds) {
 }
 
 function parseClient(path, source) {
-  const ast = parse(source, { ecmaVersion: "latest", sourceType: "module" }),
-    calls = [],
-    constants = new Map();
+  const ast = parse(source, { ecmaVersion: "latest", sourceType: "module" });
+  const calls = [],
+    constants = new Map(),
+    functions = new Map();
+  const workerExpression = (expression) =>
+    strings(expression, { path, constants }).some(
+      (value) => value.startsWith(BASE) || /^https:\/\/[^/]+\.workers\.dev(?:\/|$)/.test(value),
+    );
   walk(ast, (node, parents) => {
     if (node.type === "CallExpression") calls.push({ node, parents });
-    if (node.type === "VariableDeclarator" && node.id.type === "Identifier")
+    if (node.type === "FunctionDeclaration") functions.set(node.id.name, node);
+    if (node.type === "VariableDeclarator" && node.id.type === "Identifier") {
+      const prior = constants.get(node.id.name);
+      assert.ok(
+        !prior || !(workerExpression(prior) || workerExpression(node.init)),
+        `ambiguous Worker binding in ${path}`,
+      );
       constants.set(node.id.name, node.init);
+    }
   });
-  return { path, calls, constants };
+  return { path, calls, constants, functions };
 }
 
 test("all current site and extension Worker calls are covered, including wrappers and inline scripts", () => {
@@ -359,6 +381,15 @@ test("AST inventory handles nested literals and rejects unknown routes or comput
   assert.throws(
     () => workerCalls(parseClient("new.js", 'fetch(new URL("/config", WORKER_URL))'), []),
     /unresolved Worker target/,
+  );
+  assert.throws(
+    () =>
+      parseClient(
+        "new.js",
+        '(()=>{const API="https://api.workers.dev/unlisted";fetch(API)})();' +
+          '(()=>{const API="https://api.workers.dev/config";fetch(API)})();',
+      ),
+    /ambiguous Worker binding/,
   );
   assert.deepEqual(
     workerCalls(
