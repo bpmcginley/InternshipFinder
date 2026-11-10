@@ -1,4 +1,4 @@
-"""Both generated area settings must agree with the public source."""
+"""Generated area settings must agree with the public source."""
 
 import json
 import shutil
@@ -14,12 +14,13 @@ def test_committed_public_config_is_current():
     subprocess.run([sys.executable, ROOT / GENERATOR, "--check"], check=True)
 
 
-def test_source_change_requires_regenerating_both_areas(tmp_path):
+def test_source_change_requires_regenerating_all_areas(tmp_path):
     paths = (
         GENERATOR,
         Path("config/public.json"),
         Path("growth/public_config.py"),
         Path("extension/lib/config.js"),
+        Path("worker/src/public-config.js"),
     )
     for name in paths:
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
