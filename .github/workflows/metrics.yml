@@ -5,7 +5,6 @@ name: Dashboard metrics
 # each job below, listings) into the app's D1 database. Totals only.
 on:
   schedule:
-    # was: "30 11 * * *" (once a day, 7:30am US Eastern). Each run rewrites the last 30 days through
     # the current hour, so hourly keeps the dashboard current; minute 23 stays clear of the top of the
     # hour, when GitHub's scheduler is busiest and delays runs. Free for a public repository.
     - cron: "23 * * * *"
@@ -28,19 +27,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # was: growth + docs/data/stats.json only. growth/metrics.py counts "new this week" the way the
           # digest and the brand posts do (digest.new_roles), which needs the listings and
           # backend/internscout (standard library only, so no pip install); with just stats.json it fell
           # back to the pre-dedupe count, so the dashboard disagreed with the email and the posts.
           sparse-checkout: |
+            .github/actions
             growth
             backend/internscout
             docs/data
           sparse-checkout-cone-mode: false
 
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - uses: ./.github/actions/python
 
       - name: Search Console sign-in library
         # cryptography signs the service account's sign-in token (growth/metrics.py _jwt).
