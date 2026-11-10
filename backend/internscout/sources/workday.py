@@ -10,6 +10,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from .common import (
+    log_source_failure,
     RobotsDisallowed,
     ScanCounts,
     board_item,
@@ -259,8 +260,8 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                 if d.status_code == 200:
                     dl, desc = parse_workday_detail(d.json())
                     locs = board_locations(tenant, dl) or locs
-            except Exception:
-                pass
+            except Exception as e:
+                log_source_failure("[workday] job detail failed", e)
         out.append(
             board_item(
                 co,

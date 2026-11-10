@@ -10,6 +10,7 @@ a listing its description.
 
 from __future__ import annotations
 from .common import (
+    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -95,8 +96,8 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = html_to_text(job.get("description"))
                 it["posted_at"] = job.get("datePosted") or it["posted_at"]
-        except Exception:
-            pass
+        except Exception as e:
+            log_source_failure("[bamboohr] job detail failed", e)
     for it in items:
         it.pop("_bh_id", None)
     mark_complete(co, complete)

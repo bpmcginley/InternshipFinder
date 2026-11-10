@@ -18,6 +18,7 @@ out of the 4,000-character budget and give the classifier marketing copy to tag 
 
 from __future__ import annotations
 from .common import (
+    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -156,7 +157,7 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
                 # 2026-10-23: extract eligibility before public trimming; was: [:4000].
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = parse_oracle_detail(d.json())
-        except Exception:
-            pass
+        except Exception as e:
+            log_source_failure("[oracle] job detail failed", e)
     mark_complete(co, complete)  # every keyword read to its TotalJobsCount; see scan_evidence
     return out

@@ -14,6 +14,7 @@ copy to tag a job by.
 
 from __future__ import annotations
 from .common import (
+    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -106,7 +107,7 @@ def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
                 # 2026-10-23: extract eligibility before public trimming; was: [:4000].
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = parse_smartrecruiters_detail(d.json())
-        except Exception:
-            pass
+        except Exception as e:
+            log_source_failure("[smartrecruiters] job detail failed", e)
     mark_complete(co, complete)
     return out

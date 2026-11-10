@@ -30,7 +30,7 @@ where the health, education and energy listings live.
 from __future__ import annotations
 import re
 from urllib.parse import unquote
-from .common import board_item, counts_of, html_to_text, require_robots
+from .common import board_item, counts_of, html_to_text, require_robots, log_source_failure
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -227,6 +227,6 @@ def fetch_successfactors_board(c, co: dict) -> list[dict]:
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = desc
                 it["posted_at"] = posted or it["posted_at"]
-        except Exception:
-            pass
+        except Exception as e:
+            log_source_failure("[successfactors] job detail failed", e)
     return items

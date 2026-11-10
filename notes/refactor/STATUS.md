@@ -65,6 +65,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | Independent review, green CI, Pages 42900208315 plus data-follow run 42900434412/backend verified. Operator adoption remains gated. |
 | 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review and green CI; Pages verification pending. |
 | 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary in review | Default text and streams preserved. Remaining sources follow the canary review. |
+| 4 | WP-1.4 Remaining safe source logging | wp14_logging | `refactor/wp-1.4-logging-other-sources` | - | Prepared | Await #214 publication and lead coordination. Q5 raw-exception adapters remain paused. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
@@ -422,6 +423,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Final normal main integration includes product generated-phone PR #194. Its authoritative public assets and golden fixture pair are preserved unchanged; this package did not regenerate fixtures. Contract source, generator, parser dependency, prerequisite docs and worker install-before-Node order are unchanged from the independently approved corrected head.
 
 - Independent second review approved corrected head 724db507f52bac3f3ea28ed042975fcee6ef7a3d. Final main integration preserved that authored source byte-for-byte outside this tracker; generation freshness and all six focused contract tests passed again. No package-owned public or golden-file diff exists against current main.
+
+## WP-1.4 remaining safe source logging
+
+- HouseAI and UHN route their four existing diagnostics through the console logger. The two outer exception handlers preserve the original class-only messages and add class metadata in JSON mode.
+- JSON mode reports source, operation and exception class from 13 previously silent broad catches: 11 ATS detail reads, the HouseAI detail read, and the shared robots lookup. Default mode leaves those catches silent. The optional diagnostic tolerates an unavailable console so the original fallback can continue.
+- Q5 remains open for the five raw-exception adapters: NYC Jobs, Lever, GitHub lists, Greenhouse and USAJOBS. Those five adapters remain byte-identical.
+- The focused mocked source and adapter suites passed 143 tests. Golden snapshot and mutation checks both passed. Ruff is clean, and targeted Pyright exactly matches the nine existing diagnostics. Syntax trees match the previous revision after stripping logging-only changes from all 14 touched source modules.
 
 ## WP-1.4 sources logging canary
 

@@ -24,7 +24,7 @@ import html
 import json
 import re
 
-from .common import board_item, counts_of, html_to_text, require_robots
+from .common import board_item, counts_of, html_to_text, require_robots, log_source_failure
 from ..classify import is_internship
 from ..region import board_state, maybe_in_region, place_bare_cities
 
@@ -147,6 +147,6 @@ def fetch_jazzhr_board(c, co: dict) -> list[dict]:
                 desc, posted = parse_jazzhr_detail(d.text)
                 it["description"] = desc
                 it["posted_at"] = posted or it["posted_at"]
-        except Exception:
-            pass
+        except Exception as e:
+            log_source_failure("[jazzhr] job detail failed", e)
     return items

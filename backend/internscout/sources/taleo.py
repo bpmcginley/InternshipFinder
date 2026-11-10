@@ -18,6 +18,7 @@ import json
 import re
 import urllib.parse
 from .common import (
+    log_source_failure,
     board_item,
     counts_of,
     html_to_text,
@@ -177,7 +178,7 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
                 # 2026-10-23: extract eligibility before public trimming; was: [:4000].
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = parse_taleo_detail(d.text)
-        except Exception:
-            pass
+        except Exception as e:
+            log_source_failure("[taleo] job detail failed", e)
     mark_complete(co, complete)
     return out

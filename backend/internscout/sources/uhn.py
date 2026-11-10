@@ -11,7 +11,9 @@ the health, research and biology majors the Canadian job boards barely served.
 """
 
 from __future__ import annotations
+import logging
 from .base import client
+from ..console_log import console
 from .common import ScanCounts, board_item, report_source
 from ..classify import is_internship
 
@@ -62,9 +64,13 @@ def fetch_uhn(report=None) -> list[dict]:
             counts.reported(len(rows))  # one unpaged call: the list is every opening
             out = parse_uhn(payload, counts)
     except Exception as e:
-        print(f"[uhn] failed: {type(e).__name__}")
+        console(
+            f"[uhn] failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
         report_source(report, "uhn", error=e)
         return []
-    print(f"[uhn] {len(out)} student postings")
+    console(f"[uhn] {len(out)} student postings")
     report_source(report, "uhn", items=out, counts=counts)
     return out

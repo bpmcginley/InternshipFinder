@@ -16,13 +16,15 @@ not go through employer checkout.
 """
 
 from __future__ import annotations
+import logging
 
 import json
 import re
 from datetime import date, datetime
 
 from .base import client
-from .common import ScanCounts, board_item, html_to_text, report_source
+from ..console_log import console
+from .common import ScanCounts, board_item, html_to_text, report_source, log_source_failure
 from ..classify import is_internship
 
 HUB_URL = "https://www.houseaiapp.com/careers"
@@ -125,7 +127,8 @@ def fetch_houseai(report=None) -> list[dict]:
                 try:
                     page = c.get(f"{SITE}/careers/{slug}")
                     page.raise_for_status()
-                except Exception:
+                except Exception as e:
+                    log_source_failure("[houseai] job detail failed", e)
                     counts.discard("unreadable")
                     continue
                 item = parse_houseai_page(page.text)
@@ -134,9 +137,13 @@ def fetch_houseai(report=None) -> list[dict]:
                     continue
                 out.append(item)
     except Exception as e:
-        print(f"[houseai] failed: {type(e).__name__}")
+        console(
+            f"[houseai] failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
         report_source(report, "houseai", error=e)
         return []
-    print(f"[houseai] {len(out)} student postings")
+    console(f"[houseai] {len(out)} student postings")
     report_source(report, "houseai", items=out, counts=counts)
     return out
