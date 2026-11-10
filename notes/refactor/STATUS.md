@@ -265,7 +265,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-Verify #203 Pages and backend, finish #195/#207 review and CI, then continue serialized wave-three merges. Coordinate #205 build/golden integration after product-owned changes clear; do not overwrite claimed files or weaken date assertions. Preserve separate worktrees, source-frozen review heads, all data history, and production/operator gates.
+Continue Wave 4 with the vocabulary inventory, logging, public config and orders split. Serialize merges with the product lead and verify Pages after publishing merges. Revisit the four deferred source tag removals once product ownership clears.
 
 ## WP-0.6 validation and coordination
 
