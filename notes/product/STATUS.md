@@ -28,7 +28,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
-| A | P-1.7c Digest footer link | audit_worker_extension | `codex/product-p1.7c-digest-link` | Draft claim | In progress; needs-bruce | Own growth/digest.py, a new focused footer test and synthetic preview evidence. Exact HTML/plain-text footer copy: Internships for every major on GitHub. Email wording requires Bruce approval; no sending/provider/subscriber changes. |
+| A | P-1.7c Digest footer link | audit_worker_extension | `codex/product-p1.7c-digest-link` | [#202](https://github.com/bpmcginley/InternshipFinder/pull/202) | Prepared; needs-bruce | Exact HTML/plain-text footer copy: Internships for every major on GitHub. 102 digest/sender/footer tests, both golden tests (695 unchanged files), scoped Ruff and four synthetic screenshots passed. Email wording requires Bruce approval; no sending/provider/subscriber changes. |
 | A | P-1.7 Remaining non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
 | A | P-1.7b Install distribution links | audit_worker_extension (recovery) | `codex/revert-product-188` | [#188](https://github.com/bpmcginley/InternshipFinder/pull/188), [recovery #197](https://github.com/bpmcginley/InternshipFinder/pull/197) | Revert pending publication; implementation reviewed but not published | Merge 1fde9f42 failed Pages deployment in run 42893547158 after its build passed. Ordinary recovery revert restores pre-188 public and golden bytes; independent review and green CI required. Lead waits for the preceding Pages backend deployment to stop before merging recovery. No manual workflow or publication action. |
 | A | P-1.7a Widget builder and feed guide | audit_growth_generated | `codex/product-p1.7-widget-guide` | [#182](https://github.com/bpmcginley/InternshipFinder/pull/182) | Merged; Pages green | Independent review; 258 site tests, 695-file golden match, publication audit and [24 screenshots](screenshots/P-1.7a/README.md). Existing embed unchanged. Merged as d42e7fce; Pages run 42872637139 passed. |
@@ -96,7 +96,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- P-1.7c: approve the email footer link text `Internships for every major on GitHub`, pointing to `https://github.com/bpmcginley/internships-every-major`, in both HTML and plain text. PR remains needs-bruce and open; no email is sent.
+- [P-1.7c / PR #202](https://github.com/bpmcginley/InternshipFinder/pull/202): approve the email footer link text `Internships for every major on GitHub`, pointing to `https://github.com/bpmcginley/internships-every-major`, in both HTML and plain text. PR remains needs-bruce and open; no email is sent.
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
 
