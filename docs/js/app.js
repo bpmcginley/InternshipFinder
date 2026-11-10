@@ -371,7 +371,7 @@
     const closeWhy = () => { onWhy(r.id); setTimeout(() => { if (whyBtn.current && whyBtn.current.focus) whyBtn.current.focus(); }, 0); };
     const whyKey = e => { if (e.key === "Escape" && open) { e.preventDefault(); onWhy(r.id); } };
     return h(F, null,
-      h("tr", { className: cx(checked && "sel", open && "opened", sc.mismatch && "dim") },
+      h("tr", { id: "listing-" + r.id, tabIndex: -1, className: cx(checked && "sel", open && "opened", sc.mismatch && "dim") },
         // was: "aria-label": "Select " + r.company_name, the same name on every row from one employer.
         canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": `Select ${r.company_name}, ${r.title}`, checked,
           disabled: !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
@@ -440,7 +440,24 @@
   // full-width row after the third card on a phone (after the last, with fewer). The box is never a Row, so
   // every count here, the header checkbox and the Auto-Apply selection come from `shown` alone, the same
   // with or without it (tests/site/placements.test.mjs). was: the same markup inline in App.
-  function ListTable({ shown, rows, head, renderRow, box, phone, onMore, inlineSignup, columns = 4 }) {
+  // Runs, not a company-wide bucket: a later appearance of the same employer is independent.
+  // Work only on the current page; grouping never changes ordering, matching or pagination.
+  function companyRuns(rows, filters, expanded = new Set()) {
+    const shown = [], moreAfter = new Map();
+    if (filters.sort !== "new" || filters.q.trim()) return { shown: rows, moreAfter };
+    for (let start = 0; start < rows.length;) {
+      const company = rows[start].company_name, key = String(rows[start].id);
+      let end = start + 1;
+      while (company && end < rows.length && rows[end].company_name === company) end++;
+      const cut = expanded.has(key) ? end : Math.min(start + 2, end);
+      shown.push(...rows.slice(start, cut));
+      if (cut < end) moreAfter.set(rows[cut - 1].id, { key, company, count: end - cut, firstHidden: rows[cut].id });
+      start = end;
+    }
+    return { shown, moreAfter };
+  }
+
+  function ListTable({ shown, rows, head, renderRow, box, phone, onMore, inlineSignup, columns = 4, moreAfter = new Map(), onExpand, pageCount = shown.length }) {
     const at = Math.min(3, shown.length) - 1;
     // After the tenth row, only when more follow: on a shorter list the footer form comes right after
     // the last row, and two forms in a row read as a mistake. was: Math.min(10, shown.length) - 1.
@@ -451,11 +468,15 @@
       h("div", { className: "sheet" }, h("div", { className: "tablewrap" }, h("table", { className: "list" }, head,
         h("tbody", null, shown.flatMap((r, i) => [
           renderRow(r),
+          moreAfter.has(r.id) && h("tr", { key: "company-run-" + moreAfter.get(r.id).key, className: "company-run" }, h("td", { colSpan: columns },
+            h("button", { type: "button", className: "btn quiet", "aria-expanded": false,
+              "aria-label": `Show ${moreAfter.get(r.id).count} more listing${moreAfter.get(r.id).count === 1 ? "" : "s"} from ${moreAfter.get(r.id).company}`,
+              onClick: () => onExpand(moreAfter.get(r.id)) }, `${moreAfter.get(r.id).count} more from ${moreAfter.get(r.id).company}`))),
           phone && box && i === at && h("tr", { key: "placement", className: "paid-row" }, h("td", { colSpan: 5 }, box)),
           inlineSignup && i === signupAt && h("tr", { key: "weekly-email", className: "digest-in-list" }, h("td", { colSpan: columns }, inlineSignup))
         ].filter(Boolean)))))),
       h("div", { id: "list-end", className: "sr", tabIndex: -1 }, `End of the ${shown.length.toLocaleString()} listings shown`),
-      rows.length > shown.length && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: onMore }, `Show ${Math.min(PAGE, rows.length - shown.length)} more`)));
+      rows.length > pageCount && h("div", { className: "more" }, h("button", { type: "button", className: "btn", onClick: onMore }, `Show ${Math.min(PAGE, rows.length - pageCount)} more`)));
   }
 
   // The notice that paid listings have started (S8, 2026-10-14; the privacy page promises a dashboard notice for
@@ -1361,7 +1382,9 @@
     [placements, listed, loading, placeHidden, exclude, f.fields.length, f.app_state]);
     if (placed) placedRef.current = placed;
 
-    const shown = rows.slice(0, limit);
+    const [expandedRuns, setExpandedRuns] = useState(() => new Set());
+    const pageRows = rows.slice(0, limit);
+    const { shown, moreAfter } = companyRuns(pageRows, f, expandedRuns);
     // Every file loaded: the list itself is the whole country.
     const allLoaded = everything && !loading;
     // was: stats.open, else the sum of index.files[].open, which counts a role filed in two states twice
@@ -1670,6 +1693,13 @@
     // count itself, which changed with each file landing and each pause in typing.
     const liveText = loading || counting ? "" : rows.length ? `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${asked ? " " + asked : ""} in ${whereWords}.` : emptyText;
     const [spoken, setSpoken] = useState("");
+    const expandRun = run => {
+      setExpandedRuns(previous => new Set([...previous, run.key]));
+      IS.count("group_expand");
+      setSpoken(`${run.count} more listing${run.count === 1 ? "" : "s"} from ${run.company} shown. ${(shown.length + run.count).toLocaleString()} of ${rows.length.toLocaleString()} listings shown.`);
+      // The expansion button leaves the DOM. Keep keyboard users at the first revealed listing.
+      setTimeout(() => { const row = document.getElementById("listing-" + run.firstHidden); if (row) row.focus(); }, 0);
+    };
     const firstF = useRef(f), touched = useRef(false);
     if (f !== firstF.current) touched.current = true;
     useEffect(() => {
@@ -1989,6 +2019,7 @@
         h("span", { className: "countline" }, counting ? "Loading…" : h(F, null,
           loading ? `At least ${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""} so far` : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}`,
           ` in ${whereWords}`,
+          moreAfter.size > 0 ? ` · ${shown.length.toLocaleString()} shown; expand company groups for more` : "",
           loading ? ` · loading ${pr.done} of ${pr.total} files` : "",
           !everything && h(F, null, " · ", h("button", { type: "button", className: "linkbtn", onClick: searchAll }, "Show every state")))),
         ranked && rows.length > 1 && h("span", { className: "muted" }, "Closest matches to your search first"),
@@ -2013,7 +2044,7 @@
           // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
           : rows.length === 0 ? emptyEl
             // was: the skip link, the table, "End of the N listings shown" and "Show N more" inline here (ListTable now).
-            : h(ListTable, { shown, rows, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
+            : h(ListTable, { shown, rows, moreAfter, onExpand: expandRun, pageCount: pageRows.length, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
               inlineSignup: digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
               head: h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,

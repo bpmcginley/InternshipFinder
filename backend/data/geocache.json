@@ -370,6 +370,10 @@
 40.6687,
 -74.1143
 ],
+"beacon|NY":[
+41.5048,
+-73.9695
+],
 "beaver|PA":[
 40.6954,
 -80.3048
@@ -459,6 +463,7 @@
 41.1464,
 -74.7524
 ],
+"bratislava|PA":null,
 "brewster|NY":[
 41.3944,
 -73.6171
@@ -487,6 +492,10 @@
 "bronx & far rockaway|NY":null,
 "brookfield place fka 3 world financial center|NY":null,
 "brookfield place|NY":null,
+"brookhaven|PA":[
+39.8691,
+-75.3821
+],
 "brooklawn|NJ":[
 39.8783,
 -75.1205
@@ -526,6 +535,7 @@
 ],
 "canhq: ccs hq - syracuse|NY":null,
 "canonsburg pa|PA":null,
+"canonsburg-400 technology drive|PA":null,
 "canonsburg|PA":[
 40.2588,
 -80.1867
@@ -707,6 +717,10 @@
 40.0179,
 -79.5895
 ],
+"coopersburg|PA":[
+40.5115,
+-75.3903
+],
 "copenhagen|NY":[
 43.8934,
 -75.6738
@@ -829,6 +843,10 @@
 40.834,
 -74.0971
 ],
+"east setauket|NY":[
+40.921,
+-73.0937
+],
 "east syracuse|NY":[
 43.0653,
 -76.0785
@@ -862,6 +880,10 @@
 39.3821,
 -74.6171
 ],
+"eighty four|PA":[
+40.1827,
+-80.1331
+],
 "elmira|NY":[
 42.0898,
 -76.8077
@@ -871,6 +893,10 @@
 "elysburg|PA":[
 40.8647,
 -76.5524
+],
+"emmaus|PA":[
+40.535,
+-75.4919
 ],
 "empire state building|NY":null,
 "endicott|NY":[
@@ -973,6 +999,10 @@
 -73.8174
 ],
 "fnb financial center|PA":null,
+"folsom|PA":[
+39.8898,
+-75.3252
+],
 "forest city|PA":[
 41.6515,
 -75.4666
@@ -1064,6 +1094,10 @@
 40.1002,
 -75.1539
 ],
+"goshen|NY":[
+41.4021,
+-74.3242
+],
 "grand island|NY":[
 43.0183,
 -78.9636
@@ -1084,6 +1118,10 @@
 "greensburg|PA":[
 40.3025,
 -79.5443
+],
+"gregg township|PA":[
+40.8573,
+-77.5814
 ],
 "grove city|PA":[
 41.1579,
@@ -1199,6 +1237,7 @@
 42.3278,
 -77.6611
 ],
+"horsham-pennsylvania-united states of america|PA":null,
 "horsham|PA":[
 40.1784,
 -75.1285
@@ -1288,6 +1327,14 @@
 -74.0024
 ],
 "kornberg medical research building|NY":null,
+"kulpsville|PA":[
+40.2429,
+-75.3366
+],
+"kutztown|PA":[
+40.5173,
+-75.7774
+],
 "laboratory for laser energetics|NY":null,
 "lackawanna county|PA":null,
 "lackawaxen|PA":[
@@ -1330,6 +1377,10 @@
 40.3062,
 -80.1206
 ],
+"lebanon|NJ":[
+40.6418,
+-74.836
+],
 "lebanon|PA":[
 40.343,
 -76.4234
@@ -1347,6 +1398,7 @@
 40.834,
 -75.7136
 ],
+"leverkusen|PA":null,
 "levittown|NY":[
 40.726,
 -73.5145
@@ -1584,6 +1636,10 @@
 40.6723,
 -74.3574
 ],
+"mt holly springs|PA":[
+40.1184,
+-77.19
+],
 "mt laurel - 6000 atrium way|NJ":null,
 "mt laurel township|NJ":[
 39.934,
@@ -1655,6 +1711,7 @@
 "new jersey - remote|NJ":null,
 "new jersey office - 210 hudson street|NJ":null,
 "new jersey remote work|NJ":null,
+"new jersey strongly preferred|NJ":null,
 "new jersey|NJ":[
 40.5353,
 -74.3456
@@ -1682,6 +1739,7 @@
 "new york (usa|NY":null,
 "new york - 104 w 40th|NY":null,
 "new york - 1166|NY":null,
+"new york - 225 liberty street|NY":null,
 "new york - 245 park avenue|NY":null,
 "new york - 32 old slip|NY":null,
 "new york - 499 park|NY":null,
@@ -1723,6 +1781,7 @@
 40.6379,
 -74.1856
 ],
+"new york office (hybrid|NY":null,
 "new york office|NY":null,
 "new york privy hq|NY":null,
 "new york remote office (ny99|NY":null,
@@ -1734,9 +1793,11 @@
 "new york \u2013 1350 avenue of the americas|NY":null,
 "new york- united states|NY":null,
 "new york-office(27th st|NY":null,
+"new york/cincinnati/san francisco|NY":null,
 "new york/los angeles united states|NY":null,
 "newark nj|NJ":null,
 "newark riverfront nj|NJ":null,
+"newark-wayne community hospital|NY":null,
 "newark|NY":[
 43.0467,
 -77.0953
@@ -1749,6 +1810,10 @@
 "newton|NJ":[
 41.0583,
 -74.7531
+],
+"newtown square|PA":[
+39.9868,
+-75.4008
 ],
 "newtown|PA":[
 40.2294,
@@ -1973,7 +2038,9 @@
 "ny - farmingdale|NY":null,
 "ny - fishkill|NY":null,
 "ny - forest hills|NY":null,
+"ny - garden city|NY":null,
 "ny - glendale|NY":null,
+"ny - glenville|NY":null,
 "ny - goshen|NY":null,
 "ny - greece|NY":null,
 "ny - greenwich|NY":null,
@@ -2023,12 +2090,15 @@
 "ny - staten island|NY":null,
 "ny - sunnyside|NY":null,
 "ny - tarrytown|NY":null,
+"ny - troy|NY":null,
 "ny - valatie|NY":null,
+"ny - vestal|NY":null,
 "ny - walton|NY":null,
 "ny - wantagh|NY":null,
 "ny - warwick|NY":null,
 "ny - west islip|NY":null,
 "ny - west seneca|NY":null,
+"ny - westbury|NY":null,
 "ny - westchester|NY":null,
 "ny - whitehall|NY":null,
 "ny - whitestone|NY":null,
@@ -2102,6 +2172,10 @@
 -76.5094
 ],
 "other remote ny|NY":null,
+"otisville|NY":[
+41.4734,
+-74.5385
+],
 "oxford|NJ":[
 40.8032,
 -74.9896
@@ -2172,6 +2246,7 @@
 "pa - glenolden|PA":null,
 "pa - greencastle|PA":null,
 "pa - greensburg|PA":null,
+"pa - hamlin|PA":null,
 "pa - harrisburg|PA":null,
 "pa - hatfield|PA":null,
 "pa - havertown|PA":null,
@@ -2188,6 +2263,7 @@
 "pa - johnstown|PA":null,
 "pa - kennett square|PA":null,
 "pa - king of prussia|PA":null,
+"pa - kingston|PA":null,
 "pa - kutztown|PA":null,
 "pa - lancaster|PA":null,
 "pa - lansdale|PA":null,
@@ -2200,6 +2276,7 @@
 "pa - malvern|PA":null,
 "pa - maple glen|PA":null,
 "pa - masontown|PA":null,
+"pa - mckees rocks|PA":null,
 "pa - mechanicsburg|PA":null,
 "pa - media|PA":null,
 "pa - middletown|PA":null,
@@ -2209,6 +2286,7 @@
 "pa - monroeville|PA":null,
 "pa - mount holly springs|PA":null,
 "pa - mount pleasant|PA":null,
+"pa - natrona heights|PA":null,
 "pa - nazareth|PA":null,
 "pa - nesquehoning|PA":null,
 "pa - new castle|PA":null,
@@ -2309,6 +2387,10 @@
 "pennington|NJ":[
 40.3281,
 -74.791
+],
+"pennsville|NJ":[
+39.6534,
+-75.5166
 ],
 "pennsylvania (remote|PA":null,
 "pennsylvania (usa|PA":null,
@@ -2621,6 +2703,10 @@
 42.947,
 -76.4291
 ],
+"slippery rock|PA":[
+41.0663,
+-80.0569
+],
 "smithtown|NY":[
 40.8559,
 -73.2007
@@ -2654,6 +2740,10 @@
 "spring house|PA":[
 40.1854,
 -75.2277
+],
+"springfield|PA":[
+39.9307,
+-75.3202
 ],
 "springville|NY":[
 42.5087,
@@ -2751,6 +2841,10 @@
 40.1393,
 -74.981
 ],
+"tribeca|NY":[
+40.7154,
+-74.0093
+],
 "turnersville|NJ":[
 39.7732,
 -75.0513
@@ -2841,6 +2935,7 @@
 "us.ny.new york.10 east 40 street|NY":null,
 "us.pa.philadelphia|PA":null,
 "us: sf bay area|NY":null,
+"usa - chambersburg pa 17202|PA":null,
 "usa - hoboken|NJ":null,
 "usa - holtsville|NY":null,
 "usa - new jersey - rahway|NJ":null,
@@ -2932,6 +3027,7 @@
 "us|NY":null,
 "us|PA":null,
 "utica-rome ny hybrid|NY":null,
+"utica-rome ny|NY":null,
 "utica|NY":[
 43.1009,
 -75.2327
@@ -3060,6 +3156,10 @@
 ],
 "westchester county|NY":null,
 "westchester|NY":null,
+"westfield|NJ":[
+40.6517,
+-74.3483
+],
 "westwood|NJ":[
 40.9912,
 -74.0326

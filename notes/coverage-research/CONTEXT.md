@@ -4,7 +4,7 @@ Saved October 16, 2026 at the user's request to wrap up and resume later.
 
 ## Scope and checkout
 
-Branch: `codex/expand-north-america-coverage`. Changes remain local and uncommitted. No merge, deployment, paid API/AI calls, employer submissions or production ingestion. Preserve unrelated untracked `AGENTS.md`, `docs/product-review/` and `social-setup/`.
+Branch: `codex/expand-north-america-coverage`. Changes remain local and uncommitted. No merge, deployment, paid API/AI calls, employer submissions or production ingestion. Preserve unrelated untracked `AGENTS.md`, `notes/product-review/` and `social-setup/`.
 
 User asked for one agent per workstream: systematic source discovery; ingestion-loss measurement; closure reliability; query/adapter expansion. All four agents finished their current implementation and stopped. The user additionally requested deliberate searches near the top 50 US metros and 500 pages named “*major* internships near *city*”. They explicitly selected the ten largest NCES bachelor's degree fields.
 
