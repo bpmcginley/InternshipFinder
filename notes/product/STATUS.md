@@ -19,7 +19,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 |---|---|---|---|---|---|---|
 | 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Reviewed; CI pending | Independent site-audit reviewer found no blocker. |
 | 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | - | In progress | needs-bruce: worker merge and deploy. |
-| A | P-1.1 Company runs | audit_site | `codex/product-p1.1-company-runs` | Draft claim pending | In progress | Owns app.js, relevant tests, minimal dashboard CSS and P-1.1 screenshots. Baseline and before captures precede implementation; independent review required. Counter waits for P-0.2 privacy approval and worker deploy. |
+| A | P-1.1 Company runs | audit_site | `codex/product-p1.1-company-runs` | [#176](https://github.com/bpmcginley/InternshipFinder/pull/176) | In review preparation | Baseline 244 and updated 251 site tests pass; eight 1280/375 light/dark screenshots and keyboard/count/selection checks. Startup payload report exits 0. Golden update and independent review pending. Counter waits for P-0.2 privacy approval and worker deploy. |
 | A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
