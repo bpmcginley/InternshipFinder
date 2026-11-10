@@ -1,12 +1,19 @@
 // Import only resume-derived values automatically. Explicit edits and older profiles
 // without provenance need review when a resume disagrees with them.
-import { RESUME_FACTS, CONFIRMATION_FACTS, ELIGIBILITY_FACTS, factConfirmed, factFallback } from "../lib/store.js";
+import {
+  RESUME_FACTS,
+  CONFIRMATION_FACTS,
+  ELIGIBILITY_FACTS,
+  factConfirmed,
+  factFallback,
+} from "../lib/store.js";
 
 const clone = (v) => structuredClone(v);
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const SECTIONS = ["education", "experience", "projects", "links", "skills"];
-const CONTACT = RESUME_FACTS;   // was: the same list, here
-const empty = (v) => !v || (Array.isArray(v) && !v.length) || (typeof v === "object" && Object.values(v).every(empty));
+const CONTACT = RESUME_FACTS; // was: the same list, here
+const empty = (v) =>
+  !v || (Array.isArray(v) && !v.length) || (typeof v === "object" && Object.values(v).every(empty));
 
 export function confirmProfileValue(profile, kind, key) {
   profile.sources ||= { facts: {}, sections: {} };
@@ -30,8 +37,12 @@ export function applyInterviewFacts(profile, facts) {
     if (ok && equal(profile.facts[key], value)) continue;
     const kept = ok ? profile.facts[key] : profile.sources.facts[key]?.kept;
     profile.facts[key] = value;
-    const real = typeof kept === "string" && kept && kept !== factFallback(key);   // not just the decline default
-    profile.sources.facts[key] = { source: "interview", value: clone(value), ...(real ? { kept } : {}) };
+    const real = typeof kept === "string" && kept && kept !== factFallback(key); // not just the decline default
+    profile.sources.facts[key] = {
+      source: "interview",
+      value: clone(value),
+      ...(real ? { kept } : {}),
+    };
   }
 }
 
@@ -50,18 +61,22 @@ export function dismissSuggestion(profile, key) {
 // was: any missing or malformed section threw "The resume details were incomplete", and with no other
 // way to finish reading a resume, Auto-Apply could not be turned on at all.
 export function normalizeExtracted(extracted) {
-  const x = extracted && typeof extracted === "object" && !Array.isArray(extracted) ? extracted : {};
+  const x =
+    extracted && typeof extracted === "object" && !Array.isArray(extracted) ? extracted : {};
   const facts = x.facts && typeof x.facts === "object" && !Array.isArray(x.facts) ? x.facts : {};
   const out = { facts: {} };
   for (const key of CONTACT) if (typeof facts[key] === "string") out.facts[key] = facts[key];
   for (const key of SECTIONS) {
     const v = x[key];
     if (key === "skills") {
-      if (v && typeof v === "object" && !Array.isArray(v)) out.skills = { technical: [], tools: [], soft: [], ...v };
+      if (v && typeof v === "object" && !Array.isArray(v))
+        out.skills = { technical: [], tools: [], soft: [], ...v };
     } else if (Array.isArray(v)) out[key] = v;
   }
   if (!Object.keys(out.facts).length && SECTIONS.every((k) => !(k in out))) {
-    throw new Error("Nothing could be read from your resume. Read it again, or enter your details yourself.");
+    throw new Error(
+      "Nothing could be read from your resume. Read it again, or enter your details yourself.",
+    );
   }
   return out;
 }
@@ -76,8 +91,12 @@ export function normalizeExtracted(extracted) {
 // an interview suggestion waiting (`skip`) and old work authorization, sponsorship and age answers, which
 // each have their own Confirm button. was: all of CONFIRMATION_FACTS, so one click confirmed
 // "authorized: Yes, sponsorship: No, 18+: Yes" that an older version had filled in for everyone.
-export const bulkConfirmKeys = (profile, skip = new Set()) => CONFIRMATION_FACTS.filter((key) => !skip.has(key)
-  && !(ELIGIBILITY_FACTS.includes(key) && profile.facts?.[key] && !profile.sources?.facts?.[key]));
+export const bulkConfirmKeys = (profile, skip = new Set()) =>
+  CONFIRMATION_FACTS.filter(
+    (key) =>
+      !skip.has(key) &&
+      !(ELIGIBILITY_FACTS.includes(key) && profile.facts?.[key] && !profile.sources?.facts?.[key]),
+  );
 
 export function planResumeImport(profile, extracted, { legacyResume = false } = {}) {
   const x = normalizeExtracted(extracted);
@@ -86,9 +105,17 @@ export function planResumeImport(profile, extracted, { legacyResume = false } = 
     const before = kind === "facts" ? profile.facts[key] : profile[key];
     const origin = profile.sources?.[kind]?.[key];
     const derived = origin?.source === "resume" && equal(origin.value, before);
-    const conflict = !equal(before, next) && (!empty(before) || origin?.source === "manual") && !derived;
-    entries.push({ id: `${kind}:${key}`, kind, key, before: clone(before), next: clone(next), conflict,
-      ...(conflict && legacyResume && !origin ? { preselect: true } : {}) });
+    const conflict =
+      !equal(before, next) && (!empty(before) || origin?.source === "manual") && !derived;
+    entries.push({
+      id: `${kind}:${key}`,
+      kind,
+      key,
+      before: clone(before),
+      next: clone(next),
+      conflict,
+      ...(conflict && legacyResume && !origin ? { preselect: true } : {}),
+    });
   };
   for (const key of CONTACT) if (key in x.facts) add("facts", key, x.facts[key]);
   for (const key of SECTIONS) if (key in x) add("sections", key, x[key]);
@@ -96,7 +123,8 @@ export function planResumeImport(profile, extracted, { legacyResume = false } = 
 }
 
 // The boxes ticked when the review opens (onboarding.js drawResumeReview).
-export const preselectedImports = (plan) => plan.filter((e) => e.conflict && e.preselect).map((e) => e.id);
+export const preselectedImports = (plan) =>
+  plan.filter((e) => e.conflict && e.preselect).map((e) => e.id);
 
 export function applyResumeImport(profile, plan, accepted = []) {
   const chosen = new Set(accepted);
@@ -140,18 +168,25 @@ export function focusStepHeading(main) {
 
 export function pendingResumeReview(store) {
   return store.files.resume && Array.isArray(store.settings.resume_import?.plan)
-    ? { file: store.files.resume, plan: store.settings.resume_import.plan } : null;
+    ? { file: store.files.resume, plan: store.settings.resume_import.plan }
+    : null;
 }
 
 export function formatResumeValue(value) {
   if (empty(value)) return "Not listed";
   if (typeof value === "string") return value;
-  if (Array.isArray(value)) return value.every((v) => typeof v === "string")
-    ? value.join(", ") : value.map(formatResumeValue).join("\n\n");
-  if (typeof value === "object") return Object.entries(value).filter(([, v]) => !empty(v)).map(([key, v]) => {
-    const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-    return `${label}: ${formatResumeValue(v)}`;
-  }).join("\n");
+  if (Array.isArray(value))
+    return value.every((v) => typeof v === "string")
+      ? value.join(", ")
+      : value.map(formatResumeValue).join("\n\n");
+  if (typeof value === "object")
+    return Object.entries(value)
+      .filter(([, v]) => !empty(v))
+      .map(([key, v]) => {
+        const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+        return `${label}: ${formatResumeValue(v)}`;
+      })
+      .join("\n");
   return String(value);
 }
 
@@ -175,15 +210,20 @@ export function setSetupEmail(S, value) {
 // start of the sign-up email with no "@", set by hand. It becomes the whole address, and a resume review
 // waiting on it compares against the whole address instead. Returns true when anything changed.
 export function repairSetupEmail(S) {
-  const f = S.profile && S.profile.facts, signup = (S.settings && S.settings.signup_email) || "";
+  const f = S.profile && S.profile.facts,
+    signup = (S.settings && S.settings.signup_email) || "";
   const bad = f && f.email;
-  if (!bad || bad.includes("@") || bad.length >= signup.length || !signup.startsWith(bad)) return false;
+  if (!bad || bad.includes("@") || bad.length >= signup.length || !signup.startsWith(bad))
+    return false;
   if (S.profile.sources?.facts?.email?.source !== "manual") return false;
   f.email = signup;
   confirmProfileValue(S.profile, "facts", "email");
   const plan = S.settings.resume_import && S.settings.resume_import.plan;
   for (const e of Array.isArray(plan) ? plan : []) {
-    if (e.kind === "facts" && e.key === "email" && e.before === bad) { e.before = signup; e.conflict = !equal(signup, e.next); }
+    if (e.kind === "facts" && e.key === "email" && e.before === bad) {
+      e.before = signup;
+      e.conflict = !equal(signup, e.next);
+    }
   }
   return true;
 }

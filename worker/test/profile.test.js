@@ -12,11 +12,21 @@ const sync = (env = {}) => setup({ env: { PROFILE_KEY: KEY, ...env } });
 const USER = () => userHash("google", { sub: "109876543210" }, { HASH_SALT: "test-salt" });
 const iso = (min) => new Date(NOW.getTime() + min * 60e3).toISOString();
 const PROFILE = {
-  facts: { majors: ["Computer Science"], class_year: 2028, gender: "woman", race: ["asian"], hispanic: "no",
-           veteran: "no", disability: "no", lgbtq: "prefer_not" },
-  skills: ["Python", "SQL"], story: "Built a club website",
+  facts: {
+    majors: ["Computer Science"],
+    class_year: 2028,
+    gender: "woman",
+    race: ["asian"],
+    hispanic: "no",
+    veteran: "no",
+    disability: "no",
+    lgbtq: "prefer_not",
+  },
+  skills: ["Python", "SQL"],
+  story: "Built a club website",
 };
-const put = (w, token, profile, updated) => w.api("PUT", "/profile", { token, body: { profile, updated } });
+const put = (w, token, profile, updated) =>
+  w.api("PUT", "/profile", { token, body: { profile, updated } });
 const get = async (w, token) => {
   const res = await w.api("GET", "/profile", { token });
   assert.equal(res.status, 200);
@@ -32,7 +42,10 @@ test("PUT then GET round-trips the profile, minus the six demographic answers", 
   assert.deepEqual(await res.json(), { ok: true, updated: iso(0) });
   const back = await get(w, token);
   assert.equal(back.updated, iso(0));
-  assert.deepEqual(back.profile, { ...PROFILE, facts: { majors: ["Computer Science"], class_year: 2028 } });
+  assert.deepEqual(back.profile, {
+    ...PROFILE,
+    facts: { majors: ["Computer Science"], class_year: 2028 },
+  });
   for (const k of DEMOGRAPHICS) assert.ok(!(k in back.profile.facts), k);
   const [row] = w.db.dump().profiles;
   assert.equal(row.bytes, Buffer.byteLength(JSON.stringify(back.profile)));
@@ -50,7 +63,8 @@ test("the stored row is AES-GCM ciphertext with a fresh IV, and only this accoun
   assert.equal(raw.toString("base64"), first, "base64");
   assert.ok(raw.length >= 12 + 16 + 10, "IV, tag and ciphertext");
   const everything = JSON.stringify(w.db.dump());
-  for (const s of ["Computer Science", "Python", "club website", "majors", "woman"]) assert.ok(!everything.includes(s), s);
+  for (const s of ["Computer Science", "Python", "club website", "majors", "woman"])
+    assert.ok(!everything.includes(s), s);
   // Same profile, same time: a new IV, so a different row
   await put(w, token, PROFILE, iso(0));
   const second = w.db.dump().profiles[0].data;
@@ -63,7 +77,10 @@ test("the stored row is AES-GCM ciphertext with a fresh IV, and only this accoun
   await assert.rejects(unseal({ PROFILE_KEY: KEY }, other, second));
   await assert.rejects(unseal({ PROFILE_KEY: OTHER_KEY }, user, second));
   // And one account never sees another's copy
-  assert.deepEqual(await get(w, await w.token({ sub: "someone-else" })), { profile: null, updated: null });
+  assert.deepEqual(await get(w, await w.token({ sub: "someone-else" })), {
+    profile: null,
+    updated: null,
+  });
 });
 
 test("an older save than the stored copy is 409 stale with the stored copy; equal or newer saves win", async () => {
@@ -81,7 +98,11 @@ test("an older save than the stored copy is 409 stale with the stored copy; equa
   // The same time again (a retried save) goes through, and so does a newer one
   assert.equal((await put(w, token, { skills: ["v2b"] }, iso(-10))).status, 200);
   const newer = await put(w, token, { skills: ["v3"] }, "2026-09-14T10:00:30.000+00:00");
-  assert.deepEqual(await newer.json(), { ok: true, updated: iso(-5) }, "stored as a normal ISO time");
+  assert.deepEqual(
+    await newer.json(),
+    { ok: true, updated: iso(-5) },
+    "stored as a normal ISO time",
+  );
   assert.deepEqual(await get(w, token), { profile: { skills: ["v3"] }, updated: iso(-5) });
 });
 
@@ -104,8 +125,14 @@ test("PUT /profile refuses a body over 256 KB or without a profile object and an
   assert.equal((await res.json()).error, "bad_request");
   // Just under the cap is fine
   assert.equal((await put(w, token, { story: "x".repeat(250 * 1024) }, iso(0))).status, 200);
-  for (const body of [{ updated: iso(1) }, { profile: [], updated: iso(1) }, { profile: "text", updated: iso(1) },
-                      { profile: {} }, { profile: {}, updated: "yesterday" }, { profile: {}, updated: 12345 }]) {
+  for (const body of [
+    { updated: iso(1) },
+    { profile: [], updated: iso(1) },
+    { profile: "text", updated: iso(1) },
+    { profile: {} },
+    { profile: {}, updated: "yesterday" },
+    { profile: {}, updated: 12345 },
+  ]) {
     res = await w.api("PUT", "/profile", { token, body });
     assert.equal(res.status, 400, JSON.stringify(body).slice(0, 60));
   }
@@ -130,7 +157,10 @@ test("without PROFILE_KEY the profile routes answer 503 sync_off, and /config sa
   for (const [method, body] of [["GET"], ["PUT", { profile: {}, updated: iso(0) }], ["DELETE"]]) {
     const res = await w.api(method, "/profile", { token, body });
     assert.equal(res.status, 503, method);
-    assert.deepEqual(await res.json(), { error: "sync_off", message: "Saving profiles isn't turned on yet." });
+    assert.deepEqual(await res.json(), {
+      error: "sync_off",
+      message: "Saving profiles isn't turned on yet.",
+    });
   }
   const c = await (await w.api("GET", "/config")).json();
   assert.deepEqual([c.sessions, c.sync], [true, false]);
@@ -141,9 +171,17 @@ test("without PROFILE_KEY the profile routes answer 503 sync_off, and /config sa
 test("demographic provenance is stripped by the server before encryption", async () => {
   const w = await sync();
   const token = await w.token();
-  const profile = { facts: { first_name: "Sam" }, sources: { facts: {
-    first_name: { kind: "resume", value: "Sam" },
-    ...Object.fromEntries(DEMOGRAPHICS.map(k => [k, { kind: "manual", value: "PRIVATE-" + k }])) } } };
+  const profile = {
+    facts: { first_name: "Sam" },
+    sources: {
+      facts: {
+        first_name: { kind: "resume", value: "Sam" },
+        ...Object.fromEntries(
+          DEMOGRAPHICS.map((k) => [k, { kind: "manual", value: "PRIVATE-" + k }]),
+        ),
+      },
+    },
+  };
   assert.equal((await put(w, token, profile, iso(0))).status, 200);
   const back = await get(w, token);
   assert.ok(!JSON.stringify(back).includes("PRIVATE-"));
@@ -153,7 +191,9 @@ test("demographic provenance is stripped by the server before encryption", async
 test("the profile routes need a sign-in", async () => {
   const w = await sync();
   for (const method of ["GET", "PUT", "DELETE"]) {
-    const res = await w.api(method, "/profile", { body: method === "PUT" ? { profile: {}, updated: iso(0) } : undefined });
+    const res = await w.api(method, "/profile", {
+      body: method === "PUT" ? { profile: {}, updated: iso(0) } : undefined,
+    });
     assert.equal(res.status, 401, method);
   }
 });
@@ -164,7 +204,11 @@ test("a replaced PROFILE_KEY reads as no copy, and the next save replaces it; a 
   await put(w, token, PROFILE, iso(30));
   w.env.PROFILE_KEY = OTHER_KEY;
   assert.deepEqual(await get(w, token), { profile: null, updated: null });
-  assert.equal((await put(w, token, { skills: ["new"] }, iso(0))).status, 200, "an older time still replaces a dead row");
+  assert.equal(
+    (await put(w, token, { skills: ["new"] }, iso(0))).status,
+    200,
+    "an older time still replaces a dead row",
+  );
   assert.deepEqual(await get(w, token), { profile: { skills: ["new"] }, updated: iso(0) });
   w.env.PROFILE_KEY = "too-short";
   assert.equal((await w.api("GET", "/profile", { token })).status, 500);
@@ -198,8 +242,12 @@ test("DELETE /me still refuses while a paid plan is live, and then removes nothi
   const id = await w.token();
   const { session } = await (await w.api("POST", "/session", { token: id })).json();
   await put(w, session, PROFILE, iso(0));
-  await w.db.prepare("INSERT INTO plans (user_hash, plan, status, customer, subscription, period_end, updated) VALUES (?, 'supporter', 'active', 'cus_1', 'sub_1', NULL, ?)")
-    .bind(await USER(), NOW.toISOString()).run();
+  await w.db
+    .prepare(
+      "INSERT INTO plans (user_hash, plan, status, customer, subscription, period_end, updated) VALUES (?, 'supporter', 'active', 'cus_1', 'sub_1', NULL, ?)",
+    )
+    .bind(await USER(), NOW.toISOString())
+    .run();
   const res = await w.api("DELETE", "/me", { token: session });
   assert.equal(res.status, 409);
   assert.equal((await res.json()).error, "subscribed");
@@ -210,26 +258,51 @@ test("DELETE /me still refuses while a paid plan is live, and then removes nothi
 
 test("CORS: PUT and DELETE preflights pass for the site and the extension, and not for anyone else", async () => {
   const w = await sync();
-  for (const origin of ["https://internscout.org", "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi", "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag"]) {
-    for (const [path, method] of [["/profile", "PUT"], ["/profile", "DELETE"], ["/session", "DELETE"], ["/session", "POST"]]) {
+  for (const origin of [
+    "https://internscout.org",
+    "chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi",
+    "chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag",
+  ]) {
+    for (const [path, method] of [
+      ["/profile", "PUT"],
+      ["/profile", "DELETE"],
+      ["/session", "DELETE"],
+      ["/session", "POST"],
+    ]) {
       const pre = await w.api("OPTIONS", path, {
-        headers: { Origin: origin, "Access-Control-Request-Method": method, "Access-Control-Request-Headers": "authorization, content-type" },
+        headers: {
+          Origin: origin,
+          "Access-Control-Request-Method": method,
+          "Access-Control-Request-Headers": "authorization, content-type",
+        },
       });
       assert.equal(pre.status, 204);
       assert.equal(pre.headers.get("Access-Control-Allow-Origin"), origin);
-      const methods = pre.headers.get("Access-Control-Allow-Methods").split(",").map((s) => s.trim());
+      const methods = pre.headers
+        .get("Access-Control-Allow-Methods")
+        .split(",")
+        .map((s) => s.trim());
       assert.ok(methods.includes(method), `${method} ${path} from ${origin}`);
       assert.match(pre.headers.get("Access-Control-Allow-Headers"), /Authorization/);
       assert.match(pre.headers.get("Access-Control-Allow-Headers"), /Content-Type/);
     }
   }
-  const evil = await w.api("OPTIONS", "/profile", { headers: { Origin: "https://evil.example", "Access-Control-Request-Method": "PUT" } });
+  const evil = await w.api("OPTIONS", "/profile", {
+    headers: { Origin: "https://evil.example", "Access-Control-Request-Method": "PUT" },
+  });
   assert.equal(evil.headers.get("Access-Control-Allow-Origin"), null);
   assert.equal(evil.headers.get("Access-Control-Allow-Methods"), null);
   // The real responses carry the origin too
   const token = await w.token();
-  const res = await w.api("PUT", "/profile", { token, body: { profile: {}, updated: iso(0) }, headers: { Origin: "https://internscout.org" } });
+  const res = await w.api("PUT", "/profile", {
+    token,
+    body: { profile: {}, updated: iso(0) },
+    headers: { Origin: "https://internscout.org" },
+  });
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://internscout.org");
-  const del = await w.api("DELETE", "/session", { token, headers: { Origin: "https://internscout.org" } });
+  const del = await w.api("DELETE", "/session", {
+    token,
+    headers: { Origin: "https://internscout.org" },
+  });
   assert.equal(del.headers.get("Access-Control-Allow-Origin"), "https://internscout.org");
 });

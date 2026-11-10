@@ -10,7 +10,7 @@
 // meant for a developer testing on their own profile, and nothing in the product turns it on.
 const ON = "eval_recording";
 const KEY = "eval_steps";
-const MAX = 300;          // about 25 KB a step: a few dozen applications
+const MAX = 300; // about 25 KB a step: a few dozen applications
 
 export async function recording() {
   return !!(await chrome.storage.local.get(ON))[ON];
@@ -29,9 +29,22 @@ export async function recordStep(step) {
 }
 
 export const ISEval = {
-  start: async () => { await chrome.storage.local.set({ [ON]: true }); return "recording Auto-Apply steps"; },
-  stop: async () => { await chrome.storage.local.set({ [ON]: false }); return "stopped"; },
+  start: async () => {
+    await chrome.storage.local.set({ [ON]: true });
+    return "recording Auto-Apply steps";
+  },
+  stop: async () => {
+    await chrome.storage.local.set({ [ON]: false });
+    return "stopped";
+  },
   count: async () => ((await chrome.storage.local.get(KEY))[KEY] || []).length,
-  export: async () => ({ version: 1, exported: new Date().toISOString(), steps: (await chrome.storage.local.get(KEY))[KEY] || [] }),
-  clear: async () => { await chrome.storage.local.remove(KEY); return "cleared"; },
+  export: async () => ({
+    version: 1,
+    exported: new Date().toISOString(),
+    steps: (await chrome.storage.local.get(KEY))[KEY] || [],
+  }),
+  clear: async () => {
+    await chrome.storage.local.remove(KEY);
+    return "cleared";
+  },
 };

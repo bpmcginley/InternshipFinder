@@ -19,5 +19,8 @@ test("U8: the dashboard offers only its own session code, once, to an installed 
 });
 
 test("U2: the setup note says the picked postings are kept when the extension kept them", () => {
-  assert.match(app, /res\.held === 1 \? "The posting" : `The \$\{res\.held\} postings`\} you picked will be waiting there, ready to start when you finish\./);
+  assert.match(
+    app,
+    /res\.held === 1 \? "The posting" : `The \$\{res\.held\} postings`\} you picked will be waiting there, ready to start when you finish\./,
+  );
 });
