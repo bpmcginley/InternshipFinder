@@ -127,7 +127,7 @@ PowerShell from the repository root:
 
 ```powershell
 $env:PYTHONPATH='backend'
-python -m internscout.listing_audit --out reviews/latest-listing-audit.json
+python -m internscout.listing_audit --out notes/reviews/latest-listing-audit.json
 python -m pytest backend/tests/test_listing_audit.py backend/tests/test_fetchers.py -q
 ```
 
