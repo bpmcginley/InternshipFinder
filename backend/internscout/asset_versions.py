@@ -31,7 +31,9 @@ def _is_link(path: Path) -> bool:
 
 
 def _site_files(root: Path) -> tuple[list[Path], set[str]]:
-    pending, files, names = [root], [], set()
+    pending = [root]
+    files: list[Path] = []
+    names: set[str] = set()
     while pending:
         folder = pending.pop()
         with os.scandir(folder) as entries:
@@ -53,7 +55,8 @@ def _attribute_span(tag: str, attribute: str) -> tuple[int, int, str]:
     start = re.match(r"<\s*[^\s/>]+", tag)
     if not start:
         raise AssetVersionError("Malformed asset tag")
-    cursor, matches = start.end(), []
+    cursor = start.end()
+    matches: list[tuple[int, int, str]] = []
     while cursor < len(tag):
         while cursor < len(tag) and tag[cursor].isspace():
             cursor += 1
@@ -110,16 +113,8 @@ def _quoted_url(url: str, quote: str) -> str:
 
 
 class _AssetTags(HTMLParser):
-    # HTMLParser handles script/style raw text. Extend that protection to HTML's text-only elements.
-    CDATA_CONTENT_ELEMENTS = HTMLParser.CDATA_CONTENT_ELEMENTS + (
-        "textarea",
-        "title",
-        "xmp",
-        "iframe",
-        "noembed",
-        "noframes",
-        "plaintext",
-    )
+    # HTMLParser handles script/style raw text itself; these elements also contain text, not tags.
+    _TEXT_ONLY = frozenset({"textarea", "title", "xmp", "iframe", "noembed", "noframes"})
 
     def __init__(
         self, root: Path, path: Path, source: str, hashes: dict[Path, str], names: set[str]
@@ -128,15 +123,19 @@ class _AssetTags(HTMLParser):
         self.root, self.path, self.source, self.hashes = root, path, source, hashes
         self.names = names
         self.lines = [0] + [match.end() for match in re.finditer("\n", source)]
-        self.edits, self.references, self.plaintext = [], 0, False
+        self.edits: list[tuple[int, int, str]] = []
+        self.references, self.plaintext = 0, False
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if self.plaintext:
             return
         if tag == "plaintext":
             self.plaintext = True
             return
-        values = {}
+        if tag in self._TEXT_ONLY:
+            self.set_cdata_mode(tag)
+            return
+        values: dict[str, str | None] = {}
         for key, value in attrs:
             values.setdefault(key, value)
         if tag == "base":
@@ -144,7 +143,9 @@ class _AssetTags(HTMLParser):
         attribute = "src" if tag == "script" else None
         if tag == "link" and "stylesheet" in (values.get("rel") or "").lower().split():
             attribute = "href"
-        url = values.get(attribute) if attribute else None
+        if attribute is None:
+            return
+        url = values.get(attribute)
         if not url:
             return
         try:
@@ -182,6 +183,8 @@ class _AssetTags(HTMLParser):
             self.hashes[asset] = hashlib.sha256(asset.read_bytes()).hexdigest()[:12]
         self.references += 1
         raw = self.get_starttag_text()
+        if raw is None:
+            raise AssetVersionError("Missing asset tag source")
         begin, end, quote = _attribute_span(raw, attribute)
         versioned = _version_url(url, self.hashes[asset])
         if versioned == url:
@@ -221,7 +224,7 @@ def version_assets(site_dir: str | Path) -> VersionReport:
     return VersionReport(len(files), len(planned), references)
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("site_dir", type=Path)
     args = parser.parse_args(argv)
