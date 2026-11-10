@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make a campus internship flyer | InternScout</title>
+<meta name="description" content="Make a printable internship flyer for your campus, with a QR code made in your browser.">
+<link rel="canonical" href="https://internscout.org/flyer.html">
+<link rel="icon" href="/icon48.png">
+<style>
+@font-face{font-family:Plex;src:url('/fonts/ibm-plex-sans-latin.woff2')}@font-face{font-family:Serif;src:url('/fonts/source-serif-4-latin.woff2')}
+:root{color-scheme:light dark;--paper:#f6f4ef;--ink:#202622;--green:#1d5c46;--line:#b9c4bc;--surface:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.5 Plex,Arial,sans-serif}a{color:var(--green)}
+.skip{position:absolute;left:1rem;top:-5rem;background:var(--surface);padding:12px;z-index:2}.skip:focus{top:1rem}
+:focus-visible{outline:3px solid var(--green);outline-offset:4px}header,main{max-width:1040px;margin:auto;padding:24px}header a{display:inline-block;padding:10px 0}
+.wordmark{font:700 28px Serif,Georgia,serif;text-decoration:none}h1{font:600 clamp(30px,5vw,42px)/1.15 Serif,Georgia,serif;margin:8px 0 16px}p{margin:12px 0}
+.builder{max-width:660px;margin-bottom:28px}label{display:block;font-weight:600;margin:18px 0 6px}input{font:inherit;width:100%;min-height:48px;border:1px solid var(--line);border-radius:6px;padding:10px;background:var(--surface);color:var(--ink)}
+button{font:inherit;font-weight:600;min-height:48px;padding:10px 20px;border:0;border-radius:6px;color:white;background:var(--green);cursor:pointer;margin-top:16px}button:disabled{opacity:.55;cursor:default}
+.hint{font-size:14px}#status{min-height:1.5em}.qr-link{overflow-wrap:anywhere;font-size:13px}
+.flyer{color:#111;background:white;border:1px solid #bbb;padding:44px;max-width:740px;min-height:900px;display:flex;flex-direction:column}
+.flyer-head{display:flex;gap:18px;justify-content:space-between;align-items:center;border-bottom:2px solid #1d5c46;padding-bottom:20px}.flyer-head strong{font:700 30px Serif,Georgia,serif}.eyebrow{color:#1d5c46;font-size:13px;font-weight:700;letter-spacing:.08em}
+#campus-line{font-size:17px;overflow-wrap:anywhere;margin-top:30px}.flyer h2{font-size:clamp(38px,7vw,70px);line-height:1.02;letter-spacing:-.035em;margin:22px 0 28px}.flyer h2 span{color:#1d5c46}
+.flyer .intro{font-size:21px;font-weight:600;border-top:1px solid #1d5c46;padding-top:22px}.scan{display:flex;gap:26px;align-items:center;justify-content:space-between;margin:30px 0}.scan strong{display:block;font-size:24px}.scan a{color:#1d5c46}.qr{width:196px;height:196px;flex-shrink:0}.qr svg{display:block;width:100%;height:100%}.flyer footer{font-size:12px;margin-top:auto;border-top:1px solid #bbb;padding-top:16px}
+@media(prefers-color-scheme:dark){:root{--paper:#131416;--ink:#eef1ec;--green:#8ec9aa;--line:#657168;--surface:#202522}button{background:#226448;color:white}}
+@media(max-width:600px){header,main{padding:18px}.flyer{padding:24px;min-height:760px}.flyer-head{gap:8px;flex-wrap:wrap}.scan{flex-direction:column;align-items:flex-start}.flyer h2{font-size:43px}.flyer .intro{font-size:19px}}
+@page{size:letter;margin:.45in}
+@media print{html,body{color:#111;background:white}body{font-size:12pt}header,.builder,.skip{display:none!important}main{padding:0;max-width:none}.flyer{width:100%;min-height:9.6in;max-width:none;border:0;padding:14px;break-inside:avoid}.flyer h2{font-size:48pt}.flyer-head{flex-wrap:nowrap}.scan{flex-direction:row;align-items:center}.qr{width:1.9in;height:1.9in}.flyer a{text-decoration:none}.flyer footer{font-size:9pt}}
+</style>
+<script defer src="/js/qrcode.min.js"></script>
+<script defer src="/js/flyer.js"></script>
+<script defer src="/js/count.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to flyer builder</a>
+<header><a class="wordmark" href="/">InternScout</a></header>
+<main id="main">
+<section class="builder" aria-labelledby="builder-title">
+<h1 id="builder-title">Make a flyer for your campus</h1>
+<p>Help a classmate find their next role. Add your campus, then print a flyer for a bulletin board.</p>
+<label for="campus">Campus name</label>
+<input id="campus" maxlength="80" autocomplete="off" placeholder="Example: UMass Amherst" aria-describedby="campus-help">
+<p id="campus-help" class="hint">Your campus name stays in this browser while you make the flyer. The QR link includes a short campus tag, so scans can be counted as daily totals.</p>
+<button id="print" type="button" disabled>Print flyer</button>
+<p class="hint">Print on US Letter paper at actual size, or choose Save as PDF. Ask before posting on a campus board.</p>
+<p id="status" role="status" aria-live="polite">Preparing your QR code.</p>
+<p class="qr-link">QR link: <a id="qr-link" href="https://internscout.org/">https://internscout.org/</a></p>
+<noscript><p>Turn on JavaScript to create the QR code. You can still visit internscout.org to find roles.</p></noscript>
+</section>
+<article class="flyer" aria-label="Printable campus flyer">
+<div class="flyer-head"><strong>InternScout</strong><span class="eyebrow">FREE SEARCH</span></div>
+<p id="campus-line">For students at your campus</p>
+<h2>FIND AN<br>INTERNSHIP<br><span>THAT FITS.</span></h2>
+<p class="intro">Your major. Your class year. Your next move.</p>
+<p>Browse internships, co-ops, and research roles from employer sites and public job boards.</p>
+<div class="scan"><div><strong>SCAN FOR ROLES</strong><a href="https://internscout.org/">internscout.org</a><p>No account needed to search.</p></div><div id="qr" class="qr" role="img" aria-label="QR code linking to InternScout"></div></div>
+<footer>Independent of your school. Check each employer's posting before applying.</footer>
+</article>
+</main>
+</body>
+</html>
