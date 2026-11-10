@@ -1,5 +1,7 @@
 Formatting PRs next
 
+**Authorization update, 2026-11-10:** Bruce explicitly authorized processing now, finishing and merging retained PRs #165, #175, #177 and #178, and notifying the Product/Growth Refactor session to continue. This supersedes the 16:00 earliest-start and empty-queue holds below. Reviews, green CI, Pages verification, protected guard code/tests, and production deployment restrictions remain in force. Product has been notified and is preparing independent work while avoiding implementation overlaps until formatting lands. Design-note merges do not resolve unspecified pricing, privacy, retention or operator choices, nor enable payment/email implementation. Historical notice and inventories below record the earlier gate.
+
 This notice was published with PR #174 on **2026-11-10 at 12:40:47 America/New_York (17:40:47 UTC)**. Product session: from this notice, finish or close existing PRs and open nothing new until the formatting PRs merge, as `notes/product/HANDOFF.md` section 3 requires. The earliest formatting start is **2026-11-10 16:00 America/New_York (21:00 UTC)**, more than three hours after notice, and only after all other PRs clear. External PR #165 and remaining product PRs block that quiet window. Configuration-only work may proceed; no formatting changes have started.
 
 Product additions of public files, including new-page PRs #181 and #182, need explicit entries in `scripts/site-allowlist.txt` as well as a reviewed golden refresh. The Pages publication boundary rejects new paths without allow-list entries.
