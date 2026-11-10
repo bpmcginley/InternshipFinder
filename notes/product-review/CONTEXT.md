@@ -59,4 +59,4 @@ paths. Direct GitHub Pages hosting cannot apply repository response headers, so 
 documented as an edge/hosting task instead of adding an ineffective `_headers` file. Installed
 authentication/update, Stripe lifecycle, recovery, CWV and inbox-delivery checks remain external
 acceptance gates. No deployment, broadcast, payment or live configuration change occurred. Full
-scope and verification boundary: `reviews/2026-10-27-ops-hardening/README.md`.
+scope and verification boundary: `notes/reviews/2026-10-27-ops-hardening/README.md`.
