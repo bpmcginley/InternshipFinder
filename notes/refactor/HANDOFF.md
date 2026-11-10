@@ -52,6 +52,7 @@ Make the codebase easier and safer to change, with **no change in behaviour** un
 - **PR text** must have: WP id, what moved or changed, "behaviour change: none" or the exact change, test output summary, golden result (once WP-0.2 exists).
 - **Review.** A second agent reviews each PR for hidden behaviour change before the lead merges it.
 - Other agents (Claude and others) also open PRs in this repo. Check `gh pr list` before starting each wave and avoid files with open PRs.
+- A product session runs at the same time, from `notes/product/HANDOFF.md`. Read its section 3 before each wave. It claims hot files with draft PRs titled `product: ...` and keeps its status in `notes/product/STATUS.md`. Before you open the formatting PRs (WP-0.3), write "Formatting PRs next" at the top of `notes/refactor/STATUS.md` and give that session a few hours to clear its open PRs.
 
 ## 5. Verification (run what applies, paste the summary in the PR)
 
