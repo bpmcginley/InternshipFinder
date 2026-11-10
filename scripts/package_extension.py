@@ -6,6 +6,7 @@ Writes dist/internscout-extension-<manifest version>.zip with manifest.json at t
 (what "Load unpacked" and the Web Store expect) and prints the path as the last line.
 Leaves out tests, fixtures, *.test.* files, OS junk and signing keys.
 """
+
 from __future__ import annotations
 import fnmatch
 import json
@@ -21,7 +22,16 @@ DIST = ROOT / "dist"
 SKIP_DIRS = {"test", "tests", "fixtures", "__pycache__", "node_modules", ".git"}
 # was: SKIP_FILES = ["*.test.*", ".DS_Store", "Thumbs.db", "desktop.ini", "*.pem", "*.crx", "*.zip"]
 # README.md is developer notes; it shipped inside both zips and inside the store package.
-SKIP_FILES = ["*.test.*", ".DS_Store", "Thumbs.db", "desktop.ini", "*.pem", "*.crx", "*.zip", "README.md"]
+SKIP_FILES = [
+    "*.test.*",
+    ".DS_Store",
+    "Thumbs.db",
+    "desktop.ini",
+    "*.pem",
+    "*.crx",
+    "*.zip",
+    "README.md",
+]
 TEXT_SUFFIXES = {".js", ".mjs", ".json", ".html", ".css", ".svg", ".md", ".txt"}
 
 
@@ -47,7 +57,9 @@ def build(webstore: bool = False) -> Path:
     # and the resume summary, so both zips carry the real dashboard origin only.
     for cs in manifest.get("content_scripts", []):
         cs["matches"] = [m for m in cs.get("matches", []) if not LOCAL_RE.match(m)]
-    assert all(cs["matches"] for cs in manifest.get("content_scripts", [])), "a content script lost every match"
+    assert all(cs["matches"] for cs in manifest.get("content_scripts", [])), (
+        "a content script lost every match"
+    )
     DIST.mkdir(exist_ok=True)
     out = DIST / f"internscout-extension-{version}{'-webstore' if webstore else ''}.zip"
     files = sorted(p for p in EXT.rglob("*") if p.is_file() and included(p.relative_to(EXT)))
@@ -57,7 +69,9 @@ def build(webstore: bool = False) -> Path:
             if rel == "manifest.json":
                 if webstore:
                     manifest.pop("key", None)
-                payload = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+                payload = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode(
+                    "utf-8"
+                )
             else:
                 payload = p.read_bytes()
                 if p.suffix.lower() in TEXT_SUFFIXES:
@@ -80,4 +94,4 @@ if __name__ == "__main__":
         with zipfile.ZipFile(p) as zf:
             count = len(zf.namelist())
         print(f"{p.name}: {count} files, {p.stat().st_size // 1024} KB", file=sys.stderr)
-    print(path)   # last line: the release workflow attaches this one
+    print(path)  # last line: the release workflow attaches this one
