@@ -5,6 +5,10 @@ openings. All application links use `jobs.example.com`. Four employer names matc
 the existing optional-detail cohort so the exported facts sidecar and employer
 cards are exercised; their titles and descriptions are entirely synthetic.
 
+The initial snapshot was generated from production sources at `b8e08d1f`.
+Normal merges through main `c6ef372f` changed only coordination and developer
+tooling; its production Python package and public static assets are identical.
+
 From the repository root:
 
 ```sh
