@@ -11,6 +11,7 @@ Each section runs on whatever it can reach and says plainly when it can't:
 
 Run from the repo root:  python growth/report.py [docs]
 """
+
 from __future__ import annotations
 
 import json
@@ -72,7 +73,7 @@ query($account: string!, $site: string!, $start: Time!, $end: Time!) {
 # every page, so anyone can send pageloads with a made-up referrer (or path); a handful of fake ones
 # should not be enough to put a name in the report.
 MIN_REF_VISITS = 3
-MAX_SHOWN = 120     # characters of one path or host
+MAX_SHOWN = 120  # characters of one path or host
 
 
 def inert(value, empty: str = "(none)") -> str:
@@ -84,17 +85,24 @@ def inert(value, empty: str = "(none)") -> str:
     ways out of one are a backtick, a line break, or (in a table) a pipe, and all of those are removed
     first, with backslashes and every other control or formatting character (bidi overrides among
     them). Nothing from the analytics is ever written as a link."""
-    text = "".join(ch for ch in str(value or "")
-                   if ch not in "`|\\" and unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp"))
+    text = "".join(
+        ch
+        for ch in str(value or "")
+        if ch not in "`|\\" and unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp")
+    )
     text = re.sub(r"\s+", " ", text).strip()
     if len(text) > MAX_SHOWN:
-        text = text[:MAX_SHOWN - 3] + "..."
+        text = text[: MAX_SHOWN - 3] + "..."
     return f"`{text}`" if text else empty
 
 
 def _post(url: str, body: dict, token: str) -> dict:
-    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
-                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", **UA})
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", **UA},
+    )
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
 
@@ -103,67 +111,133 @@ def visits_section(now: datetime) -> list[str]:
     token = os.environ.get("CLOUDFLARE_API_TOKEN")
     out = ["## Visits (last 7 days)"]
     if not token:
-        return out + ["Not connected: add a Cloudflare API token with *Account Analytics: Read* as the repo "
-                      "secret `CLOUDFLARE_API_TOKEN`.", ""]
+        return out + [
+            "Not connected: add a Cloudflare API token with *Account Analytics: Read* as the repo "
+            "secret `CLOUDFLARE_API_TOKEN`.",
+            "",
+        ]
     end = now.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start, prev = end - timedelta(days=7), end - timedelta(days=14)
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
     try:
-        r = _post("https://api.cloudflare.com/client/v4/graphql",
-                  {"query": QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG, "start": iso(start),
-                                                 "end": iso(end), "prevStart": iso(prev)}}, token)
+        r = _post(
+            "https://api.cloudflare.com/client/v4/graphql",
+            {
+                "query": QUERY,
+                "variables": {
+                    "account": ACCOUNT,
+                    "site": SITE_TAG,
+                    "start": iso(start),
+                    "end": iso(end),
+                    "prevStart": iso(prev),
+                },
+            },
+            token,
+        )
         # A wrong token, account or site tag comes back as HTTP 200 with "errors" and no data; say
         # what Cloudflare said rather than failing on the missing data.
         if r.get("errors"):
-            return out + [f"Cloudflare answered: {r['errors'][0].get('message', 'unknown error')}", ""]
+            return out + [
+                f"Cloudflare answered: {r['errors'][0].get('message', 'unknown error')}",
+                "",
+            ]
         accounts = (r.get("data") or {}).get("viewer", {}).get("accounts") or []
         if not accounts:
-            return out + [f"Cloudflare returned no account {ACCOUNT}; check CLOUDFLARE_ACCOUNT_ID and the token's scope.", ""]
+            return out + [
+                f"Cloudflare returned no account {ACCOUNT}; check CLOUDFLARE_ACCOUNT_ID and the token's scope.",
+                "",
+            ]
         acct = accounts[0]
-    except Exception as e:                       # the rest of the report still has value
+    except Exception as e:  # the rest of the report still has value
         return out + [f"Could not read Cloudflare ({type(e).__name__}).", ""]
-    total = lambda rows: (rows[0]["sum"]["visits"] if rows else 0)  # noqa: E731
+    total = lambda rows: rows[0]["sum"]["visits"] if rows else 0  # noqa: E731
     week, before = total(acct["week"]), total(acct["prev"])
-    change = f" ({'+' if week >= before else ''}{week - before} on the week before)" if before else ""
-    out += [f"**{week:,} visits**{change}.",
-            f"Period (UTC, end exclusive): {iso(start)} to {iso(end)}.",
-            "Visits are Cloudflare's sampled visit estimates, not unique people, students, installs, "
-            "or confirmed email subscribers. Anonymous Worker counters use a separate collection method; "
-            "do not add the two totals together.", "", "| Page | Visits |", "|---|---|"]
+    change = (
+        f" ({'+' if week >= before else ''}{week - before} on the week before)" if before else ""
+    )
+    out += [
+        f"**{week:,} visits**{change}.",
+        f"Period (UTC, end exclusive): {iso(start)} to {iso(end)}.",
+        "Visits are Cloudflare's sampled visit estimates, not unique people, students, installs, "
+        "or confirmed email subscribers. Anonymous Worker counters use a separate collection method; "
+        "do not add the two totals together.",
+        "",
+        "| Page | Visits |",
+        "|---|---|",
+    ]
     # was: f"| `{p['dimensions']['requestPath']}` | ...": a path with a backtick or pipe in it broke out
     # of the code span and the table. And the referrer went in as bare text, so a spoofed one could put
     # a link or an @mention in a public issue. Both are now inert() code spans.
-    out += [f"| {inert(p['dimensions']['requestPath'])} | {p['sum']['visits']:,} |" for p in acct["pages"]]
+    out += [
+        f"| {inert(p['dimensions']['requestPath'])} | {p['sum']['visits']:,} |"
+        for p in acct["pages"]
+    ]
     out += ["", "| Came from | Visits |", "|---|---|"]
     # was: every referrer, whatever its count. A host with fewer than MIN_REF_VISITS is left out, but
     # direct visits (no referrer) are ours to label and always shown.
-    refs = [r for r in acct["refs"] if not r["dimensions"]["refererHost"] or r["sum"]["visits"] >= MIN_REF_VISITS]
-    out += [f"| {inert(r['dimensions']['refererHost']) if r['dimensions']['refererHost'] else '(direct or unknown)'} "
-            f"| {r['sum']['visits']:,} |" for r in refs]
+    refs = [
+        r
+        for r in acct["refs"]
+        if not r["dimensions"]["refererHost"] or r["sum"]["visits"] >= MIN_REF_VISITS
+    ]
+    out += [
+        f"| {inert(r['dimensions']['refererHost']) if r['dimensions']['refererHost'] else '(direct or unknown)'} "
+        f"| {r['sum']['visits']:,} |"
+        for r in refs
+    ]
     if len(refs) < len(acct["refs"]):
         out += ["", f"Referrers with fewer than {MIN_REF_VISITS} visits are left out."]
-    out += ["", "Countries: " + ", ".join(f"{c['dimensions']['countryName']} {c['sum']['visits']:,}"
-                                          for c in acct["countries"]), ""]
+    out += [
+        "",
+        "Countries: "
+        + ", ".join(
+            f"{c['dimensions']['countryName']} {c['sum']['visits']:,}" for c in acct["countries"]
+        ),
+        "",
+    ]
     # Counted over every landing page, not just the ones in the top-15 table: most search traffic
     # arrives spread thin across hundreds of them.
     try:
-        r = _post("https://api.cloudflare.com/client/v4/graphql",
-                  {"query": LANDING_QUERY, "variables": {"account": ACCOUNT, "site": SITE_TAG,
-                                                         "start": iso(start), "end": iso(end)}}, token)
+        r = _post(
+            "https://api.cloudflare.com/client/v4/graphql",
+            {
+                "query": LANDING_QUERY,
+                "variables": {
+                    "account": ACCOUNT,
+                    "site": SITE_TAG,
+                    "start": iso(start),
+                    "end": iso(end),
+                },
+            },
+            token,
+        )
         landing, floor = total(r["data"]["viewer"]["accounts"][0]["landing"]), ""
     except Exception:
-        landing = sum(p["sum"]["visits"] for p in acct["pages"] if p["dimensions"]["requestPath"].startswith("/internships/"))
+        landing = sum(
+            p["sum"]["visits"]
+            for p in acct["pages"]
+            if p["dimensions"]["requestPath"].startswith("/internships/")
+        )
         floor = "at least "
     share = f" ({landing * 100 // week}%)" if week else ""
-    out += [f"Landing pages under /internships/ brought {floor}{landing:,} of the {week:,} visits{share}.", ""]
+    out += [
+        f"Landing pages under /internships/ brought {floor}{landing:,} of the {week:,} visits{share}.",
+        "",
+    ]
     return out
 
 
 def demand_section() -> list[str]:
-    url, token = os.environ.get("INTERNSCOUT_DEMAND_URL"), os.environ.get("INTERNSCOUT_DEMAND_TOKEN")
+    url, token = (
+        os.environ.get("INTERNSCOUT_DEMAND_URL"),
+        os.environ.get("INTERNSCOUT_DEMAND_TOKEN"),
+    )
     out = ["## States students picked"]
     if not (url and token):
-        return out + ["Not connected (the ingest's demand secrets are not available to this run).", ""]
+        return out + [
+            "Not connected (the ingest's demand secrets are not available to this run).",
+            "",
+        ]
     try:
         req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", **UA})
         with urllib.request.urlopen(req, timeout=20) as r:
@@ -185,12 +259,17 @@ def audience_section(site_dir: str) -> list[str]:
     rows, _ = audience.tiers(site_dir)
     primary = [r for r in rows if r["near"] >= audience.PRIMARY]
     thin = [r for r in rows if r["near"] < audience.THIN]
-    return ["## Audience",
-            f"**Market to ({len(primary)} majors):** " + ", ".join(f"{r['major']} ({r['near']})" for r in primary),
-            "",
-            f"**Too thin to market yet ({len(thin)} majors):** " + ", ".join(f"{r['major']} ({r['near']})" for r in thin),
-            "",
-            "Numbers are open roles in the Northeast or remote that fit the major.", ""]
+    return [
+        "## Audience",
+        f"**Market to ({len(primary)} majors):** "
+        + ", ".join(f"{r['major']} ({r['near']})" for r in primary),
+        "",
+        f"**Too thin to market yet ({len(thin)} majors):** "
+        + ", ".join(f"{r['major']} ({r['near']})" for r in thin),
+        "",
+        "Numbers are open roles in the Northeast or remote that fit the major.",
+        "",
+    ]
 
 
 def targeting_section(site_dir: str) -> list[str]:
@@ -198,9 +277,13 @@ def targeting_section(site_dir: str) -> list[str]:
     picks = focus.thinnest(d["listings"], d["majors"])
     if not picks:
         return ["## Search targeting", "No field is thin enough to need focus searches.", ""]
-    return ["## Search targeting",
-            "The daily focus searches are going to: "
-            + "; ".join(f"**{t}** ({n} open nearby, {m} majors depend on it)" for t, n, m in picks) + ".", ""]
+    return [
+        "## Search targeting",
+        "The daily focus searches are going to: "
+        + "; ".join(f"**{t}** ({n} open nearby, {m} majors depend on it)" for t, n, m in picks)
+        + ".",
+        "",
+    ]
 
 
 def pages_section(site_dir: str) -> list[str]:
@@ -216,9 +299,13 @@ def pages_section(site_dir: str) -> list[str]:
             kinds["field in a state"] += 1
         elif len(parts) == 2 and parts[1] not in ("for", "at", "new"):
             kinds["field or state"] += 1
-    return ["## Landing pages",
-            f"{len(pages):,} pages from the current data: "
-            + ", ".join(f"{n:,} {k}" for k, n in kinds.items()) + ".", ""]
+    return [
+        "## Landing pages",
+        f"{len(pages):,} pages from the current data: "
+        + ", ".join(f"{n:,} {k}" for k, n in kinds.items())
+        + ".",
+        "",
+    ]
 
 
 def social_section(site_dir: str, now: datetime) -> list[str]:
@@ -226,29 +313,44 @@ def social_section(site_dir: str, now: datetime) -> list[str]:
     secret), and the post the data suggests next."""
     out = ["## Brand posts"]
     try:
-        url = ("https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?limit=20&filter=posts_no_replies&actor="
-               + urllib.parse.quote(BLUESKY))
+        url = (
+            "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?limit=20&filter=posts_no_replies&actor="
+            + urllib.parse.quote(BLUESKY)
+        )
         with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
             feed = json.load(r).get("feed") or []
-        week = [f["post"] for f in feed
-                if f["post"]["record"].get("createdAt", "") >= (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M")]
+        week = [
+            f["post"]
+            for f in feed
+            if f["post"]["record"].get("createdAt", "")
+            >= (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M")
+        ]
         if week:
             latest = week[0]
             link = f"https://bsky.app/profile/{BLUESKY}/post/{latest['uri'].rsplit('/', 1)[-1]}"
             likes = sum(p.get("likeCount", 0) for p in week)
             reposts = sum(p.get("repostCount", 0) for p in week)
-            out += [f"{seo_pages.plural(len(week), 'post')} on Bluesky ([@{BLUESKY}](https://bsky.app/profile/{BLUESKY})) "
-                    f"this week, with {seo_pages.plural(likes, 'like')} and {seo_pages.plural(reposts, 'repost')}. "
-                    f"[Latest]({link}).", ""]
+            out += [
+                f"{seo_pages.plural(len(week), 'post')} on Bluesky ([@{BLUESKY}](https://bsky.app/profile/{BLUESKY})) "
+                f"this week, with {seo_pages.plural(likes, 'like')} and {seo_pages.plural(reposts, 'repost')}. "
+                f"[Latest]({link}).",
+                "",
+            ]
         else:
             out += [f"Nothing on Bluesky (@{BLUESKY}) this week.", ""]
     except Exception as e:
         out += [f"Could not read Bluesky ({type(e).__name__}).", ""]
     post = social.draft(site_dir)
     if post:
-        out += ["A post drafted from this week's data (the Brand posts workflow sends one like it on Tuesdays "
-                "and Thursdays):",
-                "", "```text", post[0], "```", ""]
+        out += [
+            "A post drafted from this week's data (the Brand posts workflow sends one like it on Tuesdays "
+            "and Thursdays):",
+            "",
+            "```text",
+            post[0],
+            "```",
+            "",
+        ]
     return out
 
 
@@ -256,12 +358,17 @@ def main():
     site_dir = sys.argv[1] if len(sys.argv) > 1 else "docs"
     now = datetime.now(timezone.utc)
     lines = [f"Week ending {now:%B} {now.day}, {now.year}. Generated by `growth/report.py`.", ""]
-    for section in (lambda: visits_section(now), demand_section, lambda: audience_section(site_dir),
-                    lambda: targeting_section(site_dir), lambda: pages_section(site_dir),
-                    lambda: social_section(site_dir, now)):
+    for section in (
+        lambda: visits_section(now),
+        demand_section,
+        lambda: audience_section(site_dir),
+        lambda: targeting_section(site_dir),
+        lambda: pages_section(site_dir),
+        lambda: social_section(site_dir, now),
+    ):
         try:
             lines += section()
-        except Exception as e:                   # one broken section must not sink the report
+        except Exception as e:  # one broken section must not sink the report
             lines += [f"(A section failed: {type(e).__name__}: {e})", ""]
     print("\n".join(lines))
 
