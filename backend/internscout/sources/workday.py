@@ -132,7 +132,7 @@ def board_locations(tenant: str, locations: list[str]) -> list[str]:
 EXTRA_SEARCH = {"health": ("student",), "behavioral_health": ("student",)}
 # Every board is searched for "intern". More words for every board are opt-in, comma separated:
 # WORKDAY_EXTRA_KEYWORDS="co-op" restores the co-op search the October 16 expansion added.
-# Measured on 2026-10-18 (docs/coverage-research/live-verification-2026-10-18.md), "co-op" added
+# Measured on 2026-10-18 (notes/coverage-research/live-verification-2026-10-18.md), "co-op" added
 # no accepted listing on three boards, because Workday's fuzzy "intern" search already returns
 # most co-ops, while costing about 11 extra requests a board: about 13,500 requests and 9
 # minutes a full run across 1,230 boards. "student" for every board found one more listing on

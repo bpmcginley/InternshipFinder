@@ -13,7 +13,7 @@ Use parallel reviewers for independent evidence, then consolidate and verify the
 Review first; do not merge, deploy, send messages, or submit real applications as part of a review. Preserve another agent's uncommitted work. Keep implementation in separate branches/worktrees when concurrent work would conflict.
 
 ## Shared context
-Read `docs/product-review/CONTEXT.md` before resuming the October 2026 product review. Keep that file updated with decisions, completed verification, and pending work rather than storing chat transcripts or private reasoning.
+Read `notes/product-review/CONTEXT.md` before resuming the October 2026 product review. Keep that file updated with decisions, completed verification, and pending work rather than storing chat transcripts or private reasoning.
 `AGENTS.md` transfers project instructions and documented state; it does not transfer model execution, credentials, subscriptions, or a live conversation's entire history.
 
 ## Model and credential boundaries

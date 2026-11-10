@@ -5,7 +5,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 0: preparing this status tracker; WP-0.1 starts after its reviewed PR merges. All six baseline suites passed, with two documented backend skips. Independent full-file audit results are recorded below.
+- Wave 0: status tracker merged; WP-0.1 implementation and local validation are complete, awaiting independent review and green PR checks. All six baseline suites passed, with two documented local backend skips. Independent full-file audit results are recorded below.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
@@ -31,14 +31,16 @@ Environment: Python 3.12.10; Node 22.23.4 selected through `npm exec`. Commands 
 
 All six suites passed; tracked baseline files remained unchanged. The isolated dependency-install attempt could not build cryptography 50 on Windows ARM64 because the MSVC linker was unavailable. This is an environment limitation, not a failing main test: `backend/tests/test_metrics.py:408` intentionally skips without cryptography; `backend/tests/test_reels.py:71` skips without ffmpeg. The successful backend run used the available Python 3.12 environment. Full dependency coverage remains available in Linux CI; local skipped checks are not claimed as passes.
 
+The documentation-only status PR also verified the complete backend suite in Linux CI: [PR #168 test run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42860747632), backend job `129986040297`, passed all 1,480 tests in 50.80s with cryptography and ffmpeg installed and no skips.
+
 ## Package tracker
 
 `Queued` means not started, subject to its wave and dependencies. `Question` pauses only the named scope. Branch and PR cells are filled when assigned; no branch or PR is implied by a dash. Multi-PR packages are split into separate rows below.
 
 | Wave | Package | Owner | Branch | PR | State | Next step / constraint |
 |---|---|---|---|---|---|---|
-| 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | In review | Audits and baseline consolidated; second-agent review and green CI before merge. |
-| 0 | WP-0.1 Internal notes | Unassigned | - | - | Queued | Move tracked notes, update references, enforce publication allow list; approved URL removal. |
+| 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
+| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | Pending PR | In review | Local validation passed; independent review and green CI before lead merges. |
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
 | 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
@@ -137,7 +139,7 @@ Full reads completed: `docs/index.html`, `docs/js/core.js`, `docs/js/app.js`, `d
 2. **Vocabulary scope:** `core.js:9,22` has state/province maps; `:42,45` years/stages; `:64` derives terms from the clock; `:74` contains sparse field-label overrides duplicated in `buy.js:84`. Buy's fallback coercion/empty handling differs, so preserve it. Majors/fields are loaded at `core.js:802` and `app.js:638`. Onboarding's eligibility/citizenship definitions (`onboarding.js:658-683`) are different concepts from site work authorization (`core.js:67`), not taxonomy duplicates. Guard state-name copies near `guard.js:485,519` remain protected. No extension scoring implementation was found to justify an assumed scoring deduplication.
 3. **Token inventory correction:** canonical light/dark/coarse maps match across `docs/index.html:124`, `docs/employers/index.html:47`, `docs/employers/buy/index.html:28`, `seo_pages.py:1298`, and `extension/lib/theme.css:14`: 56 light variables, 19 dark overrides, three coarse overrides. The 57 unique names includes local `--i`. Existing `tests/site/tokens.test.mjs` covers these five plus an overlay subset. Include buy and extension in the inventory, preserving all values; adapt source-reading tests when CSS moves. No value disagreement found that requires a decision.
 4. **Cache counts correction:** five of six handwritten count.js tags lack versions, not four of five. Main index has versioned core/app/count (`index.html:757,761,800`) and unversioned placements/offer (`:760,764`). Buy has its own manual version (`employers/buy/index.html:240`) and unversioned count (`:241`); employers/install/terms/privacy also lack count versions. Generated OFFER_TAG (`seo_pages.py:1212`) is unversioned; beacon generation (`:1413`) imports the homepage tag. Hash URLs after all generation.
-5. **Config count correction:** the endpoint string occurs in six product files (`docs/index.html`, `docs/js/count.js`, `docs/js/buy.js`, `docs/employers/index.html`, `extension/lib/config.js`, `growth/social.py`) plus `backend/tests/test_reels.py`. Extension configuration is already centralized; account for worker orders' independently overridable review URL noted above.
+5. **Config count correction:** the endpoint string occurs in six product files (`docs/index.html`, `docs/js/count.js`, `docs/js/buy.js`, `docs/employers/index.html`, `extension/lib/config.js`, `growth/social.py`) plus `backend/tests/test_reels.py`. Extension configuration is already centralized; account for worker orders' independently overridable review URL.
 6. **Real-data test dependencies:** `tests/site/dashboard.test.mjs:95,113,129` enumerates shards and majors and asserts more than 1,000 listings; `placements.test.mjs:46,56,81` reads five shards/majors and asserts more than 500; `first_screen.test.mjs:90-95` conditionally skips without first.json, then reads index/first/shards. Fixture conversion must keep first-screen coverage active. `core.test.mjs` does not read actual listing files despite an old source comment.
 
 ### Backend and internal-note audit
@@ -166,6 +168,17 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | Extra SQL application mechanism | Verified in source | Included verbatim in schema.sql; production application history remains operator-owned. |
 | Orders natural seams | Verified in source | Grouping above; retain existing outbox and compatibility exports. |
 
+## Work-package validation
+
+### WP-0.1 Internal notes
+
+- Moved all 18 coverage-research files and three product-review files into `notes/`; updated the four verified pointers. Public widget integration README remains byte-identical and explicitly permitted. The approved behavior change removes the two internal-note URL trees from subsequent Pages artifacts.
+- Added a reviewed file-pattern allow list and a checker that enumerates files without following symbolic links or Windows junctions. Unknown files, hidden files other than `.nojekyll`, unexpected empty directories, and filesystem links fail before artifact upload. Only the public `widget/README.md` Markdown file is allowed. Pages runs the checker tests and prints the checked inventory before upload.
+- Local actual build: copied current `docs/` into a temporary validation directory, removed CNAME as Pages does, and ran `python -m internscout.seo_pages` with an explicit empty placements fixture. It generated 2,106 pages and a role index containing 18,717 roles. No live fetch, service write, or deployment was performed.
+- Full artifact check: 4,334 files accepted. `python -m internscout.site_links` checked 2,115 HTML pages and 195,643 internal references, with zero missing references or redirects. Copied an injected `docs/stray.md` into the artifact and confirmed exit 1 naming the unexpected file; removed both fixtures and confirmed the clean artifact passes again. A real Windows junction root was also rejected.
+- Tests: `python -m pytest tests/test_scan_completeness.py tests/test_site_links.py -q` from backend: 75 passed. `python -m unittest discover -s scripts -p 'test_site_contents.py'`: four passed, one skipped because Windows does not permit symbolic-link creation here; the same test runs on Linux in Pages. The separate real junction check passed. `git diff --check` passed.
+- Golden output comparison is not yet available: WP-0.2 follows this package. Public source assets and generator code are unchanged; the planned output difference is removal of the two internal-note trees.
+
 ## Questions and external gates
 
 | ID | Affected scope | Question / gate | Current handling |
@@ -187,8 +200,8 @@ None. No worker refactor PR has merged, and no production action has been taken.
 | PR / package | Commit | Review / CI | Pages | Result |
 |---|---|---|---|---|
 | [#167 Hand-offs](https://github.com/bpmcginley/InternshipFinder/pull/167) | `00cf10e0` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42859546750) | Merged; documentation only. |
-| [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | Pending merge | Independent review and CI pending | After merge | Open; documentation only. |
+| [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | `64fd6400` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42861453089) | Merged; documentation only. |
 
 ## Next update
 
-Independently review this tracker PR, merge under the rules above, verify Pages, then start WP-0.1. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.
+Finish WP-0.1 validation and independent review, merge under the rules above, then verify Pages before the next merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.

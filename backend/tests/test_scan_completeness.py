@@ -273,7 +273,7 @@ def cases(kind):
 
 
 def test_every_board_adapter_is_classified():
-    # A new adapter has to say whether it can prove a whole scan; docs/coverage-research explains each.
+    # A new adapter has to say whether it can prove a whole scan; notes/coverage-research explains each.
     unproven = {"icims", "successfactors", "jobvite", "jazzhr"}
     assert set(BOARD_FETCHERS) == AUTHORITATIVE | unproven
     assert not FULL_LIST & SEARCH_SCOPED
