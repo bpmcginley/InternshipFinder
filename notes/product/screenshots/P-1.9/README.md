@@ -1,6 +1,6 @@
 # P-1.9 employer entry evidence
 
-This package is stacked on PR #206 at `f6e599ef`. Parents #194 and #206 must publish before this child is retargeted and integrated with fresh main for final review and CI. The source change is confined to the employer-only offer helper; no CSS, JavaScript, worker, checkout, data, pricing or terms implementation changes.
+Originally captured on PR #206 at `f6e599ef`, this package now normally integrates published #194/#206, the #205 cache-stamping harness and documentation-only #215 at `ecbf9186`. Both golden artifacts were rebuilt from this integrated tree. Final lead review, green CI and serialized publication remain required. The source change is confined to the employer-only offer helper; no CSS, JavaScript, worker, checkout, data, pricing or terms implementation changes.
 
 Before uses the parent's synthetic golden archive; after uses the same frozen fixture with the new entry. These are invented listings, not live openings or business metrics. Fresh headless Edge contexts use 1280×1000 and 375×1000, light/dark, device scale 1, en-US and America/New_York. Browser time is fixed at November 10, 2026, 12:00 UTC. Fonts and data are local; all external requests are blocked. The existing beacon is blocked in both phases.
 
@@ -34,3 +34,7 @@ Reproduction uses isolated temporary artifacts and playwright-core, with no repo
 5. Run `python notes/product/screenshots/P-1.9/verify_delta.py <baseline-site>`. Audit publication using the unmodified golden archive, without the capture-only stress page.
 
 No app startup path changed. The generated page and existing buy-page JavaScript start successfully in the local browser flow above; prefill is tested without submission.
+
+Integration evidence: only eight employer HTML files plus page-content hashes differ from stamped main. The preservation script proves every other byte in those employer pages unchanged; all non-employer outputs and golden inputs match main. Existing screenshots remain applicable: captured employer/buy markup matches the reviewed build after removing only cache-version URL parameters. Production source, feature tests and screenshot files compare byte-identical to `6980b914`.
+
+Final integration through `ecbf9186`:221 targeted employer/SEO/phone/distribution/cache/golden/packaging tests passed,one Windows ordinary-symlink permission skip;261 Node22.23.4 serial site tests passed. Both linters,Ruff and diff checks pass. Startup payload report exits0 (estimate,not browser timing). Publication checker:695files,zero problems. Both golden tests validate all695outputs. Archive SHA-256 `b7d2e3bfb0dee9607505a03a39c5beaf0233d5e29a0bf8b987ec417b33211e66`; exactly8employerHTML and8content-date records change. No golden input/pricing fixture change.

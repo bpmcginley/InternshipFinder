@@ -33,3 +33,5 @@ import "./employer-revenue-cron.test.js";
 
 // 2026-10-23: include atomic checkout-settlement regressions in the directory CI entry point (W3).
 import "./settlement-race.test.js";
+// Route documentation and client completeness are checked without changing runtime routing.
+import "./api-contract.test.js";
