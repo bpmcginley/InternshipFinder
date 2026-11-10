@@ -1,4 +1,5 @@
 """Stage, class-year, new field tags, terms and pay: the all-majors tagging."""
+
 from datetime import date
 from internscout.classify import classify, stage_of, years_of, is_internship, ALL_FIELDS
 from internscout.config import open_terms
@@ -46,7 +47,9 @@ def test_explicit_computing_security_and_ambiguous_security_titles_are_preserved
         "Application Security Intern",
     ]:
         assert "security" in classify(title), (title, classify(title))
-    assert "security" in classify("National Security Research Intern", "Research into cybersecurity.")
+    assert "security" in classify(
+        "National Security Research Intern", "Research into cybersecurity."
+    )
 
 
 def test_stages():
@@ -66,12 +69,20 @@ def test_stages():
 
 
 def test_not_student_roles():
-    for t in ("Software Engineer, New Grad", "2027 Early Career Software Engineer", "Forward Deployed AI Engineer - Campus",
-              "Management Trainee", "Postdoctoral Fellow", "Senior Research Fellow", "Internal Audit Analyst",
-              "Entry-Level Analyst Program", "Senior Software Engineer"):
+    for t in (
+        "Software Engineer, New Grad",
+        "2027 Early Career Software Engineer",
+        "Forward Deployed AI Engineer - Campus",
+        "Management Trainee",
+        "Postdoctoral Fellow",
+        "Senior Research Fellow",
+        "Internal Audit Analyst",
+        "Entry-Level Analyst Program",
+        "Senior Software Engineer",
+    ):
         assert stage_of(t) == [], t
     assert not is_internship("Software Engineer (New Grad)")
-    assert is_internship("New Grad / Intern Software Engineer")   # explicit intern wins
+    assert is_internship("New Grad / Intern Software Engineer")  # explicit intern wins
     # was: assert stage_of("Early Career Mechanical Engineering- Summer 2027") == ["internship"]
     # Changed on the posting's own words. WSP's own description of it: "a Full-Time Early Career Mechanical Engineer ... starting in Summer of 2027".
     assert stage_of("Early Career Mechanical Engineering- Summer 2027") == []
@@ -82,32 +93,45 @@ def test_not_student_roles():
 
 def test_runs_the_programme():
     """The staff job that administers a programme is not a place on it."""
-    for t in ("Assistant/Associate Coop Coordinator",      # Northeastern posts this one
-              "Practicum Coordinator II for Nursing",      # and it was our only 'nursing' listing
-              "Manager, Internship Programs", "Internship Program Manager", "Intern Coordinator",
-              "Co-op Program Director", "Internship Supervisor", "Internship Recruiter",
-              "Fellowship Coordinator", "Intern and Volunteer Supervisor",
-              "Advisor, Co-op and Experiential Learning", "Intern & Special Programs Coordinator",
-              # "<staff noun> of|for" only counts ahead of the student word, hence both of these
-              "Coordinator of Student Internships", "Director of Public Sector Internships",
-              # a youth soccer coach; "Discovery Program" is not a first-year insight programme here
-              "Regional Discovery Program Coach"):
+    for t in (
+        "Assistant/Associate Coop Coordinator",  # Northeastern posts this one
+        "Practicum Coordinator II for Nursing",  # and it was our only 'nursing' listing
+        "Manager, Internship Programs",
+        "Internship Program Manager",
+        "Intern Coordinator",
+        "Co-op Program Director",
+        "Internship Supervisor",
+        "Internship Recruiter",
+        "Fellowship Coordinator",
+        "Intern and Volunteer Supervisor",
+        "Advisor, Co-op and Experiential Learning",
+        "Intern & Special Programs Coordinator",
+        # "<staff noun> of|for" only counts ahead of the student word, hence both of these
+        "Coordinator of Student Internships",
+        "Director of Public Sector Internships",
+        # a youth soccer coach; "Discovery Program" is not a first-year insight programme here
+        "Regional Discovery Program Coach",
+    ):
         assert stage_of(t) == [], t
 
     # ...but the same words describe real student roles, and then the student word heads the title:
-    for t in ("Program Coordinator Intern",                 # at the end
-              "Research Coordinator Intern (Summer 2027)",  # or before a separator
-              "Intern, Program Coordination", "Co-op, Advisor Technology Platform",
-              "Volunteer/Intern: Content Marketing Manager",
-              "Internship \u2014 Business Coordinator (Year-Round)",
-              "Summer 2027 Internship: Learning and Development Programs Administrator",
-              # neither word takes a separator, so the later one wins
-              "Quality Coordinator Intern Summer 2027, Idaho",
-              # "for" here belongs to the product, not to a programme being administered
-              "Summer Intern - Product Manager for Allegion Home",
-              "Visiting Engineer: Research Coach Intern", "Football Coaches Intern",
-              # work-study is a student job whatever the role is called
-              "Federal Work Study possible: Art@Work Graduate Coordinator"):
+    for t in (
+        "Program Coordinator Intern",  # at the end
+        "Research Coordinator Intern (Summer 2027)",  # or before a separator
+        "Intern, Program Coordination",
+        "Co-op, Advisor Technology Platform",
+        "Volunteer/Intern: Content Marketing Manager",
+        "Internship \u2014 Business Coordinator (Year-Round)",
+        "Summer 2027 Internship: Learning and Development Programs Administrator",
+        # neither word takes a separator, so the later one wins
+        "Quality Coordinator Intern Summer 2027, Idaho",
+        # "for" here belongs to the product, not to a programme being administered
+        "Summer Intern - Product Manager for Allegion Home",
+        "Visiting Engineer: Research Coach Intern",
+        "Football Coaches Intern",
+        # work-study is a student job whatever the role is called
+        "Federal Work Study possible: Art@Work Graduate Coordinator",
+    ):
         assert is_internship(t), t
 
 
@@ -136,12 +160,21 @@ def test_student_without_the_word_intern():
 
 def test_new_field_tags():
     cases = {
-        "Nursing Student Extern": "nursing", "Public Health Intern": "public_health",
-        "Clinical Research Coordinator Intern": "clinical_research", "Undergraduate Lab Research Assistant": "lab_research",
-        "Museum Collections Intern": "museums", "Editorial Intern": "publishing", "Journalism Intern": "journalism",
-        "Film Production Intern": "film", "Music Business Intern": "music", "Stage Management Intern": "theater",
-        "Library Intern": "library", "Urban Planning Intern": "urban_planning", "Sustainability Intern": "sustainability",
-        "Supply Chain Intern": "supply_chain", "Entrepreneurship Program Intern": "entrepreneurship",
+        "Nursing Student Extern": "nursing",
+        "Public Health Intern": "public_health",
+        "Clinical Research Coordinator Intern": "clinical_research",
+        "Undergraduate Lab Research Assistant": "lab_research",
+        "Museum Collections Intern": "museums",
+        "Editorial Intern": "publishing",
+        "Journalism Intern": "journalism",
+        "Film Production Intern": "film",
+        "Music Business Intern": "music",
+        "Stage Management Intern": "theater",
+        "Library Intern": "library",
+        "Urban Planning Intern": "urban_planning",
+        "Sustainability Intern": "sustainability",
+        "Supply Chain Intern": "supply_chain",
+        "Entrepreneurship Program Intern": "entrepreneurship",
         "Communications Intern": "communications",
     }
     for title, tag in cases.items():
@@ -154,9 +187,14 @@ def test_behaviour_analysis_is_psychology():
     # post, and not one of these titles contains the word "psychology". Before this rule they
     # classified as 'other' and the coverage report read psychology 0 with Centria Autism's
     # twelve apprenticeships sitting in the data.
-    for title in ["Clinical Apprentice - BCBA Fieldwork Program", "Registered Behavior Technician Intern",
-                  "Applied Behavior Analysis Intern", "Behavior Analyst Fieldwork Trainee",
-                  "RBT Summer Intern", "ABA Therapy Intern"]:
+    for title in [
+        "Clinical Apprentice - BCBA Fieldwork Program",
+        "Registered Behavior Technician Intern",
+        "Applied Behavior Analysis Intern",
+        "Behavior Analyst Fieldwork Trainee",
+        "RBT Summer Intern",
+        "ABA Therapy Intern",
+    ]:
         assert "psychology" in classify(title), (title, classify(title))
     # Analytics about how customers behave is not behaviour analysis.
     assert "psychology" not in classify("Behavioral Analytics Intern")
@@ -166,19 +204,34 @@ def test_behaviour_analysis_is_psychology():
 def test_language_teaching_is_languages():
     # Every one of these is an open listing the rule used to miss: a languages major is hired to
     # teach English far more often than to translate anything.
-    for title in ["WIOA ESL Assistant Instructor Intern", "Work Study Office Aide - English Language Center",
-                  "English Language Learning Intern (Fall 2026- UNPAID)", "Localization Intern",
-                  "TESOL Practicum Student", "Spanish Language Tutor"]:
+    for title in [
+        "WIOA ESL Assistant Instructor Intern",
+        "Work Study Office Aide - English Language Center",
+        "English Language Learning Intern (Fall 2026- UNPAID)",
+        "Localization Intern",
+        "TESOL Practicum Student",
+        "Spanish Language Tutor",
+    ]:
         assert "languages" in classify(title), (title, classify(title))
     # And these are the open listings that made the bare word "language" unusable in the rule.
-    for title in ["Student Researcher - Large Language Model - Seed", "PhD Intern - Language Intelligence",
-                  "Research Fellow - Mechanistic Interpretability", "Speech Language Pathologist (or SLP Intern)"]:
+    for title in [
+        "Student Researcher - Large Language Model - Seed",
+        "PhD Intern - Language Intelligence",
+        "Research Fellow - Mechanistic Interpretability",
+        "Speech Language Pathologist (or SLP Intern)",
+    ]:
         assert "languages" not in classify(title), (title, classify(title))
 
 
 def test_years():
     assert years_of("2027 Internship - Quantitative Researcher (PhD)") == ["phd"]
-    assert years_of("Campus Quantitative Researcher, UG/MS (Intern)") == ["first_year", "sophomore", "junior", "senior", "masters"]
+    assert years_of("Campus Quantitative Researcher, UG/MS (Intern)") == [
+        "first_year",
+        "sophomore",
+        "junior",
+        "senior",
+        "masters",
+    ]
     assert years_of("Summer Intern", {"class_standing": ["junior"]}) == ["junior"]
     assert years_of("2027 Summer Intern - Technology Group - Sophomore") == ["sophomore"]
     assert years_of("Software Engineer Intern") == []
@@ -209,6 +262,7 @@ def test_majors_use_known_tags():
     ex = majors_export()
     assert len(ex["majors"]) == len(UNDERGRAD) + len(GRADUATE) and "internship" in ex["stages"]
 
+
 def test_a_field_word_inside_a_longer_word_is_not_a_match():
     # "Environmental Health & Safety" contains "mental health", and thirteen of the twenty-six
     # psychology listings in one export were EHS roles because of it.
@@ -220,12 +274,14 @@ def test_a_field_word_inside_a_longer_word_is_not_a_match():
     assert classify("General Counsel Intern") == ["law"]
     # The same fault in six more tags, found by running every rule over all 13,601 exported
     # titles and keeping the matches whose preceding character is a letter.
-    assert classify("Underwriting Internship - Summer 2027") == ["insurance"]   # not ...WRITING INTERN
-    assert classify("Telecommunications Intern") == ["other"]                   # not tele...COMMUNICATIONS
-    assert classify("2027 Fulfillment Intern") == ["other"]                     # not fu...LLM...ent
-    assert classify("HCAD Intern- High School") == ["other"]                    # a county appraiser
-    assert classify("ShureCloud Marketing Intern") == ["marketing"]             # a product, not a cloud
-    assert classify("3D Asset Reconstruction Intern") == ["other"]              # not pre/construction
+    assert classify("Underwriting Internship - Summer 2027") == [
+        "insurance"
+    ]  # not ...WRITING INTERN
+    assert classify("Telecommunications Intern") == ["other"]  # not tele...COMMUNICATIONS
+    assert classify("2027 Fulfillment Intern") == ["other"]  # not fu...LLM...ent
+    assert classify("HCAD Intern- High School") == ["other"]  # a county appraiser
+    assert classify("ShureCloud Marketing Intern") == ["marketing"]  # a product, not a cloud
+    assert classify("3D Asset Reconstruction Intern") == ["other"]  # not pre/construction
     # and each of those words still counts when it is a word.
     assert classify("Editorial Writing Intern")[0] == "media"
     assert "communications" in classify("Marketing Communications Intern")
@@ -233,6 +289,7 @@ def test_a_field_word_inside_a_longer_word_is_not_a_match():
     assert classify("AutoCAD Design Intern") == ["mechanical"]
     assert classify("Cloud Engineer Intern") == ["swe"]
     assert classify("Preconstruction Intern") == ["civil"]
+
 
 def test_engineering_is_the_fallback_for_a_title_with_no_discipline():
     # 1,200 listings in one export said "engineering" and nothing a discipline rule could read,
@@ -252,19 +309,27 @@ def test_a_posting_that_names_the_store_is_retail():
     # Target posts its store leadership programme once per city, thirty of them in one export,
     # and the retail rule only knew "store operations".
     assert classify("Store Executive Intern (Store Leadership Intern) - Raleigh, NC") == ["retail"]
-    assert classify("Stores Executive Internship (Store Leadership Intern) - Omaha, NE") == ["retail"]
+    assert classify("Stores Executive Internship (Store Leadership Intern) - Omaha, NE") == [
+        "retail"
+    ]
     assert "retail" in classify("Store Analytics Intern")
     # and the one title in the export where "Cloud" is a town in Minnesota, not a platform.
-    assert classify("Store Executive Intern (Store Leadership Intern) - St. Cloud, MN") == ["retail"]
+    assert classify("Store Executive Intern (Store Leadership Intern) - St. Cloud, MN") == [
+        "retail"
+    ]
     assert classify("Cloud Engineer Intern") == ["swe"]
 
 
 def test_research_stage_reads_the_word_itself():
     # 549 postings said "research" or "researcher" and got nothing but "internship", against 73
     # that the REU/SURF wording caught, so the stage filter could not see the work it is for.
-    for title in ("Research Scientist Intern", "Quantitative Researcher Intern",
-                  "AI Research Intern - Foundation Models", "Research Assistant Intern",
-                  "2027 Formal Methods Researcher Graduate Intern"):
+    for title in (
+        "Research Scientist Intern",
+        "Quantitative Researcher Intern",
+        "AI Research Intern - Foundation Models",
+        "Research Assistant Intern",
+        "2027 Formal Methods Researcher Graduate Intern",
+    ):
         assert "research" in stage_of(title), title
     # The wordings that never say "research" still work.
     assert stage_of("REU Site: Computational Biology") == ["research"]
@@ -311,25 +376,43 @@ def test_translational_medicine_is_not_a_translation_job():
 def test_ehs_titles_are_environmental_jobs():
     # 24 of these said only "other", which sorts below everything. They are the compliance arm of an
     # environmental team and the major that wants them is environmental science or public health.
-    for title in ("EHS Intern", "HSE Intern", "HSE/Safety Intern", "2027 EHS Safety Intern",
-                  "EHS Corporate Intern", "2027 Intern- EHS - Williamsport, PA",
-                  "EHS (Environment, Health, & Safety) Intern", "Health and Safety Intern",
-                  "Health & Safety Intern", "HEALTH AND SAFETY SKILLBRIDGE INTERN",
-                  "Environment, Safety and Health Undergraduate Intern - Fall 2026",
-                  "Occupational Health & Safety Intern- CO", "Occupational Safety Intern",
-                  "Risk Control/Occupational Safety Internship Summer 2027"):
+    for title in (
+        "EHS Intern",
+        "HSE Intern",
+        "HSE/Safety Intern",
+        "2027 EHS Safety Intern",
+        "EHS Corporate Intern",
+        "2027 Intern- EHS - Williamsport, PA",
+        "EHS (Environment, Health, & Safety) Intern",
+        "Health and Safety Intern",
+        "Health & Safety Intern",
+        "HEALTH AND SAFETY SKILLBRIDGE INTERN",
+        "Environment, Safety and Health Undergraduate Intern - Fall 2026",
+        "Occupational Health & Safety Intern- CO",
+        "Occupational Safety Intern",
+        "Risk Control/Occupational Safety Internship Summer 2027",
+    ):
         assert "environmental" in classify(title), title
 
 
 def test_safety_boilerplate_in_a_description_is_not_an_ehs_job():
     # Every one of these bodies says it, and none of these jobs is an EHS job.
     for title, body in (
-        ("Engineering Intern (Oil & Gas Business)", "Our goal is to meet the highest employer "
-         "standards by ensuring the health and safety of our employees."),
-        ("Operations Intern, Commercial & MarComs", "Assess our boutiques while adhering to company "
-                                                    "regulations, and health and safety codes."),
-        ("Safety Engineer Intern", "Work with project managers and superintendents in dealing with "
-                                   "all health and safety issues on site, at the project level."),
+        (
+            "Engineering Intern (Oil & Gas Business)",
+            "Our goal is to meet the highest employer "
+            "standards by ensuring the health and safety of our employees.",
+        ),
+        (
+            "Operations Intern, Commercial & MarComs",
+            "Assess our boutiques while adhering to company "
+            "regulations, and health and safety codes.",
+        ),
+        (
+            "Safety Engineer Intern",
+            "Work with project managers and superintendents in dealing with "
+            "all health and safety issues on site, at the project level.",
+        ),
     ):
         assert "environmental" not in classify(title, body), title
 
@@ -359,10 +442,12 @@ def test_the_new_discipline_words_do_not_fire_on_a_description():
     # mentioned a GIS layer, and a bare "speech language" tagged "Machine Learning Researcher,
     # Multimodal LLMs" because its body described speech and language models. Both are anchored now.
     assert "environmental" not in classify(
-        "Civil Engineering Intern", "You will pull parcel data from our GIS and hand it to design.")
+        "Civil Engineering Intern", "You will pull parcel data from our GIS and hand it to design."
+    )
     assert "health" not in classify(
         "Machine Learning Researcher, Multimodal LLMs",
-        "Our models work across speech, language and vision.")
+        "Our models work across speech, language and vision.",
+    )
 
 
 def test_a_degree_list_in_a_description_does_not_make_a_job_a_software_job():
@@ -370,16 +455,24 @@ def test_a_degree_list_in_a_description_does_not_make_a_job_a_software_job():
     # bare word put a steel internship and an SEO internship into swe, which is the tag the biggest
     # part of the audience sorts by, so it has to lose to a comma, a slash and a preposition.
     for title, body in (
-        ("Steel Fabrication Intern",
-         "Majors considered include, but are not limited to, the following: Civil Engineering "
-         "Mechanical Engineering Computer Science"),
-        ("SEO & On-line Marketing Specialist Intern",
-         "Perform the SEO and related projects assigned. - BS/BA in Information/Computer Science "
-         "and related field."),
-        ("Quantitative Researcher Intern",
-         "PhD or master's degree in computer science, mathematics, physics, or statistics."),
-        ("Optics Intern",
-         "For students pursuing a degree in Computer Science or a related technical field."),
+        (
+            "Steel Fabrication Intern",
+            "Majors considered include, but are not limited to, the following: Civil Engineering "
+            "Mechanical Engineering Computer Science",
+        ),
+        (
+            "SEO & On-line Marketing Specialist Intern",
+            "Perform the SEO and related projects assigned. - BS/BA in Information/Computer Science "
+            "and related field.",
+        ),
+        (
+            "Quantitative Researcher Intern",
+            "PhD or master's degree in computer science, mathematics, physics, or statistics.",
+        ),
+        (
+            "Optics Intern",
+            "For students pursuing a degree in Computer Science or a related technical field.",
+        ),
     ):
         assert "swe" not in classify(title, body), title
 
@@ -387,11 +480,13 @@ def test_a_degree_list_in_a_description_does_not_make_a_job_a_software_job():
 def test_a_postdoc_is_a_postdoc_however_the_employer_spells_it():
     # All five of these were open on the board, and none of them matched, because the rule asked
     # for an optional hyphen and every one of these employers used a space instead.
-    for title in ("Post Doctoral Research Fellow",
-                  "Post Doc Research Associate - Networking and Distributed Systems Lab",
-                  "School of Arts and Communication Post Doc Visiting Research Associate",
-                  "Pain Psychology Post Doctoral Fellowship",
-                  "Post Bacc Research Assistant"):
+    for title in (
+        "Post Doctoral Research Fellow",
+        "Post Doc Research Associate - Networking and Distributed Systems Lab",
+        "School of Arts and Communication Post Doc Visiting Research Associate",
+        "Pain Psychology Post Doctoral Fellowship",
+        "Post Bacc Research Assistant",
+    ):
         assert stage_of(title) == [], title
         assert stage_of(title.replace(" Doc", "-Doc").replace(" Bacc", "-Bacc")) == [], title
     # A postdoc that calls itself an intern is still a postdoc - it needs a finished PhD - and the
@@ -404,12 +499,14 @@ def test_a_postdoc_is_a_postdoc_however_the_employer_spells_it():
 
 def test_military_skillbridge_placements_are_not_student_roles():
     # SkillBridge only takes service members still on active duty, whatever the employer calls it.
-    for title in ("DoD SkillBridge Intern – (Systems Analyst) (Active Duty Service Members)",
-                  "Boeing SkillBridge - Clearance Required - Military Internship",
-                  "Skillbridge Military Intern - Aircraft Maintenance",
-                  "Skill Bridge Intern - Marketing",
-                  "Field Service Technician Intern - Transitioning Military",
-                  "Aircraft Maintenance Technician Apprentice - Military Transition Program"):
+    for title in (
+        "DoD SkillBridge Intern – (Systems Analyst) (Active Duty Service Members)",
+        "Boeing SkillBridge - Clearance Required - Military Internship",
+        "Skillbridge Military Intern - Aircraft Maintenance",
+        "Skill Bridge Intern - Marketing",
+        "Field Service Technician Intern - Transitioning Military",
+        "Aircraft Maintenance Technician Apprentice - Military Transition Program",
+    ):
         assert stage_of(title) == [], title
     # A student internship at a defence employer, or one that mentions the military, still counts.
     assert stage_of("Military Aircraft Engineering Intern") == ["internship"]
@@ -441,26 +538,32 @@ def test_titles_that_used_to_land_in_other_now_reach_their_field():
 def test_the_rescue_phrases_stay_out_of_boilerplate():
     # Each phrase is tied to a role word because the bare phrase is everywhere in bodies.
     assert "sustainability" not in classify(
-        "C&I Sales Intern", "Be part of a supportive, high-energy intern experience.")
+        "C&I Sales Intern", "Be part of a supportive, high-energy intern experience."
+    )
     assert "environmental" not in classify(
-        "Intern - Operational Support", "Become familiar with the Health, Safety, and Environment culture.")
+        "Intern - Operational Support",
+        "Become familiar with the Health, Safety, and Environment culture.",
+    )
     assert "finance" not in classify(
-        "Software Engineering Intern", "You will help reduce operational risk across our platform.")
+        "Software Engineering Intern", "You will help reduce operational risk across our platform."
+    )
     assert "engineering" not in classify("Internal Controls Intern")
     assert "engineering" not in classify("Process Risk and Controls Consulting Intern")
 
 
 def test_investment_testing_and_rnd_titles_reach_their_field():
-    for title, tag in (("Financial Reporting Intern (Spring 2027)", "finance"),
-                       ("Wealth and Investment Management Intern", "finance"),
-                       ("Investments Intern - Bank Loans", "finance"),
-                       ("Financial Due Diligence Intern - Summer 2027", "finance"),
-                       ("R&D Intern - Catholyte", "engineering"),
-                       ("Reliability Testing and Failure Analysis Intern", "engineering"),
-                       ("Design for Test Intern, BS - Summer 2027", "engineering"),
-                       ("Military DoD SkillBridge Internship - Maintenance Technician", "engineering"),
-                       ("Advanced Packaging Intern", "hardware"),
-                       ("Site Reliability Internship - Spring 2027", "swe")):
+    for title, tag in (
+        ("Financial Reporting Intern (Spring 2027)", "finance"),
+        ("Wealth and Investment Management Intern", "finance"),
+        ("Investments Intern - Bank Loans", "finance"),
+        ("Financial Due Diligence Intern - Summer 2027", "finance"),
+        ("R&D Intern - Catholyte", "engineering"),
+        ("Reliability Testing and Failure Analysis Intern", "engineering"),
+        ("Design for Test Intern, BS - Summer 2027", "engineering"),
+        ("Military DoD SkillBridge Internship - Maintenance Technician", "engineering"),
+        ("Advanced Packaging Intern", "hardware"),
+        ("Site Reliability Internship - Spring 2027", "swe"),
+    ):
         assert tag in classify(title), (title, classify(title))
     # the word alone is not enough where it means something else
     assert "finance" not in classify("2027 Platform Internship, Non-Investment (US)")
@@ -470,34 +573,45 @@ def test_investment_testing_and_rnd_titles_reach_their_field():
 
 
 def test_safety_verification_and_design_titles_reach_their_field():
-    for title, tag in (("Safety Intern (College 26-27 Season) - Tyson's, VA", "environmental"),
-                       ("Process Safety Intern", "environmental"),
-                       ("Intern/Co-op - HES&S Safety and Industrial Hygiene (Summer 2027)", "environmental"),
-                       ("Design Verification Intern - MS", "hardware"),
-                       ("Highway Design Intern - Summer 2027", "civil"),
-                       ("Geomatics Technician Apprentice - Survey and Mapping", "civil"),
-                       ("Instructional Design Intern", "education"),
-                       ("2027 Experience Design Summer Intern", "design")):
+    for title, tag in (
+        ("Safety Intern (College 26-27 Season) - Tyson's, VA", "environmental"),
+        ("Process Safety Intern", "environmental"),
+        ("Intern/Co-op - HES&S Safety and Industrial Hygiene (Summer 2027)", "environmental"),
+        ("Design Verification Intern - MS", "hardware"),
+        ("Highway Design Intern - Summer 2027", "civil"),
+        ("Geomatics Technician Apprentice - Survey and Mapping", "civil"),
+        ("Instructional Design Intern", "education"),
+        ("2027 Experience Design Summer Intern", "design"),
+    ):
         assert tag in classify(title), (title, classify(title))
-    for title in ("Functional Safety Intern", "Product Safety Intern", "Food Safety Intern- Summer 2027"):
+    for title in (
+        "Functional Safety Intern",
+        "Product Safety Intern",
+        "Food Safety Intern- Summer 2027",
+    ):
         assert "environmental" not in classify(title), title
 
 
 def test_social_science_titles_reach_their_field():
-    for title, tag in (("Research Assistant, Addiction Psychiatry", "psychology"),
-                       ("Aviation Human Factors Intern", "psychology"),
-                       ("School-Based Therapist Intern", "psychology"),
-                       ("Child Development Specialist", "psychology"),
-                       ("PhD Research Economist", "economics"),
-                       ("Student Trainee (Economist), CG-0199-04 (NTE 1 Year)", "economics"),
-                       ("WS - Political Science Research Associate - FWS", "government"),
-                       ("Respiratory Therapist Intern - GSL", "health"),
-                       ("Speech Language Graduate Internship", "health"),
-                       ("Surveying Intern | Charlotte, NC", "civil")):
+    for title, tag in (
+        ("Research Assistant, Addiction Psychiatry", "psychology"),
+        ("Aviation Human Factors Intern", "psychology"),
+        ("School-Based Therapist Intern", "psychology"),
+        ("Child Development Specialist", "psychology"),
+        ("PhD Research Economist", "economics"),
+        ("Student Trainee (Economist), CG-0199-04 (NTE 1 Year)", "economics"),
+        ("WS - Political Science Research Associate - FWS", "government"),
+        ("Respiratory Therapist Intern - GSL", "health"),
+        ("Speech Language Graduate Internship", "health"),
+        ("Surveying Intern | Charlotte, NC", "civil"),
+    ):
         assert tag in classify(title), (title, classify(title))
     # the other therapists are not counselling jobs
-    for title in ("Respiratory Therapist Intern - GSL", "Recreation Therapist Intern",
-                  "Physical Therapist – Biomechanics Research Support"):
+    for title in (
+        "Respiratory Therapist Intern - GSL",
+        "Recreation Therapist Intern",
+        "Physical Therapist – Biomechanics Research Support",
+    ):
         assert "psychology" not in classify(title), title
     # and human factors engineering keeps an engineering field
     assert "industrial" in classify("Human Factors Engineer Intern - SE&I")
@@ -506,10 +620,17 @@ def test_social_science_titles_reach_their_field():
 def test_the_word_research_alone_does_not_make_a_student_job():
     # 925 exported postings were admitted on "research" and nothing else, and nearly all of them
     # were staff: "VP, Research", "Researcher, Interpretability", "Research Analyst II".
-    for title in ("VP, Research", "Researcher, Interpretability", "Technical Sourcer, Research",
-                  "Research Analyst II", "Research Scientist", "Applied Researcher",
-                  "Global Research - Industry & Policy Thematics - Vice President",
-                  "Graduate Quantitative Researcher (BS/MS)", "Research Assistant"):
+    for title in (
+        "VP, Research",
+        "Researcher, Interpretability",
+        "Technical Sourcer, Research",
+        "Research Analyst II",
+        "Research Scientist",
+        "Applied Researcher",
+        "Global Research - Industry & Policy Thematics - Vice President",
+        "Graduate Quantitative Researcher (BS/MS)",
+        "Research Assistant",
+    ):
         assert stage_of(title) == [], title
     # It still says what kind of student job one is.
     assert stage_of("Research Scientist Intern") == ["internship", "research"]
@@ -517,43 +638,60 @@ def test_the_word_research_alone_does_not_make_a_student_job():
 
 
 def test_student_research_jobs_that_never_say_intern_are_kept():
-    for title in ("Graduate Research Assistant - Fire Protection Engineering",
-                  "Graduate Researcher - Redwing Group - Materials Science and Engineering",
-                  "Graduate Assistant Non-Teaching - Institutional Research and Data Analysis",
-                  "Student Technician - Applied Research Laboratories",
-                  "Roadside Observational Researcher (Summer Position)",
-                  "Undergraduate Part-Time Research Support"):
+    for title in (
+        "Graduate Research Assistant - Fire Protection Engineering",
+        "Graduate Researcher - Redwing Group - Materials Science and Engineering",
+        "Graduate Assistant Non-Teaching - Institutional Research and Data Analysis",
+        "Student Technician - Applied Research Laboratories",
+        "Roadside Observational Researcher (Summer Position)",
+        "Undergraduate Part-Time Research Support",
+    ):
         assert "research" in stage_of(title), title
-    for title in ("Part-Time Research Assistant - Astronomy Department",
-                  "Electoral Reform Research Assistant Part-Time",
-                  "Research/Teaching Assistant (Student)",
-                  "WS - Medical Humanities Research Assistant - FWS",
-                  "WS - INBRE Biotechnologies Research Assistant (Wang) - IWS"):
+    for title in (
+        "Part-Time Research Assistant - Astronomy Department",
+        "Electoral Reform Research Assistant Part-Time",
+        "Research/Teaching Assistant (Student)",
+        "WS - Medical Humanities Research Assistant - FWS",
+        "WS - INBRE Biotechnologies Research Assistant (Wang) - IWS",
+    ):
         assert stage_of(title) == ["research", "part_time"], title
     # the work-study code is a word, not a piece of one
     assert stage_of("TFWS Research and Insights Analyst") == []
 
 
 def test_market_research_policy_and_community_work_reach_a_field():
-    for title, tag in (("Market Research Intern", "marketing"), ("Intern, Market Intelligence (LCS)", "marketing"),
-                       ("Consumer Insights Intern/Co-op", "marketing"), ("Community Manager Intern", "marketing"),
-                       ("Community Impact Summer Intern", "nonprofit"), ("Community Engagement Grant Intern", "nonprofit"),
-                       ("Advocacy & Survivor Leadership Intern - Spring 2027", "nonprofit"),
-                       ("Energy Policy & Regulation Intern", "government"), ("Policy Assistant", "government"),
-                       ("Summer Associate Internship (Public Policy Assistant)", "government")):
+    for title, tag in (
+        ("Market Research Intern", "marketing"),
+        ("Intern, Market Intelligence (LCS)", "marketing"),
+        ("Consumer Insights Intern/Co-op", "marketing"),
+        ("Community Manager Intern", "marketing"),
+        ("Community Impact Summer Intern", "nonprofit"),
+        ("Community Engagement Grant Intern", "nonprofit"),
+        ("Advocacy & Survivor Leadership Intern - Spring 2027", "nonprofit"),
+        ("Energy Policy & Regulation Intern", "government"),
+        ("Policy Assistant", "government"),
+        ("Summer Associate Internship (Public Policy Assistant)", "government"),
+    ):
         assert tag in classify(title), (title, classify(title))
     # an insurer's advocacy desk and an internal policy role are not those
-    for title in ("Benefits Advocacy Intern", "Customer Care Advocacy Summer Intern",
-                  "Corporate Risk and Broking - Client Advocacy- Personal Lines- 2027"):
+    for title in (
+        "Benefits Advocacy Intern",
+        "Customer Care Advocacy Summer Intern",
+        "Corporate Risk and Broking - Client Advocacy- Personal Lines- 2027",
+    ):
         assert "nonprofit" not in classify(title), title
     for title in ("Enterprise Cybersecurity IT Policy Intern", "Service Policy Intern - MN, WI"):
         assert "government" not in classify(title), title
 
 
 def test_sociology_anthropology_and_survey_work_are_social_science():
-    for title in ("Sociology Research Intern", "Anthropology Intern", "Survey Research Intern",
-                  "Polling and Outreach Intern",
-                  "Student Research Assistant - Department of Sociology and Criminology"):
+    for title in (
+        "Sociology Research Intern",
+        "Anthropology Intern",
+        "Survey Research Intern",
+        "Polling and Outreach Intern",
+        "Student Research Assistant - Department of Sociology and Criminology",
+    ):
         assert "social_science" in classify(title), title
     # the retailer is not the discipline
     assert "social_science" not in classify("Anthropologie Buying Intern - Home")
@@ -594,7 +732,8 @@ def test_operations_training_and_signal_titles_reach_a_field():
     assert "marketing" not in classify("CRM Clinical Field Intern - Summer 2027")
     assert "hr" not in classify("Indigenous Training Internship Program")
     assert "environmental" not in classify(
-        "Banking - Commercial Banking - Natural Resources & Energy,  Summer Analyst, Houston - US, 2027")
+        "Banking - Commercial Banking - Natural Resources & Energy,  Summer Analyst, Houston - US, 2027"
+    )
 
 
 def test_management_analyst_quality_and_design_titles_reach_a_field():
@@ -637,14 +776,20 @@ def test_pricing_power_imaging_and_facilities_titles_reach_a_field():
     assert classify("Simulation and Modeling Intern") == ["industrial"]
     # the same words in other jobs
     assert "finance" not in classify("Cyber Security Risk Intern [2027 Internship Program]")
-    assert "finance" not in classify("Early Careers: Corporate Risk & Broking Construction Internship")
+    assert "finance" not in classify(
+        "Early Careers: Corporate Risk & Broking Construction Internship"
+    )
     assert "health" not in classify("Summer Internship - Seismic Imaging Technology - Houston, TX")
     assert "industrial" not in classify("Process Automation Developer Intern")
 
 
 def test_political_science_evaluation_survey_and_user_research_titles():
-    assert "social_science" in classify("2027 Summer Internship - Public Policy/Political Science (Rosemead)")
-    assert "social_science" in classify("Monitoring, Evaluation, Research, & Learning Internships and Fellowships")
+    assert "social_science" in classify(
+        "2027 Summer Internship - Public Policy/Political Science (Rosemead)"
+    )
+    assert "social_science" in classify(
+        "Monitoring, Evaluation, Research, & Learning Internships and Fellowships"
+    )
     assert "social_science" in classify("Undergraduate Research Assistant - Phone Survey")
     assert "psychology" in classify("User Research Intern")
     assert "psychology" in classify("Human Behavior Analytics Intern - Safety Research")
@@ -657,22 +802,30 @@ def test_political_science_evaluation_survey_and_user_research_titles():
 
 def test_hotel_venue_and_team_titles_that_never_say_hospitality_or_sports():
     from internscout.classify import classify
+
     assert classify("Personal Trainer Internship, NYC") == ["sports"]
     assert "hr" not in classify("Personal Training Intern")
     assert "sports" in classify("2027 International Scouting Associate")
     assert "sports" in classify("Operations Intern | Highmark Stadium")
     assert classify("Student Worker (Tennis Complex)") == ["sports"]
-    assert "hospitality" in classify("Spring 2027 - 6-Month Front Desk College Intern - Scottsdale, AZ")
+    assert "hospitality" in classify(
+        "Spring 2027 - 6-Month Front Desk College Intern - Scottsdale, AZ"
+    )
     assert "hospitality" in classify("Intern - F&B Administration")
     assert "hospitality" in classify("C3 Presents - Festival Marketing Intern")
     # the near misses
-    assert "sports" not in classify("Summer 2027 Intern- Innovation Group- Scouting/Business Research")
-    assert "hospitality" not in classify("Intern, Digital Product Management (Platforms & Guest Experience)")
+    assert "sports" not in classify(
+        "Summer 2027 Intern- Innovation Group- Scouting/Business Research"
+    )
+    assert "hospitality" not in classify(
+        "Intern, Digital Product Management (Platforms & Guest Experience)"
+    )
     assert "hospitality" not in classify("Patient Concierge Intern - Spring 2027")
 
 
 def test_fundraising_and_casework_titles_that_never_say_nonprofit_or_social_work():
     from internscout.classify import classify
+
     assert classify("Philanthropy Intern - Spring 2027") == ["nonprofit"]
     assert classify("Fall 2026 Grants Management Intern - UNPAID") == ["nonprofit"]
     assert classify("Internship - Fundraising") == ["nonprofit"]
@@ -685,6 +838,7 @@ def test_fundraising_and_casework_titles_that_never_say_nonprofit_or_social_work
 
 def test_studio_writer_and_event_titles_that_name_the_person_not_the_field():
     from internscout.classify import classify
+
     assert classify("Co-op, Designer") == ["design"]
     assert classify("Tech Art Intern") == ["design"]
     assert classify("Retoucher /Digital Artist Intern") == ["design"]
@@ -699,6 +853,7 @@ def test_studio_writer_and_event_titles_that_name_the_person_not_the_field():
 
 def test_programme_lab_and_show_titles_that_fell_to_other():
     from internscout.classify import classify
+
     assert classify("Fall 2026 Casework Intern - UNPAID") == ["social_work"]
     assert classify("ESOL Intern - Fall 2026 (UNPAID)") == ["languages"]
     assert "languages" in classify("WIOA ESL Assistant Instructor Intern")
@@ -711,34 +866,51 @@ def test_programme_lab_and_show_titles_that_fell_to_other():
 
 def test_intelligence_language_roles_but_not_language_models():
     from internscout.classify import classify
+
     assert classify("Chinese Language-Enabled OSINT Collector Intern - Junior") == ["languages"]
     assert "languages" in classify("Cooperative Education Program - Language (Maryland)")
     assert "languages" in classify("Arabic Language Analyst Intern")
     # Models and NLP research say "language" too, and are not language jobs.
-    for t in ("Student Researcher - Large Language Model", "PhD Intern - Language Intelligence",
-              "Large Language Model Paid Media Co-op", "Speech Language Pathologist Intern"):
+    for t in (
+        "Student Researcher - Large Language Model",
+        "PhD Intern - Language Intelligence",
+        "Large Language Model Paid Media Co-op",
+        "Speech Language Pathologist Intern",
+    ):
         assert "languages" not in classify(t), t
 
 
 def test_hospital_student_titles_that_name_the_student_first():
     from internscout.classify import is_internship
-    for t in ("Student Nurse Technician", "Nurse Technician - Student Nurse",
-              "PACU Certified Nursing Assistant/ Nursing Student BWFH",
-              "3 East RN Student Certified Nursing Assistant BWFH",
-              "Patient Care Assistant (EMK Students Only)", "Pathology Tech Student PD"):
+
+    for t in (
+        "Student Nurse Technician",
+        "Nurse Technician - Student Nurse",
+        "PACU Certified Nursing Assistant/ Nursing Student BWFH",
+        "3 East RN Student Certified Nursing Assistant BWFH",
+        "Patient Care Assistant (EMK Students Only)",
+        "Pathology Tech Student PD",
+    ):
         assert is_internship(t), t
     # Jobs that teach, place or serve students are not places for one.
-    for t in ("Student Nurse Educator", "Clinical Instructor - Nursing Students",
-              "Assistant Director, Student Admissions", "Student Success Coordinator",
-              "Medical Assistant - gap year students welcome to apply",
-              "Registered Nurse/Licensed Practical Nurse - Student Health Center Nurse"):
+    for t in (
+        "Student Nurse Educator",
+        "Clinical Instructor - Nursing Students",
+        "Assistant Director, Student Admissions",
+        "Student Success Coordinator",
+        "Medical Assistant - gap year students welcome to apply",
+        "Registered Nurse/Licensed Practical Nurse - Student Health Center Nurse",
+    ):
         assert not is_internship(t), t
 
 
 def test_a_credentialed_clinician_is_not_a_fellow():
     # "Fellowship Trained" is what an attending surgeon is, not what a student is applying for.
-    for title in ("Outstanding Fellowship Trained Orthopaedic Trauma Surgeon Opportunity",
-                  "Fellowship-Trained Hand Surgeon", "Residency Trained Pharmacist - Fellowship Program"):
+    for title in (
+        "Outstanding Fellowship Trained Orthopaedic Trauma Surgeon Opportunity",
+        "Fellowship-Trained Hand Surgeon",
+        "Residency Trained Pharmacist - Fellowship Program",
+    ):
         assert stage_of(title) == [], title
     assert stage_of("Research Student") != []
     assert stage_of("Arborist Apprentice (Tree Surgeon)") == ["apprenticeship"]
@@ -746,26 +918,37 @@ def test_a_credentialed_clinician_is_not_a_fellow():
 
 def test_a_summer_start_date_does_not_make_a_new_grad_job_an_internship():
     # The plan keeps student opportunities only. For these the summer date is when the job starts.
-    for title in ("Additive Engineer (New Grad Summer 2027)",
-                  "New Grad Civil Engineer I: Transportation - Summer 2027",
-                  "Sales Analyst (Recent Grad - Summer 2027 Start)",
-                  "Entry Level Staff Engineer - Roadway Design - Summer 2027",
-                  "Summer 2027 - Data Scientist (New Grad)"):
+    for title in (
+        "Additive Engineer (New Grad Summer 2027)",
+        "New Grad Civil Engineer I: Transportation - Summer 2027",
+        "Sales Analyst (Recent Grad - Summer 2027 Start)",
+        "Entry Level Staff Engineer - Roadway Design - Summer 2027",
+        "Summer 2027 - Data Scientist (New Grad)",
+    ):
         assert stage_of(title) == [], title
     # A title that also offers an internship or a co-op stays.
     # was: the tuple ended with "Early Career Mechanical Engineering- Summer 2027", which offers neither an
     # internship nor a co-op (WSP's own description of it: "a Full-Time Early Career Mechanical Engineer ... starting in Summer of 2027").
-    for title in ("Photonics Characterization Intern & New Grad", "New Grad / Intern Software Engineer"):
+    for title in (
+        "Photonics Characterization Intern & New Grad",
+        "New Grad / Intern Software Engineer",
+    ):
         assert stage_of(title) != [], title
 
 
 def test_a_licensed_nurse_programme_is_not_for_students():
-    for title in ("Graduate Nurse, Acute Care (Med Surg) Internship, Opportunities at Multiple Campuses",
-                  "Graduate Nurse and Registered Nurse NICU Internship- Winter 2027 Cohort",
-                  "Nurse Residency Program", "Registered Nurse Labor and Delivery Internship"):
+    for title in (
+        "Graduate Nurse, Acute Care (Med Surg) Internship, Opportunities at Multiple Campuses",
+        "Graduate Nurse and Registered Nurse NICU Internship- Winter 2027 Cohort",
+        "Nurse Residency Program",
+        "Registered Nurse Labor and Delivery Internship",
+    ):
         assert stage_of(title) == [], title
-    for title in ("Student Nurse Extern", "Student Registered Nurse Anesthetist Internship",
-                  "Nursing Student Internship - Summer 2027"):
+    for title in (
+        "Student Nurse Extern",
+        "Student Registered Nurse Anesthetist Internship",
+        "Nursing Student Internship - Summer 2027",
+    ):
         assert stage_of(title) != [], title
 
 

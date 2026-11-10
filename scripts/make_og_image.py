@@ -12,6 +12,7 @@ extension look like one product: the dashboard's own tokens from docs/index.html
 Run: python scripts/make_og_image.py
 Writes: docs/og-preview.png
 """
+
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -21,9 +22,9 @@ OUT = ROOT / "docs" / "og-preview.png"
 ICON = ROOT / "extension" / "icons" / "icon128.png"
 
 W, H = 1200, 630
-ACCENT = (29, 92, 70)        # --accent #1d5c46
-PAPER = (246, 244, 239)      # --paper #f6f4ef
-SOFT = (227, 238, 232)       # --accent-soft #e3eee8
+ACCENT = (29, 92, 70)  # --accent #1d5c46
+PAPER = (246, 244, 239)  # --paper #f6f4ef
+SOFT = (227, 238, 232)  # --accent-soft #e3eee8
 
 FONTS = Path("C:/Windows/Fonts")
 
@@ -49,14 +50,23 @@ def build() -> Path:
 
     d.text((344, 112), "InternScout", font=_font("georgiab.ttf", 104), fill=PAPER)
     # was: segoeui 40, which ran to x=1151 and left 49px of right margin against 80px on the left.
-    d.text((350, 252), "Internships, co-ops and research, every major",
-           font=_font("segoeui.ttf", 36), fill=SOFT)
+    d.text(
+        (350, 252),
+        "Internships, co-ops and research, every major",
+        font=_font("segoeui.ttf", 36),
+        fill=SOFT,
+    )
 
     # was: y=520, which sat 50px below the band's centre line once the band moved up.
     # was: "Search free. Apply faster." The slogan the owner chose on 2026-09-23 for every ad surface,
     # and a link preview is the one every share carries. At 56px it ends at x=1113, a right margin
     # to match the 84px left one.
-    d.text((84, 486), "Built by one student, made for all students.", font=_font("segoeuisl.ttf", 56), fill=ACCENT)
+    d.text(
+        (84, 486),
+        "Built by one student, made for all students.",
+        font=_font("segoeuisl.ttf", 56),
+        fill=ACCENT,
+    )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     img.save(OUT, "PNG", optimize=True)

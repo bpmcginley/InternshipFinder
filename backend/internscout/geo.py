@@ -5,6 +5,7 @@ out-of-region cities) answers most lookups. With INTERNSCOUT_GEOCODE=1, unknown 
 NY/NJ/PA (the states where "within 50 mi of NYC" matters) are resolved once via Nominatim
 and remembered in backend/data/geocache.json, which CI commits back.
 """
+
 from __future__ import annotations
 import json
 import math
@@ -15,9 +16,59 @@ import time
 from .config import DATA_DIR
 
 REMOTE_RE = re.compile(r"\b(remote|anywhere|work from home|wfh|virtual)\b", re.I)
-_US_STATES = {"al","ak","az","ar","ca","co","ct","de","fl","ga","hi","id","il","in","ia",
- "ks","ky","la","me","md","ma","mi","mn","ms","mo","mt","ne","nv","nh","nj","nm","ny","nc",
- "nd","oh","ok","or","pa","ri","sc","sd","tn","tx","ut","vt","va","wa","wv","wi","wy","dc"}
+_US_STATES = {
+    "al",
+    "ak",
+    "az",
+    "ar",
+    "ca",
+    "co",
+    "ct",
+    "de",
+    "fl",
+    "ga",
+    "hi",
+    "id",
+    "il",
+    "in",
+    "ia",
+    "ks",
+    "ky",
+    "la",
+    "me",
+    "md",
+    "ma",
+    "mi",
+    "mn",
+    "ms",
+    "mo",
+    "mt",
+    "ne",
+    "nv",
+    "nh",
+    "nj",
+    "nm",
+    "ny",
+    "nc",
+    "nd",
+    "oh",
+    "ok",
+    "or",
+    "pa",
+    "ri",
+    "sc",
+    "sd",
+    "tn",
+    "tx",
+    "ut",
+    "vt",
+    "va",
+    "wa",
+    "wv",
+    "wi",
+    "wy",
+    "dc",
+}
 # Puerto Rico hires for the pharmaceutical and medical-device plants there (Amgen in Juncos, Lilly
 # and Medtronic, 13 open listings in one export). The dashboard's state picker and the Worker's
 # /demand already offer PR, but nothing here read it, so every one of them sat in the country-only
@@ -25,29 +76,73 @@ _US_STATES = {"al","ak","az","ar","ca","co","ct","de","fl","ga","hi","id","il","
 # below, where "PR" is as likely to mean public relations.
 _US_STATES.add("pr")
 STATE_NAMES = {
-    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
-    "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA",
-    "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
-    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
-    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
-    "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
-    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
-    "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
-    "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
-    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT",
-    "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI",
-    "wyoming": "WY", "district of columbia": "DC", "puerto rico": "PR",
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "district of columbia": "DC",
+    "puerto rico": "PR",
 }
 _STATE_NAME_RE = re.compile(
-    r"\b(" + "|".join(sorted(STATE_NAMES, key=len, reverse=True)) + r")\b", re.I)
+    r"\b(" + "|".join(sorted(STATE_NAMES, key=len, reverse=True)) + r")\b", re.I
+)
 _US_COUNTRY_RE = re.compile(r"\b(united states|u\.s\.a?\.?|usa|us)\b", re.I)
-_FOREIGN = re.compile(r"\b(london|dublin|ireland|amsterdam|netherlands|canada|toronto|vancouver|"
- r"montreal|ontario|quebec|india|bangalore|bengaluru|hyderabad|singapore|australia|sydney|"
- r"germany|berlin|munich|france|paris|japan|tokyo|china|shanghai|beijing|hong kong|israel|"
- r"tel aviv|mexico|brazil|spain|madrid|poland|warsaw|uk|united kingdom|england|scotland|"
- r"wales|europe|emea|apac|latam|switzerland|zurich|sweden|denmark|norway|finland|korea|"
- r"seoul|taiwan|philippines|vietnam|argentina|colombia|chile|portugal|lisbon|italy|milan|"
- r"romania|ukraine|czech|prague|austria|vienna|belgium|brussels|luxembourg|uae|dubai)\b", re.I)
+_FOREIGN = re.compile(
+    r"\b(london|dublin|ireland|amsterdam|netherlands|canada|toronto|vancouver|"
+    r"montreal|ontario|quebec|india|bangalore|bengaluru|hyderabad|singapore|australia|sydney|"
+    r"germany|berlin|munich|france|paris|japan|tokyo|china|shanghai|beijing|hong kong|israel|"
+    r"tel aviv|mexico|brazil|spain|madrid|poland|warsaw|uk|united kingdom|england|scotland|"
+    r"wales|europe|emea|apac|latam|switzerland|zurich|sweden|denmark|norway|finland|korea|"
+    r"seoul|taiwan|philippines|vietnam|argentina|colombia|chile|portugal|lisbon|italy|milan|"
+    r"romania|ukraine|czech|prague|austria|vienna|belgium|brussels|luxembourg|uae|dubai)\b",
+    re.I,
+)
 
 # Half the cities above have a namesake in the US, and several are where students are hired:
 # Dublin, OH is Cardinal Health and Wendy's, Ontario, CA is an Inland Empire logistics hub, Warsaw,
@@ -56,11 +151,33 @@ _FOREIGN = re.compile(r"\b(london|dublin|ireland|amsterdam|netherlands|canada|to
 # no other location was dropped outright. A location that names one of these towns and then a US
 # state - "Dublin, OH", "New Berlin, WI 53151", "Paris, Texas, USA" - is that town. Only the
 # namesakes are let through, so "Bangalore, IN" is still India and not Indiana.
-_US_NAMESAKES = frozenset({"london", "dublin", "paris", "vienna", "berlin", "milan", "warsaw", "madrid",
-                           "toronto", "mexico", "ontario", "vancouver", "lisbon", "amsterdam", "wales",
-                           "brussels", "belgium", "prague"})
-_TOWN_STATE = re.compile(r"^\s*([^,;|]+?)\s*,\s*([A-Za-z][A-Za-z ]*?)(?:\s+\d{5}(?:-\d{4})?)?"
-                         r"\s*(?:,\s*(?:us|usa|u\.s\.a?\.?|united states(?: of america)?)\s*)?$", re.I)
+_US_NAMESAKES = frozenset(
+    {
+        "london",
+        "dublin",
+        "paris",
+        "vienna",
+        "berlin",
+        "milan",
+        "warsaw",
+        "madrid",
+        "toronto",
+        "mexico",
+        "ontario",
+        "vancouver",
+        "lisbon",
+        "amsterdam",
+        "wales",
+        "brussels",
+        "belgium",
+        "prague",
+    }
+)
+_TOWN_STATE = re.compile(
+    r"^\s*([^,;|]+?)\s*,\s*([A-Za-z][A-Za-z ]*?)(?:\s+\d{5}(?:-\d{4})?)?"
+    r"\s*(?:,\s*(?:us|usa|u\.s\.a?\.?|united states(?: of america)?)\s*)?$",
+    re.I,
+)
 
 
 # Two more ways a foreign posting was filed under a US state, both found in the 2026-09 audit.
@@ -85,7 +202,9 @@ _FOREIGN_CITY_CODE = re.compile(
     r"|(?:jakarta|bandung|surabaya|bali)\s*,\s*ID"
     r"|(?:panama city|panama)\s*,\s*PA"
     r"|(?:tunis)\s*,\s*TN"
-    r")(?![A-Za-z])", re.I)
+    r")(?![A-Za-z])",
+    re.I,
+)
 # 2. Big foreign cities and countries _FOREIGN never listed. A bare "Quezon City" on a Massachusetts
 #    employer's board was stamped "Quezon City, MA" by region.place_bare_cities, which asks this
 #    module whether a name is foreign. Only names with no US town worth confusing them with: Lima,
@@ -98,7 +217,9 @@ _FOREIGN_MORE = re.compile(
     r"calgary|edmonton|mississauga|winnipeg|frankfurt|dusseldorf|düsseldorf|barcelona|budapest|bucharest|belgrade|"
     r"zagreb|helsinki|oslo|stockholm|copenhagen|gothenburg|krakow|wroclaw|gdansk|kyiv|tallinn|vilnius|"
     r"malaysia|indonesia|thailand|pakistan|bangladesh|nigeria|kenya|egypt|saudi arabia|qatar|morocco|costa rica|"
-    r"new zealand|south africa|hungary|bulgaria|serbia|croatia|estonia|latvia|lithuania|sri lanka|nepal)\b", re.I)
+    r"new zealand|south africa|hungary|bulgaria|serbia|croatia|estonia|latvia|lithuania|sri lanka|nepal)\b",
+    re.I,
+)
 
 
 # The list above answers before the namesake rule below is asked, and the review found the US towns it
@@ -106,8 +227,14 @@ _FOREIGN_MORE = re.compile(
 # region) and in Montana. Unlike _US_NAMESAKES these are let through only with the state the town is
 # really in, because region.place_bare_cities stamps a bare foreign city with its board's state and
 # "Brisbane, MA" or "Stockholm, NY" is still that. Frankfort, KY is spelled with an o and needs nothing.
-_MORE_US_TOWNS = {"brisbane": {"CA"}, "belgrade": {"ME", "MT"}, "stockholm": {"ME", "NJ"}, "copenhagen": {"NY"},
-                  "oslo": {"MN"}, "manila": {"UT", "AR"}}
+_MORE_US_TOWNS = {
+    "brisbane": {"CA"},
+    "belgrade": {"ME", "MT"},
+    "stockholm": {"ME", "NJ"},
+    "copenhagen": {"NY"},
+    "oslo": {"MN"},
+    "manila": {"UT", "AR"},
+}
 
 
 def _us_town_of_that_name(loc: str) -> bool:
@@ -147,7 +274,9 @@ class _NotUS:
         if town:
             words = [w.lower() for w in _FOREIGN.findall(town.group(1))]
             st = town.group(2).strip()
-            is_state = (len(st) == 2 and st.isupper() and st.lower() in _US_STATES) or st.lower() in STATE_NAMES
+            is_state = (
+                len(st) == 2 and st.isupper() and st.lower() in _US_STATES
+            ) or st.lower() in STATE_NAMES
             if is_state and words and all(w in _US_NAMESAKES for w in words):
                 return None
         return m
@@ -163,52 +292,120 @@ def looks_us(loc: str) -> bool:
     return bool(state_of(loc) or _US_COUNTRY_RE.search(loc))
 
 
-
 # ---- Canada ------------------------------------------------------------------------------------
 # Canadian postings were read only so that they could be thrown out (everything above). Since
 # 2026-09-30 they are kept, filed by province, for Canadian students and for US students near the
 # border. None of the 13 province and territory codes is also a US state code, so a province code
 # can sit in the same "state" field and the same per-state listing files as a US state.
 PROVINCES = {
-    "AB": "Alberta", "BC": "British Columbia", "MB": "Manitoba", "NB": "New Brunswick",
-    "NL": "Newfoundland and Labrador", "NS": "Nova Scotia", "NT": "Northwest Territories", "NU": "Nunavut",
-    "ON": "Ontario", "PE": "Prince Edward Island", "QC": "Quebec", "SK": "Saskatchewan", "YT": "Yukon",
+    "AB": "Alberta",
+    "BC": "British Columbia",
+    "MB": "Manitoba",
+    "NB": "New Brunswick",
+    "NL": "Newfoundland and Labrador",
+    "NS": "Nova Scotia",
+    "NT": "Northwest Territories",
+    "NU": "Nunavut",
+    "ON": "Ontario",
+    "PE": "Prince Edward Island",
+    "QC": "Quebec",
+    "SK": "Saskatchewan",
+    "YT": "Yukon",
 }
 _PROVINCE_NAMES = {n.lower(): c for c, n in PROVINCES.items()}
 _PROVINCE_NAMES.update({"québec": "QC", "newfoundland": "NL"})
 _PROVINCE_NAME_RE = re.compile(
-    r"\b(" + "|".join(sorted(_PROVINCE_NAMES, key=len, reverse=True)) + r")\b", re.I)
-_PROVINCE_TOKEN = re.compile(r"\s*(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?\s*")
-_SPACED_PROVINCE = re.compile(r"^\s*([A-Za-zÀ-ÿ .'-]+?)\s+(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?\s*$")
+    r"\b(" + "|".join(sorted(_PROVINCE_NAMES, key=len, reverse=True)) + r")\b", re.I
+)
+_PROVINCE_TOKEN = re.compile(
+    r"\s*(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?\s*"
+)
+_SPACED_PROVINCE = re.compile(
+    r"^\s*([A-Za-zÀ-ÿ .'-]+?)\s+(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?\s*$"
+)
 _SAYS_CANADA = re.compile(r"(?i:\bcanada\b)|\bCAN\b")
-_TRAILING_CA = re.compile(r",\s*CA\s*$")          # "Toronto, ON, CA": the country code, not California
+_TRAILING_CA = re.compile(r",\s*CA\s*$")  # "Toronto, ON, CA": the country code, not California
 
 # The metros most Canadian internships are in, with the towns that post under them. The metro name
 # is what the dashboard and the landing pages group by. (lat, lng, province, metro)
 CA_METROS: dict[str, tuple[float, float, str, str]] = {}
 for _metro, _prov, _towns in (
-    ("Toronto", "ON", {"toronto": (43.6532, -79.3832), "mississauga": (43.5890, -79.6441),
-                       "brampton": (43.7315, -79.7624), "markham": (43.8561, -79.3370),
-                       "vaughan": (43.8361, -79.4983), "richmond hill": (43.8828, -79.4403),
-                       "oakville": (43.4675, -79.6877), "north york": (43.7615, -79.4111),
-                       "scarborough": (43.7764, -79.2318), "etobicoke": (43.6205, -79.5132),
-                       "burlington": (43.3255, -79.7990), "pickering": (43.8384, -79.0868)}),
-    ("Montreal", "QC", {"montreal": (45.5017, -73.5673), "montréal": (45.5017, -73.5673),
-                        "laval": (45.6066, -73.7124), "saint-laurent": (45.5075, -73.6897),
-                        "dorval": (45.4473, -73.7442), "longueuil": (45.5312, -73.5181),
-                        "pointe-claire": (45.4487, -73.8168), "boucherville": (45.5910, -73.4362)}),
-    ("Vancouver", "BC", {"vancouver": (49.2827, -123.1207), "burnaby": (49.2488, -122.9805),
-                         "richmond": (49.1666, -123.1336), "surrey": (49.1913, -122.8490),
-                         "north vancouver": (49.3200, -123.0724), "coquitlam": (49.2838, -122.7932)}),
+    (
+        "Toronto",
+        "ON",
+        {
+            "toronto": (43.6532, -79.3832),
+            "mississauga": (43.5890, -79.6441),
+            "brampton": (43.7315, -79.7624),
+            "markham": (43.8561, -79.3370),
+            "vaughan": (43.8361, -79.4983),
+            "richmond hill": (43.8828, -79.4403),
+            "oakville": (43.4675, -79.6877),
+            "north york": (43.7615, -79.4111),
+            "scarborough": (43.7764, -79.2318),
+            "etobicoke": (43.6205, -79.5132),
+            "burlington": (43.3255, -79.7990),
+            "pickering": (43.8384, -79.0868),
+        },
+    ),
+    (
+        "Montreal",
+        "QC",
+        {
+            "montreal": (45.5017, -73.5673),
+            "montréal": (45.5017, -73.5673),
+            "laval": (45.6066, -73.7124),
+            "saint-laurent": (45.5075, -73.6897),
+            "dorval": (45.4473, -73.7442),
+            "longueuil": (45.5312, -73.5181),
+            "pointe-claire": (45.4487, -73.8168),
+            "boucherville": (45.5910, -73.4362),
+        },
+    ),
+    (
+        "Vancouver",
+        "BC",
+        {
+            "vancouver": (49.2827, -123.1207),
+            "burnaby": (49.2488, -122.9805),
+            "richmond": (49.1666, -123.1336),
+            "surrey": (49.1913, -122.8490),
+            "north vancouver": (49.3200, -123.0724),
+            "coquitlam": (49.2838, -122.7932),
+        },
+    ),
     ("Calgary", "AB", {"calgary": (51.0447, -114.0719)}),
     ("Edmonton", "AB", {"edmonton": (53.5461, -113.4938)}),
-    ("Ottawa", "ON", {"ottawa": (45.4215, -75.6972), "kanata": (45.3088, -75.8987),
-                      "nepean": (45.3348, -75.7240)}),
+    (
+        "Ottawa",
+        "ON",
+        {
+            "ottawa": (45.4215, -75.6972),
+            "kanata": (45.3088, -75.8987),
+            "nepean": (45.3348, -75.7240),
+        },
+    ),
     ("Ottawa", "QC", {"gatineau": (45.4765, -75.7013)}),
-    ("Waterloo Region", "ON", {"waterloo": (43.4643, -80.5204), "kitchener": (43.4516, -80.4925),
-                               "cambridge": (43.3616, -80.3144), "guelph": (43.5448, -80.2482)}),
-    ("Quebec City", "QC", {"quebec city": (46.8139, -71.2080), "québec city": (46.8139, -71.2080),
-                           "ville de québec": (46.8139, -71.2080), "lévis": (46.8033, -71.1779)}),
+    (
+        "Waterloo Region",
+        "ON",
+        {
+            "waterloo": (43.4643, -80.5204),
+            "kitchener": (43.4516, -80.4925),
+            "cambridge": (43.3616, -80.3144),
+            "guelph": (43.5448, -80.2482),
+        },
+    ),
+    (
+        "Quebec City",
+        "QC",
+        {
+            "quebec city": (46.8139, -71.2080),
+            "québec city": (46.8139, -71.2080),
+            "ville de québec": (46.8139, -71.2080),
+            "lévis": (46.8033, -71.1779),
+        },
+    ),
     ("Winnipeg", "MB", {"winnipeg": (49.8951, -97.1384)}),
     ("Halifax", "NS", {"halifax": (44.6488, -63.5752), "dartmouth": (44.6713, -63.5772)}),
     ("Hamilton", "ON", {"hamilton": (43.2557, -79.8711)}),
@@ -222,14 +419,30 @@ for _metro, _prov, _towns in (
 # Towns with a bigger or equally likely US namesake. They count as Canadian only when the string also
 # says so (a province, "Canada"): "Burlington, VT", "Cambridge, MA", "Richmond, VA", "London, KY",
 # "Waterloo, IA" (John Deere), "Hamilton, NJ", "Victoria, TX" stay American, and a bare one stays unread.
-_CA_AMBIGUOUS = {"burlington", "richmond", "surrey", "cambridge", "waterloo", "hamilton", "london", "victoria",
-                 "laval", "dartmouth", "halifax", "regina", "vaughan", "nepean", "guelph", "ottawa"}
+_CA_AMBIGUOUS = {
+    "burlington",
+    "richmond",
+    "surrey",
+    "cambridge",
+    "waterloo",
+    "hamilton",
+    "london",
+    "victoria",
+    "laval",
+    "dartmouth",
+    "halifax",
+    "regina",
+    "vaughan",
+    "nepean",
+    "guelph",
+    "ottawa",
+}
 
 
 def _ca_city(loc: str) -> str:
     """The town a Canadian location names, with the province and anything after it dropped."""
     first = re.split(r"[,(]", _PREFIX.sub("", loc or ""), maxsplit=1)[0]
-    spaced = _SPACED_PROVINCE.match(first)          # "Burnaby BC" -> "Burnaby"
+    spaced = _SPACED_PROVINCE.match(first)  # "Burnaby BC" -> "Burnaby"
     if spaced:
         first = spaced.group(1)
     return re.sub(r"\s+", " ", first).strip().lower()
@@ -245,10 +458,12 @@ def canada_of(loc: str) -> str | None:
     if m:
         return m.group(1)
     us = state_of(loc)
-    token = next((t.group(1) for t in map(_PROVINCE_TOKEN.fullmatch, _TOKEN_SPLIT.split(loc)) if t), None)
+    token = next(
+        (t.group(1) for t in map(_PROVINCE_TOKEN.fullmatch, _TOKEN_SPLIT.split(loc)) if t), None
+    )
     says = bool(_SAYS_CANADA.search(loc)) or bool(token and _TRAILING_CA.search(loc))
     town = CA_METROS.get(_ca_city(loc))
-    spaced = _SPACED_PROVINCE.match(loc)            # "Burnaby BC", "Toronto ON M5V 2T6"
+    spaced = _SPACED_PROVINCE.match(loc)  # "Burnaby BC", "Toronto ON M5V 2T6"
     if spaced and spaced.group(1).strip().lower() in CA_METROS and not us:
         return spaced.group(2)
     # "Toronto, CA": a Canadian city with the country code the US reading takes for California.
@@ -260,7 +475,9 @@ def canada_of(loc: str) -> str | None:
         prov = _PROVINCE_NAMES[name.group(1).lower()]
         if not us or says or (town and town[2] == prov):
             return prov
-    if town and (says or code_ca or (not us and _ca_city(loc) not in _CA_AMBIGUOUS and _city_or_country(loc))):
+    if town and (
+        says or code_ca or (not us and _ca_city(loc) not in _CA_AMBIGUOUS and _city_or_country(loc))
+    ):
         return town[2]
     if says and not us:
         return ""
@@ -293,7 +510,9 @@ _FACILITY = re.compile(r"^\s*US\s*-\s*.+\(([A-Z]{2})[A-Z]{3}\)\s*$")
 # Google - in LA.json and none of them in CA.json. One of the lot was a Louisiana employer
 # (Louisiana Blue) writing its state the same way; a bare "LA" cannot tell the two apart, and Los
 # Angeles is what it means nearly every time. "Baton Rouge, LA" names a town and is untouched.
-_LOS_ANGELES = re.compile(r"^\s*LA\s*(?:,\s*(?:CA|California|USA?|United States(?: of America)?)\s*)*$")
+_LOS_ANGELES = re.compile(
+    r"^\s*LA\s*(?:,\s*(?:CA|California|USA?|United States(?: of America)?)\s*)*$"
+)
 
 
 _WASHINGTON_DC = re.compile(r"\bwashington\s*,?\s+d\.?\s?c\.?(?![A-Za-z])", re.I)
@@ -356,9 +575,9 @@ def city_of(loc: str) -> str:
 # its Location column. This turns the ones it can read into "Windsor Locks, CT" and hands back the
 # original untouched for everything else, so a string it cannot parse is never mangled. The original
 # is kept either way: region.evaluate_locations puts it in location_raw.
-_SITE_TAIL = re.compile(r"\s*[~|]\s*.*$")                     # " ~ 1 Hamilton Rd ~ BLDG 1"
+_SITE_TAIL = re.compile(r"\s*[~|]\s*.*$")  # " ~ 1 Hamilton Rd ~ BLDG 1"
 _BLDG_TAIL = re.compile(r"\s*[-–]\s*(?:[A-Z]{0,3}\d[A-Z0-9]*|BLDG\b.*|PLANT\b.*|SITE\b.*)$", re.I)
-_STREET_TAIL = re.compile(r"\s+\d{2,}\s+[A-Za-z].*$")          # "Chicago 800 W Fulton"
+_STREET_TAIL = re.compile(r"\s+\d{2,}\s+[A-Za-z].*$")  # "Chicago 800 W Fulton"
 _DASH_SLUG = re.compile(r"^\s*USA?\s*[-–]\s*([A-Z]{2})\s*[-–]\s*(.+)$")
 _SPACE_SLUG = re.compile(r"^\s*USA?\s+([A-Z]{2})\s+(.+)$")
 _READS_AS_PLACE = re.compile(r"^\s*[A-Za-z][A-Za-z .'`-]*[A-Za-z.]\s*,\s*[A-Z]{2}(?![A-Za-z])")
@@ -388,10 +607,10 @@ def pretty_location(loc: str) -> str:
     m = _DASH_SLUG.match(body) or _SPACE_SLUG.match(s) or _PAREN_USA.match(body)
     if m:
         state, city = m.group(1), m.group(2).strip()
-    elif _ZIP_SUFFIX.match(body):                       # "PA - Pittsburgh (15222)"
+    elif _ZIP_SUFFIX.match(body):  # "PA - Pittsburgh (15222)"
         state, city = _ZIP_SUFFIX.match(body).group(1, 2)
     else:
-        comma = _COUNTRY_FIRST.match(body)              # "US, Oregon, Hillsboro", "US, Dayton, OH"
+        comma = _COUNTRY_FIRST.match(body)  # "US, Oregon, Hillsboro", "US, Dayton, OH"
         if not comma:
             return loc
         a, b = comma.group(1).strip(), comma.group(2).strip()
@@ -409,115 +628,246 @@ def pretty_location(loc: str) -> str:
 # in-city flag matters; NY/NJ/PA entries decide the 50-mile NYC test.
 GAZETTEER = {
     # Massachusetts
-    "boston|MA": (42.3601, -71.0589), "cambridge|MA": (42.3736, -71.1097),
-    "somerville|MA": (42.3876, -71.0995), "brookline|MA": (42.3318, -71.1212),
-    "newton|MA": (42.3370, -71.2092), "waltham|MA": (42.3765, -71.2356),
-    "medford|MA": (42.4184, -71.1062), "quincy|MA": (42.2529, -71.0023),
-    "watertown|MA": (42.3709, -71.1828), "malden|MA": (42.4251, -71.0662),
-    "arlington|MA": (42.4154, -71.1565), "lexington|MA": (42.4473, -71.2245),
-    "burlington|MA": (42.5048, -71.1956), "woburn|MA": (42.4793, -71.1523),
-    "needham|MA": (42.2809, -71.2358), "dedham|MA": (42.2418, -71.1662),
-    "framingham|MA": (42.2793, -71.4162), "natick|MA": (42.2834, -71.3495),
-    "wellesley|MA": (42.2968, -71.2924), "chelsea|MA": (42.3917, -71.0328),
-    "revere|MA": (42.4084, -71.0120), "everett|MA": (42.4084, -71.0537),
-    "lowell|MA": (42.6334, -71.3162), "andover|MA": (42.6584, -71.1370),
-    "marlborough|MA": (42.3459, -71.5523), "billerica|MA": (42.5584, -71.2689),
-    "braintree|MA": (42.2079, -71.0040), "peabody|MA": (42.5279, -70.9287),
-    "worcester|MA": (42.2626, -71.8023), "springfield|MA": (42.1015, -72.5898),
-    "amherst|MA": (42.3732, -72.5199), "bedford|MA": (42.4906, -71.2760),
-    "maynard|MA": (42.4334, -71.4495), "chelmsford|MA": (42.5998, -71.3673),
-    "westborough|MA": (42.2695, -71.6162), "canton|MA": (42.1584, -71.1448),
-    "norwood|MA": (42.1945, -71.1990), "boxborough|MA": (42.4910, -71.5287),
-    "salem|MA": (42.5195, -70.8967), "new bedford|MA": (41.6362, -70.9342),
-    "foxborough|MA": (42.0654, -71.2478), "tewksbury|MA": (42.6106, -71.2342),
-    "wilmington|MA": (42.5465, -71.1737), "danvers|MA": (42.5750, -70.9301),
+    "boston|MA": (42.3601, -71.0589),
+    "cambridge|MA": (42.3736, -71.1097),
+    "somerville|MA": (42.3876, -71.0995),
+    "brookline|MA": (42.3318, -71.1212),
+    "newton|MA": (42.3370, -71.2092),
+    "waltham|MA": (42.3765, -71.2356),
+    "medford|MA": (42.4184, -71.1062),
+    "quincy|MA": (42.2529, -71.0023),
+    "watertown|MA": (42.3709, -71.1828),
+    "malden|MA": (42.4251, -71.0662),
+    "arlington|MA": (42.4154, -71.1565),
+    "lexington|MA": (42.4473, -71.2245),
+    "burlington|MA": (42.5048, -71.1956),
+    "woburn|MA": (42.4793, -71.1523),
+    "needham|MA": (42.2809, -71.2358),
+    "dedham|MA": (42.2418, -71.1662),
+    "framingham|MA": (42.2793, -71.4162),
+    "natick|MA": (42.2834, -71.3495),
+    "wellesley|MA": (42.2968, -71.2924),
+    "chelsea|MA": (42.3917, -71.0328),
+    "revere|MA": (42.4084, -71.0120),
+    "everett|MA": (42.4084, -71.0537),
+    "lowell|MA": (42.6334, -71.3162),
+    "andover|MA": (42.6584, -71.1370),
+    "marlborough|MA": (42.3459, -71.5523),
+    "billerica|MA": (42.5584, -71.2689),
+    "braintree|MA": (42.2079, -71.0040),
+    "peabody|MA": (42.5279, -70.9287),
+    "worcester|MA": (42.2626, -71.8023),
+    "springfield|MA": (42.1015, -72.5898),
+    "amherst|MA": (42.3732, -72.5199),
+    "bedford|MA": (42.4906, -71.2760),
+    "maynard|MA": (42.4334, -71.4495),
+    "chelmsford|MA": (42.5998, -71.3673),
+    "westborough|MA": (42.2695, -71.6162),
+    "canton|MA": (42.1584, -71.1448),
+    "norwood|MA": (42.1945, -71.1990),
+    "boxborough|MA": (42.4910, -71.5287),
+    "salem|MA": (42.5195, -70.8967),
+    "new bedford|MA": (41.6362, -70.9342),
+    "foxborough|MA": (42.0654, -71.2478),
+    "tewksbury|MA": (42.6106, -71.2342),
+    "wilmington|MA": (42.5465, -71.1737),
+    "danvers|MA": (42.5750, -70.9301),
     # Rhode Island
-    "providence|RI": (41.8240, -71.4128), "warwick|RI": (41.7001, -71.4162),
-    "newport|RI": (41.4901, -71.3128), "cranston|RI": (41.7798, -71.4373),
-    "pawtucket|RI": (41.8787, -71.3826), "kingston|RI": (41.4804, -71.5231),
+    "providence|RI": (41.8240, -71.4128),
+    "warwick|RI": (41.7001, -71.4162),
+    "newport|RI": (41.4901, -71.3128),
+    "cranston|RI": (41.7798, -71.4373),
+    "pawtucket|RI": (41.8787, -71.3826),
+    "kingston|RI": (41.4804, -71.5231),
     # Connecticut
-    "hartford|CT": (41.7658, -72.6734), "new haven|CT": (41.3083, -72.9279),
-    "stamford|CT": (41.0534, -73.5387), "greenwich|CT": (41.0262, -73.6282),
-    "norwalk|CT": (41.1177, -73.4082), "bridgeport|CT": (41.1792, -73.1894),
-    "westport|CT": (41.1415, -73.3579), "danbury|CT": (41.3948, -73.4540),
-    "groton|CT": (41.3501, -72.0787), "windsor|CT": (41.8526, -72.6437),
-    "farmington|CT": (41.7198, -72.8320), "storrs|CT": (41.8084, -72.2495),
-    "wallingford|CT": (41.4570, -72.8231), "new london|CT": (41.3557, -72.0995),
-    "east hartford|CT": (41.7823, -72.6120), "middletown|CT": (41.5623, -72.6506),
-    "wilton|CT": (41.1954, -73.4379), "darien|CT": (41.0787, -73.4693),
+    "hartford|CT": (41.7658, -72.6734),
+    "new haven|CT": (41.3083, -72.9279),
+    "stamford|CT": (41.0534, -73.5387),
+    "greenwich|CT": (41.0262, -73.6282),
+    "norwalk|CT": (41.1177, -73.4082),
+    "bridgeport|CT": (41.1792, -73.1894),
+    "westport|CT": (41.1415, -73.3579),
+    "danbury|CT": (41.3948, -73.4540),
+    "groton|CT": (41.3501, -72.0787),
+    "windsor|CT": (41.8526, -72.6437),
+    "farmington|CT": (41.7198, -72.8320),
+    "storrs|CT": (41.8084, -72.2495),
+    "wallingford|CT": (41.4570, -72.8231),
+    "new london|CT": (41.3557, -72.0995),
+    "east hartford|CT": (41.7823, -72.6120),
+    "middletown|CT": (41.5623, -72.6506),
+    "wilton|CT": (41.1954, -73.4379),
+    "darien|CT": (41.0787, -73.4693),
     # New Hampshire
-    "manchester|NH": (42.9956, -71.4548), "nashua|NH": (42.7654, -71.4676),
-    "portsmouth|NH": (43.0718, -70.7626), "concord|NH": (43.2081, -71.5376),
-    "hanover|NH": (43.7022, -72.2896), "lebanon|NH": (43.6423, -72.2518),
-    "salem|NH": (42.7884, -71.2009), "bedford|NH": (42.9465, -71.5159),
+    "manchester|NH": (42.9956, -71.4548),
+    "nashua|NH": (42.7654, -71.4676),
+    "portsmouth|NH": (43.0718, -70.7626),
+    "concord|NH": (43.2081, -71.5376),
+    "hanover|NH": (43.7022, -72.2896),
+    "lebanon|NH": (43.6423, -72.2518),
+    "salem|NH": (42.7884, -71.2009),
+    "bedford|NH": (42.9465, -71.5159),
     "durham|NH": (43.1340, -70.9264),
     # Maine
-    "portland|ME": (43.6591, -70.2568), "bangor|ME": (44.8016, -68.7712),
-    "augusta|ME": (44.3106, -69.7795), "south portland|ME": (43.6415, -70.2409),
-    "westbrook|ME": (43.6770, -70.3712), "brunswick|ME": (43.9145, -69.9653),
-    "orono|ME": (44.8831, -68.6719), "bath|ME": (43.9109, -69.8206),
+    "portland|ME": (43.6591, -70.2568),
+    "bangor|ME": (44.8016, -68.7712),
+    "augusta|ME": (44.3106, -69.7795),
+    "south portland|ME": (43.6415, -70.2409),
+    "westbrook|ME": (43.6770, -70.3712),
+    "brunswick|ME": (43.9145, -69.9653),
+    "orono|ME": (44.8831, -68.6719),
+    "bath|ME": (43.9109, -69.8206),
     # Vermont
-    "burlington|VT": (44.4759, -73.2121), "montpelier|VT": (44.2601, -72.5754),
-    "south burlington|VT": (44.4669, -73.1709), "williston|VT": (44.4376, -73.0682),
-    "rutland|VT": (43.6106, -72.9726), "brattleboro|VT": (42.8509, -72.5579),
+    "burlington|VT": (44.4759, -73.2121),
+    "montpelier|VT": (44.2601, -72.5754),
+    "south burlington|VT": (44.4669, -73.1709),
+    "williston|VT": (44.4376, -73.0682),
+    "rutland|VT": (43.6106, -72.9726),
+    "brattleboro|VT": (42.8509, -72.5579),
     # New York (NYC metro + upstate, so upstate is a known "no")
-    "new york|NY": (40.7128, -74.0060), "new york city|NY": (40.7128, -74.0060),
-    "nyc|NY": (40.7128, -74.0060), "manhattan|NY": (40.7831, -73.9712),
-    "brooklyn|NY": (40.6782, -73.9442), "queens|NY": (40.7282, -73.7949),
-    "bronx|NY": (40.8448, -73.8648), "the bronx|NY": (40.8448, -73.8648),
-    "staten island|NY": (40.5795, -74.1502), "long island city|NY": (40.7447, -73.9485),
-    "white plains|NY": (41.0340, -73.7629), "yonkers|NY": (40.9312, -73.8988),
-    "new rochelle|NY": (40.9115, -73.7824), "tarrytown|NY": (41.0762, -73.8587),
-    "purchase|NY": (41.0409, -73.7146), "armonk|NY": (41.1265, -73.7140),
-    "rye|NY": (40.9807, -73.6837), "harrison|NY": (40.9690, -73.7126),
-    "sleepy hollow|NY": (41.0857, -73.8585), "valhalla|NY": (41.0748, -73.7757),
-    "mount kisco|NY": (41.2043, -73.7271), "garden city|NY": (40.7268, -73.6343),
-    "mineola|NY": (40.7493, -73.6407), "hempstead|NY": (40.7062, -73.6187),
-    "uniondale|NY": (40.7004, -73.5929), "melville|NY": (40.7934, -73.4151),
-    "hauppauge|NY": (40.8257, -73.2026), "great neck|NY": (40.8007, -73.7285),
-    "jericho|NY": (40.7920, -73.5399), "bethpage|NY": (40.7443, -73.4821),
-    "stony brook|NY": (40.9257, -73.1409), "ossining|NY": (41.1629, -73.8615),
-    "yorktown heights|NY": (41.2709, -73.7776), "pearl river|NY": (41.0590, -74.0218),
-    "suffern|NY": (41.1148, -74.1496), "poughkeepsie|NY": (41.7004, -73.9210),
-    "albany|NY": (42.6526, -73.7562), "rochester|NY": (43.1566, -77.6088),
-    "buffalo|NY": (42.8864, -78.8784), "syracuse|NY": (43.0481, -76.1474),
-    "ithaca|NY": (42.4440, -76.5019), "binghamton|NY": (42.0987, -75.9180),
-    "troy|NY": (42.7284, -73.6918), "schenectady|NY": (42.8142, -73.9396),
+    "new york|NY": (40.7128, -74.0060),
+    "new york city|NY": (40.7128, -74.0060),
+    "nyc|NY": (40.7128, -74.0060),
+    "manhattan|NY": (40.7831, -73.9712),
+    "brooklyn|NY": (40.6782, -73.9442),
+    "queens|NY": (40.7282, -73.7949),
+    "bronx|NY": (40.8448, -73.8648),
+    "the bronx|NY": (40.8448, -73.8648),
+    "staten island|NY": (40.5795, -74.1502),
+    "long island city|NY": (40.7447, -73.9485),
+    "white plains|NY": (41.0340, -73.7629),
+    "yonkers|NY": (40.9312, -73.8988),
+    "new rochelle|NY": (40.9115, -73.7824),
+    "tarrytown|NY": (41.0762, -73.8587),
+    "purchase|NY": (41.0409, -73.7146),
+    "armonk|NY": (41.1265, -73.7140),
+    "rye|NY": (40.9807, -73.6837),
+    "harrison|NY": (40.9690, -73.7126),
+    "sleepy hollow|NY": (41.0857, -73.8585),
+    "valhalla|NY": (41.0748, -73.7757),
+    "mount kisco|NY": (41.2043, -73.7271),
+    "garden city|NY": (40.7268, -73.6343),
+    "mineola|NY": (40.7493, -73.6407),
+    "hempstead|NY": (40.7062, -73.6187),
+    "uniondale|NY": (40.7004, -73.5929),
+    "melville|NY": (40.7934, -73.4151),
+    "hauppauge|NY": (40.8257, -73.2026),
+    "great neck|NY": (40.8007, -73.7285),
+    "jericho|NY": (40.7920, -73.5399),
+    "bethpage|NY": (40.7443, -73.4821),
+    "stony brook|NY": (40.9257, -73.1409),
+    "ossining|NY": (41.1629, -73.8615),
+    "yorktown heights|NY": (41.2709, -73.7776),
+    "pearl river|NY": (41.0590, -74.0218),
+    "suffern|NY": (41.1148, -74.1496),
+    "poughkeepsie|NY": (41.7004, -73.9210),
+    "albany|NY": (42.6526, -73.7562),
+    "rochester|NY": (43.1566, -77.6088),
+    "buffalo|NY": (42.8864, -78.8784),
+    "syracuse|NY": (43.0481, -76.1474),
+    "ithaca|NY": (42.4440, -76.5019),
+    "binghamton|NY": (42.0987, -75.9180),
+    "troy|NY": (42.7284, -73.6918),
+    "schenectady|NY": (42.8142, -73.9396),
     # New Jersey
-    "jersey city|NJ": (40.7178, -74.0431), "hoboken|NJ": (40.7439, -74.0324),
-    "newark|NJ": (40.7357, -74.1724), "weehawken|NJ": (40.7695, -74.0204),
-    "secaucus|NJ": (40.7895, -74.0565), "fort lee|NJ": (40.8509, -73.9701),
-    "hackensack|NJ": (40.8859, -74.0435), "paramus|NJ": (40.9445, -74.0754),
-    "morristown|NJ": (40.7968, -74.4815), "parsippany|NJ": (40.8579, -74.4260),
-    "edison|NJ": (40.5187, -74.4121), "new brunswick|NJ": (40.4862, -74.4518),
-    "piscataway|NJ": (40.5549, -74.4643), "princeton|NJ": (40.3573, -74.6672),
-    "basking ridge|NJ": (40.7062, -74.5493), "bridgewater|NJ": (40.6004, -74.6482),
-    "berkeley heights|NJ": (40.6834, -74.4271), "summit|NJ": (40.7157, -74.3646),
-    "florham park|NJ": (40.7879, -74.3882), "short hills|NJ": (40.7479, -74.3254),
-    "holmdel|NJ": (40.3451, -74.1840), "red bank|NJ": (40.3471, -74.0643),
-    "iselin|NJ": (40.5754, -74.3224), "woodbridge|NJ": (40.5576, -74.2846),
-    "rahway|NJ": (40.6082, -74.2776), "elizabeth|NJ": (40.6640, -74.2107),
-    "montvale|NJ": (41.0468, -74.0229), "mahwah|NJ": (41.0887, -74.1438),
-    "whippany|NJ": (40.8243, -74.4174), "east hanover|NJ": (40.8201, -74.3646),
-    "madison|NJ": (40.7598, -74.4171), "murray hill|NJ": (40.6948, -74.4007),
-    "plainsboro|NJ": (40.3337, -74.6002), "cranbury|NJ": (40.3162, -74.5138),
-    "lawrenceville|NJ": (40.2973, -74.7296), "trenton|NJ": (40.2206, -74.7597),
-    "camden|NJ": (39.9259, -75.1196), "cherry hill|NJ": (39.9348, -75.0307),
+    "jersey city|NJ": (40.7178, -74.0431),
+    "hoboken|NJ": (40.7439, -74.0324),
+    "newark|NJ": (40.7357, -74.1724),
+    "weehawken|NJ": (40.7695, -74.0204),
+    "secaucus|NJ": (40.7895, -74.0565),
+    "fort lee|NJ": (40.8509, -73.9701),
+    "hackensack|NJ": (40.8859, -74.0435),
+    "paramus|NJ": (40.9445, -74.0754),
+    "morristown|NJ": (40.7968, -74.4815),
+    "parsippany|NJ": (40.8579, -74.4260),
+    "edison|NJ": (40.5187, -74.4121),
+    "new brunswick|NJ": (40.4862, -74.4518),
+    "piscataway|NJ": (40.5549, -74.4643),
+    "princeton|NJ": (40.3573, -74.6672),
+    "basking ridge|NJ": (40.7062, -74.5493),
+    "bridgewater|NJ": (40.6004, -74.6482),
+    "berkeley heights|NJ": (40.6834, -74.4271),
+    "summit|NJ": (40.7157, -74.3646),
+    "florham park|NJ": (40.7879, -74.3882),
+    "short hills|NJ": (40.7479, -74.3254),
+    "holmdel|NJ": (40.3451, -74.1840),
+    "red bank|NJ": (40.3471, -74.0643),
+    "iselin|NJ": (40.5754, -74.3224),
+    "woodbridge|NJ": (40.5576, -74.2846),
+    "rahway|NJ": (40.6082, -74.2776),
+    "elizabeth|NJ": (40.6640, -74.2107),
+    "montvale|NJ": (41.0468, -74.0229),
+    "mahwah|NJ": (41.0887, -74.1438),
+    "whippany|NJ": (40.8243, -74.4174),
+    "east hanover|NJ": (40.8201, -74.3646),
+    "madison|NJ": (40.7598, -74.4171),
+    "murray hill|NJ": (40.6948, -74.4007),
+    "plainsboro|NJ": (40.3337, -74.6002),
+    "cranbury|NJ": (40.3162, -74.5138),
+    "lawrenceville|NJ": (40.2973, -74.7296),
+    "trenton|NJ": (40.2206, -74.7597),
+    "camden|NJ": (39.9259, -75.1196),
+    "cherry hill|NJ": (39.9348, -75.0307),
     "mount laurel|NJ": (39.9340, -74.8910),
     # Pennsylvania
-    "philadelphia|PA": (39.9526, -75.1652), "pittsburgh|PA": (40.4406, -79.9959),
-    "king of prussia|PA": (40.0893, -75.3963), "allentown|PA": (40.6084, -75.4902),
-    "malvern|PA": (40.0362, -75.5138), "conshohocken|PA": (40.0793, -75.3016),
+    "philadelphia|PA": (39.9526, -75.1652),
+    "pittsburgh|PA": (40.4406, -79.9959),
+    "king of prussia|PA": (40.0893, -75.3963),
+    "allentown|PA": (40.6084, -75.4902),
+    "malvern|PA": (40.0362, -75.5138),
+    "conshohocken|PA": (40.0793, -75.3016),
 }
 
 # Bare city names ("Stamford", "NYC") are only trusted when the name is unambiguous.
-_AMBIGUOUS = {"portland", "burlington", "manchester", "cambridge", "salem", "springfield",
-              "bedford", "windsor", "durham", "madison", "arlington", "concord", "lebanon",
-              "bath", "harrison", "rye", "summit", "kingston", "newport", "plymouth", "canton",
-              "elizabeth", "troy", "rochester", "princeton", "jericho", "melville", "newark",
-              "hanover", "wilmington", "farmington", "middletown", "newton", "quincy",
-              "lexington", "brunswick", "augusta", "camden", "everett", "danvers", "norwalk",
-              "hempstead", "edison", "warwick", "cranston", "westport", "greenwich"}
+_AMBIGUOUS = {
+    "portland",
+    "burlington",
+    "manchester",
+    "cambridge",
+    "salem",
+    "springfield",
+    "bedford",
+    "windsor",
+    "durham",
+    "madison",
+    "arlington",
+    "concord",
+    "lebanon",
+    "bath",
+    "harrison",
+    "rye",
+    "summit",
+    "kingston",
+    "newport",
+    "plymouth",
+    "canton",
+    "elizabeth",
+    "troy",
+    "rochester",
+    "princeton",
+    "jericho",
+    "melville",
+    "newark",
+    "hanover",
+    "wilmington",
+    "farmington",
+    "middletown",
+    "newton",
+    "quincy",
+    "lexington",
+    "brunswick",
+    "augusta",
+    "camden",
+    "everett",
+    "danvers",
+    "norwalk",
+    "hempstead",
+    "edison",
+    "warwick",
+    "cranston",
+    "westport",
+    "greenwich",
+}
 _CITY_ONLY: dict[str, tuple[float, float, str]] = {}
 for _k, _v in GAZETTEER.items():
     _c, _s = _k.split("|")
@@ -606,10 +956,12 @@ def _nominatim(city: str, st: str):
         try:
             import httpx
             from .config import USER_AGENT
+
             r = httpx.get(
                 "https://nominatim.openstreetmap.org/search",
                 params={"city": city, "state": st, "country": "us", "format": "json", "limit": 1},
-                headers={"User-Agent": USER_AGENT}, timeout=20.0,
+                headers={"User-Agent": USER_AGENT},
+                timeout=20.0,
             )
             data = r.json()
             if data:

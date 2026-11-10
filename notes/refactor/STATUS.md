@@ -15,8 +15,8 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
 - Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration merged in PR #183 with green Pages run 42871996393. Existing PR integration and subsequent mechanical formatting are now authorized without the earlier time/queue gate; later waves still follow the ordered plan. All six baseline suites passed.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
-- [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) is now explicitly authorized for integration and lead merge. Its agent owns directory monitoring, growth documentation, and `growth/every_major_list.py` until integration finishes. Recheck open PRs and coordinate overlapping files before every wave; the authorization does not permit discarding others' work.
-- Product-session coordination: read `notes/product/HANDOFF.md` section 3 from [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170). Refactor has structural right of way; avoid hot files claimed by open `product: ...` draft PRs. The notice above announces the upcoming WP-0.3 window with several hours to clear product PRs; formatting has not started.
+- All four retained PRs (#165, #175, #177 and #178) are merged under Bruce's explicit authorization, with independent reviews, green CI, and green Pages. PR #165 Pages run 42886670663 passed. Recheck open PRs and coordinate overlapping files before every wave; the authorization does not permit discarding others' work.
+- Authorized mechanical formatting is in progress: Python [PR #190](https://github.com/bpmcginley/InternshipFinder/pull/190) merged as `f38bd93e`; its Pages check is pending. JavaScript [PR #189](https://github.com/bpmcginley/InternshipFinder/pull/189) remains in final integration review and CI. Product-session coordination follows `notes/product/HANDOFF.md` section 3: preserve claimed hot files, protected guard code/tests, and deployment restrictions. The historical notice records the earlier, superseded timing/queue hold.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
 
 ## Execution rules
@@ -55,7 +55,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | Merged | Independent review, green CI, and green Pages run 42867413022. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review, green CI, and green Pages run 42864974798. |
 | 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
-| 2 | WP-0.3 Python formatting | Unassigned | - | - | Authorized; not started | Time/queue gate lifted by Bruce; coordinate ownership, mechanical-only PR and blame-ignore entry. |
+| 2 | WP-0.3 Python formatting | Lead | `refactor/wp-0.3-python-format` | [#190](https://github.com/bpmcginley/InternshipFinder/pull/190) | Merged | `f38bd93e`; independent review and all CI green; Pages pending. Exact AST/literal equivalence; both formatting SHAs preserved in blame-ignore. |
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Independent review / CI pending | User lifted timing/empty-queue gates. 78 files mechanically formatted; AST/literal equality, all JS suites, runtime, packaging, lint, and unchanged 695-file golden build verified. Scoped deferrals below. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
@@ -241,7 +241,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Waiting for deploy
 
-None. No worker/database deployment or extension release was performed.
+- [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175), merged as `f4504cb1`: counter allowlist expansion remains undeployed. Approved and published disclosure plus explicit operator deployment are still required. No worker/database deployment or extension release was performed.
 
 ## Merge and publication ledger
 
@@ -255,10 +255,16 @@ None. No worker/database deployment or extension release was performed.
 | [#179 Golden build](https://github.com/bpmcginley/InternshipFinder/pull/179) | `2489edca` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42866406265) | Merged; fixed offline build and 687 output hashes. |
 | [#174 Coverage reports](https://github.com/bpmcginley/InternshipFinder/pull/174) | `10f28db5` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42867413022) | Merged; report-only coverage with source-free artifacts. |
 | [#183 Lint configuration](https://github.com/bpmcginley/InternshipFinder/pull/183) | `3923879c` | Independent agent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42871996393) | Merged; no formatting or runtime edits; 691 golden files unchanged. |
+| [#177 Follow design](https://github.com/bpmcginley/InternshipFinder/pull/177) | `aef83ea3` | Independent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42884666843) | Merged; design notes only, implementation choices remain gated. |
+| [#178 Top-up design](https://github.com/bpmcginley/InternshipFinder/pull/178) | `4445cbb5` | Independent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42884967351) | Merged; design notes only, payment implementation remains gated. |
+| [#186 Product status](https://github.com/bpmcginley/InternshipFinder/pull/186) | `ad3fca40` | Green CI | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42885443353) | Merged; product coordination ledger preserved. |
+| [#175 Counter integration](https://github.com/bpmcginley/InternshipFinder/pull/175) | `f4504cb1` | Independent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42886167129) | Merged; disclosure and operator deployment remain pending. |
+| [#165 Directory monitoring](https://github.com/bpmcginley/InternshipFinder/pull/165) | `824b8a42` | Independent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42886670663) | Merged under explicit retained-PR authorization. |
+| [#190 Python formatting](https://github.com/bpmcginley/InternshipFinder/pull/190) | `f38bd93e` | Independent review; all CI green | Pending | Merged; AST/literal values and all 695 golden files preserved. |
 
 ## Next update
 
-Finish the explicitly authorized existing PR integrations, then the separate Python and JavaScript mechanical-formatting PRs without waiting for the superseded time/queue gates. Fetch and reread both hand-offs/status files; preserve separate ownership, independent reviews, all-green CI, Pages verification after each merge, and the ordered later waves. Do not discard unrelated work.
+Verify Python formatting PR #190 Pages, then finish JavaScript formatting PR #189 after final integration review and green CI. All four retained PR integrations are complete. Fetch and reread both hand-offs/status files before the ordered later waves; preserve separate ownership, independent reviews, Pages verification after each merge, and others' work.
 
 ## WP-0.6 validation and coordination
 
@@ -269,7 +275,7 @@ Finish the explicitly authorized existing PR integrations, then the separate Pyt
 - Relevant workflow-contract tests: 39 passed. The first test invocation from the repository root failed collection because the package is not installed yet; rerunning from the documented backend directory passed. This was invocation context, not a main failure or code change.
 - No runtime source, public output, or dependency versions used by product code changed. Golden validation will be run if WP-0.2 lands before this PR.
 
-## Wave-2 checkpoint
+## Historical wave-2 checkpoint (before authorization override)
 
 - Completed: initial hand-off and tracker, all wave-0/1 packages, and the configuration-only part of WP-0.3. The full refactor is not complete. No mechanical formatting or later-wave implementation has begun.
 - The initial six-suite baseline and every marked verification item are recorded above, including corrections to the hand-off. New tests, lint, types, coverage, and golden jobs now run in CI. Existing type debt remains report-only; coverage has no thresholds.
@@ -295,6 +301,16 @@ Finish the explicitly authorized existing PR integrations, then the separate Pyt
 
 Bruce authorized the refactor lead to finish and merge this existing counter PR. Integration uses an isolated worktree and normal main merge, preserving upstream product work. Local Node 22.23.4 validation: worker 336 passed, Workers runtime 11 passed in five files; golden output matched 695 files without refresh. Final independent review and CI remain required. The only runtime change is the original fixed 16-name allowlist expansion; no client emitters, schema, published privacy policy, or deploy configuration changed. Proposed disclosure still requires approval and publication before an operator deploys the worker. No worker deployment or production database command was performed.
 
+
+## WP-0.3 Python formatting validation
+
+- Formatted 166 tracked Python files across backend, growth and scripts with pinned Ruff 0.17.4. Four docstring values that Ruff would normalize were preserved verbatim; all Python ASTs, including string values, match the corresponding pre-format tree. No generated output, golden manifest/archive, public text, or service configuration changes.
+- Two pure-format commits are recorded by full SHA in `.git-blame-ignore-revs`; metadata follows them. Current main was integrated normally, including the newly merged directory checker and its test. No history rewrite.
+- Backend: 1,480 passed, two known optional-dependency skips. Golden: two tests passed, all 695 files unchanged. Packaging: two passed. Ruff correctness checks passed. Integrated directory/generator/golden tests and Linux CI run before merge.
+- Retained PRs now merged under Bruce's explicit authorization: #177 `aef83ea3` (Pages 42884666843 green), #178 `4445cbb5` (Pages 42884967351 green), #175 `f4504cb1` (Pages 42886167129 green), #165 `824b8a42` (Pages 42886670663 green). Each had independent review and all nine checks green. Product tracker #186 merged as `ad3fca40`, Pages 42885443353 green.
+- Worker counter code is merged but awaits approved/published disclosure and operator deployment. Design-note merges do not enable email/payment implementation or resolve the notes' remaining choices. Product/Growth Refactor was notified directly and resumed coordinated work.
+- Python formatting PR #190 merged as `f38bd93e` after independent review and all CI passed; Pages is pending. Its two pure-format SHAs remain in `.git-blame-ignore-revs` alongside the JavaScript SHA after the normal integration merge.
+
 ### WP-0.3 JavaScript mechanical formatting (2026-11-10)
 
 - Current authorization: Bruce lifted the formatting timing and empty-queue gates; the historical waiting statements above no longer block this package. Product-owned files remain excluded. Implementation is isolated in `InternScout-refactor-js-format`, based on main `0fe4eca3`.
@@ -308,3 +324,4 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Worker deployment remains operator-owned. If merged, record this formatting-only PR in the waiting-for-deploy ledger; no deployment is required to change behavior, and none was performed.
 - Integration: main `ad3fca40` was merged normally before opening PR #189; its delta contains only the approved product design and status notes. No source or golden baseline changed during integration. Independent review and final CI remain pending.
 - Final integration: main `824b8a42` (retained PRs #165 and #175) was merged normally. Only STATUS required conflict resolution; upstream authorization, both retained-PR evidence sections, and the product ledger were preserved. `visits.js` and its tests remain exactly upstream, and all 78 formatted files plus the pure-format SHA are unchanged. Node 22 worker rerun: **336 passed**; golden rerun: **695 files matched**, no refresh. Independent delta review and final CI are pending.
+- Python integration: normally merged main `f38bd93e` after PR #190. Conflicts were limited to STATUS and the blame-ignore file; all three full formatting SHAs and both languages' evidence are retained. The 78 JavaScript files remain identical to the independently approved formatting head, and product ledger/visits files remain exactly upstream. No JavaScript suite was repeated for this metadata/Python-only integration; final CI and independent delta review remain required.

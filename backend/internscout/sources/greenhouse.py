@@ -1,5 +1,6 @@
 """Greenhouse public boards API. The list call is light; content is fetched only for
 internship postings that might be in region."""
+
 from __future__ import annotations
 from .base import client
 from .common import board_item, counts_of, html_to_text, reported_count, stamp_board_newest
@@ -20,15 +21,27 @@ def parse_greenhouse(payload: dict, co: dict) -> list[dict]:
         if not is_internship(title):
             counts.discard("not_student")
             continue
-        it = board_item(co, source="greenhouse", title=title, locations=[loc],
-                        url=j.get("absolute_url"),
-                        posted_at=j.get("first_published") or j.get("updated_at"),
-                        description=html_to_text(j.get("content")))
+        it = board_item(
+            co,
+            source="greenhouse",
+            title=title,
+            locations=[loc],
+            url=j.get("absolute_url"),
+            posted_at=j.get("first_published") or j.get("updated_at"),
+            description=html_to_text(j.get("content")),
+        )
         it["_gh_id"] = j.get("id")
         out.append(it)
     place_bare_cities(out, board_state(board))
     # Every job's dates, not only the internships': is anyone still adding to this board?
-    stamp_board_newest(out, [d for j in payload.get("jobs", []) for d in (j.get("first_published"), j.get("updated_at"))])
+    stamp_board_newest(
+        out,
+        [
+            d
+            for j in payload.get("jobs", [])
+            for d in (j.get("first_published"), j.get("updated_at"))
+        ],
+    )
     return out
 
 
@@ -37,8 +50,11 @@ def fetch_greenhouse_board(c, co: dict) -> list[dict]:
     resp = c.get(LIST_URL.format(token=token))
     resp.raise_for_status()
     payload = resp.json()
-    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list) or not all(
-            isinstance(job, dict) for job in payload["jobs"]):
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("jobs"), list)
+        or not all(isinstance(job, dict) for job in payload["jobs"])
+    ):
         raise ValueError("Greenhouse response is missing its complete jobs list")
     counts = counts_of(co)
     counts.rows(len(payload["jobs"]))

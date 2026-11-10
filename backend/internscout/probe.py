@@ -18,6 +18,7 @@ tenant half follows the squashed-name rule and the site half does not have to be
 because the tenant's own robots.txt names its sites. See _workday. SmartRecruiters has left the
 list from the other end - its API host tells us not to read it, so we no longer ask it anything.
 """
+
 from __future__ import annotations
 import json
 import os
@@ -41,7 +42,9 @@ PROBES_CHANGED = "2026-09-18"
 MAX_PER_RUN = 150
 PROBE_TIMEOUT = 6.0
 PROBE_WORKERS = 24
-_SUFFIX = re.compile(r"\b(inc|llc|ltd|l\.?p|corp|corporation|co|company|group|holdings|technologies|the)\b\.?", re.I)
+_SUFFIX = re.compile(
+    r"\b(inc|llc|ltd|l\.?p|corp|corporation|co|company|group|holdings|technologies|the)\b\.?", re.I
+)
 
 
 def norm(s: str | None) -> str:
@@ -68,8 +71,14 @@ def _greenhouse(c, slug, name):
 
 # Empty Workable accounts named after big employers exist (Mayo Clinic, HCA), so the board must have jobs.
 def _workable(c, slug, name):
-    r = c.get(f"https://apply.workable.com/api/v1/widget/accounts/{slug}", params={"details": "true"})
-    return r.status_code == 200 and _same_name(r.json().get("name"), name) and len(r.json().get("jobs") or []) > 0
+    r = c.get(
+        f"https://apply.workable.com/api/v1/widget/accounts/{slug}", params={"details": "true"}
+    )
+    return (
+        r.status_code == 200
+        and _same_name(r.json().get("name"), name)
+        and len(r.json().get("jobs") or []) > 0
+    )
 
 
 # Lever and Ashby have no board-name endpoint, so only the exact squashed name counts, and the board must have jobs.
@@ -108,8 +117,10 @@ _SITEMAP = re.compile(r"^\s*Sitemap:\s*https://[^/\s]+/([^/\s]+)/siteMap\.xml", 
 def wd_sites(body: str) -> list[str]:
     """The sites a tenant publishes, in the order its robots.txt lists them, minus the closed ones."""
     rules = robots_rules(body)
-    named = dict.fromkeys(_SITEMAP.findall(body)
-                          + [v.strip("/") for f, v in rules if f == "allow" and v.count("/") == 2])
+    named = dict.fromkeys(
+        _SITEMAP.findall(body)
+        + [v.strip("/") for f, v in rules if f == "allow" and v.count("/") == 2]
+    )
     return [s for s in named if s and not robots_blocks(rules, f"/{s}/")]
 
 
@@ -122,10 +133,13 @@ def _workday(c, slug, name):
         if r.status_code != 200 or "<html" in r.text[:400].lower():
             continue
         for site in wd_sites(r.text)[:MAX_WD_SITES]:
-            j = c.post(f"{host}/wday/cxs/{slug}/{site}/jobs", headers=WD_HEADERS,
-                       json={"appliedFacets": {}, "limit": 1, "offset": 0, "searchText": "intern"})
+            j = c.post(
+                f"{host}/wday/cxs/{slug}/{site}/jobs",
+                headers=WD_HEADERS,
+                json={"appliedFacets": {}, "limit": 1, "offset": 0, "searchText": "intern"},
+            )
             if j.status_code == 200 and (j.json().get("jobPostings") or []):
-                return f"{slug}|{pod}|{site}"   # a board with nothing on it proves nothing
+                return f"{slug}|{pod}|{site}"  # a board with nothing on it proves nothing
     return False
 
 
@@ -143,8 +157,14 @@ def _jazzhr(c, slug, name):
 
 # JazzHR goes last: it is the only probe paying for a whole HTML page rather than a small JSON
 # existence check, so it is only reached when nothing cheaper matched.
-PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("workable", _workable),
-          ("workday", _workday), ("jazzhr", _jazzhr)]
+PROBES = [
+    ("greenhouse", _greenhouse),
+    ("ashby", _ashby),
+    ("lever", _lever),
+    ("workable", _workable),
+    ("workday", _workday),
+    ("jazzhr", _jazzhr),
+]
 
 
 # A Greenhouse board embedded in the employer's own careers page leaves no token in the apply URL:
@@ -156,18 +176,24 @@ PROBES = [("greenhouse", _greenhouse), ("ashby", _ashby), ("lever", _lever), ("w
 # under the token. Checked live 2026-09-18 on the 13 such hosts in the data: 10 resolved, among them
 # quantbot-technologies and optiverus, whose tokens no naming rule would have guessed.
 GH_JID = re.compile(r"[?&]gh_jid=(\d+)")
-GH_TOKEN = re.compile(r"(?:embed/job_board[^\"'<>]*?[?&]for=|job-boards\.greenhouse\.io/"
-                      r"|boards\.greenhouse\.io/(?!embed)|boards-api\.greenhouse\.io/v1/boards/)"
-                      r"([A-Za-z0-9_-]+)", re.I)
+GH_TOKEN = re.compile(
+    r"(?:embed/job_board[^\"'<>]*?[?&]for=|job-boards\.greenhouse\.io/"
+    r"|boards\.greenhouse\.io/(?!embed)|boards-api\.greenhouse\.io/v1/boards/)"
+    r"([A-Za-z0-9_-]+)",
+    re.I,
+)
 # What the embed URL itself is made of, never a board.
 GH_NOT_TOKENS = {"embed", "job_board", "js", "jobs"}
-GH_PAGE_TIMEOUT = 15.0   # a whole careers page, not one of the small existence checks
+GH_PAGE_TIMEOUT = 15.0  # a whole careers page, not one of the small existence checks
 MAX_GH_HOSTS = 12
 
 
 def _serves_job(c, token: str, jid: str) -> bool:
     try:
-        return c.get(f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{jid}").status_code == 200
+        return (
+            c.get(f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{jid}").status_code
+            == 200
+        )
     except Exception:
         return False
 
@@ -193,7 +219,9 @@ def gh_host_token(c, url: str, jid: str, name: str = "") -> str | None:
     return None
 
 
-def gh_hosts(reg: dict, items: list[dict], cache: dict, today: date) -> list[tuple[str, str, str, str]]:
+def gh_hosts(
+    reg: dict, items: list[dict], cache: dict, today: date
+) -> list[tuple[str, str, str, str]]:
     """(host, url, job id, employer) for each branded host whose board is still unknown."""
     known = {norm(e.get("name")) for e in reg.get("greenhouse", {}).values()}
     cutoff = (today - timedelta(days=TTL_DAYS)).isoformat()
@@ -270,15 +298,24 @@ def _probe_one(c, name: str) -> tuple[str, str] | None:
     return None
 
 
-def probe_boards(reg: dict, items: list[dict], _client=None, max_names: int = MAX_PER_RUN,
-                 workers: int = PROBE_WORKERS) -> int:
+def probe_boards(
+    reg: dict,
+    items: list[dict],
+    _client=None,
+    max_names: int = MAX_PER_RUN,
+    workers: int = PROBE_WORKERS,
+) -> int:
     """`_client` is accepted for backward compatibility but ignored — probing always uses its own
     short-timeout client (see module docstring) rather than the caller's ingest-wide one."""
     cache, today = load_cache(), date.today()
     names = candidates(reg, items, cache, today)[:max_names]
     found = 0
-    with httpx.Client(timeout=PROBE_TIMEOUT, headers={"User-Agent": USER_AGENT}, follow_redirects=True) as c, \
-         ThreadPoolExecutor(max_workers=workers) as ex:
+    with (
+        httpx.Client(
+            timeout=PROBE_TIMEOUT, headers={"User-Agent": USER_AGENT}, follow_redirects=True
+        ) as c,
+        ThreadPoolExecutor(max_workers=workers) as ex,
+    ):
         for name, hit in zip(names, ex.map(lambda n: _probe_one(c, n), names)):
             cache[norm(name)] = today.isoformat()
             if hit:
