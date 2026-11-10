@@ -2724,11 +2724,12 @@ def employer_offer(name: str) -> str:
     """
     key = quote(employer_key(name), safe="")
     return (
-        f'<section class="prose employer-offer"><h2>Hiring for {esc(name)}?</h2>'
+        f'<section class="prose employer-offer"><h2><a href="/employers/buy/?company={key}" '
+        f'data-employer-entry="employer">Work at {esc(name)}? See how students find your roles, '
+        'and feature them.</a></h2>'
         '<p>Promote an eligible open role in a clearly labeled paid listing. '
         'One role costs $29 for 30 days. Payment never changes organic search rankings.</p>'
-        f'<p><a href="/employers/buy/?company={key}" data-employer-entry="employer">Choose a role</a>'
-        ' or <a href="/employers/">see how paid listings work</a>. '
+        '<p><a href="/employers/">See how paid listings work</a>. '
         '<a href="/employers/#free-help">Board additions and corrections are free</a>.</p></section>'
     )
 
