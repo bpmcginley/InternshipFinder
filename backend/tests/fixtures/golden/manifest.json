@@ -686,8 +686,12 @@
   "pricing/index.html": "a7e772306f2141b7ea6314bf005ff1dfa0f0aeec2597f2cc2e691cc463914930",
   "privacy.html": "464789b4cdbd29f7954cc9d6a25bbc941de0fecdc58fa55833ae9e6abad490ae",
   "robots.txt": "68be2d406c31680b8ee077b2adce90b441a5b4b40fb5738be9c855d6d4dcb791",
+  "share-feeds.html": "ede8e18f5268f124994775aff7bcf56822dc5fd023a28728a8934c4136be1bf8",
   "sitemap.xml": "8e6a330c88d24cc3e442515e6a545179e8ce600b2a9bee022e0bb1df5fa7f419",
   "terms.html": "0e33fe9a74aeccdc57c11fc2cac6d83a068dfe7f55e4a704cef7b8f29b0c6da1",
-  "widget/README.md": "f378e9475545d6a588f7c7f4b27c4a5261eeb29b08d4e59b38026eb731822321",
-  "widget/index.html": "7c3dc5737b7a8a284e09e9624e9736283c456d4be327993d9faae7dd034732c8"
+  "widget/README.md": "a55638ea020dfa223fb67207d11a8607385bcead980a877b4a9d2b446a963ab9",
+  "widget/builder.html": "26594acf0c47917ad8c0b672d69428a83ce57b8d7addfb120d95721af3df2ea8",
+  "widget/builder.js": "a6019ada6df4d2a68089018f8e49df247011c21370e7ea5fc67f96156a3c00b4",
+  "widget/index.html": "7c3dc5737b7a8a284e09e9624e9736283c456d4be327993d9faae7dd034732c8",
+  "widget/share.css": "f67771e5ef98dbeee2346c5a08725a62a9a119ac34545333a463876d982e6956"
 }

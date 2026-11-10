@@ -3,9 +3,15 @@
   "private": true,
   "scripts": {
     "typecheck:python": "node scripts/type_report.mjs python",
-    "typecheck:worker": "node scripts/type_report.mjs worker"
+    "typecheck:worker": "node scripts/type_report.mjs worker",
+    "lint:python": "node scripts/lint_report.mjs python",
+    "lint:javascript": "node scripts/lint_report.mjs javascript",
+    "format:python": "python -m ruff format backend growth scripts",
+    "format:javascript": "prettier --write \"worker/**/*.{js,mjs,cjs}\" \"extension/**/*.{js,mjs,cjs}\" \"docs/js/**/*.{js,mjs,cjs}\" \"tests/**/*.{js,mjs,cjs}\""
   },
   "devDependencies": {
+    "eslint": "10.14.0",
+    "prettier": "3.9.10",
     "pyright": "1.1.414",
     "typescript": "7.0.2"
   }
