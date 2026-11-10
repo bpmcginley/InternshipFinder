@@ -17,8 +17,8 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
-| 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | - | In progress | Consolidate verification, independent review, green checks. |
-| 0 | P-0.2 Counter names | Unassigned | - | - | Queued | needs-bruce: worker merge and deploy. |
+| 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Reviewed; CI pending | Independent site-audit reviewer found no blocker. |
+| 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | - | In progress | needs-bruce: worker merge and deploy. |
 | A | P-1.1 Company runs | Unassigned | - | - | Queued | First app.js package; draft claim, screenshots, tests. |
 | A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
@@ -54,7 +54,7 @@ Evidence references use `9f739770` unless noted. Source findings are not claims 
 | Hand-off verification | Finding | Evidence / consequence |
 |---|---|---|
 | P-0.2 Unknown events before deployment | Verified by in-memory client and worker probes: group_expand sends once; beacon false/throw does not interrupt UI; worker returns counted:false without DB reads or writes. | `count.js:41-43,88-95`, `core.js:1002`, `visits.js:258`. No network or production request. Unknown events do not become page views. |
-| P-0.2 Privacy coverage | Policy explicitly lists individual counted steps and does not name all new events. | `docs/privacy.html:240`; proposed policy wording must go to Bruce. Do not assume existing wording covers expansion. |
+| P-0.2 Privacy coverage | Policy explicitly lists individual counted steps and does not name all new events. | `docs/privacy.html:241`; proposed policy wording must go to Bruce. Do not assume existing wording covers expansion. |
 | P-1.2 Major typeahead | Existing shared keyboard combobox; profile currently commits only on explicit Setup Save. | `app.js:134-182,635,738,1188`. Quick set needs immediate persistence/reranking while preserving fields and loading failures. |
 | P-1.6 Per-listing checked time | JSON inspection confirms per-row last_seen and older carried timestamps, but no explicit direct check timestamp. | `export_static.py:693-696` stamps current database rows with export time; `:504-506,550-562` preserves carried observations; `:233,573-615` includes search-derived rows. Skip the exact Checked open claim. Six-hour ingest schedule (`ingest.yml:5-6`) is not proof every posting is checked. |
 | P-1.7 Widget field parameter | Already supported: friendly aliases and comma-separated OR tags. | `docs/widget/index.html:53-78,175-182`; README `:16-24`. Existing widget is the embedded viewer, not a snippet builder. Preserve iframe URL behavior; use a separate builder or explicit builder mode. |
