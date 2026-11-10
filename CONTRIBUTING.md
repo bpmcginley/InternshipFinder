@@ -21,7 +21,7 @@ Requires Python 3.10+.
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ..
 ```
 
 ## Ingest
@@ -112,7 +112,7 @@ CI commits `backend/data/` each run, so pull before editing.
 ## Tests
 
 ```bash
-cd backend && python -m pytest -q
+cd backend && python -m pytest tests/ ../growth/tests/ -q
 node --test extension/test/*.test.mjs
 ```
 

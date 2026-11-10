@@ -16,8 +16,11 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-import audience  # noqa: E402
-import digest  # noqa: E402
+if __package__:
+    from . import audience, digest
+else:
+    import audience  # noqa: E402
+    import digest  # noqa: E402
 from internscout import seo_pages as sp  # noqa: E402
 
 MIN_NEW = 3
