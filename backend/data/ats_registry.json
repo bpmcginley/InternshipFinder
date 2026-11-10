@@ -3242,9 +3242,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -16926,10 +16925,9 @@
   "lsu|wd1|lsuwaiver": {
    "name": "Louisiana State University (LSU)",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-10"
+   "sector": "education_research"
   },
   "lthc|wd1|ExcellusBCBSCareers": {
    "name": "Excellus BCBS",
