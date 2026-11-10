@@ -59,7 +59,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Merged | Independent review, all nine checks green; Pages verification pending. Safe subset formatted; protected/public/financial exclusions documented. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
-| 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
+| 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | Pending PR | In progress | Topic index and current agent rules; historical model notes preserved pending Q1. |
 | 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
 | 3 | WP-2.3 Worker contract | Unassigned | - | - | Queued | Inventory code routes and clients, not prose alone; include missing metrics route. |
 | 3 | WP-4.1 Migrations | Unassigned | - | - | Queued / operator gate | Deduplicated baseline and local tests; no remote action or deploy-script change. |
@@ -342,3 +342,9 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - All four retained PRs (#165, #175, #177, #178) remain merged with green Pages. The counter worker changes await approved disclosure and operator deployment; design-note implementation choices remain gated.
 
 - Recovery Pages run 42890454209 passed all jobs. JavaScript formatting #189 merged as `da5bc492` after independent final review and all nine checks passed; its Pages run must pass before this retry merges. Integrated its exact source and all tracker evidence by normal merge.
+
+## WP-1.3 documentation validation
+
+- Added an internal topic index covering all 17 growth Markdown documents (including four campaign drafts), seven worker documents and four root development/coordination documents, plus current hand-offs and evaluation notes. Current inventory includes the directory-monitor documentation added by PR #165.
+- Refreshed AGENTS with worktree ownership, merge/review/Pages gates, safety boundaries and state locations. Historical model/credential notes are byte-identical; Q1 remains unanswered and that scope is preserved. No user-visible site/extension/email copy or executable files changed.
+- Checked every relative link in the new index against the current checkout; all resolve. No new tests are needed for this documentation-only change; CI and independent review remain required.
