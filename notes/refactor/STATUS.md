@@ -5,9 +5,10 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 1: WP-0.1 merged with green Pages; golden, type, coverage, and shared-CI packages are in progress. All six baseline suites passed; full Linux CI also passed all 1,480 backend tests.
+- Wave 1: WP-0.1 merged with green Pages; shared CI merged and awaits Pages. Golden, type, and coverage packages are in progress. All six baseline suites passed; full Linux CI also passed all 1,480 backend tests.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
+- Product-session coordination: read `notes/product/HANDOFF.md` section 3 from [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170). Refactor has structural right of way; avoid hot files claimed by open `product: ...` draft PRs. Before WP-0.3 formatting, put “Formatting PRs next” at the top of this tracker and give the product session a few hours to clear its PRs; no announcement or formatting window has started yet.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
 
 ## Execution rules
@@ -41,10 +42,10 @@ The documentation-only status PR also verified the complete backend suite in Lin
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
 | 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI, and green Pages run 42863632275. |
-| 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
-| 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
-| 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
-| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | In review | Composite setup in all 12 existing workflows; preserve scheduling, access, and commands. |
+| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | Pending | In progress | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
+| 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | In review | Local and Linux CI sanitized baselines recorded; final review and CI before merge. |
+| 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | Pending | In progress | Report-only Python and Node artifacts; no thresholds. |
+| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review and green CI; Pages confirmation pending. |
 | 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
 | 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
@@ -179,6 +180,16 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 - Tests: `python -m pytest tests/test_scan_completeness.py tests/test_site_links.py -q` from backend: 75 passed. `python -m unittest discover -s scripts -p 'test_site_contents.py'`: four passed, one skipped because Windows does not permit symbolic-link creation here; the same test runs on Linux in Pages. The separate real junction check passed. `git diff --check` passed.
 - First PR CI found one introduced workflow-contract failure: [run 42862662508](https://github.com/bpmcginley/InternshipFinder/actions/runs/42862662508) reported 1,479 passed and one failed. `test_placement_runs.py` requires the existing paid-listing report step immediately after the build. Moved only the new validation step after that report and before Pages configuration/upload, preserving the original adjacency and leaving the financial code, report step, and contract test unchanged. Reran `python -m pytest tests/test_placement_runs.py -q`: all 14 passed; checker tests and the 4,334-file artifact check also passed again. New-head CI and independent review are required before merge.
 - Golden output comparison is not yet available: WP-0.2 follows this package. Public source assets and generator code are unchanged; the planned output difference is removal of the two internal-note trees.
+- After the green Pages publication, lead read-only HEAD requests verified `/coverage-research/README.md` and `/product-review/CONTEXT.md` return 404, while `/widget/README.md` remains 200. No response bodies were fetched.
+
+### WP-0.4 Report-only type checks
+
+- Added Pyright basic mode for `backend/internscout` and `growth`, with Python 3.12 and the existing backend import root. Added worker `checkJs`/`noEmit` configuration for `worker/src` with ES2022 and WebWorker globals. Runtime sources, existing workflows, and worker dependencies are unchanged; no type suppressions or source fixes were added.
+- Root developer tools are locked to Pyright 1.1.414 and TypeScript 7.0.2. TypeScript's actual CLI was validated on Node 22.23.4, rather than assuming the older compiler API. `npm ci --ignore-scripts` succeeds.
+- Commands: `npm run typecheck:python` and `npm run typecheck:worker`; append `-- --output <path>` to save a sanitized JSON report. Existing type errors are report-only and return success; missing/broken tools, invalid configuration, and unusable reports fail the command. Worker enforcement remains deferred because the baseline is not zero.
+- Local baseline on source main `9f739770`, Python 3.12.10, Node 22.23.4: Pyright **124 errors, 13 warnings**; worker TypeScript **914 errors, no warnings**. Python's local dependency limitations from the baseline section still apply. Linux CI with backend requirements, Pillow, and cryptography reports **129 Python errors, 13 warnings**, and **914 worker errors, no warnings** ([type report run 42864679706](https://github.com/bpmcginley/InternshipFinder/actions/runs/42864679706)). These are separate environment baselines, not newly introduced code errors or fixes; use Linux CI for subsequent comparisons.
+- Diagnostic stdout/stderr is captured without being printed. Reports contain only counts plus constrained repository-relative paths, line/column, severity, and rule identifiers. Messages, source snippets, exception stacks, and unknown diagnostic fields are discarded to prevent existing private literals from appearing in logs or artifacts. The new CI workflow uploads only these sanitized reports.
+- Validation: all three sanitizer tests pass locally and in Linux CI, covering message/continuation removal, path restrictions, and configuration failures. Both real checkers complete and produce the counts above; the site suite passes all 244 tests. Golden output is not yet available; no production build inputs or runtime code changed.
 
 ## Questions and external gates
 
@@ -194,7 +205,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Waiting for deploy
 
-None. No worker refactor PR has merged, and no production action has been taken.
+None. No worker/database deployment or extension release was performed.
 
 ## Merge and publication ledger
 
@@ -202,10 +213,13 @@ None. No worker refactor PR has merged, and no production action has been taken.
 |---|---|---|---|---|
 | [#167 Hand-offs](https://github.com/bpmcginley/InternshipFinder/pull/167) | `00cf10e0` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42859546750) | Merged; documentation only. |
 | [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | `64fd6400` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42861453089) | Merged; documentation only. |
+| [#169 Internal notes](https://github.com/bpmcginley/InternshipFinder/pull/169) | `9f739770` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) | Merged; approved internal-note URL removal. |
+| [#171 Shared CI](https://github.com/bpmcginley/InternshipFinder/pull/171) | `fc9f1fca` | Independent agent review; all checks green | Pending lead confirmation | Merged; existing workflow setup consolidated. |
+| [#172 Type reports](https://github.com/bpmcginley/InternshipFinder/pull/172) | Pending merge | Type-report CI passed; final-head CI/review pending | After merge | Open; report-only developer tooling. |
 
 ## Next update
 
-Complete wave-1 packages and independent reviews, merge one at a time with green CI and Pages. Before wave 2, reread product coordination and publish the required formatting notice.
+Complete Wave 1 packages with separate PRs and independent reviews; verify Pages after every merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries and product-session coordination.
 
 ## WP-0.6 validation and coordination
 
