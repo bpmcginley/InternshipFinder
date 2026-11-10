@@ -311,6 +311,13 @@
   /* The plans line (2026-10-05): where the price lives once the announcement is hidden. */
   .plansline{color:var(--ink3);font-size:var(--fs-2);margin:var(--s2) 0 0;line-height:1.6}
   .plansline a{color:var(--accent);font-weight:500}
+  .footer-account{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s2) var(--s3);margin-top:var(--s3)}
+  .quick-profile .quick-major{display:flex;align-items:center;gap:var(--s3);max-width:680px}
+  .quick-profile .quick-major>.lbl{margin:0;white-space:nowrap}
+  .quick-profile .quick-details{display:grid;grid-template-columns:1fr 2fr;gap:var(--s3);margin-top:var(--s3)}
+  .quick-profile .quick-details .field{width:100%}
+  .quick-profile .quick-actions{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s2)}
+  @media(max-width:760px){.quick-profile .quick-details{grid-template-columns:1fr}.quick-profile .quick-major{align-items:flex-start;flex-direction:column;gap:var(--s1)}}
 
   /* was: a 3px accent bar down the left edge. Now one even border, tinted toward the accent. */
   /* One notice style (A2 component 5, 2026-10-14): accent-soft fill, 15px, ink2 text (7.2:1). The looks it

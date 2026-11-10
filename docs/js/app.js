@@ -281,7 +281,6 @@
           dates)
         : h("div", null, h("h3", null, "No match score yet"),
           h("p", { className: "meta" }, "With no profile every role scores close to 100, so the number would say nothing. Add your major and class year and each role gets a score for you."),
-          onRank && h("button", { type: "button", className: "btn small", onClick: onRank }, "Rank for my major"),
           dates),
       h("div", null, h("h3", null, "Skills asked for", has && req.length ? ` · you have ${met} of ${req.length} required` : ""),
         !skills.length && h("div", { className: "meta" }, r.status === "open" ? "No specific skills named in the description." : "Closed posting, so the description isn't kept."),
@@ -323,7 +322,6 @@
         // U12: and the row it is for, after the visible words: "Match 98 of 100, Why: Acme, Data Intern".
         h("span", { className: "match-label" }, "Match "), h("span", { className: "num" }, sc.score), h("span", { className: "sr" }, " of 100, "), h("span", { className: "bar" }, h("i", { style: { width: Math.max(4, Math.min(100, sc.score)) + "%" } })), h("span", { className: "why-l" }, open ? "Hide why" : "Why"), h("span", { className: "sr" }, ": " + who))
       : h("div", { className: "unscored" },
-        h("button", { type: "button", className: "rankbtn", onClick: onRank }, "Rank for my major"),
         h("button", { type: "button", ref: btnRef, className: "whybtn details", "aria-expanded": !!open, "aria-controls": panelId, "aria-label": `Details: ${r.company_name}, ${r.title}`,
           onClick: onToggle, onKeyDown }, open ? "Hide details" : "Details"));
   }
@@ -621,6 +619,28 @@
       h("input", { type: "hidden", name: "embed", value: "1" }));
   }
 
+  // Quick choices patch the existing profile; the full editor remains available below.
+  const quickProfile = (profile, patch) => ({ ...IS.emptyProfile(), ...(profile || {}), ...patch });
+  function QuickProfile({ profile, majors, majorsReady, onChange, onDone, onSetup, message }) {
+    const majorOpts = useMemo(() => ((majors && majors.majors) || []).map(m => ({ value: m.name, label: m.name, hint: m.level === "grad" ? "graduate" : "" })), [majors]);
+    const stateOpts = useMemo(() => Object.entries({ ...IS.US_STATES, ...IS.CA_PROVINCES }).map(([value, label]) => ({ value, label, chip: value })).sort((a, b) => a.label.localeCompare(b.label)), []);
+    const picked = !!(profile && profile.majors.length);
+    return h("section", { className: "notice quick-profile", "aria-label": "Rank for your major" },
+      h("div", { className: "quick-major" }, h("span", { className: "lbl" }, "I study"),
+        majors ? h(MultiSelect, { label: "I study", placeholder: "Start typing your major", wide: true, options: majorOpts, selected: profile ? profile.majors : [], onChange: majors => onChange({ majors }) })
+          : h("span", { role: "status" }, majorsReady ? "The major list didn't load. Open profile setup to choose fields instead." : "Loading the list of majors…")),
+      h("p", { className: "meta" }, "Choose a major to rank these listings. Your choices stay in this browser."),
+      picked && h("div", { className: "quick-details" },
+        h("label", { className: "lbl" }, "Class year (optional)",
+          h(Sel, { label: "Class year (optional)", value: profile.class_year, onChange: class_year => onChange({ class_year }) }, opt("", "Skip for now"), IS.YEARS.map(([k, l]) => opt(k, l)))),
+        h("div", { className: "lbl" }, "Preferred states or provinces (optional)",
+          h(MultiSelect, { label: "Preferred states or provinces (optional)", placeholder: "Anywhere", wide: true, options: stateOpts, selected: profile.states, onChange: states => onChange({ states }) }))),
+      h("div", { className: "quick-actions" },
+        h("button", { type: "button", className: "btn quiet", onClick: onSetup }, "Open profile setup"),
+        h("button", { type: "button", className: "btn", onClick: onDone }, picked ? "Done" : "Not now")),
+      h("div", { className: "meta", role: "status", "aria-live": "polite" }, message));
+  }
+
   // ---------- setup (3 steps) ----------
   const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
   const GRAD_YEARS = Array.from({ length: 9 }, (_, i) => 2026 + i);
@@ -828,6 +848,7 @@
   function App() {
     const store = useRef(null); if (!store.current) store.current = IS.createStore();
     const [p, setP] = useState(IS.loadProfile);
+    const profileRef = useRef(p); profileRef.current = p;
     const [majors, setMajors] = useState(null);
     // Set when IS.loadMajors() settles, either way (see majorsReady in Setup).
     const [majorsReady, setMajorsReady] = useState(false);
@@ -846,6 +867,9 @@
     // (setupAsk below), and the card opens in that place when asked for.
     const [setupOpen, setSetupOpen] = useState(false);
     const [skipped, setSkipped] = useState(() => !!IS.ls.get(SKIP_KEY, false));
+    const [quickOpen, setQuickOpen] = useState(() => !p && !skipped);
+    const [quickMessage, setQuickMessage] = useState("");
+    const quickFirstSave = useRef(false);
     const [landingOpen, setLandingOpen] = useState(() => !IS.ls.get(LANDING_KEY, false));
     const initF = prof => ({ sort: prof ? "score" : "new", hide_citizen: !!(prof && prof.work_auth && prof.work_auth !== "citizen"), paid: prof && prof.paid_only ? "no_unpaid" : "" });
     // The landing pages under internships/ link here with ?field=a,b&state=MA, so the list opens on what the
@@ -1200,16 +1224,16 @@
         synced.current = "asked";
         IS.ext.call({ type: "profile:get" }, 3000).then(r => {
           const got = r && IS.fromBridgeProfile(r.profile);
-          if (got && (got.majors.length || got.class_year)) { const s = IS.saveProfile(got); setP(s); setSetupOpen(false); setF(x => ({ ...x, ...initF(s) })); }
+          if (got && (got.majors.length || got.class_year) && !profileRef.current && !IS.profileDeleted()) { const s = IS.saveProfile(got); profileRef.current = s; setP(s); setSetupOpen(false); setF(x => ({ ...x, ...initF(s) })); }
         });
       }
     }, [info.installed, p]);
 
     function saveProfile(d) {
       // was: if (!p) IS.count("profile");   // the first profile on this device, not every edit
-      if (!p) { IS.count("profile"); if (!offerNudge()) offerDigestNudge("profile"); } // manual first save; extension sync never prompts
+      if (!p || quickFirstSave.current) { if (!p) IS.count("profile"); quickFirstSave.current = false; if (!offerNudge()) offerDigestNudge("profile"); } // manual first save; extension sync never prompts
       const s = IS.saveProfile(d);
-      setP(s); setSetupOpen(false); setLimit(PAGE);
+      profileRef.current = s; setP(s); setSetupOpen(false); setQuickOpen(false); setLimit(PAGE);
       setF(x => ({ ...x, states: [], ...initF(s) }));
       setNote(`Profile saved. Ranking for ${s.majors.length ? s.majors.join(", ") : s.fields.length ? s.fields.map(IS.fieldLabel).join(", ") : "all fields"}.`);
       setTimeout(() => setNote(""), 6000);
@@ -1218,14 +1242,28 @@
       // list, with focus on its heading (2026-10-14).
       setTimeout(() => requestAnimationFrame(() => { const el = document.getElementById("listings"); if (el) { el.scrollIntoView({ block: "start", behavior: scrollBehavior() }); el.focus({ preventScroll: true }); } }), 0);
     }
-    // Focus goes back to what opened the card when it closes (D13, 2026-10-14): the header button, the
-    // first-visit line or a row's "Rank for my major". The search box when that is gone (the first-visit
-    // line is, once skipped). was: always the search box.
+    function saveQuickProfile(patch) {
+      const previous = profileRef.current;
+      if (!previous && (!patch.majors || !patch.majors.length)) return;
+      const s = IS.saveProfile(quickProfile(previous || prefill, patch));
+      profileRef.current = s; setP(s); setF(f => ({ ...f, sort: "score" })); setLimit(PAGE);
+      if (!previous) { IS.count("profile"); quickFirstSave.current = true; }
+      if (patch.majors) IS.count("major_quick_set");
+      setQuickMessage((patch.majors ? patch.majors.length ? `Ranking for ${patch.majors.join(", ")}.` : "No major selected." : "Preferences updated.") + " Your current search filters still apply.");
+    }
+    function finishQuickProfile() {
+      setQuickOpen(false);
+      // Preserve the existing first-profile nudge after the optional questions, without interrupting typing.
+      if (quickFirstSave.current) { quickFirstSave.current = false; if (!offerNudge()) offerDigestNudge("profile"); }
+      if (!profileRef.current) { IS.ls.set(SKIP_KEY, true); setSkipped(true); }
+      setTimeout(() => { const el = document.getElementById(profileRef.current ? "listings" : "q"); if (el) el.focus({ preventScroll: true }); }, 0);
+    }
+    // Focus goes back to the profile editor's opener, or search when the first-visit panel is gone.
     const setupOpener = useRef(null);
     const openSetup = useCallback(() => { setupOpener.current = document.activeElement; setSetupOpen(true); }, []);
     // was: if (!p) IS.ls.set(SKIP_KEY, true); setSetupOpen(false); ...
     function closeSetup() {
-      if (!p) { IS.ls.set(SKIP_KEY, true); setSkipped(true); }
+      if (!p) { IS.ls.set(SKIP_KEY, true); setSkipped(true); setQuickOpen(false); }
       setSetupOpen(false);
       setTimeout(() => {
         const o = setupOpener.current; setupOpener.current = null;
@@ -1247,7 +1285,7 @@
         try { localStorage.removeItem("internscout.gh_token"); } catch (e) { } setGhToken("");
       }
       // was: setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
-      setP(null); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
+      profileRef.current = null; quickFirstSave.current = false; setP(null); setQuickMessage(""); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); setQuickOpen(true); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
       setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : (r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.")
         + (info.installed ? " The extension keeps its own copy of your profile and files: removing it at chrome://extensions deletes that copy." : ""));
@@ -1601,16 +1639,13 @@
       setTimeout(() => { const q = document.getElementById("q"); if (q) { q.focus(); q.scrollIntoView({ block: "center" }); } }, 0);
     };
     const openCount = nationwide ? nationwide.toLocaleString() : null;
-    // was: const firstVisit = setupOpen && !p; (the card opened by itself on a first visit). A first visit
-    // gets one line offering the setup instead (2026-10-14), so a phone shows search and listings first.
-    const setupAsk = !p && !setupOpen && !skipped;
-    // The plans line (D2.3, 2026-10-05 audit): once the announcement is hidden, the price kept no
-    // home on this page but the nav's Pricing link. One quiet line under the counters, from the same
-    // /config numbers as the announcement (IS.plansBanner, never hardcoded), and nothing at all on a
-    // paid plan or before /config answers, exactly as the announcement does.
-    // was: plansSeen && IS.plansBanner(auth.cfg, me): only once the announcement was hidden. The
-    // announcement is retired (D16), so this line is the price's one place on the page.
+    // Keep the quick panel mounted after its first save so optional choices retain keyboard focus.
+    const setupAsk = quickOpen && !setupOpen;
+    // Existing /config wording and visibility gate, beside footer sign-in; no fallback prices.
     const plansLine = IS.plansBanner(auth.cfg, me);
+    const plansEl = plansLine && h("p", { className: "plansline" },
+      `Plans: free with any email; ${plansLine.plans.map(pl => `${pl.label} ${pl.price}`).join(" and ")} raise the allowance. `,
+      h("a", { href: "pricing/" }, "Prices"));
     // Numbers get thousands separators, "You applied" appears once there is something to count,
     // and the state list is one sentence under the numbers instead of a block floated to the right.
     // A const since 2026-10-05 so it can render before or after the setup card (D2.3).
@@ -1640,10 +1675,7 @@
       // they sit beside the number they describe; this line keeps the scan time, and nothing until it is
       // known (was "Updated unknown").
       h("div", { className: "coverage" },
-        genText && h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", ".")),
-      plansLine && h("p", { className: "plansline" },
-        `Plans: free with any email; ${plansLine.plans.map(pl => `${pl.label} ${pl.price}`).join(" and ")} raise the allowance. `,
-        h("a", { href: "pricing/" }, "Prices")));
+        genText && h("span", { className: "updated" }, "Updated ", genText, legacy ? " · single-file data" : "", ".")));
     // The setup card for a first profile opens prefilled from a landing page's ?field= (2026-10-14):
     // "Rank these for your major" on /internships/nursing/ arrives with Nursing as the major.
     const prefill = useMemo(() => {
@@ -1652,10 +1684,7 @@
       return m ? { majors: [m] } : { fields: link.fields.slice() };
     }, [p, majors]);
     const setupEl = setupOpen && h(Setup, { key: p ? p.updated : "new:" + JSON.stringify(prefill), initial: p || prefill, majors, majorsReady, index, stats, statsReady, firstTime: !p, onSave: saveProfile, onClose: closeSetup, onDelete: deleteData, signedIn: !!auth.token });
-    const setupAskEl = setupAsk && h("div", { className: "notice setup-ask" },
-      h("button", { type: "button", className: "btn primary", onClick: openSetup }, prefill && prefill.majors ? `Rank these for ${prefill.majors[0]}` : "Rank these for your major"),
-      h("span", null, "Three short steps. Your profile stays in this browser."),
-      h("button", { type: "button", className: "btn quiet", onClick: () => { IS.ls.set(SKIP_KEY, true); setSkipped(true); } }, "Not now"));
+    const setupAskEl = setupAsk && h(QuickProfile, { profile: p, majors, majorsReady, onChange: saveQuickProfile, onDone: finishQuickProfile, onSetup: openSetup, message: quickMessage });
     // What narrows the list besides the search and the place, in words, for the empty list.
     const filterWords = [
       f.fields.length > 0 && "field " + f.fields.map(IS.fieldLabel).join(" or "),
@@ -2089,9 +2118,8 @@
           h("a", { href: installUrl("dashboard-footer"), target: "_blank", rel: "noopener" }, "Install extension"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
-          C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs"),
-          // was: signInBtn (the same two buttons the header showed; the header's is one quiet button now)
-          signInProviders)));
+          C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs")),
+        h("div", { className: "footer-account" }, signInProviders, plansEl)));
   }
 
   ReactDOM.createRoot(document.getElementById("root")).render(h(App));

@@ -402,7 +402,7 @@ test("Escape closes the setup card unless a picker already used it (D13)", () =>
   assert.equal(closed, 1);
 });
 
-test("before a profile a row has no score, offers Rank for my major, and Report is gone from the row (D9 to D11)", () => {
+test("before a profile a row has no score or repeated ranking prompt, and Report is gone from the row", () => {
   const harness = uiHarness();
   let ranked = 0;
   const [tr] = harness.render(
@@ -412,8 +412,8 @@ test("before a profile a row has no score, offers Rank for my major, and Report 
   const s = text(tr);
   assert.doesNotMatch(s, /\b98\b/);
   assert.doesNotMatch(s, /Report/);
-  nodes(tr, (n) => n.type === "button" && text(n) === "Rank for my major")[0].props.onClick();
-  assert.equal(ranked, 1);
+  assert.doesNotMatch(s, /Rank for my major/);
+  assert.equal(ranked, 0);
   const details = nodes(tr, (n) => n.props.className === "whybtn details")[0];
   assert.equal(details.props["aria-controls"], "why-7");
   // One facts line: field, place, term and pay together under the title.
