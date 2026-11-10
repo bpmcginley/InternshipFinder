@@ -2,20 +2,14 @@
 
 Each test names the posting or string that went wrong, so the reason the rule exists stays on record.
 """
-
 from datetime import date, datetime, timezone
 
 import httpx
 
 from internscout.discover import MAX_FAILS, prune, record_result
 from internscout.geo import looks_us, state_of
-from internscout.normalize import (
-    extract_salary,
-    lone_description_year,
-    normalize_title,
-    parse_term_from_text,
-    parse_term_pair,
-)
+from internscout.normalize import (extract_salary, lone_description_year, normalize_title,
+                                   parse_term_from_text, parse_term_pair)
 from internscout.region import place_bare_cities
 from internscout.run_ingest import _transient
 from internscout.sources import google_jobs
@@ -24,32 +18,20 @@ from internscout.sources.workday import MAX_DETAIL, fetch_workday_board
 
 # ---------- term ----------
 def test_a_place_name_is_not_a_season():
-    for place in (
-        "Intern - Silver Spring, MD",
-        "Cold Spring Harbor Laboratory intern",
-        "Intern, Fall River, MA",
-        "Winter Park, FL intern",
-        "Spring, TX intern",
-        "Spring Boot developer intern",
-    ):
+    for place in ("Intern - Silver Spring, MD", "Cold Spring Harbor Laboratory intern", "Intern, Fall River, MA",
+                  "Winter Park, FL intern", "Spring, TX intern", "Spring Boot developer intern"):
         assert parse_term_from_text(place) == (None, None), place
     assert parse_term_from_text("Spring 2027 Tax Intern") == ("Spring", 2027)
     assert parse_term_from_text("Winter 2027 Co-op") == ("Winter", 2027)
 
 
 def test_a_description_year_counts_only_when_it_can_be_the_term():
-    assert parse_term_pair("We were founded in 2021. Our Summer 2027 program runs ten weeks.") == (
-        "Summer",
-        2027,
-    )
+    assert parse_term_pair("We were founded in 2021. Our Summer 2027 program runs ten weeks.") == ("Summer", 2027)
     assert parse_term_pair("2027 Summer Analyst") == ("Summer", 2027)
     assert parse_term_pair("Students graduating in 2028 may apply.") == (None, None)
     now = datetime(2026, 9, 18, tzinfo=timezone.utc)
     assert lone_description_year("Founded in 2021, we build rockets.", now) is None
-    assert (
-        lone_description_year("You must be graduating between December 2026 and June 2027.", now)
-        is None
-    )
+    assert lone_description_year("You must be graduating between December 2026 and June 2027.", now) is None
     assert lone_description_year("Interns start in June 2027.", now) == 2027
     assert lone_description_year("Copyright 2026 Example Corp.", now) is None
 
@@ -80,24 +62,13 @@ def test_every_spelling_of_washington_dc_is_dc():
 def test_a_country_code_is_not_a_state():
     for loc in ("Pune, IN", "Berlin, DE", "Toronto, CA", "Bogota, CO", "Casablanca, MA"):
         assert not looks_us(loc), loc
-    for loc in (
-        "Ontario, CA",
-        "Vancouver, WA",
-        "Indianapolis, IN",
-        "Wilmington, DE",
-        "Dublin, OH",
-        "New Berlin, WI 53151",
-        "Panama City, FL",
-        "Waterloo, IA",
-    ):
+    for loc in ("Ontario, CA", "Vancouver, WA", "Indianapolis, IN", "Wilmington, DE", "Dublin, OH",
+                "New Berlin, WI 53151", "Panama City, FL", "Waterloo, IA"):
         assert looks_us(loc), loc
 
 
 def test_a_bare_foreign_city_is_not_stamped_with_the_boards_state():
-    items = [
-        {"company_name": "Acme", "locations": ["Quezon City"]},
-        {"company_name": "Acme", "locations": ["Danvers"]},
-    ]
+    items = [{"company_name": "Acme", "locations": ["Quezon City"]}, {"company_name": "Acme", "locations": ["Danvers"]}]
     place_bare_cities(items, "MA")
     assert items[0]["locations"] == ["Quezon City"]
     assert items[1]["locations"] == ["Danvers, MA"]
@@ -122,7 +93,7 @@ def test_real_pay_is_still_found():
 # ---------- board failures ----------
 def test_a_bad_day_counts_once_and_a_good_run_clears_it():
     reg = {"greenhouse": {"acme": {"name": "Acme"}}}
-    for _ in range(6):  # six failed runs on one day: the ingest runs four times a day
+    for _ in range(6):   # six failed runs on one day: the ingest runs four times a day
         record_result(reg, "greenhouse", "acme", False, today=date(2026, 9, 18))
     assert reg["greenhouse"]["acme"]["fails"] == 1
     assert prune(reg) == 0
@@ -155,7 +126,6 @@ def test_a_push_never_spends_google_searches(monkeypatch):
 
     def boom(*a, **k):
         raise AssertionError("a push-triggered run must not open a connection")
-
     monkeypatch.setattr(google_jobs, "client", boom)
     assert google_jobs.fetch_google_jobs(["intern"], ["Boston, MA"], api_key="k") == []
 
@@ -177,50 +147,25 @@ class _FarBoard:
 
     def __init__(self):
         self.details = []
-        self.rows = [
-            {
-                "title": "Software Intern",
-                "externalPath": "/job/%d" % i,
-                "locationsText": "Pune, India",
-            }
-            for i in range(MAX_DETAIL + 10)
-        ]
-        self.rows.append(
-            {
-                "title": "Finance Intern",
-                "externalPath": "/job/multi",
-                "locationsText": "2 Locations",
-            }
-        )
+        self.rows = [{"title": "Software Intern", "externalPath": "/job/%d" % i, "locationsText": "Pune, India"}
+                     for i in range(MAX_DETAIL + 10)]
+        self.rows.append({"title": "Finance Intern", "externalPath": "/job/multi", "locationsText": "2 Locations"})
 
     def post(self, url, headers=None, json=None):
         off = json["offset"]
-        return _Resp({"total": len(self.rows), "jobPostings": self.rows[off : off + json["limit"]]})
+        return _Resp({"total": len(self.rows), "jobPostings": self.rows[off:off + json["limit"]]})
 
     def get(self, url, headers=None, timeout=None):
         if url.endswith("robots.txt"):
             return _Resp({}, 404)
         self.details.append(url)
-        return _Resp(
-            {
-                "jobPostingInfo": {
-                    "location": "Boston, MA",
-                    "additionalLocations": ["Hartford, CT"],
-                    "jobDescription": "<p>Ten week program.</p>",
-                }
-            }
-        )
+        return _Resp({"jobPostingInfo": {"location": "Boston, MA", "additionalLocations": ["Hartford, CT"],
+                                         "jobDescription": "<p>Ten week program.</p>"}})
 
 
 def test_a_multi_location_posting_far_down_the_list_still_gets_its_detail_page():
     board = _FarBoard()
-    co = {
-        "name": "Farco",
-        "ats_token": "farco|wd1|Farco",
-        "is_quant_target": False,
-        "sector": None,
-        "location": None,
-    }
+    co = {"name": "Farco", "ats_token": "farco|wd1|Farco", "is_quant_target": False, "sector": None, "location": None}
     out = fetch_workday_board(board, co)
     multi = [o for o in out if o["title"] == "Finance Intern"][0]
     assert any(u.endswith("/job/multi") for u in board.details)
@@ -231,14 +176,7 @@ def test_a_multi_location_posting_far_down_the_list_still_gets_its_detail_page()
 # ---------- apply link ----------
 def test_a_link_that_is_not_http_is_never_a_listing():
     from internscout.normalize import _dead_url
-
-    for bad in (
-        "javascript:alert(1)",
-        "data:text/html,x",
-        " JavaScript:void(0)",
-        "/careers/123",
-        "mailto:hr@example.com",
-    ):
+    for bad in ("javascript:alert(1)", "data:text/html,x", " JavaScript:void(0)", "/careers/123", "mailto:hr@example.com"):
         assert _dead_url(bad), bad
     for ok in ("https://boards.greenhouse.io/acme/jobs/1", "http://example.com/job", "", None):
         assert not _dead_url(ok), ok
@@ -247,30 +185,19 @@ def test_a_link_that_is_not_http_is_never_a_listing():
 # ---------- full-time jobs dated like a term ----------
 def test_a_dated_full_time_job_is_not_an_internship():
     from internscout.classify import stage_of
-
-    for t in (
-        "Operations Management Development Program - Summer 2027 Start",
-        "Risk Consulting Associate - Business Applications - Summer 2027",
-        "Civil Associate I, Summer 2027",
-        "Tax Associate Summer 2027 Start",
-        "2027 PhD Graduate - Rotational Discovery Program",
-        "Predoctoral Research Associate (Summer 2027)",
-    ):
+    for t in ("Operations Management Development Program - Summer 2027 Start",
+              "Risk Consulting Associate - Business Applications - Summer 2027", "Civil Associate I, Summer 2027",
+              "Tax Associate Summer 2027 Start", "2027 PhD Graduate - Rotational Discovery Program",
+              "Predoctoral Research Associate (Summer 2027)"):
         assert stage_of(t) == [], t
 
 
 def test_the_student_roles_that_look_like_them_stay():
     from internscout.classify import stage_of
-
-    for t in (
-        "Summer Associate 2027",
-        "2027 Summer Associate - Investment Banking",
-        "Audit Intern - Summer 2027",
-        "Summer 2027 - IEF - Systems Engineering - Collegiate Associate in GAC (Savannah)",
-        "CGSR Undergraduate Research Associate - Spring 2027",
-        "Software Engineering Intern - Summer 2027 Start",
-        "MS Graduate Student Intern - Summer 2027",
-    ):
+    for t in ("Summer Associate 2027", "2027 Summer Associate - Investment Banking", "Audit Intern - Summer 2027",
+              "Summer 2027 - IEF - Systems Engineering - Collegiate Associate in GAC (Savannah)",
+              "CGSR Undergraduate Research Associate - Spring 2027", "Software Engineering Intern - Summer 2027 Start",
+              "MS Graduate Student Intern - Summer 2027"):
         assert stage_of(t), t
     # was: the tuple also held "Early Career Mechanical Engineering - Summer 2027". The review read the
     # posting: it is a full-time job, so it moved to the test below.
@@ -279,99 +206,61 @@ def test_the_student_roles_that_look_like_them_stay():
 # --- the review of those rules: too blunt one way, too narrow the other ---------------------
 def test_a_board_that_files_a_posting_under_intern_is_believed():
     from internscout.classify import stage_of
-
-    for title, emp in (
-        ("2027 Baseball Operations Associate", "Internship/Co-op"),
-        ("Marketing Associate", "Intern"),
-        ("Research Associate", "Intern"),
-        ("Sales Associate", "Part-time Internship"),
-        ("Data Analyst - Summer 2027 Start", "Internship"),
-    ):
+    for title, emp in (("2027 Baseball Operations Associate", "Internship/Co-op"), ("Marketing Associate", "Intern"),
+                       ("Research Associate", "Intern"), ("Sales Associate", "Part-time Internship"),
+                       ("Data Analyst - Summer 2027 Start", "Internship")):
         assert stage_of(title, emp), title
     assert not stage_of("Marketing Associate", "Full-time")
 
 
 def test_student_associates_the_first_rule_threw_out():
     from internscout.classify import stage_of
-
-    for t in (
-        "Summer 2027 Associate - Investment Banking",
-        "Summer 2027 MBA Associate",
-        "MBA Associate, Summer 2027",
-        "Seasonal Associate - Summer 2027",
-        "Summer Research Associate",
-        "REU - Research Associate",
-        "SURF Research Associate",
-        "Summer Associate, starting June 2027",
-        "CGSR Research Associate Graduate - Spring 2027",
-    ):
+    for t in ("Summer 2027 Associate - Investment Banking", "Summer 2027 MBA Associate", "MBA Associate, Summer 2027",
+              "Seasonal Associate - Summer 2027", "Summer Research Associate", "REU - Research Associate",
+              "SURF Research Associate", "Summer Associate, starting June 2027",
+              "CGSR Research Associate Graduate - Spring 2027"):
         assert stage_of(t), t
-    for t in (
-        "Risk Consulting Associate - Summer 2027",
-        "Civil Associate I, Summer 2027",
-    ):  # still full time
+    for t in ("Risk Consulting Associate - Summer 2027", "Civil Associate I, Summer 2027"):   # still full time
         assert not stage_of(t), t
 
 
 def test_full_time_jobs_that_rode_in_on_a_dated_summer():
     from internscout.classify import stage_of
-
-    for t in (
-        "Early Career Electrical Engineer- Summer 2027",
-        "Early Career Mechanical Engineering- Summer 2027",
-        "Commercial Graduate - Summer 2027",
-        "Graduate Management Consultant - Summer 2027",
-        "Traffic EIT, Summer 2027",
-        "Capacity Portfolio Representative, Starting Spring/Summer 2027",
-        "Audit Staff - Summer 2027",
-        "Financial Analyst - Summer 2027 Full Time",
-        "Engineer I - Summer 2027",
-    ):
+    for t in ("Early Career Electrical Engineer- Summer 2027", "Early Career Mechanical Engineering- Summer 2027",
+              "Commercial Graduate - Summer 2027", "Graduate Management Consultant - Summer 2027",
+              "Traffic EIT, Summer 2027", "Capacity Portfolio Representative, Starting Spring/Summer 2027",
+              "Audit Staff - Summer 2027", "Financial Analyst - Summer 2027 Full Time", "Engineer I - Summer 2027"):
         assert not stage_of(t), t
     # The dated internships beside them on the same board stay, and so does anything that says intern.
-    for t in (
-        "Summer 2027: Supply Chain (Greenville, SC)",
-        "Impact Strategy & Project Management - Summer 2027",
-        "Summer 2027 - System Engineer - Central Utility Plant",
-        "Software Engineer Intern I - Summer 2027",
-        "2027 Commercial Banking Summer Internship - Early Careers",
-        "Graduate Research Assistant - Fall 2026",
-    ):
+    for t in ("Summer 2027: Supply Chain (Greenville, SC)", "Impact Strategy & Project Management - Summer 2027",
+              "Summer 2027 - System Engineer - Central Utility Plant", "Software Engineer Intern I - Summer 2027",
+              "2027 Commercial Banking Summer Internship - Early Careers", "Graduate Research Assistant - Fall 2026"):
         assert stage_of(t), t
 
 
 # ---------- same job ----------
 def test_a_job_id_in_the_query_keeps_two_postings_apart():
     from internscout.dedupe import same_job
-
     a = "https://textron.taleo.net/careersection/textron/jobdetail.ftl?job=338311&lang=en"
     b = "https://textron.taleo.net/careersection/textron/jobdetail.ftl?job=338402"
     assert not same_job(a, b)
     assert same_job(a, a.replace("&lang=en", "&src=google"))
-    assert not same_job(
-        "https://apply.careers.microsoft.com/careers?pid=1&sort_by=x",
-        "https://apply.careers.microsoft.com/careers?pid=2&sort_by=x",
-    )
+    assert not same_job("https://apply.careers.microsoft.com/careers?pid=1&sort_by=x",
+                        "https://apply.careers.microsoft.com/careers?pid=2&sort_by=x")
     # unchanged: arrival markers are still ignored, and a Greenhouse id still wins
-    assert same_job(
-        "https://careers-acme.icims.com/jobs/12/x/job?icims=1",
-        "https://careers-acme.icims.com/jobs/12/x/job",
-    )
-    assert same_job(
-        "https://coinbase.com/careers/positions/8168315?gh_jid=8168315",
-        "https://boards.greenhouse.io/embed/job_app?token=8168315",
-    )
+    assert same_job("https://careers-acme.icims.com/jobs/12/x/job?icims=1", "https://careers-acme.icims.com/jobs/12/x/job")
+    assert same_job("https://coinbase.com/careers/positions/8168315?gh_jid=8168315",
+                    "https://boards.greenhouse.io/embed/job_app?token=8168315")
 
 
 # ---------- registry file ----------
 def test_a_corrupt_registry_stops_the_run_instead_of_reading_as_empty(tmp_path, monkeypatch):
     import pytest
     from internscout import discover
-
     p = tmp_path / "registry.json"
     monkeypatch.setattr(discover, "REGISTRY_PATH", str(p))
     monkeypatch.setattr(discover, "DATA_DIR", str(tmp_path))
-    assert discover.load_registry() == {}  # no file yet is still fine
+    assert discover.load_registry() == {}            # no file yet is still fine
     p.write_text('{"greenhouse": {"acme": ', encoding="utf-8")
     with pytest.raises(RuntimeError):
         discover.load_registry()
@@ -381,7 +270,6 @@ def test_a_registry_that_lost_most_of_its_boards_is_not_saved(tmp_path, monkeypa
     import json
     import pytest
     from internscout import discover
-
     p = tmp_path / "registry.json"
     monkeypatch.setattr(discover, "REGISTRY_PATH", str(p))
     monkeypatch.setattr(discover, "DATA_DIR", str(tmp_path))
@@ -391,39 +279,31 @@ def test_a_registry_that_lost_most_of_its_boards_is_not_saved(tmp_path, monkeypa
     assert len(json.loads(p.read_text(encoding="utf-8"))["greenhouse"]) == 300
     with pytest.raises(RuntimeError):
         discover.save_registry({"greenhouse": {"co1": {"name": "Co 1"}}})
-    assert (
-        len(json.loads(p.read_text(encoding="utf-8"))["greenhouse"]) == 300
-    )  # the old file is untouched
+    assert len(json.loads(p.read_text(encoding="utf-8"))["greenhouse"]) == 300   # the old file is untouched
     small = {"greenhouse": {k: v for k, v in list(big["greenhouse"].items())[:280]}}
-    discover.save_registry(small)  # an ordinary prune still saves
+    discover.save_registry(small)                     # an ordinary prune still saves
     assert not (tmp_path / "registry.json.tmp").exists()
 
 
 # ---------- age ----------
 def test_an_untermed_posting_over_a_year_old_is_dropped():
     from internscout.normalize import _zombie
-
     now = datetime(2026, 9, 18, tzinfo=timezone.utc)
     assert _zombie(datetime(2013, 2, 1, tzinfo=timezone.utc), None, None, now)
-    assert _zombie(datetime(2025, 9, 1), None, None, now)  # a naive date is read as UTC
+    assert _zombie(datetime(2025, 9, 1), None, None, now)                      # a naive date is read as UTC
     assert not _zombie(datetime(2025, 10, 1, tzinfo=timezone.utc), None, None, now)
-    assert not _zombie(
-        datetime(2024, 1, 1, tzinfo=timezone.utc), "Summer", 2027, now
-    )  # a term decides, not the date
+    assert not _zombie(datetime(2024, 1, 1, tzinfo=timezone.utc), "Summer", 2027, now)   # a term decides, not the date
     assert not _zombie(None, None, None, now)
 
 
 def test_an_old_posting_on_a_board_still_being_added_to_is_evergreen():
     from internscout.normalize import _zombie
-
     now = datetime(2026, 9, 18, tzinfo=timezone.utc)
-    old = datetime(2024, 8, 15, tzinfo=timezone.utc)  # Point72's intern requisition
+    old = datetime(2024, 8, 15, tzinfo=timezone.utc)                          # Point72's intern requisition
     assert not _zombie(old, None, None, now, board_newest=datetime(2026, 9, 8, tzinfo=timezone.utc))
-    assert not _zombie(old, None, None, now, board_newest=datetime(2026, 9, 8))  # naive is UTC
-    assert _zombie(
-        old, None, None, now, board_newest=datetime(2017, 9, 4, tzinfo=timezone.utc)
-    )  # Felix Magazine
-    assert _zombie(old, None, None, now)  # a source that cannot say
+    assert not _zombie(old, None, None, now, board_newest=datetime(2026, 9, 8))          # naive is UTC
+    assert _zombie(old, None, None, now, board_newest=datetime(2017, 9, 4, tzinfo=timezone.utc))   # Felix Magazine
+    assert _zombie(old, None, None, now)                                       # a source that cannot say
 
 
 def test_the_board_fetchers_say_how_fresh_the_board_is():
@@ -431,93 +311,32 @@ def test_the_board_fetchers_say_how_fresh_the_board_is():
     from internscout.sources.lever import parse_lever
     from internscout.sources.ashby import parse_ashby
     from internscout.normalize import normalize
-
     co = {"name": "Acme", "ats_token": "acme"}
-    gh = parse_greenhouse(
-        {
-            "jobs": [
-                {
-                    "id": 1,
-                    "title": "Software Engineer Intern",
-                    "location": {"name": "Boston, MA"},
-                    "absolute_url": "https://x.test/1",
-                    "first_published": "2024-08-15T00:00:00Z",
-                    "updated_at": "2024-08-15T00:00:00Z",
-                },
-                {
-                    "id": 2,
-                    "title": "Staff Accountant",
-                    "location": {"name": "Boston, MA"},
-                    "absolute_url": "https://x.test/2",
-                    "first_published": "2026-09-08T00:00:00Z",
-                    "updated_at": "2026-09-10T00:00:00Z",
-                },
-            ]
-        },
-        co,
-    )
+    gh = parse_greenhouse({"jobs": [
+        {"id": 1, "title": "Software Engineer Intern", "location": {"name": "Boston, MA"}, "absolute_url": "https://x.test/1",
+         "first_published": "2024-08-15T00:00:00Z", "updated_at": "2024-08-15T00:00:00Z"},
+        {"id": 2, "title": "Staff Accountant", "location": {"name": "Boston, MA"}, "absolute_url": "https://x.test/2",
+         "first_published": "2026-09-08T00:00:00Z", "updated_at": "2026-09-10T00:00:00Z"}]}, co)
     assert len(gh) == 1 and gh[0]["board_newest"].startswith("2026-09-10")
     assert normalize(gh[0]) is not None, "an evergreen requisition on a live board stays"
     del gh[0]["board_newest"]
     assert normalize(gh[0]) is None
-    lv = parse_lever(
-        [
-            {
-                "text": "Data Intern",
-                "categories": {"location": "Boston, MA"},
-                "hostedUrl": "https://x.test/3",
-                "createdAt": 1600000000000,
-            },
-            {
-                "text": "Controller",
-                "categories": {"location": "Boston, MA"},
-                "createdAt": 1788000000000,
-            },
-        ],
-        co,
-    )
+    lv = parse_lever([{"text": "Data Intern", "categories": {"location": "Boston, MA"}, "hostedUrl": "https://x.test/3",
+                       "createdAt": 1600000000000},
+                      {"text": "Controller", "categories": {"location": "Boston, MA"}, "createdAt": 1788000000000}], co)
     assert len(lv) == 1 and lv[0]["board_newest"].startswith("2026-08")
-    ab = parse_ashby(
-        {
-            "jobs": [
-                {
-                    "title": "Design Intern",
-                    "location": "Boston, MA",
-                    "jobUrl": "https://x.test/4",
-                    "publishedAt": "2024-01-01T00:00:00Z",
-                },
-                {
-                    "title": "Counsel",
-                    "location": "Boston, MA",
-                    "publishedAt": "2026-09-01T00:00:00Z",
-                },
-            ]
-        },
-        co,
-    )
+    ab = parse_ashby({"jobs": [{"title": "Design Intern", "location": "Boston, MA", "jobUrl": "https://x.test/4",
+                                "publishedAt": "2024-01-01T00:00:00Z"},
+                               {"title": "Counsel", "location": "Boston, MA", "publishedAt": "2026-09-01T00:00:00Z"}]}, co)
     assert len(ab) == 1 and ab[0]["board_newest"].startswith("2026-09-01")
 
 
 def test_us_towns_that_share_a_name_with_a_foreign_city():
     from internscout.geo import looks_us
-
-    for loc in (
-        "Brisbane, CA",
-        "Brisbane, California",
-        "Belgrade, ME",
-        "Belgrade, MT",
-        "Stockholm, ME",
-        "Copenhagen, NY",
-    ):
+    for loc in ("Brisbane, CA", "Brisbane, California", "Belgrade, ME", "Belgrade, MT", "Stockholm, ME", "Copenhagen, NY"):
         assert looks_us(loc), loc
     # A bare foreign city stamped with its board's state is still foreign.
-    for loc in (
-        "Brisbane, MA",
-        "Stockholm, NY",
-        "Shenzhen, CA",
-        "Brisbane, Australia",
-        "Belgrade, Serbia",
-    ):
+    for loc in ("Brisbane, MA", "Stockholm, NY", "Shenzhen, CA", "Brisbane, Australia", "Belgrade, Serbia"):
         assert not looks_us(loc), loc
 
 
@@ -525,15 +344,8 @@ def test_us_towns_that_share_a_name_with_a_foreign_city():
 def _posting(title, url, where="Boston, MA", source="workday", company="Acme"):
     from internscout.normalize import normalize
     from internscout.sources.common import board_item
-
-    raw = board_item(
-        {"name": company, "ats_token": "x"},
-        source=source,
-        title=title,
-        locations=[where],
-        url=url,
-        employment_type="Intern",
-    )
+    raw = board_item({"name": company, "ats_token": "x"}, source=source, title=title,
+                     locations=[where], url=url, employment_type="Intern")
     raw["apply_url"] = url
     return normalize(raw)
 
@@ -543,13 +355,12 @@ WAYMO = "https://waymo.wd1.myworkdayjobs.com/waymo/job/Mountain-View/Software-En
 
 def test_a_lists_retitled_copy_of_a_board_posting_is_one_listing():
     from internscout.dedupe import merge_batch
-
     board = _posting("2027 Summer Intern, BS/MS, Software Engineer", WAYMO)
     listed = _posting("Software Engineer Intern - BS/MS", WAYMO, source="simplify")
     assert board["dedupe_key"] != listed["dedupe_key"]
-    for batch in ([board, listed], [listed, board]):  # whichever arrives first
+    for batch in ([board, listed], [listed, board]):      # whichever arrives first
         merged = merge_batch([dict(x) for x in batch])
-        assert list(merged) == [board["dedupe_key"]]  # the employer's row and its id are kept
+        assert list(merged) == [board["dedupe_key"]]       # the employer's row and its id are kept
         kept = merged[board["dedupe_key"]]
         assert kept["title"] == board["title"]
         assert {s for s, _ in kept["_sources"]} == {"workday", "simplify"}
@@ -557,7 +368,6 @@ def test_a_lists_retitled_copy_of_a_board_posting_is_one_listing():
 
 def test_the_board_row_takes_a_term_only_the_list_knew():
     from internscout.dedupe import merge_batch
-
     board = _posting("Sophomore Internship Program - Software Engineer", WAYMO)
     listed = _posting("Software Engineer Intern, Summer 2027", WAYMO, source="simplify")
     kept = merge_batch([board, listed])[board["dedupe_key"]]
@@ -566,7 +376,6 @@ def test_the_board_row_takes_a_term_only_the_list_knew():
 
 def test_rows_that_share_a_link_but_no_board_row_are_left_alone():
     from internscout.dedupe import merge_batch
-
     # A careers page two list entries both point at: nothing says it is one posting.
     page = "https://example.com/careers/internships"
     a = _posting("Software Engineer Intern", page, source="simplify")

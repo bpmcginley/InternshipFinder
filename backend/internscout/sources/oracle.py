@@ -15,25 +15,15 @@ CorporateDescriptionStr is left out for the same reason SmartRecruiters' company
 it is the same employer boilerplate on every requisition, and it would crowd the real description
 out of the 4,000-character budget and give the classifier marketing copy to tag a job by.
 """
-
 from __future__ import annotations
-from .common import (
-    board_item,
-    counts_of,
-    html_to_text,
-    mark_complete,
-    reported_count,
-    require_robots,
-    rows_of,
-)
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 from ..region import maybe_in_region
 
-API = (
-    "https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true"
-    "&expand=requisitionList.secondaryLocations"
-    "&finder=findReqs;siteNumber={site},keyword={keyword},limit={limit},offset={offset},sortBy=POSTING_DATES_DESC"
-)
+API = ("https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true"
+       "&expand=requisitionList.secondaryLocations"
+       "&finder=findReqs;siteNumber={site},keyword={keyword},limit={limit},offset={offset},sortBy=POSTING_DATES_DESC")
 # Separate searches avoid losing co-ops and student jobs behind noisy "intern" results. A bounded
 # Stantec check on 2026-10-16 returned 802 "intern" matches (over our 600-result cap), versus 104
 # "co-op" and 112 "student" matches. French stagiaire titles are accepted by the classifier too.
@@ -41,10 +31,8 @@ API = (
 KEYWORDS = ("intern", "co-op", "student", "stagiaire")
 # The id has to arrive quoted, and ById is the only finder this resource accepts - requisitionId,
 # the name the docs use elsewhere, is rejected as an invalid finder rather than ignored.
-DETAIL = (
-    "https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?onlyData=true"
-    "&expand=all&finder=ById;Id=%22{id}%22,siteNumber={site}"
-)
+DETAIL = ("https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?onlyData=true"
+          "&expand=all&finder=ById;Id=%22{id}%22,siteNumber={site}")
 JOB_URL = "https://{host}/hcmUI/CandidateExperience/en/sites/{site}/job/{id}"
 PAGE, MAX_OFFSET = 100, 600
 MAX_DETAIL = 25
@@ -62,9 +50,7 @@ def parse_oracle(payload: dict, co: dict, host: str, site: str) -> tuple[list[di
             counts.discard("not_student")
             continue
         sec = r.get("secondaryLocations") or []
-        places = [(r.get("PrimaryLocation"), r.get("PrimaryLocationCountry"))] + [
-            (s.get("Name"), s.get("CountryCode")) for s in sec
-        ]
+        places = [(r.get("PrimaryLocation"), r.get("PrimaryLocationCountry"))] + [(s.get("Name"), s.get("CountryCode")) for s in sec]
         locs = []
         for name, country in places:
             if not name:
@@ -78,15 +64,9 @@ def parse_oracle(payload: dict, co: dict, host: str, site: str) -> tuple[list[di
         if not locs:
             counts.discard("outside_region")
             continue
-        it = board_item(
-            co,
-            source="oracle",
-            title=title,
-            locations=locs,
-            url=JOB_URL.format(host=host, site=site, id=r.get("Id")),
-            posted_at=r.get("PostedDate"),
-            description=r.get("ShortDescriptionStr") or "",
-        )
+        it = board_item(co, source="oracle", title=title, locations=locs,
+                        url=JOB_URL.format(host=host, site=site, id=r.get("Id")),
+                        posted_at=r.get("PostedDate"), description=r.get("ShortDescriptionStr") or "")
         it["_req_id"] = r.get("Id")
         out.append(it)
     return out, int(head.get("TotalJobsCount") or 0)
@@ -101,12 +81,9 @@ def parse_oracle_detail(payload: dict) -> str:
 
 def fetch_oracle_board(c, co: dict) -> list[dict]:
     host, site = co["ats_token"].split("|", 1)
-    require_robots(
-        c,
-        f"https://{host}",
-        "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
-        co["ats_token"],
-    )
+    require_robots(c, f"https://{host}",
+                   "/hcmRestApi/resources/latest/recruitingCEJobRequisitions",
+                   co["ats_token"])
     out, seen, complete, counts = [], set(), True, counts_of(co)
     for keyword in KEYWORDS:
         offset, reported, rows, well_formed = 0, None, 0, True
@@ -117,9 +94,7 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
             if not isinstance(payload, dict):
                 raise ValueError("Oracle search response is not an object")
             heads = payload.get("items")
-            page = (
-                rows_of(heads[0], "requisitionList") if isinstance(heads, list) and heads else None
-            )
+            page = rows_of(heads[0], "requisitionList") if isinstance(heads, list) and heads else None
             if page is None:
                 well_formed = False
             elif offset == 0:
@@ -140,15 +115,12 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
                 break
         else:
             if offset < total:
-                counts.stop("page_cap")  # MAX_OFFSET reached with matches left
+                counts.stop("page_cap")   # MAX_OFFSET reached with matches left
         # A keyword whose matches run past MAX_OFFSET is read only in part, and so is the board.
         complete = complete and well_formed and reported is not None and rows == reported
     # A teaser the employer did bother to write is left alone; the call is for the ones with nothing.
-    todo = [
-        i
-        for i in out
-        if not (i["description"] or "").strip() and any(maybe_in_region(l) for l in i["locations"])
-    ]
+    todo = [i for i in out if not (i["description"] or "").strip()
+            and any(maybe_in_region(l) for l in i["locations"])]
     for it in todo[:MAX_DETAIL]:
         try:
             d = c.get(DETAIL.format(host=host, site=site, id=it["_req_id"]))
@@ -158,5 +130,5 @@ def fetch_oracle_board(c, co: dict) -> list[dict]:
                 it["description"] = parse_oracle_detail(d.json())
         except Exception:
             pass
-    mark_complete(co, complete)  # every keyword read to its TotalJobsCount; see scan_evidence
+    mark_complete(co, complete)   # every keyword read to its TotalJobsCount; see scan_evidence
     return out

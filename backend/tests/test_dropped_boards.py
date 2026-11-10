@@ -1,19 +1,10 @@
 """A board pruned from the registry stays out for a while instead of being rediscovered the next day."""
-
 import json
 from datetime import date
 
 from internscout import discover
-from internscout.discover import (
-    MAX_FAILS,
-    add_board,
-    discover as discover_items,
-    kept_out,
-    prune,
-    record_closed,
-    record_result,
-    save_registry,
-)
+from internscout.discover import (MAX_FAILS, add_board, discover as discover_items, kept_out, prune,
+                                  record_closed, record_result, save_registry)
 
 
 def _fail_out(reg, ats, token):
@@ -37,7 +28,7 @@ def test_a_dropped_board_may_come_back_after_the_keep_out_period():
     _fail_out(reg, "lever", "acme")
     prune(reg, today=date(2026, 9, 5))
     later = date(2026, 9, 5).toordinal() + discover.KEEP_OUT["dead"]
-    assert kept_out("lever", "ACME", today=date(2026, 9, 6))  # case does not matter
+    assert kept_out("lever", "ACME", today=date(2026, 9, 6))           # case does not matter
     assert not kept_out("lever", "acme", today=date.fromordinal(later))
 
 
@@ -60,14 +51,8 @@ def test_a_board_already_registered_is_untouched_and_other_boards_still_come_in(
 
 def test_the_list_is_saved_with_the_registry_and_expired_entries_are_let_go(monkeypatch, tmp_path):
     monkeypatch.setattr(discover, "REGISTRY_PATH", str(tmp_path / "ats_registry.json"))
-    discover._DROPPED.update(
-        {
-            "greenhouse": {
-                "recent": {"on": date.today().isoformat(), "why": "dead"},
-                "ancient": {"on": "2020-01-01", "why": "dead"},
-            }
-        }
-    )
+    discover._DROPPED.update({"greenhouse": {"recent": {"on": date.today().isoformat(), "why": "dead"},
+                                             "ancient": {"on": "2020-01-01", "why": "dead"}}})
     save_registry({"greenhouse": {"live": {"name": "Live", "fails": 0}}})
     with open(discover.DROPPED_PATH, encoding="utf-8") as f:
         saved = json.load(f)

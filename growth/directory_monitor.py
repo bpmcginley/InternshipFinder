@@ -3,7 +3,6 @@
 Run: python growth/directory_monitor.py > directory-status.json
 2026-11-04: Keep unparseable or blocked responses unknown. Revert: remove this file and its workflow.
 """
-
 import json
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -36,12 +35,7 @@ class Links(HTMLParser):
 
 def get(url):
     with urlopen(Request(url, headers={"User-Agent": AGENT}), timeout=20) as response:
-        return (
-            response.status,
-            response.url,
-            response.headers.get_content_type(),
-            response.read(2_000_000).decode("utf-8", "replace"),
-        )
+        return response.status, response.url, response.headers.get_content_type(), response.read(2_000_000).decode("utf-8", "replace")
 
 
 def inspect(name, url):
@@ -68,25 +62,13 @@ def inspect(name, url):
         parser = Links()
         parser.feed(body)
         result["status"] = "listing recognizable"
-        result["direct_link"] = any(
-            urlparse(urljoin(final, link)).hostname in ("internscout.org", "www.internscout.org")
-            for link in parser.hrefs
-        )
-        result["note"] = (
-            "HTML link detection only; redirects, JavaScript and indexing require manual review."
-        )
+        result["direct_link"] = any(urlparse(urljoin(final, link)).hostname in ("internscout.org", "www.internscout.org") for link in parser.hrefs)
+        result["note"] = "HTML link detection only; redirects, JavaScript and indexing require manual review."
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         result["reason"] = f"fetch unavailable: {type(exc).__name__}"
     return result
 
 
 if __name__ == "__main__":
-    print(
-        json.dumps(
-            {
-                "checked_at": datetime.now(timezone.utc).isoformat(),
-                "results": [inspect(name, url) for name, url in SITES.items()],
-            },
-            indent=2,
-        )
-    )
+    print(json.dumps({"checked_at": datetime.now(timezone.utc).isoformat(),
+                      "results": [inspect(name, url) for name, url in SITES.items()]}, indent=2))

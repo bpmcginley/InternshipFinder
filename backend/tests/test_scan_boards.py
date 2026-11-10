@@ -1,5 +1,4 @@
 """scan_boards: which failures age a board toward MAX_FAILS, and which get a second try."""
-
 import httpx
 from internscout import run_ingest
 from internscout.discover import MAX_FAILS
@@ -42,7 +41,7 @@ def test_a_dead_board_still_ages(monkeypatch):
         tok = co["ats_token"]
         calls[tok] = calls.get(tok, 0) + 1
         if tok == "t0":
-            raise _status(404)  # not transient: no retry, and it ages
+            raise _status(404)   # not transient: no retry, and it ages
         return []
 
     monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "fakeats", fetch)
@@ -105,7 +104,6 @@ def test_cause_names_status_or_error_type():
 
 def test_a_throttled_ats_runs_in_its_own_smaller_pool(monkeypatch):
     import threading, time
-
     monkeypatch.setattr(run_ingest, "RETRY_PAUSE", 0)
     monkeypatch.setitem(run_ingest.ATS_WORKERS, "slowats", 2)
     live, peak, lock = [0], [0], threading.Lock()

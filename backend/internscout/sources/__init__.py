@@ -44,14 +44,5 @@ BOARD_FETCHERS = {
     "eightfold": fetch_eightfold_board,
     "jazzhr": fetch_jazzhr_board,
 }
-__all__ = [
-    "fetch_github_lists",
-    "fetch_greenhouse",
-    "fetch_lever",
-    "fetch_google_jobs",
-    "fetch_usajobs",
-    "fetch_nyc_jobs",
-    "fetch_uhn",
-    "fetch_houseai",
-    "BOARD_FETCHERS",
-]
+__all__ = ["fetch_github_lists", "fetch_greenhouse", "fetch_lever", "fetch_google_jobs", "fetch_usajobs",
+           "fetch_nyc_jobs", "fetch_uhn", "fetch_houseai", "BOARD_FETCHERS"]

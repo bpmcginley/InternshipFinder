@@ -1,5 +1,4 @@
 """Dates for meaningful page changes, independent of page selection and sitemap membership."""
-
 from __future__ import annotations
 
 import hashlib
@@ -17,42 +16,11 @@ VERSION = 1
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
 _PATH = re.compile(r"/(?:[a-zA-Z0-9_-]+/)*\Z|/[a-zA-Z0-9_-]+\.html\Z")
 _PAID = re.compile(r"<!--paid-->.*?<!--/paid-->", re.S)
-_VOID = frozenset(
-    {
-        "area",
-        "base",
-        "br",
-        "col",
-        "embed",
-        "hr",
-        "img",
-        "input",
-        "link",
-        "meta",
-        "param",
-        "source",
-        "track",
-        "wbr",
-    }
-)
+_VOID = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
 # The dashboard renders these public listing fields after loading JSON. Scan bookkeeping, descriptions
 # not exported to its cards and build timestamps do not describe a visible change. Revert: omit home_rows.
-_HOME_FIELDS = (
-    "id",
-    "company_name",
-    "title",
-    "field_tags",
-    "regions",
-    "salary",
-    "term",
-    "stage",
-    "years",
-    "posted_at",
-    "first_seen",
-    "apply_url",
-    "is_remote",
-    "insights",
-)
+_HOME_FIELDS = ("id", "company_name", "title", "field_tags", "regions", "salary", "term", "stage",
+                "years", "posted_at", "first_seen", "apply_url", "is_remote", "insights")
 
 
 def _day(value, ceiling: str) -> str | None:
@@ -75,23 +43,13 @@ def read(site_dir: str, ceiling: str) -> dict:
         obj = json.loads(raw)
     except (OSError, ValueError, UnicodeError, RecursionError):
         return {}
-    if (
-        not isinstance(obj, dict)
-        or type(obj.get("version")) is not int
-        or obj["version"] != VERSION
-        or not isinstance(obj.get("pages"), dict)
-    ):
+    if (not isinstance(obj, dict) or type(obj.get("version")) is not int or obj["version"] != VERSION
+            or not isinstance(obj.get("pages"), dict)):
         return {}
-    return {
-        path: row
-        for path, row in obj["pages"].items()
-        if isinstance(path, str)
-        and _PATH.fullmatch(path)
-        and isinstance(row, dict)
-        and isinstance(row.get("digest"), str)
-        and _HASH.fullmatch(row["digest"])
-        and _day(row.get("lastmod"), ceiling)
-    }
+    return {path: row for path, row in obj["pages"].items()
+            if isinstance(path, str) and _PATH.fullmatch(path) and isinstance(row, dict)
+            and isinstance(row.get("digest"), str) and _HASH.fullmatch(row["digest"])
+            and _day(row.get("lastmod"), ceiling)}
 
 
 class _Content(HTMLParser):
@@ -114,42 +72,26 @@ class _Content(HTMLParser):
         if path.startswith("/internships/") and path.endswith("/open/"):
             contexts.append((r"^(As of\s+)", r"(?=, [\d,]+ employers? (?:has|have) opened )"))
         if path == "/about/":
-            contexts.extend(
-                [
-                    (r"^(As of\s+)", r"(?=, [\d,]+ open )"),
-                    # About's opening coverage sentence, not its separate competitor-pricing answer.
-                    (
-                        r"^(InternScout is a free internship search for [^.!?]*, as of\s+)",
-                        r"(?=\.)",
-                    ),
-                ]
-            )
+            contexts.extend([
+                (r"^(As of\s+)", r"(?=, [\d,]+ open )"),
+                # About's opening coverage sentence, not its separate competitor-pricing answer.
+                (r"^(InternScout is a free internship search for [^.!?]*, as of\s+)", r"(?=\.)"),
+            ])
         if path == "/internships/by-the-numbers/":
             # These exact aggregate sentences are emitted only by numbers_page.
-            contexts.extend(
-                [
-                    (r"^(As of\s+)", r"(?=, InternScout lists )"),
-                    (r"^(On\s+)", r"(?= InternScout listed )"),
-                    (r"^(InternScout on\s+)", r"(?=: [\d,]+ open )"),
-                    (r"\b([\d,]+ of them (?:was|were) found in the week to\s+)", r"(?=\.)"),
-                    (r"\b(Among them, as of\s+)", r"(?=:)"),
-                    (r"\b(list pay or say they are paid, as of\s+)", r"(?=\.)"),
-                    (r"\b(an hour, as of\s+)", r"(?=\.)"),
-                    (r"\b(own applicant tracking systems, as of\s+)", r"(?=;)"),
-                    (
-                        r"^((?:The [\d,]+ largest of the [\d,]+ fields|Every field|The one field), by open roles on\s+)",
-                        r"(?=:)",
-                    ),
-                    (
-                        r"^((?:The [\d,]+ US states with the most open roles|Open roles by US state) on\s+)",
-                        r"(?=:)",
-                    ),
-                    (
-                        r"^(Every figure is counted from the listings open on\s+)",
-                        r"(?=, the same export )",
-                    ),
-                ]
-            )
+            contexts.extend([
+                (r"^(As of\s+)", r"(?=, InternScout lists )"),
+                (r"^(On\s+)", r"(?= InternScout listed )"),
+                (r"^(InternScout on\s+)", r"(?=: [\d,]+ open )"),
+                (r"\b([\d,]+ of them (?:was|were) found in the week to\s+)", r"(?=\.)"),
+                (r"\b(Among them, as of\s+)", r"(?=:)"),
+                (r"\b(list pay or say they are paid, as of\s+)", r"(?=\.)"),
+                (r"\b(an hour, as of\s+)", r"(?=\.)"),
+                (r"\b(own applicant tracking systems, as of\s+)", r"(?=;)"),
+                (r"^((?:The [\d,]+ largest of the [\d,]+ fields|Every field|The one field), by open roles on\s+)", r"(?=:)"),
+                (r"^((?:The [\d,]+ US states with the most open roles|Open roles by US state) on\s+)", r"(?=:)"),
+                (r"^(Every figure is counted from the listings open on\s+)", r"(?=, the same export )"),
+            ])
         self.routine = [re.compile(prefix + date_text + tail) for prefix, tail in contexts]
         self.updated = re.compile(r"((?:^|[.,]\s+)[Uu]pdated\s+)" + date_text + r"(?=\.)")
 
@@ -158,11 +100,8 @@ class _Content(HTMLParser):
             text = pattern.sub(r"\1[export date]", text)
         # "Updated" is routine only in the common template label or an actual generated listing
         # description. A source citation such as "Source updated DATE" remains a real fact.
-        listing_description = (
-            description
-            and self.path.startswith("/internships/")
-            and re.match(r"(?:[\d,]+ |No open |The highest hourly pay listed on )", text)
-        )
+        listing_description = (description and self.path.startswith("/internships/")
+                               and re.match(r"(?:[\d,]+ |No open |The highest hourly pay listed on )", text))
         if export_label or listing_description:
             text = self.updated.sub(r"\1[export date]", text)
         return " ".join(text.split())
@@ -174,29 +113,16 @@ class _Content(HTMLParser):
         if tag == "title":
             self.title = True
         hidden = bool(self.stack and self.stack[-1][1]) or tag in {"script", "style", "template"}
-        hidden = (
-            hidden
-            or "hidden" in a
-            or a.get("aria-hidden") == "true"
-            or (tag == "input" and a.get("type") == "hidden")
-        )
-        hidden = hidden or bool(
-            re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", a.get("style", ""), re.I)
-        )
+        hidden = hidden or "hidden" in a or a.get("aria-hidden") == "true" or (tag == "input" and a.get("type") == "hidden")
+        hidden = hidden or bool(re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", a.get("style", ""), re.I))
         if tag == "meta" and a.get("name", "").lower() == "description":
             self.parts.append(["description", self._text(a.get("content", ""), description=True)])
         if self.body and not hidden:
-            meaningful = {
-                k: " ".join((v or "").split())
-                for k, v in a.items()
-                if k
-                in {"href", "src", "alt", "aria-label", "placeholder", "datetime", "type", "value"}
-            }
+            meaningful = {k: " ".join((v or "").split()) for k, v in a.items()
+                          if k in {"href", "src", "alt", "aria-label", "placeholder", "datetime", "type", "value"}}
             self.parts.append([tag, meaningful])
         if tag not in _VOID:
-            export_label = bool(self.stack and self.stack[-1][2]) or (
-                tag == "p" and "updated" in a.get("class", "").split()
-            )
+            export_label = bool(self.stack and self.stack[-1][2]) or (tag == "p" and "updated" in a.get("class", "").split())
             self.stack.append((tag, hidden, export_label))
 
     def handle_endtag(self, tag):
@@ -220,12 +146,7 @@ def fingerprint(path: str, html: str, stamp: datetime, data=None) -> str:
     parser = _Content(stamp, path)
     parser.feed(_PAID.sub("", html))
     # The URL is part of the identity: copying a record from another page cannot preserve its date.
-    payload = json.dumps(
-        [VERSION, path, parser.parts, data],
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
+    payload = json.dumps([VERSION, path, parser.parts, data], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -234,16 +155,9 @@ def observed_day() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def refresh(
-    site_dir: str,
-    pages: list[dict],
-    stamp: datetime,
-    home: str = "",
-    home_start: str = "<!-- browse:start -->",
-    home_end: str = "<!-- browse:end -->",
-    home_rows: list[dict] = (),
-    home_floor: str | None = None,
-) -> tuple[dict, str | None]:
+def refresh(site_dir: str, pages: list[dict], stamp: datetime, home: str = "",
+            home_start: str = "<!-- browse:start -->", home_end: str = "<!-- browse:end -->",
+            home_rows: list[dict] = (), home_floor: str | None = None) -> tuple[dict, str | None]:
     """Update date values only. Page membership, indexing decisions and paid boxes are untouched."""
     today = observed_day()
     ceiling = max(stamp.strftime("%Y-%m-%d"), today)
@@ -253,9 +167,7 @@ def refresh(
     def record(path: str, content: str, fallback=None, data=None, live_floor=None) -> str:
         digest = fingerprint(path, content, stamp, data)
         old = previous.get(path, {})
-        floor = (
-            max(_day(old.get("lastmod"), ceiling) or "", _day(live_floor, ceiling) or "") or None
-        )
+        floor = max(_day(old.get("lastmod"), ceiling) or "", _day(live_floor, ceiling) or "") or None
         # Migration uses the existing sitemap-derived floor once; after that only a changed digest
         # advances the date. was: max(first_seen, live lastmod) on every build.
         if old:
@@ -270,9 +182,7 @@ def refresh(
         p["lastmod"] = mod
         # CollectionPage and Dataset dates follow the same observed content change as the sitemap.
         # No other structured-data properties, including temporalCoverage, are changed here.
-        p["html"] = re.sub(
-            r'("dateModified"\s*:\s*)"[^"\\]*"', lambda m: m[1] + json.dumps(mod), p["html"]
-        )
+        p["html"] = re.sub(r'("dateModified"\s*:\s*)"[^"\\]*"', lambda m: m[1] + json.dumps(mod), p["html"])
 
     home_mod = None
     try:
@@ -280,16 +190,11 @@ def refresh(
             text = f.read()
         start, end = text.find(home_start), text.find(home_end)
         if home and 0 <= start < end:
-            text = text[: start + len(home_start)] + home + text[end:]
+            text = text[:start + len(home_start)] + home + text[end:]
         rows = [{key: row.get(key) for key in _HOME_FIELDS} for row in home_rows]
         rows.sort(key=lambda row: str(row.get("id") or ""))
-        home_mod = record(
-            "/",
-            text,
-            next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None),
-            rows,
-            home_floor,
-        )
+        home_mod = record("/", text, next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None),
+                          rows, home_floor)
     except (OSError, UnicodeError):
         pass
     return {"version": VERSION, "pages": records}, home_mod

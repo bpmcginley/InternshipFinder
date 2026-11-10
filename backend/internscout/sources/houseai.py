@@ -14,7 +14,6 @@ listing "unpaid" when its description says so, so the facts line below leads
 with it. This is a free pipeline source, not a paid placement: House AI did
 not go through employer checkout.
 """
-
 from __future__ import annotations
 
 import json
@@ -30,11 +29,9 @@ SITE = "https://www.houseaiapp.com"
 COMPANY = {"name": "House AI"}
 # Fall 2026 batch facts, from the careers hub FAQ. The close date itself is
 # read per role from its validThrough; this line covers term + credit support.
-TERM_LINE = (
-    "Fall term August 10 - December 18, 2026. "
-    "Course credit supported (faculty sponsor forms, professor "
-    "check-ins, end-of-term evaluations)."
-)
+TERM_LINE = ("Fall term August 10 - December 18, 2026. "
+             "Course credit supported (faculty sponsor forms, professor "
+             "check-ins, end-of-term evaluations).")
 
 _SLUG_RE = re.compile(r'href="/careers/([a-z0-9][a-z0-9-]*)"')
 _SKIP_SLUGS = {"cities", "course-credit"}
@@ -79,21 +76,14 @@ def parse_houseai_jobposting(jp: dict, today: date | None = None) -> dict | None
     if not url:
         return None
     hours = (jp.get("workHours") or "20 hours per week").strip()
-    facts = f"Unpaid. {hours}. Fully remote (US or UK). {TERM_LINE}"
+    facts = (f"Unpaid. {hours}. Fully remote (US or UK). {TERM_LINE}")
     if closes:
         facts += f" Applications close {closes.strftime('%B %d, %Y')}."
     description = " ".join(x for x in (facts, html_to_text(jp.get("description") or "")) if x)
-    return board_item(
-        COMPANY,
-        source="houseai",
-        title=title,
-        locations=["Remote"],
-        url=url,
-        apply_url=url.rstrip("/") + "/apply",
-        posted_at=(jp.get("datePosted") or "")[:10] or None,
-        description=description,
-        employment_type="Intern Part-time",
-    )
+    return board_item(COMPANY, source="houseai", title=title, locations=["Remote"],
+                      url=url, apply_url=url.rstrip("/") + "/apply",
+                      posted_at=(jp.get("datePosted") or "")[:10] or None,
+                      description=description, employment_type="Intern Part-time")
 
 
 def parse_houseai_page(page_html: str, today: date | None = None) -> dict | None:

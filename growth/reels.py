@@ -17,7 +17,6 @@ to the picture post, so a Thursday is never skipped.
 
 Run from the repo root to preview:  python growth/reels.py [docs] [out.mp4]
 """
-
 from __future__ import annotations
 
 import os
@@ -36,7 +35,7 @@ W, H = 1080, 1920
 MARGIN = 96
 SAFE_TOP, SAFE_BOTTOM = 220, H - 420
 FPS = 30
-FADE = 0.35  # seconds of crossfade between slides
+FADE = 0.35                   # seconds of crossfade between slides
 TITLE_SECONDS, ROLE_SECONDS, END_SECONDS = 3.0, 2.2, 3.0
 MAX_ROLES = 4
 SLOGAN = "Built by one student, made for all students."
@@ -79,7 +78,6 @@ def title_slide(post: dict) -> Image.Image:
             y += 100
         d.text((MARGIN, y + 16), post["where"], font=font("sans", 50), fill=INK2)
         return y + 80
-
     return _slide(PAPER, body)
 
 
@@ -105,16 +103,13 @@ def role_slide(role: dict, i: int, n: int) -> Image.Image:
                 d.text((MARGIN, y), fit(d, text, detail, INNER), font=detail, fill=INK2)
                 y += 80
         return y
-
     return _slide(PAPER, body)
 
 
 def end_slide(post: dict) -> Image.Image:
     def body(d, y):
         head = font("sans_bold", 70)
-        for line in wrap(
-            d, f"Search all {post['count']} free, filtered to your major", head, INNER, 3
-        ):
+        for line in wrap(d, f"Search all {post['count']} free, filtered to your major", head, INNER, 3):
             d.text((MARGIN, y), line, font=head, fill=PAPER)
             y += 92
         y += 70
@@ -129,7 +124,6 @@ def end_slide(post: dict) -> Image.Image:
             y += 64
         d.text((MARGIN, y + 12), DISCLAIMER, font=font("sans", 36), fill=SOFT)
         return y + 60
-
     return _slide(ACCENT, body, band=False)
 
 
@@ -142,57 +136,25 @@ def slides(post: dict) -> list[tuple[Image.Image, float]]:
     return out
 
 
-def ffmpeg_command(
-    frames: list[str], seconds: list[float], out_path: str, ffmpeg: str = "ffmpeg"
-) -> list[str]:
+def ffmpeg_command(frames: list[str], seconds: list[float], out_path: str, ffmpeg: str = "ffmpeg") -> list[str]:
     """One ffmpeg call: each still held for its time, crossfaded into the next, plus silent audio
     (some players and uploaders treat a video with no audio track as broken)."""
     cmd = [ffmpeg, "-y", "-loglevel", "error"]
     for f, s in zip(frames, seconds):
         cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{s + FADE:.3f}", "-i", f]
     total = sum(seconds) + FADE
-    cmd += [
-        "-f",
-        "lavfi",
-        "-t",
-        f"{total:.3f}",
-        "-i",
-        "anullsrc=channel_layout=stereo:sample_rate=44100",
-    ]
+    cmd += ["-f", "lavfi", "-t", f"{total:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
     chain, last, offset = [], "[0:v]", 0.0
     for i in range(1, len(frames)):
         offset += seconds[i - 1]
         label = f"[v{i}]"
-        chain.append(
-            f"{last}[{i}:v]xfade=transition=fade:duration={FADE}:offset={offset - FADE / 2:.3f}{label}"
-        )
+        chain.append(f"{last}[{i}:v]xfade=transition=fade:duration={FADE}:offset={offset - FADE / 2:.3f}{label}")
         last = label
     graph = ";".join(chain) + ";" if chain else ""
     graph += f"{last}format=yuv420p,fps={FPS}[vout]"
-    cmd += [
-        "-filter_complex",
-        graph,
-        "-map",
-        "[vout]",
-        "-map",
-        f"{len(frames)}:a",
-        "-c:v",
-        "libx264",
-        "-profile:v",
-        "high",
-        "-preset",
-        "medium",
-        "-crf",
-        "20",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
-        "-shortest",
-        "-movflags",
-        "+faststart",
-        out_path,
-    ]
+    cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", f"{len(frames)}:a",
+            "-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-crf", "20",
+            "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", out_path]
     return cmd
 
 
@@ -208,9 +170,7 @@ def render(post: dict, out_path: str) -> str:
             img.save(path)
             frames.append(path)
             seconds.append(s)
-        r = subprocess.run(
-            ffmpeg_command(frames, seconds, out_path, ffmpeg), capture_output=True, text=True
-        )
+        r = subprocess.run(ffmpeg_command(frames, seconds, out_path, ffmpeg), capture_output=True, text=True)
         if r.returncode != 0 or not os.path.exists(out_path):
             raise RuntimeError("ffmpeg failed: " + (r.stderr or "").strip()[-300:])
     return out_path

@@ -12,20 +12,12 @@ anyway. Every block is serialized twice, and ":" arrives escaped, since it separ
 No tenant serves a robots.txt at all (checked on textron, massanf and hyatt: 404), and the page is
 80-400 KB, so it is fetched on the same terms as the other boards - only for postings that might be
 somewhere a student asked for, capped per board."""
-
 from __future__ import annotations
 import json
 import re
 import urllib.parse
-from .common import (
-    board_item,
-    counts_of,
-    html_to_text,
-    mark_complete,
-    reported_count,
-    require_robots,
-    rows_of,
-)
+from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
+                     require_robots, rows_of)
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -33,7 +25,7 @@ BASE = "https://{tenant}.taleo.net/careersection"
 # Quebec employers publish French-only titles, for example Tetra Tech's
 # "Stagiaire estimateur(trice) en électricité". Keep admission in is_internship below.
 KEYWORDS = ("intern", "internship", "co-op", "student", "stagiaire")
-MAX_PAGES = 8  # 25 per page
+MAX_PAGES = 8   # 25 per page
 MAX_DETAIL = 25
 HEADERS = {"Content-Type": "application/json", "tz": "GMT-04:00", "tzname": "America/New_York"}
 _PORTAL = re.compile(r"portal[^0-9]{0,20}(\d{6,})")
@@ -41,17 +33,12 @@ _HISTORY = re.compile(r'name="initialHistory"[^>]*value="([^"]*)"')
 
 
 def _body(keyword: str, page: int) -> dict:
-    return {
-        "multilineEnabled": False,
-        "sortingSelection": {"sortBySelectionParam": "3", "ascendingSortingOrder": "false"},
-        "fieldData": {
-            "fields": {"KEYWORD": keyword, "LOCATION": "", "ORGANIZATION": ""},
-            "valid": True,
-        },
-        "filterSelectionParam": {"searchFilterSelections": []},
-        "advancedSearchFiltersSelectionParam": {"searchFilterSelections": []},
-        "pageNo": page,
-    }
+    return {"multilineEnabled": False,
+            "sortingSelection": {"sortBySelectionParam": "3", "ascendingSortingOrder": "false"},
+            "fieldData": {"fields": {"KEYWORD": keyword, "LOCATION": "", "ORGANIZATION": ""}, "valid": True},
+            "filterSelectionParam": {"searchFilterSelections": []},
+            "advancedSearchFiltersSelectionParam": {"searchFilterSelections": []},
+            "pageNo": page}
 
 
 def _place(s: str) -> str | None:
@@ -92,16 +79,9 @@ def parse_taleo(payload: dict, co: dict, tenant: str, section: str) -> tuple[lis
         if not locs:
             counts.discard("outside_region")
             continue
-        out.append(
-            board_item(
-                co,
-                source="taleo",
-                title=title,
-                locations=locs,
-                url=f"{BASE.format(tenant=tenant)}/{section}/jobdetail.ftl?job={r.get('contestNo')}",
-                posted_at=dates[0] if dates else None,
-            )
-        )
+        out.append(board_item(co, source="taleo", title=title, locations=locs,
+                              url=f"{BASE.format(tenant=tenant)}/{section}/jobdetail.ftl?job={r.get('contestNo')}",
+                              posted_at=dates[0] if dates else None))
     return out, int((payload.get("pagingData") or {}).get("totalCount") or 0)
 
 
@@ -112,10 +92,10 @@ def parse_taleo_detail(html: str) -> str:
         return ""
     blocks: list[str] = []
     for part in m.group(1).split("!|!"):
-        if "%3C" not in part:  # a part with no markup in it is a label or a flag, not the advert
+        if "%3C" not in part:          # a part with no markup in it is a label or a flag, not the advert
             continue
         part = part[3:] if part.startswith("!*!") else part
-        if part not in blocks:  # each block is serialized twice
+        if part not in blocks:         # each block is serialized twice
             blocks.append(part)
     return "\n".join(html_to_text(urllib.parse.unquote(b).replace("\\:", ":")) for b in blocks)
 
@@ -132,9 +112,8 @@ def _portal(c, tenant: str, section: str) -> str:
 def fetch_taleo_board(c, co: dict) -> list[dict]:
     parts = co["ats_token"].split("|")
     tenant, section = parts[0], parts[1]
-    require_robots(
-        c, f"https://{tenant}.taleo.net", "/careersection/rest/jobboard/searchjobs", co["ats_token"]
-    )
+    require_robots(c, f"https://{tenant}.taleo.net",
+                   "/careersection/rest/jobboard/searchjobs", co["ats_token"])
     portal = parts[2] if len(parts) > 2 else _portal(c, tenant, section)
     url = f"{BASE.format(tenant=tenant)}/rest/jobboard/searchjobs"
     seen: dict[str, dict] = {}
@@ -142,9 +121,7 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
     for kw in KEYWORDS:
         reported, rows, well_formed, total = None, 0, True, 0
         for page in range(1, MAX_PAGES + 1):
-            r = c.post(
-                url, params={"lang": "en", "portal": portal}, json=_body(kw, page), headers=HEADERS
-            )
+            r = c.post(url, params={"lang": "en", "portal": portal}, json=_body(kw, page), headers=HEADERS)
             r.raise_for_status()
             payload = r.json()
             if not isinstance(payload, dict):
@@ -166,7 +143,7 @@ def fetch_taleo_board(c, co: dict) -> list[dict]:
                 break
         else:
             if MAX_PAGES * 25 < total:
-                counts.stop("page_cap")  # 200 results read with more left
+                counts.stop("page_cap")   # 200 results read with more left
         # MAX_PAGES caps a keyword at 200 results; one with more is read only in part.
         complete = complete and well_formed and reported is not None and rows == reported
     out = list(seen.values())

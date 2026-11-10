@@ -2,10 +2,8 @@
 
   cd backend && python scripts/verify_registry.py
 """
-
 import os
 import sys
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from internscout.discover import load_registry, save_registry, seed_registry, drop, MAX_FAILS
@@ -13,21 +11,17 @@ from internscout.run_ingest import scan_boards
 
 reg = load_registry()
 seed_registry(reg)
-
-
 def arm(entries):
     for e in entries:
-        e["fails"] = MAX_FAILS - 1  # one more failure = dropped
-        e.pop("last_fail", None)  # failures count once a day now; without this a board that
-        # already failed in today's ingest could never be dropped here
+        e["fails"] = MAX_FAILS - 1          # one more failure = dropped
+        e.pop("last_fail", None)            # failures count once a day now; without this a board that
+                                            # already failed in today's ingest could never be dropped here
 
 
 # Arming writes MAX_FAILS - 1 on every board, and a board the scan neither passed nor failed (its ATS
 # tripped the systemic guard, or its second failure was a throttle) used to be saved that way: one bad
 # day from deletion, for having been checked. What each board had is kept here and put back at the end.
-before = {
-    (a, t): (v.get("fails", 0), v.get("last_fail")) for a, e in reg.items() for t, v in e.items()
-}
+before = {(a, t): (v.get("fails", 0), v.get("last_fail")) for a, e in reg.items() for t, v in e.items()}
 arm(e for entries in reg.values() for e in entries.values())
 scan_boards(reg)
 dead = [(a, t) for a, e in reg.items() for t, v in e.items() if v["fails"] >= MAX_FAILS]
@@ -36,7 +30,6 @@ dead = [(a, t) for a, e in reg.items() for t, v in e.items() if v["fails"] >= MA
 # on their own and after a pause, and only a board that fails both times goes.
 if dead:
     import time
-
     time.sleep(20)
     again = {a: {t: reg[a][t] for aa, t in dead if aa == a} for a in {a for a, _ in dead}}
     arm(e for entries in again.values() for e in entries.values())
@@ -47,21 +40,15 @@ if dead:
     spared = [(a, t) for a, t in dead if reg[a][t]["fails"] < MAX_FAILS]
     for a, t in spared:
         # was: always "(answered on the second try)"
-        how = (
-            "answered on the second try"
-            if reg[a][t]["fails"] == 0
-            else "throttled on the second try, left as it was"
-        )
+        how = "answered on the second try" if reg[a][t]["fails"] == 0 else "throttled on the second try, left as it was"
         print(f"kept {a}:{t} ({how})")
     dead = [d for d in dead if d not in spared]
 for a, t in dead:
-    drop(
-        reg, a, t, "robots" if reg[a][t].get("closed") else "dead"
-    )  # was: del reg[a][t]; now remembered, so discovery leaves it out
+    drop(reg, a, t, "robots" if reg[a][t].get("closed") else "dead")   # was: del reg[a][t]; now remembered, so discovery leaves it out
     print(f"dropped {a}:{t}")
 for a, e in reg.items():
     for t, v in e.items():
-        if v.get("fails", 0) and (a, t) in before:  # never answered, never dropped: as it was
+        if v.get("fails", 0) and (a, t) in before:      # never answered, never dropped: as it was
             v["fails"], last = before[a, t]
             v.pop("last_fail", None)
             if last:

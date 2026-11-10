@@ -4,7 +4,6 @@ Token: the board slug, e.g. "palantir". A board hosted in Lever's EU region carr
 after a pipe - "cirrus|eu" - because api.lever.co answers 404 for those and api.eu.lever.co
 serves them. Plenty of EU-hosted boards advertise US internships, so they are worth reading.
 """
-
 from __future__ import annotations
 from .base import client
 from .common import board_item, counts_of, stamp_board_newest
@@ -30,34 +29,18 @@ def parse_lever(payload: list, co: dict) -> list[dict]:
             counts.discard("not_student")
             continue
         locs = list(dict.fromkeys([cats.get("location")] + list(cats.get("allLocations") or [])))
-        if (j.get("workplaceType") == "remote") and not any(
-            "remote" in (l or "").lower() for l in locs
-        ):
+        if (j.get("workplaceType") == "remote") and not any("remote" in (l or "").lower() for l in locs):
             country = (j.get("country") or "US").upper()
             # "Remote - CA" read as remote-in-California; Lever's country is the ISO code, and CA is Canada.
-            locs.append(
-                "Remote"
-                if country == "US"
-                else "Remote - Canada"
-                if country == "CA"
-                else f"Remote - {j.get('country')}"
-            )
+            locs.append("Remote" if country == "US" else "Remote - Canada" if country == "CA" else f"Remote - {j.get('country')}")
         created = j.get("createdAt")
-        out.append(
-            board_item(
-                co,
-                source="lever",
-                title=title,
-                locations=locs,
-                url=j.get("hostedUrl"),
-                apply_url=j.get("applyUrl") or j.get("hostedUrl"),
-                posted_at=created / 1000 if created else None,
-                description=j.get("descriptionPlain") or "",
-                employment_type=cats.get("commitment") or "",
-            )
-        )
+        out.append(board_item(co, source="lever", title=title, locations=locs,
+                              url=j.get("hostedUrl"), apply_url=j.get("applyUrl") or j.get("hostedUrl"),
+                              posted_at=created / 1000 if created else None,
+                              description=j.get("descriptionPlain") or "",
+                              employment_type=cats.get("commitment") or ""))
     place_bare_cities(out, board_state(board))
-    stamp_board_newest(out, [j.get("createdAt") for j in payload or []])  # see normalize._zombie
+    stamp_board_newest(out, [j.get("createdAt") for j in payload or []])   # see normalize._zombie
     return out
 
 
@@ -69,7 +52,7 @@ def fetch_lever_board(c, co: dict) -> list[dict]:
         raise ValueError("Lever response is missing its complete postings list")
     counts = counts_of(co)
     counts.rows(len(payload))
-    counts.reported(len(payload))  # unpaged: the list is everything the board listed
+    counts.reported(len(payload))   # unpaged: the list is everything the board listed
     items = parse_lever(payload, co)
     co["_scan_complete"] = True
     return items

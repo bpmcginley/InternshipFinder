@@ -22,7 +22,6 @@ Sources as of 2026-10-01:
 
 No competitor logos, and the card says InternScout is not affiliated with either.
 """
-
 from __future__ import annotations
 
 import os
@@ -36,7 +35,7 @@ from cards import ACCENT, INK, INK2, PAPER, SOFT, font, wrap  # noqa: E402
 
 W, H = 1080, 1350
 M = 60
-RULE = (226, 222, 212)  # --rule #e2ded4
+RULE = (226, 222, 212)        # --rule #e2ded4
 AS_OF = "October 1, 2026"
 HEADLINE = ("Paid plans: $4 a month", "vs $39.99 a month")
 COLS = [("", 250), ("InternScout", 270), ("Simplify", 230), ("Jobright", 230)]
@@ -47,14 +46,8 @@ FREE_EDU = {"autofill": 25, "resume_tailor": 10}
 FREE_GENERAL = {"autofill": 12, "resume_tailor": 5}
 ROWS = [
     ("Paid plan", ["$4 or $8 / month", "$39.99 / month", "$39.99 / month"]),
-    (
-        "Free AI-filled applications",
-        [f"{FREE_EDU['autofill']} a month*", "Basic autofill, free", "Daily credits"],
-    ),
-    (
-        "Free AI-tailored resumes",
-        [f"{FREE_EDU['resume_tailor']} a month*", "Paid plan only", "Daily credits"],
-    ),
+    ("Free AI-filled applications", [f"{FREE_EDU['autofill']} a month*", "Basic autofill, free", "Daily credits"]),
+    ("Free AI-tailored resumes", [f"{FREE_EDU['resume_tailor']} a month*", "Paid plan only", "Daily credits"]),
     ("Who presses Submit", ["Always you", "You", "You, or its AI agent"]),
     ("Built for", ["Internships, co-ops, research", "All job levels", "All job levels"]),
 ]
@@ -65,7 +58,7 @@ NOTES = [
     "Simplify+ price from help.simplify.jobs. Jobright doesn't publish student prices: Turbo price as",
     f"reported by Jobscan, July 2026. Prices as of {AS_OF}. Not affiliated with Simplify or Jobright.",
 ]
-LINE = 36  # line height in the table
+LINE = 36                     # line height in the table
 
 
 def _table(d: ImageDraw.ImageDraw, y: int, highlight_to: int | None) -> int:
@@ -77,17 +70,10 @@ def _table(d: ImageDraw.ImageDraw, y: int, highlight_to: int | None) -> int:
         x += w
     right = x - 14
     if highlight_to is not None:
-        d.rounded_rectangle(
-            [xs[1] - 12, y - 14, xs[1] + COLS[1][1] - 14, highlight_to], radius=18, fill=SOFT
-        )
+        d.rounded_rectangle([xs[1] - 12, y - 14, xs[1] + COLS[1][1] - 14, highlight_to], radius=18, fill=SOFT)
     for (name, _), x in zip(COLS, xs):
         if name:
-            d.text(
-                (x, y),
-                name,
-                font=font("sans_bold", 30),
-                fill=ACCENT if name == "InternScout" else INK,
-            )
+            d.text((x, y), name, font=font("sans_bold", 30), fill=ACCENT if name == "InternScout" else INK)
     y += 58
     d.line([M, y, right, y], fill=ACCENT, width=3)
     label_f, ours_f, cell_f = font("sans_bold", 28), font("sans_bold", 28), font("sans", 28)
@@ -114,9 +100,7 @@ def render(out_path: str) -> str:
 
     d.rectangle([0, 0, W, 200], fill=ACCENT)
     d.text((M, 46), "InternScout", font=font("serif", 64), fill=PAPER)
-    d.text(
-        (M + 2, 132), "AI JOB TOOLS FOR STUDENTS, COMPARED", font=font("sans_bold", 28), fill=SOFT
-    )
+    d.text((M + 2, 132), "AI JOB TOOLS FOR STUDENTS, COMPARED", font=font("sans_bold", 28), fill=SOFT)
 
     y = 236
     d.text((M, y), HEADLINE[0], font=font("serif", 60), fill=ACCENT)
@@ -136,19 +120,11 @@ def render(out_path: str) -> str:
 
     d.rectangle([0, H - foot, W, H], fill=ACCENT)
     d.text((M, H - 128), "internscout.org", font=font("serif", 50), fill=PAPER)
-    d.text(
-        (M, H - 56),
-        "Built by one student, made for all students.  Not affiliated with UMass Amherst.",
-        font=font("sans", 25),
-        fill=SOFT,
-    )
+    d.text((M, H - 56), "Built by one student, made for all students.  Not affiliated with UMass Amherst.",
+           font=font("sans", 25), fill=SOFT)
     img.save(out_path, "PNG", optimize=True)
     return out_path
 
 
 if __name__ == "__main__":
-    print(
-        render(
-            sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "internscout-comparison.png")
-        )
-    )
+    print(render(sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "internscout-comparison.png")))
