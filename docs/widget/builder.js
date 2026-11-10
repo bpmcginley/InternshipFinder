@@ -40,7 +40,7 @@
     var wanted = new URLSearchParams(location.search).get("field") || "";
     field.value = validFields.indexOf(wanted) >= 0 ? wanted : "";
     field.disabled = false;
-    status.textContent = wanted && !field.value ? "That field is unavailable. Choose a field below." : "Choose one field or show all fields.";
+    status.textContent = wanted && !field.value ? "That field is unavailable. Choose a field." : "Choose one field or show all fields.";
     update();
   }).catch(function () {
     status.textContent = "Could not load field choices. The code shows all fields; reload to try again.";

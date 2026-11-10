@@ -203,7 +203,7 @@ function uiHarness() {
   vm.runInContext(CORE_SRC, ctx);
   vm.runInContext(PLACE_SRC, ctx);
   vm.runInContext(APP_SRC.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-    'window.components = { ListTable, Row, Why, factsLine, matchControl };'), ctx);
+    'window.components = { ListTable, Row, Why, factsLine, matchControl, companyRuns };'), ctx);
   return { c: ctx.components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
     render(component, props) { cursor = 0; pending = []; const tree = component(props); pending.forEach(fn => fn()); return tree; },
     reset() { slots.length = 0; } };
@@ -255,12 +255,79 @@ test("T4: the list, its counts and its end line are the same with and without th
   assert.equal(H.P.MAX_PER_PAGE, 1);
   // Every count and the selection in app.js come from rows and shown, never from the box.
   const lines = APP_SRC.split(/\r?\n/);
-  for (const re of [/const shown = rows\.slice\(0, limit\)/, /const liveText = /, /listings shown`/, /shown\.length\.toLocaleString\(\)\} of \$\{rows\.length/, /className: "countline"/, /const selectable = /, /const allChecked = /, /const moreCount = /]) {
+  for (const re of [/const pageRows = rows\.slice\(0, limit\)/, /const \{ shown, moreAfter \} = companyRuns/, /const liveText = /, /listings shown`/, /shown\.length\.toLocaleString\(\)\} of \$\{rows\.length/, /className: "countline"/, /const selectable = /, /const allChecked = /, /const moreCount = /]) {
     const hits = lines.filter(l => re.test(l));
     assert.ok(hits.length, String(re));
     for (const l of hits) assert.doesNotMatch(l, /plac|ISPlace|PL\./i, l.trim());
   }
   assert.match(APP_SRC, /const selectable = shown\.filter\(/);
+});
+
+// P-1.1: collapsing changes presentation and selection, never the matching result set.
+const runRows = (n, company = "REGENT", prefix = "r") => Array.from({ length: n }, (_, i) => ({
+  id: prefix + i, company_name: company, apply_url: "https://jobs.example/" + prefix + i,
+}));
+for (const n of [1, 2, 3, 10]) test(`company runs: ${n} listings show at most two, then expand in order`, () => {
+  const H = uiHarness(), rows = runRows(n), original = JSON.stringify(rows);
+  const collapsed = H.c.companyRuns(rows, { sort: "new", q: "" });
+  assert.deepEqual(plain(collapsed.shown), rows.slice(0, 2));
+  assert.equal(collapsed.moreAfter.size, n > 2 ? 1 : 0);
+  if (n > 2) {
+    const run = [...collapsed.moreAfter.values()][0];
+    assert.equal(run.count, n - 2);
+    assert.equal(run.firstHidden, rows[2].id);
+    const expanded = H.c.companyRuns(rows, { sort: "new", q: "" }, new Set([run.key]));
+    assert.deepEqual(plain(expanded.shown), rows);
+    assert.equal(expanded.moreAfter.size, 0);
+  }
+  assert.equal(JSON.stringify(rows), original, "never mutates the ranked results");
+});
+
+test("company runs: separate runs of the same company expand independently", () => {
+  const H = uiHarness(), rows = [...runRows(3), ...runRows(1, "Other", "b"), ...runRows(10, "REGENT", "c")];
+  const initial = H.c.companyRuns(rows, { sort: "new", q: "" });
+  assert.equal(initial.shown.length, 5);
+  const runs = [...initial.moreAfter.values()];
+  assert.deepEqual(runs.map(r => r.count), [1, 8]);
+  assert.notEqual(runs[0].key, runs[1].key);
+  const expanded = H.c.companyRuns(rows, { sort: "new", q: "" }, new Set([runs[0].key]));
+  assert.deepEqual(plain(expanded.shown.map(r => r.id)), ["r0", "r1", "r2", "b0", "c0", "c1"]);
+  assert.equal([...expanded.moreAfter.values()][0].key, runs[1].key);
+});
+
+test("company runs: other sorts, any search text and unnamed employers stay uncollapsed", () => {
+  const H = uiHarness(), rows = runRows(10);
+  for (const sort of ["company", "score", "comp"]) assert.deepEqual(plain(H.c.companyRuns(rows, { sort, q: "" }).shown), rows);
+  for (const q of ["R", "REGENT", "  REGENT  "]) assert.deepEqual(plain(H.c.companyRuns(rows, { sort: "new", q }).shown), rows);
+  assert.equal(H.c.companyRuns(rows, { sort: "new", q: " \t " }).shown.length, 2);
+  assert.equal(H.c.companyRuns(runRows(10, ""), { sort: "new", q: "" }).shown.length, 10);
+});
+
+test("company runs: only displayed rows are selected; end counts and pagination stay honest", () => {
+  const H = uiHarness(), rows = runRows(160), pageRows = rows.slice(0, 150);
+  const render = (projection, all = rows) => H.render(H.c.ListTable, {
+    ...projection, rows: all, pageCount: pageRows.length, head: null,
+    renderRow: r => H.h("ROW", { key: r.id }), onMore() {},
+    onExpand: run => { clicked = run; }, columns: 5,
+  });
+  let clicked;
+  const initial = H.c.companyRuns(pageRows, { sort: "new", q: "" });
+  const tree = render(initial), button = nodes(tree, n => n.props["aria-expanded"] === false)[0];
+  assert.equal(text(button), "148 more from REGENT");
+  assert.equal(button.props["aria-label"], "Show 148 more listings from REGENT");
+  assert.equal(nodes(tree, n => n.props.className === "company-run")[0].children[0].props.colSpan, 5);
+  assert.equal(text(nodes(tree, n => n.props.id === "list-end")[0]), "End of the 2 listings shown");
+  assert.equal(text(nodes(tree, n => n.props.className === "more")[0]), "Show 10 more");
+  assert.equal(nodes(render(initial, pageRows), n => n.props.className === "more").length, 0, "collapsed rows are not another page");
+  const selection = H.IS.selectRows(new Set(), initial.shown, true).sel;
+  assert.deepEqual([...selection], ["r0", "r1"]);
+  button.props.onClick();
+  assert.equal(clicked.count, 148);
+  const expanded = H.c.companyRuns(pageRows, { sort: "new", q: "" }, new Set([clicked.key]));
+  assert.equal(expanded.shown.length, 150);
+  assert.equal(H.IS.headerChecked(expanded.shown, selection), false, "revealing rows does not silently select them");
+  const nextPage = H.c.companyRuns(rows, { sort: "new", q: "" }, new Set([clicked.key]));
+  assert.equal(nextPage.shown.length, 160, "an expanded run stays expanded when more rows load");
 });
 
 // ---------- T5 and T8: what the box has, and what it never has ----------

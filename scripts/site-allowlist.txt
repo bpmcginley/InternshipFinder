@@ -2,6 +2,8 @@
 # Handwritten assets: new public files require an explicit review here.
 \.nojekyll
 (index|install|privacy|terms)\.html
+flyer\.html
+js/(flyer\.js|qrcode\.min\.js|qrcode-LICENSE\.txt)
 employers/(buy/)?index\.html
 widget/index\.html
 widget/builder\.html
