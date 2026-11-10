@@ -1,4 +1,4 @@
-Formatting PRs next
+Formatting complete; wave 3 in progress
 
 **Authorization update, 2026-11-10:** Bruce explicitly authorized processing now, finishing and merging retained PRs #165, #175, #177 and #178, and notifying the Product/Growth Refactor session to continue. This supersedes the 16:00 earliest-start and empty-queue holds below. Reviews, green CI, Pages verification, protected guard code/tests, and production deployment restrictions remain in force. Product has been notified and is preparing independent work while avoiding implementation overlaps until formatting lands. Design-note merges do not resolve unspecified pricing, privacy, retention or operator choices, nor enable payment/email implementation. Historical notice and inventories below record the earlier gate.
 
@@ -59,7 +59,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Merged | Independent review, all nine checks green; Pages verification pending. Safe subset formatted; protected/public/financial exclusions documented. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
-| 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | Pending PR | In progress | Topic index and current agent rules; historical model notes preserved pending Q1. |
+| 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | [#195](https://github.com/bpmcginley/InternshipFinder/pull/195) | In review | Topic index and current agent rules; historical model notes preserved pending Q1. |
 | 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
 | 3 | WP-2.3 Worker contract | Unassigned | - | - | Queued | Inventory code routes and clients, not prose alone; include missing metrics route. |
 | 3 | WP-4.1 Migrations | Unassigned | - | - | Queued / operator gate | Deduplicated baseline and local tests; no remote action or deploy-script change. |
@@ -348,3 +348,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Added an internal topic index covering all 17 growth Markdown documents (including four campaign drafts), seven worker documents and four root development/coordination documents, plus current hand-offs and evaluation notes. Current inventory includes the directory-monitor documentation added by PR #165.
 - Refreshed AGENTS with worktree ownership, merge/review/Pages gates, safety boundaries and state locations. Historical model/credential notes are byte-identical; Q1 remains unanswered and that scope is preserved. No user-visible site/extension/email copy or executable files changed.
 - Checked every relative link in the new index against the current checkout; all resolve. No new tests are needed for this documentation-only change; CI and independent review remain required.
+
+
+## Wave 3 coordination
+
+- Formatting is complete in merged PR #189 (`da5bc492`) and retry #192 (`182c02ce`). Their push-triggered Pages runs 42891570445 and 42892197177 passed; duplicate workflow-triggered run 42892208901 also passed. The earlier formatting notice is historical, and the product session has been directly notified that ownership is released.
+- Wave 3 started after fetching current main, rereading both coordination sections and checking open product PRs #187, #188 and #193. WP-1.1 leftovers, WP-1.2 packaging, WP-4.1 local migrations and WP-1.3 documentation use separate owned worktrees and branches. Remaining wave-3 packages stay queued until an owner is available.
+- Product claims generated phone layout in #194 (`seo_pages.py`) before WP-3.1; refactor does not edit that file in these four packages. Product #188 owns the next serialized merge/Pages slot. No refactor merge occurs before that publication check returns green.
