@@ -25,7 +25,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
 | A | P-1.7 Non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
 | A | P-1.10 Flyer page | Unassigned | - | - | Queued | Browser-local QR; no third-party requests. |
-| A | P-1.11 Install and offer | audit_worker_extension | `codex/product-p1.11-install-offer` | Pending draft claim | In progress | Own install.html and offer.js; preserve permissions/focus behavior; screenshots before review. |
+| A | P-1.11 Install and offer | audit_worker_extension | codex/product-p1.11-install-offer | [#180](https://github.com/bpmcginley/InternshipFinder/pull/180) | Independent review pending | Short offer; expandable permissions; first-minute install lead; truthful demo placeholder. Site tests and local keyboard/screenshots verified; golden static assets refreshed. |
 | A | P-2.1 Follow design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
 | A | P-2.2 Top-up design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
 | B | P-1.5a Dashboard phone layout | Unassigned | - | - | Queued | Respect app.js and design-token ownership. |
