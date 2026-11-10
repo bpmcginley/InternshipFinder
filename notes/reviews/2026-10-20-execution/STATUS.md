@@ -33,7 +33,7 @@ parallel agents and independent reviews; other work in the primary checkout was 
   Future scheduling and destination delivery are not established by connection or history alone.
 - Verified D1 Time Travel bookmark availability and imported a production-schema-only export
   into isolated SQLite: 41 tables, one trigger, integrity `ok`, no foreign-key violations.
-  [RECOVERY.md](../../worker/RECOVERY.md) explicitly distinguishes this from full data recovery.
+  [RECOVERY.md](../../../worker/RECOVERY.md) explicitly distinguishes this from full data recovery.
 - Verified the live digest has a required email field, confirmation/unsubscribe/privacy copy,
   public archive link, current examples and an October 19 archive entry. No address submitted.
 
