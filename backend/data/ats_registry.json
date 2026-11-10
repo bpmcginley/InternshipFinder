@@ -4926,6 +4926,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "gsacapital": {
+   "name": "GSA Capital",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "gsdm": {
    "name": "GSD&M",
    "quant": false,
@@ -8018,6 +8024,12 @@
    "added": "2026-10-29",
    "sector": "education_research"
   },
+  "us-envoyair": {
+   "name": "Envoy Air",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "uscareers-idemia": {
    "name": "IDEMIA",
    "quant": false,
@@ -8462,6 +8474,12 @@
    "fails": 0,
    "added": "2026-11-10"
   },
+  "jobs.selective.com": {
+   "name": "Selective Insurance",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "jobs.statefarm.com": {
    "name": "State Farm",
    "quant": false,
@@ -8542,6 +8560,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-31"
+  },
+  "www.xanterrajobs.com": {
+   "name": "Windstar Cruises",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "xanterra.jibeapply.com": {
    "name": "Windstar Cruises",
@@ -9910,6 +9934,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-06"
+  },
+  "matillion": {
+   "name": "Matillion",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "MBRDNA": {
    "name": "Mercedes-Benz",
@@ -11984,16 +12014,14 @@
   "textron|textron": {
    "name": "Textron",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "utsw|2": {
    "name": "UT Southwestern Medical Center",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
@@ -15372,12 +15400,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
-  },
-  "fivebelow|wd1|fivebelowcareers": {
-   "name": "Five Below",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
   },
   "flexerasoftware|wd1|FlexeraSoftware": {
    "name": "Flexera",
