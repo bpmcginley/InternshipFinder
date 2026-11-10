@@ -42,3 +42,7 @@ Relocated exact existing pattern: `Plans: free with any email; {config plan labe
 The new aggregate event is `major_quick_set`; it sends no selected major or other typed values. Its recording depends on the separately authorized P-0.2 worker/privacy deployment. Existing browser profile storage is reused. No new storage key or third-party request is added.
 
 The plans-sentence relocation makes the entire PR **needs-bruce**; leave it open. P-1.3 and P-1.4 wait for this shared app.js change to merge.
+
+## Validation
+
+Node 22 full site suite: 263 passed, no skips, using `--test-concurrency=1`. A parallel run alongside the golden build hit the existing 30 ms/40 ms download-timer test; the complete serial rerun passed without changing core or its tests. Six new focused tests and the updated eight-test invitation harness pass. Both golden tests pass, and the integrated recovery-main tree matches all 695 golden paths; only dashboard HTML and app.js differ intentionally from main. The startup payload report succeeds, changed JavaScript passes pinned ESLint, and both released test files plus the new test file pass pinned Prettier.
