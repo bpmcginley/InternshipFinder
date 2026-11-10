@@ -6,6 +6,9 @@ each one to its listing. No account, no tracking, no external dependencies.
 
 ## Embed snippet
 
+[Choose a field and copy your embed code](https://internscout.org/widget/builder.html).
+For chat channels, use the [club feed guide](https://internscout.org/share-feeds.html).
+
 ```html
 <iframe src="https://internscout.org/widget/?field=swe&limit=8"
         width="100%" height="560" style="border:0" loading="lazy"
