@@ -1,21 +1,13 @@
 """The dashboard's first-screen file (P2): docs/data/first.json, written by the export."""
-
 import json
 import os
 import re
-from internscout.export_static import (
-    FIRST_SCREEN_KEYS,
-    FIRST_SCREEN_ROWS,
-    first_screen,
-    write_shards,
-)
+from internscout.export_static import FIRST_SCREEN_KEYS, FIRST_SCREEN_ROWS, first_screen, write_shards
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 # The same fixture tests/site/first_screen.test.mjs sorts with the dashboard's own IS.sortRows, so the
 # two languages are held to one expected order.
-with open(
-    os.path.join(ROOT, "tests", "site", "fixtures", "first_screen.json"), encoding="utf-8"
-) as f:
+with open(os.path.join(ROOT, "tests", "site", "fixtures", "first_screen.json"), encoding="utf-8") as f:
     FIX = json.load(f)
 
 
@@ -34,10 +26,8 @@ def test_rows_are_the_slim_rows_the_state_files_carry():
 def test_preview_covers_ten_results_without_removing_later_state_rows(tmp_path):
     # A preview is deliberately smaller than a page. The next state response must still contain
     # every later result, and the preview's copies must have exactly the same content and order.
-    rows = [
-        {**FIX["rows"][0], "id": f"role-{i}", "posted_at": f"2026-10-{i + 1:02d}"}
-        for i in range(24)
-    ]
+    rows = [{**FIX["rows"][0], "id": f"role-{i}", "posted_at": f"2026-10-{i + 1:02d}"}
+            for i in range(24)]
     index = write_shards(rows, str(tmp_path), "now")
     preview = json.loads((tmp_path / "first.json").read_text(encoding="utf-8"))
     state = json.loads((tmp_path / "listings" / "MA.json").read_text(encoding="utf-8"))
@@ -50,12 +40,7 @@ def test_preview_covers_ten_results_without_removing_later_state_rows(tmp_path):
 
 def test_written_beside_listings_and_named_in_the_index(tmp_path):
     index = write_shards(FIX["rows"], str(tmp_path), "now")
-    assert index["first"] == {
-        "file": "first.json",
-        "keys": FIRST_SCREEN_KEYS,
-        "sort": "new",
-        "rows": 7,
-    }
+    assert index["first"] == {"file": "first.json", "keys": FIRST_SCREEN_KEYS, "sort": "new", "rows": 7}
     rows = json.loads((tmp_path / "first.json").read_text(encoding="utf-8"))
     assert [x["id"] for x in rows] == FIX["expected_all"]
     on_disk = json.loads((tmp_path / "listings" / "index.json").read_text(encoding="utf-8"))

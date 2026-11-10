@@ -3,7 +3,6 @@
 The allow list contains full-match regular expressions over relative POSIX paths.
 It describes public files, not arbitrary contents of a permitted directory.
 """
-
 import argparse
 from pathlib import Path
 import re
@@ -13,11 +12,8 @@ DEFAULT_ALLOWLIST = Path(__file__).with_name("site-allowlist.txt")
 
 
 def read_allowlist(path):
-    return [
-        re.compile(line)
-        for raw in path.read_text(encoding="utf-8").splitlines()
-        if (line := raw.strip()) and not line.startswith("#")
-    ]
+    return [re.compile(line) for raw in path.read_text(encoding="utf-8").splitlines()
+            if (line := raw.strip()) and not line.startswith("#")]
 
 
 def audit(root, patterns):

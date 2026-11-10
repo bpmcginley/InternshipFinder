@@ -1,5 +1,4 @@
 """Publication-boundary tests, independent of the large generated site."""
-
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -23,26 +22,12 @@ class SiteContentsTests(unittest.TestCase):
         return path
 
     def test_public_assets_and_generated_families(self):
-        names = [
-            "index.html",
-            ".nojekyll",
-            "widget/README.md",
-            "employers/buy/index.html",
-            "fonts/OFL-IBM-Plex-Sans.txt",
-            "js/core.js",
-            "data/listings/MA.desc.json",
-            "data/listings/Canada.json",
-            "data/listings/remote.json",
-            "data/roles/_.json",
-            "data/page-content-dates.json",
-            "data/widget.json",
-            "sitemap.xml",
-            "llms-full.txt",
-            "internships/index.html",
-            "internships/at/fixture-employer/index.html",
-            "internships/near/boston/computer-science/feed.xml",
-            "numbers/index.html",
-        ]
+        names = ["index.html", ".nojekyll", "widget/README.md", "employers/buy/index.html",
+                 "fonts/OFL-IBM-Plex-Sans.txt", "js/core.js", "data/listings/MA.desc.json",
+                 "data/listings/Canada.json", "data/listings/remote.json", "data/roles/_.json",
+                 "data/page-content-dates.json", "data/widget.json", "sitemap.xml", "llms-full.txt",
+                 "internships/index.html", "internships/at/fixture-employer/index.html",
+                 "internships/near/boston/computer-science/feed.xml", "numbers/index.html"]
         for name in names:
             self.put(name)
         files, problems = checker.audit(self.root, self.patterns)
@@ -50,19 +35,10 @@ class SiteContentsTests(unittest.TestCase):
         self.assertEqual(files, sorted(names))
 
     def test_unexpected_files_including_inside_allowed_directories(self):
-        for name in [
-            "stray.md",
-            "widget/notes.md",
-            "widget/README.md.bak",
-            "js/notes.md",
-            "data/listings/notes.json",
-            "data/roles/private.json",
-            ".env",
-            "internships/near/boston/notes.md",
-            "internships/at/fixture/debug.txt",
-            "product-review/CONTEXT.md",
-            "coverage-research/result.json",
-        ]:
+        for name in ["stray.md", "widget/notes.md", "widget/README.md.bak", "js/notes.md",
+                     "data/listings/notes.json", "data/roles/private.json", ".env",
+                     "internships/near/boston/notes.md", "internships/at/fixture/debug.txt",
+                     "product-review/CONTEXT.md", "coverage-research/result.json"]:
             with self.subTest(name=name):
                 path = self.put(name)
                 _, problems = checker.audit(self.root, self.patterns)

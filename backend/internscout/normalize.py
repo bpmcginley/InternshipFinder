@@ -1,5 +1,4 @@
 """Turn a raw posting (any source) into a normalized dict ready for persistence."""
-
 from __future__ import annotations
 import hashlib
 import re
@@ -11,24 +10,12 @@ from .region import evaluate_locations
 # "Spring Boot" and "fall under" are not terms
 # ...and neither are "Silver Spring, MD", "Cold Spring Harbor", "Fall River, MA" or "Winter Park, FL":
 # a posting in Silver Spring was being given the term "Spring", and then dropped as out of cycle.
-_SEASON_RE = re.compile(
-    r"\b(summer|fall(?!\s+(?:under|within|into|in|on|behind|short|outside|off|river)\b)|autumn|"
-    r"winter(?!\s+(?:park|haven|garden|springs)\b)|"
-    r"(?<!silver\s)(?<!cold\s)spring(?!\s*(?:boot|framework|mvc|cloud|batch|data|hill|valley|lake|house|harbor)\b)(?!,\s*tx\b)|"
-    r"hiver|printemps|été|ete|automne|year[- ]round|academic year)\b",
-    re.I,
-)
-_SEASON_NAME = {
-    "autumn": "Fall",
-    "year round": "Year-round",
-    "year-round": "Year-round",
-    "academic year": "Year-round",
-    "hiver": "Winter",
-    "printemps": "Spring",
-    "été": "Summer",
-    "ete": "Summer",
-    "automne": "Fall",
-}
+_SEASON_RE = re.compile(r"\b(summer|fall(?!\s+(?:under|within|into|in|on|behind|short|outside|off|river)\b)|autumn|"
+                        r"winter(?!\s+(?:park|haven|garden|springs)\b)|"
+                        r"(?<!silver\s)(?<!cold\s)spring(?!\s*(?:boot|framework|mvc|cloud|batch|data|hill|valley|lake|house|harbor)\b)(?!,\s*tx\b)|"
+                        r"hiver|printemps|été|ete|automne|year[- ]round|academic year)\b", re.I)
+_SEASON_NAME = {"autumn": "Fall", "year round": "Year-round", "year-round": "Year-round", "academic year": "Year-round",
+                "hiver": "Winter", "printemps": "Spring", "été": "Summer", "ete": "Summer", "automne": "Fall"}
 _YEAR_RE = re.compile(r"\b(20[2-3]\d)\b")  # 2020-2039, avoids matching job-id digits
 
 
@@ -41,14 +28,11 @@ def parse_term_from_text(text: str):
     year = int(y.group(1)) if y else None
     return season, year
 
-
 # A season and a year written next to each other ("Summer 2027", "2027 Summer"). This is the only
 # form a DESCRIPTION is trusted for: a lone year in one is as likely to be "founded in 2021" or
 # "graduating in 2028" as the term, and it used to override the title.
 _TERM_PAIR_RE = re.compile(
-    r"\b(summer|fall|autumn|winter|spring|hiver|printemps|été|ete|automne)\s+(?:of\s+)?(20[2-3]\d)\b|\b(20[2-3]\d)\s+(summer|fall|autumn|winter|spring|hiver|printemps|été|ete|automne)\b",
-    re.I,
-)
+    r"\b(summer|fall|autumn|winter|spring|hiver|printemps|été|ete|automne)\s+(?:of\s+)?(20[2-3]\d)\b|\b(20[2-3]\d)\s+(summer|fall|autumn|winter|spring|hiver|printemps|été|ete|automne)\b", re.I)
 
 
 def parse_term_pair(text: str):
@@ -59,10 +43,7 @@ def parse_term_pair(text: str):
     return None, None
 
 
-_GRAD_CONTEXT = re.compile(
-    r"(graduat\w*|class of|degree|enrolled|completion|founded|since|established|copyright|\(c\))[^.]{0,40}$",
-    re.I,
-)
+_GRAD_CONTEXT = re.compile(r"(graduat\w*|class of|degree|enrolled|completion|founded|since|established|copyright|\(c\))[^.]{0,40}$", re.I)
 
 
 def lone_description_year(text: str, today: datetime | None = None):
@@ -75,9 +56,7 @@ def lone_description_year(text: str, today: datetime | None = None):
     now = (today or datetime.now(timezone.utc)).year
     for m in _YEAR_RE.finditer(text or ""):
         y = int(m.group(1))
-        if now <= y <= now + 1 and not _GRAD_CONTEXT.search(
-            text[max(0, m.start() - 60) : m.start()]
-        ):
+        if now <= y <= now + 1 and not _GRAD_CONTEXT.search(text[max(0, m.start() - 60):m.start()]):
             return y
     return None
 
@@ -89,9 +68,7 @@ def lone_description_year(text: str, today: datetime | None = None):
 # segment that is only digits is an id or a date folder ("/careers/2026/09/").
 _WORKDAY = re.compile(r"myworkday(?:jobs|site)\.com/.*?/job/(?:[^/?#]+/)?([^/?#]+)", re.I)
 _REQUISITION = re.compile(r"_[A-Za-z]{0,6}[-_]?\d[\w-]*$")
-_HEX_ID = re.compile(
-    r"[0-9a-f]{8}-[0-9a-f-]{20,}|[0-9a-f]{16,}", re.I
-)  # Lever's UUIDs, tracking ids
+_HEX_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f-]{20,}|[0-9a-f]{16,}", re.I)   # Lever's UUIDs, tracking ids
 
 
 def url_job_words(url: str) -> str:
@@ -103,13 +80,9 @@ def url_job_words(url: str) -> str:
         parts = [_REQUISITION.sub("", wd.group(1))]
     else:
         rest = re.sub(r"^[a-z]+://[^/?#]*", "", url, flags=re.I)
-        parts = [
-            p
-            for p in re.split(r"[/?&#=]", rest)
-            if p and not p.isdigit() and not _HEX_ID.fullmatch(p)
-        ]
+        parts = [p for p in re.split(r"[/?&#=]", rest) if p and not p.isdigit() and not _HEX_ID.fullmatch(p)]
     words = re.sub(r"[-_+.,]+", " ", " ".join(parts))
-    return re.sub(r"(?<=\d)(?=[A-Za-z])", " ", words)  # "Fall-2026Winter-2027" -> "2026 Winter"
+    return re.sub(r"(?<=\d)(?=[A-Za-z])", " ", words)   # "Fall-2026Winter-2027" -> "2026 Winter"
 
 
 def lone_url_year(words: str, today: datetime | None = None):
@@ -123,14 +96,10 @@ _SALARY_RE = re.compile(
     r'\$\s?\d[\d,]*(?:\.\d+)?\s?[kK]?'
     r'(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?'
     r'(?:\s?(?:/|per\s)?\s?(?:hour|hr|year|yr|annum|annually|month|mo|week|wk|day))?',
-    re.I,
-)
+    re.I)
 # 2026-10-23: was integer-only and matched the 5 in 10.5-week. Keep explicit ranges too.
 # Revert: restore the integer-only expression and extract_duration formatter together.
-_DURATION_RE = re.compile(
-    r'(?<![\w.])(\d{1,2}(?:\.\d+)?)\s*(?:(?:[-\u2013]|to)\s*(\d{1,2}(?:\.\d+)?)\s*)?[-\u2013]?\s*weeks?\b',
-    re.I,
-)
+_DURATION_RE = re.compile(r'(?<![\w.])(\d{1,2}(?:\.\d+)?)\s*(?:(?:[-\u2013]|to)\s*(\d{1,2}(?:\.\d+)?)\s*)?[-\u2013]?\s*weeks?\b', re.I)
 
 
 # The first dollar figure in a posting is often not the pay: "401(k) match up to $5,000", "$2,500
@@ -138,48 +107,31 @@ _DURATION_RE = re.compile(
 # earns $250,000 is worse than a card that says nothing, so a figure is skipped when the words just
 # before it are about benefits or the company, or when it is followed by million/billion; and a
 # figure with no unit (no /hr, /year, k) is believed only when pay words are close by.
-_NOT_PAY_BEFORE = re.compile(
-    r"(401\s?\(?k\)?|match|bonus|tuition|reimburs\w*|relocation|scholarship|award\w*|grant\w*|"
-    r"revenue|funding|raised|donat\w*|assets|valuation|prize|referral|"
-    r"sign[- ]on|signing|discount)[^.$]{0,40}$",
-    re.I,
-)
-_NOT_PAY_AFTER = re.compile(
-    r"^\s?(million|billion|trillion|mm\b|m\b|b\b|bn\b|\+?\s?(in|of)\s+(assets|revenue|sales|funding))",
-    re.I,
-)
-_PAY_NEAR = re.compile(
-    r"(salary|pay\b|paid|compensation|wage|rate|range|stipend|earn|hourly|annual|base|per hour)",
-    re.I,
-)
+_NOT_PAY_BEFORE = re.compile(r"(401\s?\(?k\)?|match|bonus|tuition|reimburs\w*|relocation|scholarship|award\w*|grant\w*|"
+                             r"revenue|funding|raised|donat\w*|assets|valuation|prize|referral|"
+                             r"sign[- ]on|signing|discount)[^.$]{0,40}$", re.I)
+_NOT_PAY_AFTER = re.compile(r"^\s?(million|billion|trillion|mm\b|m\b|b\b|bn\b|\+?\s?(in|of)\s+(assets|revenue|sales|funding))", re.I)
+_PAY_NEAR = re.compile(r"(salary|pay\b|paid|compensation|wage|rate|range|stipend|earn|hourly|annual|base|per hour)", re.I)
 
 
 def _is_pay(text: str, m, has_unit: bool) -> bool:
-    before, after = text[max(0, m.start() - 60) : m.start()], text[m.end() : m.end() + 30]
+    before, after = text[max(0, m.start() - 60):m.start()], text[m.end():m.end() + 30]
     if before.endswith("-") and (len(before) < 2 or not before[-2].isdigit()):
         return False  # 2026-10-23: was stripping a negative sign from -$20/hour.
     if _NOT_PAY_AFTER.search(after) or _NOT_PAY_BEFORE.search(before):
         return False
-    return has_unit or bool(_PAY_NEAR.search(text[max(0, m.start() - 80) : m.end() + 40]))
+    return has_unit or bool(_PAY_NEAR.search(text[max(0, m.start() - 80):m.end() + 40]))
 
 
 def extract_salary(text: str):
     from .pay import placeholder_pay
-
     text = text or ""
     for m in _SALARY_RE.finditer(text):
         val = re.sub(r"\s+", " ", m.group(0)).strip()
         low = val.lower()
-        has_unit = any(
-            u in low
-            for u in ("hour", "hr", "year", "yr", "annum", "month", "mo", "week", "wk", "day", "k")
-        )
+        has_unit = any(u in low for u in ("hour", "hr", "year", "yr", "annum", "month", "mo", "week", "wk", "day", "k"))
         digits = re.sub(r"[^\d]", "", val.split("-")[0])
-        if (
-            (has_unit or (digits.isdigit() and int(digits) >= 1000))
-            and _is_pay(text, m, has_unit)
-            and not placeholder_pay(val)
-        ):
+        if (has_unit or (digits.isdigit() and int(digits) >= 1000)) and _is_pay(text, m, has_unit) and not placeholder_pay(val):
             return val[:120]
     return None
 
@@ -193,13 +145,11 @@ def extract_duration(text: str):
         return None
     return f"{lo}-{hi} weeks" if hi else f"{lo} weeks"
 
-
 _WS = re.compile(r"\s+")
 _NOISE = re.compile(r"[\(\)\[\]\-–—:,/|]+")
 _SUFFIX = re.compile(
     r"\b(summer|fall|winter|spring)\b|\b20\d\d\b|\bintern(ship)?\b|\bco-?op\b|"
-    r"\b(us|usa|remote|hybrid|onsite)\b|\b(i{1,3}|iv)\b",
-    re.I,
+    r"\b(us|usa|remote|hybrid|onsite)\b|\b(i{1,3}|iv)\b", re.I
 )
 
 
@@ -208,24 +158,16 @@ _SUFFIX = re.compile(
 _COMPANY_STRIP = re.compile(
     r"\b(l\.?l\.?c\.?|inc\.?|incorporated|corp\.?|corporation|ltd\.?|"
     r"limited partnership|limited|l\.?p\.?|plc|gmbh|internships?|internship program|"
-    r"careers|external students|students)\b",
-    re.I,
-)
+    r"careers|external students|students)\b", re.I)
 # Trailing location on titles ("... Intern Boston, MA" / "... United States").
 _TITLE_TAILS = re.compile(r"[\s,]*(united states|u\.?s\.?a?\.?)\s*$", re.I)
 _TITLE_LOC = re.compile(r"[\s,]*[a-z][a-z]+(?:\s[a-z]+){0,2},\s*[a-z]{2}\s*$", re.I)
 
 
-_US_CODES = frozenset(
-    (
-        "al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms mo mt ne nv nh nj nm "
-        "ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy dc pr"
-    ).split()
-)
-_ROLE_WORD = re.compile(
-    r"\b(interns?|internship|co-?op|engineer(?:ing)?|analyst|student|research(?:er)?|program|"
-    r"assistant|associate|developer|scientist|trainee|fellow(?:ship)?|apprentice)\b"
-)
+_US_CODES = frozenset(("al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms mo mt ne nv nh nj nm "
+                       "ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy dc pr").split())
+_ROLE_WORD = re.compile(r"\b(interns?|internship|co-?op|engineer(?:ing)?|analyst|student|research(?:er)?|program|"
+                        r"assistant|associate|developer|scientist|trainee|fellow(?:ship)?|apprentice)\b")
 
 
 def _strip_title_loc(t: str) -> str:
@@ -245,7 +187,7 @@ def _strip_title_loc(t: str) -> str:
         return t
     if _ROLE_WORD.search(tail):
         return re.sub(r",\s*[a-z]{2}\s*$", " ", t)
-    return t[: m.start()] + " "
+    return t[:m.start()] + " "
 
 
 def normalize_company(name: str) -> str:
@@ -258,7 +200,7 @@ def normalize_company(name: str) -> str:
 def normalize_title(title: str) -> str:
     t = title.lower()
     t = _TITLE_TAILS.sub(" ", t)
-    t = _strip_title_loc(t)  # was _TITLE_LOC.sub(" ", t); see _strip_title_loc for why
+    t = _strip_title_loc(t)   # was _TITLE_LOC.sub(" ", t); see _strip_title_loc for why
     t = _SUFFIX.sub(" ", t)
     t = _NOISE.sub(" ", t)
     return _WS.sub(" ", t).strip()
@@ -374,12 +316,10 @@ def _dead_url(url: str) -> bool:
 # Only a title with no lower-case letter at all is touched, so a deliberate "IT Intern" or "Summer
 # Analyst - IBD" is left exactly as the employer wrote it. The listing id hashes the lower-cased
 # title, so it does not move.
-_KEEP_CAPS = frozenset(
-    """
+_KEEP_CAPS = frozenset("""
     AI AWS CAD CEO CFO CNA CS DOD DOE EE EHS EMT ER GIS GS HR HVAC IBD ICU II III IT IV LPN MA MBA
     ME ML MS MSW NASA NY NYC PHD PR QA RN ROTC SQL STEM UI US USA UX VA
-""".split()
-)
+""".split())
 _SMALL = frozenset("a an and as at by for in of on or the to with".split())
 _WORD = re.compile(r"[A-Za-z][A-Za-z']*")
 
@@ -392,7 +332,7 @@ def readable_title(title: str) -> str:
     def word(m: re.Match) -> str:
         w = m.group(0)
         if w in _KEEP_CAPS or len(w) == 1 or not re.search(r"[AEIOUY]", w):
-            return w  # an acronym, an initial, or a vowel-less "MSW" / "HR"
+            return w                   # an acronym, an initial, or a vowel-less "MSW" / "HR"
         if w.lower() in _SMALL and m.start() > 0:
             return w.lower()
         return w.capitalize()
@@ -408,12 +348,10 @@ def normalize(raw: dict, *, on_reject=None) -> dict | None:
     or off-target field)."""
     title = (raw.get("title") or "").strip()
     company = (raw.get("company_name") or "").strip()
-
     def reject(reason):
         if on_reject is not None:
             on_reject(reason)
         return None
-
     if not title or not company:
         return reject("missing_identity")
     if _dead_url(raw.get("apply_url") or raw.get("url") or ""):
@@ -425,20 +363,16 @@ def normalize(raw: dict, *, on_reject=None) -> dict | None:
     tags = classify(title)  # title-only: avoids off-target tags from JD boilerplate
     if tags == ["other"] and employer_research_field(company, title):
         tags = [employer_research_field(company, title)]
-    if tags == ["other"] and raw.get(
-        "field_hint"
-    ):  # a source that knows the field, e.g. a USAJOBS series
+    if tags == ["other"] and raw.get("field_hint"):   # a source that knows the field, e.g. a USAJOBS series
         tags = [raw["field_hint"]]
     if tags == ["other"] and raw.get("sector") in SECTOR_FIELDS:
         tags = [SECTOR_FIELDS[raw["sector"]]]
-    if (
-        raw.get("source") in PUBLIC_SOURCES
-    ):  # every posting from a government feed is government work
+    if raw.get("source") in PUBLIC_SOURCES:  # every posting from a government feed is government work
         tags = [t for t in tags if t != "other"] + ([] if "government" in tags else ["government"])
     if not tags:
         return reject("no_field_tags")
 
-    _blob = f"{title} {raw.get('description', '') or ''}"
+    _blob = f"{title} {raw.get('description','') or ''}"
     geo = evaluate_locations(raw.get("locations") or [])
     season = raw.get("season")
     year = raw.get("year")
@@ -500,8 +434,7 @@ def normalize(raw: dict, *, on_reject=None) -> dict | None:
         "locations": raw.get("locations") or [],
         "geo": geo,
         "location_raw": geo["location_raw"],
-        "lat": geo["lat"],
-        "lng": geo["lng"],
+        "lat": geo["lat"], "lng": geo["lng"],
         "is_remote": geo["is_remote"],
         "within_radius": geo["within_radius"],
         "distance_miles": geo["best_distance"],

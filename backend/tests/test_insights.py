@@ -1,5 +1,4 @@
 """Requirement / eligibility extraction from job descriptions, plus the score breakdown."""
-
 import re
 from datetime import date, datetime, timezone
 from internscout.insights import extract, extract_skills, PATTERNS
@@ -51,9 +50,7 @@ def test_eligibility():
 
 
 def test_eeo_boilerplate_is_not_a_restriction():
-    x = extract(
-        "We welcome all applicants without regard to U.S. citizenship status or national origin."
-    )
+    x = extract("We welcome all applicants without regard to U.S. citizenship status or national origin.")
     assert "citizenship" not in x
     x = extract("Must be a U.S. citizen or permanent resident.")
     assert x["citizenship"] == "citizen_or_pr"
@@ -63,10 +60,7 @@ def test_phd_only_and_standing():
     assert extract("Open to PhD students in machine learning.")["degree_only"] == "phd"
     assert "degree_only" not in extract("Open to undergraduate and PhD students.")
     assert extract("For rising juniors or seniors.")["class_standing"] == ["junior", "senior"]
-    assert extract("Open to sophomore or junior students")["class_standing"] == [
-        "junior",
-        "sophomore",
-    ]
+    assert extract("Open to sophomore or junior students")["class_standing"] == ["junior", "sophomore"]
 
 
 def test_deadline_without_year_rolls_forward():
@@ -81,13 +75,8 @@ def test_patterns_are_js_compatible():
 
 
 def test_score_parts_sum_to_total():
-    kw = dict(
-        field_tags=["swe"],
-        geo={"in_city": True},
-        first_seen=datetime.now(timezone.utc),
-        status="open",
-        sources=["greenhouse"],
-    )
+    kw = dict(field_tags=["swe"], geo={"in_city": True}, first_seen=datetime.now(timezone.utc),
+              status="open", sources=["greenhouse"])
     parts = score_parts(**kw)
     assert set(parts) == set(W)
     assert parts["location"] == W["location"]

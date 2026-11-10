@@ -26,7 +26,6 @@ time to learn:
 SuccessFactors is what large hospitals, universities, utilities and manufacturers run, which is
 where the health, education and energy listings live.
 """
-
 from __future__ import annotations
 import re
 from urllib.parse import unquote
@@ -57,10 +56,9 @@ SLUG_ST_RE = re.compile(r"-([A-Z]{2})-\d{5}(?:-\d{4})?$")
 DESC_OPEN_RE = re.compile(r'<span[^>]*itemprop="description"[^>]*>', re.I)
 SPAN_RE = re.compile(r"<(/?)span\b[^>]*>", re.I)
 # 'Tue Sep 15 07:00:00 UTC 2026'. Only the day is wanted, and _to_dt reads an ISO date.
-POSTED_RE = re.compile(
-    r'itemprop="datePosted"\s+content="\w{3} (\w{3}) (\d{1,2}) [\d:]+ \w+ (\d{4})"', re.I
-)
-MONTHS = {m: i for i, m in enumerate("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(), 1)}
+POSTED_RE = re.compile(r'itemprop="datePosted"\s+content="\w{3} (\w{3}) (\d{1,2}) [\d:]+ \w+ (\d{4})"', re.I)
+MONTHS = {m: i for i, m in enumerate(
+    "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(), 1)}
 US_STATES = set(STATE_NAMES.values())
 COUNTRY_US = {"US", "USA", "UNITED STATES"}
 COUNTRY_CA = {"CA", "CAN", "CANADA"}
@@ -81,7 +79,7 @@ def _slug_place(slug: str, title: str) -> tuple[str, str]:
     m = SLUG_ST_RE.search(slug)
     if not m or m.group(1) not in US_STATES:
         return "", ""
-    segs = slug[: m.start()].split("-")
+    segs = slug[:m.start()].split("-")
     want = _squash(unquote(title))
     for k in range(len(segs)):
         if _squash(unquote("".join(segs[k:]))) == want:
@@ -106,7 +104,7 @@ def _location(raw: str, slug: str, title: str) -> list[str]:
         if not COUNTRY_US & set(up):
             return []
         # Everything past the country code is the postcode, which we do not want.
-        head = parts[: next(i for i, p in enumerate(up) if p in COUNTRY_US)]
+        head = parts[:next(i for i, p in enumerate(up) if p in COUNTRY_US)]
         if not head:
             return [st] if st else ["United States"]
         if len(head) == 1:
@@ -130,17 +128,16 @@ def parse_successfactors_detail(html: str) -> tuple[str, str | None]:
     m = DESC_OPEN_RE.search(html or "")
     text = ""
     if m:
-        depth, body = 1, html[m.end() :]
+        depth, body = 1, html[m.end():]
         for tag in SPAN_RE.finditer(body):
             depth += -1 if tag.group(1) else 1
             if depth == 0:
-                body = body[: tag.start()]
+                body = body[:tag.start()]
                 break
         text = html_to_text(body)
     d = POSTED_RE.search(html or "")
     posted = f"{d.group(3)}-{MONTHS[d.group(1).title()]:02d}-{int(d.group(2)):02d}" if d else None
     return text, posted
-
 
 def parse_successfactors(html: str, co: dict) -> list[dict]:
     host, by_id = co["ats_token"], {}
@@ -154,21 +151,15 @@ def parse_successfactors(html: str, co: dict) -> list[dict]:
         # it. Some of a job's repeated links have it and some do not, so the first one found wins.
         # Bounded as well as bracketed, so the last job on the page cannot reach into the footer.
         end = anchors[n + 1].start() if n + 1 < len(anchors) else len(html)
-        after = html[a.end() : min(end, a.end() + 3000)]
+        after = html[a.end():min(end, a.end() + 3000)]
         loc = LOC_RE.search(after)
-        rec = by_id.setdefault(
-            job.group(2),
-            {
-                "title": html_to_text(a.group(2)),
-                "href": html_to_text(href.group(1)).replace("&amp;", "&"),
-                "slug": job.group(1),
-                "raw": "",
-            },
-        )
+        rec = by_id.setdefault(job.group(2), {"title": html_to_text(a.group(2)),
+                                              "href": html_to_text(href.group(1)).replace("&amp;", "&"),
+                                              "slug": job.group(1), "raw": ""})
         if loc and not rec["raw"]:
             rec["raw"] = loc.group(1)
     out, counts = [], counts_of(co)
-    counts.rows(len(by_id))  # distinct jobs on the page; the template repeats each link
+    counts.rows(len(by_id))   # distinct jobs on the page; the template repeats each link
     for rec in by_id.values():
         if not is_internship(rec["title"], ""):
             counts.discard("not_student")
@@ -177,15 +168,8 @@ def parse_successfactors(html: str, co: dict) -> list[dict]:
         if not locs:
             counts.discard("outside_region")
             continue
-        out.append(
-            board_item(
-                co,
-                source="successfactors",
-                title=rec["title"],
-                locations=locs,
-                url=f"https://{host}{rec['href']}",
-            )
-        )
+        out.append(board_item(co, source="successfactors", title=rec["title"], locations=locs,
+                              url=f"https://{host}{rec['href']}"))
     return out
 
 
@@ -194,9 +178,7 @@ def fetch_successfactors_board(c, co: dict) -> list[dict]:
     require_robots(c, f"https://{token}", "/search/", token)
     for kw in KEYWORDS:
         for page in range(MAX_PAGES):
-            r = c.get(
-                SEARCH_URL.format(token=token), params={"q": kw, "startrow": page * PAGE_SIZE}
-            )
+            r = c.get(SEARCH_URL.format(token=token), params={"q": kw, "startrow": page * PAGE_SIZE})
             r.raise_for_status()
             # A tenant that has left SuccessFactors still answers 200, with a body that is empty or
             # a stub (Aramark now serves nothing at all). That parses to zero items and looks
@@ -217,7 +199,7 @@ def fetch_successfactors_board(c, co: dict) -> list[dict]:
             if len({m.group(2) for m in JOB_RE.finditer(r.text)}) < PAGE_SIZE:
                 break
         else:
-            counts.stop("page_cap")  # MAX_PAGES full pages, and the next may hold more
+            counts.stop("page_cap")   # MAX_PAGES full pages, and the next may hold more
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
             d = c.get(it["url"])

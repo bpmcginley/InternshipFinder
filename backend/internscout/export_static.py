@@ -8,7 +8,6 @@ Produces:
   <out>/majors.json           - majors -> field tags for the profile picker
 The static site reads these directly; no backend needed.
 """
-
 from __future__ import annotations
 import json
 from collections import Counter, defaultdict
@@ -64,9 +63,7 @@ def shard_keys(listing: dict) -> set[str]:
             keys.add(g["state"])
         else:
             # was: "remote" if remote else "US"
-            keys.add(
-                "remote" if g["kind"] == "remote" else "Canada" if g["kind"] == "canada" else "US"
-            )
+            keys.add("remote" if g["kind"] == "remote" else "Canada" if g["kind"] == "canada" else "US")
     if not keys and listing.get("state"):
         keys.add("remote" if listing["state"] == "Remote" else listing["state"])
     return keys
@@ -74,9 +71,7 @@ def shard_keys(listing: dict) -> set[str]:
 
 def _dump(obj, path: str, indent=None) -> None:
     with open(path, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(
-            obj, f, indent=indent, separators=None if indent else (",", ":"), ensure_ascii=False
-        )
+        json.dump(obj, f, indent=indent, separators=None if indent else (",", ":"), ensure_ascii=False)
 
 
 # The dashboard renders a list from these rows and needs none of this per row. Measured on
@@ -110,7 +105,6 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
     shard_dir = os.path.join(out_dir, "listings")
     os.makedirs(shard_dir, exist_ok=True)
     from . import seo_role_details, seo_pages
-
     # This sidecar is replaced on every export. Only an unchanged carried row may keep an existing
     # check for up to seven days; its original check date/hash are never refreshed from an excerpt.
     # Freshly fetched source without supported details removes any old record. At most 160 records.
@@ -118,26 +112,17 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
     cohorts = defaultdict(list)
     for x in listings:
         name = str(x.get("company_name") or "").casefold()
-        if (
-            name in seo_role_details.COHORT_EMPLOYERS
-            and x.get("status") == "open"
-            and seo_pages.well_formed(x)
-            and seo_pages.safe_url(x.get("apply_url"))
-        ):
+        if (name in seo_role_details.COHORT_EMPLOYERS and x.get("status") == "open"
+                and seo_pages.well_formed(x) and seo_pages.safe_url(x.get("apply_url"))):
             cohorts[name].append(dict(x, keys=shard_keys(x)))
-    visible = [
-        x
-        for name in sorted(cohorts)
-        for x in seo_pages.shown(seo_pages.dedupe_roles(cohorts[name]))
-    ]
+    visible = [x for name in sorted(cohorts) for x in seo_pages.shown(seo_pages.dedupe_roles(cohorts[name]))]
     details = {}
     for x in visible:
-        packet = x.get("posting_details") or (
-            previous_details.get(str(x["id"])) if x.get("carried") else None
-        )
+        packet = x.get("posting_details") or (previous_details.get(str(x["id"])) if x.get("carried") else None)
         if seo_role_details.recorded_facts(x, packet):
             details[str(x["id"])] = packet
-    _dump({"version": 1, "records": details}, os.path.join(out_dir, seo_role_details.FILE))
+    _dump({"version": 1, "records": details},
+          os.path.join(out_dir, seo_role_details.FILE))
     shards: dict[str, list] = defaultdict(list)
     for x in listings:
         for k in shard_keys(x):
@@ -145,26 +130,18 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
     index = {"generated_at": generated_at, "files": {}}
     for k, items in sorted(shards.items()):
         _dump([shard_row(x) for x in items], os.path.join(shard_dir, f"{k}.json"))
-        _dump(
-            {
-                x["id"]: x["description"]
-                for x in items
-                if x["status"] == "open" and x.get("description")
-            },
-            os.path.join(shard_dir, desc_file(k)),
-        )
+        _dump({x["id"]: x["description"] for x in items if x["status"] == "open" and x.get("description")},
+              os.path.join(shard_dir, desc_file(k)))
         live = [x for x in items if x["status"] == "open"]
         index["files"][k] = {
-            "file": f"listings/{k}.json",
-            "desc": f"listings/{desc_file(k)}",
-            "count": len(items),
-            "open": len(live),
+            "file": f"listings/{k}.json", "desc": f"listings/{desc_file(k)}",
+            "count": len(items), "open": len(live),
             "by_field": dict(Counter(t for x in live for t in x["field_tags"]).most_common()),
             "by_stage": dict(Counter(s for x in live for s in x["stage"]).most_common()),
             "by_sector": dict(Counter(x["sector"] for x in live if x.get("sector")).most_common()),
         }
     for name in os.listdir(shard_dir):  # a state with no listings left, and its sidecar
-        stem = name[: -len(".desc.json")] if name.endswith(".desc.json") else name[:-5]
+        stem = name[:-len(".desc.json")] if name.endswith(".desc.json") else name[:-5]
         if name.endswith(".json") and name != "index.json" and stem not in shards:
             os.remove(os.path.join(shard_dir, name))
     index["first"] = write_first_screen(listings, out_dir)
@@ -190,14 +167,8 @@ FIRST_SCREEN_KEYS = sorted(BASELINE_STATES) + ["remote"]
 def first_screen(listings: list[dict], n: int = FIRST_SCREEN_ROWS) -> list[dict]:
     keys = set(FIRST_SCREEN_KEYS)
     rows = [x for x in listings if x["status"] == "open" and shard_keys(x) & keys]
-    rows.sort(
-        key=lambda x: (
-            1 if x.get("posted_at") else 0,
-            x.get("posted_at") or "",
-            x.get("first_seen") or "",
-        ),
-        reverse=True,
-    )
+    rows.sort(key=lambda x: (1 if x.get("posted_at") else 0, x.get("posted_at") or "", x.get("first_seen") or ""),
+              reverse=True)
     return [shard_row(x) for x in rows[:n]]
 
 
@@ -215,14 +186,9 @@ def _listing_dict(row: Listing) -> dict:
     ins = extract(row.description) if row.status == "open" else None
     # 2026-10-23: an impossible salary must not create a Paid badge through dollar detection.
     # Raw salary remains in Listing for source investigation. Revert: remove this suppression.
-    if (
-        ins
-        and ins.get("pay") == "paid"
-        and (placeholder_pay(row.salary) or only_placeholder_amounts(row.description))
-        and not re.search(
-            r"\bpaid (?:internship|position|opportunity|role|co-?op)", row.description or "", re.I
-        )
-    ):
+    if (ins and ins.get("pay") == "paid"
+            and (placeholder_pay(row.salary) or only_placeholder_amounts(row.description))
+            and not re.search(r"\bpaid (?:internship|position|opportunity|role|co-?op)", row.description or "", re.I)):
         ins.pop("pay", None)
     # A placeholder salary ("$0.00 /Yr", "$0.00 - $999.99 Hour") is a board with no pay to show, not
     # a paid role (seo_pages.placeholder_pay); the dashboard's pay badge reads this flag.
@@ -262,13 +228,11 @@ def _listing_dict(row: Listing) -> dict:
         "first_seen": row.first_seen.isoformat() if row.first_seen else None,
         # The CI database is rebuilt every run. Preserve which keyword adapters
         # actually found this role so a later export can assess their scan scope.
-        "scan_sources": sorted(
-            {link.source for link in row.source_links if link.source in SEARCH_SCOPED}
-        ),
+        "scan_sources": sorted({link.source for link in row.source_links
+                                if link.source in SEARCH_SCOPED}),
         **({"via_search": True} if _search_only(row) else {}),
     }
     from . import seo_role_details
-
     # 2026-10-28: extract only for the four named employers from actual full fetched source, before
     # DESC_CHARS discards its tail. Revert: remove this optional sidecar-only field.
     if str(row.company_name or "").casefold() in seo_role_details.COHORT_EMPLOYERS:
@@ -369,7 +333,7 @@ def previous_export(out_dir: str) -> list[dict]:
         try:
             with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
                 items = json.load(f)
-        except (OSError, ValueError):  # a half-written shard is not worth failing a run over
+        except (OSError, ValueError):   # a half-written shard is not worth failing a run over
             continue
         if not isinstance(items, list):
             continue
@@ -446,28 +410,20 @@ def mark_new(listings: list[dict], today=None) -> None:
     today = today or datetime.now(timezone.utc).date()
     baseline = baseline_day(listings)
     for x in listings:
-        if canada_first_scan(x):  # seo_pages.CANADA_SINCE: new only if posted this week
+        if canada_first_scan(x):        # seo_pages.CANADA_SINCE: new only if posted this week
             x["is_new"] = bool(x.get("posted_at") and _seen_within(x["posted_at"], today, NEW_DAYS))
             continue
-        x["is_new"] = (
-            _seen_within(x.get("first_seen"), today, NEW_DAYS)
-            and not (baseline and str(x.get("first_seen") or "")[:10] <= baseline)
-            and (not x.get("posted_at") or _seen_within(x["posted_at"], today, 2 * NEW_DAYS))
-        )
+        x["is_new"] = (_seen_within(x.get("first_seen"), today, NEW_DAYS)
+                       and not (baseline and str(x.get("first_seen") or "")[:10] <= baseline)
+                       and (not x.get("posted_at") or _seen_within(x["posted_at"], today, 2 * NEW_DAYS)))
 
 
 # Hosts whose first path segment names the employer's board: boards.greenhouse.io/point72,
 # jobs.lever.co/sambatv, jobs.ashbyhq.com/brainco, a Workday tenant's /<site>/. Everywhere else the
 # host itself is the board (careers-nrdc.icims.com, eaton.eightfold.ai, an employer's own site).
 # Workable is left out: one board's links come both as /mindex/j/... and as /j/....
-_PATH_BOARD_HOSTS = {
-    "greenhouse.io",
-    "jobs.lever.co",
-    "jobs.ashbyhq.com",
-    "jobs.jobvite.com",
-    "ats.rippling.com",
-    "jobs.smartrecruiters.com",
-}
+_PATH_BOARD_HOSTS = {"greenhouse.io", "jobs.lever.co", "jobs.ashbyhq.com", "jobs.jobvite.com",
+                     "ats.rippling.com", "jobs.smartrecruiters.com"}
 # Workday's locale prefix (/en-US/, /fr-CA/). Only the two-part form: two-letter sites exist (KLA's /UR/, /JJ/).
 _LOCALE = re.compile(r"^[a-z]{2}-[a-z]{2}$", re.I)
 
@@ -496,11 +452,7 @@ def board_of(x: dict) -> tuple:
         token = segs[0].lower() if segs else ""
     elif host in ("boards.greenhouse.io", "job-boards.greenhouse.io"):
         host = "greenhouse.io"
-        token = (
-            (parse_qs(u.query).get("for") or [""])[0]
-            if segs[:1] == ["embed"]
-            else (segs[0] if segs else "")
-        ).lower()
+        token = ((parse_qs(u.query).get("for") or [""])[0] if segs[:1] == ["embed"] else (segs[0] if segs else "")).lower()
     elif host in _PATH_BOARD_HOSTS:
         token = segs[0].lower() if segs else ""
     else:
@@ -531,14 +483,8 @@ def _requisition_key(row: dict, icims_hosts=frozenset(), gh_tenants=None):
     return posting_key(row, icims_hosts=icims_hosts, gh_tenants=gh_tenants)
 
 
-def carry_open_boards(
-    listings: list[dict],
-    out_dir: str,
-    today=None,
-    prev=None,
-    completed_boards=None,
-    observed_urls=None,
-) -> int:
+def carry_open_boards(listings: list[dict], out_dir: str, today=None, prev=None,
+                      completed_boards=None, observed_urls=None) -> int:
     """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
 
     An export is only what this run managed to fetch, so a board that timed out deletes all of
@@ -595,20 +541,14 @@ def carry_open_boards(
 
     held = 0
     for key, rows in was_open.items():
-        collapsed = len(rows) >= COLLAPSE_FLOOR and now_open.get(key, 0) <= COLLAPSE_RATIO * len(
-            rows
-        )
+        collapsed = len(rows) >= COLLAPSE_FLOOR and now_open.get(key, 0) <= COLLAPSE_RATIO * len(rows)
         for it in rows:
             url = it.get("apply_url")
-            if (
-                not url
-                or url in have
-                or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
-                or (it.get("id") and it["id"] in have_ids)
-            ):
+            if (not url or url in have or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
+                    or (it.get("id") and it["id"] in have_ids)):
                 continue
             if not _seen_within(it.get("last_seen") or it.get("first_seen"), today, CARRY_DAYS):
-                continue  # the board has been quiet for days; it is not coming back
+                continue   # the board has been quiet for days; it is not coming back
             if _absent_from_scan(it, completed, observed):
                 continue
             board = export_board(it, completed)
@@ -630,14 +570,8 @@ def carry_open_boards(
     return held
 
 
-def carry_search_finds(
-    listings: list[dict],
-    out_dir: str,
-    today=None,
-    prev=None,
-    completed_boards=None,
-    observed_urls=None,
-) -> int:
+def carry_search_finds(listings: list[dict], out_dir: str, today=None, prev=None,
+                       completed_boards=None, observed_urls=None) -> int:
     """Keep what the Google Jobs searches found until they have had a chance to find it again.
 
     Those searches cost money and run once a day, on the first run after midnight UTC; the three
@@ -666,14 +600,9 @@ def carry_search_finds(
     held = 0
     for it in prev:
         url = it.get("apply_url")
-        if (
-            not it.get("via_search")
-            or it.get("status") != "open"
-            or not url
-            or url in have
-            or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
-            or (it.get("id") and it["id"] in have_ids)
-        ):
+        if (not it.get("via_search") or it.get("status") != "open" or not url or url in have
+                or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
+                or (it.get("id") and it["id"] in have_ids)):
             continue
         if _absent_from_scan(it, completed, observed):
             continue
@@ -693,23 +622,15 @@ def carry_search_finds(
     return held
 
 
-def closed_by_scan(
-    listings: list[dict], prev: list[dict], completed_boards, observed_urls=None
-) -> int:
+def closed_by_scan(listings: list[dict], prev: list[dict], completed_boards, observed_urls=None) -> int:
     """How many of the last export's open rows this run's complete scans closed, for the log."""
     completed = canonical(completed_boards)
     if not completed:
         return 0
     have = {x.get("apply_url") for x in listings}
     observed = _observed_keys(observed_urls)
-    return sum(
-        1
-        for it in prev
-        if it.get("status") == "open"
-        and it.get("apply_url")
-        and it["apply_url"] not in have
-        and _absent_from_scan(it, completed, observed)
-    )
+    return sum(1 for it in prev if it.get("status") == "open" and it.get("apply_url")
+               and it["apply_url"] not in have and _absent_from_scan(it, completed, observed))
 
 
 def correct_non_cyber_security_tags(listings: list[dict]) -> None:
@@ -734,15 +655,9 @@ def discard_legacy_grad_windows(listings: list[dict]) -> None:
     Revert: remove this call and the insights_text_version marker together (DQ-1).
     """
     for listing in listings:
-        if (
-            listing.get("carried")
-            and listing.get("insights_text_version") != INSIGHTS_TEXT_VERSION
-            and isinstance(listing.get("insights"), dict)
-            and "grad_years" in listing["insights"]
-        ):
-            listing["insights"] = {
-                k: v for k, v in listing["insights"].items() if k != "grad_years"
-            }
+        if (listing.get("carried") and listing.get("insights_text_version") != INSIGHTS_TEXT_VERSION
+                and isinstance(listing.get("insights"), dict) and "grad_years" in listing["insights"]):
+            listing["insights"] = {k: v for k, v in listing["insights"].items() if k != "grad_years"}
 
 
 def discard_placeholder_paid_claims(listings: list[dict]) -> None:
@@ -752,16 +667,8 @@ def discard_placeholder_paid_claims(listings: list[dict]) -> None:
     # Revert: remove this post-carry helper and call together.
     for listing in listings:
         ins = listing.get("insights")
-        if (
-            placeholder_pay(listing.get("salary"))
-            and isinstance(ins, dict)
-            and ins.get("pay") == "paid"
-            and not re.search(
-                r"\bpaid (?:internship|position|opportunity|role|co-?op)",
-                listing.get("description") or "",
-                re.I,
-            )
-        ):
+        if (placeholder_pay(listing.get("salary")) and isinstance(ins, dict) and ins.get("pay") == "paid"
+                and not re.search(r"\bpaid (?:internship|position|opportunity|role|co-?op)", listing.get("description") or "", re.I)):
             listing["insights"] = {key: value for key, value in ins.items() if key != "pay"}
 
 
@@ -780,32 +687,21 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
     with SessionLocal() as db:
         rows = db.scalars(
             # source_links in one query: _listing_dict reads them for every row (via_search).
-            select(Listing)
-            .options(selectinload(Listing.source_links))
+            select(Listing).options(selectinload(Listing.source_links))
             .order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
         listings = still_student_opportunities([_listing_dict(r) for r in rows])
         generated_at = datetime.now(timezone.utc).isoformat()
         for x in listings:
-            x["last_seen"] = generated_at  # this run really did read these off the board
+            x["last_seen"] = generated_at   # this run really did read these off the board
         # Before write_shards overwrites it: the export on disk is the only record of when we
         # first saw any of this and of what the boards held, because the db does not outlive a run.
         prev = previous_export(out_dir)
         carried = carry_first_seen(listings, out_dir, prev=prev)
-        held = carry_open_boards(
-            listings,
-            out_dir,
-            prev=prev,
-            completed_boards=completed_boards,
-            observed_urls=observed_urls,
-        )
-        held += carry_search_finds(
-            listings,
-            out_dir,
-            prev=prev,
-            completed_boards=completed_boards,
-            observed_urls=observed_urls,
-        )
+        held = carry_open_boards(listings, out_dir, prev=prev, completed_boards=completed_boards,
+                                 observed_urls=observed_urls)
+        held += carry_search_finds(listings, out_dir, prev=prev, completed_boards=completed_boards,
+                                  observed_urls=observed_urls)
         closed = closed_by_scan(listings, prev, completed_boards, observed_urls=observed_urls)
         correct_non_cyber_security_tags(listings)
         discard_legacy_grad_windows(listings)
@@ -830,29 +726,11 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
                 "wanted_states": sorted(wanted_states()),
                 "nyc_radius_miles": REGION.nyc_radius_miles,
             },
-            "by_state": dict(
-                Counter(
-                    k for x in listings if x["status"] == "open" for k in shard_keys(x)
-                ).most_common()
-            ),
-            "by_ats": dict(
-                Counter(x["ats"] for x in listings if x["status"] == "open").most_common()
-            ),
-            "by_field": dict(
-                Counter(
-                    t for x in listings if x["status"] == "open" for t in x["field_tags"]
-                ).most_common()
-            ),
-            "by_stage": dict(
-                Counter(
-                    s for x in listings if x["status"] == "open" for s in x["stage"]
-                ).most_common()
-            ),
-            "by_sector": dict(
-                Counter(
-                    x["sector"] for x in listings if x["status"] == "open" and x.get("sector")
-                ).most_common()
-            ),
+            "by_state": dict(Counter(k for x in listings if x["status"] == "open" for k in shard_keys(x)).most_common()),
+            "by_ats": dict(Counter(x["ats"] for x in listings if x["status"] == "open").most_common()),
+            "by_field": dict(Counter(t for x in listings if x["status"] == "open" for t in x["field_tags"]).most_common()),
+            "by_stage": dict(Counter(s for x in listings if x["status"] == "open" for s in x["stage"]).most_common()),
+            "by_sector": dict(Counter(x["sector"] for x in listings if x["status"] == "open" and x.get("sector")).most_common()),
             "score_weights": W,
             "skill_patterns": PATTERNS,
         }
@@ -861,38 +739,25 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
         os.remove(legacy)
     _dump(stats, os.path.join(out_dir, "stats.json"), indent=2)
     _dump(majors_export(), os.path.join(out_dir, "majors.json"))
-    print(
-        f"[export] {carried} of {len(listings)} listings kept a first-seen date from the "
-        f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days"
-    )
-    print(
-        f"[export] {held} listings held from the last export because their board came back "
-        f"with half or less of what it had"
-    )
-    print(
-        f"[export] {closed} listings from the last export left the site because a complete "
-        f"scan of their board this run did not find them "
-        f"({len(canonical(completed_boards))} boards read to the end)"
-    )
+    print(f"[export] {carried} of {len(listings)} listings kept a first-seen date from the "
+          f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days")
+    print(f"[export] {held} listings held from the last export because their board came back "
+          f"with half or less of what it had")
+    print(f"[export] {closed} listings from the last export left the site because a complete "
+          f"scan of their board this run did not find them "
+          f"({len(canonical(completed_boards))} boards read to the end)")
     index = write_shards(listings, out_dir, generated_at)
     unplaced = [x for x in listings if not shard_keys(x)]
-    print(
-        f"[export] wrote {len(listings) - len(unplaced)} listings "
-        f"({len(index['files'])} state files) to {out_dir}"
-    )
+    print(f"[export] wrote {len(listings) - len(unplaced)} listings "
+          f"({len(index['files'])} state files) to {out_dir}")
     if unplaced:
-        print(
-            f"[export] {len(unplaced)} listings name no US location today's rules can place, so "
-            f"they are in no state file and the site cannot show them: "
-            + "; ".join(
-                f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
-                for x in unplaced[:5]
-            )
-        )
+        print(f"[export] {len(unplaced)} listings name no US location today's rules can place, so "
+              f"they are in no state file and the site cannot show them: "
+              + "; ".join(f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
+                          for x in unplaced[:5]))
     return stats
 
 
 if __name__ == "__main__":
     import sys
-
     export(sys.argv[1] if len(sys.argv) > 1 else "docs/data")

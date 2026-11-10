@@ -3,7 +3,6 @@
 The source is Census Vintage 2025 MSA population, not city-proper population.
 Searching an anchor city does not establish complete coverage of an MSA boundary.
 """
-
 from __future__ import annotations
 
 import json
@@ -11,12 +10,8 @@ from pathlib import Path
 
 CATALOG = json.loads(Path(__file__).with_name("us_top50_metros.json").read_text(encoding="utf-8"))
 TOP_US_METROS = tuple(CATALOG["metros"])
-METRO_QUERIES = (
-    "internship",
-    "co-op student",
-    "summer student internship",
-    "undergraduate research internship",
-)
+METRO_QUERIES = ("internship", "co-op student", "summer student internship",
+                 "undergraduate research internship")
 
 
 def metro_searches(cursor: int, slots: int) -> list[tuple[str, str, str]]:

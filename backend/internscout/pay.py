@@ -1,13 +1,9 @@
 """Conservative salary display checks. Never guess an upstream amount's intended unit."""
-
 import re
 
 _AMOUNT = re.compile(r"\d[\d,]*(?:\.\d+)?\s*[kK]?")
 _ANNUAL = re.compile(r"\b(year|yr|annum|annual|annually)\b", re.I)
-_MONEY = re.compile(
-    r"-?\$\s*-?\s*\d[\d,]*(?:\.\d+)?\s?[kK]?(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?(?:\s?(?:/|per\s)?\s?(?:hour|hr|year|yr|annum|annually|month|mo|week|wk|day))?",
-    re.I,
-)
+_MONEY = re.compile(r"-?\$\s*-?\s*\d[\d,]*(?:\.\d+)?\s?[kK]?(?:\s?(?:[-\u2013]|to)\s?\$?\s?\d[\d,]*(?:\.\d+)?\s?[kK]?)?(?:\s?(?:/|per\s)?\s?(?:hour|hr|year|yr|annum|annually|month|mo|week|wk|day))?", re.I)
 
 
 def placeholder_pay(salary) -> bool:
@@ -22,12 +18,9 @@ def placeholder_pay(salary) -> bool:
     amounts = []
     for raw in _AMOUNT.findall(text):
         raw = raw.strip()
-        amounts.append(
-            float(raw.rstrip("kK").replace(",", "")) * (1000 if raw[-1:] in ("k", "K") else 1)
-        )
-    return bool(amounts) and (
-        amounts[0] == 0 or ("$" in text and _ANNUAL.search(text) and max(amounts) < 1000)
-    )
+        amounts.append(float(raw.rstrip("kK").replace(",", "")) * (1000 if raw[-1:] in ("k", "K") else 1))
+    return bool(amounts) and (amounts[0] == 0 or (
+        "$" in text and _ANNUAL.search(text) and max(amounts) < 1000))
 
 
 def only_placeholder_amounts(text) -> bool:

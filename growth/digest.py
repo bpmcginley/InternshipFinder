@@ -24,7 +24,6 @@ tracking added. The code says "placement", never "paid", because "paid" means a 
 Run from the repo root:  python growth/digest.py [docs] [--out DIR] [--placements PATH]
     writes digest.html, digest.txt and digest.json into DIR (default ./digest-preview).
 """
-
 from __future__ import annotations
 
 import argparse
@@ -45,10 +44,10 @@ from internscout import placements  # noqa: E402
 
 # was: MIN_NEW = 3. It moved to seo_pages (2026-10-06) with the "new" rule below, so the sign-up
 # forms on the landing pages quote a field's number only when the email would give it a section.
-MIN_NEW = sp.DIGEST_MIN_NEW  # new roles a field needs this week to get a section
-MAX_SECTIONS = 8  # eight fields of five roles is already a long email
-PER_SECTION = 5  # roles shown per field; the field's page has the rest
-PER_EMPLOYER = 2  # ...and at most this many from one employer, so one big poster can't fill a field
+MIN_NEW = sp.DIGEST_MIN_NEW    # new roles a field needs this week to get a section
+MAX_SECTIONS = 8       # eight fields of five roles is already a long email
+PER_SECTION = 5        # roles shown per field; the field's page has the rest
+PER_EMPLOYER = 2       # ...and at most this many from one employer, so one big poster can't fill a field
 
 UTM = "utm_source=digest&utm_medium=email"
 HOME_URL = f"{sp.SITE}/?{UTM}"
@@ -72,7 +71,6 @@ STATE_SLUGS = {sp.state_slug(k) for k in sp.US_STATES}
 
 
 # ---------------------------------------------------------------- building
-
 
 def _text(value) -> str:
     """Job-board text on one line. A title with a newline or tab in it would break the text email's layout."""
@@ -111,26 +109,15 @@ def field_url(tag: str, open_count: int) -> str:
 
 def role(x: dict) -> dict:
     pay = _text(x["salary"]) if x.get("salary") else ("Paid" if sp.is_paid(x) else None)
-    return {
-        "id": x.get("id"),
-        "title": _text(x.get("title")),
-        "company": _text(x.get("company_name")),
-        "place": _text(sp.place(x)),
-        "pay": pay,
-        "url": _link(x.get("apply_url")),
-        "nearby": bool(x["keys"] & sp.HOME_STATES),
-    }
+    return {"id": x.get("id"), "title": _text(x.get("title")), "company": _text(x.get("company_name")),
+            "place": _text(sp.place(x)), "pay": pay, "url": _link(x.get("apply_url")),
+            "nearby": bool(x["keys"] & sp.HOME_STATES)}
 
 
 def section(tag: str, items: list[dict], open_count: int) -> dict:
-    return {
-        "tag": tag,
-        "title": sp.field_title(tag),
-        "new": len(items),
-        "open": open_count,
-        "url": field_url(tag, open_count),
-        "roles": [role(x) for x in varied(sp.near_home_first(items))],
-    }
+    return {"tag": tag, "title": sp.field_title(tag), "new": len(items), "open": open_count,
+            "url": field_url(tag, open_count),
+            "roles": [role(x) for x in varied(sp.near_home_first(items))]}
 
 
 def varied(ordered: list[dict]) -> list[dict]:
@@ -144,7 +131,7 @@ def varied(ordered: list[dict]) -> list[dict]:
             picked.append(x)
         if len(picked) == PER_SECTION:
             return picked
-    return picked + [x for x in ordered if x not in picked][: PER_SECTION - len(picked)]
+    return picked + [x for x in ordered if x not in picked][:PER_SECTION - len(picked)]
 
 
 def preheader(sections: list[dict]) -> str:
@@ -165,17 +152,13 @@ def build(site_dir: str, now: datetime | None = None, placements_path: str | Non
     # was: new = unique_roles([x for x in listings if sp.fresh(x, now, d["baseline"])])
     new = new_roles(d, now)
     # Open roles per field, counted as the field's landing page counts them, so "See all N" matches it.
-    open_by_field = Counter(
-        t for x in listings for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS
-    )
+    open_by_field = Counter(t for x in listings for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS)
     by_field: dict[str, list[dict]] = {}
     for x in new:
         for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS:
             by_field.setdefault(t, []).append(x)
-    ranked = sorted(
-        ((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW),
-        key=lambda tv: (-len(tv[1]), sp.field_title(tv[0])),
-    )
+    ranked = sorted(((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW),
+                    key=lambda tv: (-len(tv[1]), sp.field_title(tv[0])))
     sections = [section(t, v, open_by_field[t]) for t, v in ranked]
     return {
         "subject": f"{sp.plural(len(new), 'new internship')} this week",
@@ -183,44 +166,28 @@ def build(site_dir: str, now: datetime | None = None, placements_path: str | Non
         "week_ending": f"{now:%B} {now.day}, {now.year}",
         "generated_at": now.isoformat(),
         # /internships/new/ is built only when it has MIN_OPEN roles; below that, the dashboard's new filter.
-        "new_url": f"{sp.SITE}/internships/new/?{UTM}"
-        if len(new) >= sp.MIN_OPEN
-        else f"{sp.SITE}/?new=1&{UTM}",
-        "totals": {
-            "open": len(listings),
-            "new": len(new),
-            "nearby": sum(1 for x in new if x["keys"] & sp.HOME_STATES),
-            "fields": len(sections),
-        },
+        "new_url": f"{sp.SITE}/internships/new/?{UTM}" if len(new) >= sp.MIN_OPEN else f"{sp.SITE}/?new=1&{UTM}",
+        "totals": {"open": len(listings), "new": len(new),
+                   "nearby": sum(1 for x in new if x["keys"] & sp.HOME_STATES), "fields": len(sections)},
         "sections": sections[:MAX_SECTIONS],
         # Fields past the cap. Everyone's email stops at MAX_SECTIONS, but a subscriber who picked one of
         # these fields still gets it (pick_sections).
         "more_sections": sections[MAX_SECTIONS:],
         # Paid listings that still resolve this week; [] unless placements_on(). An email shows one at most.
-        "placements": (
-            resolve_placements(
-                read_placements(placements_path or os.path.join(site_dir, "data", PLACEMENTS_FILE)),
-                listings,
-                now.strftime("%Y-%m-%d"),
-            )
-            if placements_on()
-            else []
-        ),
+        "placements": (resolve_placements(
+            read_placements(placements_path or os.path.join(site_dir, "data", PLACEMENTS_FILE)),
+            listings, now.strftime("%Y-%m-%d")) if placements_on() else []),
     }
 
 
 # ---------------------------------------------------------------- placements (paid listings)
 
-PLACEMENTS_ENV = (
-    "DIGEST_PLACEMENTS"  # "1" turns paid listings on; anything else, or unset, keeps them off
-)
-PLACEMENTS_FILE = "placements.json"  # in <site_dir>/data, the shape the site build writes
+PLACEMENTS_ENV = "DIGEST_PLACEMENTS"   # "1" turns paid listings on; anything else, or unset, keeps them off
+PLACEMENTS_FILE = "placements.json"    # in <site_dir>/data, the shape the site build writes
 PLACEMENT_HEADING = "Paid listing"
 PLACEMENT_AD = "Ad"
-PLACEMENT_WHY = (
-    "An employer paid to show this role here. It is not part of this week's list and "
-    "does not change which roles this email lists or their order."
-)
+PLACEMENT_WHY = ("An employer paid to show this role here. It is not part of this week's list and "
+                 "does not change which roles this email lists or their order.")
 
 
 def placements_on() -> bool:
@@ -230,9 +197,8 @@ def placements_on() -> bool:
 def _citizen_only(x: dict) -> bool:
     """A citizenship rule of any kind. The dashboard hides such a paid listing from a student who has
     not said they can meet it (citizenBlocked with no work authorization), and an email reader has not."""
-    return "us_citizen_only" in (x.get("restrictions") or []) or bool(
-        (x.get("insights") or {}).get("citizenship")
-    )
+    return ("us_citizen_only" in (x.get("restrictions") or [])
+            or bool((x.get("insights") or {}).get("citizenship")))
 
 
 def read_placements(path: str) -> list:
@@ -268,10 +234,8 @@ def pick_placement(digest: dict, sections: list[dict]):
     matters. One goes in the first shown section for one of its fields; one with no shown field is
     skipped, so a paid listing only ever appears inside a field the email already covers."""
     week = str(digest.get("week_ending") or "")
-    cands = sorted(
-        digest.get("placements") or [],
-        key=lambda c: hashlib.sha256(f"{week}|{c['id']}".encode()).hexdigest(),
-    )
+    cands = sorted(digest.get("placements") or [],
+                   key=lambda c: hashlib.sha256(f"{week}|{c['id']}".encode()).hexdigest())
     for p in cands:
         for s in sections:
             if s.get("tag") in p.get("tags", ()):
@@ -280,7 +244,6 @@ def pick_placement(digest: dict, sections: list[dict]):
 
 
 # ---------------------------------------------------------------- rendering
-
 
 def pick_sections(digest: dict, fields=None) -> tuple[list[dict], str]:
     """(sections, why) for one subscriber. fields are the field tags they picked. why is "picked" when
@@ -311,10 +274,8 @@ def note(why: str) -> str:
     if why == "picked":
         return "Showing only the fields you picked."
     if why == "fallback":
-        return (
-            f"None of the fields you picked gained {MIN_NEW} or more new roles this week, "
-            "so here are the fields that did."
-        )
+        return (f"None of the fields you picked gained {MIN_NEW} or more new roles this week, "
+                "so here are the fields that did.")
     return ""
 
 
@@ -324,11 +285,9 @@ def _address(postal_address) -> list[str] | None:
 
 
 def affiliation() -> str:
-    return (
-        "InternScout is a free internship search made by a UMass Amherst student. It is not "
-        "affiliated with UMass Amherst or with any employer listed here. These roles come from "
-        "public job boards, so always check the posting on the employer's own site before applying."
-    )
+    return ("InternScout is a free internship search made by a UMass Amherst student. It is not "
+            "affiliated with UMass Amherst or with any employer listed here. These roles come from "
+            "public job boards, so always check the posting on the employer's own site before applying.")
 
 
 def _a(url, label: str, style: str) -> str:
@@ -340,14 +299,12 @@ def _a(url, label: str, style: str) -> str:
 def _role_html(r: dict) -> str:
     meta = " · ".join(esc(_text(v)) for v in (r.get("place"), r.get("pay")) if _text(v))
     title = _a(r.get("url"), _text(r.get("title")), f"color:{ACCENT};text-decoration:underline")
-    return (
-        f'<tr><td style="padding:12px 0;border-top:1px solid {RULE};{SANS};font-size:15px;'
-        f'line-height:1.45;color:{INK}">'
-        f'<div style="font-weight:bold">{esc(_text(r.get("company")))}</div>'
-        f'<div>{title}</div>'
-        + (f'<div style="font-size:13px;color:{INK3}">{meta}</div>' if meta else "")
-        + "</td></tr>"
-    )
+    return (f'<tr><td style="padding:12px 0;border-top:1px solid {RULE};{SANS};font-size:15px;'
+            f'line-height:1.45;color:{INK}">'
+            f'<div style="font-weight:bold">{esc(_text(r.get("company")))}</div>'
+            f'<div>{title}</div>'
+            + (f'<div style="font-size:13px;color:{INK3}">{meta}</div>' if meta else "")
+            + "</td></tr>")
 
 
 def _placement_html(r: dict) -> str:
@@ -355,27 +312,19 @@ def _placement_html(r: dict) -> str:
     name, and the posting's own link with rel="sponsored" and no tracking added."""
     meta = " · ".join(esc(_text(v)) for v in (r.get("place"), r.get("pay")) if _text(v))
     url = _link(r.get("url"))
-    title = (
-        (
-            f'<a href="{esc(url)}" rel="sponsored noopener" style="color:{ACCENT};text-decoration:underline">'
-            f'{esc(_text(r.get("title")))}</a>'
-        )
-        if url
-        else esc(_text(r.get("title")))
-    )
-    return (
-        f'<tr><td style="padding:12px 0;border-top:1px solid {RULE};{SANS};font-size:15px;'
-        f'line-height:1.45;color:{INK}">'
-        f'<div style="padding:10px 12px;border:1px solid {RULE};border-radius:6px;background:#ffffff">'
-        f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:{INK2}">{esc(PLACEMENT_HEADING)}</p>'
-        f'<div style="font-weight:bold"><span style="display:inline-block;padding:0 5px;margin-right:6px;'
-        f'border:1px solid {INK3};border-radius:3px;font-size:12px;color:{INK2}">{esc(PLACEMENT_AD)}</span>'
-        f'{esc(_text(r.get("company")))}</div>'
-        f'<div>{title}</div>'
-        + (f'<div style="font-size:13px;color:{INK3}">{meta}</div>' if meta else "")
-        + f'<p style="margin:6px 0 0;font-size:13px;color:{INK3}">{esc(PLACEMENT_WHY)}</p>'
-        "</div></td></tr>"
-    )
+    title = (f'<a href="{esc(url)}" rel="sponsored noopener" style="color:{ACCENT};text-decoration:underline">'
+             f'{esc(_text(r.get("title")))}</a>') if url else esc(_text(r.get("title")))
+    return (f'<tr><td style="padding:12px 0;border-top:1px solid {RULE};{SANS};font-size:15px;'
+            f'line-height:1.45;color:{INK}">'
+            f'<div style="padding:10px 12px;border:1px solid {RULE};border-radius:6px;background:#ffffff">'
+            f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:{INK2}">{esc(PLACEMENT_HEADING)}</p>'
+            f'<div style="font-weight:bold"><span style="display:inline-block;padding:0 5px;margin-right:6px;'
+            f'border:1px solid {INK3};border-radius:3px;font-size:12px;color:{INK2}">{esc(PLACEMENT_AD)}</span>'
+            f'{esc(_text(r.get("company")))}</div>'
+            f'<div>{title}</div>'
+            + (f'<div style="font-size:13px;color:{INK3}">{meta}</div>' if meta else "")
+            + f'<p style="margin:6px 0 0;font-size:13px;color:{INK3}">{esc(PLACEMENT_WHY)}</p>'
+            "</div></td></tr>")
 
 
 def _with_placement(items: list, extra) -> list:
@@ -388,26 +337,17 @@ def _with_placement(items: list, extra) -> list:
 
 def _section_html(s: dict, placed: dict | None = None) -> str:
     title = _text(s.get("title"))
-    rows = "".join(
-        _with_placement(
-            [_role_html(r) for r in s.get("roles") or []],
-            _placement_html(placed["role"]) if placed else None,
-        )
-    )
-    more = _a(
-        s.get("url"),
-        f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles",
-        f"color:{ACCENT};font-weight:bold;text-decoration:underline",
-    )
-    return (
-        f'<tr><td style="padding:30px 0 6px">'
-        f'<h2 style="margin:0;{SERIF};font-size:21px;line-height:1.3;font-weight:bold;color:{INK}">{esc(title)}</h2>'
-        f'<p style="margin:4px 0 0;{SANS};font-size:14px;color:{INK3}">{s.get("new", 0):,} new this week</p>'
-        "</td></tr>"
-        '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
-        f"{rows}</table></td></tr>"
-        f'<tr><td style="padding:10px 0 0;border-top:1px solid {RULE};{SANS};font-size:14px">{more}</td></tr>'
-    )
+    rows = "".join(_with_placement([_role_html(r) for r in s.get("roles") or []],
+                                   _placement_html(placed["role"]) if placed else None))
+    more = _a(s.get("url"), f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles",
+              f"color:{ACCENT};font-weight:bold;text-decoration:underline")
+    return (f'<tr><td style="padding:30px 0 6px">'
+            f'<h2 style="margin:0;{SERIF};font-size:21px;line-height:1.3;font-weight:bold;color:{INK}">{esc(title)}</h2>'
+            f'<p style="margin:4px 0 0;{SANS};font-size:14px;color:{INK3}">{s.get("new", 0):,} new this week</p>'
+            "</td></tr>"
+            '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+            f"{rows}</table></td></tr>"
+            f'<tr><td style="padding:10px 0 0;border-top:1px solid {RULE};{SANS};font-size:14px">{more}</td></tr>')
 
 
 def render_html(digest: dict, fields=None, postal_address=None) -> str:
@@ -417,35 +357,21 @@ def render_html(digest: dict, fields=None, postal_address=None) -> str:
     sections, why = pick_sections(digest, fields)
     pre = preheader(sections) if why == "picked" else digest.get("preheader", "")
     address = _address(postal_address)
-    address_html = (
-        "<br>".join(esc(line) for line in address)
-        if address
-        else f'<strong style="color:#9b1c1c">{esc(NO_ADDRESS)}</strong>'
-    )
+    address_html = ("<br>".join(esc(line) for line in address) if address else
+                    f'<strong style="color:#9b1c1c">{esc(NO_ADDRESS)}</strong>')
     extra = note(why)
-    extra_html = (
-        f'<p style="margin:12px 0 0;{SANS};font-size:15px;line-height:1.55;color:{INK2}">{esc(extra)}</p>'
-        if extra
-        else ""
-    )
+    extra_html = (f'<p style="margin:12px 0 0;{SANS};font-size:15px;line-height:1.55;color:{INK2}">{esc(extra)}</p>'
+                  if extra else "")
     new_url = _link(digest.get("new_url"))
-    button = (
-        (
-            f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0">'
-            f'<tr><td style="background:{ACCENT};border-radius:6px">'
-            f'<a href="{esc(new_url)}" style="display:inline-block;padding:11px 18px;{SANS};font-size:15px;'
-            # Buttondown adds an !important accent color to every link. Keep the
-            # button text light instead of allowing dark text on its dark background.
-            f'font-weight:bold;color:{PAPER}!important;text-decoration:none;border-radius:6px">See every new role</a>'
-            "</td></tr></table>"
-        )
-        if new_url
-        else ""
-    )
+    button = (f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0">'
+              f'<tr><td style="background:{ACCENT};border-radius:6px">'
+              f'<a href="{esc(new_url)}" style="display:inline-block;padding:11px 18px;{SANS};font-size:15px;'
+              # Buttondown adds an !important accent color to every link. Keep the
+              # button text light instead of allowing dark text on its dark background.
+              f'font-weight:bold;color:{PAPER}!important;text-decoration:none;border-radius:6px">See every new role</a>'
+              "</td></tr></table>") if new_url else ""
     chosen = pick_placement(digest, sections)
-    body = "".join(
-        _section_html(s, chosen[0] if chosen and chosen[1] is s else None) for s in sections
-    )
+    body = "".join(_section_html(s, chosen[0] if chosen and chosen[1] is s else None) for s in sections)
     subject = esc(_text(digest.get("subject")))
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -492,12 +418,8 @@ def render_text(digest: dict, fields=None, postal_address=None) -> str:
     """The email's plain-text part: the same content as render_html, with every link written out."""
     sections, why = pick_sections(digest, fields)
     new_url = _link(digest.get("new_url"))
-    out = [
-        _text(digest.get("subject")),
-        f"Week ending {_text(digest.get('week_ending'))}",
-        "",
-        intro(digest, sections),
-    ]
+    out = [_text(digest.get("subject")), f"Week ending {_text(digest.get('week_ending'))}", "",
+           intro(digest, sections)]
     if why:
         out.append(note(why))
     if new_url:
@@ -519,12 +441,8 @@ def render_text(digest: dict, fields=None, postal_address=None) -> str:
             blocks.append(block)
         if chosen and chosen[1] is s:
             r = chosen[0]["role"]
-            block = [
-                "",
-                f"  {PLACEMENT_HEADING}",
-                f"* {PLACEMENT_AD}: {_text(r.get('company'))}",
-                f"  {_text(r.get('title'))}",
-            ]
+            block = ["", f"  {PLACEMENT_HEADING}", f"* {PLACEMENT_AD}: {_text(r.get('company'))}",
+                     f"  {_text(r.get('title'))}"]
             meta = " · ".join(_text(v) for v in (r.get("place"), r.get("pay")) if _text(v))
             if meta:
                 block.append(f"  {meta}")
@@ -535,10 +453,7 @@ def render_text(digest: dict, fields=None, postal_address=None) -> str:
         for block in blocks:
             out += block
         if _link(s.get("url")):
-            out += [
-                "",
-                f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles: {_link(s.get('url'))}",
-            ]
+            out += ["", f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles: {_link(s.get('url'))}"]
     address = _address(postal_address)
     out += ["", "", "-" * 40, SLOGAN, "", affiliation(), "", WHY, f"Unsubscribe: {UNSUBSCRIBE}", ""]
     out += address or [NO_ADDRESS]
@@ -547,39 +462,24 @@ def render_text(digest: dict, fields=None, postal_address=None) -> str:
 
 # ---------------------------------------------------------------- command line
 
-
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(
-        prog="digest.py", description="Write a preview of this week's email digest."
-    )
-    ap.add_argument(
-        "site_dir", nargs="?", default="docs", help="a copy of docs/ (reads <site_dir>/data)"
-    )
-    ap.add_argument(
-        "--out", default="digest-preview", help="folder for digest.html, digest.txt and digest.json"
-    )
-    ap.add_argument(
-        "--placements",
-        default=None,
-        help="the site build's placements.json (default <site_dir>/data/placements.json); "
-        "read only when DIGEST_PLACEMENTS=1",
-    )
+    ap = argparse.ArgumentParser(prog="digest.py", description="Write a preview of this week's email digest.")
+    ap.add_argument("site_dir", nargs="?", default="docs", help="a copy of docs/ (reads <site_dir>/data)")
+    ap.add_argument("--out", default="digest-preview", help="folder for digest.html, digest.txt and digest.json")
+    ap.add_argument("--placements", default=None,
+                    help="the site build's placements.json (default <site_dir>/data/placements.json); "
+                         "read only when DIGEST_PLACEMENTS=1")
     args = ap.parse_args(argv[1:])
     digest = build(args.site_dir, placements_path=args.placements)
     os.makedirs(args.out, exist_ok=True)
-    for name, body in (
-        ("digest.html", render_html(digest)),
-        ("digest.txt", render_text(digest)),
-        ("digest.json", json.dumps(digest, ensure_ascii=False, indent=1) + "\n"),
-    ):
+    for name, body in (("digest.html", render_html(digest)), ("digest.txt", render_text(digest)),
+                       ("digest.json", json.dumps(digest, ensure_ascii=False, indent=1) + "\n")):
         with open(os.path.join(args.out, name), "w", encoding="utf-8", newline="\n") as f:
             f.write(body)
     t = digest["totals"]
-    print(
-        f"[digest] {digest['subject']}: {len(digest['sections'])} of {t['fields']} fields shown, "
-        f"{t['nearby']:,} new roles in the Northeast or remote; wrote digest.html, digest.txt and "
-        f"digest.json to {args.out}"
-    )
+    print(f"[digest] {digest['subject']}: {len(digest['sections'])} of {t['fields']} fields shown, "
+          f"{t['nearby']:,} new roles in the Northeast or remote; wrote digest.html, digest.txt and "
+          f"digest.json to {args.out}")
     return 0
 
 

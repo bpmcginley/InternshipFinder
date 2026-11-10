@@ -18,7 +18,6 @@ Two halves:
 Needs GITHUB_TOKEN (actions: write to start runs, actions: read to guard) and GITHUB_REPOSITORY.
 Standard library only.
 """
-
 from __future__ import annotations
 
 import json
@@ -57,12 +56,8 @@ def _call(method: str, path: str, body: dict | None = None) -> dict:
     headers = {"Accept": "application/vnd.github+json", **UA}
     if os.environ.get("GITHUB_TOKEN"):
         headers["Authorization"] = f"Bearer {os.environ['GITHUB_TOKEN']}"
-    req = urllib.request.Request(
-        f"{API}/{path}",
-        method=method,
-        headers=headers,
-        data=json.dumps(body).encode() if body is not None else None,
-    )
+    req = urllib.request.Request(f"{API}/{path}", method=method, headers=headers,
+                                 data=json.dumps(body).encode() if body is not None else None)
     with urllib.request.urlopen(req, timeout=30) as r:
         raw = r.read()
     return json.loads(raw) if raw else {}
@@ -85,10 +80,8 @@ def job_ran(run: dict, job: str, jobs_of=None) -> bool:
     if run.get("conclusion") in ("skipped", "cancelled"):
         return False
     jobs_of = jobs_of or (lambda r: _call("GET", f"runs/{r['id']}/jobs").get("jobs") or [])
-    return any(
-        j.get("name") == job and j.get("conclusion") not in ("skipped", "cancelled")
-        for j in jobs_of(run)
-    )
+    return any(j.get("name") == job and j.get("conclusion") not in ("skipped", "cancelled")
+               for j in jobs_of(run))
 
 
 def last_worked(rs: list[dict], job: str, jobs_of=None, skip_id=None) -> dict | None:
@@ -116,15 +109,8 @@ def post_due(rs: list[dict], now: datetime) -> bool:
 
 
 def _step_conclusion(jobs: list[dict], name: str) -> str | None:
-    return next(
-        (
-            step.get("conclusion")
-            for job in jobs
-            for step in job.get("steps", [])
-            if step.get("name") == name
-        ),
-        None,
-    )
+    return next((step.get("conclusion") for job in jobs for step in job.get("steps", [])
+                 if step.get("name") == name), None)
 
 
 def digest_run_active(run: dict, jobs_of=None) -> bool:
@@ -133,11 +119,8 @@ def digest_run_active(run: dict, jobs_of=None) -> bool:
     GitHub can start the active cron hours late, so created_at cannot identify which UTC slot won.
     A queued or failed run is not proven inactive and keeps the existing do-not-retry behavior.
     """
-    if (
-        run.get("event") != "schedule"
-        or run.get("status") != "completed"
-        or run.get("conclusion") != "success"
-    ):
+    if (run.get("event") != "schedule" or run.get("status") != "completed" or
+            run.get("conclusion") != "success"):
         return True
     jobs_of = jobs_of or (lambda r: _call("GET", f"runs/{r['id']}/jobs").get("jobs") or [])
     return _step_conclusion(jobs_of(run), "Write the digest") != "skipped"
@@ -149,15 +132,9 @@ def digest_due(rs: list[dict], now: datetime, jobs_of=None) -> bool:
     At most one catch-up runs per Monday, however the day's runs ended. A failed send is not retried.
     """
     local = now.astimezone(EASTERN)
-    if (
-        local.weekday() != DIGEST_DAY
-        or local.hour < DIGEST_LOCAL_HOUR
-        or now.hour >= DIGEST_LAST_HOUR
-    ):
+    if local.weekday() != DIGEST_DAY or local.hour < DIGEST_LOCAL_HOUR or now.hour >= DIGEST_LAST_HOUR:
         return False
-    since = local.replace(hour=DIGEST_LOCAL_HOUR, minute=0, second=0, microsecond=0).astimezone(
-        timezone.utc
-    )
+    since = local.replace(hour=DIGEST_LOCAL_HOUR, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     since -= timedelta(minutes=5)
     # 2026-10-27: was: every run after `since` blocked catch-up. The spare UTC cron is a successful
     # no-op, so only its proven-skipped write step is ignored. Revert with the former one-line any().
@@ -167,9 +144,7 @@ def digest_due(rs: list[dict], now: datetime, jobs_of=None) -> bool:
 def post_done_today(rs: list[dict], now: datetime, this_id, jobs_of=None) -> bool:
     """Another run today already got as far as posting (or is posting). Failed runs count: Bluesky
     may have posted before Instagram failed, and posting it twice is worse than once."""
-    today = [
-        r for r in rs if r.get("id") != this_id and _when(r["created_at"]).date() == now.date()
-    ]
+    today = [r for r in rs if r.get("id") != this_id and _when(r["created_at"]).date() == now.date()]
     return last_worked(today, "post", jobs_of) is not None
 
 
@@ -178,9 +153,7 @@ def recent_ingest(rs: list[dict], now: datetime, this_id, jobs_of=None) -> bool:
     for r in rs:
         if r.get("id") == this_id or now - _when(r["created_at"]) > INGEST_GUARD:
             continue
-        if (r.get("status") in BUSY or r.get("conclusion") == "success") and job_ran(
-            r, "ingest", jobs_of
-        ):
+        if (r.get("status") in BUSY or r.get("conclusion") == "success") and job_ran(r, "ingest", jobs_of):
             return True
     return False
 
@@ -220,10 +193,7 @@ def main(argv: list[str]) -> int:
     if "--guard" in argv:
         file = argv[argv.index("--guard") + 1]
         skip = guard(file, now)
-        print(
-            f"[catchup] {file}: "
-            + ("another run already did this slot's work; skipping" if skip else "go")
-        )
+        print(f"[catchup] {file}: " + ("another run already did this slot's work; skipping" if skip else "go"))
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
                 f.write(f"skip={'true' if skip else 'false'}\n")
@@ -236,7 +206,7 @@ def main(argv: list[str]) -> int:
                 print(f"[catchup] {file}: overdue, started")
             else:
                 print(f"[catchup] {file}: on time")
-        except Exception as e:  # one API hiccup must not stop the other jobs' checks
+        except Exception as e:            # one API hiccup must not stop the other jobs' checks
             failed = True
             print(f"[catchup] {file}: check failed ({type(e).__name__})")
     try:

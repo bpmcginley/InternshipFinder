@@ -1,7 +1,6 @@
 """USAJOBS Search API, student hiring path (Pathways internships, student trainees).
 Needs a free key from developer.usajobs.gov: USAJOBS_API_KEY, plus USAJOBS_EMAIL (the address the
 key was requested with; USAJOBS requires it as the User-Agent). Skipped when either is missing."""
-
 from __future__ import annotations
 import os
 from .base import client
@@ -17,25 +16,15 @@ PAGE, MAX_PAGES = 500, 10
 # "Student Trainee (Economist)". The series is on every posting, so it names the field when the
 # title cannot. Only used when the title alone says nothing (normalize's "other").
 SERIES_FIELDS = {
-    "0101": "social_science",
-    "0102": "social_science",  # social science; its aides and technicians
-    "0110": "economics",
-    "0119": "economics",  # economist; economics assistant
-    "0130": "social_science",
-    "0131": "social_science",  # foreign affairs; international relations
-    "0140": "social_science",
-    "0150": "social_science",  # workforce research; geography
-    "0170": "social_science",  # history (OPM files it with the social sciences)
-    "0180": "psychology",
-    "0181": "psychology",  # psychology; its aides and technicians
-    "0184": "social_science",
-    "0190": "social_science",
-    "0193": "social_science",  # sociology, anthropology, archeology
-    "0185": "social_work",
-    "0186": "social_work",
-    "0187": "social_work",
-    "1040": "languages",
-    "1046": "languages",  # language specialist; language clerical
+    "0101": "social_science", "0102": "social_science",   # social science; its aides and technicians
+    "0110": "economics", "0119": "economics",              # economist; economics assistant
+    "0130": "social_science", "0131": "social_science",   # foreign affairs; international relations
+    "0140": "social_science", "0150": "social_science",   # workforce research; geography
+    "0170": "social_science",                             # history (OPM files it with the social sciences)
+    "0180": "psychology", "0181": "psychology",            # psychology; its aides and technicians
+    "0184": "social_science", "0190": "social_science", "0193": "social_science",  # sociology, anthropology, archeology
+    "0185": "social_work", "0186": "social_work", "0187": "social_work",
+    "1040": "languages", "1046": "languages",              # language specialist; language clerical
 }
 
 
@@ -49,9 +38,7 @@ def _series_field(d: dict) -> str | None:
 
 def _place(name: str) -> str:
     parts = [p.strip() for p in (name or "").split(",") if p.strip()]
-    return ", ".join(
-        parts[-2:]
-    )  # "Point Loma Complex, San Diego, California" -> "San Diego, California"
+    return ", ".join(parts[-2:])   # "Point Loma Complex, San Diego, California" -> "San Diego, California"
 
 
 def _text(v) -> str:
@@ -65,15 +52,12 @@ def parse_usajobs(payload: dict, counts: ScanCounts | None = None) -> tuple[list
         d = hit.get("MatchedObjectDescriptor") or {}
         title = d.get("PositionTitle") or ""
         sched = ((d.get("PositionSchedule") or [{}])[0] or {}).get("Name") or ""
-        emp = f"Intern {sched}".strip()  # every student-path posting is a student role
+        emp = f"Intern {sched}".strip()      # every student-path posting is a student role
         if not is_internship(title, emp):
             counts.discard("not_student")
             continue
-        locs = [
-            _place(l.get("LocationName"))
-            for l in d.get("PositionLocation") or []
-            if (l.get("CountryCode") or "") in ("United States", "US")
-        ]
+        locs = [_place(l.get("LocationName")) for l in d.get("PositionLocation") or []
+                if (l.get("CountryCode") or "") in ("United States", "US")]
         if not locs:
             counts.discard("outside_region")
             continue
@@ -81,32 +65,20 @@ def parse_usajobs(payload: dict, counts: ScanCounts | None = None) -> tuple[list
         pay = (d.get("PositionRemuneration") or [{}])[0] or {}
         lines = []
         if pay.get("MinimumRange"):
-            lines.append(
-                f"Salary: ${pay['MinimumRange']} - ${pay.get('MaximumRange') or pay['MinimumRange']} "
-                f"{pay.get('Description') or ''}".strip()
-            )
+            lines.append(f"Salary: ${pay['MinimumRange']} - ${pay.get('MaximumRange') or pay['MinimumRange']} "
+                         f"{pay.get('Description') or ''}".strip())
         who = (details.get("WhoMayApply") or {}).get("Name")
         if who:
             lines.append(f"Who may apply: {who}")
         if d.get("ApplicationCloseDate"):
             lines.append(f"Apply by: {d['ApplicationCloseDate'][:10]}")
-        lines += [
-            _text(details.get("JobSummary")),
-            _text(details.get("MajorDuties")),
-            _text(d.get("QualificationSummary")),
-        ]
+        lines += [_text(details.get("JobSummary")), _text(details.get("MajorDuties")), _text(d.get("QualificationSummary"))]
         url = d.get("PositionURI")
-        item = board_item(
-            {"name": d.get("OrganizationName") or d.get("DepartmentName") or "US Government"},
-            source="usajobs",
-            title=title,
-            locations=locs,
-            url=url,
-            apply_url=(d.get("ApplyURI") or [url])[0],
-            posted_at=d.get("PublicationStartDate"),
-            description=html_to_text("\n".join(l for l in lines if l.strip())),
-            employment_type=emp,
-        )
+        item = board_item({"name": d.get("OrganizationName") or d.get("DepartmentName") or "US Government"},
+                          source="usajobs", title=title, locations=locs, url=url,
+                          apply_url=(d.get("ApplyURI") or [url])[0], posted_at=d.get("PublicationStartDate"),
+                          description=html_to_text("\n".join(l for l in lines if l.strip())),
+                          employment_type=emp)
         field = _series_field(d)
         if field:
             item["field_hint"] = field
@@ -127,11 +99,7 @@ def fetch_usajobs(api_key: str | None = None, email: str | None = None, report=N
     try:
         with client() as c:
             for page in range(1, MAX_PAGES + 1):
-                r = c.get(
-                    API,
-                    params={"HiringPath": "student", "ResultsPerPage": PAGE, "Page": page},
-                    headers=headers,
-                )
+                r = c.get(API, params={"HiringPath": "student", "ResultsPerPage": PAGE, "Page": page}, headers=headers)
                 r.raise_for_status()
                 payload = r.json()
                 if not isinstance(payload, dict):

@@ -6,7 +6,6 @@ in the Northeast or remote, and nationwide, and sorts the majors into the tiers 
 
 Run from the repo root:  python growth/audience.py [docs]
 """
-
 import os
 import sys
 
@@ -23,11 +22,9 @@ def tiers(site_dir: str):
         if m.get("level") not in (None, "undergrad"):
             continue
         tags = set(m.get("tags") or []) - seo_pages.SKIP_FIELDS
-        if (
-            not tags
-        ):  # Undeclared, BDIC: no field of their own, so every listing is theirs to browse
+        if not tags:        # Undeclared, BDIC: no field of their own, so every listing is theirs to browse
             continue
-        fits = [x for x in d["listings"] if set(x.get("field_tags") or []) & tags]
+        fits =[x for x in d["listings"] if set(x.get("field_tags") or []) & tags]
         near = [x for x in fits if x["keys"] & seo_pages.HOME_STATES]
         rows.append({"major": m["name"], "near": len(near), "all": len(fits)})
     return sorted(rows, key=lambda r: -r["near"]), d["generated_at"]
@@ -36,12 +33,10 @@ def tiers(site_dir: str):
 def main():
     rows, when = tiers(sys.argv[1] if len(sys.argv) > 1 else "docs")
     print(f"Data from {when}\n")
-    for title, keep in (
-        ("Primary: market now", lambda n: n >= PRIMARY),
-        ("Secondary", lambda n: SECONDARY <= n < PRIMARY),
-        ("Serviceable", lambda n: THIN <= n < SECONDARY),
-        ("Not yet: fix the data first", lambda n: n < THIN),
-    ):
+    for title, keep in (("Primary: market now", lambda n: n >= PRIMARY),
+                        ("Secondary", lambda n: SECONDARY <= n < PRIMARY),
+                        ("Serviceable", lambda n: THIN <= n < SECONDARY),
+                        ("Not yet: fix the data first", lambda n: n < THIN)):
         group = [r for r in rows if keep(r["near"])]
         print(f"{title} ({len(group)})")
         for r in group:

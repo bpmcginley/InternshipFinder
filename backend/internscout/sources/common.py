@@ -1,5 +1,4 @@
 """Helpers shared by the ATS fetchers."""
-
 from __future__ import annotations
 import html
 from collections import Counter
@@ -83,7 +82,7 @@ def robots_allows(c, base: str, path: str) -> bool:
                 body = ""
             _ROBOTS[base] = robots_rules(body)
         except Exception:
-            _ROBOTS[base] = []  # nothing said is nothing forbidden
+            _ROBOTS[base] = []   # nothing said is nothing forbidden
     return not robots_blocks(_ROBOTS[base], path)
 
 
@@ -119,8 +118,7 @@ def stamp_board_newest(items: list[dict], dates) -> list[dict]:
     uses. normalize() reads the stamp to tell an evergreen requisition on a board that is still being
     added to from a posting on a board nobody has touched in years (see normalize._zombie).
     """
-    from ..normalize import _to_dt  # here, not at the top: normalize pulls in classify and region
-
+    from ..normalize import _to_dt      # here, not at the top: normalize pulls in classify and region
     newest = None
     for d in dates:
         dt = _to_dt(d)
@@ -136,24 +134,14 @@ def stamp_board_newest(items: list[dict], dates) -> list[dict]:
     return items
 
 
-def board_item(
-    co: dict,
-    *,
-    source: str,
-    title: str,
-    locations: list,
-    url: str | None,
-    apply_url: str | None = None,
-    posted_at=None,
-    description: str = "",
-    employment_type: str = "",
-) -> dict:
+def board_item(co: dict, *, source: str, title: str, locations: list, url: str | None,
+               apply_url: str | None = None, posted_at=None, description: str = "",
+               employment_type: str = "") -> dict:
     return {
         "company_name": co["name"],
         "title": title or "",
         "locations": seed_location(co, [l for l in locations if l]),
-        "season": None,
-        "year": None,
+        "season": None, "year": None,
         "url": url,
         "apply_url": apply_url or url,
         "posted_at": posted_at,
@@ -225,24 +213,20 @@ def mark_complete(co: dict, complete: bool) -> None:
 # filtered, so without these the ingest report cannot tell a board that listed nothing from one
 # whose 300 results were all "Internal Audit Manager". Reasons are program-defined labels, never
 # text from the response.
-DISCARD_REASONS = frozenset(
-    {
-        "not_student",  # is_internship said no to the title (and employment type)
-        "outside_region",  # no US or Canadian place the adapter could keep
-        "duplicate",  # the same job again: another keyword's search, another location row
-        "unlisted",  # the API marked the row hidden or unlisted
-        "expired",  # the row's own closing date has passed
-        "unreadable",  # a row without the fields a listing needs (no link, not an object)
-    }
-)
-STOP_REASONS = frozenset(
-    {
-        "page_cap",  # the adapter's page or offset ceiling stopped the read with results left
-        "dry_pages",  # Workday: past CORE_OFFSET, pages in a row held no internship
-        "row_limit",  # one request whose row limit was filled, so more may exist
-        "quota",  # a paid search quota ran out before the plan was done
-    }
-)
+DISCARD_REASONS = frozenset({
+    "not_student",      # is_internship said no to the title (and employment type)
+    "outside_region",   # no US or Canadian place the adapter could keep
+    "duplicate",        # the same job again: another keyword's search, another location row
+    "unlisted",         # the API marked the row hidden or unlisted
+    "expired",          # the row's own closing date has passed
+    "unreadable",       # a row without the fields a listing needs (no link, not an object)
+})
+STOP_REASONS = frozenset({
+    "page_cap",         # the adapter's page or offset ceiling stopped the read with results left
+    "dry_pages",        # Workday: past CORE_OFFSET, pages in a row held no internship
+    "row_limit",        # one request whose row limit was filled, so more may exist
+    "quota",            # a paid search quota ran out before the plan was done
+})
 
 
 class ScanCounts:
@@ -315,17 +299,9 @@ def failure_cause(e: BaseException) -> str:
     return type(e).__name__
 
 
-def report_source(
-    report,
-    source: str,
-    *,
-    items=None,
-    error: BaseException | None = None,
-    skipped: str | None = None,
-    counts: ScanCounts | None = None,
-    failed_units: int = 0,
-    units: int | None = None,
-) -> None:
+def report_source(report, source: str, *, items=None, error: BaseException | None = None,
+                  skipped: str | None = None, counts: ScanCounts | None = None,
+                  failed_units: int = 0, units: int | None = None) -> None:
     """Hand a whole non-board source's outcome to the run's collector (IngestMetrics.source_result).
 
     Exactly one status: skipped (with a code-defined cause), failed (an error stopped the fetch,
@@ -344,6 +320,5 @@ def report_source(
         status, cause = "partial", failure_cause(error) if error is not None else None
     else:
         status, cause = ("success" if n else "empty"), None
-    report(
-        source, status, count=n, cause=cause, scan=counts.as_dict() if counts is not None else None
-    )
+    report(source, status, count=n, cause=cause,
+           scan=counts.as_dict() if counts is not None else None)

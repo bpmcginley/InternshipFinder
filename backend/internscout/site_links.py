@@ -1,5 +1,4 @@
 """Check a built Pages directory without making network requests."""
-
 from __future__ import annotations
 
 import json
@@ -29,11 +28,7 @@ class PageLinks(HTMLParser):
         attrs = dict(attrs)
         for key in ("href", "src"):
             if attrs.get(key):
-                kind = (
-                    "canonical"
-                    if tag == "link" and "canonical" in attrs.get("rel", "").split()
-                    else tag
-                )
+                kind = "canonical" if tag == "link" and "canonical" in attrs.get("rel", "").split() else tag
                 self.references.append((attrs[key], kind))
 
 
@@ -56,9 +51,7 @@ def audit(site_dir: str | Path) -> dict:
         refs.extend((source, target, kind) for target, kind in parser.references)
     sitemap = root / "sitemap.xml"
     if sitemap.exists():
-        for loc in ElementTree.parse(sitemap).iter(
-            "{http://www.sitemaps.org/schemas/sitemap/0.9}loc"
-        ):
+        for loc in ElementTree.parse(sitemap).iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc"):
             refs.append(("/sitemap.xml", loc.text or "", "sitemap"))
     checked, problems = 0, []
     for source, target, kind in refs:
@@ -72,23 +65,17 @@ def audit(site_dir: str | Path) -> dict:
         index = path.rstrip("/") + "/index.html" if path else "index.html"
         if index in files:
             if path and not path.endswith("/"):
-                problems.append(
-                    Reference(source, target, kind, "directory URL needs a trailing slash")
-                )
+                problems.append(Reference(source, target, kind, "directory URL needs a trailing slash"))
             continue
         problems.append(Reference(source, target, kind, "missing target"))
-    return {
-        "html_pages": len(pages),
-        "internal_references": checked,
-        "missing_references": sum(p.problem == "missing target" for p in problems),
-        "redirect_references": sum(p.problem != "missing target" for p in problems),
-        "problems": [asdict(p) for p in problems],
-    }
+    return {"html_pages": len(pages), "internal_references": checked,
+            "missing_references": sum(p.problem == "missing target" for p in problems),
+            "redirect_references": sum(p.problem != "missing target" for p in problems),
+            "problems": [asdict(p) for p in problems]}
 
 
 def main(argv=None):
     import sys
-
     args = sys.argv[1:] if argv is None else argv
     report = audit(args[0] if args else "docs")
     print(json.dumps(report, indent=2))

@@ -44,7 +44,6 @@ Run from the repo root:
                                 [--skip-if-sent]
   python growth/digest_send.py --check
 """
-
 from __future__ import annotations
 
 import argparse
@@ -88,10 +87,8 @@ GONE = ("about_to_send", "scheduled", "in_flight", "sent")
 # Two digests this close together are one sent twice. Six days, not seven, so a run a week after the
 # last one (the Monday schedule, give or take the minutes a send takes) is never blocked by it.
 SAME_WEEK = timedelta(days=6)
-MAX_PAGES = 20  # of Buttondown's email list; a weekly newsletter needs years to fill that many
-MAX_EXPORT_AGE = timedelta(
-    days=2
-)  # Same limit as brand posts; ingest normally runs every six hours.
+MAX_PAGES = 20      # of Buttondown's email list; a weekly newsletter needs years to fill that many
+MAX_EXPORT_AGE = timedelta(days=2)  # Same limit as brand posts; ingest normally runs every six hours.
 
 
 def utcnow() -> datetime:
@@ -105,9 +102,7 @@ def export_issue(site_dir: str, now: datetime | None = None) -> str | None:
         with open(os.path.join(site_dir, "data", "listings", "index.json"), encoding="utf-8") as f:
             index = json.load(f)
         stamp = index.get("generated_at") if isinstance(index, dict) else None
-        made = (
-            datetime.fromisoformat(stamp.replace("Z", "+00:00")) if isinstance(stamp, str) else None
-        )
+        made = datetime.fromisoformat(stamp.replace("Z", "+00:00")) if isinstance(stamp, str) else None
     except (OSError, ValueError):
         return "the data export index or generated_at time is missing or unreadable"
     if made is None or made.tzinfo is None:
@@ -136,7 +131,6 @@ class NoAnswer(ProviderError):
 
 # ---------------------------------------------------------------- the email
 
-
 def subject(d: dict) -> str:
     """The subject, with the week's date in it. Buttondown has an email_duplicate error whose trigger
     it doesn't document, and a subject that names its week is at least never the same twice."""
@@ -160,21 +154,15 @@ def body_html(page: str) -> str:
     link = f'href="{digest.UNSUBSCRIBE}"'
     parts = m.group(1).split(link)
     if len(parts) != 2:
-        raise ValueError(
-            f"the digest needs exactly one unsubscribe link ({link}); found {len(parts) - 1}"
-        )
+        raise ValueError(f"the digest needs exactly one unsubscribe link ({link}); found {len(parts) - 1}")
     safe = [p.replace("{", "&#123;").replace("}", "&#125;") for p in parts]
     return FANCY + f'href="{UNSUBSCRIBE}"'.join(safe).strip()
 
 
 def payload(d: dict, postal_address: str | None, public_archive: bool = False) -> dict:
     """The body of POST /v1/emails: a draft to every subscriber."""
-    out = {
-        "subject": subject(d),
-        "body": body_html(digest.render_html(d, postal_address=postal_address)),
-        "status": "draft",
-        "filters": EVERYONE,
-    }
+    out = {"subject": subject(d), "body": body_html(digest.render_html(d, postal_address=postal_address)),
+           "status": "draft", "filters": EVERYONE}
     if not public_archive:
         # Buttondown posts emails on the newsletter's public web archive unless told not to.
         out["archival_mode"] = "disabled"
@@ -183,38 +171,24 @@ def payload(d: dict, postal_address: str | None, public_archive: bool = False) -
 
 # ---------------------------------------------------------------- Buttondown
 
-
 def _explain(method: str, path: str, status: int, raw: bytes) -> str:
     text = raw.decode("utf-8", "replace")[:500]
     hint = ""
     if status in (401, 403):
         hint = f" Check {KEY_ENV}: the key needs email_access and sending_access set to write."
     elif "email_duplicate" in text:
-        hint = (
-            " Buttondown took this for a duplicate email. Its docs don't say what counts as one, so "
-            "look in the dashboard for an email with the same subject before running this again."
-        )
+        hint = (" Buttondown took this for a duplicate email. Its docs don't say what counts as one, so "
+                "look in the dashboard for an email with the same subject before running this again.")
     return f"Buttondown refused {method} {path} ({status}): {text}{hint}"
 
 
-def call(
-    method: str,
-    path: str,
-    key: str,
-    body: dict | None = None,
-    headers: dict | None = None,
-    tries: int = 1,
-) -> dict:
+def call(method: str, path: str, key: str, body: dict | None = None, headers: dict | None = None,
+         tries: int = 1) -> dict:
     """One request to Buttondown's API, with its JSON answer. A refusal raises ProviderError at once.
     A network failure is tried again up to tries times, so pass tries > 1 only for a request that is
     safe to repeat."""
-    h = {
-        "Authorization": f"Token {key}",
-        "X-API-Version": API_VERSION,
-        "Content-Type": "application/json",
-        **UA,
-        **(headers or {}),
-    }
+    h = {"Authorization": f"Token {key}", "X-API-Version": API_VERSION,
+         "Content-Type": "application/json", **UA, **(headers or {})}
     data = json.dumps(body).encode("utf-8") if body is not None else None
     problem = ""
     for _ in range(max(1, tries)):
@@ -224,15 +198,14 @@ def call(
                 raw = r.read()
         except urllib.error.HTTPError as e:
             raise ProviderError(_explain(method, path, e.code, e.read() or b""), e.code) from None
-        except OSError as e:  # URLError, a timeout or a dropped connection
+        except OSError as e:          # URLError, a timeout or a dropped connection
             problem = f"No answer from Buttondown to {method} {path}: {e}"
             continue
         try:
             return json.loads(raw) if raw.strip() else {}
         except ValueError:
-            raise ProviderError(
-                f"Buttondown answered {method} {path} with something that isn't JSON: {raw[:200]!r}"
-            ) from None
+            raise ProviderError(f"Buttondown answered {method} {path} with something that isn't JSON: "
+                                f"{raw[:200]!r}") from None
     raise NoAnswer(problem)
 
 
@@ -242,15 +215,11 @@ def create_draft(key: str, body: dict) -> str:
     created = call("POST", "/emails", key, body, {"X-Idempotency-Key": str(uuid.uuid4())}, tries=2)
     email_id = created.get("id")
     if not isinstance(email_id, str) or not EMAIL_ID.fullmatch(email_id):
-        raise ProviderError(
-            f"Buttondown's answer to POST /emails has no usable email id, so nothing more "
-            f"was sent: {json.dumps(created)[:300]}"
-        )
+        raise ProviderError(f"Buttondown's answer to POST /emails has no usable email id, so nothing more "
+                            f"was sent: {json.dumps(created)[:300]}")
     if created.get("status", "draft") != "draft":
-        raise ProviderError(
-            f"Buttondown made {email_id} with status {created.get('status')!r}, not "
-            f"'draft'. Stopping; look at it in the dashboard."
-        )
+        raise ProviderError(f"Buttondown made {email_id} with status {created.get('status')!r}, not "
+                            f"'draft'. Stopping; look at it in the dashboard.")
     return email_id
 
 
@@ -273,7 +242,7 @@ def same_week(key: str, subject_line: str, now: datetime | None = None) -> dict 
     now = now or datetime.now(timezone.utc)
     path = "/emails?" + urllib.parse.urlencode([("status", s) for s in GONE])
     for _ in range(MAX_PAGES):
-        page = call("GET", path, key, tries=2)  # a read, so safe to repeat
+        page = call("GET", path, key, tries=2)          # a read, so safe to repeat
         for e in page.get("results") or []:
             if not isinstance(e, dict) or e.get("status") not in GONE:
                 continue
@@ -287,14 +256,10 @@ def same_week(key: str, subject_line: str, now: datetime | None = None) -> dict 
             return None
         # Follow only Buttondown's own next-page links, so the key is never sent anywhere else.
         if not str(nxt).startswith(f"{API}/emails?"):
-            raise ProviderError(
-                f"Buttondown's email list gave a next page that isn't its own: {str(nxt)[:200]}"
-            )
-        path = str(nxt)[len(API) :]
-    raise ProviderError(
-        f"Buttondown's email list runs past {MAX_PAGES} pages, so this week's could not all "
-        "be checked."
-    )
+            raise ProviderError(f"Buttondown's email list gave a next page that isn't its own: {str(nxt)[:200]}")
+        path = str(nxt)[len(API):]
+    raise ProviderError(f"Buttondown's email list runs past {MAX_PAGES} pages, so this week's could not all "
+                        "be checked.")
 
 
 def unknown(e: ProviderError) -> bool:
@@ -317,16 +282,12 @@ def check(key: str, send: bool) -> int:
     except ProviderError as e:
         print(f"[digest] Check failed: {e}")
         return EXIT_PROVIDER
-    print(
-        f"[digest] {KEY_ENV} works: Buttondown answered the same-week check (API version {API_VERSION}). "
-        "Nothing was sent."
-    )
+    print(f"[digest] {KEY_ENV} works: Buttondown answered the same-week check (API version {API_VERSION}). "
+          "Nothing was sent.")
     if earlier:
         when = earlier.get("publish_date") or earlier.get("creation_date") or "no date"
-        print(
-            f"[digest] A send to everyone would refuse right now: {earlier.get('id')} ({earlier.get('status')}, "
-            f"{when}) went out or is scheduled within six days."
-        )
+        print(f"[digest] A send to everyone would refuse right now: {earlier.get('id')} ({earlier.get('status')}, "
+              f"{when}) went out or is scheduled within six days.")
     else:
         print("[digest] No email was sent or scheduled in the last six days.")
     return 0
@@ -334,71 +295,37 @@ def check(key: str, send: bool) -> int:
 
 # ---------------------------------------------------------------- command line
 
-
 def _plan(test_to: str | None) -> list[str]:
     """The requests a real send would make, for the dry run to print."""
     if test_to:
-        second = (
-            f"POST {API}/emails/<new id>/send-draft  "
-            + json.dumps({"recipients": [test_to]})
-            + "  (one test copy; the draft stays unsent)"
-        )
+        second = (f"POST {API}/emails/<new id>/send-draft  " + json.dumps({"recipients": [test_to]})
+                  + "  (one test copy; the draft stays unsent)")
     else:
-        second = (
-            f"PATCH {API}/emails/<new id>  "
-            + json.dumps({"status": "about_to_send"})
-            + "  (every subscriber)"
-        )
+        second = f"PATCH {API}/emails/<new id>  " + json.dumps({"status": "about_to_send"}) + "  (every subscriber)"
     # was: return [f"POST {API}/emails  (a draft, with X-API-Version {API_VERSION})", second]
-    first = (
-        []
-        if test_to
-        else [f"GET {API}/emails?status=...  (stops if one was sent or scheduled this week)"]
-    )
+    first = [] if test_to else [f"GET {API}/emails?status=...  (stops if one was sent or scheduled this week)"]
     return first + [f"POST {API}/emails  (a draft, with X-API-Version {API_VERSION})", second]
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(
-        prog="digest_send.py",
-        description="Send this week's email digest through Buttondown. Without --send, "
-        "only print what would be sent.",
-    )
-    ap.add_argument(
-        "site_dir", nargs="?", default="docs", help="a copy of docs/ (reads <site_dir>/data)"
-    )
-    ap.add_argument(
-        "--send",
-        action="store_true",
-        help="really send; needs BUTTONDOWN_API_KEY and DIGEST_POSTAL_ADDRESS",
-    )
-    ap.add_argument(
-        "--test-to",
-        metavar="ADDRESS",
-        help="send one test copy to this address instead of to every subscriber",
-    )
-    ap.add_argument(
-        "--public-archive",
-        action="store_true",
-        help="also post the email on Buttondown's public web archive (off by default)",
-    )
-    ap.add_argument(
-        "--allow-same-week",
-        action="store_true",
-        help="send to every subscriber even though Buttondown already has an email sent or "
-        "scheduled this week (only after checking it in the dashboard)",
-    )
-    ap.add_argument(
-        "--skip-if-sent",
-        action="store_true",
-        help="when Buttondown already has this week's email, say so and exit 0 instead of 2 "
-        "(for the late scheduled run)",
-    )
-    ap.add_argument(
-        "--check",
-        action="store_true",
-        help="only check that BUTTONDOWN_API_KEY works (one read, nothing sent); not with --send",
-    )
+    ap = argparse.ArgumentParser(prog="digest_send.py",
+                                 description="Send this week's email digest through Buttondown. Without --send, "
+                                             "only print what would be sent.")
+    ap.add_argument("site_dir", nargs="?", default="docs", help="a copy of docs/ (reads <site_dir>/data)")
+    ap.add_argument("--send", action="store_true",
+                    help="really send; needs BUTTONDOWN_API_KEY and DIGEST_POSTAL_ADDRESS")
+    ap.add_argument("--test-to", metavar="ADDRESS",
+                    help="send one test copy to this address instead of to every subscriber")
+    ap.add_argument("--public-archive", action="store_true",
+                    help="also post the email on Buttondown's public web archive (off by default)")
+    ap.add_argument("--allow-same-week", action="store_true",
+                    help="send to every subscriber even though Buttondown already has an email sent or "
+                         "scheduled this week (only after checking it in the dashboard)")
+    ap.add_argument("--skip-if-sent", action="store_true",
+                    help="when Buttondown already has this week's email, say so and exit 0 instead of 2 "
+                         "(for the late scheduled run)")
+    ap.add_argument("--check", action="store_true",
+                    help="only check that BUTTONDOWN_API_KEY works (one read, nothing sent); not with --send")
     args = ap.parse_args(argv[1:])
 
     key = (os.environ.get(KEY_ENV) or "").strip()
@@ -409,17 +336,13 @@ def main(argv: list[str]) -> int:
     if args.test_to is not None:
         test_to = args.test_to.strip()
         if not EMAIL.fullmatch(test_to):
-            print(
-                f"[digest] Not sent: --test-to needs one email address, and got {args.test_to!r}. "
-                "The Email digest workflow reads it from the DIGEST_TEST_TO repository variable."
-            )
+            print(f"[digest] Not sent: --test-to needs one email address, and got {args.test_to!r}. "
+                  "The Email digest workflow reads it from the DIGEST_TEST_TO repository variable.")
             return EXIT_REFUSED
     if args.send:
         missing = []
         if not key:
-            missing.append(
-                f"{KEY_ENV} (a Buttondown API key with email_access and sending_access set to write)"
-            )
+            missing.append(f"{KEY_ENV} (a Buttondown API key with email_access and sending_access set to write)")
         if not address:
             missing.append(f"{ADDRESS_ENV} (the postal address every email must carry, a PO box)")
         if missing:
@@ -427,30 +350,18 @@ def main(argv: list[str]) -> int:
             return EXIT_REFUSED
         why = export_issue(args.site_dir)
         if why:
-            print(
-                f"[digest] Not sent: {why}. Refresh listings and inspect the preview before sending."
-            )
+            print(f"[digest] Not sent: {why}. Refresh listings and inspect the preview before sending.")
             return EXIT_REFUSED
 
     d = digest.build(args.site_dir)
-    empty = (
-        f"no field gained {digest.MIN_NEW} or more new roles this week, so there is nothing to send"
-        if not d["sections"]
-        else ""
-    )
+    empty = (f"no field gained {digest.MIN_NEW} or more new roles this week, so there is nothing to send"
+             if not d["sections"] else "")
     email = payload(d, address or None, args.public_archive)
 
     if not args.send:
         print("[digest] Dry run: nothing was sent.")
         print(f"Subject: {email['subject']}")
-        print(
-            "To: "
-            + (
-                f"{test_to} only (a test copy)"
-                if test_to
-                else "every confirmed Buttondown subscriber"
-            )
-        )
+        print("To: " + (f"{test_to} only (a test copy)" if test_to else "every confirmed Buttondown subscriber"))
         print("Draft settings: " + json.dumps({k: v for k, v in email.items() if k != "body"}))
         print(f"Body: {len(email['body']):,} characters of HTML")
         print("A real send makes these requests:")
@@ -460,9 +371,7 @@ def main(argv: list[str]) -> int:
         print(digest.render_text(d, postal_address=address or None))
         if empty:
             print(f"[digest] A real send would refuse this week: {empty}.")
-        still = ["--send"] + [
-            name for name, value in ((KEY_ENV, key), (ADDRESS_ENV, address)) if not value
-        ]
+        still = ["--send"] + [name for name, value in ((KEY_ENV, key), (ADDRESS_ENV, address)) if not value]
         print("[digest] A real send needs: " + ", ".join(still))
         return 0
 
@@ -472,9 +381,7 @@ def main(argv: list[str]) -> int:
     if digest.NO_ADDRESS in email["body"]:
         # In case digest.py and this script ever disagree about what a blank address is: the email
         # must never go out with the marker where the address belongs.
-        print(
-            f"[digest] Not sent: {ADDRESS_ENV} has no printable lines, so the email has no postal address."
-        )
+        print(f"[digest] Not sent: {ADDRESS_ENV} has no printable lines, so the email has no postal address.")
         return EXIT_REFUSED
 
     if not test_to and not args.allow_same_week:
@@ -482,23 +389,17 @@ def main(argv: list[str]) -> int:
         try:
             earlier = same_week(key, email["subject"])
         except ProviderError as e:
-            print(
-                f"[digest] Not sent: could not check Buttondown for an email already sent this week. {e}"
-            )
+            print(f"[digest] Not sent: could not check Buttondown for an email already sent this week. {e}")
             return EXIT_PROVIDER
         if earlier:
             when = earlier.get("publish_date") or earlier.get("creation_date") or "no date"
             if args.skip_if_sent:
-                print(
-                    f"[digest] Nothing to send: Buttondown already has {earlier.get('id')} "
-                    f"({earlier.get('status')}, {when}): {earlier.get('subject')!r}. This week's email is out."
-                )
+                print(f"[digest] Nothing to send: Buttondown already has {earlier.get('id')} "
+                      f"({earlier.get('status')}, {when}): {earlier.get('subject')!r}. This week's email is out.")
                 return 0
-            print(
-                f"[digest] Not sent: Buttondown already has {earlier.get('id')} ({earlier.get('status')}, "
-                f"{when}): {earlier.get('subject')!r}. Subscribers get one digest a week. If that email "
-                "really did not go out, check it in the dashboard, then run this again with --allow-same-week."
-            )
+            print(f"[digest] Not sent: Buttondown already has {earlier.get('id')} ({earlier.get('status')}, "
+                  f"{when}): {earlier.get('subject')!r}. Subscribers get one digest a week. If that email "
+                  "really did not go out, check it in the dashboard, then run this again with --allow-same-week.")
             return EXIT_REFUSED
 
     try:
@@ -510,16 +411,12 @@ def main(argv: list[str]) -> int:
     try:
         if test_to:
             call("POST", f"/emails/{email_id}/send-draft", key, {"recipients": [test_to]})
-            print(
-                f"[digest] Sent one test copy of {email_id} to {test_to}. The draft stays unsent; the next "
-                "run makes a new one."
-            )
+            print(f"[digest] Sent one test copy of {email_id} to {test_to}. The draft stays unsent; the next "
+                  "run makes a new one.")
         else:
             call("PATCH", f"/emails/{email_id}", key, {"status": "about_to_send"})
-            print(
-                f"[digest] {email_id} is on its way to every subscriber. Buttondown sends it within a few "
-                "minutes; until then, setting it back to a draft in the dashboard stops it."
-            )
+            print(f"[digest] {email_id} is on its way to every subscriber. Buttondown sends it within a few "
+                  "minutes; until then, setting it back to a draft in the dashboard stops it.")
     # was: except NoAnswer as e: ... "Check that email's status in Buttondown's dashboard before running
     # this again." A 5xx fell through to the branch below, which said "made but not sent" and "Send or
     # delete that draft": but a gateway's 502 or 504 can come after Buttondown queued the send, and
@@ -528,21 +425,15 @@ def main(argv: list[str]) -> int:
         if unknown(e):
             # The request may have reached Buttondown before the error, so the email may be on its way.
             # Saying "not sent" here is how a second run sends everyone a second copy.
-            print(
-                f"[digest] Status UNKNOWN for {email_id}: the last step failed in a way that can come after "
-                f"Buttondown took it, so it may or may not be sending. {e}"
-            )
-            print(
-                f"[digest] Before doing anything else, look for {email_id} in Buttondown's sent and scheduled "
-                "emails. If it is there, it is sending: leave it. Do not send that draft or run this again "
-                "until you have checked; a run this week refuses by itself once it shows there."
-            )
+            print(f"[digest] Status UNKNOWN for {email_id}: the last step failed in a way that can come after "
+                  f"Buttondown took it, so it may or may not be sending. {e}")
+            print(f"[digest] Before doing anything else, look for {email_id} in Buttondown's sent and scheduled "
+                  "emails. If it is there, it is sending: leave it. Do not send that draft or run this again "
+                  "until you have checked; a run this week refuses by itself once it shows there.")
             return EXIT_PROVIDER
         # A 4xx: Buttondown answered, and refused.
         print(f"[digest] Draft {email_id} was made but not sent. {e}")
-        print(
-            "[digest] Send or delete that draft in Buttondown's dashboard before running this again."
-        )
+        print("[digest] Send or delete that draft in Buttondown's dashboard before running this again.")
         return EXIT_PROVIDER
     return 0
 

@@ -4,7 +4,6 @@ The newest twelve roles for every field plus the global newest twelve are suffic
 widget query (limit <= 12, fields combined with OR). A union avoids repeating a role for each field.
 The build does the full-corpus work once; an embedded visitor downloads one bounded public file.
 """
-
 from __future__ import annotations
 
 import json
@@ -36,32 +35,21 @@ def _eligible(x: dict, today: str) -> bool:
 
 
 def _fields(x: dict) -> list[str]:
-    return sorted(
-        {t for t in x.get("field_tags") or [] if isinstance(t, str) and FIELD.fullmatch(t)}
-    )
+    return sorted({t for t in x.get("field_tags") or [] if isinstance(t, str) and FIELD.fullmatch(t)})
 
 
 def _rank(x: dict) -> tuple:
-    return (
-        bool(x.get("posted_at")),
-        x.get("posted_at") or "",
-        x.get("first_seen") or "",
-        str(x["id"]),
-    )
+    return (bool(x.get("posted_at")), x.get("posted_at") or "", x.get("first_seen") or "", str(x["id"]))
 
 
 def _row(x: dict) -> dict:
     regions = x.get("regions") or []
     loc = next((g.get("loc") for g in regions if isinstance(g, dict) and g.get("loc")), "")
     return {
-        "id": str(x["id"]),
-        "title": x["title"],
-        "company_name": x.get("company_name") or "",
+        "id": str(x["id"]), "title": x["title"], "company_name": x.get("company_name") or "",
         "location": "Remote" if x.get("is_remote") else loc or x.get("state") or "",
-        "apply_url": x["apply_url"],
-        "field_tags": _fields(x),
-        "salary": x.get("salary") or "",
-        "stage": x.get("stage") or [],
+        "apply_url": x["apply_url"], "field_tags": _fields(x),
+        "salary": x.get("salary") or "", "stage": x.get("stage") or [],
     }
 
 
@@ -82,23 +70,12 @@ def build(listings: list[dict], generated: datetime, today: str | None = None) -
         if i < PER_FIELD or any(used[t] < PER_FIELD for t in tags):
             picked.append(_row(x))
         used.update(tags)
-    return {
-        "schema": 1,
-        "generated_at": generated.astimezone(timezone.utc).isoformat(timespec="seconds"),
-        "per_field": PER_FIELD,
-        "total": len(all_rows),
-        "counts": dict(sorted(counts.items())),
-        "rows": picked,
-    }
+    return {"schema": 1, "generated_at": generated.astimezone(timezone.utc).isoformat(timespec="seconds"),
+            "per_field": PER_FIELD, "total": len(all_rows), "counts": dict(sorted(counts.items())), "rows": picked}
 
 
-def write(
-    site_dir: str, listings: list[dict], generated: datetime, today: str | None = None
-) -> int:
-    data = (
-        json.dumps(build(listings, generated, today), ensure_ascii=False, separators=(",", ":"))
-        + "\n"
-    )
+def write(site_dir: str, listings: list[dict], generated: datetime, today: str | None = None) -> int:
+    data = json.dumps(build(listings, generated, today), ensure_ascii=False, separators=(",", ":")) + "\n"
     encoded = data.encode("utf-8")
     if len(encoded) > MAX_BYTES:
         raise ValueError("Widget feed exceeds its download limit")

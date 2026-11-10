@@ -30,7 +30,6 @@ or set music to these files; it must not change what they say.
 
 Run from the repo root:  python growth/campaign.py [docs] [--out=DIR]
 """
-
 from __future__ import annotations
 
 import json
@@ -55,189 +54,83 @@ SIZES = {"feed": (1080, 1350), "tall": (1080, 1920)}
 # pixels of a tall frame (growth/reels.py); a feed carousel only needs a margin.
 SAFE = {"feed": (96, 110), "tall": (220, 420)}
 MARGIN = 96
-SLIDE_SECONDS = 2.6  # the video holds each slide this long; the first and last a little longer
-MIN_SEARCH = 15  # open roles a field needs in a place before a week's search can show it
+SLIDE_SECONDS = 2.6           # the video holds each slide this long; the first and last a little longer
+MIN_SEARCH = 15               # open roles a field needs in a place before a week's search can show it
 # The places a search is shown for: where InternScout's students are (the Northeast) and remote.
 SEARCH_PLACES = ["Boston", "MA", "New York City", "NY", "NJ", "CT", "RI", "Philadelphia", "remote"]
 CHANNELS = ("tiktok", "instagram", "facebook", "youtube", "x")
 
 # Words and marks that read as machine-made or as an ad: a slide or caption with any of these is
 # refused (lint). Checked as whole words, case-insensitive. Emoji are refused separately.
-BANNED = [
-    "unlock",
-    "dream internship",
-    "game-changer",
-    "game changer",
-    "supercharge",
-    "elevate",
-    "seamless",
-    "seamlessly",
-    "effortless",
-    "effortlessly",
-    "revolutionize",
-    "revolutionary",
-    "unleash",
-    "skyrocket",
-    "level up",
-    "next level",
-    "delve",
-    "journey",
-    "landscape",
-    "embark",
-    "in today's",
-    "look no further",
-    "say goodbye",
-    "hack",
-    "secret",
-    "guaranteed",
-    "land your",
-    "dream job",
-    "ultimate",
-    "must-have",
-    "magic",
-    "🚀",
-]
-_EMOJI = re.compile("[\U0001f300-\U0001faff\U00002600-\U000027bf\U0001f000-\U0001f2ff]")
+BANNED = ["unlock", "dream internship", "game-changer", "game changer", "supercharge", "elevate",
+          "seamless", "seamlessly", "effortless", "effortlessly", "revolutionize", "revolutionary",
+          "unleash", "skyrocket", "level up", "next level", "delve", "journey", "landscape", "embark",
+          "in today's", "look no further", "say goodbye", "hack", "secret", "guaranteed", "land your",
+          "dream job", "ultimate", "must-have", "magic", "🚀"]
+_EMOJI = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
 
 # Hand-written tips (2026-10-25). Each is a hook, three steps and the InternScout step, and every claim
 # about the site is true on that day: the pages exist (checked live) and the extension "fills out
 # applications and stops at the submit button" (install.html). Edit freely; lint still applies.
 TIPS = [
-    {
-        "slug": "check-a-posting",
-        "path": "/internships/",
-        "slides": [
-            ("Before you apply", "3 things to check on any internship posting"),
-            ("1", "When it was posted. A role up for months may already be filled."),
-            ("2", "The start term. Summer 2027 and Fall 2026 can look the same at a glance."),
-            ("3", "Who it is for. Many say junior or senior only, halfway down the page."),
-            (
-                "On InternScout",
-                "Every listing shows its start term, the class years it takes when the posting "
-                "says, and a link to the employer's own posting.",
-            ),
-        ],
-    },
-    {
-        "slug": "first-years",
-        "path": "/internships/for-freshmen/",
-        "slides": [
-            (
-                "First-year or sophomore?",
-                "Most internship lists aren't written for you. Some roles are.",
-            ),
-            ("1", "Search for postings that name your class year, not ones that leave it out."),
-            ("2", "Look at research programs and co-ops too. Some take first and second years."),
-            ("3", "Note each deadline when you find it. Many close months before summer."),
-            (
-                "On InternScout",
-                "Two pages list only roles whose posting says it takes first-years or sophomores.",
-            ),
-        ],
-    },
-    {
-        "slug": "co-ops",
-        "path": "/internships/co-op/",
-        "slides": [
-            ("Co-ops", "A co-op is a paid, full-time term of work, usually 3 to 6 months."),
-            (
-                "1",
-                "They are not only for schools with a co-op program. Many employers take anyone.",
-            ),
-            ("2", "They run in fall and spring too, when fewer students are applying."),
-            ("3", "Check the dates against your semester before you apply."),
-            ("On InternScout", "One page lists every open co-op we track, by field and place."),
-        ],
-    },
-    {
-        "slug": "research",
-        "path": "/internships/research/",
-        "slides": [
-            ("Research counts", "A summer in a lab is an internship too."),
-            ("1", "REUs are paid summer research programs for undergraduates, funded by the NSF."),
-            ("2", "Most want a short statement and a faculty reference, not a long resume."),
-            ("3", "Deadlines are often January to March, earlier than you would think."),
-            (
-                "On InternScout",
-                "Research programs are listed alongside internships, with their own page.",
-            ),
-        ],
-    },
-    {
-        "slug": "paid-only",
-        "path": "/internships/paid/",
-        "slides": [
-            ("Pay", "You can filter to roles that say what they pay."),
-            ("1", "A posting with no pay listed is not always unpaid. Ask before you rule it out."),
-            ("2", "Hourly and yearly figures are hard to compare. Divide yearly pay by 2,080."),
-            (
-                "3",
-                "Some states require pay ranges in postings: New York, New Jersey, Massachusetts and more.",
-            ),
-            (
-                "On InternScout",
-                "The paid page lists roles whose posting states pay, with the figure shown.",
-            ),
-        ],
-    },
-    {
-        "slug": "summer-tracker",
-        "path": "/internships/summer-2027/open/",
-        "slides": [
-            ("Summer 2027", "Summer internships open months before summer."),
-            ("1", "Large employers in finance, tech and consulting open in August to October."),
-            ("2", "Many others open from January to March. Both are normal."),
-            ("3", "Checking once a week beats checking every day and burning out."),
-            (
-                "On InternScout",
-                "The summer tracker lists every employer that has opened Summer 2027 roles, "
-                "newest first.",
-            ),
-        ],
-    },
-    {
-        "slug": "every-major",
-        "path": "/internships/",
-        "slides": [
-            ("Not in tech?", "Your major has internships. They are just spread across more sites."),
-            (
-                "1",
-                "Nursing, government, arts, education and law post on different boards than tech.",
-            ),
-            ("2", "Search by your major's field, not by the job titles you have seen online."),
-            ("3", "Add the places you would actually live, and remote."),
-            ("On InternScout", "One free search across 66 fields, with no account needed."),
-        ],
-    },
-    {
-        "slug": "forms",
-        "path": "/install.html",
-        "slides": [
-            ("Application forms", "How to stop typing the same answers into every form"),
-            ("1", "Keep one document with your answers: work history, coursework, links."),
-            ("2", "Tailor the two or three questions that matter. Copy the rest."),
-            ("3", "Read every field before you submit, even the ones you filled in fast."),
-            (
-                "On InternScout",
-                "The free Auto-Apply extension fills out the form from your profile and "
-                "stops at the submit button, so you check it first.",
-            ),
-        ],
-    },
-    {
-        "slug": "weekly-email",
-        "path": "/digest/",
-        "slides": [
-            ("Less checking", "You don't need to check job boards every day."),
-            ("1", "Most roles stay open for weeks. A weekly look catches nearly all of them."),
-            ("2", "Pick one day, and give it 30 minutes."),
-            ("3", "Apply to the best few, not to everything."),
-            (
-                "On InternScout",
-                "A free email every Monday with the week's new roles in your fields.",
-            ),
-        ],
-    },
+    {"slug": "check-a-posting", "path": "/internships/",
+     "slides": [("Before you apply", "3 things to check on any internship posting"),
+                ("1", "When it was posted. A role up for months may already be filled."),
+                ("2", "The start term. Summer 2027 and Fall 2026 can look the same at a glance."),
+                ("3", "Who it is for. Many say junior or senior only, halfway down the page."),
+                ("On InternScout", "Every listing shows its start term, the class years it takes when the posting "
+                                   "says, and a link to the employer's own posting.")]},
+    {"slug": "first-years", "path": "/internships/for-freshmen/",
+     "slides": [("First-year or sophomore?", "Most internship lists aren't written for you. Some roles are."),
+                ("1", "Search for postings that name your class year, not ones that leave it out."),
+                ("2", "Look at research programs and co-ops too. Some take first and second years."),
+                ("3", "Note each deadline when you find it. Many close months before summer."),
+                ("On InternScout", "Two pages list only roles whose posting says it takes first-years or "
+                                   "sophomores.")]},
+    {"slug": "co-ops", "path": "/internships/co-op/",
+     "slides": [("Co-ops", "A co-op is a paid, full-time term of work, usually 3 to 6 months."),
+                ("1", "They are not only for schools with a co-op program. Many employers take anyone."),
+                ("2", "They run in fall and spring too, when fewer students are applying."),
+                ("3", "Check the dates against your semester before you apply."),
+                ("On InternScout", "One page lists every open co-op we track, by field and place.")]},
+    {"slug": "research", "path": "/internships/research/",
+     "slides": [("Research counts", "A summer in a lab is an internship too."),
+                ("1", "REUs are paid summer research programs for undergraduates, funded by the NSF."),
+                ("2", "Most want a short statement and a faculty reference, not a long resume."),
+                ("3", "Deadlines are often January to March, earlier than you would think."),
+                ("On InternScout", "Research programs are listed alongside internships, with their own page.")]},
+    {"slug": "paid-only", "path": "/internships/paid/",
+     "slides": [("Pay", "You can filter to roles that say what they pay."),
+                ("1", "A posting with no pay listed is not always unpaid. Ask before you rule it out."),
+                ("2", "Hourly and yearly figures are hard to compare. Divide yearly pay by 2,080."),
+                ("3", "Some states require pay ranges in postings: New York, New Jersey, Massachusetts and more."),
+                ("On InternScout", "The paid page lists roles whose posting states pay, with the figure shown.")]},
+    {"slug": "summer-tracker", "path": "/internships/summer-2027/open/",
+     "slides": [("Summer 2027", "Summer internships open months before summer."),
+                ("1", "Large employers in finance, tech and consulting open in August to October."),
+                ("2", "Many others open from January to March. Both are normal."),
+                ("3", "Checking once a week beats checking every day and burning out."),
+                ("On InternScout", "The summer tracker lists every employer that has opened Summer 2027 roles, "
+                                   "newest first.")]},
+    {"slug": "every-major", "path": "/internships/",
+     "slides": [("Not in tech?", "Your major has internships. They are just spread across more sites."),
+                ("1", "Nursing, government, arts, education and law post on different boards than tech."),
+                ("2", "Search by your major's field, not by the job titles you have seen online."),
+                ("3", "Add the places you would actually live, and remote."),
+                ("On InternScout", "One free search across 66 fields, with no account needed.")]},
+    {"slug": "forms", "path": "/install.html",
+     "slides": [("Application forms", "How to stop typing the same answers into every form"),
+                ("1", "Keep one document with your answers: work history, coursework, links."),
+                ("2", "Tailor the two or three questions that matter. Copy the rest."),
+                ("3", "Read every field before you submit, even the ones you filled in fast."),
+                ("On InternScout", "The free Auto-Apply extension fills out the form from your profile and "
+                                   "stops at the submit button, so you check it first.")]},
+    {"slug": "weekly-email", "path": "/digest/",
+     "slides": [("Less checking", "You don't need to check job boards every day."),
+                ("1", "Most roles stay open for weeks. A weekly look catches nearly all of them."),
+                ("2", "Pick one day, and give it 30 minutes."),
+                ("3", "Apply to the best few, not to everything."),
+                ("On InternScout", "A free email every Monday with the week's new roles in your fields.")]},
 ]
 
 
@@ -256,10 +149,8 @@ def week_tag(now: datetime) -> str:
 def tagged(path: str, channel: str, campaign: str, content: str = "post") -> str:
     """SITE+path with the channel's utm tags, keeping a query the path already has."""
     sep = "&" if "?" in path else "?"
-    return (
-        f"{SITE}{path}{sep}utm_source={channel}&utm_medium=social&utm_campaign={campaign}"
-        f"&utm_content={content}"
-    )
+    return (f"{SITE}{path}{sep}utm_source={channel}&utm_medium=social&utm_campaign={campaign}"
+            f"&utm_content={content}")
 
 
 def place_words(k: str) -> str:
@@ -275,9 +166,7 @@ def search_pick(listings: list[dict], now: datetime) -> dict | None:
             for k in x["keys"] & set(SEARCH_PLACES):
                 count[(t, k)] += 1
     best: dict[str, tuple[str, int]] = {}
-    for (t, k), n in sorted(
-        count.items(), key=lambda kv: (-kv[1], SEARCH_PLACES.index(kv[0][1]), kv[0][0])
-    ):
+    for (t, k), n in sorted(count.items(), key=lambda kv: (-kv[1], SEARCH_PLACES.index(kv[0][1]), kv[0][0])):
         if n >= MIN_SEARCH and t not in best:
             best[t] = (k, n)
     if not best:
@@ -295,52 +184,20 @@ def search_slides(pick: dict, now: datetime, baseline: str | None) -> list[tuple
     name = sp.lower_name(sp.field_title(t))
     where = place_words(k)
     new = [x for x in items if sp.fresh(x, now, baseline)]
-    out = [
-        (
-            "A real search, this week",
-            f"{sp.field_title(t)} internships {('that are ' if k == 'remote' else 'in ')}{where}",
-        ),
-        (
-            "Open right now",
-            "open roles" + (f", {len(new)} of them found in the last 7 days." if new else "."),
-            f"{len(items)}",
-        ),
-    ]
-    employers = [
-        c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(5) if c
-    ]
+    out = [("A real search, this week", f"{sp.field_title(t)} internships {('that are ' if k == 'remote' else 'in ')}{where}"),
+           ("Open right now", "open roles" + (f", {len(new)} of them found in the last 7 days." if new else "."), f"{len(items)}")]
+    employers = [c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(5) if c]
     if employers:
-        out.append(
-            (
-                "Who is hiring",
-                ", ".join(employers[:4]) + (" and more." if len(employers) > 4 else "."),
-            )
-        )
+        out.append(("Who is hiring", ", ".join(employers[:4]) + (" and more." if len(employers) > 4 else ".")))
     pay = sp.hourly_range(items)
     if pay:
         lo, hi, n = pay
-        out.append(
-            (
-                "Listed pay",
-                f"an hour, on the {n} of {len(items)} postings that state an hourly rate.",
-                sp.money(lo) if lo == hi else f"{sp.money(lo)}-{sp.money(hi)}",
-            )
-        )
+        out.append(("Listed pay", f"an hour, on the {n} of {len(items)} postings that state an hourly rate.",
+                    sp.money(lo) if lo == hi else f"{sp.money(lo)}-{sp.money(hi)}"))
     early = [x for x in items if {"first_year", "sophomore"} & set(x.get("years") or [])]
     if early:
-        out.append(
-            (
-                "First-years and sophomores",
-                "of them say they take first-years or sophomores.",
-                f"{len(early)}",
-            )
-        )
-    out.append(
-        (
-            "Search it yourself",
-            f"Free, no account: internscout.org, filtered to {name} {('roles that are ' if k == 'remote' else 'in ')}{where}.",
-        )
-    )
+        out.append(("First-years and sophomores", "of them say they take first-years or sophomores.", f"{len(early)}"))
+    out.append(("Search it yourself", f"Free, no account: internscout.org, filtered to {name} {('roles that are ' if k == 'remote' else 'in ')}{where}."))
     return out
 
 
@@ -354,9 +211,7 @@ def search_path(pick: dict) -> str:
     return f"/?field={quote(pick['field'])}&state={quote(sp._dash_state(k), safe=',')}"
 
 
-def captions(
-    slides: list[tuple[str, str]], path: str, campaign: str, content: str = "post"
-) -> dict[str, str]:
+def captions(slides: list[tuple[str, str]], path: str, campaign: str, content: str = "post") -> dict[str, str]:
     """Each channel's caption: the slides' words as plain sentences, the link tagged for that channel."""
     words = [said(slide) for slide in slides]
     head, body, last = words[0], " ".join(words[1:-1]), words[-1]
@@ -384,7 +239,7 @@ def clip(text: str, n: int) -> str:
         return text
     cut = text[:n]
     end = cut.rfind(". ")
-    return cut[: end + 1] if end > n // 2 else cut[: n - 1].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
+    return cut[:end + 1] if end > n // 2 else cut[: n - 1].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
 
 def draw(slide: tuple, size: str, i: int, n: int):
@@ -394,7 +249,6 @@ def draw(slide: tuple, size: str, i: int, n: int):
     paper, as the site and card are."""
     from PIL import Image, ImageDraw
     from cards import ACCENT, INK, INK2, PAPER, SOFT, font, wrap
-
     kicker, text, big = (tuple(slide) + ("",))[:3]
     w, h = SIZES[size]
     top, bottom = SAFE[size]
@@ -450,21 +304,15 @@ def write_video(frames: list[str], out_path: str) -> str | None:
     if not ffmpeg:
         return None
     import reels
-
-    seconds = [
-        SLIDE_SECONDS + (0.8 if i in (0, len(frames) - 1) else 0) for i in range(len(frames))
-    ]
+    seconds = [SLIDE_SECONDS + (0.8 if i in (0, len(frames) - 1) else 0) for i in range(len(frames))]
     with tempfile.TemporaryDirectory() as tmp:
         pngs = []
         from PIL import Image
-
         for i, f in enumerate(frames):
             p = os.path.join(tmp, f"{i}.png")
             Image.open(f).save(p)
             pngs.append(p)
-        r = subprocess.run(
-            reels.ffmpeg_command(pngs, seconds, out_path, ffmpeg), capture_output=True, text=True
-        )
+        r = subprocess.run(reels.ffmpeg_command(pngs, seconds, out_path, ffmpeg), capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(out_path):
         print(f"[campaign] no video ({(r.stderr or '').strip()[-200:]})")
         return None
@@ -473,11 +321,7 @@ def write_video(frames: list[str], out_path: str) -> str | None:
 
 SCHEDULE = [
     ("Monday", "tip", "TikTok photo slideshow (tall), Instagram and Facebook carousel (feed)"),
-    (
-        "Wednesday",
-        "search",
-        "TikTok photo slideshow (tall), Instagram and Facebook carousel (feed)",
-    ),
+    ("Wednesday", "search", "TikTok photo slideshow (tall), Instagram and Facebook carousel (feed)"),
     ("Thursday", "search", "the video: YouTube Short, Instagram and Facebook Reel"),
     ("Saturday", "tip", "the video: YouTube Short and TikTok"),
 ]
@@ -523,36 +367,24 @@ def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict | No
     tip = tip_pick(now)
     pieces = {"search": (search, search_path(pick)), "tip": (tip["slides"], tip["path"])}
     caps = {kind: captions(slides, path, campaign, kind) for kind, (slides, path) in pieces.items()}
-    problems = [
-        (kind, where, found)
-        for kind, (slides, _) in pieces.items()
-        for where, text in [(f"slide {i}", " ".join(slide)) for i, slide in enumerate(slides, 1)]
-        + list(caps[kind].items())
-        if (found := lint(text))
-    ]
+    problems = [(kind, where, found) for kind, (slides, _) in pieces.items()
+                for where, text in [(f"slide {i}", " ".join(slide)) for i, slide in enumerate(slides, 1)]
+                + list(caps[kind].items()) if (found := lint(text))]
     if problems:
         for kind, where, found in problems:
             print(f"[campaign] {kind} {where}: {', '.join(found)}")
         return None
     os.makedirs(out_dir, exist_ok=True)
-    pack = {
-        "week": week_tag(now),
-        "written": f"{now:%Y-%m-%d}",
-        "export": f"{export:%Y-%m-%d %H:%M} UTC",
-        "campaign": campaign,
-    }
+    pack = {"week": week_tag(now), "written": f"{now:%Y-%m-%d}", "export": f"{export:%Y-%m-%d %H:%M} UTC",
+            "campaign": campaign}
     for kind, (slides, path) in pieces.items():
         files = write_slides(slides, out_dir, kind)
         video = write_video(files["tall"], os.path.join(out_dir, f"{kind}.mp4"))
-        pack[kind] = {
-            "title": slides[0][1],
-            "slides": len(slides),
-            "path": path,
-            "feed": [os.path.basename(p) for p in files["feed"]],
-            "tall": [os.path.basename(p) for p in files["tall"]],
-            "video": os.path.basename(video) if video else None,
-            "captions": caps[kind],
-        }
+        pack[kind] = {"title": slides[0][1], "slides": len(slides), "path": path,
+                      "feed": [os.path.basename(p) for p in files["feed"]],
+                      "tall": [os.path.basename(p) for p in files["tall"]],
+                      "video": os.path.basename(video) if video else None,
+                      "captions": caps[kind]}
     with open(os.path.join(out_dir, "captions.json"), "w", encoding="utf-8") as f:
         json.dump({k: pack[k]["captions"] for k in pieces}, f, ensure_ascii=False, indent=1)
     with open(os.path.join(out_dir, "pack.json"), "w", encoding="utf-8") as f:
@@ -568,9 +400,7 @@ def main(argv: list[str]) -> int:
     pack = build(args[0] if args else "docs", out)
     if not pack:
         return 1
-    print(
-        f"[campaign] {pack['week']}: search '{pack['search']['title']}', tip '{pack['tip']['title']}' -> {out}"
-    )
+    print(f"[campaign] {pack['week']}: search '{pack['search']['title']}', tip '{pack['tip']['title']}' -> {out}")
     return 0
 
 
