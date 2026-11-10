@@ -2475,6 +2475,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "tonicai": {
+   "name": "Tonic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "tracelabs": {
    "name": "Trace Labs",
    "quant": false,
@@ -3057,6 +3063,12 @@
    "fails": 0,
    "added": "2026-11-07"
   },
+  "aegissortation": {
+   "name": "Aegis Sortation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "aegworldwide": {
    "name": "AEG",
    "quant": false,
@@ -3194,8 +3206,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -3294,6 +3307,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "artofproblemsolving": {
+   "name": "Art of Problem Solving",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "arvinas": {
    "name": "Arvinas",
    "quant": false,
@@ -3353,13 +3372,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "atlassand": {
-   "name": "Atlas Energy Solutions",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-09"
   },
   "atoms": {
    "name": "Atoms",
@@ -5391,6 +5403,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "kasa": {
+   "name": "Kasa Living",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "keeleycompanies": {
    "name": "Keeley Companies",
@@ -7425,13 +7443,6 @@
    "added": "2026-09-13",
    "sector": "quant_finance"
   },
-  "viseai": {
-   "name": "Vise",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-09"
-  },
   "vixxo": {
    "name": "Vixxo",
    "quant": false,
@@ -7791,12 +7802,6 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "health"
-  },
-  "careers-kimley-horn": {
-   "name": "Kimley-Horn",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
   },
   "careers-lynker": {
    "name": "Lynker",
@@ -8349,6 +8354,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-09"
+  },
+  "i3-corps.jibeapply.com": {
+   "name": "Integration Innovation (i3)",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "ice.jibeapply.com": {
    "name": "Intercontinental Exchange",
@@ -10367,6 +10378,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-09"
+  },
+  "virginiagreen": {
+   "name": "Virginia Green",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "vivenu": {
    "name": "Vivenu",
@@ -12564,13 +12581,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "aah|wd5|External": {
-   "name": "Atrium Health",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-09"
   },
   "aba|wd1|aba": {
    "name": "American Bankers Association",
@@ -15689,6 +15699,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "godirect|wd5|voya_jobs": {
+   "name": "Voya Financial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "golimitless|wd1|Staff_External_career_site": {
    "name": "International Mission Board",
    "quant": false,
@@ -17651,13 +17667,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "nxp|wd3|careers": {
-   "name": "NXP Semiconductors",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-09"
-  },
   "nyp|wd1|nypcareers": {
    "name": "NewYork-Presbyterian",
    "quant": false,
@@ -18149,9 +18158,8 @@
   "pwc|wd3|Global_Experienced_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-09"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "pwc|wd3|US_Entry_Level_Careers": {
    "name": "PricewaterhouseCoopers (PwC)",

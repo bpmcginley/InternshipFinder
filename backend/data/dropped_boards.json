@@ -112,6 +112,10 @@
    "on": "2026-10-01",
    "why": "dead"
   },
+  "atlassand": {
+   "on": "2026-11-10",
+   "why": "dead"
+  },
   "bcg": {
    "on": "2026-10-08",
    "why": "dead"
@@ -218,6 +222,10 @@
   },
   "transcarent": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "viseai": {
+   "on": "2026-11-10",
    "why": "dead"
   },
   "visiersolutionsinc": {
@@ -488,6 +496,10 @@
   },
   "careers-kearnybank": {
    "on": "2026-10-24",
+   "why": "robots"
+  },
+  "careers-kimley-horn": {
+   "on": "2026-11-10",
    "why": "robots"
   },
   "careers-kinaxis": {
@@ -1488,6 +1500,10 @@
   }
  },
  "workday": {
+  "aah|wd5|external": {
+   "on": "2026-11-10",
+   "why": "dead"
+  },
   "accenture|wd103|accenturecareers": {
    "on": "2026-10-23",
    "why": "dead"
@@ -1806,6 +1822,10 @@
   },
   "nrel|wd5|nrel": {
    "on": "2026-10-01",
+   "why": "dead"
+  },
+  "nxp|wd3|careers": {
+   "on": "2026-11-10",
    "why": "dead"
   },
   "oneok|wd1|oneok_early_careers": {
