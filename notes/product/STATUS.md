@@ -41,7 +41,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | B | P-1.8 Out-of-runs arrival | Unassigned | - | - | Queued | Plan text needs Bruce; top-up stays absent until supported. |
 | C | P-1.9 Employer entry | Unassigned | - | - | Queued | Generated-page hot-file rule. |
 | C | P-1.7 Generated distribution | Unassigned | - | - | Queued | Generated-page hot-file rule. |
-| C | P-2.3 Employer click design | Unassigned | - | - | Queued | needs-bruce: design approval before new counting. |
+| C | P-2.3 Employer click design | audit_worker_extension | `codex/product-p2.3-employer-click-design` | Draft PR pending | Design proposed; needs-bruce | [One-page note](P-2.3-employer-clicks-design.md): exact privacy/admin words, organic once-per-company/page semantics, public key mapping, anonymous daily rows, proposed retention/caps/recovery. No collection, source, schema or deployment change; independent review pending. |
 | D | P-2.1 Follow build | Unassigned | - | - | Waiting for design | No build before approved note; worker deployment stays with Bruce. |
 | D | P-2.2 Top-up build | Unassigned | - | - | Waiting for design | No build before approved price, note, terms and secret setup. |
 | D | P-3.1 Limit card | Unassigned | - | - | Queued | needs-bruce: extension merge and release. |
@@ -99,6 +99,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.3 employer posting-click design and privacy | [Proposed design](P-2.3-employer-clicks-design.md), draft PR pending: approve exact words, counting scope, public mapping, caps, cache lifetime, retention/deletion and operator recovery before implementation. Prior design-note merges confer no approval. | - |
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
 | 2026-11-10 | P-0.2 worker deployment and disclosure | Refactor lead owns authorized merge of [reviewed PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175). Approve/publish disclosure before deployment; no deployment by this product session. | - |
 | 2026-11-10 | P-0.2 privacy wording for new named events | [Exact proposed wording](https://github.com/bpmcginley/InternshipFinder/blob/codex/product-p0.2-counters/notes/product/P-0.2-counter-review.md). No published policy changed. follow_confirm measures a browser confirmation-page signal. | - |
