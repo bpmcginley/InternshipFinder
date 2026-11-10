@@ -1,0 +1,9 @@
+# P-1.10 browser proof
+
+Captured in fresh headless Microsoft Edge contexts at 1280 and 375 CSS pixels, light and dark. `Example University` is an invented campus. Before images show the local 404 for the new page, which does not exist in baseline `c6ef372f`; they are not claims about a production request. After images use this branch. `print.png` shows print CSS; the browser-generated US Letter PDF was also checked locally and contains one page.
+
+`capture.cjs` starts its own local server, blocks nonlocal requests, checks overflow and script errors, exercises text injection and Print, and independently decodes the rendered QR with jsQR. All four cases passed. Install playwright-core 1.56.1, pngjs 7.0.0 and jsqr 1.4.0 into an isolated tool directory, set NODE_PATH to its node_modules, create `.validation/`, and run this script from the repository. No real print job, production request, or persistent browser profile is used.
+
+QR generation is local: qrcode-generator 2.0.4 (MIT), minified with terser 5.44.1, plus an included license. The npm source integrity is `sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==`. Reproduce with `terser dist/qrcode.js --compress --mangle --comments false` and prepend the one-line license banner. It adds no remote script, image, font, or QR service. Campus input is not persisted or sent; the generated public URL has the existing bounded flyer channel tag. The new `flyer_print` counter remains ignored until Bruce approves disclosure and deploys P-0.2.
+
+Baseline site suite: 244 passed. New suite: 247 passed. Startup payload report exits successfully; dashboard payload is unchanged. Golden refresh adds only flyer.html, js/flyer.js, js/qrcode.min.js and js/qrcode-LICENSE.txt; no generated page family changes. The 691-file golden comparison and publication allowlist check passed. Both golden files are included in this PR.
