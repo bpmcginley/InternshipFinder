@@ -12,6 +12,7 @@ Choose the relevant runbook, then check the current hand-off and status before a
 | GitHub Actions and Pages setup | [GitHub setup](../GITHUB_SETUP.md) |
 | Refactor instructions | [Hand-off](refactor/HANDOFF.md), [evidence](refactor/ANALYSIS.md), [status](refactor/STATUS.md) |
 | Product instructions | [Hand-off](product/HANDOFF.md), [status](product/STATUS.md) |
+| Review archive | [Archived reviews](reviews/) |
 | Earlier product review | [Context](product-review/CONTEXT.md) |
 | Coverage research | [Research archive](coverage-research/) |
 | Model evaluation tooling | [Evaluation README](../scripts/eval/README.md), [comparison notes](../scripts/eval/haiku-vs-flash.md) |
@@ -21,6 +22,8 @@ Choose the relevant runbook, then check the current hand-off and status before a
 | Topic | Document |
 |---|---|
 | Worker setup and operation | [Worker README](../worker/README.md) |
+| Local schema adoption preparation | [Migrations](../worker/MIGRATIONS.md) |
+| Node and Workers-runtime testing | [Test runners](../worker/TESTING.md) |
 | Routes and request contracts | [API](../worker/API.md) |
 | Paid-listing orders | [Orders](../worker/ORDERS.md) |
 | Employer checkout review | [Launch review](../worker/LAUNCH_REVIEW.md) |
