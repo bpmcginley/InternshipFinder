@@ -1,0 +1,7 @@
+{
+  "include": ["backend/internscout", "growth"],
+  "exclude": ["**/__pycache__", "**/node_modules"],
+  "extraPaths": ["backend"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic"
+}

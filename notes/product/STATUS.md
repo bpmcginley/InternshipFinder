@@ -4,11 +4,12 @@ Updated: 2026-11-10. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
-- Product hand-off read in full from `origin/product/handoff-docs`; [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170) merged as `b8e08d1f` after independent review and all checks passed. Refactor hand-off and status read in full. Its Pages run is being monitored.
+- Product hand-off read in full from `origin/product/handoff-docs`; [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170) merged as `b8e08d1f` after independent review and all checks passed. Refactor hand-off and status read in full. Pages passed (run 42864401492).
 - Initial read-only audits cover site, worker, extension, growth, generated pages, and every product hand-off verification item. Evidence below distinguishes source findings from executed checks and account settings that cannot be inferred from source.
 - Original checkout has unrelated uncommitted work and remains untouched. Each implementation package uses its own worktree, branch, PR, and independent reviewer.
 - Before each package: fetch origin, reread refactor status, and list open PRs. Refactor structure has right of way. Stop new PRs for its announced formatting window. Never force-push, rewrite history, deploy the worker, release the extension, send outreach, or submit applications. Preserve MuseWork.md and others' work.
 - No private business metrics, service identifiers, credentials, or personal profile data belong in this public tracker.
+- **Formatting coordination gate:** refactor STATUS now says "Formatting PRs next", earliest 2026-11-10 16:00 America/New_York, after all other PRs clear. Finish the existing site PR #180; #181 and #182 have merged; open no new packages until formatting merges. P-1.2 was not started. The user's explicit instruction to leave needs-bruce PRs open takes precedence over clearing the quiet window: #175, #177 and #178 remain open for Bruce, and #165 belongs to another session. Refactor must account for these open PRs; this session will not close or merge them to manufacture a quiet window.
 - PR #165 owns `growth/every_major_list.py`; queue that part of P-1.7. Refactor WP-0.1 has merged as `9f739770`; its Pages run succeeded. The refactor status still describes its review, so inspect current PRs as well as the tracker.
 
 ## Package tracker
@@ -17,17 +18,18 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
-| 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Reviewed; CI pending | Independent site-audit reviewer found no blocker. |
-| 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | - | In progress | needs-bruce: worker merge and deploy. |
-| A | P-1.1 Company runs | Unassigned | - | - | Queued | First app.js package; draft claim, screenshots, tests. |
+| 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged; Pages green | Independent review and all CI passed; Pages 42865303436. |
+| 0 | P-0.2 Counter names | audit_worker_extension | `codex/product-p0.2-counters` | [#175](https://github.com/bpmcginley/InternshipFinder/pull/175) | Reviewed; needs-bruce | All CI passed. Approve/publish proposed privacy wording before worker deployment. Unknown events remain harmless meanwhile. |
+| A | P-1.1 Company runs | audit_site | `codex/product-p1.1-company-runs` | [#176](https://github.com/bpmcginley/InternshipFinder/pull/176) | Merged; Pages green | 251 site tests, two golden tests, eight screenshots and independent review passed; Pages 42867992902. Counter waits for P-0.2. |
 | A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
-| A | P-1.7 Non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
-| A | P-1.10 Flyer page | Unassigned | - | - | Queued | Browser-local QR; no third-party requests. |
-| A | P-1.11 Install and offer | Unassigned | - | - | Queued | Preserve permissions explanation; demo clip from Bruce. |
-| A | P-2.1 Follow design | audit_growth_generated | `codex/product-p2.1-follow-design` | [#177](https://github.com/bpmcginley/InternshipFinder/pull/177) | Awaiting independent review / Bruce | [Design note](P-2.1-follow-design.md); needs-bruce for copy, daily-marker retention, search scope, account linkage and sending gate. |
-| A | P-2.2 Top-up design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
+| A | P-1.7 Remaining non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
+| A | P-1.7a Widget builder and feed guide | audit_growth_generated | `codex/product-p1.7-widget-guide` | [#182](https://github.com/bpmcginley/InternshipFinder/pull/182) | Merged; Pages green | Independent review; 258 site tests, 695-file golden match, publication audit and [24 screenshots](screenshots/P-1.7a/README.md). Existing embed unchanged. Merged as d42e7fce; Pages run 42872637139 passed. |
+| A | P-1.10 Flyer page | product lead | `codex/product-p1.10-flyer` | [#181](https://github.com/bpmcginley/InternshipFinder/pull/181) | Merged; Pages green | Local QR, bounded campus tag, one-page print; independent review, 254 site tests and four browser/QR cases passed; Pages 42869656734 passed. |
+| A | P-1.11 Install and offer | audit_worker_extension | `codex/product-p1.11-install-offer` | [#180](https://github.com/bpmcginley/InternshipFinder/pull/180) | Reviewed for lead merge | Independent review; 24 screenshots; 257 site tests, two golden tests (695 files), and both linters pass. Includes corrected install assertion in backend/tests/test_seo_pages.py; full backend passed 1,480 tests with two known optional-dependency skips. Follow the linked PR for final checks and merge/Pages outcome. |
+| A | P-2.1 Follow design | audit_growth_generated | `codex/product-p2.1-follow-design` | [#177](https://github.com/bpmcginley/InternshipFinder/pull/177) | Reviewed; needs-bruce | Exact wording/storage/deletion note ready; no build before Bruce approves the explicit scope and retention decisions. |
+| A | P-2.2 Top-up design | product lead | `codex/product-p2.2-topup-design` | [#178](https://github.com/bpmcginley/InternshipFinder/pull/178) | Reviewed; needs-bruce | Independent design/existing webhook-path review completed; proposed price, durable grant/refund/deletion design and exact wording await approval. No implementation. |
 | B | P-1.5a Dashboard phone layout | Unassigned | - | - | Queued | Respect app.js and design-token ownership. |
 | B | P-1.5b Generated phone layout | Unassigned | - | - | Queued | Only before WP-3.1 or after WP-3.5; update golden if available. |
 | B | P-1.6 Checked-open evidence | audit_growth_generated | - | - | Skipped as written | last_seen proves observation, not a direct application-link check. |
@@ -73,7 +75,17 @@ Full-read inventory completed by three independent read-only agents: docs/index.
 
 ## Validation and publication ledger
 
-No product implementation merged yet. Clean baseline `9f739770`: all 244 site tests passed, no skips; `python scripts/startup_budget.py` exited successfully. This script reports local payload estimates, not a browser timing measurement or an enforced threshold. Check every PR's current head, independent review, all CI checks, and required screenshots. Site-only Stage 1 merges are authorized; needs-bruce changes remain open. Pages runs on every main push; verify it before the next merge. Any failed publication requires a new revert PR.
+Clean baseline `9f739770`: all 244 site tests passed, no skips; `python scripts/startup_budget.py` exited successfully. This script reports local payload estimates, not a browser timing measurement or an enforced threshold. Check every PR's current head, independent review, all CI checks, and required screenshots. Site-only Stage 1 merges are authorized; needs-bruce changes remain open. Pages runs on every main push; verify it before the next merge. Any failed publication requires a new revert PR.
+
+| PR | Merge commit | Verification | Pages |
+|---|---|---|---|
+| #170 Hand-off | `b8e08d1f` | Independent review; all checks passed | [Passed](https://github.com/bpmcginley/InternshipFinder/actions/runs/42864401492) |
+| #173 Tracker | `3eb55beb` | Independent review; all checks passed | [Passed](https://github.com/bpmcginley/InternshipFinder/actions/runs/42865303436) |
+| #176 Company runs | `898e4327` | Independent review; 251 site tests, two golden tests, required screenshots; all checks passed | [Passed](https://github.com/bpmcginley/InternshipFinder/actions/runs/42867992902) |
+| #181 Flyer page | `ad180f0d` | Independent review; 254 site tests, browser/QR checks and required screenshots; all checks passed | [Passed](https://github.com/bpmcginley/InternshipFinder/actions/runs/42869656734) |
+| #182 Widget builder and feed guide | `d42e7fce` | Independent review; 258 site tests, 695-file golden match, required screenshots; all checks passed | [Passed](https://github.com/bpmcginley/InternshipFinder/actions/runs/42872637139) |
+
+The golden harness now covers static assets as well as generated pages. Each site PR refreshes both manifest and archive from the integrated tree, identifies intentional path changes, and preserves other packages' outputs. New public paths also require exact site-allowlist entries. No generator page family has changed in the completed product work.
 
 ## Waiting for Bruce
 
@@ -82,11 +94,12 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
-| 2026-11-10 | P-0.2 worker merge and deploy | Counter PR will be linked when ready. | - |
-| 2026-11-10 | P-0.2 privacy wording for new named events | Existing enumeration omits new actions; proposed wording will accompany counter PR for approval. | - |
-| 2026-11-10 | Approve every Stage 2 design note | Exact words, stored data, retention and deletion will be supplied before build. | - |
-| 2026-11-10 | Top-up price, size, Stripe price and secret | P-2.2 design first; never put private identifiers in the repo. | - |
-| 2026-11-10 | P-2.1 follow design, postal address and sending gate | [PR #177](https://github.com/bpmcginley/InternshipFinder/pull/177), [design note](P-2.1-follow-design.md): approve exact copy, daily-marker retention, field/state-only search scope and linked-only account deletion proposal; verify actual sending entitlement/quota before choosing a cap. No implementation before approval. | - |
+| 2026-11-10 | P-0.2 worker merge and deploy | [Reviewed PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175); approve and publish disclosure before deploying counters. | - |
+| 2026-11-10 | P-0.2 privacy wording for new named events | [Exact proposed wording](https://github.com/bpmcginley/InternshipFinder/blob/codex/product-p0.2-counters/notes/product/P-0.2-counter-review.md). No published policy changed. follow_confirm measures a browser confirmation-page signal. | - |
+| 2026-11-10 | P-2.1 follow design and email wording | [Reviewed PR #177](https://github.com/bpmcginley/InternshipFinder/pull/177): approve field/state search scope, linked-account deletion behavior and daily email HMAC marker retention through next UTC midnight (at most 24 hours). No implementation before approval. | - |
+| 2026-11-10 | P-2.2 top-up design, price and size | [Reviewed PR #178](https://github.com/bpmcginley/InternshipFinder/pull/178): proposed $3/25, spending order, full successful refunds, disputes, durable purchase retention/deletion and exact plan/terms wording. Existing published pricing is unchanged. | - |
+| 2026-11-10 | Stripe price and secret | After approved P-2.2 design, owner configures privately; never put private identifiers in the repo. | - |
+| 2026-11-10 | Postal address and follow-email sending entitlement | P-2.1 note ready in #177. Verify onboarded domain, account-specific sending quota and capacity reserved for order mail before choosing volume; no guessed cap. | - |
 | 2026-11-10 | Rename/topic/share the public GitHub list | Coordinate with existing PR #165; owner action. | - |
 | 2026-11-10 | Record or approve an Auto-Apply demo clip | P-1.11 leaves space without claiming a demo exists. | - |
 | 2026-11-10 | Extension merges and release after Stage 3 | Link reviewed PRs as ready; no release by this session. | - |

@@ -291,5 +291,8 @@ test("install.html and privacy.html headings don't skip a level (U12), and insta
   assert.match(install, /<strong>Read and change your data on a number of websites<\/strong> and <strong>Read your browsing history<\/strong>/);
   const howto = JSON.parse(install.match(/<script type="application\/ld\+json">\s*(\{"@context":"https:\/\/schema.org","@type":"HowTo"[\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(howto.step.map(s => s.name), steps);
+  const updated = install.match(/Updated <time datetime="([^"]+)">([^<]+)<\/time>/);
+  assert.equal(howto.dateModified, updated[1]);
+  assert.equal(new Date(updated[2] + " UTC").toISOString().slice(0, 10), updated[1]);
   assert.doesNotMatch(install, /Click the InternScout icon and choose/);
 });

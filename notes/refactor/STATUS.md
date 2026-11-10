@@ -1,3 +1,9 @@
+Formatting PRs next
+
+This notice was published with PR #174 on **2026-11-10 at 12:40:47 America/New_York (17:40:47 UTC)**. Product session: from this notice, finish or close existing PRs and open nothing new until the formatting PRs merge, as `notes/product/HANDOFF.md` section 3 requires. The earliest formatting start is **2026-11-10 16:00 America/New_York (21:00 UTC)**, more than three hours after notice, and only after all other PRs clear. External PR #165 and remaining product PRs block that quiet window. Configuration-only work may proceed; no formatting changes have started.
+
+Product additions of public files, including new-page PRs #181 and #182, need explicit entries in `scripts/site-allowlist.txt` as well as a reviewed golden refresh. The Pages publication boundary rejects new paths without allow-list entries.
+
 # InternScout refactor status
 
 Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOFF.md); background: [ANALYSIS.md](ANALYSIS.md). The current user instructions and HANDOFF decisions supersede historical proposals in ANALYSIS.
@@ -5,9 +11,10 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 1: WP-0.1 merged with green Pages; golden, type, coverage, and shared-CI packages are in progress. All six baseline suites passed; full Linux CI also passed all 1,480 backend tests.
+- Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration merged in PR #183 with green Pages run 42871996393. Mechanical formatting remains blocked by the notice period and open PRs; later waves do not start ahead of it. All six baseline suites passed.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
+- Product-session coordination: read `notes/product/HANDOFF.md` section 3 from [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170). Refactor has structural right of way; avoid hot files claimed by open `product: ...` draft PRs. The notice above announces the upcoming WP-0.3 window with several hours to clear product PRs; formatting has not started.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
 
 ## Execution rules
@@ -41,11 +48,11 @@ The documentation-only status PR also verified the complete backend suite in Lin
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
 | 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI, and green Pages run 42863632275. |
-| 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
-| 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
-| 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
-| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | In review | Composite setup in all 12 existing workflows; preserve scheduling, access, and commands. |
-| 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
+| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | [#179](https://github.com/bpmcginley/InternshipFinder/pull/179) | Merged | Independent review, green Linux CI, and green Pages run 42866406265. |
+| 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | Merged | Independent review, green CI, and green Pages run 42865676691. |
+| 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | Merged | Independent review, green CI, and green Pages run 42867413022. |
+| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review, green CI, and green Pages run 42864974798. |
+| 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
 | 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
@@ -179,6 +186,44 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 - Tests: `python -m pytest tests/test_scan_completeness.py tests/test_site_links.py -q` from backend: 75 passed. `python -m unittest discover -s scripts -p 'test_site_contents.py'`: four passed, one skipped because Windows does not permit symbolic-link creation here; the same test runs on Linux in Pages. The separate real junction check passed. `git diff --check` passed.
 - First PR CI found one introduced workflow-contract failure: [run 42862662508](https://github.com/bpmcginley/InternshipFinder/actions/runs/42862662508) reported 1,479 passed and one failed. `test_placement_runs.py` requires the existing paid-listing report step immediately after the build. Moved only the new validation step after that report and before Pages configuration/upload, preserving the original adjacency and leaving the financial code, report step, and contract test unchanged. Reran `python -m pytest tests/test_placement_runs.py -q`: all 14 passed; checker tests and the 4,334-file artifact check also passed again. New-head CI and independent review are required before merge.
 - Golden output comparison is not yet available: WP-0.2 follows this package. Public source assets and generator code are unchanged; the planned output difference is removal of the two internal-note trees.
+- After the green Pages publication, lead read-only HEAD requests verified `/coverage-research/README.md` and `/product-review/CONTEXT.md` return 404, while `/widget/README.md` remains 200. No response bodies were fetched.
+
+### WP-0.4 Report-only type checks
+
+- Added Pyright basic mode for `backend/internscout` and `growth`, with Python 3.12 and the existing backend import root. Added worker `checkJs`/`noEmit` configuration for `worker/src` with ES2022 and WebWorker globals. Runtime sources, existing workflows, and worker dependencies are unchanged; no type suppressions or source fixes were added.
+- Root developer tools are locked to Pyright 1.1.414 and TypeScript 7.0.2. TypeScript's actual CLI was validated on Node 22.23.4, rather than assuming the older compiler API. `npm ci --ignore-scripts` succeeds.
+- Commands: `npm run typecheck:python` and `npm run typecheck:worker`; append `-- --output <path>` to save a sanitized JSON report. Existing type errors are report-only and return success; missing/broken tools, invalid configuration, and unusable reports fail the command. Worker enforcement remains deferred because the baseline is not zero.
+- Local baseline on source main `9f739770`, Python 3.12.10, Node 22.23.4: Pyright **124 errors, 13 warnings**; worker TypeScript **914 errors, no warnings**. Python's local dependency limitations from the baseline section still apply. Linux CI with backend requirements, Pillow, and cryptography reports **129 Python errors, 13 warnings**, and **914 worker errors, no warnings** ([type report run 42864679706](https://github.com/bpmcginley/InternshipFinder/actions/runs/42864679706)). These are separate environment baselines, not newly introduced code errors or fixes; use Linux CI for subsequent comparisons.
+- Diagnostic stdout/stderr is captured without being printed. Reports contain only counts plus constrained repository-relative paths, line/column, severity, and rule identifiers. Messages, source snippets, exception stacks, and unknown diagnostic fields are discarded to prevent existing private literals from appearing in logs or artifacts. The new CI workflow uploads only these sanitized reports.
+- Validation: all three sanitizer tests pass locally and in Linux CI, covering message/continuation removal, path restrictions, and configuration failures. Both real checkers complete and produce the counts above; the site suite passes all 244 tests. Golden output is not yet available; no production build inputs or runtime code changed.
+
+### WP-0.5 Coverage reports
+
+- Added a separate, read-only-permission coverage workflow on main pushes and pull requests. Existing workflows and normal test commands are unchanged. Coverage has no minimum thresholds; failing tests still fail the job. Artifact upload runs after failures to retain available diagnostics, without swallowing the failed test step.
+- Pinned `pytest-cov` 7.1.0, coverage.py 7.17.2, and `c8` 12.0.0. The worker lockfile adds coverage-only development dependencies; no existing package versions changed or packages were removed. A clean Node 22 `npm ci --ignore-scripts` succeeded locally.
+- Python command from backend: `COVERAGE_FILE=../coverage/python/.coverage python -m pytest tests/ -q --tb=no --show-capture=no --cov=internscout --cov=../growth --cov-report=term --cov-report=xml:../coverage/python/coverage.xml` (set the environment variable using the current shell). Python 3.12.10: 1,478 passed, two known missing-cryptography/ffmpeg skips in 174.62s. Line coverage: 9,897 / 11,227, or 88.15%, across 87 backend/growth files, including unexecuted modules. Branch coverage is not collected for Python in this initial report.
+- Node command from worker: `npm run test:coverage` under Node 22.23.4. The existing worker, extension, and site suites passed. C8 includes all production JS in the three areas, excludes tests and extension vendor code, and includes unexecuted files in the denominator. Line coverage: worker 5,394 / 5,473 (98.56%, 22 files); extension 6,532 / 9,103 (71.76%, 37 files); site 2,499 / 4,690 (53.28%, six files). Combined: 14,425 / 19,266 (74.87%). These are coverage-run measurements, not production usage or browser coverage.
+- Existing VM tests often omit filenames. A coverage-only preload supplies a filename only when the entire source string exactly matches one unique production file. It does not modify source, guard code/tests, or test behavior. Modified scripts and snippets remain unattributed; notably, app.js reports zero despite component tests. Three focused attribution tests passed. A deliberately failing child process returned its original exit code through c8, confirming failures are not converted to success.
+- Artifacts are explicitly limited to Python Cobertura XML, Node LCOV, and Node JSON summary. Their structures contain paths, names, line numbers, and counters, not source bodies. No HTML reports, raw V8 data, source maps, coverage databases, or test-output logs are uploaded. Generated files stay ignored under coverage/. Node uses the dot reporter and Python suppresses tracebacks/captured output to avoid copying legacy source values into diagnostics.
+- Before golden integration, [Linux coverage run 42865852643](https://github.com/bpmcginley/InternshipFinder/actions/runs/42865852643) passed all 1,480 Python tests with no skips in 102.91s: 9,925 / 11,227 covered lines (88.40%). Node coverage matched local counts exactly. Downloaded CI artifacts contain only coverage.xml, lcov.info, and coverage-summary.json; their field structures contain no source bodies. Final-head CI includes the two added golden tests.
+- After merging WP-0.2, `python backend/tests/golden_build.py` passed: all 687 output hashes matched. Runtime sources, public assets, generators, and test assertions are unchanged; public output difference: none. The committed golden fixture and manifest were not edited.
+
+### WP-0.2 Golden build
+
+- Added a test-only harness that stages production code and public static assets in an isolated temporary directory, omits real `docs/data`, seeds SQLite with 300 fixed synthetic listings, and runs the actual `export_static`, `seo_pages`, and `site_links` module entry points in separate subprocesses. No production clock hook or workflow edit is needed. Near-page generation retains its production setting, outside pytest's autouse override.
+- Fixed the UTC clock before imports, locale, hash seed, previous sitemap/noindex set, Search Console evidence, placements, prior page-content dates, empty previous export, and absent geocode cache. The subprocess environment excludes user config and credentials. Geocoding is disabled and socket/DNS attempts fail even if a production helper tries to swallow the error.
+- The initial artifact has 687 hashed files, including 501 near HTML pages, 73 feeds, eight employer pages and their hub, 147 cohort-detail records, active placement content, and all required page families. Fixed inputs also exercise a rejected expired placement and both retained and advanced content dates. The compressed review archive contains only the public fixture build's output bytes.
+- Windows text inputs are normalized to Linux checkout LF before building; generated output bytes are never normalized before SHA-256 comparison. Binary assets remain exact. The explicit refresh command and product-session baseline-update rule are documented in `backend/tests/fixtures/golden/README.md`.
+- Validation: the golden tests passed twice consecutively (two tests in 20.94s and 27.92s), including a one-character footer-template mutation rejected with changed-file diagnostics and a short diff. Full local backend: 1,480 passed and the same two environment skips in 97.15s. Independent review verified all 687 archive members exactly match manifest hashes and all fixture URLs use the reserved example domain. Linux CI passed before the lead merged PR #179.
+
+### WP-0.3 Lint configuration only
+
+- Added pinned Ruff 0.17.4, ESLint 10.14.0, and Prettier 3.9.10 developer tooling. Existing Pyright/TypeScript pins and scripts remain unchanged; the root package still has no module-type declaration. No runtime source, user-visible text, or generated output was changed.
+- Ruff checks `backend`, `growth`, and `scripts` with Python 3.12 syntax and initial E9/F63/F7 correctness rules. ESLint checks worker, extension, site JavaScript, and tests with eight initial correctness rules (constructor super, class assignment, negative-zero comparison, duplicate args/cases, invalid native constructors, unsafe negation, and typeof comparisons). Both rule sets pass the current source without runtime fixes or per-file suppressions.
+- The new lint workflow uses shared setup actions, pinned installs, sanitizer tests, and check-only commands: `npm run lint:python` and `npm run lint:javascript`. Lint errors, invalid configuration, and unusable tool reports fail CI. Diagnostics expose only constrained paths, locations, severity, and rule identifiers, never messages, source snippets, suggestions, or exception stacks.
+- Future commands are `npm run format:python` and `npm run format:javascript`; neither has been run. Formatter configuration uses LF and disables embedded-language formatting. JavaScript targets exclude vendor/minified code, generated/data assets, MuseWork, the guard module, direct and transitive guard tests, and takeover/ownership safety regressions. Format-clean CI is deferred until the separate mechanical PRs have landed. Any byte changes to published JavaScript will require the lead's explicit golden-output handling before that formatting package can proceed; this configuration PR does not refresh golden files.
+- Local validation: both linters report zero errors and zero warnings. Sanitizer and formatter-ignore tests pass without formatting any source. Golden build matched all 687 files before and after normally integrating product PR #176 (`898e4327`), preserving its source and reviewed manifest/archive together. After normally integrating product flyer PR #181 (`ad180f0d`), both linters remained clean and the golden build matched all 691 files, preserving its source and reviewed manifest/archive. The subsequent automated data refresh (`13a71aad`) was also integrated. No golden refresh was performed in this package. Final CI and independent review remain required.
+- Remaining open PRs were checked before work; configuration paths are unclaimed by product. Formatting waits for the notice period and every other PR to clear. Later waves remain queued; no scope is skipped to work around this gate. Existing user questions below remain unchanged.
 
 ## Questions and external gates
 
@@ -189,12 +234,12 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | Q3 | WP-4.3 financial routes; WP-5.1 buy | May checkout/refund routing move beyond file moves into new auth/limiter wrappers or module integration? Section 9 requires a decision for that scope. | Contract inventory and characterization may proceed; financial behavior restructuring remains paused. |
 | Q4 | WP-2.1 state-label normalization only | State maps use different DC display labels. Are these intentional presentation differences? | Inventory and generation may preserve distinct representations; no silent label unification or user-visible text change. |
 | G1 | WP-4.1 adoption | Bruce verifies actual production schema and marks the baseline migration applied; deployment-script change follows only afterward. | Prepare and test locally; no production commands. |
-| G2 | WP-0.3 formatting | No other PR may remain open during mechanical formatting. External PR #165 is currently open. | Wait for quiet window; do not interfere with unrelated PR. |
+| G2 | WP-0.3 formatting | No other PR may remain open during mechanical formatting. External PR #165 and remaining product PRs are open. Notice published 2026-11-10 12:40:47 Eastern; earliest start 16:00 Eastern (21:00 UTC). | From notice until formatting merges, product finishes/closes existing PRs and opens no new work; wait for both the notice period and a quiet window. |
 | G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | No cutover yet; observation clock has not started. |
 
 ## Waiting for deploy
 
-None. No worker refactor PR has merged, and no production action has been taken.
+None. No worker/database deployment or extension release was performed.
 
 ## Merge and publication ledger
 
@@ -202,10 +247,16 @@ None. No worker refactor PR has merged, and no production action has been taken.
 |---|---|---|---|---|
 | [#167 Hand-offs](https://github.com/bpmcginley/InternshipFinder/pull/167) | `00cf10e0` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42859546750) | Merged; documentation only. |
 | [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | `64fd6400` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42861453089) | Merged; documentation only. |
+| [#169 Internal notes](https://github.com/bpmcginley/InternshipFinder/pull/169) | `9f739770` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) | Merged; approved internal-note URL removal. |
+| [#171 Shared CI setup](https://github.com/bpmcginley/InternshipFinder/pull/171) | `fc9f1fca` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42864974798) | Merged; effective workflow behavior preserved. |
+| [#172 Type reports](https://github.com/bpmcginley/InternshipFinder/pull/172) | `c6ef372f` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42865676691) | Merged; report-only developer tooling. |
+| [#179 Golden build](https://github.com/bpmcginley/InternshipFinder/pull/179) | `2489edca` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42866406265) | Merged; fixed offline build and 687 output hashes. |
+| [#174 Coverage reports](https://github.com/bpmcginley/InternshipFinder/pull/174) | `10f28db5` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42867413022) | Merged; report-only coverage with source-free artifacts. |
+| [#183 Lint configuration](https://github.com/bpmcginley/InternshipFinder/pull/183) | `3923879c` | Independent agent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42871996393) | Merged; no formatting or runtime edits; 691 golden files unchanged. |
 
 ## Next update
 
-Complete wave-1 packages and independent reviews, merge one at a time with green CI and Pages. Before wave 2, reread product coordination and publish the required formatting notice.
+Next implementation: the separate Python and JavaScript mechanical-formatting PRs, only after 16:00 Eastern on 2026-11-10 and a fresh open-PR check confirms the quiet window. Until then, formatting and waves 3-7 remain queued. Fetch and reread both hand-offs/status files before resuming; use separate owned worktrees, independent reviews, all-green CI, and Pages verification after each merge. Do not close unrelated PRs to manufacture a quiet window.
 
 ## WP-0.6 validation and coordination
 
@@ -215,3 +266,17 @@ Complete wave-1 packages and independent reviews, merge one at a time with green
 - Parsed before/after YAML: workflow/job metadata (including triggers, conditions, permissions, concurrency, schedules, environment, timeouts) unchanged. Expanded shared actions and compared effective steps after ignoring comment-only lines; commands, environments, conditions, and order match. The deliberate setup difference is release.yml now explicitly selects Python 3.12 and Node 22, matching the existing test workflow rather than inheriting runner defaults. No extension release was run.
 - Relevant workflow-contract tests: 39 passed. The first test invocation from the repository root failed collection because the package is not installed yet; rerunning from the documented backend directory passed. This was invocation context, not a main failure or code change.
 - No runtime source, public output, or dependency versions used by product code changed. Golden validation will be run if WP-0.2 lands before this PR.
+
+## Wave-2 checkpoint
+
+- Completed: initial hand-off and tracker, all wave-0/1 packages, and the configuration-only part of WP-0.3. The full refactor is not complete. No mechanical formatting or later-wave implementation has begun.
+- The initial six-suite baseline and every marked verification item are recorded above, including corrections to the hand-off. New tests, lint, types, coverage, and golden jobs now run in CI. Existing type debt remains report-only; coverage has no thresholds.
+- The open-PR inventory at 18:13 UTC (13:13 Eastern) on 2026-11-10 contains #165, #175, #177, #178 and #180. These must clear before mechanical formatting under WP-0.3 and the product coordination rule. Preserve their branches and work; this session has not closed or merged them.
+- Original uncommitted work and MuseWork.md were not edited. No force pushes, history rewriting, worker/database deployment, extension release, paid AI calls, real submissions, outreach, or manually triggered publishing workflows were performed. Normal main merges triggered the existing Pages workflows, which are verified in the ledger.
+
+## Formatting readiness follow-up (2026-11-10)
+
+- Fetched main at `4144e5ae`. PR #180 has merged; its Pages run 42876965306 and subsequent data-refresh Pages run 42877725984 passed. Four PRs remain open: #165, #175, #177 and #178. No formatting has run. The 16:00 Eastern earliest start and empty-queue requirement remain in force.
+- **Q5, coordination:** product STATUS records Bruce's explicit instruction to retain #175, #177 and #178 for review; #165 belongs to another session. This prevents satisfying the empty-queue rule. Asked Bruce whether these four retained PRs may be exempt after the notice period or whether formatting must continue waiting. No exemption is assumed.
+- Read-only JavaScript scope audit: the pinned Prettier command covers 142 eligible tracked files; guard.js, its protected direct/transitive tests, vendor and minified assets remain excluded. Source-inferred obstacle: protected `extension/test/batch_focus.test.mjs:63,98,147` matches exact source layout in eligible implementation files. Formatting could break it; do not edit the protected test. Preserve those implementation regions or narrow scope if confirmed during an authorized formatting run.
+- Golden copies public assets verbatim (`backend/tests/golden_build.py:43`), so formatting eligible `docs/js` files can alter output hashes even when runtime behavior is unchanged. Do not silently refresh the manifest. Review every affected output and resolve the hand-offs' baseline restrictions before proceeding. The blanket JavaScript command also includes financial modules, which remain subject to section 9 and Q3. These are source-inferred risks, not observed formatter or test failures.

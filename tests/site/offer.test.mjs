@@ -75,7 +75,7 @@ function load({ ua = CHROME, touch = false, media = true, attr = false, local = 
   // Inside the context, `window` is its global proxy, not the object passed in.
   const message = (data) => winListeners.message({ source: vm.runInContext("window", ctx), data });
   const counted = () => (ctx.ISCountQ && typeof ctx.ISCountQ.length === "number" ? [...ctx.ISCountQ] : []);
-  return { ctx, doc, clock, posting, open, bar, message, counted, local, session };
+  return { ctx, doc, clock, posting, open, bar, message, counted, local, session, resize: () => winListeners.resize() };
 }
 
 test("opening a posting Auto-Apply fills, in desktop Chrome without the extension, shows the offer once", () => {
@@ -87,10 +87,9 @@ test("opening a posting Auto-Apply fills, in desktop Chrome without the extensio
   assert.ok(b, "the bar is on the page");
   assert.equal(b.getAttribute("role"), "status");
   assert.equal(b.text.replace(/\s+/g, " ").trim(),
-    // was: "Applying? Auto-Apply can fill in this application ..." (U6: worded for coming back to the tab).
-    "Back from the posting? Next time, Auto-Apply can fill in an application like this one from your resume. You check it and press Submit yourself." +
-    "When you add it, Chrome will say it can “Read and change your data on a number of websites” and “Read your browsing history”. " +
-    "That is how it fills in job application sites and finds the application tab.Add to Chrome, freeDismiss");
+    "Auto-Apply fills from your resume. You review and submit.Add to Chrome, freeDismissWhat will Chrome ask?" +
+    "When you add it, Chrome will say it can \u201cRead and change your data on a number of websites\u201d and \u201cRead your browsing history\u201d. " +
+    "That is how it fills in job application sites and finds the application tab.");
   const go = b.find((n) => n.tag === "a");
   assert.equal(go.getAttribute("href"), STORE + "?utm_source=apply-offer");
   assert.equal(go.getAttribute("target"), "_blank");
@@ -226,7 +225,7 @@ test("the copy stays plain: no dashes, exclamation marks or hype, and it says th
   const r = load();
   r.open();
   const text = r.bar().text;
-  assert.match(text, /press Submit yourself/);
+  assert.match(text, /You review and submit/);
   assert.match(text, /Add to Chrome, free/);
   assert.doesNotMatch(text, /[–—!]|instantly|seconds|effortless|supercharge|AI-powered|magic|apply for you|submits? for you/i);
 });
@@ -273,33 +272,29 @@ test("the bar uses the shared tokens: the large radius, the pop-up shadow and on
   assert.match(OFFER, /\.is-offer button\{[^}]*border:0;[^}]*background:transparent;[^}]*color:var\(--accent,/);
 });
 
-// ---------- U6 (2026-10-14): worded for coming back to the tab, and ready for Chrome's dialog ----------
-test("the bar names the company on the posting's own row, on the dashboard and on a landing page", () => {
-  for (const [rowTag, nameNode] of [["tr", "span"], ["li", "a"]]) {
-    const r = load();
-    const row = r.doc.createElement(rowTag);
-    const co = r.doc.createElement(nameNode);
-    co.setAttribute("class", "co");
-    // The first child is the name; a landing page's "New" badge comes after it inside .co.
-    const name = { textContent: "  Acme\n Robotics " };
-    co.firstChild = name;
-    row.querySelector = (sel) => (sel === ".co" ? co : null);
-    const link = r.posting();
-    const own = link.closest;
-    link.closest = (sel) => (sel === "tr, li.job" ? row : own(sel));
-    r.open(link);
-    assert.match(r.bar().text, /^Back from Acme Robotics\? Next time, Auto-Apply can fill in an application like this one/);
-  }
-});
-
-test("without a readable company it says Back from the posting, and it always prepares for Chrome's permission dialog", () => {
+test("permission details are closed initially and resizing or toggling keeps focus padding current", () => {
   const r = load();
+  r.doc.documentElement.style.scrollPaddingBottom = "10px";
   r.open();
-  const t = r.bar().text;
-  assert.match(t, /^Back from the posting\?/);
-  assert.match(t, /Read and change your data on a number of websites/);
-  assert.match(t, /Read your browsing history/);
-  assert.doesNotMatch(t, /Applying\?|this application from/);
+  const b = r.bar(), details = b.find((n) => n.tag === "details");
+  assert.ok(details);
+  assert.equal(details.hasAttribute("open"), false);
+  assert.equal(details.find((n) => n.tag === "summary").text, "What will Chrome ask?");
+  assert.match(details.text, /Read and change your data on a number of websites/);
+  assert.match(details.text, /Read your browsing history/);
+  b.rect.height = 220;
+  details.fire("toggle");
+  assert.equal(r.doc.documentElement.style.scrollPaddingBottom, "244px");
+  b.rect.height = 140;
+  r.resize();
+  assert.equal(r.doc.documentElement.style.scrollPaddingBottom, "164px");
+  details.find((n) => n.tag === "summary").focus();
+  b.fire("keydown", { key: "Escape" });
+  assert.equal(r.doc.documentElement.style.scrollPaddingBottom, "10px");
+  // A queued toggle or later resize after dismissal must not restore bar padding.
+  details.fire("toggle");
+  r.resize();
+  assert.equal(r.doc.documentElement.style.scrollPaddingBottom, "10px");
 });
 
 // U2 (2026-10-14): the posting a student wanted is remembered for the extension to offer after setup.
