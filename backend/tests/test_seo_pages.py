@@ -5,6 +5,7 @@ import html as html_mod
 import json
 import os
 import re
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -2106,11 +2107,11 @@ def test_landing_digest_navigation_is_absent_when_signup_is_disabled(tmp_path):
 def test_landing_digest_link_precedes_listings_without_duplicating_the_form(tmp_path):
     site = _email_site(tmp_path, FORM)
     pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
-    link = '<a href="/digest/" data-digest-placement="nav">Free Monday email</a>'
+    link = '<a class="nav-extra" href="/digest/" data-digest-placement="nav">Free Monday email</a>'
     landing_pages = {path: html for path, html in pages.items() if path.startswith("/internships/")}
     assert landing_pages
     for path, html in landing_pages.items():
-        nav = re.search(r"<nav>.*?</nav>", html, re.S).group(0)
+        nav = re.search(r"<nav[^>]*>.*?</nav>", html, re.S).group(0)
         assert link in nav and html.count(link) == 1, path
         if '<ul class="jobs">' in html:
             assert html.index(link) < html.index('<ul class="jobs">'), path
@@ -2388,10 +2389,17 @@ def test_the_summer_tracker_lists_employers_newest_opened_first(tmp_path):
     path = "/internships/summer-2027/open/"
     assert path in pages and pages[path]["lastmod"] == "2026-09-22"
     html = pages[path]["html"]
-    rows = re.findall(
-        r"<tr><td>(.*?)</td><td class=\"num\">(.*?)</td><td class=\"num\">(\d+)</td></tr>", html
-    )
-    assert [(re.sub("<[^>]+>", "", n), d, k) for n, d, k in rows] == [
+    tracker = ET.fromstring(re.search(r'<table class="data tracker".*?</table>', html, re.S)[0])
+    rows = [
+        tuple(
+            "".join(
+                (cell.find("span[@class='cell-value']") if cell.tag == "td" else cell).itertext()
+            )
+            for cell in row
+        )
+        for row in tracker.findall("./tbody/tr")
+    ]
+    assert rows == [
         ("Alpha", "Sep 22, 2026", "6"),
         ("Delta", "Sep 21, 2026", "5"),
         ("Gamma", "By Sep 18, 2026", "5"),
@@ -3161,9 +3169,9 @@ def test_compare_table_scrolls_by_keyboard_with_a_named_first_column(tmp_path):
     compare = pages["/compare/"]
     assert (
         '<div class="tablewrap" tabindex="0" role="region" aria-label="InternScout, Simplify and Jobright compared">'
-        '<table class="data cmp">'
+        '<table class="data cmp" role="table">'
     ) in compare
-    assert '<th scope="col"><span class="vh">Feature</span></th>' in compare
+    assert '<th scope="col" role="columnheader"><span class="vh">Feature</span></th>' in compare
     assert '<th scope="col"></th>' not in compare
     # Every scrolling table box on every page can be reached and is named.
     for path, html in pages.items():

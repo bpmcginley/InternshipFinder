@@ -1550,17 +1550,16 @@ def tracker_page(
     for day, exact, name, path, k in rows:
         who = f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)
         when = short_day(day) if exact else f"By {short_day(day)}"
-        trs.append(
-            f"<tr><td>{who}</td><td class=\"num\">{when}</td><td class=\"num\">{k:,}</td></tr>"
-        )
+        trs.append([who, when, f"{k:,}"])
     body = (
         f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
         f"<a class=\"cta\" href=\"{term_path}\">See every {esc(term)} role</a>"
-        + tablewrap(f"Employers with {term} roles")
-        + "<table class=\"data\"><thead><tr><th>Employer</th><th>Opened</th>"
-        f"<th>{esc(term)} roles</th></tr></thead><tbody>"
-        + "".join(trs)
-        + "</tbody></table></div>"
+        + table(
+            ["Employer", "Opened", f"{esc(term)} roles"],
+            trs,
+            cls="data tracker",
+            label=f"Employers with {term} roles",
+        )
         + floor_note
         + "<p class=\"follow\">Roles found in the last week, whatever the term: "
         "<a href=\"/internships/new/\">new internships this week</a>. "
@@ -1792,6 +1791,8 @@ padding:22px 0 14px;border-bottom:1px solid var(--ink)}
 .mark{font:600 var(--fs-6)/1 var(--serif);color:var(--ink);text-decoration:none}
 nav{display:flex;gap:4px 14px;flex-wrap:wrap}
 nav a{color:var(--ink2);font-size:var(--fs-3);text-decoration:none;transition:color 140ms ease-out}nav a:hover{color:var(--ink)}
+.mobile-digest{display:none}
+@media(max-width:560px){header nav{gap:4px 14px}header nav a{display:inline-flex;align-items:center;min-height:44px}header nav .nav-extra{display:none}.mobile-digest{display:inline}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .crumbs{font-size:var(--fs-3);color:var(--ink3);margin:22px 0 0}.crumbs a{color:var(--ink3)}
 h1{font:600 var(--fs-8)/1.2 var(--serif);margin:10px 0 8px}
@@ -1829,6 +1830,15 @@ table.data th,table.data td{text-align:left;vertical-align:top;padding:9px 14px 
 table.data thead th{border-bottom:1px solid var(--ink);font-weight:600}table.data td.num{white-space:nowrap}
 section.prose h2{font:600 var(--fs-6)/1.3 var(--serif);margin:34px 0 6px}.src{color:var(--ink3);font-size:var(--fs-3)}
 table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:var(--fs-3)}table.data th,table.data td{padding-right:10px}}
+table.tracker tbody th{font-weight:400}.cell-label{display:none}
+@media(max-width:560px){
+table.data,table.data tbody{display:block;min-width:0;width:100%}
+table.data thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+table.data tbody tr{display:block;padding:12px 0;border-bottom:1px solid var(--rule)}
+table.data tbody th{display:block;padding:0 0 8px;border:0;font-weight:600;overflow-wrap:anywhere}
+table.data tbody td{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:4px 0;border:0;white-space:normal;overflow-wrap:anywhere}
+.cell-label{display:block;color:var(--ink3);font-weight:500}.cell-value{min-width:0}
+}
 .aa-card{margin:18px 0 0;padding:14px 18px 6px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
 .aa-card p{margin:0;color:var(--ink2)}.aa-card .cta{margin:10px 0 8px}
 figure.chart{margin:8px 0 18px}figure.chart img{display:block;max-width:100%;height:auto}
@@ -2119,8 +2129,14 @@ def page(
     # A landing visitor can find the optional digest before scrolling through the listings.
     # Reuse the existing nav link counter; the lower form keeps its landing placement.
     digest_nav = (
-        '<a href="/digest/" data-digest-placement="nav">Free Monday email</a>'
+        '<a class="nav-extra" href="/digest/" data-digest-placement="nav">Free Monday email</a>'
         if DIGEST_FORM and path.startswith("/internships/")
+        else ""
+    )
+    digest_footer = (
+        '<span class="mobile-digest"> · <a href="/digest/" '
+        'data-digest-placement="footer">Free Monday email</a></span>'
+        if digest_nav
         else ""
     )
     return f"""<!DOCTYPE html>
@@ -2147,13 +2163,13 @@ def page(
 </head>
 <body>
 <div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a><a href="/employers/" data-employer-entry="nav">Hire interns</a></nav></header>
+<header><a class="mark" href="/">InternScout</a><nav aria-label="Primary"><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a class="nav-extra" href="/pricing/">Pricing</a><a class="nav-extra" href="/compare/">Compare</a><a class="nav-extra" href="/about/">About</a><a class="nav-extra" href="/employers/" data-employer-entry="nav">Hire interns</a></nav></header>
 <main>
 {crumb_html}<h1>{esc(h1)}</h1>
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>{digest_footer}</footer>
 </div>
 {BEACON}
 {OFFER_TAG if OFFER_MARK in body else ""}
@@ -3255,19 +3271,27 @@ def table(
 ) -> str:
     """An HTML table; cells are HTML already. Columns from num_from on hold figures and don't wrap.
     label: what the table is, for the scrolling box's name (tablewrap)."""
-    th = "".join(f"<th scope=\"col\">{h}</th>" for h in head)
+    # Explicit roles retain table relationships when narrow-screen CSS stacks the rows.
+    # Repeated visible labels are decorative; the real column headers stay in the accessibility tree.
+    th = "".join(f'<th scope="col" role="columnheader">{h}</th>' for h in head)
     body = "".join(
-        "<tr>"
+        '<tr role="row">'
         + "".join(
-            f"<td class=\"num\">{c}</td>"
-            if i >= num_from
-            else (f"<th scope=\"row\">{c}</th>" if i == 0 else f"<td>{c}</td>")
+            f'<th scope="row" role="rowheader">{c}</th>'
+            if i == 0 and i < num_from
+            else f'<td class="{"num" if i >= num_from else ""}" role="cell">'
+            f'<span class="cell-label" aria-hidden="true">{head[i] if i < len(head) else ""}</span>'
+            f'<span class="cell-value">{c}</span></td>'
             for i, c in enumerate(r)
         )
         + "</tr>"
         for r in rows
     )
-    return f"{tablewrap(label)}<table class=\"{cls}\"><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>"
+    return (
+        f'{tablewrap(label)}<table class="{cls}" role="table">'
+        f'<thead role="rowgroup"><tr role="row">{th}</tr></thead>'
+        f'<tbody role="rowgroup">{body}</tbody></table></div>'
+    )
 
 
 def pay_page(
