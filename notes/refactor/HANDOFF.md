@@ -25,11 +25,13 @@ Make the codebase easier and safer to change, with **no change in behaviour** un
 4. Jinja2 is allowed as a new backend dependency for page templates.
 5. Remove `frontend/`, `run.sh` and `backend/internscout/api.py` if nothing uses them. **Keep `MuseWork.md`. Do not edit, move or delete it.**
 6. Execution is by Codex with many agents, from this hand-off.
+7. Codex starts straight away, with no check-in first, and the lead session may merge its own refactor PRs under the conditions in section 3. Production deploys and the items in section 8 stay with Bruce.
 
 ## 3. Hard rules
 
 - **Never force-push.** Not on any branch. Say this in every worker prompt.
-- **Do not merge.** Open PRs and stop. Bruce merges, or tells you to. The repo does not allow GitHub auto-merge.
+- **Merging.** Workers never merge. The lead session may merge a refactor PR when all of these hold: every CI check is green; a second agent has reviewed it for hidden behaviour change; the golden test is unchanged, or every changed output file is explained in the PR; and it is not on the list in section 8. The repo does not allow GitHub auto-merge, so merge by hand, one PR at a time.
+- **Merging to `main` publishes the site.** After any merge that touches `docs/`, `backend/` or `.github/workflows/pages.yml`, wait for the Pages run and confirm it is green before merging the next PR. If it fails, open a revert PR at once and merge it.
 - **Do not deploy.** No `wrangler deploy`, no `wrangler d1 execute --remote`, no manual workflow runs that publish, send email, post to social accounts, or publish the extension.
 - **No secrets** in code, logs, PRs, or `STATUS.md`. Do not print tokens. Do not write private service identifiers (database id, Stripe account id, Cloudflare account id, Meta app id) anywhere new.
 - No account creation, no passwords, no payments.
@@ -37,7 +39,7 @@ Make the codebase easier and safer to change, with **no change in behaviour** un
 - **Do not collect new user data or change the privacy policy.** Ask Bruce first.
 - Do not touch other checkouts on this machine or another agent's uncommitted work. Work only in worktrees you create.
 - Any text a user can see (site, extension, emails): plain English, no em dashes, no emoji, honest facts. Refactor PRs should not change user-visible text at all.
-- If a WP cannot be done without changing behaviour, stop and write the question in `STATUS.md` for Bruce. Do not guess.
+- If a WP cannot be done without changing behaviour, stop that WP and write the question in `STATUS.md` for Bruce. Do not guess. Carry on with the other WPs.
 
 ## 4. Running many agents safely
 
@@ -48,7 +50,7 @@ Make the codebase easier and safer to change, with **no change in behaviour** un
 - **Old import paths keep working** until WP-6.2. When code moves, leave a thin re-export at the old location.
 - **Rebase by merge.** To pick up `main`, merge `main` into your branch. Never force-push after a rebase.
 - **PR text** must have: WP id, what moved or changed, "behaviour change: none" or the exact change, test output summary, golden result (once WP-0.2 exists).
-- **Review.** A second agent reviews each PR for hidden behaviour change before it is marked ready for Bruce.
+- **Review.** A second agent reviews each PR for hidden behaviour change before the lead merges it.
 - Other agents (Claude and others) also open PRs in this repo. Check `gh pr list` before starting each wave and avoid files with open PRs.
 
 ## 5. Verification (run what applies, paste the summary in the PR)
@@ -86,7 +88,7 @@ Facts below were measured on the snapshot. Items marked **verify** were inferred
 
 **WP-0.3 Lint and format**
 - Do: add root `pyproject.toml` with ruff lint and format config, and an eslint flat config for `worker/`, `extension/` (exclude `extension/vendor/`), `docs/js/`, `tests/`. Start with a rule set the code already passes or nearly passes. Add a CI job. Then one mechanical formatting PR per language with nothing else in it, and add its commit to `.git-blame-ignore-revs`.
-- Timing: the formatting PRs touch most files. The lead schedules them for a moment with no open PRs, and no other WP runs until they are merged.
+- Timing: the formatting PRs touch most files. The lead runs them when `gh pr list` shows no open PRs from anyone, merges them quickly, and no other WP runs until they are merged.
 - Accept: CI lint job green; formatting PRs show test results identical to before.
 
 **WP-0.4 Type checks without a build step**
@@ -183,9 +185,9 @@ Every PR in this phase: golden test unchanged, no manifest update allowed.
 1. One `DATA_DIR` setting used by every reader and writer, default `docs/data`. No behaviour change.
 2. Tests that read real data files switch to fixtures (**verify** which do).
 3. Workflows check out a second copy of the repo at the `data` branch into a side folder and point `DATA_DIR` at it, falling back to `main` when the branch does not exist. Readers first (Pages, digest, metrics).
-4. Bruce creates the `data` branch from current `main` data (or tells you to) and sets any branch rules.
+4. Create the `data` branch from current `main` data with a normal push. Bruce sets any branch rules.
 5. Ingest writes to the `data` branch. Keep the "Pages follows the ingest run" trigger working.
-6. After a week of clean runs and Bruce's OK: remove the data files from `main` in one PR and add them to `.gitignore`. Add a script that fetches the `data` branch into `docs/data` for local work.
+6. After 7 days of clean ingest and Pages runs: remove the data files from `main` in one PR and add them to `.gitignore`. Add a script that fetches the `data` branch into `docs/data` for local work.
 - Rollback at any step is a revert of that step's PR. History on `main` is never rewritten.
 
 **WP-6.2 Remove compatibility shims** once a repo-wide search shows no imports of old paths.
@@ -203,20 +205,21 @@ Every PR in this phase: golden test unchanged, no manifest update allowed.
 | 4 | WP-1.4 (several agents by area), WP-2.1 inventory, WP-2.4, WP-4.2 | Parallel |
 | 5 | WP-3.1 to WP-3.5 in order (one owner of `seo_pages.py`), WP-4.3, WP-5.2 alongside | Phase 3 is serial inside |
 | 6 | WP-2.1 code, WP-2.2, WP-5.1, WP-5.3, WP-6.1 steps 1 to 3 | WP-2.2 after Phase 3 so the CSS has one home |
-| 7 | WP-3.6, WP-6.1 steps 4 to 6, WP-6.2, WP-6.3 | Need Bruce at several points |
+| 7 | WP-3.6, WP-6.1 steps 4 to 6, WP-6.2, WP-6.3 | WP-6.1 step 6 waits 7 days |
 
-Each wave ends with all its PRs merged by Bruce and `STATUS.md` updated. Do not stack PRs on unmerged PRs across waves.
+Each wave ends with all its PRs merged and `STATUS.md` updated. Do not stack PRs on unmerged PRs across waves.
 
 ## 8. Things only Bruce does
 
-- Merging every PR.
-- Any deploy: worker, database, extension release.
-- Marking database migrations as applied in production (WP-4.1).
-- Creating the `data` branch and its rules, and the OK to remove data from `main` (WP-6.1).
-- Timing the formatting PRs (WP-0.3).
+- Merging any PR that changes behaviour beyond what section 2 already approves (WP-0.1 and WP-1.5 are approved).
+- Any production deploy: worker, database, extension release. Worker code merged to `main` goes live only when Bruce deploys, so list every merged worker PR in `STATUS.md` under "waiting for deploy".
+- Marking database migrations as applied in production, and the deploy script change that follows (WP-4.1).
+- Branch rules and repo settings.
 - Any change to user-visible text, privacy policy, pricing or data collection.
 
 ## 9. When to stop and ask
+
+Stop the affected WP, write the question in `STATUS.md`, and keep working on WPs that do not depend on the answer.
 
 - The golden test changes and you cannot explain every changed file.
 - A "leftover" turns out to be used.
