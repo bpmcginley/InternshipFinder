@@ -48,7 +48,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | D | P-2.1 Follow build | Unassigned | - | - | Waiting for design | No build before approved note; worker deployment stays with Bruce. |
 | D | P-2.2 Top-up build | Unassigned | - | - | Waiting for design | No build before approved price, note, terms and secret setup. |
 | D | P-3.1 Limit card | Unassigned | - | - | Queued | needs-bruce: extension merge and release. |
-| D | P-3.2 Review ask | mylist_review | `codex/product-p3.2-review-ask` | Draft claim pending | In progress; needs-bruce | Third successful fill, once; preserve prior dismissals; sole proactive side-panel surface. Owns review.js, background/index.js, sidepanel.js and relevant tests/evidence only. No agent/onboarding/guard, permissions or release changes. |
+| D | P-3.2 Review ask | mylist_review | `codex/product-p3.2-review-ask` | [#212](https://github.com/bpmcginley/InternshipFinder/pull/212) | Implementation complete; needs-bruce | Frozen source `f9574db6`: version-2 same-key migration, third Ready fill once, prior decisions retained, manual Submitted excluded, sole proactive panel. 348 Node 22 tests and 2 packaging checks pass; 40 synthetic screenshots. Independent review/CI pending. No protected, permission, manifest or release changes. |
 | E | P-2.4 Cross-device list | Unassigned | - | - | Waiting for observation | P-1.4 live for two weeks, approved design/privacy, then build. |
 | E | P-3.3 Resume first | Unassigned | - | - | Waiting for refactor | After WP-5.2; needs-bruce. |
 | E | P-3.4 Practice form | Unassigned | - | - | Verification | Stop if a new host permission is needed; needs-bruce for extension. |
@@ -105,6 +105,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-3.2 extension review ask policy | [PR #212](https://github.com/bpmcginley/InternshipFinder/pull/212): approve third-fill once migration, sole proactive side-panel surface and extension merge/release. Existing passive review links remain. | - |
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
 | 2026-11-10 | P-0.2 worker deployment and disclosure | [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175) merged. Approve/publish disclosure before deployment; no deployment by this product session. | - |
 | 2026-11-10 | P-1.2 plan-text relocation and merge | [Reviewed PR #187](https://github.com/bpmcginley/InternshipFinder/pull/187) is ready for Bruce; follow its latest integration/CI. P-1.3 #193 remains stacked behind it. | - |
