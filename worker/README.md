@@ -62,7 +62,8 @@ Workers Logs stay off for the same reason.
 
 ## Run locally
 
-Use Node 22, matching CI. The Node tests use the built-in `node:sqlite` module.
+Use Node 22, matching CI. The Node tests use the built-in `node:sqlite` module and the pinned
+test-only API contract parser, so install dependencies before running either suite.
 
 ```bash
 cd worker
