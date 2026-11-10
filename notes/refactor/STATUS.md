@@ -12,12 +12,12 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 
 ## Current position
 
-- Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration merged in PR #183 with green Pages run 42871996393. Existing PR integration and subsequent mechanical formatting are now authorized without the earlier time/queue gate; later waves still follow the ordered plan. All six baseline suites passed.
-- Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
-- All four retained PRs (#165, #175, #177 and #178) are merged under Bruce's explicit authorization, with independent reviews, green CI, and green Pages. PR #165 Pages run 42886670663 passed. Recheck open PRs and coordinate overlapping files before every wave; the authorization does not permit discarding others' work.
-- Formatting is complete: JavaScript #189 and Python retry #192 are merged with green Pages runs 42891570445 and 42892197177 (duplicate 42892208901 also passed). Prior #190 was reverted by #191 after a deployment timeout; recovery Pages 42890454209 passed. Wave 3 implementation is active in isolated branches. Product #188 failed publication and was reverted by #197, merged as `e009644f`, preserving automated data refresh `79e85`. Product #197 recovery Pages run 42896131695 passed all jobs and its exact-commit backend check succeeded. The lead may resume serialized refactor merges after each PR satisfies its final review and CI gates.
-- Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
+- Both hand-offs were read in full before the initial audit; original clean-main baseline is `57202cae` and all six suites passed. The original dirty checkout and MuseWork.md remain untouched.
+- Waves 0-2 are complete. JavaScript #189 and Python retry #192 have green Pages/backend verification. Python #190 was ordinarily reverted by #191 after a deployment timeout, then retried without source changes.
+- The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
+- Wave 3 cleanup #196, migration preparation #198, packaging #199 and runner documentation #203 are merged. The first three have green publication/backend checks; #203 is the current publication verification. Docs index #195 and API contract #207 are in review; isolated cache helper #205 remains draft pending coordinated integration.
+- Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
+- Counter #175 still awaits approved/published disclosure and operator deployment. Migration adoption and unspecified email/payment design choices remain operator decisions. Product claims #187/#193 app/index and #194/generated follow-ups; no refactor writes overlap those claims.
 
 ## Execution rules
 
@@ -57,13 +57,13 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
 | 2 | WP-0.3 Python formatting | Lead | `refactor/wp-0.3-python-format-retry` | [#192](https://github.com/bpmcginley/InternshipFinder/pull/192) | Merged | Independent final review, green CI and green Pages run 42892197177; merged as `182c02ce`. |
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Merged | Independent review, green CI and green Pages run 42891570445. Safe subset formatted; protected/public/financial exclusions documented. |
-| 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | [#196](https://github.com/bpmcginley/InternshipFinder/pull/196) | Merged | Independent review and green CI; Pages 42897982856 and exact-commit backend check passed. |
-| 3 | WP-1.2 Python packaging | read_site_extension | `refactor/wp-1.2-packaging` | [#199](https://github.com/bpmcginley/InternshipFinder/pull/199) | Independent review / CI pending | Combined backend/growth suite: 1,493 passed, two known skips; standalone growth: 428 passed, same two skips. External editable imports, unchanged golden, packaging, lint, moved-file and workflow-scope checks passed. |
-| 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
-| 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
-| 3 | WP-2.3 Worker contract | Unassigned | - | - | Queued | Inventory code routes and clients, not prose alone; include missing metrics route. |
-| 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | `7982abbc`; independent review and green CI; Pages pending. One existing-schema baseline; 15 local D1 tests pass. Production adoption and recurring-backfill/deploy transition remain operator-gated. |
-| 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | In review | Document Node/SQLite versus local workerd/D1; intentional shared scenarios preserved; no test moves. |
+| 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | [#196](https://github.com/bpmcginley/InternshipFinder/pull/196) | Merged | Independent review, green CI, Pages 42897982856 and backend verified. |
+| 3 | WP-1.2 Python packaging | read_site_extension | `refactor/wp-1.2-packaging` | [#199](https://github.com/bpmcginley/InternshipFinder/pull/199) | Merged | Independent review, green CI, Pages 42902346112 and backend verified; 19 test moves and external import proof. |
+| 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | [#195](https://github.com/bpmcginley/InternshipFinder/pull/195) | In review | Topic index and current rules; model notes preserved pending Q1. |
+| 3 | WP-1.5 Cache versions | wp15_cache | `refactor/wp-1.5-asset-versions` | [#205](https://github.com/bpmcginley/InternshipFinder/pull/205) | Draft / integration blocked | Isolated helper independently approved after P2 fix; product-owned HTML/golden integration remains coordinated. |
+| 3 | WP-2.3 Worker contract | wp23_contract | `refactor/wp-2.3-api-contract` | [#207](https://github.com/bpmcginley/InternshipFinder/pull/207) | Independent review / CI pending | Inert route data, generated docs and AST/client completeness checks; router unchanged. |
+| 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | Independent review, green CI, Pages 42900208315 plus data-follow run 42900434412/backend verified. Operator adoption remains gated. |
+| 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review and green CI; Pages verification pending. |
 | 4 | WP-1.4 Logging foundation/sources | Unassigned | - | - | Queued | Shared helper plus source adapters; preserve default output text and stream. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
@@ -265,7 +265,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-Product #197 recovery publication and backend checks are verified green. Resume serialized Wave 3 merges after each package has final independent review and green CI. WP-1.1 PR #196 is merged with green Pages and backend verification. Migration PR #198 awaits final integration review and CI, after the current product #200 publication slot. Preserve current product/data history, separate ownership, and Pages verification after every merge; later waves remain ordered.
+Verify #203 Pages and backend, finish #195/#207 review and CI, then continue serialized wave-three merges. Coordinate #205 build/golden integration after product-owned changes clear; do not overwrite claimed files or weaken date assertions. Preserve separate worktrees, source-frozen review heads, all data history, and production/operator gates.
 
 ## WP-0.6 validation and coordination
 
@@ -385,3 +385,23 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Integrated current main `043c84d4` by normal merge before final review; preserved its cleanup, data and tracker evidence. Only the shared STATUS file required conflict resolution; documentation source is unchanged.
 
 - Normally integrated main `24402e36`, including merged packaging #199, migrations #198, cleanup #196, product retry #200 and current data. Worker README/TESTING source is unchanged from the reviewed documentation patch; only shared STATUS conflict resolution was needed. PR #199 publication verification remains lead-owned and must pass before the next merge.
+
+## WP-1.3 documentation validation
+
+- Added an internal topic index covering all 17 growth Markdown documents (including four campaign drafts), nine worker documents and four root development/coordination documents, plus current hand-offs and evaluation notes. Current inventory includes the directory-monitor documentation added by PR #165.
+- Refreshed AGENTS with worktree ownership, merge/review/Pages gates, safety boundaries and state locations. Historical model/credential notes are byte-identical; Q1 remains unanswered and that scope is preserved. No user-visible site/extension/email copy or executable files changed.
+- Checked every relative link in the new index against the current checkout; all resolve, including the newly merged migration/test guides and review archive. No new tests are needed for this documentation-only change; CI and independent review remain required.
+
+## Page-generator extraction readiness (read-only)
+
+- Independent source audit at main `73020090` and product #194 `9dad8284`: begin WP-3.1 with eight independent leaves (`keep_at`, `safe_url`, `plural`, `lower_name`, `join_words`, `possessive`, `money`, `pct`), explicit re-exports, and no state/template/orchestrator move. This is preparation only; Wave 5 has not started and product owns current renderer changes.
+- `build()` rebinds BEACON, BASELINE, GENERATED, DIGEST_FORM, TRACKER, EMPLOYERS, TEXTS, HOME and HOME_LIVE_DATE, while LISTINGS is mutated in place. Feeds and the every-major generator read legacy state after building. Copied re-exports would become stale; preserve the legacy settings/callback authority until explicit inputs are introduced.
+- Existing tests patch legacy settings and entry functions; they also derive paths from physical `seo_pages.__file__`, mutate its exact SLOGAN assignment, and extract its literal CSS block. Keep these contracts meaningful and unchanged until deliberately redirected to actual new source locations. Preserve actual module CLI execution and its documented `__main__` versus canonical-module behavior.
+- Deferred-import count is not a cycle count: the measured direct back-edge pairs are seo_pages/feeds and seo_pages/role_index. External static importers measured four backend and eight growth modules; additional mentions include comments. Verify each actual caller rather than relying on the hand-off's broader counts.
+- When introducing site/render subpackages, update PR #199's explicit setuptools declarations and inspect built wheel members; editable imports alone can hide omitted packages. Golden fixtures must remain unchanged for these refactor extractions.
+
+## Orders extraction readiness (read-only)
+
+- Audit at main `7728e02b` verified 39 exports. Keep literal TERMS_VERSION/TERMS_BOX assignments in legacy orders.js: unchanged buy tests read them directly. Preserve the billing/orders live-binding cycle and listing settlement before student handling; introduce no eager imported-value reads or configuration snapshots.
+- The only top-level mutable local is the review styleHash cache; keep it with the renderer. Exported PRICES/WEBMAIL/CLOSE_REASONS objects retain shared identity. readShard has no module cache; preserve injected-fetch edge-cache options rather than adding memoization.
+- Safest first file-move boundary is shardOf/cleanRole/readShard plus necessary shared regex/error helpers. Existing durable outbox stays in order-mail.js. Preserve every db.batch boundary/statement order, cron job order and names, SQL/email/style literals, default fetch expressions, and all facade exports. The shared settlement-race scenario remains unchanged across both adapters. This is preparation only, not later-wave implementation or financial-behavior approval.
