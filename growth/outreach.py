@@ -3,6 +3,7 @@
 This script writes files only. It never looks up contacts, sends email, or posts to a community.
 Run from the repository root: python growth/outreach.py docs --out outreach-kit
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,13 +31,15 @@ def one_line(value: object) -> str:
 
 def major_url(major: dict, medium: str, now: datetime) -> str:
     tags = sorted(set(major.get("tags") or []) - sp.SKIP_FIELDS)[:6]
-    query = urlencode({
-        "field": ",".join(tags),
-        "utm_source": "campus_partner",
-        "utm_medium": medium,
-        "utm_campaign": f"campus_{now:%Y_%m}",
-        "utm_content": sp.slugify(major["name"]),
-    })
+    query = urlencode(
+        {
+            "field": ",".join(tags),
+            "utm_source": "campus_partner",
+            "utm_medium": medium,
+            "utm_campaign": f"campus_{now:%Y_%m}",
+            "utm_content": sp.slugify(major["name"]),
+        }
+    )
     return f"{sp.SITE}/?{query}"
 
 
@@ -52,7 +55,7 @@ def pick_roles(items: list[dict], count: int = 3) -> list[dict]:
         employers.add(employer)
         if len(chosen) == count:
             return chosen
-    return chosen + [x for x in ordered if x not in chosen][:count - len(chosen)]
+    return chosen + [x for x in ordered if x not in chosen][: count - len(chosen)]
 
 
 def place_nearby(x: dict) -> str:
@@ -77,19 +80,34 @@ def build(data: dict, now: datetime | None = None, limit: int = 8) -> dict:
         tags = set(major.get("tags") or []) - sp.SKIP_FIELDS
         if not tags:
             continue
-        fits = lambda x: bool(tags & set(x.get("field_tags") or [])) and bool(x["keys"] & sp.HOME_STATES)  # noqa: E731
+        fits = lambda x: (
+            bool(tags & set(x.get("field_tags") or [])) and bool(x["keys"] & sp.HOME_STATES)
+        )  # noqa: E731
         open_count = sum(1 for x in listings if fits(x))
         if open_count < audience.PRIMARY:
             continue
         new = [x for x in fresh if fits(x)]
         if len(new) < MIN_NEW:
             continue
-        roles = [{"title": one_line(x.get("title")), "company": one_line(x.get("company_name")),
-                  "place": place_nearby(x), "url": sp.safe_url(x.get("apply_url"))}
-                 for x in pick_roles(new)]
-        result.append({"major": major["name"], "open": open_count, "new": len(new),
-                       "email_url": major_url(major, "email", generated),
-                       "community_url": major_url(major, "community", generated), "roles": roles})
+        roles = [
+            {
+                "title": one_line(x.get("title")),
+                "company": one_line(x.get("company_name")),
+                "place": place_nearby(x),
+                "url": sp.safe_url(x.get("apply_url")),
+            }
+            for x in pick_roles(new)
+        ]
+        result.append(
+            {
+                "major": major["name"],
+                "open": open_count,
+                "new": len(new),
+                "email_url": major_url(major, "email", generated),
+                "community_url": major_url(major, "community", generated),
+                "roles": roles,
+            }
+        )
     result.sort(key=lambda x: (-x["new"], -x["open"], x["major"]))
     return {"generated_at": generated.isoformat(), "status": "ready", "majors": result[:limit]}
 
@@ -99,10 +117,14 @@ def render(kit: dict) -> str:
         return "No outreach drafts: the listing export is missing, too old, or dated in the future. Refresh the ingest first.\n"
     if not kit["majors"]:
         return "No outreach drafts: no undergraduate major meets both the coverage and fresh-role thresholds.\n"
-    parts = [f"InternScout campus outreach kit — listing export {kit['generated_at']}",
-             "Review every example and link before sharing. Replace [Name] and add your own signature. No messages have been sent."]
+    parts = [
+        f"InternScout campus outreach kit — listing export {kit['generated_at']}",
+        "Review every example and link before sharing. Replace [Name] and add your own signature. No messages have been sent.",
+    ]
     for row in kit["majors"]:
-        examples = "\n".join(f"- {r['title']} — {r['company']} ({r['place']})" for r in row["roles"])
+        examples = "\n".join(
+            f"- {r['title']} — {r['company']} ({r['place']})" for r in row["roles"]
+        )
         parts += [
             f"\n{'=' * 72}\n{row['major']}: {row['open']} open in the Northeast or remote; {row['new']} found this week",
             "\nPARTNER EMAIL DRAFT",
@@ -132,7 +154,9 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "drafts.txt").write_text(render(kit), encoding="utf-8")
-    (out / "drafts.json").write_text(json.dumps(kit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (out / "drafts.json").write_text(
+        json.dumps(kit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"[outreach] {len(kit['majors'])} drafts; status={kit['status']}; wrote {out}")
 
 

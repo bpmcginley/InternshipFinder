@@ -1,5 +1,7 @@
 """Offline end-to-end test: no network. Validates filtering, dedupe, geo, scoring."""
+
 import os, tempfile
+
 os.environ.setdefault("INTERNSCOUT_DB", os.path.join(tempfile.gettempdir(), "internscout_test.db"))
 if os.path.exists(os.environ["INTERNSCOUT_DB"]):
     os.remove(os.environ["INTERNSCOUT_DB"])
@@ -17,7 +19,7 @@ FIX = os.path.join(HERE, "fixtures", "sample_github.json")
 def test_classify():
     assert "swe" in classify("Software Engineer Intern")
     assert "quant" in classify("Quantitative Trading Intern")
-    assert classify("Marketing Intern") == ["marketing"]   # all disciplines now supported
+    assert classify("Marketing Intern") == ["marketing"]  # all disciplines now supported
     assert classify("Mechanical Engineering Intern") == ["mechanical"]
     assert classify("Some Unknown Widget Intern") == ["other"]  # never silently dropped
     assert is_internship("SWE Intern")
@@ -32,9 +34,23 @@ def test_a_season_with_no_year_does_not_print_the_word_none():
     # "Year-round Intern - UX Design and Research" names a season and no year, and the term came out
     # as "Year-round None". 649 listings in one export did. A season on its own is the honest answer.
     def term(title, **raw):
-        return (normalize(dict({"company_name": "Acme", "title": title, "locations": ["Boston, MA"],
-                                "source": "test", "employment_type": "Intern",
-                                "url": "https://example.com/1"}, **raw)) or {}).get("term")
+        return (
+            normalize(
+                dict(
+                    {
+                        "company_name": "Acme",
+                        "title": title,
+                        "locations": ["Boston, MA"],
+                        "source": "test",
+                        "employment_type": "Intern",
+                        "url": "https://example.com/1",
+                    },
+                    **raw,
+                )
+            )
+            or {}
+        ).get("term")
+
     assert term("Summer Intern - Mechanical Design") == "Summer"
     assert term("Year-round Intern - UX Design and Research") == "Year-round"
     assert term("Software Engineer Intern, Summer 2027") == "Summer 2027"
@@ -50,9 +66,11 @@ def test_geo():
     g2 = evaluate_locations(["Remote in USA"])
     assert g2["is_remote"] and not g2["within_radius"] and g2["in_region"]
     g3 = evaluate_locations(["San Francisco, CA"])
-    assert g3["in_region"] and not g3["within_radius"] and g3["on_site"]   # nationwide, outside the baseline
+    assert (
+        g3["in_region"] and not g3["within_radius"] and g3["on_site"]
+    )  # nationwide, outside the baseline
     g4 = evaluate_locations(["Hoboken, NJ"])
-    assert g4["within_radius"] and g4["state"] == "NJ"              # NYC metro
+    assert g4["within_radius"] and g4["state"] == "NJ"  # NYC metro
 
 
 def test_dedupe_title():
@@ -68,6 +86,7 @@ def test_full_pipeline():
     stats = run(raw, verbose=True)
     from internscout.db import SessionLocal
     from internscout.models import Listing
+
     with SessionLocal() as db:
         rows = db.query(Listing).all()
         names = sorted({r.company_name for r in rows})
@@ -78,35 +97,49 @@ def test_full_pipeline():
         assert "Jane Street" in names
         assert "HRT" in names
         assert "Acme Cloud" in names
-        assert "FarCorp" in names            # every US location is kept
-        assert "OldCo" not in names          # wrong year
-        assert "BioLab" in names             # marketing is a supported discipline now
-        assert "FullTimeCo" not in names     # not an internship
+        assert "FarCorp" in names  # every US location is kept
+        assert "OldCo" not in names  # wrong year
+        assert "BioLab" in names  # marketing is a supported discipline now
+        assert "FullTimeCo" not in names  # not an internship
         # a named place outranks a remote-only role (neutral score)
         js = next(r for r in rows if r.company_name == "Jane Street")
         acme = next(r for r in rows if r.company_name == "Acme Cloud")
         assert js.relevance_score > acme.relevance_score
         # Jane Street seen from 2 sources -> deduped to 1 with 2 source links
         assert len(js.source_links) == 2  # vanshb03 + speedyapply, deduped
-        assert js.state in ("NY", "MA") and set(js.region_locations) >= {"New York, NY", "Boston, MA"}
+        assert js.state in ("NY", "MA") and set(js.region_locations) >= {
+            "New York, NY",
+            "Boston, MA",
+        }
     print("ALL PIPELINE ASSERTIONS PASSED")
 
 
 if __name__ == "__main__":
-    test_classify(); test_term_parse(); test_geo(); test_dedupe_title(); test_full_pipeline()
+    test_classify()
+    test_term_parse()
+    test_geo()
+    test_dedupe_title()
+    test_full_pipeline()
     print("OK")
 
 
 def test_dead_adp_link_is_dropped():
     """ADP's recruitment.html without a cid opens a cookie banner and nothing else, forever."""
-    base = dict(company_name="Mathtech", title="Web Application Developer Intern",
-                locations=["Falls Church, VA"], source="google_jobs", active=True)
+    base = dict(
+        company_name="Mathtech",
+        title="Web Application Developer Intern",
+        locations=["Falls Church, VA"],
+        source="google_jobs",
+        active=True,
+    )
     adp = "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html"
     assert normalize({**base, "apply_url": adp + "?jobId=565843"}) is None
     # The same posting with the tenant id our own fetcher writes is fine.
     assert normalize({**base, "apply_url": adp + "?cid=89da4960&ccId=19000101_000001&jobId=565843"})
     # And nothing else on ADP is touched.
-    assert normalize({**base, "apply_url": "https://workforcenow.adp.com/jobs/apply/posting.html?client=acme"})
+    assert normalize(
+        {**base, "apply_url": "https://workforcenow.adp.com/jobs/apply/posting.html?client=acme"}
+    )
 
 
 def test_a_run_that_reports_no_date_does_not_erase_the_one_we_have():
@@ -115,10 +148,16 @@ def test_a_run_that_reports_no_date_does_not_erase_the_one_we_have():
     # that was dated on the run that fetched its detail went back to undated on the next one.
     from internscout.db import SessionLocal
     from internscout.models import Listing
-    item = dict(company_name="Datewise", title="Software Engineer Intern - Summer 2027",
-                locations=["Boston, MA"], source="workday", active=True,
-                url="https://datewise.wd1.myworkdayjobs.com/careers/job/Boston/R9",
-                apply_url="https://datewise.wd1.myworkdayjobs.com/careers/job/Boston/R9")
+
+    item = dict(
+        company_name="Datewise",
+        title="Software Engineer Intern - Summer 2027",
+        locations=["Boston, MA"],
+        source="workday",
+        active=True,
+        url="https://datewise.wd1.myworkdayjobs.com/careers/job/Boston/R9",
+        apply_url="https://datewise.wd1.myworkdayjobs.com/careers/job/Boston/R9",
+    )
     run([dict(item, posted_at="2026-08-07T00:00:00+00:00")])
     run([dict(item)])
     with SessionLocal() as db:
@@ -132,10 +171,11 @@ def test_freshness_counts_from_the_day_the_employer_posted_it():
     # they were posted, and scored as new on the strength of when we happened to find them.
     from datetime import datetime, timedelta, timezone
     from internscout.score import _freshness
+
     now = datetime.now(timezone.utc)
     old, yday = now - timedelta(days=180), now - timedelta(days=1)
-    assert _freshness(yday, old) == 0.0          # posted in March, found yesterday: not new
-    assert _freshness(old, yday) > 0.9           # posted yesterday, held for months: new
+    assert _freshness(yday, old) == 0.0  # posted in March, found yesterday: not new
+    assert _freshness(old, yday) > 0.9  # posted yesterday, held for months: new
     # No posting date means the age is unknown, which is not the same as new, and it can never
     # outscore a posting we know is fresh.
     assert _freshness(now, None) == 0.5
@@ -158,10 +198,15 @@ def test_a_listing_keeps_its_id_when_the_next_run_rebuilds_the_database():
     from internscout.export_static import _listing_dict
     from internscout.normalize import listing_id, make_dedupe_key
 
-    item = dict(company_name="Idstable", title="Software Engineer Intern - Summer 2027",
-                locations=["Boston, MA"], source="workday", active=True,
-                url="https://idstable.wd1.myworkdayjobs.com/careers/job/Boston/R1",
-                apply_url="https://idstable.wd1.myworkdayjobs.com/careers/job/Boston/R1")
+    item = dict(
+        company_name="Idstable",
+        title="Software Engineer Intern - Summer 2027",
+        locations=["Boston, MA"],
+        source="workday",
+        active=True,
+        url="https://idstable.wd1.myworkdayjobs.com/careers/job/Boston/R1",
+        apply_url="https://idstable.wd1.myworkdayjobs.com/careers/job/Boston/R1",
+    )
     run([item])
     with SessionLocal() as db:
         row = db.query(Listing).filter(Listing.company_name == "Idstable").one()
@@ -172,9 +217,9 @@ def test_a_listing_keeps_its_id_when_the_next_run_rebuilds_the_database():
 
     # The next run reads the employer, the title and the term off the board again and rebuilds
     # the same key from them, so it recomputes the same id without having stored anything.
-    assert got == listing_id(make_dedupe_key("Idstable",
-                                             "Software Engineer Intern - Summer 2027",
-                                             "Summer", 2027))
+    assert got == listing_id(
+        make_dedupe_key("Idstable", "Software Engineer Intern - Summer 2027", "Summer", 2027)
+    )
     # A different posting is a different id; the same one twice is not.
     assert listing_id("a|b||") != listing_id("a|c||")
     assert len(listing_id("a|b||")) == 16
@@ -182,14 +227,28 @@ def test_a_listing_keeps_its_id_when_the_next_run_rebuilds_the_database():
 
 def test_a_shouted_title_is_shown_in_title_case_and_keeps_its_id():
     from internscout.normalize import normalize, readable_title
+
     assert readable_title("STUDENT TRAINEE (ACCOUNTING)") == "Student Trainee (Accounting)"
-    assert readable_title("INTERN - SOCIAL WORK (MSW/MA) - UNPAID") == "Intern - Social Work (MSW/MA) - Unpaid"
-    assert readable_title("2027 IT SUMMER INTERNSHIP - IT INTERN") == "2027 IT Summer Internship - IT Intern"
-    assert readable_title("HEALTH AND SAFETY SKILLBRIDGE INTERN") == "Health and Safety Skillbridge Intern"
+    assert (
+        readable_title("INTERN - SOCIAL WORK (MSW/MA) - UNPAID")
+        == "Intern - Social Work (MSW/MA) - Unpaid"
+    )
+    assert (
+        readable_title("2027 IT SUMMER INTERNSHIP - IT INTERN")
+        == "2027 IT Summer Internship - IT Intern"
+    )
+    assert (
+        readable_title("HEALTH AND SAFETY SKILLBRIDGE INTERN")
+        == "Health and Safety Skillbridge Intern"
+    )
     # an employer's own mixed case is theirs to keep
     assert readable_title("IT Intern - IBD Support") == "IT Intern - IBD Support"
-    raw = {"company_name": "Defense Finance and Accounting Service", "title": "STUDENT TRAINEE (AUDITING)",
-           "locations": ["Indianapolis, IN"], "apply_url": "https://www.usajobs.gov/job/1"}
+    raw = {
+        "company_name": "Defense Finance and Accounting Service",
+        "title": "STUDENT TRAINEE (AUDITING)",
+        "locations": ["Indianapolis, IN"],
+        "apply_url": "https://www.usajobs.gov/job/1",
+    }
     loud, quiet = normalize(dict(raw)), normalize(dict(raw, title="Student Trainee (Auditing)"))
     assert loud["title"] == "Student Trainee (Auditing)"
     assert loud["dedupe_key"] == quiet["dedupe_key"]

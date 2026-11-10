@@ -1,4 +1,5 @@
 """growth/social.py: brand posts written from the data, short enough for every account."""
+
 import importlib.util
 import io
 import json
@@ -39,6 +40,7 @@ def test_old_postings_a_scan_just_reached_are_not_new():
 
 # ---------------------------------------------------------------- links only to pages that exist
 
+
 def test_a_field_without_a_page_links_the_dashboard_instead(monkeypatch):
     items = [_x(i, f"Co {i}") for i in range(6)]
     # Below seo_pages.MIN_OPEN open roles the field has no landing page.
@@ -48,25 +50,44 @@ def test_a_field_without_a_page_links_the_dashboard_instead(monkeypatch):
     monkeypatch.setattr(social.digest, "STATE_SLUGS", {"machine-learning-ai"})
     assert social.compose("ml", items, 500)[1] == "https://internscout.org/?field=ml"
     monkeypatch.undo()
-    assert social.compose("ml", items, 500)[1] == "https://internscout.org/internships/machine-learning-ai/"
+    assert (
+        social.compose("ml", items, 500)[1]
+        == "https://internscout.org/internships/machine-learning-ai/"
+    )
 
 
 def test_the_link_rule_is_the_digests():
     for tag, n in (("ml", 0), ("ml", 5), ("ml", 4), ("data", 99)):
-        assert (social.link(tag, n).startswith("https://internscout.org/internships/")
-                == social.digest.has_page(tag, n))
+        assert social.link(tag, n).startswith(
+            "https://internscout.org/internships/"
+        ) == social.digest.has_page(tag, n)
 
 
 # ---------------------------------------------------------------- the run
 
+
 def _site(tmp_path, made, rows=None):
     """A site whose export was made at made, with six new roles in one field nearby."""
     seen = ((made or _now()) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
-    rows = rows if rows is not None else [
-        {"id": f"n{i}", "company_name": f"Company {i}", "title": f"Data Intern {i}", "field_tags": ["data"],
-         "first_seen": seen, "posted_at": None, "status": "open", "is_remote": False,
-         "regions": [{"loc": "Boston, MA", "kind": "x", "state": "MA"}], "apply_url": f"https://jobs.example.com/{i}"}
-        for i in range(6)]
+    rows = (
+        rows
+        if rows is not None
+        else [
+            {
+                "id": f"n{i}",
+                "company_name": f"Company {i}",
+                "title": f"Data Intern {i}",
+                "field_tags": ["data"],
+                "first_seen": seen,
+                "posted_at": None,
+                "status": "open",
+                "is_remote": False,
+                "regions": [{"loc": "Boston, MA", "kind": "x", "state": "MA"}],
+                "apply_url": f"https://jobs.example.com/{i}",
+            }
+            for i in range(6)
+        ]
+    )
     data = tmp_path / "data" / "listings"
     data.mkdir(parents=True)
     (data / "MA.json").write_text(json.dumps(rows), encoding="utf-8")
@@ -80,7 +101,13 @@ def _site(tmp_path, made, rows=None):
 
 @pytest.fixture
 def no_accounts(monkeypatch):
-    for k in ("BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD", "MASTODON_URL", "MASTODON_TOKEN", "DISCORD_WEBHOOK_URL"):
+    for k in (
+        "BLUESKY_HANDLE",
+        "BLUESKY_APP_PASSWORD",
+        "MASTODON_URL",
+        "MASTODON_TOKEN",
+        "DISCORD_WEBHOOK_URL",
+    ):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -103,7 +130,7 @@ def test_a_stale_export_posts_nothing_and_says_why(tmp_path, monkeypatch, capsys
     assert social.main(["social.py", _site(tmp_path, _now() - age), "--send"]) == 0
     out = capsys.readouterr().out
     assert "not posting: the data export is from" in out and "stalled" in out
-    assert "internships" not in out                                    # no post text either
+    assert "internships" not in out  # no post text either
 
 
 def test_an_export_with_no_time_counts_as_stale(tmp_path, no_accounts, capsys):
@@ -112,8 +139,13 @@ def test_an_export_with_no_time_counts_as_stale(tmp_path, no_accounts, capsys):
 
 
 def _hook_refused(*_a, **_k):
-    raise urllib.error.HTTPError("https://discord.com/api/webhooks/1/secret-token", 401, "Unauthorized", {},
-                                 io.BytesIO(b'{"message": "Invalid Webhook Token"}'))
+    raise urllib.error.HTTPError(
+        "https://discord.com/api/webhooks/1/secret-token",
+        401,
+        "Unauthorized",
+        {},
+        io.BytesIO(b'{"message": "Invalid Webhook Token"}'),
+    )
 
 
 def test_a_failed_account_fails_the_run_after_trying_the_others(tmp_path, monkeypatch, capsys):
@@ -126,9 +158,14 @@ def test_a_failed_account_fails_the_run_after_trying_the_others(tmp_path, monkey
     monkeypatch.setattr(social, "to_discord", lambda t: tried.append("Discord") or "sent")
     assert social.main(["social.py", _site(tmp_path, _now() - timedelta(hours=1)), "--send"]) == 1
     out = capsys.readouterr().out
-    assert tried == ["Discord"]                                        # the next account was still tried
+    assert tried == ["Discord"]  # the next account was still tried
     assert "[social] Mastodon failed: HTTPError" in out and "[social] Discord: sent" in out
-    for secret in ("secret-token", "mastodon-secret-token", "discord.com/api", "Invalid Webhook Token"):
+    for secret in (
+        "secret-token",
+        "mastodon-secret-token",
+        "discord.com/api",
+        "Invalid Webhook Token",
+    ):
         assert secret not in out
 
 
@@ -140,9 +177,10 @@ def test_every_account_posting_is_a_green_run(tmp_path, monkeypatch, capsys):
     assert social.main(["social.py", _site(tmp_path, _now() - timedelta(hours=1)), "--send"]) == 0
 
 
-def test_a_post_links_the_dashboard_when_the_field_has_too_few_open_roles(tmp_path, no_accounts, capsys,
-                                                                         monkeypatch):
-    monkeypatch.setattr(social.sp, "MIN_OPEN", 50)                     # six open roles: no page
+def test_a_post_links_the_dashboard_when_the_field_has_too_few_open_roles(
+    tmp_path, no_accounts, capsys, monkeypatch
+):
+    monkeypatch.setattr(social.sp, "MIN_OPEN", 50)  # six open roles: no page
     assert social.main(["social.py", _site(tmp_path, _now() - timedelta(hours=1))]) == 0
     assert capsys.readouterr().out.rstrip().endswith("https://internscout.org/?field=data")
 
@@ -151,10 +189,18 @@ def test_new_roles_are_counted_once_per_employer(tmp_path, no_accounts):
     """The same role on two of one employer's boards is one role, as in the digest."""
     made = _now() - timedelta(hours=1)
     seen = (made - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
-    row = lambda i, co: {"id": f"r{i}", "company_name": co, "title": "Data Intern", "field_tags": ["data"],  # noqa: E731
-                         "first_seen": seen, "posted_at": None, "status": "open", "is_remote": False,
-                         "regions": [{"loc": "Boston, MA", "kind": "x", "state": "MA"}],
-                         "apply_url": f"https://jobs.example.com/{i}"}
+    row = lambda i, co: {
+        "id": f"r{i}",
+        "company_name": co,
+        "title": "Data Intern",
+        "field_tags": ["data"],  # noqa: E731
+        "first_seen": seen,
+        "posted_at": None,
+        "status": "open",
+        "is_remote": False,
+        "regions": [{"loc": "Boston, MA", "kind": "x", "state": "MA"}],
+        "apply_url": f"https://jobs.example.com/{i}",
+    }
     rows = [row(i, f"Co {i}") for i in range(5)] + [row(9, "Co 0 Inc.")]
     ranked, _, _ = social.candidates(_site(tmp_path, made, rows))
     assert [(t, len(v)) for t, v in ranked] == [("data", 5)]
@@ -165,15 +211,21 @@ def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, m
     # The analytics page can only reach D1, so the card's bytes go into the draft row.
     import base64
     import metrics
+
     calls = []
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
     if schema != "new":
         image_column = ", image_b64 TEXT" if schema == "current" else ""
-        db.execute("CREATE TABLE social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
-                   "text TEXT NOT NULL, image_url TEXT, url TEXT" + image_column +
-                   ", PRIMARY KEY (taken, channel))")
-        db.execute("INSERT INTO social_drafts (taken, channel, text) VALUES ('existing', 'linkedin', 'keep me')")
+        db.execute(
+            "CREATE TABLE social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
+            "text TEXT NOT NULL, image_url TEXT, url TEXT"
+            + image_column
+            + ", PRIMARY KEY (taken, channel))"
+        )
+        db.execute(
+            "INSERT INTO social_drafts (taken, channel, text) VALUES ('existing', 'linkedin', 'keep me')"
+        )
 
     def fake_json(url, body, token):
         # Exercise real SQL through D1's response shape. A rejected SQL request raises HTTPError
@@ -183,29 +235,47 @@ def test_the_linkedin_draft_carries_its_card_for_the_download_button(tmp_path, m
         try:
             result = db.execute(sql, params)
         except sqlite3.OperationalError as e:
-            raise urllib.error.HTTPError(url, 400, "Bad Request", {},
-                                         io.BytesIO(json.dumps({"errors": [{"message": str(e)}]}).encode()))
+            raise urllib.error.HTTPError(
+                url,
+                400,
+                "Bad Request",
+                {},
+                io.BytesIO(json.dumps({"errors": [{"message": str(e)}]}).encode()),
+            )
         rows = [dict(row) for row in result.fetchall()] if result.description else []
         return {"success": True, "result": [{"success": True, "results": rows}]}
 
     monkeypatch.setattr(metrics, "_json", fake_json)
     card = tmp_path / "card.jpg"
     card.write_bytes(b"\xff\xd8jpeg")
-    data = {"linkedin_text": "text", "card_url": "https://example.test/c.jpg", "url": "https://internscout.org/"}
+    data = {
+        "linkedin_text": "text",
+        "card_url": "https://example.test/c.jpg",
+        "url": "https://internscout.org/",
+    }
     social.save_drafts(data, "token", str(card))
     insert = next(p for s, p in calls if s.startswith("INSERT"))
     assert base64.b64decode(insert[-1]) == b"\xff\xd8jpeg"
-    social.save_drafts(data, "token", str(tmp_path / "missing.jpg"))     # no card: the text still saves
+    social.save_drafts(
+        data, "token", str(tmp_path / "missing.jpg")
+    )  # no card: the text still saves
     assert [p for s, p in calls if s.startswith("INSERT")][-1][-1] is None
     assert sum(s.startswith("ALTER TABLE") for s, _ in calls) == (1 if schema == "legacy" else 0)
-    assert db.execute("SELECT COUNT(*) FROM social_drafts WHERE channel = 'linkedin'").fetchone()[0] >= 1
+    assert (
+        db.execute("SELECT COUNT(*) FROM social_drafts WHERE channel = 'linkedin'").fetchone()[0]
+        >= 1
+    )
     if schema != "new":
-        assert db.execute("SELECT text FROM social_drafts WHERE taken = 'existing'").fetchone()[0] == "keep me"
+        assert (
+            db.execute("SELECT text FROM social_drafts WHERE taken = 'existing'").fetchone()[0]
+            == "keep me"
+        )
     db.close()
 
 
 def test_linkedin_draft_schema_errors_are_not_ignored(monkeypatch):
     import metrics
+
     calls = []
 
     def refused(url, body, token):
@@ -215,7 +285,11 @@ def test_linkedin_draft_schema_errors_are_not_ignored(monkeypatch):
         raise urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b"permission denied"))
 
     monkeypatch.setattr(metrics, "_json", refused)
-    data = {"linkedin_text": "text", "card_url": "https://example.test/c.jpg", "url": "https://internscout.org/"}
+    data = {
+        "linkedin_text": "text",
+        "card_url": "https://example.test/c.jpg",
+        "url": "https://internscout.org/",
+    }
     with pytest.raises(urllib.error.HTTPError):
         social.save_drafts(data, "token")
     assert not any(sql.startswith("INSERT") for sql in calls)
@@ -229,7 +303,9 @@ FORM = "https://buttondown.com/api/emails/embed-subscribe/internscout-test"
 def _live(site, action=FORM):
     """The dashboard's config line, as docs/index.html writes it: the one place the form address lives."""
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
-        f.write(f'<script>window.CONFIG = {{\n    digest: {{ provider: "Buttondown", formAction: "{action}" }},\n}};</script>')
+        f.write(
+            f'<script>window.CONFIG = {{\n    digest: {{ provider: "Buttondown", formAction: "{action}" }},\n}};</script>'
+        )
     return site
 
 
@@ -237,7 +313,10 @@ def test_the_signup_line_is_tagged_per_channel_and_fits_bluesky():
     items = [_x(i, "A Very Long Employer Name Incorporated %d" % i) for i in range(40)]
     for channel in ("bluesky", "mastodon", "discord"):
         line = social.signup_line(channel)
-        assert line == f"Every Monday by email: https://internscout.org/digest/?utm_source={channel}&utm_medium=social"
+        assert (
+            line
+            == f"Every Monday by email: https://internscout.org/digest/?utm_source={channel}&utm_medium=social"
+        )
         text, url = social.compose("ml", items, 40, signup=line)
         assert len(text) <= social.LIMIT and text.endswith("\n\n" + line) and url in text
     # Employers' names give way to the line, not the other way round.
@@ -248,57 +327,92 @@ def test_the_signup_line_is_tagged_per_channel_and_fits_bluesky():
 
 def test_a_post_too_long_for_the_line_goes_out_without_it(monkeypatch):
     monkeypatch.setattr(social, "LIMIT", 140)
-    text, url = social.compose("ml", [_x(i, "Co") for i in range(6)], 40, signup=social.signup_line("bluesky"))
+    text, url = social.compose(
+        "ml", [_x(i, "Co") for i in range(6)], 40, signup=social.signup_line("bluesky")
+    )
     assert "digest" not in text and text.endswith(url) and len(text) <= 140
 
 
 def test_the_line_goes_out_only_once_the_form_has_an_address(tmp_path, monkeypatch, capsys):
     sent = {}
-    for k in ("BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD", "MASTODON_URL", "MASTODON_TOKEN", "DISCORD_WEBHOOK_URL"):
+    for k in (
+        "BLUESKY_HANDLE",
+        "BLUESKY_APP_PASSWORD",
+        "MASTODON_URL",
+        "MASTODON_TOKEN",
+        "DISCORD_WEBHOOK_URL",
+    ):
         monkeypatch.setenv(k, "x")
     monkeypatch.setattr(social, "to_bluesky", lambda t, u: sent.setdefault("Bluesky", t) and "ok")
     monkeypatch.setattr(social, "to_mastodon", lambda t: sent.setdefault("Mastodon", t) and "ok")
     monkeypatch.setattr(social, "to_discord", lambda t: sent.setdefault("Discord", t) and "ok")
-    monkeypatch.setattr(social, "CHANNELS", [
-        ("Bluesky", ("BLUESKY_HANDLE",), lambda t, u: social.to_bluesky(t, u)),
-        ("Mastodon", ("MASTODON_URL",), lambda t, u: social.to_mastodon(t)),
-        ("Discord", ("DISCORD_WEBHOOK_URL",), lambda t, u: social.to_discord(t))])
+    monkeypatch.setattr(
+        social,
+        "CHANNELS",
+        [
+            ("Bluesky", ("BLUESKY_HANDLE",), lambda t, u: social.to_bluesky(t, u)),
+            ("Mastodon", ("MASTODON_URL",), lambda t, u: social.to_mastodon(t)),
+            ("Discord", ("DISCORD_WEBHOOK_URL",), lambda t, u: social.to_discord(t)),
+        ],
+    )
     site = _live(_site(tmp_path, _now() - timedelta(hours=1)), action="")
     assert social.main(["social.py", site, "--send"]) == 0
-    assert sent and not [t for t in sent.values() if "digest" in t]                 # empty: no line anywhere
+    assert sent and not [t for t in sent.values() if "digest" in t]  # empty: no line anywhere
     sent.clear()
     _live(site)
     assert social.main(["social.py", site, "--send"]) == 0
     for name, text in sent.items():
-        assert text.endswith(f"https://internscout.org/digest/?utm_source={name.lower()}&utm_medium=social"), name
+        assert text.endswith(
+            f"https://internscout.org/digest/?utm_source={name.lower()}&utm_medium=social"
+        ), name
         assert len(text) <= social.LIMIT
     assert set(sent) == {"Bluesky", "Mastodon", "Discord"}
-    assert social.draft(site)[0].count("digest") == 0                                 # the report's copy
+    assert social.draft(site)[0].count("digest") == 0  # the report's copy
     assert social.draft(site, "bluesky")[0].endswith("utm_source=bluesky&utm_medium=social")
 
 
 def test_bluesky_links_both_addresses_by_byte():
-    text = "5 new café internships.\n\nhttps://internscout.org/internships/x/\n\n" + social.signup_line("bluesky")
+    text = (
+        "5 new café internships.\n\nhttps://internscout.org/internships/x/\n\n"
+        + social.signup_line("bluesky")
+    )
     facets = social.link_facets(text)
     raw = text.encode("utf-8")
-    got = [raw[f["index"]["byteStart"]:f["index"]["byteEnd"]].decode() for f in facets]
+    got = [raw[f["index"]["byteStart"] : f["index"]["byteEnd"]].decode() for f in facets]
     assert got == ["https://internscout.org/internships/x/", social.signup_url("bluesky")]
     assert [f["features"][0]["uri"] for f in facets] == got
 
 
 def test_the_picture_channels_carry_the_line_once_live(tmp_path, monkeypatch):
-    items = [{"company_name": c, "title": "Intern", "keys": {"MA"}} for c in ["Baker Tilly", "Crowe", "MFS"] * 2]
-    monkeypatch.setattr(social, "candidates", lambda site: ([("accounting", items)], NOW, {"accounting": 200}))
+    items = [
+        {"company_name": c, "title": "Intern", "keys": {"MA"}}
+        for c in ["Baker Tilly", "Crowe", "MFS"] * 2
+    ]
+    monkeypatch.setattr(
+        social, "candidates", lambda site: ([("accounting", items)], NOW, {"accounting": 200})
+    )
     site = str(tmp_path)
     off = social.card_data(site, today=NOW)
     assert off["signup"] == {} and "digest" not in off["linkedin_text"] + off["instagram_caption"]
     on = social.card_data(_live(site), today=NOW)
-    assert social.signup_line("linkedin") in on["linkedin_text"] and len(on["linkedin_text"]) <= social.LINKEDIN_MAX
-    assert "internscout.org/digest" in on["instagram_caption"] and len(on["instagram_caption"]) <= social.IG_CAPTION_MAX
-    assert on["signup"] == {"youtube": "https://internscout.org/digest/?utm_source=youtube&utm_medium=social"}
+    assert (
+        social.signup_line("linkedin") in on["linkedin_text"]
+        and len(on["linkedin_text"]) <= social.LINKEDIN_MAX
+    )
+    assert (
+        "internscout.org/digest" in on["instagram_caption"]
+        and len(on["instagram_caption"]) <= social.IG_CAPTION_MAX
+    )
+    assert on["signup"] == {
+        "youtube": "https://internscout.org/digest/?utm_source=youtube&utm_medium=social"
+    }
     # Each line still ends the post's own text, ahead of the slogan and the tags.
     assert on["linkedin_text"].index("digest") < on["linkedin_text"].index(social.SLOGAN)
     import youtube
+
     desc = youtube.description_for(on)
-    assert "Every Monday by email: https://internscout.org/digest/?utm_source=youtube&utm_medium=social" in desc
+    assert (
+        "Every Monday by email: https://internscout.org/digest/?utm_source=youtube&utm_medium=social"
+        in desc
+    )
     assert "digest" not in youtube.description_for(off)

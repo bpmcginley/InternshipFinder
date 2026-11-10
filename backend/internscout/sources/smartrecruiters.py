@@ -11,9 +11,17 @@ employer boilerplate on every posting a company has, and including it would both
 real description inside the 4,000-character budget and hand the classifier a company's marketing
 copy to tag a job by.
 """
+
 from __future__ import annotations
-from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
-                     require_robots, rows_of)
+from .common import (
+    board_item,
+    counts_of,
+    html_to_text,
+    mark_complete,
+    reported_count,
+    require_robots,
+    rows_of,
+)
 from ..classify import is_internship
 from ..region import maybe_in_region
 
@@ -42,9 +50,15 @@ def parse_smartrecruiters(payload: dict, co: dict, token: str) -> list[dict]:
         locs = [where]
         if loc.get("remote"):
             locs.append("Remote - US")
-        it = board_item(co, source="smartrecruiters", title=title, locations=locs,
-                        url=f"https://jobs.smartrecruiters.com/{token}/{j.get('id')}",
-                        posted_at=j.get("releasedDate"), employment_type=emp)
+        it = board_item(
+            co,
+            source="smartrecruiters",
+            title=title,
+            locations=locs,
+            url=f"https://jobs.smartrecruiters.com/{token}/{j.get('id')}",
+            posted_at=j.get("releasedDate"),
+            employment_type=emp,
+        )
         it["_sr_id"] = j.get("id")
         out.append(it)
     return out
@@ -82,7 +96,7 @@ def fetch_smartrecruiters_board(c, co: dict) -> list[dict]:
             break
     else:
         if offset < total:
-            counts.stop("page_cap")   # MAX_OFFSET reached with results left
+            counts.stop("page_cap")  # MAX_OFFSET reached with results left
     # The one "intern" search read to its totalFound, not stopped at MAX_OFFSET.
     complete = well_formed and reported is not None and rows == reported
     for it in [i for i in out if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
