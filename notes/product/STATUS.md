@@ -27,7 +27,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-1.10 Flyer page | Unassigned | - | - | Queued | Browser-local QR; no third-party requests. |
 | A | P-1.11 Install and offer | Unassigned | - | - | Queued | Preserve permissions explanation; demo clip from Bruce. |
 | A | P-2.1 Follow design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
-| A | P-2.2 Top-up design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
+| A | P-2.2 Top-up design | product lead | `codex/product-p2.2-topup-design` | - | Review; needs-bruce | [Proposed words and data lifecycle](P-2.2-topup-design.md); approve price, refunds, retention, terms and privacy before build. |
 | B | P-1.5a Dashboard phone layout | Unassigned | - | - | Queued | Respect app.js and design-token ownership. |
 | B | P-1.5b Generated phone layout | Unassigned | - | - | Queued | Only before WP-3.1 or after WP-3.5; update golden if available. |
 | B | P-1.6 Checked-open evidence | audit_growth_generated | - | - | Skipped as written | last_seen proves observation, not a direct application-link check. |
@@ -85,7 +85,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | 2026-11-10 | P-0.2 worker merge and deploy | Counter PR will be linked when ready. | - |
 | 2026-11-10 | P-0.2 privacy wording for new named events | Existing enumeration omits new actions; proposed wording will accompany counter PR for approval. | - |
 | 2026-11-10 | Approve every Stage 2 design note | Exact words, stored data, retention and deletion will be supplied before build. | - |
-| 2026-11-10 | Top-up price, size, Stripe price and secret | P-2.2 design first; never put private identifiers in the repo. | - |
+| 2026-11-10 | Top-up price, size, Stripe price and secret | [P-2.2 design](P-2.2-topup-design.md) awaits approval, including spend order, refunds and retention. Never put private identifiers in the repo. | - |
 | 2026-11-10 | Postal address and follow-email wording | P-2.1 design first; account sending entitlement also needs verification. | - |
 | 2026-11-10 | Rename/topic/share the public GitHub list | Coordinate with existing PR #165; owner action. | - |
 | 2026-11-10 | Record or approve an Auto-Apply demo clip | P-1.11 leaves space without claiming a demo exists. | - |
