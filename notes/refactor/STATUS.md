@@ -55,9 +55,9 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | Merged | Independent review, green CI, and green Pages run 42867413022. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review, green CI, and green Pages run 42864974798. |
 | 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
-| 2 | WP-0.3 Python formatting | Lead | `refactor/wp-0.3-python-format-retry` | [#192](https://github.com/bpmcginley/InternshipFinder/pull/192) | In review | Exact approved source reapplied after recovery #191; independent review and all CI green before latest metadata integration. |
+| 2 | WP-0.3 Python formatting | Lead | `refactor/wp-0.3-python-format-retry` | [#192](https://github.com/bpmcginley/InternshipFinder/pull/192) | Merged; Pages pending | Merged as `182c02ce` after independent final review and green CI; no next merge until Pages passes. |
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Merged | Independent review, all nine checks green; Pages verification pending. Safe subset formatted; protected/public/financial exclusions documented. |
-| 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
+| 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | Pending PR | In review | Backend 1,484 passed/two known skips; golden 695 unchanged; Ruff and move/reference/link audits passed. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
 | 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
 | 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
@@ -342,3 +342,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - All four retained PRs (#165, #175, #177, #178) remain merged with green Pages. The counter worker changes await approved disclosure and operator deployment; design-note implementation choices remain gated.
 
 - Recovery Pages run 42890454209 passed all jobs. JavaScript formatting #189 merged as `da5bc492` after independent final review and all nine checks passed; its Pages run must pass before this retry merges. Integrated its exact source and all tracker evidence by normal merge.
+
+
+## WP-1.1 unused local server and review archive
+
+- Started from clean main `182c02ce` after the lead authorized Wave 3. Re-read current instructions and trackers; product PRs #187, #188 and #193 claim different files. PR #192 is merged; its Pages result remains a lead-owned gate before the next merge.
+- Rechecked the entire tracked repository, including workflows and data, while excluding protected MuseWork. Only `run.sh` launches `internscout.api`; the legacy frontend is its only client. FastAPI imports occur only in that module, and uvicorn only in the launcher and dependency pin. Removed those three approved unused files and the two pins. Retained DB/models/schemas and the classification vocabulary mentioning FastAPI. README and CONTRIBUTING already document static serving and need no edit.
+- Moved 24 review files under `notes/reviews/`, preserving their contents except one relative worker-document link and one documented audit-output path. Repaired four external review-path references. Historical refactor hand-offs retain their original evidence paths. No public site output, privacy, pricing, or data collection changes.
+- Validation: full backend suite **1,484 passed, two known optional-dependency skips** in 198.20s; standalone golden build matched all **695 files** without refresh; Ruff correctness checks passed. The move-content audit verified all 24 files against Git blobs, allowing only the two exact path substitutions; all three relative Markdown links and four external review references resolve. DB/models/schemas remain byte-identical. Remaining legacy-name search matches are historical notes and FastAPI classification vocabulary. `git diff --check` passed. Final CI and independent review remain required.
