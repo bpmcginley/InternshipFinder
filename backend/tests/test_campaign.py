@@ -1,5 +1,4 @@
 """growth/campaign.py: the weekly campaign pack (2026-10-25)."""
-
 import json
 import os
 import re
@@ -15,13 +14,12 @@ import campaign  # noqa: E402
 from internscout import seo_pages as sp  # noqa: E402
 from test_seo_pages import _row, _site  # noqa: E402
 
-NOW = datetime(2026, 10, 26, 12, tzinfo=timezone.utc)  # a Monday, ISO week 44
+NOW = datetime(2026, 10, 26, 12, tzinfo=timezone.utc)      # a Monday, ISO week 44
 
 
 def _fonts():
     pytest.importorskip("PIL")
     import cards
-
     try:
         cards.font("sans", 20)
     except RuntimeError:
@@ -49,7 +47,7 @@ def test_every_hand_written_tip_is_clean_and_ends_on_what_internscout_does():
         assert tip["path"].startswith("/")
         for kicker, text in tip["slides"]:
             assert campaign.lint(f"{kicker} {text}") == [], (tip["slug"], text)
-            assert "—" not in text  # no em dashes in copy
+            assert "—" not in text                                 # no em dashes in copy
 
 
 def test_the_tip_rotates_by_week():
@@ -58,13 +56,11 @@ def test_the_tip_rotates_by_week():
 
 
 def test_search_pick_needs_enough_roles_and_changes_field_each_week():
-    rows = [_ny(i) for i in range(campaign.MIN_SEARCH)] + [
-        _ny(100 + i, tags=("law",)) for i in range(20)
-    ]
-    rows += [_ny(200 + i, tags=("arts",)) for i in range(campaign.MIN_SEARCH - 1)]  # one short
+    rows = [_ny(i) for i in range(campaign.MIN_SEARCH)] + [_ny(100 + i, tags=("law",)) for i in range(20)]
+    rows += [_ny(200 + i, tags=("arts",)) for i in range(campaign.MIN_SEARCH - 1)]       # one short
     listings = [dict(x, keys={"NY", "New York City"}) for x in rows]
     picks = {campaign.search_pick(listings, NOW.replace(day=d))["field"] for d in (19, 26)}
-    assert picks == {"finance", "law"}  # two weeks, two fields; never arts
+    assert picks == {"finance", "law"}                                  # two weeks, two fields; never arts
     pick = campaign.search_pick(listings, NOW)
     assert pick["place"] in campaign.SEARCH_PLACES and len(pick["items"]) >= campaign.MIN_SEARCH
     assert campaign.search_pick([dict(x, keys={"TX"}) for x in rows], NOW) is None
@@ -83,21 +79,12 @@ def test_search_slides_say_only_what_the_listings_show():
     assert slides[-1][0] == "Search it yourself"
     # No pay slide when no posting states an hourly rate, and no class-year slide when none says.
     bare = [dict(_ny(i), keys={"NY"}) for i in range(16)]
-    kickers = [
-        s[0]
-        for s in campaign.search_slides(
-            {"field": "finance", "place": "NY", "items": bare}, NOW, None
-        )
-    ]
+    kickers = [s[0] for s in campaign.search_slides({"field": "finance", "place": "NY", "items": bare}, NOW, None)]
     assert "Listed pay" not in kickers and "First-years and sophomores" not in kickers
 
 
 def test_captions_tag_each_channel_and_fit_x():
-    slides = [
-        ("A", "Finance internships in New York"),
-        ("B", "151 open roles. " * 30, "151"),
-        ("C", "Search it."),
-    ]
+    slides = [("A", "Finance internships in New York"), ("B", "151 open roles. " * 30, "151"), ("C", "Search it.")]
     caps = campaign.captions(slides, "/?field=finance&state=NY", "weekly-2026w44", "search")
     assert "utm_source=facebook&utm_medium=social&utm_campaign=weekly-2026w44" in caps["facebook"]
     assert "utm_content=search" in caps["facebook"]
@@ -120,14 +107,10 @@ def test_the_pack_is_written_in_both_sizes_with_captions_and_a_readme(tmp_path):
         n = pack[kind]["slides"]
         assert len(pack[kind]["feed"]) == len(pack[kind]["tall"]) == n
         from PIL import Image
-
         assert Image.open(out / pack[kind]["feed"][0]).size == (1080, 1350)
         assert Image.open(out / pack[kind]["tall"][-1]).size == (1080, 1920)
     caps = json.loads((out / "captions.json").read_text(encoding="utf-8"))
-    assert (
-        set(caps) == {"search", "tip"}
-        and "utm_campaign=weekly-2026w44" in caps["search"]["facebook"]
-    )
+    assert set(caps) == {"search", "tip"} and "utm_campaign=weekly-2026w44" in caps["search"]["facebook"]
     assert "utm_content=search" in caps["search"]["facebook"]
     assert "utm_content=tip" in caps["tip"]["facebook"]
     readme = (out / "README.md").read_text(encoding="utf-8")
@@ -137,19 +120,8 @@ def test_the_pack_is_written_in_both_sizes_with_captions_and_a_readme(tmp_path):
 def test_nothing_is_written_when_a_slide_breaks_the_rules(tmp_path, monkeypatch, capsys):
     rows = [_ny(i) for i in range(20)]
     site = _site(tmp_path, {"NY": rows})
-    bad = [
-        {
-            "slug": "bad",
-            "path": "/",
-            "slides": [
-                ("Hook", "Unlock your future 🚀"),
-                ("1", "a"),
-                ("2", "b"),
-                ("3", "c"),
-                ("On InternScout", "d"),
-            ],
-        }
-    ]
+    bad = [{"slug": "bad", "path": "/", "slides": [("Hook", "Unlock your future 🚀"), ("1", "a"), ("2", "b"),
+                                                   ("3", "c"), ("On InternScout", "d")]}]
     monkeypatch.setattr(campaign, "TIPS", bad)
     out = tmp_path / "pack"
     assert campaign.build(site, str(out), NOW) is None

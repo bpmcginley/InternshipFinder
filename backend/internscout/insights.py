@@ -4,12 +4,11 @@
 Skill patterns are exported to the dashboard (stats.json) and run there against the user's profile
 with JavaScript's RegExp, so keep them to syntax both engines share: no inline flags, no \\Z.
 """
-
 from __future__ import annotations
 import re
 from datetime import date
 
-_B = r"(?<![A-Za-z0-9+#])"  # boundary that works for C++ / C# / .NET
+_B = r"(?<![A-Za-z0-9+#])"   # boundary that works for C++ / C# / .NET
 _E = r"(?![A-Za-z0-9+#])"
 
 SKILLS: dict[str, str] = {
@@ -104,25 +103,11 @@ SKILLS: dict[str, str] = {
 PATTERNS = {name: _B + "(?:" + p + ")" + _E for name, p in SKILLS.items()}
 _COMPILED = {name: re.compile(p, re.I) for name, p in PATTERNS.items()}
 
-_PREF_LINE = re.compile(
-    r"preferred|nice[- ]to[- ]have|a plus\b|is a plus|are a plus|bonus|desired|desirable|ideally|stand out",
-    re.I,
-)
-_REQ_HEAD = re.compile(
-    r"requirement|required|qualifications|what you(?:'ll| will)? (?:need|bring)|must[- ]have|minimum|basic|who you are|you have|skills|about you",
-    re.I,
-)
-_OTHER_HEAD = re.compile(
-    r"responsibilit|what you(?:'ll| will) do|about (?:the|this) (?:role|team|job)|about us|benefits|compensation|salary|pay range|equal opportunity|perks",
-    re.I,
-)
+_PREF_LINE = re.compile(r"preferred|nice[- ]to[- ]have|a plus\b|is a plus|are a plus|bonus|desired|desirable|ideally|stand out", re.I)
+_REQ_HEAD = re.compile(r"requirement|required|qualifications|what you(?:'ll| will)? (?:need|bring)|must[- ]have|minimum|basic|who you are|you have|skills|about you", re.I)
+_OTHER_HEAD = re.compile(r"responsibilit|what you(?:'ll| will) do|about (?:the|this) (?:role|team|job)|about us|benefits|compensation|salary|pay range|equal opportunity|perks", re.I)
 
-MONTHS = {
-    m: i
-    for i, m in enumerate(
-        ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1
-    )
-}
+MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 
 
 def _segments(text: str) -> list[str]:
@@ -150,11 +135,7 @@ def extract_skills(text: str) -> list[dict]:
 
 
 def _near_eeo(text: str, start: int) -> bool:
-    return bool(
-        re.search(
-            r"regard|regardless|discriminat|protected", text[max(0, start - 60) : start], re.I
-        )
-    )
+    return bool(re.search(r"regard|regardless|discriminat|protected", text[max(0, start - 60):start], re.I))
 
 
 def _parse_date(s: str, today: date) -> str | None:
@@ -183,40 +164,30 @@ def _parse_date(s: str, today: date) -> str | None:
 _YEAR_WORD = r"freshm[ae]n|first[- ]years?|sophomores?|juniors?|seniors?"
 _YEAR_LIST = rf"(?:{_YEAR_WORD})(?:\s*(?:,?\s*(?:or|and)|[,/])\s*(?:{_YEAR_WORD}))*"
 _RANKS = ["freshman", "sophomore", "junior", "senior"]
-_YEAR_CLAUSE = re.compile(
-    rf"\b({_YEAR_LIST})\s+(?:year|standing|students?|undergraduates?)\b", re.I
-)
+_YEAR_CLAUSE = re.compile(rf"\b({_YEAR_LIST})\s+(?:year|standing|students?|undergraduates?)\b", re.I)
 # "current senior leadership" or "incoming junior analyst" is about staff, not students.
-_STAFF_NOUN = (
-    r"leaders?|leadership|management|managers?|executives?|staff|engineers?|developers?|"
-    r"scientists?|analysts?|associates?|directors?|vice|vps?|officers?|partners?|consultants?|"
-    r"roles?|positions?|team|members?|software|data|product|research|designers?|"
-    r"accountants?|counsel|attorneys?|architects?|technicians?|specialists?|coordinators?"
-)
-_YEAR_STATUS = re.compile(
-    rf"\b(?:rising|current(?:ly)?(?: an?)?|incoming)\s+({_YEAR_LIST})\b", re.I
-)
+_STAFF_NOUN = (r"leaders?|leadership|management|managers?|executives?|staff|engineers?|developers?|"
+               r"scientists?|analysts?|associates?|directors?|vice|vps?|officers?|partners?|consultants?|"
+               r"roles?|positions?|team|members?|software|data|product|research|designers?|"
+               r"accountants?|counsel|attorneys?|architects?|technicians?|specialists?|coordinators?")
+_YEAR_STATUS = re.compile(rf"\b(?:rising|current(?:ly)?(?: an?)?|incoming)\s+({_YEAR_LIST})\b", re.I)
 _STAFF_AFTER = re.compile(rf"\s+(?:{_STAFF_NOUN})\b", re.I)
 # "at least current sophomores", "sophomores or above", "junior standing or higher": that year and up.
 _YEAR_AT_LEAST = re.compile(
     rf"\bat\s+least\s+(?:an?\s+)?(?:(?:current(?:ly)?|rising|incoming)\s+)?(?:an?\s+)?({_YEAR_LIST})\b"
     rf"|\b({_YEAR_LIST})(?:\s+(?:year|standing|students?|undergraduates?))?\s+(?:or|and)\s+(?:above|higher|beyond|up|older|later)\b",
-    re.I,
-)
+    re.I)
 # "must have completed their Freshman year": the years after it. Only a whole year counts;
 # "completed junior-level coursework" says nothing certain about standing.
 _DONE = r"\b(?:completed|finished|complete|finish)\s+(?:at\s+least\s+)?(?:(?:their|your|his\s+or\s+her|one's|the|a)\s+)?"
 _YEAR_COMPLETED = re.compile(
-    rf"{_DONE}({_YEAR_LIST})\s+year\b|{_DONE}(first[- ]year)\b(?![- ]level)", re.I
-)
+    rf"{_DONE}({_YEAR_LIST})\s+year\b|{_DONE}(first[- ]year)\b(?![- ]level)", re.I)
 # A role that serves students ("mentors who help first-year students") is not an eligibility limit.
 _SERVES = re.compile(
     r"\b(?:mentor(?:s|ing)?|tutor(?:s|ing)?|advis(?:e|es|ing|ors?)|coach(?:es|ing)?|teach(?:es|ing)?|"
     r"orient(?:s|ing)?|welcom(?:e|es|ing)|facilitat(?:e|es|ing)|counsel(?:s|ing)?|help(?:s|ing)?|"
     r"assist(?:s|ing)?|support(?:s|ing)?|serv(?:e|es|ing)|connect(?:s|ing)?\s+with|work(?:s|ing)?\s+with|"
-    r"dedicated\s+to)\b[^.;!?\n]{0,40}$",
-    re.I,
-)
+    r"dedicated\s+to)\b[^.;!?\n]{0,40}$", re.I)
 
 
 def _years_in(clause: str) -> set[str]:
@@ -233,7 +204,7 @@ def class_standing(text: str) -> list[str]:
     covered: list[tuple[int, int]] = []
     for m in _YEAR_COMPLETED.finditer(text):
         lowest = min(_RANKS.index(y) for y in _years_in(m.group(1) or m.group(2)))
-        standing.update(_RANKS[lowest + 1 :])
+        standing.update(_RANKS[lowest + 1:])
         covered.append(m.span())
     for m in _YEAR_AT_LEAST.finditer(text):
         if any(a < m.end() and m.start() < b for a, b in covered):
@@ -241,7 +212,7 @@ def class_standing(text: str) -> list[str]:
         covered.append(m.span())
         # "a preference for a standing of a sophomore or higher" is a wish, not a limit: no year is
         # read from it, so a freshman still sees the role.
-        if re.search(r"prefer", text[max(0, m.start() - 50) : m.start()], re.I):
+        if re.search(r"prefer", text[max(0, m.start() - 50):m.start()], re.I):
             continue
         lowest = min(_RANKS.index(y) for y in _years_in(m.group(1) or m.group(2)))
         standing.update(_RANKS[lowest:])
@@ -249,7 +220,7 @@ def class_standing(text: str) -> list[str]:
         for m in rx.finditer(text):
             if any(a < m.end() and m.start() < b for a, b in covered):
                 continue
-            if rx is _YEAR_CLAUSE and _SERVES.search(text[max(0, m.start() - 80) : m.start()]):
+            if rx is _YEAR_CLAUSE and _SERVES.search(text[max(0, m.start() - 80):m.start()]):
                 continue
             if rx is _YEAR_STATUS and _STAFF_AFTER.match(text, m.end()):
                 continue
@@ -268,7 +239,7 @@ def extract(text: str | None, today: date | None = None) -> dict:
 
     years: set[int] = set()
     for m in re.finditer(r"graduat|class of", text, re.I):
-        window = re.split(r"[.;\n]", text[m.start() : m.start() + 110])[0]
+        window = re.split(r"[.;\n]", text[m.start():m.start() + 110])[0]
         years.update(int(y) for y in re.findall(r"\b(20[2-3]\d)\b", window))
     if years:
         out["grad_years"] = sorted(years)
@@ -277,98 +248,44 @@ def extract(text: str | None, today: date | None = None) -> dict:
     if standing:
         out["class_standing"] = standing
 
-    for m in re.finditer(
-        r"u\.?\s?s\.?\s+citizen(?:ship)?|united states citizen(?:ship)?|citizens? of the united states|\bus persons?\b|u\.s\. persons?|\bitar\b|export control",
-        text,
-        re.I,
-    ):
+    for m in re.finditer(r"u\.?\s?s\.?\s+citizen(?:ship)?|united states citizen(?:ship)?|citizens? of the united states|\bus persons?\b|u\.s\. persons?|\bitar\b|export control", text, re.I):
         if _near_eeo(text, m.start()):
             continue
-        tail = text[m.end() : m.end() + 60]
-        out["citizenship"] = (
-            "citizen_or_pr"
-            if re.search(r"permanent resident|green card|lawful", tail, re.I)
-            and out.get("citizenship") != "citizen"
-            else "citizen"
-        )
+        tail = text[m.end():m.end() + 60]
+        out["citizenship"] = "citizen_or_pr" if re.search(r"permanent resident|green card|lawful", tail, re.I) and out.get("citizenship") != "citizen" else "citizen"
         if out["citizenship"] == "citizen":
             break
 
-    if re.search(
-        r"(?:security|secret|top secret|dod|government)\s+clearance|clearance\s+(?:is\s+)?required|(?:obtain|maintain|hold)\s+(?:and\s+maintain\s+)?(?:an?\s+)?(?:active\s+)?(?:security\s+)?clearance|ts/sci|polygraph",
-        text,
-        re.I,
-    ):
+    if re.search(r"(?:security|secret|top secret|dod|government)\s+clearance|clearance\s+(?:is\s+)?required|(?:obtain|maintain|hold)\s+(?:and\s+maintain\s+)?(?:an?\s+)?(?:active\s+)?(?:security\s+)?clearance|ts/sci|polygraph", text, re.I):
         out["clearance"] = True
 
-    has_undergrad = re.search(
-        r"bachelor|undergrad|b\.s\.|\bbs\b|\bba\b|b\.a\.|sophomore|junior|senior", text, re.I
-    )
+    has_undergrad = re.search(r"bachelor|undergrad|b\.s\.|\bbs\b|\bba\b|b\.a\.|sophomore|junior|senior", text, re.I)
     if not has_undergrad:
-        if re.search(
-            r"ph\.?\s?d\.?\s+(?:students?|candidates?|program)|(?:pursuing|enrolled in|currently in)[^.\n]{0,40}ph\.?\s?d",
-            text,
-            re.I,
-        ):
+        if re.search(r"ph\.?\s?d\.?\s+(?:students?|candidates?|program)|(?:pursuing|enrolled in|currently in)[^.\n]{0,40}ph\.?\s?d", text, re.I):
             out["degree_only"] = "phd"
-        elif re.search(
-            r"master'?s\s+(?:students?|candidates?|program)|(?:pursuing|enrolled in|currently in)[^.\n]{0,40}master'?s",
-            text,
-            re.I,
-        ):
+        elif re.search(r"master'?s\s+(?:students?|candidates?|program)|(?:pursuing|enrolled in|currently in)[^.\n]{0,40}master'?s", text, re.I):
             out["degree_only"] = "masters"
 
     # drop the scale ("on a 4.0 scale", "out of 4.0", "/4.0") so it isn't read as the minimum
-    text_g = re.sub(
-        r"(?:on|out of|of)\s+an?\s+\d\.\d{1,2}\s*(?:point\s+)?scale|out of\s+\d\.\d{1,2}|/\s*4\.0{1,2}\b|\d\.\d{1,2}\s+scale",
-        " ",
-        text,
-        flags=re.I,
-    )
-    gpas = [
-        float(g)
-        for g in re.findall(r"(?:gpa|grade point average)[^.\n\d]{0,30}(\d\.\d{1,2})", text_g, re.I)
-    ]
-    gpas += [
-        float(g)
-        for g in re.findall(
-            r"(\d\.\d{1,2})\s*(?:/\s*4\.0\s*)?(?:\+|or (?:higher|above|better))?\s*(?:cumulative\s+|minimum\s+)?(?:gpa|grade point)",
-            text_g,
-            re.I,
-        )
-    ]
+    text_g = re.sub(r"(?:on|out of|of)\s+an?\s+\d\.\d{1,2}\s*(?:point\s+)?scale|out of\s+\d\.\d{1,2}|/\s*4\.0{1,2}\b|\d\.\d{1,2}\s+scale", " ", text, flags=re.I)
+    gpas = [float(g) for g in re.findall(r"(?:gpa|grade point average)[^.\n\d]{0,30}(\d\.\d{1,2})", text_g, re.I)]
+    gpas += [float(g) for g in re.findall(r"(\d\.\d{1,2})\s*(?:/\s*4\.0\s*)?(?:\+|or (?:higher|above|better))?\s*(?:cumulative\s+|minimum\s+)?(?:gpa|grade point)", text_g, re.I)]
     gpas = [g for g in gpas if 2.0 <= g <= 4.0]
     if gpas:
         out["gpa_min"] = max(gpas)
 
-    if re.search(
-        r"(?:not|unable to|cannot|won't|will not|does not|do not)\s+(?:be able to\s+)?(?:provide|offer|support|sponsor)[^.\n]{0,40}sponsor|(?:not|unable to|cannot|will not|does not|do not)\s+sponsor|without\s+(?:the\s+need\s+for\s+)?(?:current\s+or\s+future\s+)?(?:employment\s+)?(?:visa\s+)?sponsorship|sponsorship\s+(?:is\s+|will\s+)?not\s+(?:be\s+)?(?:available|provided|offered)",
-        text,
-        re.I,
-    ):
+    if re.search(r"(?:not|unable to|cannot|won't|will not|does not|do not)\s+(?:be able to\s+)?(?:provide|offer|support|sponsor)[^.\n]{0,40}sponsor|(?:not|unable to|cannot|will not|does not|do not)\s+sponsor|without\s+(?:the\s+need\s+for\s+)?(?:current\s+or\s+future\s+)?(?:employment\s+)?(?:visa\s+)?sponsorship|sponsorship\s+(?:is\s+|will\s+)?not\s+(?:be\s+)?(?:available|provided|offered)", text, re.I):
         out["no_sponsorship"] = True
 
-    if re.search(
-        r"\bunpaid\b|volunteer (?:position|role|internship)|(?:is|are) not paid|no (?:compensation|pay)\b|for academic credit only",
-        text,
-        re.I,
-    ):
+    if re.search(r"\bunpaid\b|volunteer (?:position|role|internship)|(?:is|are) not paid|no (?:compensation|pay)\b|for academic credit only", text, re.I):
         out["pay"] = "unpaid"
     elif re.search(r"\bstipends?\b", text, re.I):
         out["pay"] = "stipend"
-    elif re.search(
-        r"\bpaid (?:internship|position|opportunity|role|co-?op)|\$\s?\d|hourly (?:rate|wage|pay)|pay range|salary range|compensation range",
-        text,
-        re.I,
-    ):
+    elif re.search(r"\bpaid (?:internship|position|opportunity|role|co-?op)|\$\s?\d|hourly (?:rate|wage|pay)|pay range|salary range|compensation range", text, re.I):
         out["pay"] = "paid"
 
-    m = re.search(
-        r"(?:deadline|apply by|apply before|applications?\s+(?:are\s+|is\s+|will\s+be\s+)?(?:due|close[sd]?|accepted\s+(?:until|through))|submit[^.\n]{0,25}\bby)[^.\n\d]{0,25}"
-        r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d\d)?|\d{1,2}/\d{1,2}/(?:20)?\d\d)",
-        text,
-        re.I,
-    )
+    m = re.search(r"(?:deadline|apply by|apply before|applications?\s+(?:are\s+|is\s+|will\s+be\s+)?(?:due|close[sd]?|accepted\s+(?:until|through))|submit[^.\n]{0,25}\bby)[^.\n\d]{0,25}"
+                  r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d\d)?|\d{1,2}/\d{1,2}/(?:20)?\d\d)", text, re.I)
     if m:
         d = _parse_date(m.group(1), today)
         if d:

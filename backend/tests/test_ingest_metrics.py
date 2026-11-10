@@ -46,11 +46,7 @@ def test_board_retries_replace_failure_and_empty_success_is_explicit(tmp_path):
     m.write(path)
     report = json.loads(path.read_text())
     assert report["boards"]["workday"] == {
-        "success": 2,
-        "returned": 3,
-        "empty_success": 1,
-        "failed": 1,
-        "blocked": 1,
+        "success": 2, "returned": 3, "empty_success": 1, "failed": 1, "blocked": 1,
     }
     assert len(report["board_failures"]) == 2
     assert {r["cause"] for r in report["board_failures"]} == {"ReadTimeout", "RobotsDisallowed"}

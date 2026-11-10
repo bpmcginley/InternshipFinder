@@ -1,5 +1,4 @@
 """The outreach kit must use real, fresh coverage and never invent a destination."""
-
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -13,30 +12,17 @@ NOW = datetime(2026, 9, 27, 16, tzinfo=timezone.utc)
 
 
 def row(i, company, tags=("swe",), state="MA"):
-    return {
-        "id": str(i),
-        "title": f"Intern {i}",
-        "company_name": company,
-        "field_tags": list(tags),
-        "keys": {state},
-        "regions": [{"state": state, "loc": f"Boston, {state}"}],
-        "first_seen": (NOW - timedelta(days=1)).isoformat(),
-        "posted_at": None,
-        "apply_url": f"https://jobs.example/{i}",
-    }
+    return {"id": str(i), "title": f"Intern {i}", "company_name": company, "field_tags": list(tags),
+            "keys": {state}, "regions": [{"state": state, "loc": f"Boston, {state}"}],
+            "first_seen": (NOW - timedelta(days=1)).isoformat(), "posted_at": None,
+            "apply_url": f"https://jobs.example/{i}"}
 
 
 def test_build_selects_covered_major_and_tracked_links(monkeypatch):
     listings = [row(i, f"Employer {i}") for i in range(4)]
-    data = {
-        "generated_at": NOW.isoformat(),
-        "listings": listings,
-        "baseline": "2026-09-18",
-        "majors": [
-            {"name": "Computer Science", "tags": ["swe"], "level": "undergrad"},
-            {"name": "Music", "tags": ["music"], "level": "undergrad"},
-        ],
-    }
+    data = {"generated_at": NOW.isoformat(), "listings": listings, "baseline": "2026-09-18",
+            "majors": [{"name": "Computer Science", "tags": ["swe"], "level": "undergrad"},
+                       {"name": "Music", "tags": ["music"], "level": "undergrad"}]}
     monkeypatch.setattr(outreach.audience, "PRIMARY", 3)
     kit = outreach.build(data, NOW)
     assert [x["major"] for x in kit["majors"]] == ["Computer Science"]

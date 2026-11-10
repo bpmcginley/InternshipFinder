@@ -4,7 +4,6 @@ Dry run: python -m internscout.reconcile_requisitions ../docs/data
 Write: add --write --expected-generated-at <stats.json generated_at>.
 No source requests, new facts, timestamp refreshes or closed-record changes.
 """
-
 from __future__ import annotations
 import argparse
 from collections import Counter, defaultdict
@@ -45,9 +44,7 @@ def reconcile(data: Path, *, write=False, expected_generated_at=None) -> dict:
             if identity in rows and rows[identity] != row:
                 raise ValueError("Conflicting shard variants for one listing ID")
             rows[identity] = row
-    if len(rows) != stats.get("total") or sum(
-        x.get("status") == "open" for x in rows.values()
-    ) != stats.get("open"):
+    if len(rows) != stats.get("total") or sum(x.get("status") == "open" for x in rows.values()) != stats.get("open"):
         raise ValueError("The export totals do not match its unique ID corpus")
     opened = [row for row in rows.values() if row.get("status") == "open"]
     icims = recognized_icims_hosts(opened)
@@ -63,16 +60,9 @@ def reconcile(data: Path, *, write=False, expected_generated_at=None) -> dict:
         # was: no offline reconciliation. Revert: restore removed rows from this PR's parent.
         authority = (row.get("score_parts") or {}).get("source") or 0
         scanned = bool(set(row.get("scan_sources") or []) & set(BOARD_FETCHERS))
-        return (
-            authority,
-            scanned,
-            not row.get("carried"),
-            row.get("last_seen") or "",
-            row.get("posted_at") or "",
-            len(descriptions.get(row["id"], "")),
-            (row.get("company_name") or "").casefold(),
-            row["id"],
-        )
+        return (authority, scanned, not row.get("carried"), row.get("last_seen") or "",
+                row.get("posted_at") or "", len(descriptions.get(row["id"], "")),
+                (row.get("company_name") or "").casefold(), row["id"])
 
     removed, changes = set(), []
     for key, group in sorted(groups.items()):
@@ -81,25 +71,13 @@ def reconcile(data: Path, *, write=False, expected_generated_at=None) -> dict:
         winner = max(group, key=preference)
         losers = [row for row in group if row["id"] != winner["id"]]
         removed.update(row["id"] for row in losers)
-        changes.append(
-            {
-                "identity": list(key),
-                "retained": winner["id"],
-                "removed": sorted(row["id"] for row in losers),
-            }
-        )
+        changes.append({"identity": list(key), "retained": winner["id"],
+                        "removed": sorted(row["id"] for row in losers)})
     kept = [row for identity, row in rows.items() if identity not in removed]
-    report = {
-        "generated_at": stats["generated_at"],
-        "before_total": len(rows),
-        "before_open": len(opened),
-        "after_total": len(kept),
-        "after_open": len(opened) - len(removed),
-        "closed_unchanged": sum(row.get("status") == "closed" for row in kept),
-        "duplicate_groups_removed": len(changes),
-        "removed_ids": sorted(removed),
-        "changes": changes,
-    }
+    report = {"generated_at": stats["generated_at"], "before_total": len(rows), "before_open": len(opened),
+              "after_total": len(kept), "after_open": len(opened) - len(removed),
+              "closed_unchanged": sum(row.get("status") == "closed" for row in kept),
+              "duplicate_groups_removed": len(changes), "removed_ids": sorted(removed), "changes": changes}
     if not write or not removed:
         return report
 
@@ -110,57 +88,21 @@ def reconcile(data: Path, *, write=False, expected_generated_at=None) -> dict:
         key = path.stem
         live = [row for row in filtered if row.get("status") == "open"]
         entry = index["files"][key]
-        entry.update(
-            count=len(filtered),
-            open=len(live),
-            by_field=dict(
-                Counter(tag for row in live for tag in row.get("field_tags", [])).most_common()
-            ),
-            by_stage=dict(
-                Counter(tag for row in live for tag in row.get("stage", [])).most_common()
-            ),
-            by_sector=dict(
-                Counter(row["sector"] for row in live if row.get("sector")).most_common()
-            ),
-        )
+        entry.update(count=len(filtered), open=len(live),
+            by_field=dict(Counter(tag for row in live for tag in row.get("field_tags", [])).most_common()),
+            by_stage=dict(Counter(tag for row in live for tag in row.get("stage", [])).most_common()),
+            by_sector=dict(Counter(row["sector"] for row in live if row.get("sector")).most_common()))
     for path, content in sidecars.items():
-        filtered = {
-            identity: value for identity, value in content.items() if identity not in removed
-        }
+        filtered = {identity: value for identity, value in content.items() if identity not in removed}
         if len(filtered) != len(content):
             _dump(filtered, str(path))
-    stats.update(
-        total=len(kept),
-        open=report["after_open"],
-        new=sum(bool(row.get("is_new")) for row in kept),
+    stats.update(total=len(kept), open=report["after_open"], new=sum(bool(row.get("is_new")) for row in kept),
         held=sum(bool(row.get("carried")) for row in kept),
-        by_state=dict(
-            Counter(
-                key for row in kept if row.get("status") == "open" for key in shard_keys(row)
-            ).most_common()
-        ),
-        by_ats=dict(
-            Counter(row.get("ats") for row in kept if row.get("status") == "open").most_common()
-        ),
-        by_field=dict(
-            Counter(
-                tag
-                for row in kept
-                if row.get("status") == "open"
-                for tag in row.get("field_tags", [])
-            ).most_common()
-        ),
-        by_stage=dict(
-            Counter(
-                tag for row in kept if row.get("status") == "open" for tag in row.get("stage", [])
-            ).most_common()
-        ),
-        by_sector=dict(
-            Counter(
-                row["sector"] for row in kept if row.get("status") == "open" and row.get("sector")
-            ).most_common()
-        ),
-    )
+        by_state=dict(Counter(key for row in kept if row.get("status") == "open" for key in shard_keys(row)).most_common()),
+        by_ats=dict(Counter(row.get("ats") for row in kept if row.get("status") == "open").most_common()),
+        by_field=dict(Counter(tag for row in kept if row.get("status") == "open" for tag in row.get("field_tags", [])).most_common()),
+        by_stage=dict(Counter(tag for row in kept if row.get("status") == "open" for tag in row.get("stage", [])).most_common()),
+        by_sector=dict(Counter(row["sector"] for row in kept if row.get("status") == "open" and row.get("sector")).most_common()))
     # Retained records are unchanged; first-screen membership and aggregate counts follow them.
     index["first"] = write_first_screen(kept, str(data))
     _dump(index, str(index_path), indent=1)
@@ -175,17 +117,11 @@ def main():
     parser.add_argument("--expected-generated-at")
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
-    report = reconcile(
-        args.data, write=args.write, expected_generated_at=args.expected_generated_at
-    )
+    report = reconcile(args.data, write=args.write, expected_generated_at=args.expected_generated_at)
     rendered = json.dumps(report, indent=2) + "\n"
     if args.report:
         args.report.write_text(rendered, encoding="utf-8")
-    print(
-        json.dumps(
-            {k: v for k, v in report.items() if k not in {"changes", "removed_ids"}}, indent=2
-        )
-    )
+    print(json.dumps({k: v for k, v in report.items() if k not in {"changes", "removed_ids"}}, indent=2))
 
 
 if __name__ == "__main__":

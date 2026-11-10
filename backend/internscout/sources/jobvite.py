@@ -1,7 +1,6 @@
 """Jobvite hosted career pages (public agencies, mid-size employers). Token: the company slug in
 jobs.jobvite.com/<slug>/jobs. The list page is HTML with every opening; in-region internships get
 one job-page fetch for the description (capped)."""
-
 from __future__ import annotations
 import html
 import re
@@ -11,20 +10,15 @@ from ..region import maybe_in_region
 
 BASE = "https://jobs.jobvite.com"
 MAX_DETAIL = 25
-_ROW = re.compile(
-    r'<td class="jv-job-list-name">\s*<a href="([^"]+)">([^<]+)</a>\s*</td>\s*'
-    r'<td class="jv-job-list-location">(.*?)</td>',
-    re.S,
-)
-_DESC = re.compile(
-    r'<div class="jv-job-detail-description"[^>]*>(.*?)<div class="jv-job-detail-bottom', re.S
-)
+_ROW = re.compile(r'<td class="jv-job-list-name">\s*<a href="([^"]+)">([^<]+)</a>\s*</td>\s*'
+                  r'<td class="jv-job-list-location">(.*?)</td>', re.S)
+_DESC = re.compile(r'<div class="jv-job-detail-description"[^>]*>(.*?)<div class="jv-job-detail-bottom', re.S)
 
 
 def parse_jobvite(page: str, co: dict) -> list[dict]:
     out, counts = [], counts_of(co)
     rows = _ROW.findall(page)
-    counts.rows(len(rows))  # the job rows on the one list page; there is no total to compare
+    counts.rows(len(rows))   # the job rows on the one list page; there is no total to compare
     for href, title, loc in rows:
         title = html.unescape(title).strip()
         if not is_internship(title):
@@ -33,16 +27,8 @@ def parse_jobvite(page: str, co: dict) -> list[dict]:
         loc = re.sub(r"\s+", " ", html_to_text(loc)).strip()
         loc = re.sub(r"\s+,", ",", loc)
         url = BASE + href if href.startswith("/") else href
-        out.append(
-            board_item(
-                co,
-                source="jobvite",
-                title=title,
-                locations=[loc],
-                url=url,
-                apply_url=url.rstrip("/") + "/apply",
-            )
-        )
+        out.append(board_item(co, source="jobvite", title=title, locations=[loc], url=url,
+                              apply_url=url.rstrip("/") + "/apply"))
     return out
 
 

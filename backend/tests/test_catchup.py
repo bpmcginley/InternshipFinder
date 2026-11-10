@@ -1,36 +1,27 @@
 """growth/catchup.py: start the jobs GitHub's scheduler is late with, and let only one of each run."""
-
 import importlib.util
 import os
 import sys
 from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-_spec = importlib.util.spec_from_file_location(
-    "catchup", os.path.join(ROOT, "growth", "catchup.py")
-)
+_spec = importlib.util.spec_from_file_location("catchup", os.path.join(ROOT, "growth", "catchup.py"))
 cu = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cu)
 
-TUE = datetime(2026, 9, 29, 16, 4, tzinfo=timezone.utc)  # a Tuesday, just after the post hour
+TUE = datetime(2026, 9, 29, 16, 4, tzinfo=timezone.utc)      # a Tuesday, just after the post hour
 
 
 def _run(i, created, status="completed", conclusion="success"):
-    return {
-        "id": i,
-        "created_at": created.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "status": status,
-        "conclusion": conclusion,
-    }
+    return {"id": i, "created_at": created.strftime("%Y-%m-%dT%H:%M:%SZ"), "status": status,
+            "conclusion": conclusion}
 
 
 def _jobs(ran: set):
     """jobs_of for tests: the working job ran in the runs whose ids are in `ran`, else was skipped."""
-    return lambda r: [
-        {"name": "guard", "conclusion": "success"},
-        {"name": "ingest", "conclusion": "success" if r["id"] in ran else "skipped"},
-        {"name": "post", "conclusion": "failure" if r["id"] in ran else "skipped"},
-    ]
+    return lambda r: [{"name": "guard", "conclusion": "success"},
+                      {"name": "ingest", "conclusion": "success" if r["id"] in ran else "skipped"},
+                      {"name": "post", "conclusion": "failure" if r["id"] in ran else "skipped"}]
 
 
 def test_an_ingest_is_overdue_once_the_last_one_that_ran_is_over_six_hours_old():
@@ -42,10 +33,8 @@ def test_an_ingest_is_overdue_once_the_last_one_that_ran_is_over_six_hours_old()
 
 
 def test_nothing_is_started_while_a_run_is_queued_or_running():
-    rs = [
-        _run(3, TUE - timedelta(minutes=2), status="queued", conclusion=None),
-        _run(1, TUE - timedelta(days=1)),
-    ]
+    rs = [_run(3, TUE - timedelta(minutes=2), status="queued", conclusion=None),
+          _run(1, TUE - timedelta(days=1))]
     assert not cu.overdue(rs, "ingest", timedelta(hours=6), TUE, _jobs({1}))
 
 
@@ -55,9 +44,9 @@ def test_a_job_that_never_ran_is_overdue():
 
 def test_the_post_is_started_once_on_a_post_day_after_the_hour():
     assert cu.post_due([], TUE)
-    assert not cu.post_due([], TUE.replace(hour=14))  # before the hour
-    assert not cu.post_due([], TUE + timedelta(days=1))  # Wednesday
-    assert cu.post_due([], TUE + timedelta(days=2))  # Thursday
+    assert not cu.post_due([], TUE.replace(hour=14))                       # before the hour
+    assert not cu.post_due([], TUE + timedelta(days=1))                    # Wednesday
+    assert cu.post_due([], TUE + timedelta(days=2))                        # Thursday
     # Any run since the hour - the schedule on time, or an earlier catch-up - means no second start.
     assert not cu.post_due([_run(9, TUE.replace(hour=15, minute=1), conclusion="failure")], TUE)
     assert cu.post_due([_run(8, TUE - timedelta(days=5))], TUE)
@@ -65,42 +54,30 @@ def test_the_post_is_started_once_on_a_post_day_after_the_hour():
 
 def test_a_late_scheduled_post_skips_when_another_run_posted_today():
     late = TUE.replace(hour=19, minute=45)
-    rs = [
-        _run(20, late, status="in_progress", conclusion=None),
-        _run(19, TUE.replace(hour=15, minute=5), conclusion="failure"),
-    ]
+    rs = [_run(20, late, status="in_progress", conclusion=None), _run(19, TUE.replace(hour=15, minute=5), conclusion="failure")]
     # Run 19 reached the post job and failed on Instagram after Bluesky posted: once is enough.
     assert cu.post_done_today(rs, late, this_id=20, jobs_of=_jobs({19}))
     # A run whose post job was skipped (kill switch, or a guard) posted nothing.
     assert not cu.post_done_today(rs, late, this_id=20, jobs_of=_jobs(set()))
     # Yesterday's post does not stop today's.
-    assert not cu.post_done_today(
-        [_run(5, TUE - timedelta(days=1))], TUE, this_id=20, jobs_of=_jobs({5})
-    )
+    assert not cu.post_done_today([_run(5, TUE - timedelta(days=1))], TUE, this_id=20, jobs_of=_jobs({5}))
 
 
 def test_a_late_scheduled_ingest_skips_inside_four_hours_of_one_that_ran():
     now = TUE
     rs = [_run(31, now, status="in_progress", conclusion=None), _run(30, now - timedelta(hours=2))]
     assert cu.recent_ingest(rs, now, this_id=31, jobs_of=_jobs({30}))
-    assert not cu.recent_ingest(rs, now, this_id=31, jobs_of=_jobs(set()))  # 30 was skipped
+    assert not cu.recent_ingest(rs, now, this_id=31, jobs_of=_jobs(set()))          # 30 was skipped
     old = [_run(31, now, status="in_progress", conclusion=None), _run(30, now - timedelta(hours=5))]
     assert not cu.recent_ingest(old, now, this_id=31, jobs_of=_jobs({30}))
-    failed = [
-        _run(31, now, status="in_progress", conclusion=None),
-        _run(30, now - timedelta(hours=1), conclusion="failure"),
-    ]
-    assert not cu.recent_ingest(
-        failed, now, this_id=31, jobs_of=_jobs({30})
-    )  # a failed one is redone
+    failed = [_run(31, now, status="in_progress", conclusion=None), _run(30, now - timedelta(hours=1), conclusion="failure")]
+    assert not cu.recent_ingest(failed, now, this_id=31, jobs_of=_jobs({30}))       # a failed one is redone
 
 
 def test_a_person_clicking_run_workflow_is_never_skipped(monkeypatch):
     monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("CATCHUP_FORCE", "true")
-    monkeypatch.setattr(
-        cu, "runs", lambda f: (_ for _ in ()).throw(AssertionError("no API call needed"))
-    )
+    monkeypatch.setattr(cu, "runs", lambda f: (_ for _ in ()).throw(AssertionError("no API call needed")))
     assert cu.guard("social.yml", TUE) is False and cu.guard("ingest.yml", TUE) is False
 
 
@@ -122,9 +99,7 @@ def test_the_guard_writes_its_answer_for_the_next_job(monkeypatch, tmp_path):
 
 def test_one_failed_check_does_not_stop_the_others(monkeypatch, capsys):
     started = []
-    monkeypatch.setattr(
-        cu, "runs", lambda f: (_ for _ in ()).throw(OSError("boom")) if f == "ingest.yml" else []
-    )
+    monkeypatch.setattr(cu, "runs", lambda f: (_ for _ in ()).throw(OSError("boom")) if f == "ingest.yml" else [])
     monkeypatch.setattr(cu, "dispatch", started.append)
     monkeypatch.setattr(cu, "post_due", lambda rs, now: False)
     monkeypatch.setattr(cu, "digest_due", lambda rs, now: False)
@@ -136,28 +111,22 @@ def test_one_failed_check_does_not_stop_the_others(monkeypatch, capsys):
 def test_a_catch_up_asks_for_the_guard_explicitly(monkeypatch):
     # GitHub fills a missing input with its default, and the ingest's force defaults to true.
     sent = []
-    monkeypatch.setattr(
-        cu, "_call", lambda method, path, body=None: sent.append((path, body)) or {}
-    )
+    monkeypatch.setattr(cu, "_call", lambda method, path, body=None: sent.append((path, body)) or {})
     cu.dispatch("ingest.yml")
     cu.dispatch("metrics.yml")
-    assert sent == [
-        ("workflows/ingest.yml/dispatches", {"ref": "main", "inputs": {"force": "false"}}),
-        ("workflows/metrics.yml/dispatches", {"ref": "main"}),
-    ]
+    assert sent == [("workflows/ingest.yml/dispatches", {"ref": "main", "inputs": {"force": "false"}}),
+                    ("workflows/metrics.yml/dispatches", {"ref": "main"})]
 
 
-MON = datetime(
-    2026, 10, 19, 17, 30, tzinfo=timezone.utc
-)  # the Monday GitHub dropped the first send
+MON = datetime(2026, 10, 19, 17, 30, tzinfo=timezone.utc)    # the Monday GitHub dropped the first send
 
 
 def test_the_weekly_email_is_started_once_after_eight_eastern_and_before_ten_pm_utc():
     assert cu.digest_due([], MON)
     assert cu.digest_due([], MON.replace(hour=12, minute=4))
-    assert not cu.digest_due([], MON.replace(hour=11, minute=59))  # before the hour
-    assert not cu.digest_due([], MON.replace(hour=22))  # too late at night
-    assert not cu.digest_due([], MON + timedelta(days=1))  # Tuesday
+    assert not cu.digest_due([], MON.replace(hour=11, minute=59))          # before the hour
+    assert not cu.digest_due([], MON.replace(hour=22))                     # too late at night
+    assert not cu.digest_due([], MON + timedelta(days=1))                  # Tuesday
     # Any run since 11:55 that day, however it ended, means no catch-up (a failure isn't retried).
     assert not cu.digest_due([_run(9, MON.replace(hour=12, minute=1), conclusion="failure")], MON)
     assert not cu.digest_due([_run(9, MON.replace(hour=11, minute=56))], MON)
@@ -165,13 +134,13 @@ def test_the_weekly_email_is_started_once_after_eight_eastern_and_before_ten_pm_
     assert cu.digest_due([_run(8, MON - timedelta(days=7))], MON)
 
     winter = datetime(2026, 11, 2, 13, 4, tzinfo=timezone.utc)
-    assert not cu.digest_due([], winter.replace(hour=12, minute=59))  # 7:59am EST
-    assert cu.digest_due([], winter)  # 8:04am EST
+    assert not cu.digest_due([], winter.replace(hour=12, minute=59))     # 7:59am EST
+    assert cu.digest_due([], winter)                                    # 8:04am EST
     assert not cu.digest_due([_run(10, winter.replace(minute=1))], winter)
 
 
 def test_a_summer_spare_cron_does_not_hide_a_missing_active_send():
-    now = datetime(2026, 10, 26, 13, 34, tzinfo=timezone.utc)  # 9:34am EDT
+    now = datetime(2026, 10, 26, 13, 34, tzinfo=timezone.utc)   # 9:34am EDT
     spare = {**_run(40, now.replace(minute=4)), "event": "schedule"}
     skipped = lambda run: [{"steps": [{"name": "Write the digest", "conclusion": "skipped"}]}]
     assert cu.digest_due([spare], now, skipped)
@@ -185,16 +154,10 @@ def test_a_summer_spare_cron_does_not_hide_a_missing_active_send():
 def test_the_email_catch_up_asks_for_everyone_explicitly(monkeypatch):
     # A dispatch sends only a test copy unless everyone is true; the schedule it stands in for sends to all.
     sent = []
-    monkeypatch.setattr(
-        cu, "_call", lambda method, path, body=None: sent.append((path, body)) or {}
-    )
+    monkeypatch.setattr(cu, "_call", lambda method, path, body=None: sent.append((path, body)) or {})
     cu.dispatch("digest.yml")
-    assert sent == [
-        (
-            "workflows/digest.yml/dispatches",
-            {"ref": "main", "inputs": {"everyone": "true", "check_key": "false"}},
-        )
-    ]
+    assert sent == [("workflows/digest.yml/dispatches",
+                     {"ref": "main", "inputs": {"everyone": "true", "check_key": "false"}})]
 
 
 def test_main_starts_the_email_when_due(monkeypatch, capsys):

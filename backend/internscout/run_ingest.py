@@ -7,7 +7,6 @@ Usage:
   python -m internscout.run_ingest --google     # Google Jobs (SerpApi) only
   python -m internscout.run_ingest --fixture path.json --source vanshb03
 """
-
 from __future__ import annotations
 import argparse
 import os
@@ -16,43 +15,14 @@ import httpx
 from collections import Counter
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .sources import (
-    fetch_github_lists,
-    fetch_google_jobs,
-    fetch_usajobs,
-    fetch_nyc_jobs,
-    fetch_uhn,
-    fetch_houseai,
-    BOARD_FETCHERS,
-)
+from .sources import fetch_github_lists, fetch_google_jobs, fetch_usajobs, fetch_nyc_jobs, fetch_uhn, fetch_houseai, BOARD_FETCHERS
 from .sources.base import client
 from .sources.common import RobotsDisallowed, ScanCounts, failure_cause
 from .sources.github_lists import parse_fixture
-from .config import (
-    GOOGLE_JOBS_QUERIES,
-    GOOGLE_JOBS_MAX_SEARCHES,
-    FETCH_WORKERS,
-    google_jobs_locations,
-)
-from .config import (
-    GOOGLE_JOBS_FOCUS_QUERIES,
-    GOOGLE_JOBS_FOCUS_SEARCHES,
-    GOOGLE_JOBS_FIXED,
-    canada_searches,
-)
-from .discover import (
-    load_registry,
-    save_registry,
-    seed_registry,
-    discover,
-    boards,
-    label_boards,
-    label_sectors,
-    record_result,
-    record_closed,
-    prune,
-    refused_count,
-)
+from .config import GOOGLE_JOBS_QUERIES, GOOGLE_JOBS_MAX_SEARCHES, FETCH_WORKERS, google_jobs_locations
+from .config import GOOGLE_JOBS_FOCUS_QUERIES, GOOGLE_JOBS_FOCUS_SEARCHES, GOOGLE_JOBS_FIXED, canada_searches
+from .discover import (load_registry, save_registry, seed_registry, discover, boards,
+                       label_boards, label_sectors, record_result, record_closed, prune, refused_count)
 from .probe import probe_boards
 from .geo import save_cache
 from .pipeline import run
@@ -64,9 +34,9 @@ from .ingest_metrics import IngestMetrics
 # 1,186 Workday boards and all 61 Workable ones; ten of those Workday boards sampled the same
 # morning from a laptop all answered 200. The failures were the run, not the boards, and at
 # MAX_FAILS they would have cost 223 working Workday boards their place in the registry.
-RETRY_PAUSE = 15  # seconds between the main pass and the retry
+RETRY_PAUSE = 15      # seconds between the main pass and the retry
 RETRY_WORKERS = 4
-RETRY_MAX = 400  # a retry pass is not allowed to double the length of the run
+RETRY_MAX = 400       # a retry pass is not allowed to double the length of the run
 # An ATS that fails on at least half its boards in one run has a problem of its own (a block on the
 # runner's address range, an API change), and the registry must not read that as its boards dying.
 SYSTEMIC_SHARE = 0.5
@@ -89,21 +59,12 @@ def _transient(e: Exception) -> bool:
         return s == 429 or s >= 500
     # ConnectError (DNS, refused, TLS) was missing, so a board that could not be reached for a
     # moment was never retried. NetworkError is the parent of ConnectError, ReadError and WriteError.
-    return isinstance(
-        e,
-        (
-            httpx.TimeoutException,
-            httpx.RemoteProtocolError,
-            httpx.ReadError,
-            httpx.ConnectError,
-            httpx.NetworkError,
-        ),
-    )
+    return isinstance(e, (httpx.TimeoutException, httpx.RemoteProtocolError, httpx.ReadError,
+                          httpx.ConnectError, httpx.NetworkError))
 
 
 class BoardItems(list):
     """List-compatible fetch result with explicit authoritative-scan evidence and page counts."""
-
     def __init__(self, items, *, complete=False, counts: ScanCounts | None = None):
         super().__init__(items)
         self.complete = complete
@@ -145,14 +106,8 @@ def _fetch_boards(c, jobs: list, workers: int) -> dict:
 
 
 # was: def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True) -> list[dict]:
-def scan_boards(
-    reg: dict,
-    workers: int = FETCH_WORKERS,
-    verbose: bool = True,
-    systemic_guard: bool = True,
-    completed_boards: set | None = None,
-    metrics=None,
-) -> list[dict]:
+def scan_boards(reg: dict, workers: int = FETCH_WORKERS, verbose: bool = True,
+                systemic_guard: bool = True, completed_boards: set | None = None, metrics=None) -> list[dict]:
     """Fetch every registered board in parallel; records success/failure in the registry.
 
     systemic_guard=False is for scripts/verify_registry.py's second look, which is handed only the
@@ -161,31 +116,18 @@ def scan_boards(
     counts unless it is a transient one (429, 5xx, a timeout), which says nothing about the board.
     """
     todo = [(ats, tok, e) for ats, tok, e in boards(reg) if ats in BOARD_FETCHERS]
-    jobs = [
-        (
-            ats,
-            tok,
-            {
-                "name": e["name"],
-                "ats_token": tok,
-                "is_quant_target": e.get("quant", False),
-                "sector": e.get("sector") or ("quant_finance" if e.get("quant") else None),
-                "location": e.get("location"),
-            },
-        )
-        for ats, tok, e in todo
-    ]
+    jobs = [(ats, tok, {"name": e["name"], "ats_token": tok, "is_quant_target": e.get("quant", False),
+                        "sector": e.get("sector") or ("quant_finance" if e.get("quant") else None),
+                        "location": e.get("location")})
+            for ats, tok, e in todo]
     out: list[dict] = []
     per_ats, failed, closed = Counter(), Counter(), Counter()
     causes: dict[str, Counter] = {}
     t0 = time.monotonic()
     with client() as c:
         res = _fetch_boards(c, jobs, workers)
-        transient = [
-            j
-            for j in jobs
-            if isinstance(res[j[0], j[1]], Exception) and _transient(res[j[0], j[1]])
-        ]
+        transient = [j for j in jobs
+                     if isinstance(res[j[0], j[1]], Exception) and _transient(res[j[0], j[1]])]
         again = transient[:RETRY_MAX]
         if again:
             time.sleep(RETRY_PAUSE)
@@ -197,11 +139,8 @@ def scan_boards(
         elif isinstance(r, Exception):
             failed[ats] += 1
             causes.setdefault(ats, Counter())[_cause(r)] += 1
-    systemic = {
-        a
-        for a, n in failed.items()
-        if size[a] >= SYSTEMIC_MIN_BOARDS and n >= SYSTEMIC_SHARE * size[a]
-    }
+    systemic = {a for a, n in failed.items()
+                if size[a] >= SYSTEMIC_MIN_BOARDS and n >= SYSTEMIC_SHARE * size[a]}
     if not systemic_guard:
         systemic = set()
     for (ats, tok), r in res.items():
@@ -221,14 +160,9 @@ def scan_boards(
         else:
             if metrics is not None:
                 counts = getattr(r, "counts", None)
-                metrics.board_result(
-                    ats,
-                    tok,
-                    "success",
-                    count=len(r),
-                    complete=getattr(r, "complete", False),
-                    scan=counts.as_dict() if counts is not None else None,
-                )
+                metrics.board_result(ats, tok, "success", count=len(r),
+                                     complete=getattr(r, "complete", False),
+                                     scan=counts.as_dict() if counts is not None else None)
             record_result(reg, ats, tok, True)
             if completed_boards is not None and getattr(r, "complete", False):
                 completed_boards.add((ats, tok))
@@ -236,20 +170,13 @@ def scan_boards(
             per_ats[ats] += len(r)
     if verbose:
         note = f"; closed by robots.txt {dict(closed)}" if closed else ""
-        print(
-            f"[boards] {len(todo)} boards in {time.monotonic() - t0:.0f}s "
-            f"({len(again)} of {len(transient)} transient failures retried); "
-            f"intern postings {dict(per_ats)}; failed boards {dict(failed)}{note}"
-        )
-        why = {
-            a: dict(k.most_common(4))
-            for a, k in sorted(causes.items(), key=lambda x: -failed[x[0]])
-        }
+        print(f"[boards] {len(todo)} boards in {time.monotonic() - t0:.0f}s "
+              f"({len(again)} of {len(transient)} transient failures retried); "
+              f"intern postings {dict(per_ats)}; failed boards {dict(failed)}{note}")
+        why = {a: dict(k.most_common(4)) for a, k in sorted(causes.items(), key=lambda x: -failed[x[0]])}
         print(f"[boards] failure causes {why}")
         if systemic:
-            print(
-                f"[boards] not aged this run, failing on half their boards or more: {sorted(systemic)}"
-            )
+            print(f"[boards] not aged this run, failing on half their boards or more: {sorted(systemic)}")
     return out
 
 
@@ -263,11 +190,7 @@ def main():
     ap.add_argument("--source", default="vanshb03")
     ap.add_argument("--export", metavar="DIR", help="also write static JSON for GitHub Pages")
     ap.add_argument("--workers", type=int, default=FETCH_WORKERS)
-    ap.add_argument(
-        "--metrics",
-        metavar="PATH",
-        help="write ingestion counts (defaults to export directory when exporting)",
-    )
+    ap.add_argument("--metrics", metavar="PATH", help="write ingestion counts (defaults to export directory when exporting)")
     args = ap.parse_args()
 
     metrics = IngestMetrics()
@@ -288,20 +211,14 @@ def main():
             # The fields UMass majors are worst served in, read from the export this run is about
             # to replace; GOOGLE_JOBS_FOCUS_QUERIES is only the fallback now.
             from .focus import choose as choose_focus
-
             focus_queries = choose_focus(args.export, GOOGLE_JOBS_FOCUS_QUERIES)
-            items = fetch_google_jobs(
-                GOOGLE_JOBS_QUERIES,
-                google_jobs_locations(),
-                max_searches=GOOGLE_JOBS_MAX_SEARCHES,
-                focus_queries=focus_queries,
-                focus_searches=GOOGLE_JOBS_FOCUS_SEARCHES,
-                # was: fixed=GOOGLE_JOBS_FIXED. Today's Canadian metro search
-                # (2026-10-01) runs every day beside it, from the same budget.
-                fixed=GOOGLE_JOBS_FIXED + canada_searches(date.today().toordinal()),
-                nationwide=True,
-                report=metrics.source_result,
-            )
+            items = fetch_google_jobs(GOOGLE_JOBS_QUERIES, google_jobs_locations(), max_searches=GOOGLE_JOBS_MAX_SEARCHES,
+                                      focus_queries=focus_queries,
+                                      focus_searches=GOOGLE_JOBS_FOCUS_SEARCHES,
+                                      # was: fixed=GOOGLE_JOBS_FIXED. Today's Canadian metro search
+                                      # (2026-10-01) runs every day beside it, from the same budget.
+                                      fixed=GOOGLE_JOBS_FIXED + canada_searches(date.today().toordinal()),
+                                      nationwide=True, report=metrics.source_result)
             found += discover(reg, items)
             raw += items
         if raw:
@@ -309,55 +226,39 @@ def main():
             found += probed
             print(f"[probe] +{probed} boards guessed from company names", flush=True)
         if args.ats or do_all:
-            raw += scan_boards(
-                reg, args.workers, completed_boards=completed_boards, metrics=metrics
-            )
+            raw += scan_boards(reg, args.workers, completed_boards=completed_boards, metrics=metrics)
         if args.public or do_all:  # government feeds: no ATS boards to discover from these
             # was: fetch_usajobs() + fetch_nyc_jobs(). UHN is one employer's own site, read the same way.
             # House AI is likewise one employer's own site (custom careers pages, no ATS).
-            raw += (
-                fetch_usajobs(report=metrics.source_result)
-                + fetch_nyc_jobs(report=metrics.source_result)
-                + fetch_uhn(report=metrics.source_result)
-                + fetch_houseai(report=metrics.source_result)
-            )
+            raw += (fetch_usajobs(report=metrics.source_result)
+                    + fetch_nyc_jobs(report=metrics.source_result)
+                    + fetch_uhn(report=metrics.source_result)
+                    + fetch_houseai(report=metrics.source_result))
         # Boards first, so the listings below can be labelled off them in the same run.
         named = label_boards(reg)
         # Last, so it sees every item from every source in this run.
         labelled = label_sectors(reg, raw)
         dropped = prune(reg)
         save_registry(reg)
-        print(
-            f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead or closed, "
-            f"{refused_count()} recently dropped boards left out, "
-            f"+{named} boards labelled by name, "
-            f"{labelled} listings labelled from their board; "
-            f"{ {a: len(b) for a, b in reg.items()} }"
-        )
+        print(f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead or closed, "
+              f"{refused_count()} recently dropped boards left out, "
+              f"+{named} boards labelled by name, "
+              f"{labelled} listings labelled from their board; "
+              f"{ {a: len(b) for a, b in reg.items()} }")
 
     run(raw, completed_boards=completed_boards, metrics=metrics)
     save_cache()
     if args.export:
         from .export_static import export
-
         # The same evidence pipeline.run closed by: CI's database is new every run, so without it
         # the export's carry rules could put a closed posting straight back on the site.
         # The list can confirm a posting whose detail/location enrichment failed.
         # Its missing normalized row must not be mistaken for an absent posting.
-        observed_urls = {
-            raw_item[key]
-            for raw_item in raw
-            if raw_item.get("active", True)
-            for key in ("apply_url", "url", "source_url")
-            if raw_item.get(key)
-        }
-        exported = export(
-            args.export, completed_boards=completed_boards, observed_urls=observed_urls
-        )
+        observed_urls = {raw_item[key] for raw_item in raw if raw_item.get("active", True)
+                         for key in ("apply_url", "url", "source_url") if raw_item.get(key)}
+        exported = export(args.export, completed_boards=completed_boards, observed_urls=observed_urls)
         metrics.export_result(exported["total"], open_count=exported["open"], held=exported["held"])
-    metrics_path = args.metrics or (
-        os.path.join(args.export, "ingest-report.json") if args.export else None
-    )
+    metrics_path = args.metrics or (os.path.join(args.export, "ingest-report.json") if args.export else None)
     if metrics_path:
         metrics.write(metrics_path)
 

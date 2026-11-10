@@ -4,7 +4,6 @@ GitHub Actions schedules are UTC and cannot name a timezone. digest.yml therefor
 12:00 and 13:00 UTC Monday slots; exactly one is active as Eastern daylight/standard time changes.
 The script writes a GitHub step output and uses only the standard library.
 """
-
 from __future__ import annotations
 
 import sys

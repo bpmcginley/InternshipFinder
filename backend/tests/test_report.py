@@ -1,7 +1,6 @@
 """growth/report.py: what the analytics say goes into a PUBLIC GitHub issue, so a visitor-supplied
 page path or referrer must never become a link, an @mention or a broken table. Cloudflare is replaced
 in every test, so nothing here touches the network."""
-
 import importlib.util
 import os
 import re
@@ -27,7 +26,7 @@ HOSTILE = [
     "<img src=x onerror=alert(1)>",
     "https://evil.example/phish",
     "#1 and GH-2",
-    "‮evil‬.example",  # a right-to-left override
+    "‮evil‬.example",           # a right-to-left override
     "```\nfenced\n```",
     "\\`escaped\\`",
     "",
@@ -56,30 +55,13 @@ def test_inert_is_one_plain_code_span(value):
 
 def _analytics(pages, refs):
     week = [{"count": 1, "sum": {"visits": 100}}]
-    return {
-        "data": {
-            "viewer": {
-                "accounts": [
-                    {
-                        "week": week,
-                        "prev": week,
-                        "pages": [
-                            {"sum": {"visits": v}, "dimensions": {"requestPath": p}}
-                            for p, v in pages
-                        ],
-                        "refs": [
-                            {"sum": {"visits": v}, "dimensions": {"refererHost": h}}
-                            for h, v in refs
-                        ],
-                        "countries": [
-                            {"sum": {"visits": 100}, "dimensions": {"countryName": "United States"}}
-                        ],
-                        "landing": [{"sum": {"visits": 40}}],
-                    }
-                ]
-            }
-        }
-    }
+    return {"data": {"viewer": {"accounts": [{
+        "week": week, "prev": week,
+        "pages": [{"sum": {"visits": v}, "dimensions": {"requestPath": p}} for p, v in pages],
+        "refs": [{"sum": {"visits": v}, "dimensions": {"refererHost": h}} for h, v in refs],
+        "countries": [{"sum": {"visits": 100}, "dimensions": {"countryName": "United States"}}],
+        "landing": [{"sum": {"visits": 40}}],
+    }]}}}
 
 
 @pytest.fixture
@@ -92,28 +74,20 @@ def cloudflare(monkeypatch):
 
 def test_hostile_paths_and_referrers_render_inert(cloudflare):
     hostile = [h for h in HOSTILE if h]
-    data = _analytics(
-        [("/internships/", 50)] + [(f"/{h}", 5) for h in hostile],
-        [("", 30), ("www.google.com", 20)] + [(h, 10) for h in hostile],
-    )
+    data = _analytics([("/internships/", 50)] + [(f"/{h}", 5) for h in hostile],
+                      [("", 30), ("www.google.com", 20)] + [(h, 10) for h in hostile])
     cloudflare += [data, data]
     md = "\n".join(report.visits_section(NOW))
 
     # Every table row still has exactly two cells, and no value ran onto a line of its own.
-    rows = [
-        line
-        for line in md.splitlines()
-        if line.startswith("| ")
-        and not line.startswith("| Page")
-        and not line.startswith("| Came from")
-    ]
+    rows = [line for line in md.splitlines() if line.startswith("| ") and not line.startswith("| Page")
+            and not line.startswith("| Came from")]
     assert len(rows) == 1 + len(hostile) + 2 + len(hostile)
     for line in rows:
         name, visits = _cells(line)
         assert re.fullmatch(r"[\d,]+", visits)
-        assert name == "(direct or unknown)" or (
-            name.startswith("`") and name.endswith("`") and name.count("`") == 2
-        )
+        assert name == "(direct or unknown)" or (name.startswith("`") and name.endswith("`")
+                                                 and name.count("`") == 2)
 
     # Outside the code spans nothing can be a link, a mention, an issue reference or HTML.
     bare = re.sub(r"`[^`\n]*`", "", md)
@@ -123,14 +97,13 @@ def test_hostile_paths_and_referrers_render_inert(cloudflare):
 
 
 def test_referrers_with_fewer_than_three_visits_are_left_out(cloudflare):
-    data = _analytics(
-        [("/", 10)], [("", 1), ("news.ycombinator.com", 3), ("spoof.example", 2), ("@someone", 1)]
-    )
+    data = _analytics([("/", 10)], [("", 1), ("news.ycombinator.com", 3), ("spoof.example", 2),
+                                    ("@someone", 1)])
     cloudflare += [data, data]
     md = "\n".join(report.visits_section(NOW))
     assert "`news.ycombinator.com` | 3 |" in md
     assert "spoof.example" not in md and "someone" not in md
-    assert "(direct or unknown) | 1 |" in md  # no referrer: our own label, always shown
+    assert "(direct or unknown) | 1 |" in md                # no referrer: our own label, always shown
     assert f"fewer than {report.MIN_REF_VISITS} visits are left out" in md
 
 

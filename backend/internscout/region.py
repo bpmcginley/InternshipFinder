@@ -2,38 +2,15 @@
 Each location gets a kind: new_england (ME, NH, VT, MA, RI, CT), nyc_metro (50 mi of Midtown), us (any
 other state, or just "United States"), remote (US-remote), or canada (a province, or just "Canada",
 remote or not). A posting is kept if ANY of its locations is in the US or Canada."""
-
 from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 from .config import REGION, wanted_states
-from .geo import (
-    REMOTE_RE,
-    STATE_NAMES,
-    _CITY_ONLY,
-    _NON_US,
-    _US_COUNTRY_RE,  # noqa: F401
-    ca_metro,
-    canada_of,
-    city_of,
-    haversine_miles,
-    locate,
-    pretty_location,
-    state_of,
-)
+from .geo import (REMOTE_RE, STATE_NAMES, _CITY_ONLY, _NON_US, _US_COUNTRY_RE,  # noqa: F401
+                  ca_metro, canada_of, city_of, haversine_miles, locate, pretty_location, state_of)
 
-IN_CITY = {
-    "boston|MA",
-    "cambridge|MA",
-    "new york|NY",
-    "new york city|NY",
-    "nyc|NY",
-    "manhattan|NY",
-    "brooklyn|NY",
-    "queens|NY",
-    "bronx|NY",
-    "long island city|NY",
-}
+IN_CITY = {"boston|MA", "cambridge|MA", "new york|NY", "new york city|NY", "nyc|NY",
+           "manhattan|NY", "brooklyn|NY", "queens|NY", "bronx|NY", "long island city|NY"}
 BASELINE_KINDS = ("new_england", "nyc_metro")
 # Canadian provinces whose postings get the per-posting detail calls (a description, which tags the
 # field) the way a wanted US state's do: the ones holding the big metros (Toronto, Ottawa, Waterloo,
@@ -43,56 +20,18 @@ ON_SITE_KINDS = ("new_england", "nyc_metro", "us")
 _SPLIT = re.compile(r"\s*(?:;|\||\s/\s|\sor\s|\n)\s*")
 # Big posting cities outside the gazetteer, so "New York, Chicago" is read as two cities, not one.
 _MAJOR = {
-    "chicago": "IL",
-    "seattle": "WA",
-    "redmond": "WA",
-    "bellevue": "WA",
-    "austin": "TX",
-    "dallas": "TX",
-    "houston": "TX",
-    "san antonio": "TX",
-    "san francisco": "CA",
-    "los angeles": "CA",
-    "san jose": "CA",
-    "san diego": "CA",
-    "palo alto": "CA",
-    "mountain view": "CA",
-    "menlo park": "CA",
-    "sunnyvale": "CA",
-    "santa clara": "CA",
-    "irvine": "CA",
-    "sacramento": "CA",
-    "denver": "CO",
-    "boulder": "CO",
-    "atlanta": "GA",
-    "miami": "FL",
-    "orlando": "FL",
-    "tampa": "FL",
-    "phoenix": "AZ",
-    "salt lake city": "UT",
-    "detroit": "MI",
-    "ann arbor": "MI",
-    "minneapolis": "MN",
-    "raleigh": "NC",
-    "charlotte": "NC",
-    "durham": "NC",
-    "nashville": "TN",
-    "baltimore": "MD",
-    "columbus": "OH",
-    "st. louis": "MO",
-    "kansas city": "MO",
-    "las vegas": "NV",
-    "washington dc": "DC",
-    "washington d.c.": "DC",
-    "new york": "NY",
-    "new york city": "NY",
-    "sf": "CA",
-    "la": "CA",
-    "dc": "DC",
+    "chicago": "IL", "seattle": "WA", "redmond": "WA", "bellevue": "WA", "austin": "TX", "dallas": "TX",
+    "houston": "TX", "san antonio": "TX", "san francisco": "CA", "los angeles": "CA", "san jose": "CA",
+    "san diego": "CA", "palo alto": "CA", "mountain view": "CA", "menlo park": "CA", "sunnyvale": "CA",
+    "santa clara": "CA", "irvine": "CA", "sacramento": "CA", "denver": "CO", "boulder": "CO",
+    "atlanta": "GA", "miami": "FL", "orlando": "FL", "tampa": "FL", "phoenix": "AZ", "salt lake city": "UT",
+    "detroit": "MI", "ann arbor": "MI", "minneapolis": "MN", "raleigh": "NC", "charlotte": "NC",
+    "durham": "NC", "nashville": "TN", "baltimore": "MD", "columbus": "OH", "st. louis": "MO",
+    "kansas city": "MO", "las vegas": "NV", "washington dc": "DC", "washington d.c.": "DC",
+    "new york": "NY", "new york city": "NY", "sf": "CA", "la": "CA", "dc": "DC",
     # A board that names only the park (IBM, Cisco, NetApp, Biogen all post there) was dropped as
     # an unplaceable location, since no state follows it.
-    "research triangle park": "NC",
-    "rtp": "NC",
+    "research triangle park": "NC", "rtp": "NC",
 }
 
 
@@ -108,16 +47,14 @@ _AFTER_STATE = re.compile(r"(?<=[\s,][A-Z]{2}),\s*" + _NEXT_CITY)
 # the work mode or country that stays with its town (was: the suffix kept the whole string as one
 # location, and Boston was lost).
 _AFTER_SUFFIX = re.compile(
-    r"[\s,][A-Z]{2}\s*,\s*(?:United States|USA?|Canada|Remote|Hybrid|On[- ]?site)\b(\s*,\s*)"
-    + _NEXT_CITY
-)
+    r"[\s,][A-Z]{2}\s*,\s*(?:United States|USA?|Canada|Remote|Hybrid|On[- ]?site)\b(\s*,\s*)" + _NEXT_CITY)
 
 
 def _split_cities(loc: str) -> list[str]:
     """'New York, Chicago' -> ['New York', 'Chicago']; 'Brooklyn, New York' and 'Boston, MA' stay whole."""
     cut = _AFTER_SUFFIX.search(loc)
     if cut:
-        return _split_cities(loc[: cut.start(1)].strip()) + _split_cities(loc[cut.end(1) :].strip())
+        return _split_cities(loc[:cut.start(1)].strip()) + _split_cities(loc[cut.end(1):].strip())
     pieces = _AFTER_STATE.split(loc)
     if len(pieces) > 1:
         return [q for p in pieces for q in _split_cities(p.strip())]
@@ -131,8 +68,6 @@ def _split_cities(loc: str) -> list[str]:
     if len(parts) == 2 and last in STATE_NAMES and STATE_NAMES[last] == states[0]:
         return [loc]  # "Brooklyn, New York" is a city and its state
     return parts
-
-
 # Words that may accompany a US-remote location. Anything left over ("Remote - HU", "Virtual, BR") is
 # a non-US qualifier, so the posting is not US-remote. The second line is the plain English a board
 # writes around the word: "Remote - US: All locations" is how Greenhouse boards say it, and one
@@ -144,9 +79,7 @@ _REMOTE_NOISE = re.compile(
     r"any|location|locations|only|flexible|nationwide|based|u\.?s\.?a?|united states(?: of america)?|america|"
     r"east coast|eastern|northeast|us time ?zones?|est|et|"
     r"all|fully|various|multiple|worker|position|"
-    r"continental|mainland|lower)\b|[^a-z]+",
-    re.I,
-)
+    r"continental|mainland|lower)\b|[^a-z]+", re.I)
 
 
 def remote_ok(loc: str) -> bool:
@@ -166,9 +99,7 @@ def split_locations(locations) -> list[str]:
 
 # "Chicago" and "Chicago, United States" name the same city and no state, but only the first reached
 # the map above: the comma made _state read the country as if it were a region of its own.
-_JUST_COUNTRY = re.compile(
-    r"^(?:the\s+)?(?:u\.?\s?s\.?\s?a?\.?|united states(?: of america)?|america)$", re.I
-)
+_JUST_COUNTRY = re.compile(r"^(?:the\s+)?(?:u\.?\s?s\.?\s?a?\.?|united states(?: of america)?|america)$", re.I)
 
 
 def _city_only(loc: str) -> bool:
@@ -218,16 +149,8 @@ def classify_location(loc: str) -> dict | None:
     if prov is not None:
         remote = bool(REMOTE_RE.search(raw_loc))
         hit = ca_metro(loc, prov) if not remote else None
-        return {
-            "kind": "canada",
-            "state": prov or None,
-            "lat": hit and hit[0],
-            "lng": hit and hit[1],
-            "distance": None,
-            "in_city": False,
-            "remote": remote,
-            "metro": hit and hit[2],
-        }
+        return {"kind": "canada", "state": prov or None, "lat": hit and hit[0], "lng": hit and hit[1],
+                "distance": None, "in_city": False, "remote": remote, "metro": hit and hit[2]}
     if not loc or _NON_US.search(loc):
         return None
     hit = locate(loc)
@@ -242,25 +165,18 @@ def classify_location(loc: str) -> dict | None:
     elif nyc is not None and nyc <= REGION.nyc_radius_miles:
         kind = "nyc_metro"
     elif st:
-        kind = "remote" if remote else "us"  # "Remote, TX" is remote but limited to Texas
+        kind = "remote" if remote else "us"   # "Remote, TX" is remote but limited to Texas
     elif remote and REGION.include_remote and remote_ok(loc):
-        kind = "remote"  # "Remote", "Remote - US"
+        kind = "remote"                        # "Remote", "Remote - US"
     elif not remote and _US_COUNTRY_RE.search(loc):
-        kind = "us"  # "United States": somewhere in the US
+        kind = "us"                            # "United States": somewhere in the US
     else:
         return None
     dist = None
     if lat is not None:
         dist = min(haversine_miles(h[1], h[2], lat, lng) for h in REGION.hubs)
-    return {
-        "kind": kind,
-        "state": st,
-        "lat": lat,
-        "lng": lng,
-        "distance": dist,
-        "in_city": f"{city_of(loc)}|{st}" in IN_CITY,
-        "remote": remote,
-    }
+    return {"kind": kind, "state": st, "lat": lat, "lng": lng, "distance": dist,
+            "in_city": f"{city_of(loc)}|{st}" in IN_CITY, "remote": remote}
 
 
 # A bare town name we may place: letters and the punctuation town names carry, at most four words.
@@ -281,16 +197,12 @@ def board_state(locations) -> str | None:
     Called by each board parser with every posting's location, internship or not: the postings we
     are about to throw away are most of the evidence, and after the parser returns they are gone.
     """
-    states = Counter(
-        st
-        for loc in locations
-        for part in split_locations([loc] if isinstance(loc, str) else loc)
-        for st in [_stated(part)]
-        if st
-    )
+    states = Counter(st for loc in locations
+                     for part in split_locations([loc] if isinstance(loc, str) else loc)
+                     for st in [_stated(part)] if st)
     if len(states) != 1:
         return None
-    ((state, named),) = states.items()
+    (state, named), = states.items()
     return state if named >= _AGREE_MIN else None
 
 
@@ -318,10 +230,8 @@ def place_bare_cities(raw_items: list[dict], state: str | None = None) -> int:
             key = (raw.get("company_name") or "").strip().lower()
             if key:
                 by_board[key].append(raw)
-        groups = [
-            (board_state([it.get("locations") or [] for it in items]), items)
-            for items in by_board.values()
-        ]
+        groups = [(board_state([it.get("locations") or [] for it in items]), items)
+                  for items in by_board.values()]
 
     placed = 0
     for st, items in groups:
@@ -329,7 +239,7 @@ def place_bare_cities(raw_items: list[dict], state: str | None = None) -> int:
             continue
         for it in items:
             out = []
-            for loc in it.get("locations") or []:
+            for loc in (it.get("locations") or []):
                 fixed = _with_state(loc, st)
                 placed += fixed != loc
                 out.append(fixed)
@@ -359,21 +269,19 @@ def evaluate_locations(locations) -> dict:
     best = min(placed, key=lambda h: h["distance"]) if placed else (pool[0] if pool else None)
     stated = next((h["state"] for _, h in region if h["state"]), None)
     return {
-        "in_region": bool(region),  # any US, US-remote or Canadian location
+        "in_region": bool(region),                 # any US, US-remote or Canadian location
         "in_canada": any(h["kind"] == "canada" for _, h in region),
         "is_remote": any(REMOTE_RE.search(l) for l in locs),
         # has a non-remote US or Canadian location (was: US only; an in-person Toronto role scored as
         # if it were remote, below every in-person US one)
-        "on_site": bool(on_site)
-        or any(h["kind"] == "canada" and not h["remote"] for _, h in region),
-        "within_radius": bool(local),  # has a New England / NYC-metro location
+        "on_site": bool(on_site) or any(h["kind"] == "canada" and not h["remote"] for _, h in region),
+        "within_radius": bool(local),              # has a New England / NYC-metro location
         "in_city": any(h["in_city"] for h in local),
         # "Remote" only where a location actually says so. A US location we could not pin to a state
         # ("United States", "US - UPS CORPORATE OFFICES (GACOR)") is somewhere in the US, not remote,
         # and the old fallback put on-site listings under a label that was simply untrue - visible
         # in the card's location line and in what the dashboard searches.
-        "state": (best and best["state"])
-        or stated
+        "state": (best and best["state"]) or stated
         or ("Remote" if any(h["kind"] == "remote" for _, h in region) else None),
         # The two display strings below run through geo.pretty_location, which rewrites an ATS site
         # code into "City, ST" and leaves anything it cannot read alone. Workday slugs were 4.6% of
@@ -384,15 +292,10 @@ def evaluate_locations(locations) -> dict:
         # one entry per US location, so the dashboard can filter and show the right one
         # was: "regions": [{"loc": l, ...
         # was: {"loc", "kind", "state"}. A Canadian entry also names its metro (Toronto, Montreal...).
-        "regions": [
-            {
-                "loc": pretty_location(l),
-                "kind": h["kind"],
-                "state": h["state"] or ("Remote" if h["kind"] == "remote" else None),
-                **({"metro": h["metro"]} if h.get("metro") else {}),
-            }
-            for l, h in region
-        ],
+        "regions": [{"loc": pretty_location(l), "kind": h["kind"],
+                     "state": h["state"] or ("Remote" if h["kind"] == "remote" else None),
+                     **({"metro": h["metro"]} if h.get("metro") else {})}
+                    for l, h in region],
         "best_distance": best["distance"] if best else None,
         "lat": best["lat"] if best else None,
         "lng": best["lng"] if best else None,

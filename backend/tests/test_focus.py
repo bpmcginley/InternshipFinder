@@ -1,5 +1,4 @@
 """The daily focus searches follow whichever fields UMass majors are worst served in."""
-
 import re
 
 from internscout import focus
@@ -29,16 +28,14 @@ def test_more_majors_on_an_empty_field_rank_first():
 
 def test_full_fields_and_far_away_roles():
     near = [_x(["psychology"])] * focus.ENOUGH
-    far = [_x(["languages"], key="TX")] * 500  # plenty in Texas is still nothing nearby
+    far = [_x(["languages"], key="TX")] * 500      # plenty in Texas is still nothing nearby
     assert [p[0] for p in focus.thinnest(near + far, MAJORS)] == ["languages"]
 
 
 def test_fields_with_no_search_bank_are_skipped():
-    majors = [
-        {"name": "Undeclared", "tags": [], "level": "undergrad"},
-        {"name": "Finance", "tags": ["finance"], "level": "undergrad"},
-    ]
-    assert focus.thinnest([], majors) == []  # finance has no bank; it is searched elsewhere
+    majors = [{"name": "Undeclared", "tags": [], "level": "undergrad"},
+              {"name": "Finance", "tags": ["finance"], "level": "undergrad"}]
+    assert focus.thinnest([], majors) == []          # finance has no bank; it is searched elsewhere
 
 
 def test_interleave_reaches_every_field_early():
@@ -61,12 +58,7 @@ def test_bad_export_falls_back(tmp_path):
 def _typical_title(query: str) -> str:
     """The title a query usually brings back: "fine arts internship" -> "Fine Arts Intern"."""
     if re.search(r"\bintern(ship)?s?\b", query, re.I):
-        core = re.sub(
-            r"\b(internships?|interns?|undergraduate|college student|summer \d{4}|\d{4})\b",
-            "",
-            query,
-            flags=re.I,
-        )
+        core = re.sub(r"\b(internships?|interns?|undergraduate|college student|summer \d{4}|\d{4})\b", "", query, flags=re.I)
         return re.sub(r"\s+", " ", core).strip().title() + " Intern"
     return query.title()
 

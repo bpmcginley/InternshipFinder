@@ -7,7 +7,6 @@ Both QR codes lead to the published homepage. Keep the URL in type so the flyer 
 camera cannot scan. The PDFs use black type, a little brand green, and vector QR codes; print at
 actual size in color or grayscale.
 """
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -45,16 +44,8 @@ def register_fonts() -> None:
         FONT_REGULAR, FONT_BOLD = "FlyerRegular", "FlyerBold"
 
 
-def text(
-    c: canvas.Canvas,
-    x: float,
-    y: float,
-    value: str,
-    size: float,
-    *,
-    bold: bool = False,
-    color=BLACK,
-) -> None:
+def text(c: canvas.Canvas, x: float, y: float, value: str, size: float, *,
+         bold: bool = False, color=BLACK) -> None:
     c.setFillColor(color)
     c.setFont(FONT_BOLD if bold else FONT_REGULAR, size)
     c.drawString(x, y, value)
@@ -79,7 +70,7 @@ def qr_code(c: canvas.Canvas, x: float, y: float, size: float = 132) -> None:
 
 def footer(c: canvas.Canvas) -> None:
     c.setStrokeColor(LIGHT)
-    c.setLineWidth(0.7)
+    c.setLineWidth(.7)
     c.line(45, 56, W - 45, 56)
     text(c, 45, 39, "Built by a UMass student. Independent of UMass Amherst.", 8.5, color=GREY)
 

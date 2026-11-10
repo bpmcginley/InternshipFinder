@@ -1,5 +1,4 @@
 """Offline production-entry-point build; run with --refresh to approve a new baseline."""
-
 from __future__ import annotations
 
 import argparse
@@ -36,27 +35,16 @@ def copy_file(source, target):
 
 def prepare(work):
     work.mkdir(parents=True)
-    shutil.copytree(
-        REPO / "backend" / "internscout",
-        work / "backend" / "internscout",
-        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-        copy_function=copy_file,
-    )
-    shutil.copytree(
-        REPO / "docs", work / "site", ignore=shutil.ignore_patterns("data"), copy_function=copy_file
-    )
+    shutil.copytree(REPO / "backend" / "internscout", work / "backend" / "internscout",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"), copy_function=copy_file)
+    shutil.copytree(REPO / "docs", work / "site", ignore=shutil.ignore_patterns("data"),
+                    copy_function=copy_file)
     (work / "site" / "CNAME").unlink(missing_ok=True)
     shutil.copytree(FIXTURE / "inputs", work / "inputs", copy_function=copy_file)
     (work / "backend" / "data").mkdir()
-    copy_file(
-        work / "inputs" / "search-console.json",
-        work / "backend" / "data" / "search_console_pages.json",
-    )
+    copy_file(work / "inputs" / "search-console.json", work / "backend" / "data" / "search_console_pages.json")
     (work / "site" / "data").mkdir()
-    copy_file(
-        work / "inputs" / "page-content-dates.json",
-        work / "site" / "data" / "page-content-dates.json",
-    )
+    copy_file(work / "inputs" / "page-content-dates.json", work / "site" / "data" / "page-content-dates.json")
 
 
 def frozen_runtime():
@@ -103,39 +91,25 @@ def stage(name, work):
     if name == "export":
         from internscout.db import SessionLocal, init_db
         from internscout.models import Listing, SourceLink
-
         init_db()
         with SessionLocal() as session:
-            for values in json.loads(
-                (work / "inputs" / "listings.json").read_text(encoding="utf-8")
-            ):
+            for values in json.loads((work / "inputs" / "listings.json").read_text(encoding="utf-8")):
                 values = dict(values)
                 sources = values.pop("sources")
                 for field in ("first_seen", "last_seen", "posted_at"):
-                    values[field] = (
-                        dt.datetime.fromisoformat(values[field]) if values[field] else None
-                    )
+                    values[field] = dt.datetime.fromisoformat(values[field]) if values[field] else None
                 listing = Listing(**values)
-                listing.source_links = [
-                    SourceLink(
-                        source=source, source_url=values["apply_url"], seen_at=dt.datetime.now()
-                    )
-                    for source in sources
-                ]
+                listing.source_links = [SourceLink(source=source, source_url=values["apply_url"],
+                                                   seen_at=dt.datetime.now()) for source in sources]
                 session.add(listing)
             session.commit()
         args = [str(work / "site" / "data")]
         module = "internscout.export_static"
     elif name == "pages":
-        args = [
-            str(work / "site"),
-            str(work / "inputs" / "live-sitemap.xml"),
-            str(work / "inputs" / "live-noindex.txt"),
-            "--placements",
-            str(work / "inputs" / "placements.json"),
-            "--placements-report",
-            str(work / "placements-report.json"),
-        ]
+        args = [str(work / "site"), str(work / "inputs" / "live-sitemap.xml"),
+                str(work / "inputs" / "live-noindex.txt"), "--placements",
+                str(work / "inputs" / "placements.json"), "--placements-report",
+                str(work / "placements-report.json")]
         module = "internscout.seo_pages"
     else:
         args = [str(work / "site")]
@@ -149,42 +123,18 @@ def stage(name, work):
 
 def build(work):
     # Keep only OS process-launch necessities; never inherit provider credentials or config.
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if k.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "COMSPEC"}
-    }
-    env.update(
-        PYTHONHASHSEED="0",
-        PYTHONUTF8="1",
-        PYTHONDONTWRITEBYTECODE="1",
-        INTERNSCOUT_DB=str(work / "fixture.sqlite"),
-        INTERNSCOUT_DATA=str(work / "backend" / "data"),
-        INTERNSCOUT_GEOCODE="0",
-    )
+    env = {k: v for k, v in os.environ.items()
+           if k.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "COMSPEC"}}
+    env.update(PYTHONHASHSEED="0", PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1",
+               INTERNSCOUT_DB=str(work / "fixture.sqlite"), INTERNSCOUT_DATA=str(work / "backend" / "data"),
+               INTERNSCOUT_GEOCODE="0")
     for name in ("export", "pages", "links"):
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(Path(__file__).resolve()),
-                "--stage",
-                name,
-                "--workspace",
-                str(work),
-            ],
-            cwd=work,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=120,
-        )
+        result = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--stage", name,
+                                 "--workspace", str(work)], cwd=work, env=env,
+                                capture_output=True, text=True, encoding="utf-8", timeout=120)
         assert result.returncode == 0, f"{name} failed:\n{result.stdout}\n{result.stderr}"
-    return {
-        p.relative_to(work / "site").as_posix(): p.read_bytes()
-        for p in sorted((work / "site").rglob("*"))
-        if p.is_file()
-    }
+    return {p.relative_to(work / "site").as_posix(): p.read_bytes()
+            for p in sorted((work / "site").rglob("*")) if p.is_file()}
 
 
 def manifest(files):
@@ -194,47 +144,30 @@ def manifest(files):
 def differences(files):
     expected = json.loads((FIXTURE / "manifest.json").read_text(encoding="utf-8"))
     actual = manifest(files)
-    changes = [
-        name
-        for name in sorted(expected.keys() | actual.keys())
-        if expected.get(name) != actual.get(name)
-    ]
+    changes = [name for name in sorted(expected.keys() | actual.keys()) if expected.get(name) != actual.get(name)]
     if not changes:
         return ""
     lines = [f"Golden output differs in {len(changes)} files:"]
-    lines.extend(
-        f"{'added' if name not in expected else 'removed' if name not in actual else 'changed'}: {name}"
-        for name in changes
-    )
+    lines.extend(f"{'added' if name not in expected else 'removed' if name not in actual else 'changed'}: {name}"
+                 for name in changes)
     with tarfile.open(FIXTURE / "expected.tar.gz", "r:gz") as archive:
         for name in changes[:3]:
             old = archive.extractfile(name).read() if name in expected else b""
-            assert not old or hashlib.sha256(old).hexdigest() == expected[name], (
-                "Baseline archive/manifest mismatch"
-            )
+            assert not old or hashlib.sha256(old).hexdigest() == expected[name], "Baseline archive/manifest mismatch"
             try:
                 before, after = old.decode("utf-8"), files.get(name, b"").decode("utf-8")
             except UnicodeDecodeError:
                 lines.append(f"{name}: binary bytes changed")
                 continue
             # Minified HTML/JSON can have huge lines: bound both lines and characters.
-            diff = list(
-                difflib.unified_diff(
-                    before.splitlines(),
-                    after.splitlines(),
-                    fromfile=f"expected/{name}",
-                    tofile=f"actual/{name}",
-                    n=1,
-                )
-            )
+            diff = list(difflib.unified_diff(before.splitlines(), after.splitlines(),
+                                            fromfile=f"expected/{name}", tofile=f"actual/{name}", n=1))
             lines.extend(line[:400] for line in diff[:18])
     return "\n".join(lines)
 
 
 def refresh(files):
-    (FIXTURE / "manifest.json").write_text(
-        json.dumps(manifest(files), indent=2) + "\n", encoding="utf-8", newline="\n"
-    )
+    (FIXTURE / "manifest.json").write_text(json.dumps(manifest(files), indent=2) + "\n", encoding="utf-8", newline="\n")
     with (FIXTURE / "expected.tar.gz").open("wb") as raw:
         with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
             with tarfile.open(fileobj=compressed, mode="w|") as archive:

@@ -1,5 +1,4 @@
 """2026-10-23: employer sales entry points stay separate from organic role actions."""
-
 from urllib.parse import parse_qs, urlsplit
 import re
 

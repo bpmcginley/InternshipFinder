@@ -13,7 +13,6 @@ first character of k when it is a-z or 0-9, else "_". One shard is all the buy p
 employer and all the Worker reads for an order. "generated" is when the listings were exported, so two
 builds of the same data on the same day write the same bytes.
 """
-
 from __future__ import annotations
 
 import json
@@ -41,32 +40,19 @@ def qualifies(x: dict, today: str) -> bool:
     """Open, from a real employer, applied to over https, its deadline (if any) not passed, and with a
     well-formed id. seo_pages.load already kept only open roles with an http(s) link; an order needs
     https, which is also all a placement accepts (placements._well_formed)."""
-    return (
-        x.get("status") == "open"
-        and sp.real_company(x.get("company_name") or "")
-        and str(x.get("apply_url") or "").startswith("https://")
-        and not _deadline_passed(x, today)
-        and bool(_ID.match(str(x.get("id"))))
-    )
+    return (x.get("status") == "open" and sp.real_company(x.get("company_name") or "")
+            and str(x.get("apply_url") or "").startswith("https://")
+            and not _deadline_passed(x, today) and bool(_ID.match(str(x.get("id")))))
 
 
 def roles(listings: list[dict], today: str) -> list[dict]:
     """Every shard's rows, by company, then title, then id. One row per role within each employer
     (unique_roles, the rule the employer pages count by), so a requisition posted on two boards is
     offered once; it runs after the rules, so a copy that fails them never hides one that passes."""
-    rows = [
-        {
-            "id": x["id"],
-            "k": sp.employer_key(x["company_name"]),
-            "co": x["company_name"],
-            "t": x.get("title") or "",
-            "loc": sp.place(x),
-            "u": x["apply_url"],
-            "f": list(x.get("field_tags") or []),
-            "unpaid": unpaid(x),
-        }
-        for x in sp.unique_roles([x for x in listings if qualifies(x, today)])
-    ]
+    rows = [{"id": x["id"], "k": sp.employer_key(x["company_name"]), "co": x["company_name"],
+             "t": x.get("title") or "", "loc": sp.place(x), "u": x["apply_url"],
+             "f": list(x.get("field_tags") or []), "unpaid": unpaid(x)}
+            for x in sp.unique_roles([x for x in listings if qualifies(x, today)])]
     return sorted(rows, key=lambda r: (r["co"].lower(), r["t"].lower(), r["id"]))
 
 
@@ -76,10 +62,8 @@ def employers(rows: list[dict]) -> list[dict]:
     names: dict[str, Counter] = {}
     for r in rows:
         names.setdefault(r["k"], Counter())[r["co"]] += 1
-    out = [
-        {"k": k, "n": min(c, key=lambda n: (-c[n], len(n), n)), "c": sum(c.values()), "s": shard(k)}
-        for k, c in names.items()
-    ]
+    out = [{"k": k, "n": min(c, key=lambda n: (-c[n], len(n), n)), "c": sum(c.values()), "s": shard(k)}
+           for k, c in names.items()]
     return sorted(out, key=lambda e: (e["n"].lower(), e["n"], e["k"]))
 
 
@@ -89,9 +73,7 @@ def _dump(path: str, obj: dict) -> None:
         f.write("\n")
 
 
-def write(
-    site_dir: str, listings: list[dict], now: datetime, today: str | None = None
-) -> dict[str, int]:
+def write(site_dir: str, listings: list[dict], now: datetime, today: str | None = None) -> dict[str, int]:
     """Writes the index and its shards into <site_dir>/data/roles; {file name: roles} for the log.
 
     now: when the listings were exported (seo_pages.GENERATED), the files' "generated". today: the UTC
@@ -110,7 +92,5 @@ def write(
             os.remove(os.path.join(folder, name))
     for s, part in sorted(by_shard.items()):
         _dump(os.path.join(folder, f"{s}.json"), {"generated": generated, "roles": part})
-    _dump(
-        os.path.join(folder, "index.json"), {"generated": generated, "employers": employers(rows)}
-    )
+    _dump(os.path.join(folder, "index.json"), {"generated": generated, "employers": employers(rows)})
     return {f"{s}.json": len(part) for s, part in sorted(by_shard.items())}

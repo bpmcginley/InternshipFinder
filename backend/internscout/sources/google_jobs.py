@@ -5,7 +5,6 @@ free-text queries + location, so companies NOT in our ATS registry still get fou
 (Walleye, Weiss, and anyone else Google indexes). Requires a SerpApi key (free tier:
 250 searches/month) in the SERPAPI_KEY env var. If absent, the source is skipped.
 """
-
 from __future__ import annotations
 import json
 import os
@@ -19,7 +18,7 @@ from ..us_metros import metro_searches
 # carries api_key. GitHub masks the secret in Actions logs, but a local run's log would not.
 
 URL = "https://serpapi.com/search.json"
-ACCOUNT_URL = "https://serpapi.com/account.json"  # free to call; does not use a search
+ACCOUNT_URL = "https://serpapi.com/account.json"   # free to call; does not use a search
 # The UTC day the paid searches last ran, committed with the data. The rule used to be "the first
 # run after 00:00 UTC", read off the clock as hour < 6; GitHub starts that run 2 to 3 hours late
 # and sometimes not at all, and a run it started after 06:00, or one Keep schedule started for it,
@@ -73,17 +72,10 @@ def is_daily_run(today: str) -> bool:
     return searched_on() != today
 
 
-def fetch_google_jobs(
-    queries: list[str],
-    locations: list[str],
-    api_key: str | None = None,
-    max_searches: int | None = None,
-    focus_queries: list[str] | None = None,
-    focus_searches: int = 0,
-    fixed: list[tuple[str, str]] | None = None,
-    nationwide: bool = False,
-    report=None,
-) -> list[dict]:
+def fetch_google_jobs(queries: list[str], locations: list[str], api_key: str | None = None,
+                      max_searches: int | None = None, focus_queries: list[str] | None = None,
+                      focus_searches: int = 0, fixed: list[tuple[str, str]] | None = None,
+                      nationwide: bool = False, report=None) -> list[dict]:
     """Query Google Jobs. Stays inside the SerpApi quota by capping searches per run and
     rotating which queries are used (day-based offset), so all disciplines get covered
     across runs instead of always hitting the same few.
@@ -91,7 +83,6 @@ def fetch_google_jobs(
     `report` (IngestMetrics.source_result) hears the feed's outcome: skipped and why, failed
     when every search failed, partial when some did, empty or success otherwise."""
     import datetime
-
     api_key = api_key or os.environ.get("SERPAPI_KEY")
     if not api_key:
         print("[google_jobs] no SERPAPI_KEY set; skipping")
@@ -120,13 +111,10 @@ def fetch_google_jobs(
             account = r.json()
     except Exception as e:
         print(f"[google_jobs] account check failed ({type(e).__name__}); assuming the free plan")
-    max_searches = daily_budget(
-        account, max_searches, int(os.environ.get("SERPAPI_MONTHLY_SEARCHES", "100"))
-    )
+    max_searches = daily_budget(account, max_searches,
+                                int(os.environ.get("SERPAPI_MONTHLY_SEARCHES", "100")))
     left = (account or {}).get("total_searches_left")
-    print(
-        f"[google_jobs] budget today {max_searches} (searches left this month: {left if left is not None else 'unknown'})"
-    )
+    print(f"[google_jobs] budget today {max_searches} (searches left this month: {left if left is not None else 'unknown'})")
     if max_searches <= 0:
         report_source(report, "google_jobs", skipped="no_budget")
         return []
@@ -152,50 +140,32 @@ def fetch_google_jobs(
     focus: list[tuple[str, str]] = []
     if focus_queries and focus_searches > 0 and locations:
         n = min(focus_searches, max_searches)
-        focus = [
-            (
-                focus_queries[(day * n + i) % len(focus_queries)],
-                locations[(day + i) % len(locations)],
-            )
-            for i in range(n)
-        ]
+        focus = [(focus_queries[(day * n + i) % len(focus_queries)], locations[(day + i) % len(locations)])
+                 for i in range(n)]
         max_searches -= n
     if len(locations) > max_searches:  # more wanted metros than searches: rotate them by day too
         s = day % len(locations)
         locations = (locations[s:] + locations[:s])[:max_searches]
     per_loc = max(1, max_searches // max(1, len(locations)))
-    turn = int(os.environ.get("GITHUB_RUN_NUMBER") or day)  # next clusters each run
+    turn = int(os.environ.get("GITHUB_RUN_NUMBER") or day)   # next clusters each run
     start = (turn * per_loc) % max(1, len(queries))
     rotated = queries[start:] + queries[:start]
     picked = rotated[:per_loc]
     pairs = [(q, loc, cbsa) for q, loc, cbsa in national]
-    pairs += [
-        (q, loc, None)
-        for q, loc in daily
-        + focus
-        + [(q, loc) for loc in locations for q in picked][: max(0, max_searches)]
-    ]
-    print(
-        f"[google_jobs] {len(national)} top-50 metro, {len(daily)} daily, {len(focus)} focus search(es), then {len(picked)} quer(ies) x "
-        f"{len(locations)} location(s) (cap {max_searches})"
-    )
+    pairs += [(q, loc, None) for q, loc in daily + focus + [(q, loc) for loc in locations for q in picked][:max(0, max_searches)]]
+    print(f"[google_jobs] {len(national)} top-50 metro, {len(daily)} daily, {len(focus)} focus search(es), then {len(picked)} quer(ies) x "
+          f"{len(locations)} location(s) (cap {max_searches})")
     out: list[dict] = []
     seen = set()
     # Google reports no result total, so discovered stays unmeasured; rows and repeats are counted.
     counts, searched, failed, error = ScanCounts(), 0, 0, None
     with client() as c:
         metro_failed = False
-        for q, loc, cbsa in pairs:  # already capped at the day's budget
+        for q, loc, cbsa in pairs:   # already capped at the day's budget
             if cbsa and metro_failed:
                 continue  # retry this metro next run; don't advance over a failed city
             searched += 1
-            params = {
-                "engine": "google_jobs",
-                "q": q,
-                "location": loc,
-                "hl": "en",
-                "api_key": api_key,
-            }
+            params = {"engine": "google_jobs", "q": q, "location": loc, "hl": "en", "api_key": api_key}
             if loc.endswith(", Canada"):
                 # Google's Canadian results (2026-10-01): without it a Toronto search leans on US postings.
                 params["gl"] = "ca"
@@ -228,39 +198,31 @@ def fetch_google_jobs(
                     link = (opts[0].get("link") if opts else None) or j.get("share_link")
                     # Same employer/title can represent distinct requisitions or
                     # offices in different metro searches; preserve that evidence.
-                    key = (
-                        j.get("company_name", ""),
-                        j.get("title", ""),
-                        j.get("location") or loc,
-                        link,
-                    )
+                    key = (j.get("company_name", ""), j.get("title", ""),
+                           j.get("location") or loc, link)
                     if key in seen:
                         counts.discard("duplicate")
                         continue
                     seen.add(key)
-                    out.append(
-                        {
-                            "company_name": j.get("company_name", ""),
-                            "title": j.get("title", ""),
-                            "locations": [j.get("location") or loc],
-                            "season": None,
-                            "year": None,
-                            "url": link,
-                            "apply_url": link,
-                            "posted_at": None,
-                            # 2026-10-23: keep all text the feed provided; was: [:3000].
-                            # Revert: restore [:3000] here (DQ-1).
-                            "description": (j.get("description") or ""),
-                            "active": True,
-                            "source": "google_jobs",
-                            "source_url": link,
-                        }
-                    )
+                    out.append({
+                        "company_name": j.get("company_name", ""),
+                        "title": j.get("title", ""),
+                        "locations": [j.get("location") or loc],
+                        "season": None, "year": None,
+                        "url": link, "apply_url": link,
+                        "posted_at": None,
+                        # 2026-10-23: keep all text the feed provided; was: [:3000].
+                        # Revert: restore [:3000] here (DQ-1).
+                        "description": (j.get("description") or ""),
+                        "active": True,
+                        "source": "google_jobs",
+                        "source_url": link,
+                    })
             except httpx.HTTPStatusError as e:
                 metro_failed = metro_failed or bool(cbsa)
                 failed, error = failed + 1, e
                 print(f"[google_jobs] '{q}' @ {loc} failed: HTTP {e.response.status_code}")
-                if e.response.status_code == 429:  # quota gone: the rest will fail the same way
+                if e.response.status_code == 429:   # quota gone: the rest will fail the same way
                     print("[google_jobs] out of searches; stopping for this run")
                     counts.stop("quota")
                     break
@@ -268,13 +230,6 @@ def fetch_google_jobs(
                 metro_failed = metro_failed or bool(cbsa)
                 failed, error = failed + 1, e
                 print(f"[google_jobs] '{q}' @ {loc} failed: {type(e).__name__}")
-    report_source(
-        report,
-        "google_jobs",
-        items=out,
-        error=error,
-        counts=counts,
-        failed_units=failed,
-        units=searched,
-    )
+    report_source(report, "google_jobs", items=out, error=error, counts=counts,
+                  failed_units=failed, units=searched)
     return out

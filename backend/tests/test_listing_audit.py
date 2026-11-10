@@ -1,5 +1,4 @@
 """Audit must surface defects instead of hiding them through its own deduplication."""
-
 import json
 
 import pytest
@@ -16,12 +15,8 @@ def test_shard_repetition_is_removed_but_changed_url_for_same_id_is_kept(tmp_pat
     shards.mkdir()
     first = role("a", "https://employer.example/jobs/1")
     changed = role("a", "https://employer.example/jobs/2")
-    for name, content in {
-        "MA.json": [first],
-        "NY.json": [first, changed],
-        "MA.desc.json": {"a": "Student required"},
-        "index.json": {"files": {}},
-    }.items():
+    for name, content in {"MA.json": [first], "NY.json": [first, changed],
+                          "MA.desc.json": {"a": "Student required"}, "index.json": {"files": {}}}.items():
         (shards / name).write_text(json.dumps(content), encoding="utf-8")
     rows, descriptions = read_corpus(tmp_path)
     result = audit(rows, descriptions, fields=["swe"])
@@ -32,11 +27,9 @@ def test_shard_repetition_is_removed_but_changed_url_for_same_id_is_kept(tmp_pat
 
 
 def test_same_url_different_ids_and_conflicting_years_are_candidates_not_auto_deleted():
-    rows = [
-        role("a", "https://jobs.example/123?source=x", years=["phd"]),
-        role("b", "https://jobs.example/123?source=y", years=[]),
-        role("closed", "https://jobs.example/closed", status="closed"),
-    ]
+    rows = [role("a", "https://jobs.example/123?source=x", years=["phd"]),
+            role("b", "https://jobs.example/123?source=y", years=[]),
+            role("closed", "https://jobs.example/closed", status="closed")]
     result = audit(rows, {}, fields=["swe"])
     assert result["unique_open_ids"] == 2
     assert result["canonical_groups_with_multiple_ids"] == 1
@@ -46,9 +39,7 @@ def test_same_url_different_ids_and_conflicting_years_are_candidates_not_auto_de
 
 
 def test_sample_is_stable_across_input_order_and_never_repeats_multi_field_ids():
-    rows = [
-        role(str(i), f"https://jobs.example/{i}", field_tags=["swe", "civil"]) for i in range(12)
-    ]
+    rows = [role(str(i), f"https://jobs.example/{i}", field_tags=["swe", "civil"]) for i in range(12)]
     a = audit(rows, {}, fields=["swe", "civil"], per_field=4)
     b = audit(rows[::-1], {}, fields=["swe", "civil"], per_field=4)
     assert a["samples"] == b["samples"]
