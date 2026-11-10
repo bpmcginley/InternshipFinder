@@ -37,6 +37,12 @@ const ROUND_TRIP = /^(accounts\.google\.com|login\.microsoftonline\.com|login\.l
 // was: export const EVENTS = new Set([..., "posting_click", "digest_signup", "review_click"]);
 export const EVENTS = new Set(["install_click", "signin_start", "signin", "profile", "autoapply", "checkout", "invite_open",
   "posting_click", "digest_signup", "review_click", "apply_offer_shown", "apply_offer_click"]);
+// P-0.2: fixed product steps, using only the existing day/event/page totals. No listing,
+// company, search, email or account dimensions. follow_confirm is a browser-observed
+// confirmation-page signal, not proof that a subscription was confirmed by the server.
+for (const event of ["group_expand", "major_quick_set", "save_role", "mylist_open", "share_click",
+  "list_link_click", "widget_link_click", "out_of_runs_view", "out_of_runs_invite", "out_of_runs_topup",
+  "out_of_runs_plan", "follow_open", "follow_submit", "follow_confirm", "demo_play", "flyer_print"]) EVENTS.add(event);
 // Anonymous placement totals (2026-10-15). Finite names keep row cardinality bounded; no address,
 // arbitrary campaign value or confirmed-subscriber claim can be submitted through /hit.
 export const DIGEST_PLACEMENTS = ["footer", "results_inline", "digest_page", "landing", "contextual", "nav"];
