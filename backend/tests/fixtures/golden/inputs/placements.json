@@ -1,0 +1,20 @@
+{
+  "placements": [
+    {
+      "id": "p-golden-active",
+      "listing_id": "768f01b60a4f408f",
+      "apply_url": "https://jobs.example.com/golden/000",
+      "employer": "Bose",
+      "start": "2026-11-01",
+      "end": "2026-12-01"
+    },
+    {
+      "id": "p-golden-ended",
+      "listing_id": "768f01b60a4f408f",
+      "apply_url": "https://jobs.example.com/golden/000",
+      "employer": "Bose",
+      "start": "2026-10-01",
+      "end": "2026-11-01"
+    }
+  ]
+}
