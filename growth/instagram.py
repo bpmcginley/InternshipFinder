@@ -32,7 +32,6 @@ Run from the repo root:
   python growth/instagram.py --send                 # refresh the token only (a week with no post)
 Needs INSTAGRAM_TOKEN; CLOUDFLARE_API_TOKEN to keep refreshed tokens.
 """
-
 from __future__ import annotations
 
 import hashlib
@@ -53,12 +52,10 @@ import metrics  # noqa: E402  (the D1 database, account and API helper the analy
 
 GRAPH = "https://graph.instagram.com"
 UA = {"User-Agent": "InternScout-brand-posts/1.0 (+https://internscout.org)"}
-REFRESH_EVERY = timedelta(
-    days=7
-)  # well inside the 60-day life, and a refresh needs a day-old token
-IMAGE_WAIT = 120  # seconds to wait for the pushed card to be served
-CONTAINER_WAIT = 90  # seconds to wait for Instagram to fetch it
-REEL_WAIT = 300  # seconds to wait for Instagram to process a Reel
+REFRESH_EVERY = timedelta(days=7)       # well inside the 60-day life, and a refresh needs a day-old token
+IMAGE_WAIT = 120                        # seconds to wait for the pushed card to be served
+CONTAINER_WAIT = 90                     # seconds to wait for Instagram to fetch it
+REEL_WAIT = 300                         # seconds to wait for Instagram to process a Reel
 
 
 class InstagramError(RuntimeError):
@@ -74,9 +71,7 @@ def _request(method: str, path: str, params: dict) -> dict:
     never printed, and an error keeps only Meta's own message."""
     data = urllib.parse.urlencode(params).encode()
     url = f"{GRAPH}/{path}" + (f"?{data.decode()}" if method == "GET" else "")
-    req = urllib.request.Request(
-        url, data=None if method == "GET" else data, method=method, headers=UA
-    )
+    req = urllib.request.Request(url, data=None if method == "GET" else data, method=method, headers=UA)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read() or b"{}")
@@ -91,14 +86,9 @@ def _request(method: str, path: str, params: dict) -> dict:
 
 # ---- the token -------------------------------------------------------------------------------------
 
-
 def _d1_rows(cf_token: str, sql: str, params: list | None = None) -> list[dict]:
-    r = metrics._json(
-        f"https://api.cloudflare.com/client/v4/accounts/{metrics.ACCOUNT}/d1/database/"
-        f"{metrics.D1_DATABASE}/query",
-        {"sql": sql, "params": params or []},
-        cf_token,
-    )
+    r = metrics._json(f"https://api.cloudflare.com/client/v4/accounts/{metrics.ACCOUNT}/d1/database/"
+                      f"{metrics.D1_DATABASE}/query", {"sql": sql, "params": params or []}, cf_token)
     if not r.get("success"):
         raise RuntimeError("D1: " + json.dumps(r.get("errors"))[:300])
     return (r.get("result") or [{}])[0].get("results") or []
@@ -112,17 +102,12 @@ def working_token(secret: str, cf_token: str | None) -> tuple[str, datetime | No
     """(the token to use, when it was last refreshed or None if unknown)."""
     if not cf_token:
         return secret, None
-    _d1_rows(
-        cf_token,
-        "CREATE TABLE IF NOT EXISTS social_tokens (name TEXT PRIMARY KEY, token TEXT NOT NULL, "
-        "seed TEXT NOT NULL, refreshed TEXT NOT NULL, expires TEXT)",
-    )
-    rows = _d1_rows(
-        cf_token, "SELECT token, seed, refreshed FROM social_tokens WHERE name = 'instagram'"
-    )
+    _d1_rows(cf_token, "CREATE TABLE IF NOT EXISTS social_tokens (name TEXT PRIMARY KEY, token TEXT NOT NULL, "
+                       "seed TEXT NOT NULL, refreshed TEXT NOT NULL, expires TEXT)")
+    rows = _d1_rows(cf_token, "SELECT token, seed, refreshed FROM social_tokens WHERE name = 'instagram'")
     if rows and rows[0]["seed"] == _seed(secret):
         return rows[0]["token"], datetime.fromisoformat(rows[0]["refreshed"].replace("Z", "+00:00"))
-    return secret, None  # no row yet, or the owner put a new token in the secret: start from it
+    return secret, None     # no row yet, or the owner put a new token in the secret: start from it
 
 
 def refresh(token: str, refreshed: datetime | None, now: datetime) -> tuple[str, int] | None:
@@ -130,9 +115,7 @@ def refresh(token: str, refreshed: datetime | None, now: datetime) -> tuple[str,
     if refreshed is not None and now - refreshed < REFRESH_EVERY:
         return None
     try:
-        r = _request(
-            "GET", "refresh_access_token", {"grant_type": "ig_refresh_token", "access_token": token}
-        )
+        r = _request("GET", "refresh_access_token", {"grant_type": "ig_refresh_token", "access_token": token})
     except InstagramError as e:
         if refreshed is None:
             # A token generated less than a day ago can't be refreshed yet; it is good as it is.
@@ -144,12 +127,9 @@ def refresh(token: str, refreshed: datetime | None, now: datetime) -> tuple[str,
 
 def keep(cf_token: str, secret: str, token: str, lasts: int, now: datetime) -> None:
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
-    _d1_rows(
-        cf_token,
-        "INSERT OR REPLACE INTO social_tokens (name, token, seed, refreshed, expires) "
-        "VALUES ('instagram', ?, ?, ?, ?)",
-        [token, _seed(secret), iso(now), iso(now + timedelta(seconds=lasts)) if lasts else None],
-    )
+    _d1_rows(cf_token, "INSERT OR REPLACE INTO social_tokens (name, token, seed, refreshed, expires) "
+                       "VALUES ('instagram', ?, ?, ?, ?)",
+             [token, _seed(secret), iso(now), iso(now + timedelta(seconds=lasts)) if lasts else None])
 
 
 def token_for_run(secret: str, cf_token: str | None, now: datetime | None = None) -> str:
@@ -162,15 +142,12 @@ def token_for_run(secret: str, cf_token: str | None, now: datetime | None = None
             keep(cf_token, secret, token, lasts, now)
             print(f"[instagram] token refreshed; good for {lasts // 86400} more days")
         else:
-            print(
-                "[instagram] token refreshed but NOT kept: set CLOUDFLARE_API_TOKEN, or the "
-                "INSTAGRAM_TOKEN secret will stop working 60 days after it was made"
-            )
+            print("[instagram] token refreshed but NOT kept: set CLOUDFLARE_API_TOKEN, or the "
+                  "INSTAGRAM_TOKEN secret will stop working 60 days after it was made")
     return token
 
 
 # ---- posting ---------------------------------------------------------------------------------------
-
 
 def wait_for_image(url: str, timeout: int = IMAGE_WAIT, sleep=time.sleep) -> None:
     """Until url answers 200 with a JPEG. A card pushed seconds ago can take a moment to be served."""
@@ -189,10 +166,7 @@ def _wait_for_media(url: str, media_type: str, what: str, timeout: int, sleep) -
         try:
             req = urllib.request.Request(url, method="HEAD", headers=UA)
             with urllib.request.urlopen(req, timeout=15) as r:
-                if (
-                    r.status == 200
-                    and (r.headers.get("Content-Type") or "").split(";", 1)[0] == media_type
-                ):
+                if r.status == 200 and (r.headers.get("Content-Type") or "").split(";", 1)[0] == media_type:
                     return
         except urllib.error.URLError:
             pass
@@ -210,9 +184,7 @@ def _wait(container: str, token: str, what: str, timeout: int, sleep, every: int
     """Until Instagram has the container's media ready (status_code FINISHED)."""
     end = time.monotonic() + timeout
     while True:
-        status = _request("GET", container, {"fields": "status_code", "access_token": token}).get(
-            "status_code"
-        )
+        status = _request("GET", container, {"fields": "status_code", "access_token": token}).get("status_code")
         if status == "FINISHED":
             return
         if status in ("ERROR", "EXPIRED"):
@@ -222,16 +194,11 @@ def _wait(container: str, token: str, what: str, timeout: int, sleep, every: int
         sleep(every)
 
 
-def publish(
-    token: str, image_url: str, caption: str, sleep=time.sleep, timeout: int = CONTAINER_WAIT
-) -> str:
+def publish(token: str, image_url: str, caption: str, sleep=time.sleep, timeout: int = CONTAINER_WAIT) -> str:
     """The new post's media id."""
     ig_id = _ig_id(token)
-    container = _request(
-        "POST",
-        f"{ig_id}/media",
-        {"image_url": image_url, "caption": caption, "access_token": token},
-    )["id"]
+    container = _request("POST", f"{ig_id}/media", {"image_url": image_url, "caption": caption,
+                                                    "access_token": token})["id"]
     _wait(container, token, "image", timeout, sleep, 3)
     return _publish_container(token, ig_id, container)
 
@@ -239,15 +206,11 @@ def publish(
 def _publish_container(token: str, ig_id: str, container: str) -> str:
     """A lost final response is not proof of failure: Meta may already have published the post."""
     try:
-        answer = _request(
-            "POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token}
-        )
+        answer = _request("POST", f"{ig_id}/media_publish", {"creation_id": container, "access_token": token})
     except (InstagramError, urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
         # Do not infer success/failure from a timeout, 5xx or an unreadable response. Conservatively
         # stop after any rejected final publish too; only pre-publication failures may use a card.
-        raise PublishOutcomeUnknown(
-            "Instagram did not confirm the final publishing result"
-        ) from None
+        raise PublishOutcomeUnknown("Instagram did not confirm the final publishing result") from None
     media_id = answer.get("id") if isinstance(answer, dict) else None
     if not isinstance(media_id, str) or not media_id.strip():
         raise PublishOutcomeUnknown("Instagram did not confirm the final publishing result")
@@ -257,45 +220,28 @@ def _publish_container(token: str, ig_id: str, container: str) -> str:
 def _public_video_url(video_url: str) -> None:
     url = urllib.parse.urlsplit(video_url)
     name = url.path.removeprefix("/social-video/")
-    if (
-        url.scheme != "https"
-        or url.netloc != "internscout-api.bpmcginley.workers.dev"
-        or not url.path.startswith("/social-video/")
-        or len(name) > 120
-        or not re.fullmatch(r"\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.mp4", name)
-        or url.query
-        or url.fragment
-    ):
+    if (url.scheme != "https" or url.netloc != "internscout-api.bpmcginley.workers.dev" or
+            not url.path.startswith("/social-video/") or len(name) > 120 or
+            not re.fullmatch(r"\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.mp4", name) or
+            url.query or url.fragment):
         raise InstagramError("the Reel needs InternScout's public brand video URL")
 
 
-def publish_reel(
-    token: str, video_url: str, caption: str, sleep=time.sleep, timeout: int = REEL_WAIT
-) -> str:
+def publish_reel(token: str, video_url: str, caption: str, sleep=time.sleep, timeout: int = REEL_WAIT) -> str:
     """Post the video as a Reel (also shown on the profile grid); the new post's media id."""
     _public_video_url(video_url)
     ig_id = _ig_id(token)
     # thumb_offset: the cover is the title slide, a second in, after its fade has settled.
-    made = _request(
-        "POST",
-        f"{ig_id}/media",
-        {
-            "media_type": "REELS",
-            "video_url": video_url,
-            "caption": caption,
-            "share_to_feed": "true",
-            "thumb_offset": "1000",
-            "access_token": token,
-        },
-    )
+    made = _request("POST", f"{ig_id}/media", {"media_type": "REELS", "video_url": video_url,
+                                               "caption": caption, "share_to_feed": "true",
+                                               "thumb_offset": "1000", "access_token": token})
     container = made["id"]
     _wait(container, token, "video", timeout, sleep, 5)
     return _publish_container(token, ig_id, container)
 
 
-def publish_carousel(
-    token: str, image_urls: list[str], caption: str, sleep=time.sleep, timeout: int = CONTAINER_WAIT
-) -> str:
+def publish_carousel(token: str, image_urls: list[str], caption: str, sleep=time.sleep,
+                     timeout: int = CONTAINER_WAIT) -> str:
     """Post the images as one carousel (2026-10-25: Tuesday's search slides, growth/social.py carousel);
     the new post's media id. Each image is a carousel item container, then one CAROUSEL container holds
     them and carries the caption, as Meta's content publishing guide orders it."""
@@ -304,37 +250,20 @@ def publish_carousel(
     ig_id = _ig_id(token)
     children = []
     for url in image_urls:
-        item = _request(
-            "POST",
-            f"{ig_id}/media",
-            {"image_url": url, "is_carousel_item": "true", "access_token": token},
-        )["id"]
+        item = _request("POST", f"{ig_id}/media", {"image_url": url, "is_carousel_item": "true",
+                                                   "access_token": token})["id"]
         _wait(item, token, "carousel image", timeout, sleep, 3)
         children.append(item)
-    container = _request(
-        "POST",
-        f"{ig_id}/media",
-        {
-            "media_type": "CAROUSEL",
-            "children": ",".join(children),
-            "caption": caption,
-            "access_token": token,
-        },
-    )["id"]
+    container = _request("POST", f"{ig_id}/media", {"media_type": "CAROUSEL", "children": ",".join(children),
+                                                    "caption": caption, "access_token": token})["id"]
     _wait(container, token, "carousel", timeout, sleep, 3)
     return _publish_container(token, ig_id, container)
 
 
-def record_status(
-    path: str | None, requested: str, outcome: str, reason: str | None = None
-) -> None:
+def record_status(path: str | None, requested: str, outcome: str, reason: str | None = None) -> None:
     """Finite operational result only: no tokens, captions, provider errors or subscriber data."""
-    status = {
-        "channel": "instagram",
-        "checked_at": datetime.now(timezone.utc).isoformat(),
-        "requested": requested,
-        "outcome": outcome,
-    }
+    status = {"channel": "instagram", "checked_at": datetime.now(timezone.utc).isoformat(),
+              "requested": requested, "outcome": outcome}
     if reason:
         status["reason"] = reason
     if path:
@@ -345,19 +274,13 @@ def record_status(
     if outcome == "card_fallback":
         # A Tuesday's carousel falls back the same way (2026-10-25). was: the Reel's words only.
         what = {"reel": "Reel"}.get(requested, requested)
-        print(
-            f"::warning title=Instagram {what} unavailable::Posted the picture card instead of the planned {what}. See the Instagram result artifact."
-        )
+        print(f"::warning title=Instagram {what} unavailable::Posted the picture card instead of the planned {what}. See the Instagram result artifact.")
     if outcome == "unknown":
-        print(
-            "::error title=Instagram publishing outcome unknown::The final publish may have succeeded. No retry or fallback was attempted. Check the product profile and provider before any manual retry."
-        )
+        print("::error title=Instagram publishing outcome unknown::The final publish may have succeeded. No retry or fallback was attempted. Check the product profile and provider before any manual retry.")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as f:
-            f.write(
-                f"\n### Instagram publishing result\n\nRequested: {requested}. Result: **{outcome}**.\n"
-            )
+            f.write(f"\n### Instagram publishing result\n\nRequested: {requested}. Result: **{outcome}**.\n")
             if reason:
                 f.write(f"Reason: `{reason}`.\n")
 
@@ -378,11 +301,7 @@ def main(argv: list[str]) -> int:
         return 0
     status_path = next((a.split("=", 1)[1] for a in argv if a.startswith("--status-file=")), None)
     # was: "reel" if post and post.get("reel") else "card" if post else "none"
-    requested = (
-        ("reel" if post.get("reel") else "carousel" if post.get("carousel_urls") else "card")
-        if post
-        else "none"
-    )
+    requested = ("reel" if post.get("reel") else "carousel" if post.get("carousel_urls") else "card") if post else "none"
     secret = os.environ.get("INSTAGRAM_TOKEN")
     if not secret:
         print("[instagram] no INSTAGRAM_TOKEN; nothing sent")
@@ -401,9 +320,7 @@ def main(argv: list[str]) -> int:
                 media_id = publish_reel(token, post["reel_url"], post["instagram_caption"])
             except (InstagramError, urllib.error.URLError, OSError) as e:
                 # Final publish uncertainty has its own exception and must bypass this fallback.
-                print(
-                    f"[instagram] reel failed ({type(e).__name__}: {e}); posting the card instead"
-                )
+                print(f"[instagram] reel failed ({type(e).__name__}: {e}); posting the card instead")
                 fallback_reason = "reel_publish_failed"
             else:
                 print(f"[instagram] reel posted: {media_id}")
@@ -416,16 +333,11 @@ def main(argv: list[str]) -> int:
             try:
                 for url in post["carousel_urls"]:
                     wait_for_image(url)
-                media_id = publish_carousel(
-                    token,
-                    post["carousel_urls"],
-                    post.get("carousel_caption") or post["instagram_caption"],
-                )
+                media_id = publish_carousel(token, post["carousel_urls"],
+                                            post.get("carousel_caption") or post["instagram_caption"])
             except (InstagramError, urllib.error.URLError, OSError) as e:
                 # As for a Reel: only a failure before the final publish falls back to the card.
-                print(
-                    f"[instagram] carousel failed ({type(e).__name__}: {e}); posting the card instead"
-                )
+                print(f"[instagram] carousel failed ({type(e).__name__}: {e}); posting the card instead")
                 fallback_reason = "carousel_publish_failed"
             else:
                 print(f"[instagram] carousel posted: {media_id}")
@@ -434,12 +346,7 @@ def main(argv: list[str]) -> int:
         wait_for_image(post["card_url"])
         print(f"[instagram] posted: {publish(token, post['card_url'], post['instagram_caption'])}")
         # was: "card_fallback" if requested == "reel" else "published_card"
-        record_status(
-            status_path,
-            requested,
-            "published_card" if requested == "card" else "card_fallback",
-            fallback_reason,
-        )
+        record_status(status_path, requested, "published_card" if requested == "card" else "card_fallback", fallback_reason)
         return 0
     except PublishOutcomeUnknown:
         record_status(status_path, requested, "unknown", "final_publish_unconfirmed")
@@ -458,20 +365,12 @@ def advice(error: str) -> str:
     code 200 with "API access blocked" (every run since 2026-09-29) is Meta restricting the app, and
     a new token will not fix that."""
     if "API access blocked" in error:
-        return (
-            "Meta has blocked this app's API access; a new token will not help. Open the app at "
-            "developers.facebook.com: check its Alerts, that it is Live (not Development), and that "
-            "the Instagram account is still connected to it (growth/README.md, Instagram)"
-        )
-    if (
-        " 190" in error
-        or "expired" in error.lower()
-        or ("invalid" in error.lower() and "token" in error.lower())
-    ):
-        return (
-            "the token is invalid or expired: generate a new one in Meta's app dashboard and replace "
-            "the INSTAGRAM_TOKEN secret (growth/README.md, Instagram)"
-        )
+        return ("Meta has blocked this app's API access; a new token will not help. Open the app at "
+                "developers.facebook.com: check its Alerts, that it is Live (not Development), and that "
+                "the Instagram account is still connected to it (growth/README.md, Instagram)")
+    if " 190" in error or "expired" in error.lower() or ("invalid" in error.lower() and "token" in error.lower()):
+        return ("the token is invalid or expired: generate a new one in Meta's app dashboard and replace "
+                "the INSTAGRAM_TOKEN secret (growth/README.md, Instagram)")
     return "see Meta's message above (growth/README.md, Instagram)"
 
 

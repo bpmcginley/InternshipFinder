@@ -9,7 +9,6 @@ Most of UHN's 200 or so openings are staff roles; the student ones (summer stude
 students, co-ops) come in seasons, so a run with none is normal. Added 2026-09-30 with Canada, for
 the health, research and biology majors the Canadian job boards barely served.
 """
-
 from __future__ import annotations
 from .base import client
 from .common import ScanCounts, board_item, report_source
@@ -34,17 +33,9 @@ def parse_uhn(payload: dict, counts: ScanCounts | None = None) -> list[dict]:
             continue
         site, dept = (j.get("site") or "").strip(), (j.get("department") or "").strip()
         about = " · ".join(x for x in (site, dept, emp) if x)
-        out.append(
-            board_item(
-                {"name": "University Health Network", "sector": "health"},
-                source="uhn",
-                title=title,
-                locations=[WHERE],
-                url=POSTING_URL.format(id=j["id"]),
-                description=about,
-                employment_type=emp,
-            )
-        )
+        out.append(board_item({"name": "University Health Network", "sector": "health"}, source="uhn",
+                              title=title, locations=[WHERE],
+                              url=POSTING_URL.format(id=j["id"]), description=about, employment_type=emp))
     return out
 
 
@@ -59,7 +50,7 @@ def fetch_uhn(report=None) -> list[dict]:
             if not isinstance(rows, list) or not all(isinstance(j, dict) for j in rows):
                 raise ValueError("UHN job list is missing its data rows")
             counts.rows(len(rows))
-            counts.reported(len(rows))  # one unpaged call: the list is every opening
+            counts.reported(len(rows))   # one unpaged call: the list is every opening
             out = parse_uhn(payload, counts)
     except Exception as e:
         print(f"[uhn] failed: {type(e).__name__}")

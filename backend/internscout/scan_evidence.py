@@ -21,16 +21,13 @@ keywords (a "Summer Analyst" never answers searchText="intern"), so that evidenc
 Adapters in neither set (iCIMS portal, SuccessFactors, Jobvite, JazzHR) scrape HTML with no
 result total to check against, and never signal completion.
 """
-
 from __future__ import annotations
 from urllib.parse import urlsplit
 
-FULL_LIST = frozenset(
-    {"greenhouse", "lever", "ashby", "recruitee", "workable", "bamboohr", "rippling", "adp"}
-)
-SEARCH_SCOPED = frozenset(
-    {"workday", "oracle", "smartrecruiters", "taleo", "eightfold", "icims_site"}
-)
+FULL_LIST = frozenset({"greenhouse", "lever", "ashby", "recruitee", "workable", "bamboohr",
+                       "rippling", "adp"})
+SEARCH_SCOPED = frozenset({"workday", "oracle", "smartrecruiters", "taleo", "eightfold",
+                           "icims_site"})
 AUTHORITATIVE = FULL_LIST | SEARCH_SCOPED
 # Adapters whose registry token is the board's host, which discover.ats_of cannot read back out
 # of a posting URL (it has no "?icims=1" on it). The source link's own name says which ATS it is.
@@ -59,7 +56,6 @@ def canonical(completed) -> set[tuple[str, str]]:
 def url_board(url: str | None, source: str | None = None) -> tuple[str, str] | None:
     """The (ats, token) board a posting URL belongs to, or None when it cannot be recovered."""
     from .discover import ats_of
-
     ats, token = ats_of(url)
     if token:
         return evidence_key(ats, token)

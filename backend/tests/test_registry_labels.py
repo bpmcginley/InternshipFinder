@@ -1,5 +1,4 @@
 """Employer names and sectors that once went wrong in the board registry (2026-10-14)."""
-
 import json
 import os
 

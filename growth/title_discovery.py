@@ -7,7 +7,6 @@ publishes nothing and never infers degree eligibility from a field tag.
 2026-11-02: was: campaign packs offered only a rotating tip and a real search.
 Revert: remove this module, its tests and the supplemental campaign workflow step.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -24,41 +23,20 @@ sys.path.insert(0, str(HERE.parent / "backend"))
 from internscout import seo_pages as sp  # noqa: E402
 
 # These are topic tags, not majors or employer eligibility requirements.
-FIELDS = (
-    "finance",
-    "marketing",
-    "operations",
-    "accounting",
-    "supply_chain",
-    "government",
-    "environmental",
-    "hr",
-    "mechanical",
-    "industrial",
-)
+FIELDS = ("finance", "marketing", "operations", "accounting", "supply_chain",
+          "government", "environmental", "hr", "mechanical", "industrial")
 STATES = ("CT", "MA", "ME", "NH", "NJ", "NY", "RI", "VT", "remote")
 MAX_AGE = timedelta(hours=48)
 FUTURE_TOLERANCE = timedelta(minutes=5)
 MIN_ROLES = 30
 TITLES_PER_SHEET = 4
 SHEET_COUNT = 3
-ELIGIBILITY_NOTE = (
-    "Field tags are search categories, not degree eligibility. Check each employer's requirements."
-)
+ELIGIBILITY_NOTE = "Field tags are search categories, not degree eligibility. Check each employer's requirements."
 SNAPSHOT_NOTE = "Listed open in this snapshot; availability can change."
-AGGREGATOR_HOSTS = {
-    "jooble.org",
-    "indeed.com",
-    "glassdoor.com",
-    "ziprecruiter.com",
-    "simplyhired.com",
-    "talent.com",
-}
+AGGREGATOR_HOSTS = {"jooble.org", "indeed.com", "glassdoor.com", "ziprecruiter.com", "simplyhired.com", "talent.com"}
 CHANNELS = ("tiktok", "instagram", "facebook", "youtube")
 GRADUATE_TITLE = re.compile(r"\b(?:pharmd|ph\.?d\.?|doctoral|m\.?b\.?a\.?)\b", re.I)
-MARKETING_EXAMPLE = re.compile(
-    r"\b(?:marketing|advertising|brand(?:ing)?|communications?|social\s+media|content)\b", re.I
-)
+MARKETING_EXAMPLE = re.compile(r"\b(?:marketing|advertising|brand(?:ing)?|communications?|social\s+media|content)\b", re.I)
 
 
 def source_url(value: object) -> str | None:
@@ -75,18 +53,9 @@ def source_url(value: object) -> str | None:
     try:
         p = urlsplit(value)
         host = (p.hostname or "").lower().rstrip(".")
-        if (
-            p.scheme != "https"
-            or p.username is not None
-            or p.password is not None
-            or p.port not in (None, 443)
-        ):
+        if p.scheme != "https" or p.username is not None or p.password is not None or p.port not in (None, 443):
             return None
-        if (
-            not host
-            or "." not in host
-            or host.endswith((".local", ".localhost", ".internal", ".invalid", ".test"))
-        ):
+        if not host or "." not in host or host.endswith((".local", ".localhost", ".internal", ".invalid", ".test")):
             return None
         if any(host == blocked or host.endswith("." + blocked) for blocked in AGGREGATOR_HOSTS):
             return None
@@ -107,14 +76,9 @@ def source_url(value: object) -> str | None:
 def url_key(url: str) -> str:
     """Ignore only known advertising tags and fragments when finding duplicate links."""
     p = urlsplit(url)
-    query = sorted(
-        (k, v)
-        for k, v in parse_qsl(p.query, keep_blank_values=True)
-        if not k.lower().startswith("utm_") and k.lower() not in {"gclid", "fbclid"}
-    )
-    return urlunsplit(
-        (p.scheme, p.netloc.lower().removesuffix(":443"), p.path.rstrip("/"), urlencode(query), "")
-    )
+    query = sorted((k, v) for k, v in parse_qsl(p.query, keep_blank_values=True)
+                   if not k.lower().startswith("utm_") and k.lower() not in {"gclid", "fbclid"})
+    return urlunsplit((p.scheme, p.netloc.lower().removesuffix(":443"), p.path.rstrip("/"), urlencode(query), ""))
 
 
 def _text(value: object) -> str:
@@ -143,27 +107,16 @@ def make_pack(data: dict, now: datetime) -> dict:
         if not isinstance(row, dict):
             continue
         title, employer = _text(row.get("title")), _text(row.get("company_name"))
-        if (
-            row.get("status") != "open"
-            or not row.get("id")
-            or not source_url(row.get("apply_url"))
-            or not _recent(row.get("last_seen"), now)
-            or not title
-            or len(title) > 110
-            or not employer
-            or len(employer) > 80
-            or GRADUATE_TITLE.search(title)
-            or not set(row.get("keys") or []) & set(STATES)
-            or not set(row.get("stage") or []) & {"internship", "co_op", "research"}
-        ):
+        if (row.get("status") != "open" or not row.get("id") or not source_url(row.get("apply_url"))
+                or not _recent(row.get("last_seen"), now) or not title or len(title) > 110
+                or not employer or len(employer) > 80 or GRADUATE_TITLE.search(title)
+                or not set(row.get("keys") or []) & set(STATES)
+                or not set(row.get("stage") or []) & {"internship", "co_op", "research"}):
             continue
         rows.append(row)
     # Break ties explicitly, including when the same role appears in several shards.
     rows.sort(key=lambda r: (str(r["id"]), r["apply_url"]))
-    rows.sort(
-        key=lambda r: _time(r.get("first_seen")) or datetime.min.replace(tzinfo=timezone.utc),
-        reverse=True,
-    )
+    rows.sort(key=lambda r: _time(r.get("first_seen")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     # Merge connected duplicate groups, including a copy sharing a URL with one
     # row and an employer/title with another. Simple sequential sets miss that case.
     parents, owners = list(range(len(rows))), {}
@@ -175,11 +128,8 @@ def make_pack(data: dict, now: datetime) -> dict:
         return index
 
     for index, row in enumerate(rows):
-        keys = (
-            ("id", str(row["id"])),
-            ("url", url_key(row["apply_url"])),
-            ("role", sp.employer_key(row["company_name"]), _text(row["title"]).casefold()),
-        )
+        keys = (("id", str(row["id"])), ("url", url_key(row["apply_url"])),
+                ("role", sp.employer_key(row["company_name"]), _text(row["title"]).casefold()))
         for key in keys:
             if key in owners:
                 a, b = root(index), root(owners[key])
@@ -188,7 +138,6 @@ def make_pack(data: dict, now: datetime) -> dict:
                 owners[key] = index
     unique = [row for index, row in enumerate(rows) if root(index) == index]
     from campaign import tagged, week_tag
-
     campaign = f"title-discovery-{week_tag(now)}"
     sheets = []
     for field in FIELDS:
@@ -208,86 +157,56 @@ def make_pack(data: dict, now: datetime) -> dict:
                 continue
             titles.add(title_key)
             employers.add(employer_key)
-            selected.append(
-                {
-                    "id": str(row["id"]),
-                    "title": title,
-                    "employer": employer,
-                    "source_title": row["title"],
-                    "source_company_name": row["company_name"],
-                    "source_url": row["apply_url"],
-                    "field_tags": row["field_tags"],
-                    "last_seen": row["last_seen"],
-                    "first_seen": row.get("first_seen"),
-                    "locations": sorted(set(row["keys"]) & set(STATES)),
-                }
-            )
+            selected.append({"id": str(row["id"]), "title": title, "employer": employer,
+                             "source_title": row["title"], "source_company_name": row["company_name"],
+                             "source_url": row["apply_url"], "field_tags": row["field_tags"],
+                             "last_seen": row["last_seen"], "first_seen": row.get("first_seen"),
+                             "locations": sorted(set(row["keys"]) & set(STATES))})
             if len(selected) == TITLES_PER_SHEET:
                 break
         if len(selected) != TITLES_PER_SHEET:
             continue
         label = sp.field_title(field)
         url = sp.SITE + "/?" + urlencode({"field": field, "state": ",".join(STATES)}, safe=",")
-        sheet = {
-            "field": field,
-            "field_label": label,
-            "image": f"{field}.png",
-            "dashboard_url": url,
-            "eligible_distinct_title_employer_pairs": len(candidates),
-            "eligible_role_ids": sorted(str(r["id"]) for r in candidates),
-            "roles": selected,
-        }
-        sheet["caption"] = (
-            f"Searching for {label.lower()} internships? Try these actual posting titles.\n\n"
-            + "\n".join(f"{r['title']} | {r['employer']}" for r in selected)
-            + f"\n\nExamples tagged {label} in InternScout's Northeast / remote results. "
-            + f"Snapshot: {export:%Y-%m-%d %H:%M} UTC. {SNAPSHOT_NOTE}\n"
-            + f"{ELIGIBILITY_NOTE}\n\nSearch the field: {url}\n"
-            + "Keep this list for your next search or send it to a classmate exploring this field."
-        )
+        sheet = {"field": field, "field_label": label, "image": f"{field}.png",
+                 "dashboard_url": url, "eligible_distinct_title_employer_pairs": len(candidates),
+                 "eligible_role_ids": sorted(str(r["id"]) for r in candidates), "roles": selected}
+        sheet["caption"] = (f"Searching for {label.lower()} internships? Try these actual posting titles.\n\n"
+                            + "\n".join(f"{r['title']} | {r['employer']}" for r in selected)
+                            + f"\n\nExamples tagged {label} in InternScout's Northeast / remote results. "
+                            + f"Snapshot: {export:%Y-%m-%d %H:%M} UTC. {SNAPSHOT_NOTE}\n"
+                            + f"{ELIGIBILITY_NOTE}\n\nSearch the field: {url}\n"
+                            + "Keep this list for your next search or send it to a classmate exploring this field.")
         path = url.removeprefix(sp.SITE)
         sheet["captions_by_channel"] = {
-            channel: sheet["caption"].replace(
-                url, tagged(path, channel, campaign, f"titles_{field}")
-            )
-            for channel in CHANNELS
-        }
+            channel: sheet["caption"].replace(url, tagged(path, channel, campaign, f"titles_{field}"))
+            for channel in CHANNELS}
         sheets.append(sheet)
         if len(sheets) == SHEET_COUNT:
             break
     if len(sheets) != SHEET_COUNT:
-        raise ValueError(
-            "need three fields with 30 recent distinct title/employer pairs and four different employers"
-        )
+        raise ValueError("need three fields with 30 recent distinct title/employer pairs and four different employers")
     oldest = min([export] + [_time(r["last_seen"]) for s in sheets for r in s["roles"]])
-    return {
-        "schema_version": 1,
-        "generated_at": now.isoformat(),
-        "snapshot_at": export.isoformat(),
-        "expires_at": (oldest + MAX_AGE).isoformat(),
-        "published": False,
-        "campaign": campaign,
-        "eligibility_note": ELIGIBILITY_NOTE,
-        "snapshot_note": SNAPSHOT_NOTE,
-        "scope": "Northeast US and remote listing shards; field tags are not majors",
-        "methodology": "Open internship/co-op/research rows, export and last_seen within 48 hours. "
-        "Public HTTPS source URLs, excluding known aggregators; dedupe by ID, URL and employer/title. "
-        "Pick configured non-CS fields with 30 eligible pairs, then four recent titles "
-        "from distinct employers. Exclude titles explicitly naming PharmD, PhD, doctoral or MBA; "
-        "this does not prove undergraduate eligibility for remaining rows. "
-        "Marketing examples require an explicit marketing/advertising/brand/communications/"
-        "social media/content title term; tagged supply counts retain all otherwise eligible rows. "
-        "Title and employer whitespace normalized only. "
-        "No source-page fetch or independent live-availability verification.",
-        "sheets": sheets,
-    }
+    return {"schema_version": 1, "generated_at": now.isoformat(), "snapshot_at": export.isoformat(),
+            "expires_at": (oldest + MAX_AGE).isoformat(), "published": False, "campaign": campaign,
+            "eligibility_note": ELIGIBILITY_NOTE, "snapshot_note": SNAPSHOT_NOTE,
+            "scope": "Northeast US and remote listing shards; field tags are not majors",
+            "methodology": "Open internship/co-op/research rows, export and last_seen within 48 hours. "
+                           "Public HTTPS source URLs, excluding known aggregators; dedupe by ID, URL and employer/title. "
+                           "Pick configured non-CS fields with 30 eligible pairs, then four recent titles "
+                           "from distinct employers. Exclude titles explicitly naming PharmD, PhD, doctoral or MBA; "
+                           "this does not prove undergraduate eligibility for remaining rows. "
+                           "Marketing examples require an explicit marketing/advertising/brand/communications/"
+                           "social media/content title term; tagged supply counts retain all otherwise eligible rows. "
+                           "Title and employer whitespace normalized only. "
+                           "No source-page fetch or independent live-availability verification.",
+            "sheets": sheets}
 
 
 def render_sheet(sheet: dict, snapshot_at: str):
     """Reuse the campaign's palette/fonts; never silently truncate a factual title."""
     from PIL import Image, ImageDraw
     from cards import ACCENT, INK, INK2, PAPER, SOFT, font
-
     image = Image.new("RGB", (1080, 1350), PAPER)
     draw = ImageDraw.Draw(image)
     margin, width = 72, 936
@@ -316,9 +235,7 @@ def render_sheet(sheet: dict, snapshot_at: str):
     f, text, step = lines(sheet["field_label"], 44, "sans_bold", 1)
     draw.text((margin, 100), text[0], font=f, fill=PAPER)
     draw.text((margin, 211), "Try these job titles", font=font("serif", 58), fill=INK)
-    draw.text(
-        (margin, 290), "Four real postings to broaden your search", font=font("sans", 32), fill=INK2
-    )
+    draw.text((margin, 290), "Four real postings to broaden your search", font=font("sans", 32), fill=INK2)
     y = 361
     for index, row in enumerate(sheet["roles"], 1):
         draw.line((margin, y - 17, 1008, y - 17), fill=SOFT, width=3)
@@ -331,55 +248,33 @@ def render_sheet(sheet: dict, snapshot_at: str):
         y = 361 + index * 158
     draw.rectangle((0, 1015, 1080, 1350), fill=SOFT)
     y = 1043
-    for text in (
-        "Northeast / remote examples. Listed open in the snapshot.",
-        ELIGIBILITY_NOTE,
-        f"Snapshot: {_time(snapshot_at):%Y-%m-%d %H:%M} UTC. Recheck availability.",
-    ):
+    for text in ("Northeast / remote examples. Listed open in the snapshot.",
+                 ELIGIBILITY_NOTE, f"Snapshot: {_time(snapshot_at):%Y-%m-%d %H:%M} UTC. Recheck availability."):
         f, text_lines, step = lines(text, 27, max_lines=2)
         for line in text_lines:
             draw.text((margin, y), line, font=f, fill=INK2)
             y += step
         y += 11
-    draw.text(
-        (margin, 1285), "internscout.org  |  Free search", font=font("sans_bold", 31), fill=ACCENT
-    )
+    draw.text((margin, 1285), "internscout.org  |  Free search", font=font("sans_bold", 31), fill=ACCENT)
     return image
 
 
 def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict:
     pack = make_pack(sp.load(site_dir), now or datetime.now(timezone.utc))
     # Render all sheets before writing; a layout failure cannot leave a half-written new pack.
-    images = [
-        (sheet["image"], render_sheet(sheet, pack["snapshot_at"])) for sheet in pack["sheets"]
-    ]
+    images = [(sheet["image"], render_sheet(sheet, pack["snapshot_at"])) for sheet in pack["sheets"]]
     out = Path(out_dir)
     if out.exists() and any(out.iterdir()):
         raise ValueError("output directory must be empty; use a new dated directory")
     out.mkdir(parents=True, exist_ok=True)
     for name, image in images:
         image.save(out / name, format="PNG")
-    (out / "pack.json").write_text(
-        json.dumps(pack, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    (out / "captions.json").write_text(
-        json.dumps(
-            {s["field"]: s["captions_by_channel"] for s in pack["sheets"]},
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    (out / "captions.txt").write_text(
-        "\n\n---\n\n".join(
-            f"{s['field_label']} / {channel}\n\n{caption}"
-            for s in pack["sheets"]
-            for channel, caption in s["captions_by_channel"].items()
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    (out / "pack.json").write_text(json.dumps(pack, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "captions.json").write_text(json.dumps({s["field"]: s["captions_by_channel"] for s in pack["sheets"]},
+                                                  ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "captions.txt").write_text("\n\n---\n\n".join(
+        f"{s['field_label']} / {channel}\n\n{caption}"
+        for s in pack["sheets"] for channel, caption in s["captions_by_channel"].items()) + "\n", encoding="utf-8")
     (out / "REVIEW.txt").write_text(
         "DRAFTS ONLY. Nothing has been posted.\n\n"
         "Before release, open all 12 source URLs in pack.json and confirm the posting, title and current availability.\n"
@@ -390,8 +285,7 @@ def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict:
         "The supplied dashboard URL is a filtered search; it does not freeze these exact examples.\n"
         "Channel captions use only the existing bounded anonymous campaign tags. Intent counts are not confirmed installs or subscribers.\n"
         "Four examples are not a complete list, a job-market estimate or degree-eligibility advice.\n",
-        encoding="utf-8",
-    )
+        encoding="utf-8")
     return pack
 
 
@@ -405,9 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as error:
         print(f"[title-discovery] refused: {error}", file=sys.stderr)
         return 1
-    print(
-        f"[title-discovery] wrote {len(pack['sheets'])} draft sheets to {args.out}; nothing posted"
-    )
+    print(f"[title-discovery] wrote {len(pack['sheets'])} draft sheets to {args.out}; nothing posted")
     return 0
 
 

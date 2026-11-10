@@ -4,7 +4,6 @@ was: selected fixtures checked a few top-level objects, leaving nested JobPostin
 invisible FAQ regressions uncovered. Revert: remove this file and its schema guards.
 These are offline schema contracts, not a claim of Google rich-result eligibility.
 """
-
 from html import unescape
 from html.parser import HTMLParser
 from datetime import date
@@ -22,22 +21,8 @@ class _Visible(HTMLParser):
     # 2026-10-23: hidden ancestors must not make an invisible answer pass the schema check.
     # was: only head/script/style/template were excluded, using a tag counter.
     # Revert: restore the counter and remove the hidden-subtree regression cases below.
-    VOID = {
-        "area",
-        "base",
-        "br",
-        "col",
-        "embed",
-        "hr",
-        "img",
-        "input",
-        "link",
-        "meta",
-        "param",
-        "source",
-        "track",
-        "wbr",
-    }
+    VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+            "param", "source", "track", "wbr"}
 
     def __init__(self, html):
         super().__init__()
@@ -47,24 +32,17 @@ class _Visible(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        style = dict(
-            (
-                key.strip().lower(),
-                re.sub(r"\s*!important\s*$", "", value.strip(), flags=re.I).lower(),
-            )
-            for declaration in (attrs.get("style") or "").split(";")
-            if ":" in declaration
-            for key, value in [declaration.split(":", 1)]
-        )
-        hidden = (
-            bool(self.stack and self.stack[-1][1])
-            or tag in {"head", "script", "style", "template"}
-            or "hidden" in attrs
-            or (attrs.get("aria-hidden") or "").strip().lower() == "true"
-            or style.get("display") == "none"
-            or style.get("visibility") in {"hidden", "collapse"}
-            or style.get("content-visibility") == "hidden"
-        )
+        style = dict((key.strip().lower(), re.sub(r"\s*!important\s*$", "", value.strip(),
+                                                 flags=re.I).lower())
+                     for declaration in (attrs.get("style") or "").split(";")
+                     if ":" in declaration
+                     for key, value in [declaration.split(":", 1)])
+        hidden = (bool(self.stack and self.stack[-1][1])
+                  or tag in {"head", "script", "style", "template"}
+                  or "hidden" in attrs or (attrs.get("aria-hidden") or "").strip().lower() == "true"
+                  or style.get("display") == "none"
+                  or style.get("visibility") in {"hidden", "collapse"}
+                  or style.get("content-visibility") == "hidden")
         # Void elements have no subtree, so a hidden input cannot hide its following siblings.
         if tag not in self.VOID:
             self.stack.append((tag, hidden))
@@ -174,57 +152,29 @@ def collection_pages(tmp_path):
     data = tmp_path / "data"
     listings = data / "listings"
     listings.mkdir(parents=True)
-    rows = [
-        {
-            "id": f"role-{i}",
-            "company_name": ["Apex Robotics", "Boreal Systems", "Cobalt Labs"][i // 10],
-            "title": f"Mechanical internship {i}",
-            "field_tags": ["mechanical"],
-            "stage": ["internship"],
-            "term": "Summer 2027",
-            "salary": "$25/hr",
-            "posted_at": "2026-10-20T00:00:00",
-            "first_seen": "2026-10-20T00:00:00",
-            "regions": [
-                {
-                    "loc": "Boston, MA" if i < 24 else "New York, NY",
-                    "kind": "x",
-                    "state": "MA" if i < 24 else "NY",
-                }
-            ],
-            "apply_url": f"https://jobs.example.com/{i}",
-            "status": "open",
-            "is_remote": False,
-        }
-        for i in range(30)
-    ]
+    rows = [{
+        "id": f"role-{i}", "company_name": ["Apex Robotics", "Boreal Systems", "Cobalt Labs"][i // 10],
+        "title": f"Mechanical internship {i}", "field_tags": ["mechanical"],
+        "stage": ["internship"], "term": "Summer 2027", "salary": "$25/hr",
+        "posted_at": "2026-10-20T00:00:00", "first_seen": "2026-10-20T00:00:00",
+        "regions": [{"loc": "Boston, MA" if i < 24 else "New York, NY", "kind": "x",
+                     "state": "MA" if i < 24 else "NY"}],
+        "apply_url": f"https://jobs.example.com/{i}", "status": "open", "is_remote": False,
+    } for i in range(30)]
     (listings / "MA.json").write_text(json.dumps(rows), encoding="utf-8")
-    (listings / "index.json").write_text(
-        json.dumps(
-            {
-                "generated_at": "2026-10-21T12:00:00+00:00",
-                "files": {"MA": {"file": "listings/MA.json"}},
-            }
-        ),
-        encoding="utf-8",
-    )
+    (listings / "index.json").write_text(json.dumps({
+        "generated_at": "2026-10-21T12:00:00+00:00", "files": {"MA": {"file": "listings/MA.json"}},
+    }), encoding="utf-8")
     (data / "majors.json").write_text('{"majors": []}', encoding="utf-8")
     return {p["path"]: p for p in seo_pages.build(str(tmp_path))}
 
 
 def test_all_generated_page_schemas_and_required_page_types(collection_pages):
     required = {
-        "/internships/",
-        "/internships/for/",
-        "/internships/at/",
-        "/internships/mechanical-engineering/",
-        "/internships/massachusetts/",
-        "/internships/mechanical-engineering/massachusetts/",
-        "/internships/at/apex-robotics/",
-        "/about/",
-        "/compare/",
-        "/pricing/",
-        "/internships/by-the-numbers/",
+        "/internships/", "/internships/for/", "/internships/at/",
+        "/internships/mechanical-engineering/", "/internships/massachusetts/",
+        "/internships/mechanical-engineering/massachusetts/", "/internships/at/apex-robotics/",
+        "/about/", "/compare/", "/pricing/", "/internships/by-the-numbers/",
     }
     assert required <= collection_pages.keys()
     for path, page in collection_pages.items():
@@ -261,17 +211,9 @@ def test_product_without_google_required_offers_or_ratings_is_rejected():
 
 
 def test_nested_job_posting_is_rejected():
-    bad = seo_pages.ld_script(
-        {
-            "@context": "https://schema.org",
-            "@graph": [
-                {
-                    "@type": "ItemList",
-                    "itemListElement": [{"@type": "JobPosting", "title": "Hidden job"}],
-                },
-            ],
-        }
-    )
+    bad = seo_pages.ld_script({"@context": "https://schema.org", "@graph": [
+        {"@type": "ItemList", "itemListElement": [{"@type": "JobPosting", "title": "Hidden job"}]},
+    ]})
     with pytest.raises(AssertionError):
         _assert_collection_schema(bad, "/internships/")
 
@@ -282,20 +224,12 @@ def test_invisible_faq_answer_is_rejected():
         _assert_collection_schema(bad + "<h2>A visible question?</h2>", "/internships/")
 
 
-@pytest.mark.parametrize(
-    "attrs",
-    [
-        "hidden",
-        'hidden=""',
-        'aria-hidden="true"',
-        'aria-hidden=" TRUE "',
-        'style="display: none"',
-        'style="DISPLAY: NONE !important; color: red"',
-        'style="visibility: hidden"',
-        'style="visibility: collapse"',
-        'style="content-visibility: hidden"',
-    ],
-)
+@pytest.mark.parametrize("attrs", [
+    "hidden", 'hidden=""', 'aria-hidden="true"', 'aria-hidden=" TRUE "',
+    'style="display: none"', 'style="DISPLAY: NONE !important; color: red"',
+    'style="visibility: hidden"', 'style="visibility: collapse"',
+    'style="content-visibility: hidden"',
+])
 def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
     question, answer = "A visible question?", "An answer readers cannot see."
     ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
@@ -305,17 +239,11 @@ def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
         _assert_collection_schema(html, "/internships/")
 
 
-@pytest.mark.parametrize(
-    "prefix",
-    [
-        '<input type="hidden">',
-        '<img hidden src="x.png">',
-        '<br hidden>',
-        '<img hidden />',
-        '<div hidden><input type="hidden"><p>Do not include this.</p></div>',
-        '<div aria-hidden="true"><span>Do not include this.</span></div>',
-    ],
-)
+@pytest.mark.parametrize("prefix", [
+    '<input type="hidden">', '<img hidden src="x.png">', '<br hidden>', '<img hidden />',
+    '<div hidden><input type="hidden"><p>Do not include this.</p></div>',
+    '<div aria-hidden="true"><span>Do not include this.</span></div>',
+])
 def test_hidden_void_elements_and_closed_subtrees_do_not_hide_visible_siblings(prefix):
     question, answer = "A visible question?", "A visible answer."
     ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))

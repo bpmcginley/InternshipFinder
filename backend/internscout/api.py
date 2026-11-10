@@ -1,5 +1,4 @@
 """FastAPI app: JSON endpoints + serves the single-file dashboard."""
-
 from __future__ import annotations
 import os
 from datetime import datetime, timezone
@@ -15,9 +14,7 @@ from .config import PROFILE
 app = FastAPI(title="InternScout")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-FRONTEND = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "index.html"
-)
+FRONTEND = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "index.html")
 
 
 @app.on_event("startup")
@@ -27,21 +24,12 @@ def _startup():
 
 def _to_out(row: Listing) -> ListingOut:
     return ListingOut(
-        id=row.id,
-        company_name=row.company_name,
-        title=row.title,
-        field_tags=row.field_tags or [],
-        term=row.term,
-        location_raw=row.location_raw,
-        is_remote=row.is_remote,
-        within_radius=row.within_radius,
-        distance_miles=row.distance_miles,
-        apply_url=row.apply_url,
-        status=row.status,
-        relevance_score=row.relevance_score,
-        is_new=row.is_new,
-        first_seen=row.first_seen,
-        last_seen=row.last_seen,
+        id=row.id, company_name=row.company_name, title=row.title,
+        field_tags=row.field_tags or [], term=row.term, location_raw=row.location_raw,
+        is_remote=row.is_remote, within_radius=row.within_radius,
+        distance_miles=row.distance_miles, apply_url=row.apply_url, status=row.status,
+        relevance_score=row.relevance_score, is_new=row.is_new,
+        first_seen=row.first_seen, last_seen=row.last_seen,
         app_state=row.application.state if row.application else "none",
         sources=[{"source": s.source, "source_url": s.source_url} for s in row.source_links],
     )
@@ -50,11 +38,9 @@ def _to_out(row: Listing) -> ListingOut:
 @app.get("/api/profile")
 def get_profile():
     return {
-        "name": PROFILE.name,
-        "fields": PROFILE.fields,
+        "name": PROFILE.name, "fields": PROFILE.fields,
         "terms": [f"{s} {y}" for s, y in PROFILE.terms],
-        "center_city": PROFILE.center_city,
-        "radius_miles": PROFILE.radius_miles,
+        "center_city": PROFILE.center_city, "radius_miles": PROFILE.radius_miles,
         "include_remote": PROFILE.include_remote,
     }
 
@@ -65,9 +51,7 @@ def stats():
         total = db.scalar(select(func.count()).select_from(Listing))
         open_ = db.scalar(select(func.count()).where(Listing.status == "open"))
         new = db.scalar(select(func.count()).where(Listing.is_new == True))  # noqa: E712
-        applied = db.scalar(
-            select(func.count()).select_from(Application).where(Application.state == "applied")
-        )
+        applied = db.scalar(select(func.count()).select_from(Application).where(Application.state == "applied"))
         return {"total": total or 0, "open": open_ or 0, "new": new or 0, "applied": applied or 0}
 
 
@@ -87,9 +71,7 @@ def listings(
         stmt = select(Listing)
         if q:
             like = f"%{q.lower()}%"
-            stmt = stmt.where(
-                func.lower(Listing.company_name).like(like) | func.lower(Listing.title).like(like)
-            )
+            stmt = stmt.where(func.lower(Listing.company_name).like(like) | func.lower(Listing.title).like(like))
         if field:
             stmt = stmt.where(Listing.field_tags.like(f'%"{field}"%'))
         if status:
@@ -101,10 +83,8 @@ def listings(
         elif location == "radius":
             stmt = stmt.where(Listing.within_radius == True)  # noqa: E712
         elif location == "in_city":
-            stmt = stmt.where(
-                func.lower(Listing.location_raw).like("%boston%")
-                | func.lower(Listing.location_raw).like("%cambridge%")
-            )
+            stmt = stmt.where(func.lower(Listing.location_raw).like("%boston%") |
+                              func.lower(Listing.location_raw).like("%cambridge%"))
         if sort == "score":
             stmt = stmt.order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         elif sort == "new":

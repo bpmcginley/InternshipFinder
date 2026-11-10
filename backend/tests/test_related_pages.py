@@ -1,43 +1,24 @@
 """2026-10-23: recommendation quality must not change page eligibility or factual counts."""
-
 from copy import deepcopy
 from internscout.related_pages import SECTIONS, prefer_indexed
 
 
 def page(path, *, indexed=True, kind=None, ids=(), body="", h1="Field"):
-    return {
-        "path": path,
-        "index": indexed,
-        "thin": not indexed,
-        "kind": kind,
-        "items": [{"id": i} for i in ids],
-        "h1": h1,
-        "lastmod": "2026-10-01",
-        "html": '<main>' + body + '</main>',
-    }
+    return {"path": path, "index": indexed, "thin": not indexed, "kind": kind,
+            "items": [{"id": i} for i in ids], "h1": h1, "lastmod": "2026-10-01",
+            "html": '<main>' + body + '</main>'}
 
 
 def related(*targets):
-    return (
-        '<section class="rel"><h2>Related</h2><ul>'
-        + ''.join(
-            f'<li><a href="{p}">Local field</a> <span class="n">5</span></li>' for p in targets
-        )
-        + '</ul></section>'
-    )
+    return '<section class="rel"><h2>Related</h2><ul>' + ''.join(
+        f'<li><a href="{p}">Local field</a> <span class="n">5</span></li>' for p in targets) + '</ul></section>'
 
 
 def test_thin_combo_falls_back_to_real_field_with_accurate_all_place_count():
-    pages = [
-        page('/internships/engineering/', kind='field', ids=range(30), h1='Engineering & research'),
-        page('/internships/engineering/maine/', indexed=False, kind='combo', ids=range(5)),
-        page(
-            '/internships/maine/',
-            kind='state',
-            ids=range(5),
-            body=related('/internships/engineering/maine/'),
-        ),
-    ]
+    pages = [page('/internships/engineering/', kind='field', ids=range(30), h1='Engineering & research'),
+             page('/internships/engineering/maine/', indexed=False, kind='combo', ids=range(5)),
+             page('/internships/maine/', kind='state', ids=range(5),
+                  body=related('/internships/engineering/maine/'))]
     before = deepcopy(pages)
     prefer_indexed(pages)
     text = pages[-1]['html']
@@ -49,17 +30,13 @@ def test_thin_combo_falls_back_to_real_field_with_accurate_all_place_count():
     assert '<details class="browse-more">' in text
     assert 'href="/internships/engineering/maine/"' in text
     for old, new in zip(before, pages):
-        assert {k: v for k, v in old.items() if k != 'html'} == {
-            k: v for k, v in new.items() if k != 'html'
-        }
+        assert {k: v for k, v in old.items() if k != 'html'} == {k: v for k, v in new.items() if k != 'html'}
 
 
 def test_recommendations_keep_indexed_targets_and_dedupe_fallbacks():
     field = page('/internships/engineering/', kind='field', ids=range(30))
     thin = [page(f'/internships/engineering/{p}/', indexed=False) for p in ['maine', 'vermont']]
-    source = page(
-        '/internships/at/acme/', ids=[1], body=related(*(p['path'] for p in thin), field['path'])
-    )
+    source = page('/internships/at/acme/', ids=[1], body=related(*(p['path'] for p in thin), field['path']))
     prefer_indexed([field, *thin, source])
     assert source['html'].count('href="/internships/engineering/"') == 1
 
@@ -97,12 +74,8 @@ def test_no_fabricated_field_when_no_indexed_field_shares_a_role():
 def test_a_field_already_recommended_is_not_repeated_under_places():
     field = page('/internships/engineering/', kind='field', ids=range(30))
     thin = page('/internships/engineering/maine/', indexed=False)
-    source = page(
-        '/internships/at/acme/',
-        kind='employer',
-        ids=[1],
-        body=related(field['path']) + related(thin['path']),
-    )
+    source = page('/internships/at/acme/', kind='employer', ids=[1],
+                  body=related(field['path']) + related(thin['path']))
     prefer_indexed([field, thin, source])
     assert source['html'].count('href="/internships/engineering/"') == 1
     assert 'href="/internships/engineering/maine/"' in source['html']

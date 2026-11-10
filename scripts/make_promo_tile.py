@@ -8,7 +8,6 @@ search and category rows, so it carries only the name, one line and the icon on 
 Run: python scripts/make_promo_tile.py
 Writes: store/promo-tile-440x280.png (outside docs/, so Pages does not publish it)
 """
-
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -18,9 +17,9 @@ OUT = ROOT / "store" / "promo-tile-440x280.png"
 ICON = ROOT / "extension" / "icons" / "icon128.png"
 
 W, H = 440, 280
-ACCENT = (29, 92, 70)  # --accent #1d5c46
-PAPER = (246, 244, 239)  # --paper #f6f4ef
-SOFT = (227, 238, 232)  # --accent-soft #e3eee8
+ACCENT = (29, 92, 70)        # --accent #1d5c46
+PAPER = (246, 244, 239)      # --paper #f6f4ef
+SOFT = (227, 238, 232)       # --accent-soft #e3eee8
 
 FONTS = Path("C:/Windows/Fonts")
 

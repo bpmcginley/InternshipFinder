@@ -3,7 +3,6 @@
 Absence only closes a listing after its exact employer board completed an
 authoritative scan. Sampled searches and failed/capped scans cannot prove closure.
 """
-
 from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
@@ -30,7 +29,7 @@ def _term_ok(season, year) -> bool:
 
 
 def _field_ok(tags) -> bool:
-    if not PROFILE.fields:  # empty tuple = accept every discipline
+    if not PROFILE.fields:      # empty tuple = accept every discipline
         return True
     return any(t in PROFILE.fields for t in tags)
 
@@ -46,7 +45,6 @@ def _listing_boards(row):
     # Search/community provenance is not an authoritative source of absence. Its
     # employer URL can identify a board, but disappearance from a list never can.
     from .sources import BOARD_FETCHERS
-
     for link in row.source_links:
         board = _board_key(link.source_url, link.source)
         if board:
@@ -75,24 +73,16 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
     """
     init_db()
     completed_boards = canonical(completed_boards)
-    seen_urls = {
-        _canon_job(raw.get(key))
-        for raw in raw_items
-        for key in ("apply_url", "url", "source_url")
-        if raw.get(key)
-    } - {None}
+    seen_urls = {_canon_job(raw.get(key)) for raw in raw_items
+                 for key in ("apply_url", "url", "source_url") if raw.get(key)} - {None}
     placed = place_bare_cities(raw_items)
     normalized = []
     for raw in raw_items:
         source = raw.get("source")
         if metrics is not None:
             metrics.count("fetched", source=source)
-        n = normalize(
-            raw,
-            on_reject=(lambda reason: metrics.reject(reason, source=source))
-            if metrics is not None
-            else None,
-        )
+        n = normalize(raw, on_reject=(lambda reason: metrics.reject(reason, source=source))
+                      if metrics is not None else None)
         if not n:
             continue
         if metrics is not None:
@@ -105,7 +95,7 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
             if metrics is not None:
                 metrics.reject("term_filter", source=source, stage="filter")
             continue
-        if not n["geo"]["in_region"]:  # anywhere in the US, or US-remote
+        if not n["geo"]["in_region"]:   # anywhere in the US, or US-remote
             if metrics is not None:
                 metrics.reject("outside_region", source=source, stage="filter")
             continue
@@ -116,14 +106,8 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
     merged = merge_batch(normalized)
     if metrics is not None:
         metrics.count("unique", len(merged))
-    stats = {
-        "raw": len(raw_items),
-        "kept": len(normalized),
-        "unique": len(merged),
-        "new": 0,
-        "updated": 0,
-        "closed": 0,
-    }
+    stats = {"raw": len(raw_items), "kept": len(normalized), "unique": len(merged),
+             "new": 0, "updated": 0, "closed": 0}
 
     now = datetime.now(timezone.utc)
     with SessionLocal() as db:
@@ -145,12 +129,9 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
             row.field_tags = it["field_tags"]
             row.stage = it.get("stage") or []
             row.employment_type = it.get("employment_type")
-            row.season = it["season"]
-            row.year = it["year"]
-            row.term = it["term"]
+            row.season = it["season"]; row.year = it["year"]; row.term = it["term"]
             row.location_raw = it["location_raw"]
-            row.lat = it["lat"]
-            row.lng = it["lng"]
+            row.lat = it["lat"]; row.lng = it["lng"]
             row.is_remote = it["is_remote"]
             row.within_radius = it["within_radius"]
             row.distance_miles = it["distance_miles"]
@@ -168,12 +149,8 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
             row.last_seen = now
             row.status = "open" if it.get("active", True) else "closed"
             row.score_parts = score_parts(
-                field_tags=it["field_tags"],
-                geo=it["geo"],
-                first_seen=row.first_seen,
-                posted_at=row.posted_at,
-                status=row.status,
-                sources=sources,
+                field_tags=it["field_tags"], geo=it["geo"], first_seen=row.first_seen,
+                posted_at=row.posted_at, status=row.status, sources=sources,
             )
             row.relevance_score = round(sum(row.score_parts.values()), 1)
             db.flush()
@@ -197,18 +174,11 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
             for row in db.scalars(select(Listing).where(Listing.status == "open")):
                 if row.dedupe_key in seen_keys:
                     continue
-                if any(
-                    _canon_job(url) in seen_urls
-                    for url in [row.apply_url] + [sl.source_url for sl in row.source_links]
-                    if url
-                ):
+                if any(_canon_job(url) in seen_urls for url in
+                       [row.apply_url] + [sl.source_url for sl in row.source_links] if url):
                     continue  # fetched but rejected/changed metadata is not proof of absence
                 row_boards = _listing_boards(row)
-                if (
-                    row_boards
-                    and row_boards.issubset(completed_boards)
-                    and _in_scan_scope(row, row_boards)
-                ):
+                if row_boards and row_boards.issubset(completed_boards) and _in_scan_scope(row, row_boards):
                     row.status = "closed"
                     stats["closed"] += 1
         db.commit()
@@ -217,12 +187,6 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
 
     if verbose:
         print(f"[pipeline] {stats}; {placed} bare town names placed by their board")
-        print(
-            "[pipeline] by state:",
-            dict(Counter(it["geo"]["state"] for it in merged.values()).most_common()),
-        )
-        print(
-            "[pipeline] by source:",
-            dict(Counter(s for it in merged.values() for s, _ in it["_sources"]).most_common()),
-        )
+        print("[pipeline] by state:", dict(Counter(it["geo"]["state"] for it in merged.values()).most_common()))
+        print("[pipeline] by source:", dict(Counter(s for it in merged.values() for s, _ in it["_sources"]).most_common()))
     return stats
