@@ -5,7 +5,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 0: status tracker merged; WP-0.1 implementation and local validation are complete, awaiting independent review and green PR checks. All six baseline suites passed, with two documented local backend skips. Independent full-file audit results are recorded below.
+- Wave 1: WP-0.1 merged with green Pages; golden, type, coverage, and shared-CI packages are in progress. All six baseline suites passed; full Linux CI also passed all 1,480 backend tests.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
@@ -40,11 +40,11 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | Wave | Package | Owner | Branch | PR | State | Next step / constraint |
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
-| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | In review | Local validation passed; independent review and green CI before lead merges. |
+| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI, and green Pages run 42863632275. |
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
 | 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
-| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | Pending PR | In review | Composite setup in all 12 existing workflows; preserve scheduling, access, and commands. |
+| 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | In review | Composite setup in all 12 existing workflows; preserve scheduling, access, and commands. |
 | 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
 | 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
@@ -205,7 +205,7 @@ None. No worker refactor PR has merged, and no production action has been taken.
 
 ## Next update
 
-Finish WP-0.1 validation and independent review, merge under the rules above, then verify Pages before the next merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.
+Complete wave-1 packages and independent reviews, merge one at a time with green CI and Pages. Before wave 2, reread product coordination and publish the required formatting notice.
 
 ## WP-0.6 validation and coordination
 
