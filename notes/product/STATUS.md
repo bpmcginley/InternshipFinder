@@ -40,7 +40,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | B | P-1.6 Checked-open evidence | audit_growth_generated | - | - | Skipped as written | last_seen proves observation, not a direct application-link check. |
 | B | P-1.8 Out-of-runs arrival | Unassigned | - | - | Queued | Plan text needs Bruce; top-up stays absent until supported. |
 | C | P-1.9 Employer entry | Unassigned | - | - | Queued | Generated-page hot-file rule. |
-| C | P-1.7 Generated distribution | Unassigned | - | - | Queued | Generated-page hot-file rule. |
+| C | P-1.7e Generated distribution | audit_growth_generated | `codex/product-p1.7e-generated-links` | Draft being opened | In progress; stacked on #194 | Claims seo_pages.py after the same writer froze #194. Two footer links and canonical field preselection only. Parent #194 must merge, then child must integrate fresh main and pass review/CI/Pages gates. |
 | C | P-2.3 Employer click design | Unassigned | - | - | Queued | needs-bruce: design approval before new counting. |
 | D | P-2.1 Follow build | Unassigned | - | - | Waiting for design | No build before approved note; worker deployment stays with Bruce. |
 | D | P-2.2 Top-up build | Unassigned | - | - | Waiting for design | No build before approved price, note, terms and secret setup. |
