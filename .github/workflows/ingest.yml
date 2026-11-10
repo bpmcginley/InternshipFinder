@@ -53,14 +53,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
+      - uses: ./.github/actions/python
         with:
-          python-version: "3.12"
           cache: pip
-
-      - name: Install deps
-        working-directory: backend
-        run: pip install -r requirements.txt
+          install-backend: 'true'
 
       # Extra states (beyond New England + NY/NJ) that get detail calls and Google searches:
       # the states students picked (Worker GET /demand, counts only) plus the optional repo variable.
@@ -93,7 +89,6 @@ jobs:
           USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
         # The ingest report (counts per source, board and filter) goes to the runner's temp folder and
         # is kept as a run artifact below, not in docs/data, which the website serves to everyone.
-        # was: no --metrics, so it defaulted to docs/data/ingest-report.json (2026-10-19).
         run: |
           python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data" --metrics "${{ runner.temp }}/ingest-report.json"
 

@@ -29,8 +29,6 @@ on:
         description: "Post even if another run already posted today"
         type: boolean
         default: false
-
-# was: contents: read. Write is for pushing the card to the social-cards branch; nothing here
 # touches main (and a push made with this token starts no other workflow).
 permissions:
   contents: write
@@ -64,7 +62,6 @@ jobs:
   post:
     needs: guard
     # The variable reaches only this condition, never a command line.
-    # was: if: vars.SOCIAL_ENABLED != '0'. An unset variable is null, and an expression comparing null
     # with a string turns both into numbers: null -> 0 and '0' -> 0, so "!= '0'" was false and every
     # run was skipped whenever the variable did not exist, the default it was meant to leave on.
     # Now: run when the variable is unset or empty (!vars.X; '' and null are falsy), or set to
@@ -75,9 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - uses: ./.github/actions/python
 
       - name: Card fonts and Pillow
         # IBM Plex is the site's typeface (growth/cards.py falls back to DejaVu without it).
@@ -98,7 +93,6 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           # For the LinkedIn draft in D1 (the analytics copy's token: D1 Edit).
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        # was: run: python growth/social.py docs --send
         run: python growth/social.py docs --out=out --send
 
       # The steps below run even when a text account failed above (a failed step still leaves the run

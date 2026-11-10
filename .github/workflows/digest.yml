@@ -1,4 +1,3 @@
-# was: name: Email digest preview
 # It can send now, once the owner turns sending on, so "preview" no longer describes it.
 name: Email digest
 
@@ -27,7 +26,6 @@ on:
   # writes the preview when it isn't. Manual runs still default to an owner-only test.
   schedule:
     # 2026-10-27: GitHub cron is UTC. The guard below keeps only the slot that is 8am Eastern.
-    # was: 12:00 UTC year-round, which became 7am after daylight saving time ended.
     # Revert: remove 13:00 and the local-time guard to restore the fixed UTC schedule.
     - cron: "0 12 * * 1"
     - cron: "0 13 * * 1"
@@ -48,13 +46,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           sparse-checkout: |
+            .github/actions
             growth
             backend
             docs/data
 
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - uses: ./.github/actions/python
 
       - name: Keep the 8am Eastern schedule slot
         id: eastern-slot
@@ -96,7 +93,6 @@ jobs:
         # Buttondown, which every sign-up form links as "See last Monday's email". Only the send to
         # everyone has it: a test copy's draft stays off the archive. The email is the same for every
         # subscriber and carries nothing about any of them.
-        # was: if: vars.DIGEST_ENABLED == '1'. A key check sends nothing, even with sending on.
         if: steps.eastern-slot.outputs.run == 'true' && vars.DIGEST_ENABLED == '1' && !inputs.check_key
         env:
           BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
