@@ -4,8 +4,18 @@ import { HttpError } from "./http.js";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
 const LEVELS = ["minimal", "low", "medium", "high"];
-const GEN_KEYS = ["temperature", "topP", "topK", "stopSequences", "responseMimeType", "responseSchema",
-  "responseJsonSchema", "presencePenalty", "frequencyPenalty", "seed"];
+const GEN_KEYS = [
+  "temperature",
+  "topP",
+  "topK",
+  "stopSequences",
+  "responseMimeType",
+  "responseSchema",
+  "responseJsonSchema",
+  "presencePenalty",
+  "frequencyPenalty",
+  "seed",
+];
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
@@ -17,7 +27,10 @@ function cleanPart(part) {
   const out = {};
   if (typeof part.text === "string") out.text = part.text;
   if (isObj(part.inlineData) && typeof part.inlineData.data === "string") {
-    out.inlineData = { mimeType: String(part.inlineData.mimeType || ""), data: part.inlineData.data };
+    out.inlineData = {
+      mimeType: String(part.inlineData.mimeType || ""),
+      data: part.inlineData.data,
+    };
   }
   if (isObj(part.functionCall)) {
     const { name, id, args } = part.functionCall;
@@ -26,7 +39,11 @@ function cleanPart(part) {
   if (isObj(part.functionResponse)) {
     // `response` only: a function response can also carry parts of its own, fileData among them.
     const { name, id, response } = part.functionResponse;
-    out.functionResponse = { name, ...(id != null ? { id } : {}), response: isObj(response) ? response : {} };
+    out.functionResponse = {
+      name,
+      ...(id != null ? { id } : {}),
+      response: isObj(response) ? response : {},
+    };
   }
   if (!Object.keys(out).length) return null;
   if (typeof part.thoughtSignature === "string") out.thoughtSignature = part.thoughtSignature;
@@ -44,7 +61,10 @@ function cleanContent(c) {
 // Keeps only contents, systemInstruction, tools, toolConfig and generationConfig; clamps tokens and thinking.
 export function sanitizeRequest(body, task, config) {
   const cfg = config.TASKS[task];
-  const contents = isObj(body) && Array.isArray(body.contents) ? body.contents.map(cleanContent).filter(Boolean) : [];
+  const contents =
+    isObj(body) && Array.isArray(body.contents)
+      ? body.contents.map(cleanContent).filter(Boolean)
+      : [];
   if (contents.length === 0) {
     throw new HttpError(400, "bad_request", "request.contents must be a non-empty array");
   }
@@ -90,7 +110,11 @@ function clampThinking(tc, cfg, levels) {
 }
 
 export function geminiUrl(model, stream) {
-  return BASE + encodeURIComponent(model) + (stream ? ":streamGenerateContent?alt=sse" : ":generateContent");
+  return (
+    BASE +
+    encodeURIComponent(model) +
+    (stream ? ":streamGenerateContent?alt=sse" : ":generateContent")
+  );
 }
 
 export async function callGemini(model, body, stream, env, fetcher) {
@@ -110,7 +134,11 @@ export async function callGemini(model, body, stream, env, fetcher) {
     try {
       status = (await res.json())?.error?.status || "";
     } catch {}
-    throw new HttpError(502, "upstream", `Gemini failed (${res.status}${status ? " " + status : ""})`);
+    throw new HttpError(
+      502,
+      "upstream",
+      `Gemini failed (${res.status}${status ? " " + status : ""})`,
+    );
   }
   return res;
 }
@@ -135,7 +163,12 @@ export function costCents(model, usage, config, date) {
 
 // No usageMetadata (a cut-off stream): assume ~4 bytes per input token and a full-length reply
 export function estimateCents(model, bodyBytes, maxOutputTokens, config, date) {
-  return costCents(model, { promptTokenCount: Math.ceil(bodyBytes / 4), candidatesTokenCount: maxOutputTokens }, config, date);
+  return costCents(
+    model,
+    { promptTokenCount: Math.ceil(bodyBytes / 4), candidatesTokenCount: maxOutputTokens },
+    config,
+    date,
+  );
 }
 
 // Reads an SSE stream to the end and returns the last usageMetadata (each chunk carries the running total).

@@ -206,6 +206,49 @@ test("opening the invite panel is a step of its own", async () => {
 const events = async (w) => (await w.db.dump()).event_counts.map(({ event, page, n }) => ({ event, page, n }))
   .sort((a, b) => (a.event + a.page).localeCompare(b.event + b.page));
 
+const PRODUCT_EVENTS = ["group_expand", "major_quick_set", "save_role", "mylist_open", "share_click",
+  "list_link_click", "widget_link_click", "out_of_runs_view", "out_of_runs_invite", "out_of_runs_topup",
+  "out_of_runs_plan", "follow_open", "follow_submit", "follow_confirm", "demo_play", "flyer_print"];
+
+test("product steps keep only day, fixed event and page kind, with no attribution or personal fields", async () => {
+  const w = await setup();
+  for (const e of PRODUCT_EVENTS) {
+    assert.ok(EVENTS.has(e), e);
+    assert.ok(!SERVER_EVENTS.has(e), e + " is a browser signal, not a verified server outcome");
+    assert.ok(!ATTRIBUTED_EVENTS.has(e), e + " does not add campaign dimensions");
+    assert.equal((await hit(w, { e, p: "/internships/at/fixture-company/?email=fixture@example.test",
+      email: "fixture@example.test", company: "fixture-company", listing: "fixture-role", search: "fixture-search",
+      user_hash: "fixture-user", c: "fixture-campaign", t: "fixture-content", u: "x" })).status, 204);
+  }
+  const dump = await w.db.dump();
+  assert.deepEqual(dump.event_counts.map(r => Object.keys(r).sort()),
+    PRODUCT_EVENTS.map(() => ["day", "event", "n", "page"]));
+  assert.deepEqual(dump.event_counts.map(r => ({ ...r })).sort((a, b) => a.event.localeCompare(b.event)),
+    [...PRODUCT_EVENTS].sort().map(event => ({ day: "2026-09-14", event, page: "landing", n: 1 })));
+  assert.deepEqual(dump.event_attribution, []);
+  assert.deepEqual(await rows(w), [], "an event is not a page load");
+  assert.ok(!JSON.stringify(dump).includes("fixture-"), "arbitrary payload fields and full paths are not stored");
+  assert.ok(!JSON.stringify(dump).includes("fixture@example.test"));
+});
+
+test("unknown product steps are harmless and cannot create event or visit rows", async () => {
+  const w = await setup();
+  for (const e of ["future_product_step", "group_expand_fixture-company", "follow_confirmed", "save_role:fixture-role", "", null]) {
+    assert.equal((await hit(w, { e, p: "/" })).status, 204);
+  }
+  assert.deepEqual(await events(w), []);
+  assert.deepEqual(await rows(w), []);
+  assert.deepEqual((await w.db.dump()).event_attribution, []);
+});
+
+test("product steps retain the existing shared daily event cap", async () => {
+  const w = await setup();
+  await hit(w, { e: "group_expand", p: "/" });
+  await w.db.prepare("UPDATE event_counts SET n = ?").bind(DAY_CAP).run();
+  for (const e of PRODUCT_EVENTS) assert.equal((await hit(w, { e, p: "/" })).status, 204);
+  assert.deepEqual(await events(w), [{ event: "group_expand", page: "dashboard", n: DAY_CAP }]);
+});
+
 test("a click through to a posting is a step the site sends; the Worker's own steps are not", async () => {
   const w = await setup();
   await hit(w, { e: "posting_click", p: "/internships/ohio/" });

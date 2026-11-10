@@ -6,17 +6,35 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const data = {};
-globalThis.chrome = { storage: { local: {
-  async get(k) { return typeof k === "string" ? { [k]: data[k] } : Object.fromEntries([].concat(k).map((x) => [x, data[x]])); },
-  async set(o) { for (const [k, v] of Object.entries(o)) data[k] = JSON.parse(JSON.stringify(v)); },
-  async remove(k) { for (const x of [].concat(k)) delete data[x]; },
-} } };
+globalThis.chrome = {
+  storage: {
+    local: {
+      async get(k) {
+        return typeof k === "string"
+          ? { [k]: data[k] }
+          : Object.fromEntries([].concat(k).map((x) => [x, data[x]]));
+      },
+      async set(o) {
+        for (const [k, v] of Object.entries(o)) data[k] = JSON.parse(JSON.stringify(v));
+      },
+      async remove(k) {
+        for (const x of [].concat(k)) delete data[x];
+      },
+    },
+  },
+};
 
 const R = await import("../lib/review.js");
 const { emptyState, recordFill, shouldShow, answer, webLineOk, cardCopy, MILESTONES, KEY } = R;
 
-const fills = (n, s = emptyState(), from = 0) => { for (let i = 0; i < n; i++) s = recordFill(s, "j" + (from + i)); return s; };
-const idle = [{ id: "a", status: "ready_to_submit" }, { id: "b", status: "submitted" }];
+const fills = (n, s = emptyState(), from = 0) => {
+  for (let i = 0; i < n; i++) s = recordFill(s, "j" + (from + i));
+  return s;
+};
+const idle = [
+  { id: "a", status: "ready_to_submit" },
+  { id: "b", status: "submitted" },
+];
 
 test("the first filled application never asks; the second does", () => {
   const one = fills(1);
@@ -60,10 +78,14 @@ test("Not now waits for the next milestone, and nothing asks between milestones"
 });
 
 test("at most two asks ever, even for a student who always says Not now", () => {
-  let s = emptyState(), shown = 0;
+  let s = emptyState(),
+    shown = 0;
   for (let i = 0; i < 500; i++) {
     s = recordFill(s, "j" + i);
-    if (shouldShow(s, idle)) { shown++; s = answer(s, "later"); }
+    if (shouldShow(s, idle)) {
+      shown++;
+      s = answer(s, "later");
+    }
   }
   assert.equal(shown, MILESTONES.length);
   assert.equal(MILESTONES.length, 2);
@@ -144,18 +166,38 @@ test("the card asks honestly: no incentive, no star count, no suggested text, th
   assert.equal(c.title, "Auto-Apply has filled 3 applications for you.");
   assert.equal(cardCopy(1).title, "Auto-Apply has filled 1 application for you.");
   const all = Object.values(c).join(" ");
-  assert.doesNotMatch(all, /star|5\s*\/\s*5|five|rating of|bonus|free run|extra|unlock|reward|in exchange/i);
+  assert.doesNotMatch(
+    all,
+    /star|5\s*\/\s*5|five|rating of|bonus|free run|extra|unlock|reward|in exchange/i,
+  );
   assert.match(all, /Built by one student, made for all students\./);
   assert.match(all, /good or bad/);
   assert.ok(c.never && c.later && c.feedback);
-  assert.match(R.STORE_REVIEWS_URL, /^https:\/\/chromewebstore\.google\.com\/detail\/internscout-auto-apply\/hpnbbpmalfjijnmpoihhjgjolhabjpgi\/reviews$/);
+  assert.match(
+    R.STORE_REVIEWS_URL,
+    /^https:\/\/chromewebstore\.google\.com\/detail\/internscout-auto-apply\/hpnbbpmalfjijnmpoihhjgjolhabjpgi\/reviews$/,
+  );
 });
 
 test("the review card needs no new permission and sends nothing anywhere", () => {
   const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
-  assert.deepEqual(manifest.permissions, ["storage", "unlimitedStorage", "tabs", "tabGroups", "scripting", "webNavigation", "sidePanel", "notifications", "identity"]);
+  assert.deepEqual(manifest.permissions, [
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "tabGroups",
+    "scripting",
+    "webNavigation",
+    "sidePanel",
+    "notifications",
+    "identity",
+  ]);
   const src = readFileSync(new URL("../lib/review.js", import.meta.url), "utf8");
-  assert.doesNotMatch(src, /fetch\(|sendBeacon|XMLHttpRequest/, "nothing about reviews is sent anywhere");
+  assert.doesNotMatch(
+    src,
+    /fetch\(|sendBeacon|XMLHttpRequest/,
+    "nothing about reviews is sent anywhere",
+  );
   const panel = readFileSync(new URL("../sidepanel/sidepanel.js", import.meta.url), "utf8");
   assert.match(panel, /shouldShow\(rv, jobs\)/);
 });

@@ -26,13 +26,19 @@ export function takeWantedInPage(key) {
     const v = localStorage.getItem(key);
     if (v !== null) localStorage.removeItem(key);
     return v;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }
 
 // Puts the bridge into every open tab the manifest would have, and returns what the offer bar
 // remembered in them (raw text, unchecked: held.js wantedJob checks it). One tab failing (a page still
 // loading, a discarded tab) never stops the others.
-export async function connectOpenTabs({ tabs = chrome.tabs, scripting = chrome.scripting, manifest = chrome.runtime.getManifest() } = {}) {
+export async function connectOpenTabs({
+  tabs = chrome.tabs,
+  scripting = chrome.scripting,
+  manifest = chrome.runtime.getManifest(),
+} = {}) {
   const matches = bridgeMatches(manifest);
   if (!matches.length) return { connected: 0, wanted: [] };
   const open = await tabs.query({ url: matches }).catch(() => []);
@@ -43,9 +49,15 @@ export async function connectOpenTabs({ tabs = chrome.tabs, scripting = chrome.s
     try {
       await scripting.executeScript({ target: { tabId: t.id }, files: ["bridge/bridge.js"] });
       connected++;
-      const [r] = await scripting.executeScript({ target: { tabId: t.id }, func: takeWantedInPage, args: [WANTED_KEY] });
+      const [r] = await scripting.executeScript({
+        target: { tabId: t.id },
+        func: takeWantedInPage,
+        args: [WANTED_KEY],
+      });
       if (r && typeof r.result === "string") wanted.push(r.result);
-    } catch (e) { /* not scriptable right now: that tab picks the bridge up on its next load */ }
+    } catch (e) {
+      /* not scriptable right now: that tab picks the bridge up on its next load */
+    }
   }
   return { connected, wanted };
 }

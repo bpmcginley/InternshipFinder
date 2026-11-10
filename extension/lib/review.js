@@ -15,27 +15,40 @@
 // anywhere, and it needs no new permission (opening a tab from an extension page needs none).
 
 export const KEY = "review_ask";
-export const STORE_REVIEWS_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews";
+export const STORE_REVIEWS_URL =
+  "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews";
 // The feedback form the dashboard already points students at (docs/index.html window.CONFIG.formUrl),
 // and Chrome's uninstall page (background/index.js).
-export const FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
+export const FEEDBACK_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
 // Filled applications after which the card appears. Two asks at most, ever.
 export const MILESTONES = [2, 10];
-const MAX_IDS = 500;   // job ids already counted, so "Check the form again" or a retry doesn't count a job twice
+const MAX_IDS = 500; // job ids already counted, so "Check the form again" or a retry doesn't count a job twice
 
 // Statuses that mean the agent finished filling: ready_to_submit is the success moment, and a job
 // marked submitted got there too.
 export const FILLED = new Set(["ready_to_submit", "submitted"]);
 
 // The next milestone above `filled`, as an index into MILESTONES (MILESTONES.length when none is left).
-const nextAfter = (filled) => { const i = MILESTONES.findIndex((m) => m > filled); return i < 0 ? MILESTONES.length : i; };
+const nextAfter = (filled) => {
+  const i = MILESTONES.findIndex((m) => m > filled);
+  return i < 0 ? MILESTONES.length : i;
+};
 
 // A first state. `ids` are jobs already filled when this version arrives (an update, not a fresh
 // install): they count toward the number on the card, but a milestone already passed is not asked
 // about late, at a moment that isn't a success.
 export function emptyState(ids = []) {
   const uniq = [...new Set(ids)].slice(-MAX_IDS);
-  return { v: 1, filled: uniq.length, ids: uniq, next: nextAfter(uniq.length), open: false, asks: 0, done: null };
+  return {
+    v: 1,
+    filled: uniq.length,
+    ids: uniq,
+    next: nextAfter(uniq.length),
+    open: false,
+    asks: 0,
+    done: null,
+  };
 }
 
 // One application filled. Returns a new state; the same one when this job was already counted.
@@ -43,8 +56,13 @@ export function recordFill(state, id) {
   const s = state || emptyState();
   if (!id || s.ids.includes(id)) return s;
   const out = { ...s, filled: s.filled + 1, ids: [...s.ids, id].slice(-MAX_IDS) };
-  if (!out.done && out.next < MILESTONES.length && out.filled >= MILESTONES[out.next] && out.filled >= 2) {
-    if (!out.open) out.asks = out.asks + 1;   // a card still showing from the last milestone stays one card
+  if (
+    !out.done &&
+    out.next < MILESTONES.length &&
+    out.filled >= MILESTONES[out.next] &&
+    out.filled >= 2
+  ) {
+    if (!out.open) out.asks = out.asks + 1; // a card still showing from the last milestone stays one card
     out.open = true;
     out.next = nextAfter(out.filled);
   }
@@ -77,7 +95,10 @@ export function cardCopy(n) {
   return {
     title: `Auto-Apply has filled ${n} application${n === 1 ? "" : "s"} for you.`,
     body: "Built by one student, made for all students. Reviews are how other students find it, so a sentence or two about how it went, good or bad, helps the next person decide.",
-    review: "Leave a review", later: "Not now", never: "Don't ask again", feedback: "Something wrong? Tell us",
+    review: "Leave a review",
+    later: "Not now",
+    never: "Don't ask again",
+    feedback: "Something wrong? Tell us",
   };
 }
 
@@ -88,13 +109,17 @@ function withLock(fn) {
   lock = p.catch(() => {});
   return p;
 }
-export async function loadReview() { return (await chrome.storage.local.get(KEY))[KEY] || null; }
+export async function loadReview() {
+  return (await chrome.storage.local.get(KEY))[KEY] || null;
+}
 
 // A job reached a filled status. `jobs` (the whole queue's jobs) seeds the count the first time.
 export function noteFilled(id, jobs = []) {
   return withLock(async () => {
     const stored = await loadReview();
-    const s = stored || emptyState(jobs.filter((j) => j && FILLED.has(j.status) && j.id !== id).map((j) => j.id));
+    const s =
+      stored ||
+      emptyState(jobs.filter((j) => j && FILLED.has(j.status) && j.id !== id).map((j) => j.id));
     const out = recordFill(s, id);
     if (out !== stored) await chrome.storage.local.set({ [KEY]: out });
     return out;

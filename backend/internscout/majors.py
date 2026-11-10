@@ -4,6 +4,7 @@
 The list follows the UMass Amherst undergraduate catalog as of Fall 2026 plus common graduate
 programs; students with an unlisted or undeclared major pick fields directly.
 """
+
 from __future__ import annotations
 from .classify import ALL_FIELDS, STAGES, YEARS
 
@@ -13,51 +14,102 @@ LANG_RELATED = ("education", "government", "publishing")
 UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     # Isenberg School of Management
     "Accounting": (("accounting",), ("finance", "consulting", "business")),
-    "Finance": (("finance",), ("accounting", "consulting", "insurance", "real_estate", "quant", "business")),
-    "Hospitality and Tourism Management": (("hospitality",), ("marketing", "operations", "sports", "business")),
-    "Management": (("consulting", "operations", "hr"), ("entrepreneurship", "sales", "pm", "business")),
+    "Finance": (
+        ("finance",),
+        ("accounting", "consulting", "insurance", "real_estate", "quant", "business"),
+    ),
+    "Hospitality and Tourism Management": (
+        ("hospitality",),
+        ("marketing", "operations", "sports", "business"),
+    ),
+    "Management": (
+        ("consulting", "operations", "hr"),
+        ("entrepreneurship", "sales", "pm", "business"),
+    ),
     "Marketing": (("marketing",), ("sales", "communications", "retail", "design", "business")),
-    "Operations and Information Management": (("operations", "supply_chain", "data"), ("consulting", "pm", "industrial", "business")),
+    "Operations and Information Management": (
+        ("operations", "supply_chain", "data"),
+        ("consulting", "pm", "industrial", "business"),
+    ),
     "Sport Management": (("sports",), ("marketing", "sales", "hospitality", "business")),
     # Engineering
-    "Biomedical Engineering": (("biomedical",), ("biology", "health", "mechanical", "clinical_research", "engineering")),
-    "Chemical Engineering": (("chemical",), ("materials", "environmental", "biology", "chemistry", "engineering")),
-    "Civil Engineering": (("civil",), ("environmental", "urban_planning", "architecture", "engineering")),
+    "Biomedical Engineering": (
+        ("biomedical",),
+        ("biology", "health", "mechanical", "clinical_research", "engineering"),
+    ),
+    "Chemical Engineering": (
+        ("chemical",),
+        ("materials", "environmental", "biology", "chemistry", "engineering"),
+    ),
+    "Civil Engineering": (
+        ("civil",),
+        ("environmental", "urban_planning", "architecture", "engineering"),
+    ),
     "Computer Engineering": (("hardware", "swe"), ("electrical", "security", "ml", "engineering")),
-    "Electrical Engineering": (("electrical", "hardware"), ("swe", "physics", "aerospace", "engineering")),
-    "Environmental Engineering": (("environmental", "civil"), ("sustainability", "chemical", "engineering")),
-    "Industrial Engineering": (("industrial", "supply_chain", "operations"), ("data", "consulting", "engineering")),
-    "Mechanical Engineering": (("mechanical",), ("aerospace", "hardware", "materials", "industrial", "engineering")),
+    "Electrical Engineering": (
+        ("electrical", "hardware"),
+        ("swe", "physics", "aerospace", "engineering"),
+    ),
+    "Environmental Engineering": (
+        ("environmental", "civil"),
+        ("sustainability", "chemical", "engineering"),
+    ),
+    "Industrial Engineering": (
+        ("industrial", "supply_chain", "operations"),
+        ("data", "consulting", "engineering"),
+    ),
+    "Mechanical Engineering": (
+        ("mechanical",),
+        ("aerospace", "hardware", "materials", "industrial", "engineering"),
+    ),
     # Information and Computer Sciences
     "Computer Science": (("swe",), ("ml", "data", "security", "quant", "pm")),
     "Informatics": (("data", "swe"), ("design", "pm", "ml", "security")),
     # Natural Sciences
     "Animal Science": (("agriculture", "biology"), ("lab_research",)),
     "Astronomy": (("physics",), ("data", "aerospace", "lab_research")),
-    "Biochemistry and Molecular Biology": (("biology", "chemistry", "lab_research"), ("clinical_research", "health")),
+    "Biochemistry and Molecular Biology": (
+        ("biology", "chemistry", "lab_research"),
+        ("clinical_research", "health"),
+    ),
     "Biology": (("biology", "lab_research"), ("health", "clinical_research", "environmental")),
     "Chemistry": (("chemistry", "lab_research"), ("chemical", "materials", "biology")),
-    "Environmental Science": (("environmental", "sustainability"), ("agriculture", "government", "lab_research")),
+    "Environmental Science": (
+        ("environmental", "sustainability"),
+        ("agriculture", "government", "lab_research"),
+    ),
     "Food Science": (("agriculture", "chemistry"), ("health", "retail", "lab_research")),
     "Geography": (("urban_planning", "environmental"), ("data", "government")),
     "Geology": (("environmental",), ("sustainability", "civil", "lab_research")),
     "Mathematics": (("math",), ("quant", "data", "finance", "insurance")),
     "Microbiology": (("biology", "lab_research"), ("health", "clinical_research")),
-    "Natural Resources Conservation": (("environmental", "sustainability", "agriculture"), ("government", "nonprofit")),
+    "Natural Resources Conservation": (
+        ("environmental", "sustainability", "agriculture"),
+        ("government", "nonprofit"),
+    ),
     "Neuroscience": (("biology", "psychology", "lab_research"), ("clinical_research", "health")),
     "Physics": (("physics",), ("quant", "hardware", "data", "aerospace")),
-    "Plant, Soil and Insect Sciences": (("agriculture", "biology"), ("sustainability", "lab_research")),
+    "Plant, Soil and Insect Sciences": (
+        ("agriculture", "biology"),
+        ("sustainability", "lab_research"),
+    ),
     "Psychology": (("psychology",), ("health", "social_work", "education", "data", "hr")),
     "Statistics and Data Science": (("data", "math"), ("ml", "quant", "insurance")),
     "Sustainable Food and Farming": (("agriculture", "sustainability"), ("nonprofit",)),
-    "Building and Construction Technology": (("civil", "architecture"), ("real_estate", "sustainability")),
+    "Building and Construction Technology": (
+        ("civil", "architecture"),
+        ("real_estate", "sustainability"),
+    ),
     "Landscape Architecture": (("architecture", "urban_planning"), ("sustainability", "design")),
     # Public Health and Health Sciences / Nursing
     "Communication Disorders": (("health",), ("education", "psychology", "clinical_research")),
     "Kinesiology": (("health", "sports"), ("clinical_research", "biomedical")),
     "Nursing": (("nursing", "health"), ("clinical_research", "public_health")),
     "Nutrition": (("health", "public_health"), ("agriculture", "clinical_research")),
-    "Public Health Sciences": (("public_health", "health"), ("clinical_research", "government", "nonprofit", "data")),
+    "Public Health Sciences": (
+        ("public_health", "health"),
+        ("clinical_research", "government", "nonprofit", "data"),
+    ),
     # Social and Behavioral Sciences
     "Anthropology": (("social_science", "nonprofit", "museums"), ("public_health", "government")),
     "Communication": (("communications", "media"), ("marketing", "film", "journalism")),
@@ -66,11 +118,20 @@ UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "Journalism": (("journalism", "media"), ("communications", "publishing")),
     "Legal Studies": (("law",), ("government", "nonprofit")),
     "Political Science": (("government", "law"), ("nonprofit", "economics", "communications")),
-    "Public Policy": (("government", "economics"), ("nonprofit", "urban_planning", "public_health")),
+    "Public Policy": (
+        ("government", "economics"),
+        ("nonprofit", "urban_planning", "public_health"),
+    ),
     "Sociology": (("social_science", "social_work", "nonprofit"), ("government", "data", "hr")),
     "Social Thought and Political Economy": (("nonprofit", "government"), ("economics",)),
-    "Sustainable Community Development": (("urban_planning", "sustainability"), ("nonprofit", "government")),
-    "Women, Gender, Sexuality Studies": (("nonprofit", "social_work"), ("government", "public_health")),
+    "Sustainable Community Development": (
+        ("urban_planning", "sustainability"),
+        ("nonprofit", "government"),
+    ),
+    "Women, Gender, Sexuality Studies": (
+        ("nonprofit", "social_work"),
+        ("government", "public_health"),
+    ),
     "Afro-American Studies": (("nonprofit", "education"), ("museums", "government")),
     # Humanities and Fine Arts
     "Architecture": (("architecture",), ("design", "civil", "urban_planning")),
@@ -102,11 +163,17 @@ UNDERGRAD: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 }
 
 GRADUATE: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "MBA": (("consulting", "finance", "marketing"), ("pm", "operations", "entrepreneurship", "business")),
+    "MBA": (
+        ("consulting", "finance", "marketing"),
+        ("pm", "operations", "entrepreneurship", "business"),
+    ),
     "MS Accounting": (("accounting",), ("finance", "business")),
     "MS Computer Science": (("swe", "ml"), ("data", "security")),
     "MS Data Science / Statistics": (("data", "math"), ("ml", "quant")),
-    "MS Engineering (any)": (("mechanical", "electrical", "civil", "industrial"), ("hardware", "materials", "engineering")),
+    "MS Engineering (any)": (
+        ("mechanical", "electrical", "civil", "industrial"),
+        ("hardware", "materials", "engineering"),
+    ),
     "Master of Public Health": (("public_health", "health"), ("clinical_research", "government")),
     "Master of Public Policy": (("government", "economics"), ("nonprofit", "urban_planning")),
     "Master of Education": (("education",), ("nonprofit", "psychology")),
@@ -119,6 +186,17 @@ GRADUATE: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 
 def majors_export() -> dict:
     """What the dashboard needs for the profile picker: majors, the tag and stage vocabularies."""
-    rows = [{"name": n, "tags": list(t), "related": list(r), "level": "undergrad"} for n, (t, r) in UNDERGRAD.items()]
-    rows += [{"name": n, "tags": list(t), "related": list(r), "level": "grad"} for n, (t, r) in GRADUATE.items()]
-    return {"majors": rows, "fields": list(ALL_FIELDS), "stages": list(STAGES), "years": list(YEARS)}
+    rows = [
+        {"name": n, "tags": list(t), "related": list(r), "level": "undergrad"}
+        for n, (t, r) in UNDERGRAD.items()
+    ]
+    rows += [
+        {"name": n, "tags": list(t), "related": list(r), "level": "grad"}
+        for n, (t, r) in GRADUATE.items()
+    ]
+    return {
+        "majors": rows,
+        "fields": list(ALL_FIELDS),
+        "stages": list(STAGES),
+        "years": list(YEARS),
+    }

@@ -1,4 +1,5 @@
 """Search comparisons must not mistake incomplete dates or other engines for Google recovery."""
+
 import importlib.util
 import json
 import io
@@ -16,17 +17,38 @@ spec.loader.exec_module(metrics)
 NOW = datetime(2026, 10, 28, 17, tzinfo=timezone.utc)
 
 
-@pytest.mark.parametrize("host,engine", [("www.google.com", "google"), ("google.ca", "google"),
-    ("www.google.co.uk", "google"), ("www.google.com.hk", "google"), ("www.bing.com", "bing"),
-    ("cn.bing.com", "bing"), ("duckduckgo.com", "other_search"), ("chatgpt.com", "other_search")])
+@pytest.mark.parametrize(
+    "host,engine",
+    [
+        ("www.google.com", "google"),
+        ("google.ca", "google"),
+        ("www.google.co.uk", "google"),
+        ("www.google.com.hk", "google"),
+        ("www.bing.com", "bing"),
+        ("cn.bing.com", "bing"),
+        ("duckduckgo.com", "other_search"),
+        ("chatgpt.com", "other_search"),
+    ],
+)
 def test_search_engines_are_separate(host, engine):
     assert metrics.source(host) == "search"
     assert metrics.search_engine(host) == engine
 
 
-@pytest.mark.parametrize("host", ["mail.google.com", "accounts.google.com", "mail.google.co.uk",
-    "accounts.google.ca", "maps.google.co.in", "google.com.evil.example", "notgoogle.com",
-    "google.evil.com", "notinternscout.org"])
+@pytest.mark.parametrize(
+    "host",
+    [
+        "mail.google.com",
+        "accounts.google.com",
+        "mail.google.co.uk",
+        "accounts.google.ca",
+        "maps.google.co.in",
+        "google.com.evil.example",
+        "notgoogle.com",
+        "google.evil.com",
+        "notinternscout.org",
+    ],
+)
 def test_mail_auth_and_false_domain_suffixes_are_not_search_or_direct(host):
     assert metrics.source(host) == "other"
     assert metrics.search_engine(host) is None
@@ -39,11 +61,22 @@ def cf_reply(**changes):
 
 
 def test_successful_omitted_cloudflare_day_replaces_stale_estimate_and_labels_sampling(monkeypatch):
-    refs = [{"dimensions": {"date": "2026-10-26", "refererHost": host}, "sum": {"visits": n}}
-            for host, n in [("www.google.com", 2), ("www.bing.com", 10), ("duckduckgo.com", 3),
-                            ("accounts.google.com", 7)]]
-    monkeypatch.setattr(metrics, "_json", lambda *a, **k: cf_reply(
-        days=[{"dimensions": {"date": "2026-10-26"}, "sum": {"visits": 20}}], refs=refs))
+    refs = [
+        {"dimensions": {"date": "2026-10-26", "refererHost": host}, "sum": {"visits": n}}
+        for host, n in [
+            ("www.google.com", 2),
+            ("www.bing.com", 10),
+            ("duckduckgo.com", 3),
+            ("accounts.google.com", 7),
+        ]
+    ]
+    monkeypatch.setattr(
+        metrics,
+        "_json",
+        lambda *a, **k: cf_reply(
+            days=[{"dimensions": {"date": "2026-10-26"}, "sum": {"visits": 20}}], refs=refs
+        ),
+    )
     rows, week = metrics.visits("synthetic", NOW)
     by_day = {r["day"]: r for r in rows}
     assert len(rows) == 30
@@ -53,12 +86,23 @@ def test_successful_omitted_cloudflare_day_replaces_stale_estimate_and_labels_sa
     assert week["coverage"]["measurement"] == "adaptive_sample_estimates"
     assert by_day["2026-10-26"]["search"] == 15
     assert next(d for d in week["search_engines"]["days"] if d["day"] == "2026-10-26") == {
-        "day": "2026-10-26", "google": 2, "bing": 10, "other_search": 3}
+        "day": "2026-10-26",
+        "google": 2,
+        "bing": 10,
+        "other_search": 3,
+    }
 
 
-@pytest.mark.parametrize("reply", [None, {"errors": [{"message": "unavailable"}]}, cf_reply(days=None),
-                                   {"data": {"viewer": {"accounts": []}}},
-                                   {"data": {"viewer": {"accounts": [None]}}}])
+@pytest.mark.parametrize(
+    "reply",
+    [
+        None,
+        {"errors": [{"message": "unavailable"}]},
+        cf_reply(days=None),
+        {"data": {"viewer": {"accounts": []}}},
+        {"data": {"viewer": {"accounts": [None]}}},
+    ],
+)
 def test_failed_or_incomplete_cloudflare_response_never_becomes_zero_visits(monkeypatch, reply):
     monkeypatch.setattr(metrics, "_json", lambda *a, **k: reply)
     with pytest.raises((RuntimeError, IndexError)):
@@ -67,8 +111,20 @@ def test_failed_or_incomplete_cloudflare_response_never_becomes_zero_visits(monk
 
 def test_cloudflare_failed_collection_does_not_overwrite_stored_daily_values(monkeypatch, capsys):
     monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "synthetic")
-    monkeypatch.setattr(metrics, "visits", lambda *a: (_ for _ in ()).throw(RuntimeError("unavailable")))
-    for name in ("bluesky", "instagram", "mastodon", "automation", "search_console", "bing", "listings", "page_count", "store"):
+    monkeypatch.setattr(
+        metrics, "visits", lambda *a: (_ for _ in ()).throw(RuntimeError("unavailable"))
+    )
+    for name in (
+        "bluesky",
+        "instagram",
+        "mastodon",
+        "automation",
+        "search_console",
+        "bing",
+        "listings",
+        "page_count",
+        "store",
+    ):
         monkeypatch.setattr(metrics, name, lambda *a: {})
     monkeypatch.setattr(metrics, "automation", lambda *a: [])
     calls = []
@@ -79,36 +135,71 @@ def test_cloudflare_failed_collection_does_not_overwrite_stored_daily_values(mon
 
 
 def stub_google(monkeypatch, metadata=None, final_rows=None, fail_week=False):
-    monkeypatch.setenv("GSC_SERVICE_ACCOUNT", json.dumps({"client_email": "synthetic", "private_key": "synthetic"}))
+    monkeypatch.setenv(
+        "GSC_SERVICE_ACCOUNT", json.dumps({"client_email": "synthetic", "private_key": "synthetic"})
+    )
     monkeypatch.setattr(metrics, "_gsc_token", lambda _: "synthetic")
     calls = []
+
     def answer(url, body=None, token=None, **kwargs):
         if "urlInspection" in url:
-            return {"inspectionResult": {"indexStatusResult": {"verdict": "PASS", "lastCrawlTime": "2026-10-28T12:00:00Z"}}}
+            return {
+                "inspectionResult": {
+                    "indexStatusResult": {
+                        "verdict": "PASS",
+                        "lastCrawlTime": "2026-10-28T12:00:00Z",
+                    }
+                }
+            }
         calls.append(body)
         if body["dataState"] == "all":
-            return {"metadata": metadata or {}, "rows": [{"keys": ["2026-10-28"], "clicks": 99, "impressions": 9999}]}
+            return {
+                "metadata": metadata or {},
+                "rows": [{"keys": ["2026-10-28"], "clicks": 99, "impressions": 9999}],
+            }
         if body["dimensions"] == ["date", "page"]:
-            return {"rows": [{"keys": [body["startDate"], "https://internscout.org/internships/at/bose/"],
-                              "clicks": 1, "impressions": 10, "position": 8.1}]}
+            return {
+                "rows": [
+                    {
+                        "keys": [body["startDate"], "https://internscout.org/internships/at/bose/"],
+                        "clicks": 1,
+                        "impressions": 10,
+                        "position": 8.1,
+                    }
+                ]
+            }
         if body["dimensions"] == ["date"]:
             return {"rows": final_rows or [], "responseAggregationType": "byProperty"}
         if fail_week and body["rowLimit"] == metrics.GSC_WEEK_PAGES:
             raise RuntimeError("detail temporarily unavailable")
-        key = "https://internscout.org/internships/software-engineering/" if body["dimensions"] == ["page"] else "synthetic private query"
-        return {"rows": [{"keys": [key], "clicks": 1, "impressions": 10, "position": 8.1}],
-                "responseAggregationType": "byPage" if body["dimensions"] == ["page"] else "byProperty"}
+        key = (
+            "https://internscout.org/internships/software-engineering/"
+            if body["dimensions"] == ["page"]
+            else "synthetic private query"
+        )
+        return {
+            "rows": [{"keys": [key], "clicks": 1, "impressions": 10, "position": 8.1}],
+            "responseAggregationType": "byPage" if body["dimensions"] == ["page"] else "byProperty",
+        }
+
     monkeypatch.setattr(metrics, "_json", answer)
     return calls
 
 
 @pytest.mark.parametrize("metadata_key", ["firstIncompleteDate", "first_incomplete_date"])
-def test_final_google_windows_use_pacific_metadata_and_keep_zero_final_day(monkeypatch, metadata_key):
+def test_final_google_windows_use_pacific_metadata_and_keep_zero_final_day(
+    monkeypatch, metadata_key
+):
     metadata = {metadata_key: "2026-10-27"}
-    calls = stub_google(monkeypatch, metadata,
-        [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20, "position": 9}])
+    calls = stub_google(
+        monkeypatch,
+        metadata,
+        [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20, "position": 9}],
+    )
     got = metrics.search_console(NOW)
-    assert got["reporting"]["end"] == "2026-10-26"  # zero-impression final day does not shift the end
+    assert (
+        got["reporting"]["end"] == "2026-10-26"
+    )  # zero-impression final day does not shift the end
     assert got["reporting"]["seven_day_start"] == "2026-10-20"
     assert got["reporting"]["timezone"] == "America/Los_Angeles"
     assert got["reporting"]["completeness_metadata"] == metadata
@@ -117,35 +208,62 @@ def test_final_google_windows_use_pacific_metadata_and_keep_zero_final_day(monke
     assert got["totals_28d"]["impressions"] == 20  # preliminary probe never contaminates totals
     assert all(c["dataState"] == "final" and c["type"] == "web" for c in calls[1:])
     assert [(w["start"], w["end"]) for w in got["comparison"]["weeks"]] == [
-        ("2026-10-12", "2026-10-18"), ("2026-10-19", "2026-10-25")]
+        ("2026-10-12", "2026-10-18"),
+        ("2026-10-19", "2026-10-25"),
+    ]
     assert got["pages"][0]["url"].startswith("https://internscout.org/")
     assert got["reporting"]["limits"]["queries"]["exhaustive"] is False
     assert len(calls) == 9
 
 
-def test_actual_wire_metadata_removes_extra_reporting_lag_without_including_preliminary_rows(monkeypatch):
-    calls = stub_google(monkeypatch, {"firstIncompleteDate": "2026-10-29"}, [
-        {"keys": ["2026-10-28"], "clicks": 2, "impressions": 20, "position": 9},
-        {"keys": ["2026-10-29"], "clicks": 99, "impressions": 9999, "position": 1}])
+def test_actual_wire_metadata_removes_extra_reporting_lag_without_including_preliminary_rows(
+    monkeypatch,
+):
+    calls = stub_google(
+        monkeypatch,
+        {"firstIncompleteDate": "2026-10-29"},
+        [
+            {"keys": ["2026-10-28"], "clicks": 2, "impressions": 20, "position": 9},
+            {"keys": ["2026-10-29"], "clicks": 99, "impressions": 9999, "position": 1},
+        ],
+    )
     got = metrics.search_console(datetime(2026, 10, 30, 22, tzinfo=timezone.utc))
     assert got["reporting"]["end"] == "2026-10-28"
     assert got["totals_28d"]["impressions"] == 20
     assert all(c["endDate"] <= "2026-10-28" and c["dataState"] == "final" for c in calls[1:])
 
 
-@pytest.mark.parametrize("metadata", [
-    {"firstIncompleteDate": "2026-10-28", "first_incomplete_date": "2026-10-26"},
-    {"firstIncompleteDate": "2026-10-26", "first_incomplete_date": "2026-10-28"},
-    {"firstIncompleteDate": "2026-10-26", "first_incomplete_date": "2026-10-26"},
-])
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"firstIncompleteDate": "2026-10-28", "first_incomplete_date": "2026-10-26"},
+        {"firstIncompleteDate": "2026-10-26", "first_incomplete_date": "2026-10-28"},
+        {"firstIncompleteDate": "2026-10-26", "first_incomplete_date": "2026-10-26"},
+    ],
+)
 def test_conflicting_metadata_uses_the_earliest_incomplete_boundary(metadata):
     end, basis = metrics._gsc_end(NOW, metadata)
     assert end.isoformat() == "2026-10-25"
     assert basis == "google_first_incomplete_date"
 
 
-@pytest.mark.parametrize("invalid", [None, "", 20261027, [], {}, "2026-10-29", "2026-02-30",
-    "2026-10-7", "2026-10-27T00:00:00Z", " 2026-10-27", "2026-10-27\n", "0001-01-01"])
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        None,
+        "",
+        20261027,
+        [],
+        {},
+        "2026-10-29",
+        "2026-02-30",
+        "2026-10-7",
+        "2026-10-27T00:00:00Z",
+        " 2026-10-27",
+        "2026-10-27\n",
+        "0001-01-01",
+    ],
+)
 @pytest.mark.parametrize("metadata_key", ["firstIncompleteDate", "first_incomplete_date"])
 def test_invalid_metadata_never_advances_the_conservative_window(metadata_key, invalid):
     end, basis = metrics._gsc_end(NOW, {metadata_key: invalid})
@@ -154,39 +272,57 @@ def test_invalid_metadata_never_advances_the_conservative_window(metadata_key, i
 
 
 @pytest.mark.parametrize("valid_key", ["firstIncompleteDate", "first_incomplete_date"])
-@pytest.mark.parametrize("valid_date,expected,basis", [
-    ("2026-10-28", "2026-10-25", "conservative_three_day_lag_metadata_unavailable"),
-    ("2026-10-24", "2026-10-23", "google_first_incomplete_date"),
-])
-def test_invalid_alias_cannot_override_a_more_conservative_boundary(valid_key, valid_date, expected, basis):
-    other_key = "first_incomplete_date" if valid_key == "firstIncompleteDate" else "firstIncompleteDate"
+@pytest.mark.parametrize(
+    "valid_date,expected,basis",
+    [
+        ("2026-10-28", "2026-10-25", "conservative_three_day_lag_metadata_unavailable"),
+        ("2026-10-24", "2026-10-23", "google_first_incomplete_date"),
+    ],
+)
+def test_invalid_alias_cannot_override_a_more_conservative_boundary(
+    valid_key, valid_date, expected, basis
+):
+    other_key = (
+        "first_incomplete_date" if valid_key == "firstIncompleteDate" else "firstIncompleteDate"
+    )
     end, actual_basis = metrics._gsc_end(NOW, {valid_key: valid_date, other_key: "invalid"})
     assert end.isoformat() == expected
     assert actual_basis == basis
 
 
 def test_completeness_today_excludes_the_current_pacific_day():
-    end, basis = metrics._gsc_end(datetime(2026, 10, 28, 1, tzinfo=timezone.utc),
-                                 {"firstIncompleteDate": "2026-10-27"})
+    end, basis = metrics._gsc_end(
+        datetime(2026, 10, 28, 1, tzinfo=timezone.utc), {"firstIncompleteDate": "2026-10-27"}
+    )
     assert end.isoformat() == "2026-10-26"  # UTC Oct 28 is still Oct 27 Pacific
     assert basis == "google_first_incomplete_date"
 
 
 def test_metadata_absent_uses_explicit_lag_not_latest_nonzero_date(monkeypatch):
-    calls = stub_google(monkeypatch, final_rows=[{"keys": ["2026-10-20"], "clicks": 1, "impressions": 5}])
+    calls = stub_google(
+        monkeypatch, final_rows=[{"keys": ["2026-10-20"], "clicks": 1, "impressions": 5}]
+    )
     got = metrics.search_console(datetime(2026, 10, 28, 1, tzinfo=timezone.utc))
     assert calls[0]["endDate"] == "2026-10-27"  # still Oct 27 Pacific
     assert got["reporting"]["end"] == "2026-10-24"
     assert got["reporting"]["boundary_basis"] == "conservative_three_day_lag_metadata_unavailable"
 
 
-def test_optional_cohort_failure_preserves_final_headlines_and_does_not_invent_empty_details(monkeypatch):
-    stub_google(monkeypatch, {"first_incomplete_date": "2026-10-27"},
-                [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20}], fail_week=True)
+def test_optional_cohort_failure_preserves_final_headlines_and_does_not_invent_empty_details(
+    monkeypatch,
+):
+    stub_google(
+        monkeypatch,
+        {"first_incomplete_date": "2026-10-27"},
+        [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20}],
+        fail_week=True,
+    )
     got = metrics.search_console(NOW)
     assert got["totals_7d"]["clicks"] == 2
-    assert all(w["status"] == "unavailable" and "pages" not in w and "queries" not in w
-               for w in got["comparison"]["weeks"])
+    assert all(
+        w["status"] == "unavailable" and "pages" not in w and "queries" not in w
+        for w in got["comparison"]["weeks"]
+    )
 
 
 def test_private_weekly_queries_and_full_urls_do_not_leak_into_public_logs(monkeypatch):
@@ -200,8 +336,16 @@ def test_private_weekly_queries_and_full_urls_do_not_leak_into_public_logs(monke
 
 
 def test_capped_diagnostics_are_explicitly_non_exhaustive(monkeypatch):
-    monkeypatch.setattr(metrics, "_gsc_response", lambda *a: {"rows": [
-        {"keys": ["private"], "impressions": 5}, {"keys": ["private2"], "impressions": 2}]})
+    monkeypatch.setattr(
+        metrics,
+        "_gsc_response",
+        lambda *a: {
+            "rows": [
+                {"keys": ["private"], "impressions": 5},
+                {"keys": ["private2"], "impressions": 2},
+            ]
+        },
+    )
     _, limits = metrics._gsc_details("synthetic", {}, "query", 2)
     assert limits["at_row_limit"] and not limits["exhaustive"]
 
@@ -214,39 +358,73 @@ def test_fixed_page_date_cohort_has_exact_eight_urls_and_both_complete_weeks(mon
     assert request["startDate"] == "2026-10-12" and request["endDate"] == "2026-10-25"
     assert request["dataState"] == "final" and request["rowLimit"] == 1000
     regex = re.compile(request["dimensionFilterGroups"][0]["filters"][0]["expression"])
-    for slug in ("under-armour", "medtronic", "lyft", "bose", "shure", "sun-life", "ul-solutions", "capital-one"):
+    for slug in (
+        "under-armour",
+        "medtronic",
+        "lyft",
+        "bose",
+        "shure",
+        "sun-life",
+        "ul-solutions",
+        "capital-one",
+    ):
         assert regex.fullmatch(f"https://internscout.org/internships/at/{slug}/")
-    for url in ("https://evil.example/internships/at/bose/", "https://internscout.org/internships/at/bose/extra/",
-                "https://internscout.org/internships/at/bose/?email=private", "http://internscout.org/internships/at/bose/"):
+    for url in (
+        "https://evil.example/internships/at/bose/",
+        "https://internscout.org/internships/at/bose/extra/",
+        "https://internscout.org/internships/at/bose/?email=private",
+        "http://internscout.org/internships/at/bose/",
+    ):
         assert not regex.fullmatch(url)
     assert cohort["status"] == "available" and cohort["max_possible_page_days"] == 112
     assert cohort["rows"][0]["url"] == "https://internscout.org/internships/at/bose/"
-    assert "https://internscout.org/internships/at/bose/" not in json.dumps(metrics.printable({"search_console": got}))
+    assert "https://internscout.org/internships/at/bose/" not in json.dumps(
+        metrics.printable({"search_console": got})
+    )
 
 
 def test_fixed_cohort_failure_does_not_erase_successful_headlines(monkeypatch):
-    stub_google(monkeypatch, {"first_incomplete_date": "2026-10-27"},
-                [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20}])
+    stub_google(
+        monkeypatch,
+        {"first_incomplete_date": "2026-10-27"},
+        [{"keys": ["2026-10-25"], "clicks": 2, "impressions": 20}],
+    )
     answer = metrics._gsc_response
+
     def fail(token, body):
         if body["dimensions"] == ["date", "page"]:
             raise RuntimeError("optional query unavailable")
         return answer(token, body)
+
     monkeypatch.setattr(metrics, "_gsc_response", fail)
     got = metrics.search_console(NOW)
     assert got["totals_7d"]["clicks"] == 2
-    assert got["fixed_page_cohort"]["status"] == "unavailable" and "rows" not in got["fixed_page_cohort"]
+    assert (
+        got["fixed_page_cohort"]["status"] == "unavailable"
+        and "rows" not in got["fixed_page_cohort"]
+    )
 
 
 def test_cloudflare_matched_pacific_weeks_account_for_dst_and_do_not_mix_engines(monkeypatch):
     calls = []
+
     def answer(url, body=None, token=None):
         calls.append(body)
-        return cf_reply(refs=[{"dimensions": {"refererHost": h}, "sum": {"visits": n}}
-                              for h, n in [("www.google.com", 4), ("www.bing.com", 20), ("mail.google.co.uk", 9)]])
+        return cf_reply(
+            refs=[
+                {"dimensions": {"refererHost": h}, "sum": {"visits": n}}
+                for h, n in [("www.google.com", 4), ("www.bing.com", 20), ("mail.google.co.uk", 9)]
+            ]
+        )
+
     monkeypatch.setattr(metrics, "_json", answer)
-    got = metrics.cloudflare_search_comparison("synthetic", [
-        {"start": "2026-10-26", "end": "2026-11-01"}, {"start": "2026-11-02", "end": "2026-11-08"}])
+    got = metrics.cloudflare_search_comparison(
+        "synthetic",
+        [
+            {"start": "2026-10-26", "end": "2026-11-01"},
+            {"start": "2026-11-02", "end": "2026-11-08"},
+        ],
+    )
     assert calls[0]["variables"]["start"] == "2026-10-26T07:00:00Z"
     assert calls[0]["variables"]["end"] == "2026-11-02T08:00:00Z"  # DST week has 169 hours
     assert calls[1]["variables"]["start"] == "2026-11-02T08:00:00Z"
@@ -256,14 +434,28 @@ def test_cloudflare_matched_pacific_weeks_account_for_dst_and_do_not_mix_engines
 
 def test_optional_inspection_reads_crawl_state_without_requesting_indexing(monkeypatch):
     calls = []
+
     def answer(url, body, token, timeout):
         calls.append((url, body, token, timeout))
-        return {"inspectionResult": {"indexStatusResult": {"lastCrawlTime": "2026-10-28T12:00:00Z",
-            "coverageState": "Submitted and indexed", "verdict": "PASS", "googleCanonical": body["inspectionUrl"],
-            "userCanonical": body["inspectionUrl"], "indexingState": "INDEXING_ALLOWED", "pageFetchState": "SUCCESSFUL"}}}
+        return {
+            "inspectionResult": {
+                "indexStatusResult": {
+                    "lastCrawlTime": "2026-10-28T12:00:00Z",
+                    "coverageState": "Submitted and indexed",
+                    "verdict": "PASS",
+                    "googleCanonical": body["inspectionUrl"],
+                    "userCanonical": body["inspectionUrl"],
+                    "indexingState": "INDEXING_ALLOWED",
+                    "pageFetchState": "SUCCESSFUL",
+                }
+            }
+        }
+
     monkeypatch.setattr(metrics, "_json", answer)
     got = metrics.inspect_search_pages("synthetic", NOW)
-    assert len(calls) == 4 and all(c[0].endswith("urlInspection/index:inspect") and c[3] == 10 for c in calls)
+    assert len(calls) == 4 and all(
+        c[0].endswith("urlInspection/index:inspect") and c[3] == 10 for c in calls
+    )
     assert all(c[1]["siteUrl"] == metrics.GSC_SITE for c in calls)
     assert got["checked_at"] == "2026-10-28T17:00:00Z"
     assert got["results"][0]["lastCrawlTime"] == "2026-10-28T12:00:00Z"
@@ -272,9 +464,13 @@ def test_optional_inspection_reads_crawl_state_without_requesting_indexing(monke
 
 def test_inspection_stops_at_first_permission_denial_without_losing_main_report(monkeypatch):
     calls = []
+
     def denied(*args, **kwargs):
         calls.append(args)
-        raise urllib.error.HTTPError("https://searchconsole.googleapis.com/", 403, "denied", {}, io.BytesIO(b""))
+        raise urllib.error.HTTPError(
+            "https://searchconsole.googleapis.com/", 403, "denied", {}, io.BytesIO(b"")
+        )
+
     monkeypatch.setattr(metrics, "_json", denied)
     got = metrics.inspect_search_pages("synthetic", NOW)
     assert len(calls) == 1 and got["status"] == "unavailable"

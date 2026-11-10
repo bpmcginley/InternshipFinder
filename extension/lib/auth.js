@@ -9,15 +9,18 @@
 // The pure helpers at the top have no chrome dependency so node tests can import this file.
 import { WORKER_URL } from "./config.js";
 
-const KEY = "internscout.idtoken";                // chrome.storage.session: { token } (legacy ID token)
+const KEY = "internscout.idtoken"; // chrome.storage.session: { token } (legacy ID token)
 export const SESSION_KEY = "internscout.session"; // chrome.storage.local: { token, account, email, provider, tier, expires }
-export const SIGNIN_KEY = "internscout.signin";   // chrome.storage.local: { hint, provider } for the silent refresh
+export const SIGNIN_KEY = "internscout.signin"; // chrome.storage.local: { hint, provider } for the silent refresh
 const LEEWAY_S = 60;
 
 export function decodeJwt(token) {
   try {
     const part = String(token).split(".")[1];
-    const b64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
+    const b64 = part
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(part.length / 4) * 4, "=");
     const bin = atob(b64);
     return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
   } catch (e) {
@@ -31,11 +34,12 @@ export function isExpired(token, now = Date.now(), leeway = LEEWAY_S) {
   return !p || !p.exp || p.exp * 1000 <= now + leeway * 1000;
 }
 
-export const emailOf = (payload) => (payload && (payload.email || payload.preferred_username || payload.upn)) || "";
+export const emailOf = (payload) =>
+  (payload && (payload.email || payload.preferred_username || payload.upn)) || "";
 
 // One entry of GET /config's providers list ({id, client_id, authorize_url, scopes}), or null.
 export function pickProvider(cfg, id) {
-  const list = (cfg && Array.isArray(cfg.providers)) ? cfg.providers : [];
+  const list = cfg && Array.isArray(cfg.providers) ? cfg.providers : [];
   return list.find((p) => p.id === id) || null;
 }
 
@@ -43,7 +47,11 @@ export function pickProvider(cfg, id) {
 // always; a local copy of the site only on an unpacked (developer) build, where `unpacked` is true.
 export function trustedDashboard(sender, unpacked) {
   let origin = sender && sender.origin;
-  try { origin = origin || new URL(sender.url).origin; } catch (e) { return false; }
+  try {
+    origin = origin || new URL(sender.url).origin;
+  } catch (e) {
+    return false;
+  }
   if (origin === "https://internscout.org") return true;
   return !!unpacked && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || "");
 }
@@ -56,7 +64,13 @@ export function buildAuthUrl(provider, { redirectUri, nonce, loginHint, silent }
   q.set("client_id", provider.client_id);
   q.set("response_type", "id_token");
   q.set("redirect_uri", redirectUri);
-  q.set("scope", (provider.scopes && provider.scopes.length ? provider.scopes : ["openid", "email", "profile"]).join(" "));
+  q.set(
+    "scope",
+    (provider.scopes && provider.scopes.length
+      ? provider.scopes
+      : ["openid", "email", "profile"]
+    ).join(" "),
+  );
   q.set("nonce", nonce);
   q.set("state", nonce);
   if (provider.id === "microsoft") q.set("response_mode", "fragment");
@@ -70,11 +84,13 @@ export function buildAuthUrl(provider, { redirectUri, nonce, loginHint, silent }
 export function parseRedirect(url, nonce) {
   const u = new URL(url);
   const params = new URLSearchParams(u.hash.replace(/^#/, "") || u.search.replace(/^\?/, ""));
-  if (params.get("error")) throw new Error(`Sign-in failed: ${params.get("error_description") || params.get("error")}`);
+  if (params.get("error"))
+    throw new Error(`Sign-in failed: ${params.get("error_description") || params.get("error")}`);
   const token = params.get("id_token");
   if (!token) throw new Error("Sign-in failed: no ID token came back.");
   const p = decodeJwt(token);
-  if (!p || p.nonce !== nonce) throw new Error("Sign-in failed: the reply did not match this request. Try again.");
+  if (!p || p.nonce !== nonce)
+    throw new Error("Sign-in failed: the reply did not match this request. Try again.");
   return token;
 }
 
@@ -94,9 +110,21 @@ export function pickToken(session, idToken, now = Date.now()) {
 
 // POST /session's 200 reply → the record kept in chrome.storage.local, or null when it isn't one.
 export function sessionRecord(data) {
-  if (!data || !isSessionToken(data.session) || !data.expires || !Number.isFinite(Date.parse(data.expires))) return null;
-  return { token: data.session, account: String(data.account || ""), email: String(data.email || ""),
-    provider: data.provider || null, tier: data.tier || null, expires: data.expires };
+  if (
+    !data ||
+    !isSessionToken(data.session) ||
+    !data.expires ||
+    !Number.isFinite(Date.parse(data.expires))
+  )
+    return null;
+  return {
+    token: data.session,
+    account: String(data.account || ""),
+    email: String(data.email || ""),
+    provider: data.provider || null,
+    tier: data.tier || null,
+    expires: data.expires,
+  };
 }
 
 // POST /session's outcome: "session" (use it), "legacy" (an older Worker, or it's down: keep the ID token)
@@ -105,14 +133,19 @@ export function sessionRecord(data) {
 export function sessionOutcome(status, data) {
   if (status >= 200 && status < 300) return sessionRecord(data) ? "session" : "legacy";
   if (status === 401 || status === 403) return "refused";
-  return "legacy";   // 404 (no /session yet), 5xx, network
+  return "legacy"; // 404 (no /session yet), 5xx, network
 }
 
 // The bridge's auth:token reply (the dashboard asks the extension for its sign-in):
 // { token, email, account, expires (ms epoch) } for a session, { token } for a legacy ID token.
 export function bridgeReply(session, token) {
   if (token && session && session.token === token) {
-    return { token, email: session.email || "", account: session.account || "", expires: Date.parse(session.expires) };
+    return {
+      token,
+      email: session.email || "",
+      account: session.account || "",
+      expires: Date.parse(session.expires),
+    };
   }
   return { token: token || null };
 }
@@ -122,7 +155,8 @@ let cfgCache = null;
 export async function getConfig(fetchImpl = fetch) {
   if (cfgCache && Date.now() - cfgCache.at < 10 * 60 * 1000) return cfgCache.cfg;
   const res = await fetchImpl(`${WORKER_URL}/config`).catch(() => null);
-  if (!res || !res.ok) throw new Error("Couldn't reach InternScout. Check your connection and try again.");
+  if (!res || !res.ok)
+    throw new Error("Couldn't reach InternScout. Check your connection and try again.");
   const cfg = await res.json();
   cfgCache = { cfg, at: Date.now() };
   return cfg;
@@ -153,20 +187,30 @@ export async function getToken() {
   return pickToken(await local(SESSION_KEY), (await readLegacy()).token);
 }
 
-const quick = () => (typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined);
+const quick = () =>
+  typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined;
 
 // Best effort: the Worker forgets this session. Nothing is thrown; a session nobody uses expires anyway.
 async function endSession(token, fetchImpl = fetch) {
   if (!isSessionToken(token)) return;
-  await fetchImpl(`${WORKER_URL}/session`, { method: "DELETE", headers: { authorization: `Bearer ${token}` }, signal: quick() }).catch(() => null);
+  await fetchImpl(`${WORKER_URL}/session`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${token}` },
+    signal: quick(),
+  }).catch(() => null);
 }
 
 // Trades a provider ID token for a session. Returns the record, or null to keep using the ID token.
 export async function createSession(idToken, fetchImpl = fetch) {
-  const res = await fetchImpl(`${WORKER_URL}/session`, { method: "POST", headers: { authorization: `Bearer ${idToken}` }, signal: quick() }).catch(() => null);
+  const res = await fetchImpl(`${WORKER_URL}/session`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${idToken}` },
+    signal: quick(),
+  }).catch(() => null);
   const data = res ? await res.json().catch(() => ({})) : {};
   const out = sessionOutcome(res ? res.status : 0, data);
-  if (out === "refused") throw new Error(`Sign-in failed: ${data.message || "InternScout didn't accept this account"}.`);
+  if (out === "refused")
+    throw new Error(`Sign-in failed: ${data.message || "InternScout didn't accept this account"}.`);
   return out === "session" ? sessionRecord(data) : null;
 }
 
@@ -180,21 +224,36 @@ export async function signIn({ interactive = true, provider } = {}) {
   if (!p) throw new Error(`${PROVIDER_LABELS[id] || id} sign-in isn't available right now.`);
   const nonce = crypto.randomUUID();
   const hint = saved.provider === id ? saved.hint : undefined;
-  const url = buildAuthUrl(p, { redirectUri: chrome.identity.getRedirectURL(), nonce, loginHint: hint, silent: !interactive });
+  const url = buildAuthUrl(p, {
+    redirectUri: chrome.identity.getRedirectURL(),
+    nonce,
+    loginHint: hint,
+    silent: !interactive,
+  });
   // A silent refresh (prompt=none) can take a redirect or two after the first page load; by default Chrome
   // gives up on a non-interactive flow at that first load, so the refresh failed and every job an hour
   // after sign-in stopped at "sign in". These two options (Chrome 113+, ignored before) let it finish.
-  const back = await chrome.identity.launchWebAuthFlow(interactive ? { url, interactive }
-    : { url, interactive, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 10000 });
+  const back = await chrome.identity.launchWebAuthFlow(
+    interactive
+      ? { url, interactive }
+      : {
+          url,
+          interactive,
+          abortOnLoadForNonInteractive: false,
+          timeoutMsForNonInteractive: 10000,
+        },
+  );
   if (!back) throw new Error("Sign-in was cancelled.");
   const token = parseRedirect(back, nonce);
   const session = await createSession(token);
   const old = await local(SESSION_KEY);
-  await chrome.storage.local.set({ [SIGNIN_KEY]: { hint: emailOf(decodeJwt(token)), provider: id } });
+  await chrome.storage.local.set({
+    [SIGNIN_KEY]: { hint: emailOf(decodeJwt(token)), provider: id },
+  });
   if (session) {
     await chrome.storage.local.set({ [SESSION_KEY]: session });
     await chrome.storage.session.remove(KEY);
-    if (old && old.token !== session.token) endSession(old.token);   // signed in again over a live session
+    if (old && old.token !== session.token) endSession(old.token); // signed in again over a live session
     return session.token;
   }
   // was: chrome.storage.session.set({ [KEY]: { token, hint, provider } }). The hint and provider now sit in
@@ -254,13 +313,24 @@ export async function workerFetch(path, init = {}, token) {
 export async function authStatus() {
   const session = await getSession();
   if (session) {
-    return { signedIn: true, email: session.email || "", provider: session.provider || null,
-      exp: Math.floor(Date.parse(session.expires) / 1000), account: session.account || "", session: true };
+    return {
+      signedIn: true,
+      email: session.email || "",
+      provider: session.provider || null,
+      exp: Math.floor(Date.parse(session.expires) / 1000),
+      account: session.account || "",
+      session: true,
+    };
   }
   const token = await getToken();
   const p = token && decodeJwt(token);
   const { provider } = await readSignin();
-  return { signedIn: !!token, email: emailOf(p), provider: token ? provider || null : null, exp: (p && p.exp) || null };
+  return {
+    signedIn: !!token,
+    email: emailOf(p),
+    provider: token ? provider || null : null,
+    exp: (p && p.exp) || null,
+  };
 }
 
 // The bridge's auth:token reply.
@@ -285,9 +355,9 @@ export async function authBridge() {
 //     never the dashboard's token itself, so signing out of one leaves the other signed in.
 // The dashboard already holds this token, and could already be handed the extension's (auth:token), so
 // the extension gives nothing away here: the offer only goes from the page to the extension.
-export const OFFER_KEY = "internscout.offer";   // chrome.storage.session: { token, at }
+export const OFFER_KEY = "internscout.offer"; // chrome.storage.session: { token, at }
 export const OFFER_TTL_MS = 10 * 60 * 1000;
-const SESSION_SHAPE = /^iss_[A-Za-z0-9_-]{43}$/;   // worker/src/session.js TOKEN
+const SESSION_SHAPE = /^iss_[A-Za-z0-9_-]{43}$/; // worker/src/session.js TOKEN
 export const offerTokenOk = (t) => typeof t === "string" && SESSION_SHAPE.test(t);
 
 // GET /session's 200 reply for `token` → the session record kept in chrome.storage.local, or null.
@@ -297,8 +367,14 @@ export function offeredRecord(token, data, now = Date.now()) {
   if (typeof data.account !== "string" || !/^[0-9a-f]{16}$/.test(data.account)) return null;
   const exp = Date.parse(data.expires);
   if (!Number.isFinite(exp) || exp <= now) return null;
-  return { token, account: data.account, email: "", provider: ["google", "microsoft"].includes(data.provider) ? data.provider : null,
-    tier: ["edu", "general"].includes(data.tier) ? data.tier : null, expires: new Date(exp).toISOString() };
+  return {
+    token,
+    account: data.account,
+    email: "",
+    provider: ["google", "microsoft"].includes(data.provider) ? data.provider : null,
+    tier: ["edu", "general"].includes(data.tier) ? data.tier : null,
+    expires: new Date(exp).toISOString(),
+  };
 }
 
 // Asks the Worker whether `token` is a live session that can still be passed on. The record, or null (not
@@ -307,7 +383,10 @@ export function offeredRecord(token, data, now = Date.now()) {
 // was: live sessions only, so a dashboard sign-in already used once kept being offered and always failed.
 export async function checkSession(token, fetchImpl = fetch, now = Date.now()) {
   if (!offerTokenOk(token)) return null;
-  const res = await fetchImpl(`${WORKER_URL}/session`, { headers: { authorization: `Bearer ${token}` }, signal: quick() }).catch(() => null);
+  const res = await fetchImpl(`${WORKER_URL}/session`, {
+    headers: { authorization: `Bearer ${token}` },
+    signal: quick(),
+  }).catch(() => null);
   if (!res || res.status !== 200) return null;
   const data = await res.json().catch(() => null);
   if (data && data.copyable === false) return null;
@@ -319,7 +398,11 @@ export async function checkSession(token, fetchImpl = fetch, now = Date.now()) {
 // already copied once, an older Worker without the route, or no answer).
 export async function copySessionFrom(token, fetchImpl = fetch, now = Date.now()) {
   if (!offerTokenOk(token)) return null;
-  const res = await fetchImpl(`${WORKER_URL}/session/copy`, { method: "POST", headers: { authorization: `Bearer ${token}` }, signal: quick() }).catch(() => null);
+  const res = await fetchImpl(`${WORKER_URL}/session/copy`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    signal: quick(),
+  }).catch(() => null);
   if (!res || res.status !== 200) return null;
   const data = await res.json().catch(() => null);
   if (!data || data.session === token) return null;
@@ -330,7 +413,7 @@ export async function copySessionFrom(token, fetchImpl = fetch, now = Date.now()
 export async function holdOffer(token, fetchImpl = fetch, now = Date.now()) {
   if (!offerTokenOk(token) || (await getToken())) return false;
   const was = (await chrome.storage.session.get(OFFER_KEY))[OFFER_KEY];
-  if (was && was.token === token && now - was.at < OFFER_TTL_MS) return true;   // the same offer again
+  if (was && was.token === token && now - was.at < OFFER_TTL_MS) return true; // the same offer again
   if (!(await checkSession(token, fetchImpl, now))) return false;
   await chrome.storage.session.set({ [OFFER_KEY]: { token, at: now } });
   return true;
@@ -349,8 +432,11 @@ export async function offerWaiting(now = Date.now()) {
 export async function acceptOffer(fetchImpl = fetch, now = Date.now()) {
   const o = (await chrome.storage.session.get(OFFER_KEY))[OFFER_KEY];
   await chrome.storage.session.remove(OFFER_KEY);
-  if (await getToken()) return { ok: true };   // signed in some other way meanwhile: that sign-in stays
-  const gone = { error: "That sign-in from the dashboard can't be used any more. Sign in with Google or Microsoft instead." };
+  if (await getToken()) return { ok: true }; // signed in some other way meanwhile: that sign-in stays
+  const gone = {
+    error:
+      "That sign-in from the dashboard can't be used any more. Sign in with Google or Microsoft instead.",
+  };
   if (!o || !offerTokenOk(o.token) || now - o.at >= OFFER_TTL_MS) return gone;
   const rec = await copySessionFrom(o.token, fetchImpl, now);
   if (!rec) return gone;
@@ -376,12 +462,17 @@ export async function deleteServerData(token) {
   const res = await workerFetch("/me", { method: "DELETE" }, token);
   if (!res) return { ok: false, error: "network" };
   const data = await res.json().catch(() => ({}));
-  return res.ok ? { ok: true } : { ok: false, error: data.error || String(res.status), message: data.message || "" };
+  return res.ok
+    ? { ok: true }
+    : { ok: false, error: data.error || String(res.status), message: data.message || "" };
 }
 
 export const TASK_LABELS = {
-  resume_tailor: "Tailored resumes", autofill: "Auto-Apply runs", deep_dive: "Deep Dives",
-  field_match: "Field matches", short_answer: "Short answers",
+  resume_tailor: "Tailored resumes",
+  autofill: "Auto-Apply runs",
+  deep_dive: "Deep Dives",
+  field_match: "Field matches",
+  short_answer: "Short answers",
 };
 
 // "Tailored resumes: 7 of 8 left" per task in a GET /me reply (optionally only some tasks).
@@ -389,9 +480,11 @@ export function allowanceLines(me, tasks) {
   if (!me || me.error || !me.allowance) return [];
   return Object.entries(me.allowance)
     .filter(([k]) => !tasks || tasks.includes(k))
-    .map(([k, v]) => v.limit == null   // no monthly cap on this task (the Deep Dive)
-      ? `${TASK_LABELS[k] || k}: unlimited`
-      : `${TASK_LABELS[k] || k}: ${Math.max(0, (v.limit || 0) - (v.used || 0))} of ${v.limit || 0} left`);
+    .map(([k, v]) =>
+      v.limit == null // no monthly cap on this task (the Deep Dive)
+        ? `${TASK_LABELS[k] || k}: unlimited`
+        : `${TASK_LABELS[k] || k}: ${Math.max(0, (v.limit || 0) - (v.used || 0))} of ${v.limit || 0} left`,
+    );
 }
 
 // The allowances a student acts on; field matches and short answers happen inside those runs.
@@ -401,8 +494,13 @@ export const MAIN_TASKS = ["autofill", "resume_tailor", "deep_dive"];
 export function tierNote(me) {
   if (!me) return "Couldn't reach InternScout to check your allowance.";
   if (me.error) return me.message || `Couldn't check your allowance (${me.error}).`;
-  const paused = me.paused ? " AI is paused for everyone until next month; search still works." : "";
-  return (me.tier === "edu"
-    ? "School (.edu) allowance: about twice the standard. Resets on the 1st."
-    : "Standard allowance. A Google account with a .edu email gets about twice as much. Resets on the 1st.") + paused;
+  const paused = me.paused
+    ? " AI is paused for everyone until next month; search still works."
+    : "";
+  return (
+    (me.tier === "edu"
+      ? "School (.edu) allowance: about twice the standard. Resets on the 1st."
+      : "Standard allowance. A Google account with a .edu email gets about twice as much. Resets on the 1st.") +
+    paused
+  );
 }

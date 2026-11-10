@@ -1,12 +1,19 @@
 // The Deep Dive's quick start (2026-10-04): sign in, add a resume, and Auto-Apply can be turned on from
 // the Files step. Quick facts, Interview and Voice stay in the Deep Dive as optional extras that make the
 // answers better. Kept out of onboarding.js, which needs a page to run, so the tests can load it.
-import { hasKey, isWorker, hasLocalResume, resumeReviewPending, manualDetailsMissing } from "../lib/store.js";
+import {
+  hasKey,
+  isWorker,
+  hasLocalResume,
+  resumeReviewPending,
+  manualDetailsMissing,
+} from "../lib/store.js";
 
 // A replaced resume must finish reading/review before either finish button enables
 // Auto-Apply. Older profiles without a reading marker retain their existing setup.
 // Sign-in itself is checked on the first AI call, as everywhere else.
-export const quickStartReady = (S) => !!(hasKey(S) && S.files.resume && S.settings.signup_email && !resumeReviewPending(S));
+export const quickStartReady = (S) =>
+  !!(hasKey(S) && S.files.resume && S.settings.signup_email && !resumeReviewPending(S));
 
 // The way past a resume the AI couldn't read (or wasn't asked to): the student types their details on
 // Quick facts instead. Auto-Apply stays paused until first name, last name and email are there
@@ -21,17 +28,26 @@ export function enterDetailsManually(S) {
 // Whether to offer "I'll enter my details myself": a resume is there, it isn't being read or reviewed
 // right now, and its details were never saved.
 export const manualPathOpen = (S, { extracting = false, pending = false } = {}) =>
-  !!S.files.resume && !extracting && !pending && !S.settings.resume_import && S.settings.resume_details_ready === false;
+  !!S.files.resume &&
+  !extracting &&
+  !pending &&
+  !S.settings.resume_import &&
+  S.settings.resume_details_ready === false;
 
 const NAMES = { first_name: "first name", last_name: "last name", email: "email" };
-const list = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+const list = (xs) =>
+  xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 // Why Auto-Apply is paused, in one or two plain sentences (Files step, Review).
 export function pausedMessage(S) {
   const missing = manualDetailsMissing(S);
-  if (!hasLocalResume(S)) return "Add your resume above, then read it and save its details. Auto-Apply starts when you do.";
-  if (S.settings.resume_import) return "Review the resume updates above and save them. Auto-Apply starts when you do.";
-  if (S.settings.resume_details_ready === false) return "Your resume details aren't saved yet. Read your resume above, or enter your details yourself in Quick facts. Auto-Apply starts when one of these is done.";
-  if (missing.length) return `Add your ${list(missing.map((k) => NAMES[k]))} in Quick facts. Auto-Apply starts when they are filled in.`;
+  if (!hasLocalResume(S))
+    return "Add your resume above, then read it and save its details. Auto-Apply starts when you do.";
+  if (S.settings.resume_import)
+    return "Review the resume updates above and save them. Auto-Apply starts when you do.";
+  if (S.settings.resume_details_ready === false)
+    return "Your resume details aren't saved yet. Read your resume above, or enter your details yourself in Quick facts. Auto-Apply starts when one of these is done.";
+  if (missing.length)
+    return `Add your ${list(missing.map((k) => NAMES[k]))} in Quick facts. Auto-Apply starts when they are filled in.`;
   return "";
 }
 
@@ -39,10 +55,14 @@ export function pausedMessage(S) {
 // is on (background/index.js checks onboarded), the date is kept for the side panel, and the next Deep
 // Dive is a new run on the Worker. `save` is onboarding.js's save(now).
 export async function finishOnboarding(S, save, now = Date.now()) {
-  if (!quickStartReady(S)) throw new Error(pausedMessage(S) || "Set up the AI and add your application email before turning on Auto-Apply.");
+  if (!quickStartReady(S))
+    throw new Error(
+      pausedMessage(S) ||
+        "Set up the AI and add your application email before turning on Auto-Apply.",
+    );
   S.settings.onboarded = true;
   S.settings.deep_dive_at = now;
-  S.settings.deep_dive_run = null;   // the next Deep Dive is a new run
+  S.settings.deep_dive_run = null; // the next Deep Dive is a new run
   await save(true);
   return S;
 }
@@ -52,13 +72,16 @@ export async function finishOnboarding(S, save, now = Date.now()) {
 // provider; the extension itself never sees or sends an address. utm_source and utm_medium say it came
 // from here, the Worker's "extension" source (worker/src/visits.js sourceOf). Ships with the next
 // extension release; 0.5.5 was already in review.
-export const DIGEST_URL = "https://internscout.org/digest/?utm_source=extension&utm_medium=extension";
+export const DIGEST_URL =
+  "https://internscout.org/digest/?utm_source=extension&utm_medium=extension";
 // Public signup and the Monday schedule were approved and enabled on 2026-10-15. Keep this an optional
 // link: the extension never submits an address or subscribes someone when they finish setup.
 export const DIGEST_OPEN = true;
-export const digestLink = (open = DIGEST_OPEN) => !open ? "" :
-  // A block span, not a <p>: Review puts it inside its #rstat <span>, where a <p> isn't allowed.
-  `<span class="small" style="display:block;margin:6px 0 0"><a href="${DIGEST_URL}" target="_blank" rel="noopener">Get new internships by email every Monday ↗</a></span>`;
+export const digestLink = (open = DIGEST_OPEN) =>
+  !open
+    ? ""
+    : // A block span, not a <p>: Review puts it inside its #rstat <span>, where a <p> isn't allowed.
+      `<span class="small" style="display:block;margin:6px 0 0"><a href="${DIGEST_URL}" target="_blank" rel="noopener">Get new internships by email every Monday ↗</a></span>`;
 
 // The "Ready to apply" card on the Files step (D28, 2026-10-14 design review). It appears under the
 // resume slots after a read or a save, often below the fold, and students missed it. When it turns
@@ -76,7 +99,8 @@ export function revealQuick(box, button, reduceMotion = false) {
 // be signed in, because reading the resume and every application need it. `signedIn` is true, false, or
 // null while it is still being checked (not ticked yet). hasKey() is always true on InternScout's AI, so
 // was: !!(hasKey(S) && S.settings.signup_email), which ticked Setup for a student who never signed in.
-export const setupDone = (S, signedIn) => !!(hasKey(S) && S.settings.signup_email && (!isWorker(S.ai) || signedIn === true));
+export const setupDone = (S, signedIn) =>
+  !!(hasKey(S) && S.settings.signup_email && (!isWorker(S.ai) || signedIn === true));
 
 // Whether to ask for sign-in where it is needed (Setup's warning, the Files step's sign-in buttons):
 // only on InternScout's AI and only once the check has said "signed out".

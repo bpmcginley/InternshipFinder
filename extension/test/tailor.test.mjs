@@ -7,19 +7,45 @@ import { renderResume, wrap, clean } from "../lib/pdf.js";
 const store = () => ({
   settings: { signup_email: "student@example.edu" },
   profile: {
-    facts: { first_name: "Sam", last_name: "Lee", phone: "555-0100", city: "Amherst", state: "MA", linkedin: "https://www.linkedin.com/in/sam/" },
-    education: [{ school: "UMass Amherst", degree: "BS", major: "Biology", gpa: "3.6", end: "May 2028" }],
-    experience: [{ company: "Lab", title: "Research Assistant", start: "2025", end: "Present", bullets: ["Ran 40 PCR assays weekly", "Kept lab notebook", "Ordered supplies"] }],
+    facts: {
+      first_name: "Sam",
+      last_name: "Lee",
+      phone: "555-0100",
+      city: "Amherst",
+      state: "MA",
+      linkedin: "https://www.linkedin.com/in/sam/",
+    },
+    education: [
+      { school: "UMass Amherst", degree: "BS", major: "Biology", gpa: "3.6", end: "May 2028" },
+    ],
+    experience: [
+      {
+        company: "Lab",
+        title: "Research Assistant",
+        start: "2025",
+        end: "Present",
+        bullets: ["Ran 40 PCR assays weekly", "Kept lab notebook", "Ordered supplies"],
+      },
+    ],
     projects: [{ name: "Tide model", description: "Modeled tides in Python" }],
     skills: { technical: ["PCR", "Python", "R"], tools: [], soft: ["Teamwork"] },
-    goals: { career: "" }, voice: { summary: "" },
+    goals: { career: "" },
+    voice: { summary: "" },
   },
 });
 
 test("rewording kept, invented numbers reverted, one bullet may drop", () => {
   const { resume, diff } = applyTailoring(store(), {
     summary: "Biology student with wet-lab experience.",
-    experience: [{ i: 0, bullets: [{ from: 0, text: "Performed 40 PCR assays each week" }, { from: 1, text: "Documented 200 experiments" }] }],
+    experience: [
+      {
+        i: 0,
+        bullets: [
+          { from: 0, text: "Performed 40 PCR assays each week" },
+          { from: 1, text: "Documented 200 experiments" },
+        ],
+      },
+    ],
     skills: { technical: ["R", "Made-up skill"] },
   });
   const b = resume.experience[0].bullets;
@@ -33,7 +59,10 @@ test("rewording kept, invented numbers reverted, one bullet may drop", () => {
 
 test("bad model output falls back to the original", () => {
   const s = store();
-  const { resume } = applyTailoring(s, { experience: [{ i: 0, bullets: [{ from: 9, text: "x" }] }], summary: "Led a 12 person team" });
+  const { resume } = applyTailoring(s, {
+    experience: [{ i: 0, bullets: [{ from: 9, text: "x" }] }],
+    summary: "Led a 12 person team",
+  });
   assert.deepEqual(resume.experience[0].bullets, s.profile.experience[0].bullets);
   assert.equal(resume.summary, "");
   assert.ok(applyTailoring(s, null).resume.experience[0].bullets.length === 3);
@@ -62,15 +91,22 @@ test("pdf is well formed", () => {
   assert.equal(clean("“Résumé” – café"), '"Resume" - cafe');
 });
 
-
 // A fake chrome.storage.local: one object, the same get/set/remove shape, and a switch for failing.
 function fakeStore() {
-  let data = {}, fail = false;
+  let data = {},
+    fail = false;
   return {
     get: async (k) => (fail ? Promise.reject(new Error("quota")) : { [k]: data[k] }),
-    set: async (o) => { if (fail) throw new Error("quota"); Object.assign(data, o); },
-    remove: async (k) => { delete data[k]; },
-    break: (v) => { fail = v; },
+    set: async (o) => {
+      if (fail) throw new Error("quota");
+      Object.assign(data, o);
+    },
+    remove: async (k) => {
+      delete data[k];
+    },
+    break: (v) => {
+      fail = v;
+    },
     raw: () => data,
   };
 }
@@ -79,9 +115,9 @@ test("tailor cache key depends on every input, and cannot be forged by shifting 
   const k = await tailorKey("gemini-3.8-flash", "SYS", "JOB");
   assert.match(k, /^[0-9a-f]{64}$/);
   assert.equal(k, await tailorKey("gemini-3.8-flash", "SYS", "JOB"));
-  assert.notEqual(k, await tailorKey("claude-haiku-4-5", "SYS", "JOB"));   // a different model
-  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SYS2", "JOB"));  // a reworded system prompt
-  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SYS", "JOB2"));  // a different posting
+  assert.notEqual(k, await tailorKey("claude-haiku-4-5", "SYS", "JOB")); // a different model
+  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SYS2", "JOB")); // a reworded system prompt
+  assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SYS", "JOB2")); // a different posting
   // Length prefixes are what stop a boundary shift from colliding: "SY"+"SJOB" must not equal "SYS"+"JOB".
   assert.notEqual(k, await tailorKey("gemini-3.8-flash", "SY", "SJOB"));
 });
@@ -125,8 +161,8 @@ test("entries written in the same millisecond still evict oldest first", async (
 test("a broken cache costs an AI call, never the tailoring", async () => {
   const st = fakeStore();
   st.break(true);
-  assert.equal(await readTailored("k1", st), null);          // a failed read is simply a miss
-  await writeTailored("k1", { summary: "hi" }, st);          // and a failed write must not throw
+  assert.equal(await readTailored("k1", st), null); // a failed read is simply a miss
+  await writeTailored("k1", { summary: "hi" }, st); // and a failed write must not throw
   st.break(false);
   assert.equal(await readTailored("k1", st), null);
 });

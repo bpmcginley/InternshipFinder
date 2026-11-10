@@ -19,7 +19,8 @@ export function requireSync(env) {
 
 const b64 = (bytes) => {
   let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 };
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -33,7 +34,8 @@ async function keyFor(env, user) {
   } catch {
     ikm = null;
   }
-  if (!ikm || ikm.length !== 32) throw new HttpError(500, "server", "PROFILE_KEY must be 32 random bytes, base64");
+  if (!ikm || ikm.length !== 32)
+    throw new HttpError(500, "server", "PROFILE_KEY must be 32 random bytes, base64");
   const base = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     { name: "HKDF", hash: "SHA-256", salt: enc.encode(SALT), info: enc.encode(user) },
@@ -47,7 +49,9 @@ async function keyFor(env, user) {
 // base64(iv(12) || ciphertext), with a fresh IV every write.
 export async function seal(env, user, text) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await keyFor(env, user), enc.encode(text)));
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await keyFor(env, user), enc.encode(text)),
+  );
   const out = new Uint8Array(12 + ct.length);
   out.set(iv);
   out.set(ct, 12);
@@ -56,7 +60,11 @@ export async function seal(env, user, text) {
 
 export async function unseal(env, user, data) {
   const raw = unb64(data);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.subarray(0, 12) }, await keyFor(env, user), raw.subarray(12));
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: raw.subarray(0, 12) },
+    await keyFor(env, user),
+    raw.subarray(12),
+  );
   return new TextDecoder().decode(pt);
 }
 
@@ -64,12 +72,15 @@ export async function unseal(env, user, data) {
 // longer decrypts (PROFILE_KEY was replaced). A broken row counts as no copy, so the student's next save
 // simply replaces it rather than every sync failing from then on.
 async function readStored(db, env, user) {
-  const row = await db.prepare("SELECT data, updated FROM profiles WHERE user_hash = ?").bind(user).first();
+  const row = await db
+    .prepare("SELECT data, updated FROM profiles WHERE user_hash = ?")
+    .bind(user)
+    .first();
   if (!row) return null;
   try {
     return { profile: JSON.parse(await unseal(env, user, row.data)), updated: row.updated };
   } catch (e) {
-    if (e instanceof HttpError) throw e;   // a malformed PROFILE_KEY is a server error, not "no copy"
+    if (e instanceof HttpError) throw e; // a malformed PROFILE_KEY is a server error, not "no copy"
     console.error("profile decrypt failed:", e && e.name);
     return { broken: true };
   }
@@ -107,19 +118,24 @@ export async function putProfile(db, env, user, body, now = Date.now()) {
   const text = JSON.stringify(profile);
   const stale = (stored) => {
     const ok = stored && !stored.broken;
-    return new HttpError(409, "stale", "Your account has a newer copy of this profile.",
-      { profile: ok ? stored.profile : null, updated: ok ? stored.updated : null });
+    return new HttpError(409, "stale", "Your account has a newer copy of this profile.", {
+      profile: ok ? stored.profile : null,
+      updated: ok ? stored.updated : null,
+    });
   };
 
   const before = await readStored(db, env, user);
   if (before && !before.broken && before.updated > updated) throw stale(before);
   // Stored times are all toISOString(), so comparing them as text is comparing them as times.
   const cond = before && before.broken ? "" : "WHERE profiles.updated <= excluded.updated";
-  const res = await db.prepare(
-    "INSERT INTO profiles (user_hash, data, updated, bytes) VALUES (?, ?, ?, ?) " +
-    `ON CONFLICT(user_hash) DO UPDATE SET data = excluded.data, updated = excluded.updated, bytes = excluded.bytes ${cond}`,
-  ).bind(user, await seal(env, user, text), updated, enc.encode(text).length).run();
-  if (res.meta.changes === 0) throw stale(await readStored(db, env, user));   // a parallel, later save won
+  const res = await db
+    .prepare(
+      "INSERT INTO profiles (user_hash, data, updated, bytes) VALUES (?, ?, ?, ?) " +
+        `ON CONFLICT(user_hash) DO UPDATE SET data = excluded.data, updated = excluded.updated, bytes = excluded.bytes ${cond}`,
+    )
+    .bind(user, await seal(env, user, text), updated, enc.encode(text).length)
+    .run();
+  if (res.meta.changes === 0) throw stale(await readStored(db, env, user)); // a parallel, later save won
   return { ok: true, updated };
 }
 
@@ -129,4 +145,5 @@ export async function deleteProfile(db, user) {
 }
 
 // "Delete my data" removes the copy too (limits.js deleteUser).
-export const forgetProfile = (db, user) => db.prepare("DELETE FROM profiles WHERE user_hash = ?").bind(user);
+export const forgetProfile = (db, user) =>
+  db.prepare("DELETE FROM profiles WHERE user_hash = ?").bind(user);

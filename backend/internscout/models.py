@@ -1,7 +1,18 @@
 """ORM models. Mirrors the data model in the plan doc."""
+
 from __future__ import annotations
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON, UniqueConstraint
+from sqlalchemy import (
+    String,
+    Integer,
+    Float,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Text,
+    JSON,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -14,7 +25,7 @@ class Company(Base):
     __tablename__ = "company"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), index=True)
-    ats_type: Mapped[str | None] = mapped_column(String(32))          # greenhouse|lever|...
+    ats_type: Mapped[str | None] = mapped_column(String(32))  # greenhouse|lever|...
     ats_token: Mapped[str | None] = mapped_column(String(128))
     careers_url: Mapped[str | None] = mapped_column(String(512))
     is_quant_target: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -31,10 +42,10 @@ class Listing(Base):
     title: Mapped[str] = mapped_column(String(400))
     description: Mapped[str | None] = mapped_column(Text)
     field_tags: Mapped[list] = mapped_column(JSON, default=list)
-    stage: Mapped[list | None] = mapped_column(JSON, default=list)           # internship|co_op|research|...
+    stage: Mapped[list | None] = mapped_column(JSON, default=list)  # internship|co_op|research|...
     season: Mapped[str | None] = mapped_column(String(16))
     year: Mapped[int | None] = mapped_column(Integer)
-    term: Mapped[str | None] = mapped_column(String(32), index=True)   # "Summer 2027"
+    term: Mapped[str | None] = mapped_column(String(32), index=True)  # "Summer 2027"
     employment_type: Mapped[str | None] = mapped_column(String(32), default="internship")
     salary: Mapped[str | None] = mapped_column(String(120))
     duration: Mapped[str | None] = mapped_column(String(60))
@@ -44,21 +55,27 @@ class Listing(Base):
     is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
     within_radius: Mapped[bool] = mapped_column(Boolean, default=False)
     distance_miles: Mapped[float | None] = mapped_column(Float)
-    state: Mapped[str | None] = mapped_column(String(24), index=True)        # "MA", "NY", "Remote"
+    state: Mapped[str | None] = mapped_column(String(24), index=True)  # "MA", "NY", "Remote"
     region_locations: Mapped[list | None] = mapped_column(JSON, default=list)
-    ats: Mapped[str | None] = mapped_column(String(24))                       # greenhouse|workday|...|other
-    sector: Mapped[str | None] = mapped_column(String(32), index=True)        # employer label from the registry
+    ats: Mapped[str | None] = mapped_column(String(24))  # greenhouse|workday|...|other
+    sector: Mapped[str | None] = mapped_column(
+        String(32), index=True
+    )  # employer label from the registry
     apply_url: Mapped[str | None] = mapped_column(String(1024))
     posted_at: Mapped[datetime | None] = mapped_column(DateTime)
     first_seen: Mapped[datetime] = mapped_column(DateTime, default=_now)
     last_seen: Mapped[datetime] = mapped_column(DateTime, default=_now)
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)  # open|closed
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
-    score_parts: Mapped[dict | None] = mapped_column(JSON)                     # points per component
+    score_parts: Mapped[dict | None] = mapped_column(JSON)  # points per component
     is_new: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    source_links: Mapped[list["SourceLink"]] = relationship(back_populates="listing", cascade="all, delete-orphan")
-    application: Mapped["Application"] = relationship(back_populates="listing", uselist=False, cascade="all, delete-orphan")
+    source_links: Mapped[list["SourceLink"]] = relationship(
+        back_populates="listing", cascade="all, delete-orphan"
+    )
+    application: Mapped["Application"] = relationship(
+        back_populates="listing", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class SourceLink(Base):
@@ -77,7 +94,9 @@ class Application(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     listing_id: Mapped[int] = mapped_column(ForeignKey("listing.id"), unique=True)
     listing: Mapped["Listing"] = relationship(back_populates="application")
-    state: Mapped[str] = mapped_column(String(24), default="none")  # none|interested|applied|interviewing|rejected|offer
+    state: Mapped[str] = mapped_column(
+        String(24), default="none"
+    )  # none|interested|applied|interviewing|rejected|offer
     applied_at: Mapped[datetime | None] = mapped_column(DateTime)
     deadline: Mapped[datetime | None] = mapped_column(DateTime)
     notes: Mapped[str | None] = mapped_column(Text)

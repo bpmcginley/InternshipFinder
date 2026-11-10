@@ -9,10 +9,20 @@ const { setSetupEmail, planResumeImport } = await import("../onboarding/profile.
 
 const fresh = () => ({
   settings: { signup_email: "" },
-  profile: { facts: { email: "", first_name: "" }, sources: { facts: {}, sections: {} },
-    education: [], experience: [], projects: [], links: [], skills: { technical: [], tools: [], soft: [] } },
+  profile: {
+    facts: { email: "", first_name: "" },
+    sources: { facts: {}, sections: {} },
+    education: [],
+    experience: [],
+    projects: [],
+    links: [],
+    skills: { technical: [], tools: [], soft: [] },
+  },
 });
-const typeInto = (S, text) => { for (let i = 1; i <= text.length; i++) setSetupEmail(S, text.slice(0, i)); return S; };
+const typeInto = (S, text) => {
+  for (let i = 1; i <= text.length; i++) setSetupEmail(S, text.slice(0, i));
+  return S;
+};
 
 test("typing the Setup email key by key keeps the whole address in the profile too", () => {
   const S = typeInto(fresh(), "jane.doe@umass.edu");
@@ -23,8 +33,13 @@ test("typing the Setup email key by key keeps the whole address in the profile t
 
 test("a first resume read with the same email finds no conflict to review", () => {
   const S = typeInto(fresh(), "jane.doe@umass.edu");
-  const plan = planResumeImport(S.profile, { facts: { email: "jane.doe@umass.edu", first_name: "Jane" } });
-  assert.deepEqual(plan.filter((e) => e.conflict), []);
+  const plan = planResumeImport(S.profile, {
+    facts: { email: "jane.doe@umass.edu", first_name: "Jane" },
+  });
+  assert.deepEqual(
+    plan.filter((e) => e.conflict),
+    [],
+  );
 });
 
 test("an email given elsewhere first is not replaced by the Setup box", () => {
@@ -50,7 +65,18 @@ test("a profile saved with the first letter is repaired, and a waiting resume re
   S.settings.signup_email = "jane.doe@umass.edu";
   S.profile.facts.email = "j";
   S.profile.sources.facts.email = { source: "manual", value: "j" };
-  S.settings.resume_import = { plan: [{ id: "facts:email", kind: "facts", key: "email", before: "j", next: "jane.doe@umass.edu", conflict: true }] };
+  S.settings.resume_import = {
+    plan: [
+      {
+        id: "facts:email",
+        kind: "facts",
+        key: "email",
+        before: "j",
+        next: "jane.doe@umass.edu",
+        conflict: true,
+      },
+    ],
+  };
   assert.equal(repairSetupEmail(S), true);
   assert.equal(S.profile.facts.email, "jane.doe@umass.edu");
   assert.equal(S.settings.resume_import.plan[0].conflict, false);
@@ -74,7 +100,10 @@ test("the Setup page uses it, and repairs an affected profile when it opens", as
   const { readFileSync } = await import("node:fs");
   const onb = readFileSync(new URL("../onboarding/onboarding.js", import.meta.url), "utf8");
   assert.match(onb, /bind\("#email", \(v\) => \{ setSetupEmail\(S, v\); \}\);/);
-  assert.match(onb, /if \(repairSetupEmail\(S\)\) \{ pendingResumeImport = pendingResumeReview\(S\); save\(true\); \}/);
+  assert.match(
+    onb,
+    /if \(repairSetupEmail\(S\)\) \{ pendingResumeImport = pendingResumeReview\(S\); save\(true\); \}/,
+  );
   // Called after every declaration save() needs (it runs at the top level of a module).
   assert.ok(onb.indexOf("if (repairSetupEmail(S))") > onb.indexOf("let saveTimer = null;"));
 });

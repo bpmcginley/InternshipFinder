@@ -18,20 +18,28 @@ Checked live 2026-09-18 on all 29 branded hosts already in the data. Every one a
   - A posting outside the US has no state at all, which is why the country code is what the filter
     reads. additional_locations carries the other sites of a multi-location posting.
 """
+
 from __future__ import annotations
 import re
 import time
 
-from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
-                     require_robots, rows_of)
+from .common import (
+    board_item,
+    counts_of,
+    html_to_text,
+    mark_complete,
+    reported_count,
+    require_robots,
+    rows_of,
+)
 from ..classify import is_internship
 
 URL = "https://{token}/api/jobs"
 JOB_URL = "https://{token}/jobs/{slug}"
 QUERY = "intern OR internship OR co-op OR fellow"
-LIMIT = 100        # the API's own ceiling
+LIMIT = 100  # the API's own ceiling
 MAX_PAGES = 3
-CRAWL_DELAY = 5    # what these hosts ask for in robots.txt
+CRAWL_DELAY = 5  # what these hosts ask for in robots.txt
 # 'posted_date' is a full timestamp; the day is all that is wanted here.
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
@@ -45,7 +53,9 @@ def _locations(d: dict) -> list[str]:
         # read as provinces only beside a Canadian town or the country's name.
         if country not in ("US", "CA"):
             continue
-        name = ", ".join(x for x in (p.get("city"), p.get("state"), "Canada" if country == "CA" else None) if x)
+        name = ", ".join(
+            x for x in (p.get("city"), p.get("state"), "Canada" if country == "CA" else None) if x
+        )
         if name and name not in out:
             out.append(name)
     return out
@@ -65,11 +75,18 @@ def parse_icims_site(payload: dict, co: dict) -> list[dict]:
             counts.discard("outside_region")
             continue
         day = DATE_RE.match(str(d.get("posted_date") or ""))
-        out.append(board_item(co, source="icims_site", title=title, locations=locs,
-                              url=JOB_URL.format(token=co["ats_token"], slug=d.get("slug")),
-                              posted_at=day.group(1) if day else None,
-                              description=html_to_text(d.get("description")),
-                              employment_type=emp))
+        out.append(
+            board_item(
+                co,
+                source="icims_site",
+                title=title,
+                locations=locs,
+                url=JOB_URL.format(token=co["ats_token"], slug=d.get("slug")),
+                posted_at=day.group(1) if day else None,
+                description=html_to_text(d.get("description")),
+                employment_type=emp,
+            )
+        )
     return out
 
 
@@ -81,8 +98,11 @@ def fetch_icims_site_board(c, co: dict) -> list[dict]:
     for page in range(1, MAX_PAGES + 1):
         if page > 1:
             time.sleep(CRAWL_DELAY)
-        r = c.get(URL.format(token=token), params={"keywords": QUERY, "limit": LIMIT, "page": page},
-                  headers={"Accept": "application/json"})
+        r = c.get(
+            URL.format(token=token),
+            params={"keywords": QUERY, "limit": LIMIT, "page": page},
+            headers={"Accept": "application/json"},
+        )
         r.raise_for_status()
         payload = r.json()
         if not isinstance(payload, dict):
@@ -104,7 +124,7 @@ def fetch_icims_site_board(c, co: dict) -> list[dict]:
             break
     else:
         if MAX_PAGES * LIMIT < total:
-            counts.stop("page_cap")   # 300 results read with more left
+            counts.stop("page_cap")  # 300 results read with more left
     # The one query read to its totalCount, not stopped at MAX_PAGES (300 results).
     mark_complete(co, well_formed and reported is not None and rows == reported)
     return list(seen.values())

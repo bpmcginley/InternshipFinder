@@ -3,11 +3,13 @@ import { HttpError } from "./http.js";
 
 // Canada's provinces and territories since 2026-10-01 (none is also a US code), so a student who
 // picks Ontario counts toward where the ingest scans in detail, like one who picks Ohio.
-export const STATES = new Set((
-  "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY " +
-  "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR GU VI AS MP REMOTE " +
-  "AB BC MB NB NL NS NT NU ON PE QC SK YT"
-).split(" "));
+export const STATES = new Set(
+  (
+    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY " +
+    "NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR GU VI AS MP REMOTE " +
+    "AB BC MB NB NL NS NT NU ON PE QC SK YT"
+  ).split(" "),
+);
 
 export function cleanStates(body) {
   const list = body && body.states;
@@ -17,29 +19,43 @@ export function cleanStates(body) {
   const out = [...new Set(list.map((s) => String(s).trim().toUpperCase()))];
   if (out.some((s) => !STATES.has(s))) {
     // was: "states must be USPS codes or REMOTE"
-    throw new HttpError(400, "bad_request", "states must be USPS codes, Canadian province codes or REMOTE");
+    throw new HttpError(
+      400,
+      "bad_request",
+      "states must be USPS codes, Canadian province codes or REMOTE",
+    );
   }
   return out.sort();
 }
 
 export async function setDemand(db, user, states, now) {
   const t = now.toISOString();
-  await db.prepare(
-    "INSERT INTO demand (user_hash, states, updated, seen) VALUES (?, ?, ?, ?) " +
-    "ON CONFLICT(user_hash) DO UPDATE SET states = excluded.states, updated = excluded.updated, seen = excluded.seen",
-  ).bind(user, JSON.stringify(states), t, t).run();
+  await db
+    .prepare(
+      "INSERT INTO demand (user_hash, states, updated, seen) VALUES (?, ?, ?, ?) " +
+        "ON CONFLICT(user_hash) DO UPDATE SET states = excluded.states, updated = excluded.updated, seen = excluded.seen",
+    )
+    .bind(user, JSON.stringify(states), t, t)
+    .run();
 }
 
 // Marks the user active, at most one write a day, so the 90-day window stays current.
 export async function touchSeen(db, user, now) {
   const t = now.toISOString();
-  await db.prepare("UPDATE demand SET seen = ? WHERE user_hash = ? AND seen < ?").bind(t, user, t.slice(0, 10)).run();
+  await db
+    .prepare("UPDATE demand SET seen = ? WHERE user_hash = ? AND seen < ?")
+    .bind(t, user, t.slice(0, 10))
+    .run();
 }
 
-const windowStart = (config, now) => new Date(now.getTime() - config.DEMAND_WINDOW_DAYS * 86400e3).toISOString();
+const windowStart = (config, now) =>
+  new Date(now.getTime() - config.DEMAND_WINDOW_DAYS * 86400e3).toISOString();
 
 export async function demandCounts(db, config, now) {
-  const { results } = await db.prepare("SELECT states FROM demand WHERE seen >= ?").bind(windowStart(config, now)).all();
+  const { results } = await db
+    .prepare("SELECT states FROM demand WHERE seen >= ?")
+    .bind(windowStart(config, now))
+    .all();
   const states = {};
   for (const r of results) {
     let list = [];
