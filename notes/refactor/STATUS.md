@@ -265,7 +265,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-Product #197 recovery publication and backend checks are verified green. Resume serialized Wave 3 merges after each package has final independent review and green CI. WP-1.1 PR #196 is ready for that sequence. Preserve current product/data history, separate ownership, and Pages verification after every merge; later waves remain ordered.
+Product #197 recovery publication and backend checks are verified green. Resume serialized Wave 3 merges after each package has final independent review and green CI. WP-1.1 PR #196 is merged with green Pages and backend verification. Migration PR #198 awaits final integration review and CI, after the current product #200 publication slot. Preserve current product/data history, separate ownership, and Pages verification after every merge; later waves remain ordered.
 
 ## WP-0.6 validation and coordination
 
@@ -361,4 +361,4 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - `worker/MIGRATIONS.md` documents operator-only adoption: verify actual production objects/backfill state and existing migration history, then mark only the verified baseline applied. Repository state and local tests cannot establish live schema history. The deploy-script transition remains a later gated change.
 - Explicit recurring-backfill gate: current deployments rerun `schema.sql`; named migrations execute once. The test demonstrates that later usage data is not backfilled by reapplying an already-recorded migration. A later deploy-script PR must preserve that recurring operation or obtain explicit approval for its behavior change. No such transition is made here.
 
-- Final integration: normally merged main `043c84d4`, retaining product recovery #197 and cleanup #196, including the API/launcher/frontend deletions, removed dependency pins and latest data/product ledger. Approved migration source and the exact schema copy are unchanged. PR #196 Pages run 42897982856 and its exact-commit backend check passed. All formatting/recovery publication gates are green; final independent review and CI remain required. Product #200 owns the current publication slot.
+- Final integration: normally merged main `043c84d4`, retaining product recovery #197 and cleanup #196, including the API/launcher/frontend deletions, removed dependency pins and latest data/product ledger. Approved migration source and the exact schema copy are unchanged. PR #196 Pages run 42897982856 and its exact-commit backend check passed. All formatting/recovery publication gates are green; final independent review and CI remain required. Product #200 owns the current publication slot. The integrated golden build again matched all **695 files**, with no fixture refresh; all four approved worker files are byte-identical to the independently reviewed head.
