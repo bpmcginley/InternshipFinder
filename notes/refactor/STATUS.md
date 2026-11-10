@@ -52,7 +52,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | Merged | Independent review, green CI, and green Pages run 42865676691. |
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | Merged | Independent review, green CI, and green Pages run 42867413022. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review, green CI, and green Pages run 42864974798. |
-| 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | Pending | In progress | Correctness-only lint passes; no source formatting or format-clean requirement. |
+| 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | In review | Correctness-only lint passes; final CI and independent review pending; no formatting. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
 | 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
