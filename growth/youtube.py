@@ -36,6 +36,7 @@ Needs YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET and YOUTUBE_REFRESH_TOKEN; withou
 with no Reel, it says why and exits 0. It exits 1 only when an upload was tried and failed, and the
 workflow step runs whatever Instagram did, so neither channel stops the other.
 """
+
 from __future__ import annotations
 
 import json
@@ -53,14 +54,14 @@ UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
 UA = {"User-Agent": "InternScout-brand-posts/1.0 (+https://internscout.org)"}
 SECRETS = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
 
-TITLE_MAX = 100           # YouTube's limit, in characters
-DESCRIPTION_MAX = 5000    # YouTube's limit, in bytes
-HASHTAGS_MAX = 5          # YouTube ignores every hashtag on a video with more than 15; a few read better
-CATEGORY = "27"           # Education
+TITLE_MAX = 100  # YouTube's limit, in characters
+DESCRIPTION_MAX = 5000  # YouTube's limit, in bytes
+HASHTAGS_MAX = 5  # YouTube ignores every hashtag on a video with more than 15; a few read better
+CATEGORY = "27"  # Education
 VIDEO_TYPE = "video/mp4"
-SAME_POST = timedelta(hours=20)   # an upload with today's title this recent is today's Short
+SAME_POST = timedelta(hours=20)  # an upload with today's title this recent is today's Short
 UPLOAD_TRIES = 3
-UPLOAD_TIMEOUT = 120      # seconds per attempt; a Reel is a few MB
+UPLOAD_TIMEOUT = 120  # seconds per attempt; a Reel is a few MB
 SLOGAN = "Built by one student, made for all students."
 DISCLAIMER = "Not affiliated with UMass Amherst."
 
@@ -93,8 +94,16 @@ def _google_message(body: bytes, code: int) -> str:
     return f"HTTP {code}"
 
 
-def _call(method: str, url: str, *, token: str | None = None, data: bytes | None = None,
-          headers: dict | None = None, timeout: int = 60, allow: tuple = ()) -> tuple[int, object, bytes]:
+def _call(
+    method: str,
+    url: str,
+    *,
+    token: str | None = None,
+    data: bytes | None = None,
+    headers: dict | None = None,
+    timeout: int = 60,
+    allow: tuple = (),
+) -> tuple[int, object, bytes]:
     """(status, headers, body). The token travels only in the Authorization header (or, for the token
     exchange, the POST body), never in a URL, and is never printed. An HTTP error whose code is in
     allow is returned like a success (308 means "upload incomplete"); any other raises YouTubeError
@@ -115,12 +124,24 @@ def _call(method: str, url: str, *, token: str | None = None, data: bytes | None
 
 # ---- the token -------------------------------------------------------------------------------------
 
+
 def access_token(client_id: str, client_secret: str, refresh_token: str) -> str:
     """An access token (good for an hour) for the refresh token growth/youtube_auth.py printed."""
-    form = urllib.parse.urlencode({"client_id": client_id, "client_secret": client_secret,
-                                   "refresh_token": refresh_token, "grant_type": "refresh_token"}).encode()
-    _, _, body = _call("POST", TOKEN_URL, data=form,
-                       headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=30)
+    form = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        }
+    ).encode()
+    _, _, body = _call(
+        "POST",
+        TOKEN_URL,
+        data=form,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=30,
+    )
     token = json.loads(body or b"{}").get("access_token")
     if not token:
         raise YouTubeError("the token endpoint answered without an access token")
@@ -128,6 +149,7 @@ def access_token(client_id: str, client_secret: str, refresh_token: str) -> str:
 
 
 # ---- what the Short says ---------------------------------------------------------------------------
+
 
 def _clean(text: str) -> str:
     """YouTube refuses a title or description with < or > in it (invalidTitle, invalidDescription)."""
@@ -142,12 +164,14 @@ def title_for(post: dict) -> str:
     for tail in (" this week #Shorts", " #Shorts"):
         if len(base + tail) <= TITLE_MAX:
             return base + tail
-    return base[:TITLE_MAX - len(" #Shorts") - 1].rstrip() + "…" + " #Shorts"
+    return base[: TITLE_MAX - len(" #Shorts") - 1].rstrip() + "…" + " #Shorts"
 
 
 def hashtags_for(post: dict) -> list[str]:
     """#Shorts first, then the captions' own tags (the field's first), HASHTAGS_MAX in all."""
-    tags = ["#Shorts"] + [t for t in post.get("hashtags") or ["#internships"] if t.lower() != "#shorts"]
+    tags = ["#Shorts"] + [
+        t for t in post.get("hashtags") or ["#internships"] if t.lower() != "#shorts"
+    ]
     return tags[:HASHTAGS_MAX]
 
 
@@ -156,18 +180,25 @@ def description_for(post: dict) -> str:
     search them, the slogan and the disclaimer. The link is the post's own (the field's landing page);
     YouTube makes it clickable on the watch page."""
     employers = ", ".join((post.get("employers") or [])[:4])
-    lines = [f"{post['count']} {post['headline']} {post.get('where') or ''} this week".replace("  ", " ")
-             + (f", from {employers} and more" if employers else "") + ".",
-             "",
-             "Search them free at internscout.org: every major, filtered to the states you pick, no account needed.",
-             post.get("url") or "https://internscout.org",
-             "",
-             # The weekly email's line (2026-10-06), as the other channels end with it, once it is live
-             # (social.card_data fills post["signup"] only then).
-             *([f"Every Monday by email: {post['signup']['youtube']}", ""] if (post.get("signup") or {}).get("youtube") else []),
-             f"{SLOGAN} {DISCLAIMER}",
-             "",
-             " ".join(hashtags_for(post))]
+    lines = [
+        f"{post['count']} {post['headline']} {post.get('where') or ''} this week".replace("  ", " ")
+        + (f", from {employers} and more" if employers else "")
+        + ".",
+        "",
+        "Search them free at internscout.org: every major, filtered to the states you pick, no account needed.",
+        post.get("url") or "https://internscout.org",
+        "",
+        # The weekly email's line (2026-10-06), as the other channels end with it, once it is live
+        # (social.card_data fills post["signup"] only then).
+        *(
+            [f"Every Monday by email: {post['signup']['youtube']}", ""]
+            if (post.get("signup") or {}).get("youtube")
+            else []
+        ),
+        f"{SLOGAN} {DISCLAIMER}",
+        "",
+        " ".join(hashtags_for(post)),
+    ]
     # Today's text is a few hundred bytes; the cut is a guard, not a plan.
     return _clean("\n".join(lines)).encode()[:DESCRIPTION_MAX].decode(errors="ignore")
 
@@ -180,7 +211,13 @@ def metadata(post: dict) -> dict:
             "title": title_for(post),
             "description": description_for(post),
             "categoryId": CATEGORY,
-            "tags": ["internships", f"{name} internships", "college students", "summer internships", "InternScout"],
+            "tags": [
+                "internships",
+                f"{name} internships",
+                "college students",
+                "summer internships",
+                "InternScout",
+            ],
             "defaultLanguage": "en",
         },
         "status": {
@@ -196,6 +233,7 @@ def metadata(post: dict) -> dict:
 
 
 # ---- uploading -------------------------------------------------------------------------------------
+
 
 def _parse_time(s: str | None) -> datetime | None:
     try:
@@ -232,9 +270,17 @@ def already_posted(token: str, title: str, now: datetime | None = None) -> str |
 def start_session(token: str, meta: dict, size: int) -> str:
     """The resumable session's URI (the Location header). It is a capability URL, so it's not printed."""
     q = urllib.parse.urlencode({"uploadType": "resumable", "part": "snippet,status"})
-    _, headers, _ = _call("POST", f"{UPLOAD_URL}?{q}", token=token, data=json.dumps(meta).encode(),
-                          headers={"Content-Type": "application/json; charset=UTF-8",
-                                   "X-Upload-Content-Length": str(size), "X-Upload-Content-Type": VIDEO_TYPE})
+    _, headers, _ = _call(
+        "POST",
+        f"{UPLOAD_URL}?{q}",
+        token=token,
+        data=json.dumps(meta).encode(),
+        headers={
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Upload-Content-Length": str(size),
+            "X-Upload-Content-Type": VIDEO_TYPE,
+        },
+    )
     uri = headers.get("Location") if headers else None
     if not uri:
         raise YouTubeError("YouTube opened no upload session (no Location header)")
@@ -243,15 +289,23 @@ def start_session(token: str, meta: dict, size: int) -> str:
 
 def _resume_point(session: str, token: str, size: int) -> tuple[dict | None, int]:
     """(the video, if YouTube already has the whole file; else the byte to resume from)."""
-    status, headers, body = _call("PUT", session, token=token, data=b"",
-                                  headers={"Content-Range": f"bytes */{size}"}, allow=(308,))
+    status, headers, body = _call(
+        "PUT",
+        session,
+        token=token,
+        data=b"",
+        headers={"Content-Range": f"bytes */{size}"},
+        allow=(308,),
+    )
     if status in (200, 201):
         return json.loads(body or b"{}"), size
-    rng = headers.get("Range") if headers else None      # "bytes=0-524287": what YouTube has
+    rng = headers.get("Range") if headers else None  # "bytes=0-524287": what YouTube has
     return None, (int(rng.rsplit("-", 1)[1]) + 1 if rng else 0)
 
 
-def send_file(session: str, token: str, data: bytes, sleep=time.sleep, tries: int = UPLOAD_TRIES) -> dict:
+def send_file(
+    session: str, token: str, data: bytes, sleep=time.sleep, tries: int = UPLOAD_TRIES
+) -> dict:
     """Send the bytes; on a dropped connection or a 5xx, ask YouTube how much it has and send the rest.
     The video resource YouTube made."""
     size, start = len(data), 0
@@ -260,21 +314,29 @@ def send_file(session: str, token: str, data: bytes, sleep=time.sleep, tries: in
         if start:
             headers["Content-Range"] = f"bytes {start}-{size - 1}/{size}"
         try:
-            _, _, body = _call("PUT", session, token=token, data=data[start:], headers=headers,
-                               timeout=UPLOAD_TIMEOUT)
+            _, _, body = _call(
+                "PUT",
+                session,
+                token=token,
+                data=data[start:],
+                headers=headers,
+                timeout=UPLOAD_TIMEOUT,
+            )
             return json.loads(body or b"{}")
-        except (YouTubeError, OSError) as e:        # URLError and timeouts are OSErrors
+        except (YouTubeError, OSError) as e:  # URLError and timeouts are OSErrors
             if (isinstance(e, YouTubeError) and not e.retryable) or attempt == tries:
                 raise
-            print(f"[youtube] upload interrupted ({type(e).__name__}: {e}); resuming, try {attempt + 1} of {tries}")
-            sleep(2 ** attempt)
+            print(
+                f"[youtube] upload interrupted ({type(e).__name__}: {e}); resuming, try {attempt + 1} of {tries}"
+            )
+            sleep(2**attempt)
             try:
                 done, start = _resume_point(session, token, size)
                 if done is not None:
                     return done
             except (YouTubeError, OSError):
-                pass        # no answer about the offset: the next try sends from where it was
-    raise YouTubeError("the upload did not finish")    # not reached: the last try returns or raises
+                pass  # no answer about the offset: the next try sends from where it was
+    raise YouTubeError("the upload did not finish")  # not reached: the last try returns or raises
 
 
 def publish_short(token: str, video_path: str, post: dict, sleep=time.sleep) -> dict:
@@ -287,13 +349,16 @@ def publish_short(token: str, video_path: str, post: dict, sleep=time.sleep) -> 
 
 # ---- the run ---------------------------------------------------------------------------------------
 
+
 def advice(error: str) -> str:
     """What to do about Google's answer."""
     e = error.lower()
     if "invalid_grant" in e:
-        return ("the refresh token was revoked or has expired (an app left in Testing gets 7-day tokens): "
-                "check the OAuth app is In production, run growth/youtube_auth.py again and replace "
-                "the YOUTUBE_REFRESH_TOKEN secret (growth/README.md, YouTube)")
+        return (
+            "the refresh token was revoked or has expired (an app left in Testing gets 7-day tokens): "
+            "check the OAuth app is In production, run growth/youtube_auth.py again and replace "
+            "the YOUTUBE_REFRESH_TOKEN secret (growth/README.md, YouTube)"
+        )
     if "invalid_client" in e or "unauthorized_client" in e:
         return "YOUTUBE_CLIENT_ID or YOUTUBE_CLIENT_SECRET is wrong: copy them again from the Desktop app client"
     if "quotaexceeded" in e or "uploadlimitexceeded" in e:
@@ -301,8 +366,10 @@ def advice(error: str) -> str:
     if "youtubesignuprequired" in e:
         return "the account the refresh token belongs to has no YouTube channel: sign in as the InternScout channel in growth/youtube_auth.py"
     if "insufficient" in e or "forbidden" in e or "accessnotconfigured" in e:
-        return ("the token can't upload: check the YouTube Data API v3 is enabled in the Google Cloud project "
-                "and that growth/youtube_auth.py was run with its scopes (growth/README.md, YouTube)")
+        return (
+            "the token can't upload: check the YouTube Data API v3 is enabled in the Google Cloud project "
+            "and that growth/youtube_auth.py was run with its scopes (growth/README.md, YouTube)"
+        )
     return "see Google's message above (growth/README.md, YouTube)"
 
 
@@ -319,7 +386,9 @@ def main(argv: list[str]) -> int:
         print("[youtube] not a Reel day (post.json has no reel); no Short")
         return 0
     if not os.path.exists(reel):
-        print("[youtube] post.json asks for a Reel but reel.mp4 wasn't made (see the Post step); no Short")
+        print(
+            "[youtube] post.json asks for a Reel but reel.mp4 wasn't made (see the Post step); no Short"
+        )
         return 0
     meta = metadata(post)
     print(meta["snippet"]["title"])
@@ -337,18 +406,24 @@ def main(argv: list[str]) -> int:
             done = already_posted(token, meta["snippet"]["title"])
         except (YouTubeError, OSError, KeyError, ValueError) as e:
             # The check is a courtesy; a token that can't read the channel may still upload.
-            print(f"[youtube] couldn't check the channel's recent uploads ({type(e).__name__}: {e}); uploading")
+            print(
+                f"[youtube] couldn't check the channel's recent uploads ({type(e).__name__}: {e}); uploading"
+            )
             done = None
         if done:
-            print(f"[youtube] today's Short is already up (https://youtube.com/shorts/{done}); not uploading again")
+            print(
+                f"[youtube] today's Short is already up (https://youtube.com/shorts/{done}); not uploading again"
+            )
             return 0
         video = publish_short(token, reel, post)
         vid = video.get("id") or "?"
         print(f"[youtube] Short uploaded: https://youtube.com/shorts/{vid}")
         privacy = (video.get("status") or {}).get("privacyStatus")
         if privacy and privacy != "public":
-            print(f"[youtube] YouTube made it {privacy}, not public. Uploads from an API project that hasn't "
-                  "passed YouTube's compliance audit are locked private (growth/README.md, YouTube)")
+            print(
+                f"[youtube] YouTube made it {privacy}, not public. Uploads from an API project that hasn't "
+                "passed YouTube's compliance audit are locked private (growth/README.md, YouTube)"
+            )
         return 0
     except (YouTubeError, OSError, KeyError, ValueError) as e:
         # Google's message only: never a token, a header or the session URI.

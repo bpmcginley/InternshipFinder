@@ -1,6 +1,7 @@
 """growth/every_major_list.py: the public "Summer 2027 Internships — Every Major" README, written from
 the data. Job-board text can't break a table, links go only where they should, and the same data
 always writes the same bytes (so the publishing workflow commits nothing when nothing changed)."""
+
 import importlib.util
 import json
 import os
@@ -12,7 +13,9 @@ import pytest
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 sys.path.insert(0, os.path.join(ROOT, "growth"))
-_spec = importlib.util.spec_from_file_location("every_major_list", os.path.join(ROOT, "growth", "every_major_list.py"))
+_spec = importlib.util.spec_from_file_location(
+    "every_major_list", os.path.join(ROOT, "growth", "every_major_list.py")
+)
 eml = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(eml)
 
@@ -22,11 +25,19 @@ BAR = re.compile(r"(?<!\\)\|")
 
 def _row(i, state="MA", tags=("mechanical",), **over):
     row = {
-        "id": f"id{i:03d}", "company_name": f"Company {i}", "title": f"Mechanical Intern {i}",
-        "field_tags": list(tags), "stage": ["internship"], "term": "Summer 2027", "salary": None,
-        "posted_at": "2026-09-20T00:00:00", "first_seen": f"2026-09-2{i % 3}T00:00:00",
+        "id": f"id{i:03d}",
+        "company_name": f"Company {i}",
+        "title": f"Mechanical Intern {i}",
+        "field_tags": list(tags),
+        "stage": ["internship"],
+        "term": "Summer 2027",
+        "salary": None,
+        "posted_at": "2026-09-20T00:00:00",
+        "first_seen": f"2026-09-2{i % 3}T00:00:00",
         "regions": [{"loc": f"Town {i}, {state}", "kind": "x", "state": state}],
-        "apply_url": f"https://jobs.example.com/{i}", "status": "open", "is_remote": False,
+        "apply_url": f"https://jobs.example.com/{i}",
+        "status": "open",
+        "is_remote": False,
         "insights": None,
     }
     row.update(over)
@@ -51,12 +62,15 @@ def _table_rows(text):
 
 # ---------------------------------------------------------------- escaping
 
+
 def test_job_board_text_cannot_break_a_cell_or_make_a_link():
-    out = eml.md('Evil | Co [click](https://evil.example) <img src=x> *b* _i_ `c` ~s~ \\ &copy; AT&T\nnext')
+    out = eml.md(
+        'Evil | Co [click](https://evil.example) <img src=x> *b* _i_ `c` ~s~ \\ &copy; AT&T\nnext'
+    )
     assert not BAR.search(out)
     assert "[" not in out.replace("\\[", "") and "]" not in out.replace("\\]", "")
     assert "<" not in out and ">" not in out
-    assert "&amp;copy;" in out and "AT&T" in out          # an entity is escaped, a bare & is left
+    assert "&amp;copy;" in out and "AT&T" in out  # an entity is escaped, a bare & is left
     assert "\n" not in out and out.endswith("next")
     assert eml.md("x" * 500, 20) == "x" * 19 + "…"
     # GitHub reads $...$ as math: a pay range would show as a formula (added 2026-10-02).
@@ -65,30 +79,39 @@ def test_job_board_text_cannot_break_a_cell_or_make_a_link():
 
 def test_links_are_web_addresses_that_stay_inside_their_cell():
     assert eml.md_url("javascript:alert(1)") is None
-    assert eml.md_url("https://a.example/x y") is None              # whitespace: not a real address
+    assert eml.md_url("https://a.example/x y") is None  # whitespace: not a real address
     u = eml.md_url("https://a.example/job(1)|x?a=<b>")
     assert u == "https://a.example/job%281%29%7Cx?a=%3Cb%3E"
 
 
 def test_a_hostile_listing_is_one_six_cell_row(tmp_path):
     rows = [_row(i) for i in range(6)]
-    rows[0].update(company_name="Evil | Co [x](https://evil.example)", title="Intern | Ops\n<script>x</script>",
-                   salary="$20 | hour", apply_url="https://jobs.example.com/a(b)|c")
+    rows[0].update(
+        company_name="Evil | Co [x](https://evil.example)",
+        title="Intern | Ops\n<script>x</script>",
+        salary="$20 | hour",
+        apply_url="https://jobs.example.com/a(b)|c",
+    )
     files = eml.build(_site(tmp_path, {"MA": rows}))
     for name, text in files.items():
         for line in _table_rows(text):
-            assert len(BAR.findall(line)) == 7, (name, line)       # six cells, seven bars
+            assert len(BAR.findall(line)) == 7, (name, line)  # six cells, seven bars
         assert "<script>" not in text and "[x](https://evil.example)" not in text
     assert "[Apply](https://jobs.example.com/a%28b%29%7Cc)" in files["README.md"]
 
 
 # ---------------------------------------------------------------- what is listed
 
+
 def test_only_open_summer_2027_student_roles_are_listed(tmp_path):
     rows = [_row(i) for i in range(6)]
-    rows += [_row(10, term="Fall 2026", title="Fall Role"), _row(11, term=None, title="No Term Role"),
-             _row(12, stage=["part_time"], title="Part Time Role"), _row(13, status="closed", title="Closed Role"),
-             _row(14, stage=["co_op"], title="Co-op Role")]
+    rows += [
+        _row(10, term="Fall 2026", title="Fall Role"),
+        _row(11, term=None, title="No Term Role"),
+        _row(12, stage=["part_time"], title="Part Time Role"),
+        _row(13, status="closed", title="Closed Role"),
+        _row(14, stage=["co_op"], title="Co-op Role"),
+    ]
     text = eml.build(_site(tmp_path, {"MA": rows}))["README.md"]
     for gone in ("Fall Role", "No Term Role", "Part Time Role", "Closed Role"):
         assert gone not in text
@@ -98,13 +121,17 @@ def test_only_open_summer_2027_student_roles_are_listed(tmp_path):
 
 def test_a_role_posted_twice_by_one_employer_is_one_row(tmp_path):
     rows = [_row(i) for i in range(6)]
-    rows.append(dict(rows[0], id="id900", apply_url="https://jobs.example.com/copy"))   # same title, same place
+    rows.append(
+        dict(rows[0], id="id900", apply_url="https://jobs.example.com/copy")
+    )  # same title, same place
     text = eml.build(_site(tmp_path, {"MA": rows}))["fields/mechanical-engineering.md"]
     assert len(_table_rows(text)) == 6
 
 
 def test_a_field_needs_min_field_roles_for_a_section(tmp_path):
-    rows = [_row(i) for i in range(6)] + [_row(20 + i, tags=("nursing",), title=f"Nurse {i}") for i in range(2)]
+    rows = [_row(i) for i in range(6)] + [
+        _row(20 + i, tags=("nursing",), title=f"Nurse {i}") for i in range(2)
+    ]
     files = eml.build(_site(tmp_path, {"MA": rows}))
     assert "## Mechanical Engineering" in files["README.md"]
     assert "## Nursing" not in files["README.md"] and "fields/nursing.md" not in files
@@ -117,12 +144,20 @@ def test_no_field_with_enough_roles_writes_nothing(tmp_path):
 
 def test_listings_missing_optional_fields_still_render(tmp_path):
     rows = [_row(i) for i in range(5)]
-    bare = {"id": "bare1", "title": "Bare Intern", "field_tags": ["mechanical"], "term": "Summer 2027",
-            "apply_url": "https://jobs.example.com/bare", "status": "open"}     # no company, place, dates, stage
+    bare = {
+        "id": "bare1",
+        "title": "Bare Intern",
+        "field_tags": ["mechanical"],
+        "term": "Summer 2027",
+        "apply_url": "https://jobs.example.com/bare",
+        "status": "open",
+    }  # no company, place, dates, stage
     rows.append(bare)
-    rows.append(_row(7, field_tags=None, title="Untagged Intern"))             # no field: in no section
+    rows.append(_row(7, field_tags=None, title="Untagged Intern"))  # no field: in no section
     files = eml.build(_site(tmp_path, {"MA": rows}))
-    line = next(r for r in _table_rows(files["fields/mechanical-engineering.md"]) if "Bare Intern" in r)
+    line = next(
+        r for r in _table_rows(files["fields/mechanical-engineering.md"]) if "Bare Intern" in r
+    )
     cells = [c.strip() for c in BAR.split(line)[1:-1]]
     assert cells[0] == "" and cells[2] == "United States" and cells[3] == "" and cells[4] == ""
     assert "Untagged Intern" not in files["fields/mechanical-engineering.md"]
@@ -131,6 +166,7 @@ def test_listings_missing_optional_fields_still_render(tmp_path):
 
 
 # ---------------------------------------------------------------- caps and size
+
 
 def test_rows_are_capped_per_field_newest_first(tmp_path, monkeypatch):
     rows = [_row(i, posted_at=f"2026-09-{1 + i % 20:02d}T00:00:00") for i in range(50)]
@@ -167,14 +203,19 @@ def test_new_this_week_is_capped(tmp_path, monkeypatch):
 
 # ---------------------------------------------------------------- links
 
+
 def test_links_go_to_the_field_page_the_employer_page_and_the_posting(tmp_path):
     rows = [_row(i, company_name="Acme") for i in range(5)] + [_row(10, company_name="Solo Shop")]
-    rows.append(_row(11, term="Fall 2026", title="Fall Role"))       # counted on the field page, not listed
+    rows.append(
+        _row(11, term="Fall 2026", title="Fall Role")
+    )  # counted on the field page, not listed
     text = eml.build(_site(tmp_path, {"MA": rows}))["README.md"]
-    assert ("[See all 7 mechanical engineering internships on InternScout]"
-            "(https://internscout.org/internships/mechanical-engineering/)") in text
+    assert (
+        "[See all 7 mechanical engineering internships on InternScout]"
+        "(https://internscout.org/internships/mechanical-engineering/)"
+    ) in text
     assert "| [Acme](https://internscout.org/internships/at/acme/) |" in text
-    assert "| Solo Shop |" in text                                   # no employer page, no link
+    assert "| Solo Shop |" in text  # no employer page, no link
     assert "[Apply](https://jobs.example.com/10)" in text
     assert "[Mechanical Engineering](#mechanical-engineering)" in text
 
@@ -196,6 +237,7 @@ def test_github_anchors_match_headings_and_never_repeat():
 
 # ---------------------------------------------------------------- the brand and the rules
 
+
 def test_slogan_disclaimer_and_report_link(tmp_path):
     files = eml.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}), repo="someone/list")
     for text in files.values():
@@ -207,14 +249,18 @@ def test_slogan_disclaimer_and_report_link(tmp_path):
 
 # ---------------------------------------------------------------- same data, same bytes
 
+
 def test_same_data_writes_the_same_bytes_in_any_order(tmp_path):
-    rows = [_row(i, posted_at="2026-09-20T00:00:00", first_seen="2026-09-21T00:00:00") for i in range(30)]
+    rows = [
+        _row(i, posted_at="2026-09-20T00:00:00", first_seen="2026-09-21T00:00:00")
+        for i in range(30)
+    ]
     a = eml.build(_site(tmp_path / "a", {"MA": rows}))
     shuffled = rows[:]
     random.Random(4).shuffle(shuffled)
     b = eml.build(_site(tmp_path / "b", {"MA": shuffled}))
     assert a == b
-    assert "**Updated September 23, 2026.**" in a["README.md"]      # the export's day, not the clock
+    assert "**Updated September 23, 2026.**" in a["README.md"]  # the export's day, not the clock
 
 
 def test_a_later_export_on_the_same_day_changes_nothing(tmp_path):
@@ -233,5 +279,5 @@ def test_write_removes_stale_field_files_and_nothing_else(tmp_path):
     eml.write(str(out), files)
     assert sorted(os.listdir(out / "fields")) == ["mechanical-engineering.md"]
     assert (out / "LICENSE").read_text(encoding="utf-8") == "keep"
-    assert (out / "README.md").read_bytes().decode("utf-8") == files["README.md"]   # LF, as built
+    assert (out / "README.md").read_bytes().decode("utf-8") == files["README.md"]  # LF, as built
     assert b"\r\n" not in (out / "README.md").read_bytes()

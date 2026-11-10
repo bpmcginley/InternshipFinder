@@ -7,9 +7,17 @@ way, because the empty shape is still a dict and so still wins an `or`: those jo
 no location, which dropped them from the export and, before that, from the detail call that gives
 a listing its description.
 """
+
 from __future__ import annotations
-from .common import (board_item, counts_of, html_to_text, mark_complete, reported_count,
-                     require_robots, rows_of)
+from .common import (
+    board_item,
+    counts_of,
+    html_to_text,
+    mark_complete,
+    reported_count,
+    require_robots,
+    rows_of,
+)
 from ..classify import is_internship
 from ..geo import STATE_NAMES
 from ..region import maybe_in_region
@@ -39,12 +47,18 @@ def parse_bamboohr(payload: dict, co: dict, token: str) -> list[dict]:
                 continue
         elif state and state.strip().lower() not in STATE_NAMES:
             counts.discard("outside_region")
-            continue     # no country field to go on, so a state that is not one of the 50 is abroad
+            continue  # no country field to go on, so a state that is not one of the 50 is abroad
         names = [", ".join(x for x in (city, state, "Canada" if canada else None) if x)]
         if j.get("isRemote"):
             names.append("Remote - Canada" if canada else "Remote - US")
-        it = board_item(co, source="bamboohr", title=title, locations=names,
-                        url=f"https://{token}.bamboohr.com/careers/{j.get('id')}", employment_type=emp)
+        it = board_item(
+            co,
+            source="bamboohr",
+            title=title,
+            locations=names,
+            url=f"https://{token}.bamboohr.com/careers/{j.get('id')}",
+            employment_type=emp,
+        )
         it["_bh_id"] = j.get("id")
         out.append(it)
     return out
@@ -71,7 +85,10 @@ def fetch_bamboohr_board(c, co: dict) -> list[dict]:
     complete = rows is not None and (stated is None or reported_count(stated) == len(rows))
     for it in [i for i in items if any(maybe_in_region(l) for l in i["locations"])][:MAX_DETAIL]:
         try:
-            d = c.get(DETAIL_URL.format(token=token, id=it["_bh_id"]), headers={"Accept": "application/json"})
+            d = c.get(
+                DETAIL_URL.format(token=token, id=it["_bh_id"]),
+                headers={"Accept": "application/json"},
+            )
             if d.status_code == 200:
                 job = (d.json().get("result") or {}).get("jobOpening") or {}
                 # 2026-10-23: extract eligibility before public trimming; was: [:4000].

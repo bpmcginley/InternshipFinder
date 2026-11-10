@@ -13,6 +13,7 @@ is the one that ships.
 
 Run from the repo root to preview:  python growth/cards.py [docs] [out.jpg]
 """
+
 from __future__ import annotations
 
 import glob
@@ -22,28 +23,45 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1080, 1350
-ACCENT = (29, 92, 70)        # --accent #1d5c46
-PAPER = (246, 244, 239)      # --paper #f6f4ef
-SOFT = (227, 238, 232)       # --accent-soft #e3eee8
-INK = (23, 25, 28)           # --ink #17191c
-INK2 = (69, 74, 82)          # --ink2 #454a52
+ACCENT = (29, 92, 70)  # --accent #1d5c46
+PAPER = (246, 244, 239)  # --paper #f6f4ef
+SOFT = (227, 238, 232)  # --accent-soft #e3eee8
+INK = (23, 25, 28)  # --ink #17191c
+INK2 = (69, 74, 82)  # --ink2 #454a52
 MARGIN = 84
-FOOT = 190                   # height of the green foot band
+FOOT = 190  # height of the green foot band
 
 # Each role: font files tried in order. Plex first (CI), then what a Windows or Linux laptop has.
 FONTS = {
-    "serif": ["IBMPlexSerif-SemiBold.otf", "IBMPlexSerif-SemiBold.ttf", "georgiab.ttf", "DejaVuSerif-Bold.ttf"],
+    "serif": [
+        "IBMPlexSerif-SemiBold.otf",
+        "IBMPlexSerif-SemiBold.ttf",
+        "georgiab.ttf",
+        "DejaVuSerif-Bold.ttf",
+    ],
     "sans": ["IBMPlexSans-Regular.otf", "IBMPlexSans-Regular.ttf", "segoeui.ttf", "DejaVuSans.ttf"],
-    "sans_bold": ["IBMPlexSans-SemiBold.otf", "IBMPlexSans-SemiBold.ttf", "segoeuib.ttf", "DejaVuSans-Bold.ttf"],
+    "sans_bold": [
+        "IBMPlexSans-SemiBold.otf",
+        "IBMPlexSans-SemiBold.ttf",
+        "segoeuib.ttf",
+        "DejaVuSans-Bold.ttf",
+    ],
 }
-FONT_DIRS = ["/usr/share/fonts", "/usr/local/share/fonts", os.path.expanduser("~/.fonts"),
-             "C:/Windows/Fonts", os.path.expanduser("~/AppData/Local/Microsoft/Windows/Fonts")]
+FONT_DIRS = [
+    "/usr/share/fonts",
+    "/usr/local/share/fonts",
+    os.path.expanduser("~/.fonts"),
+    "C:/Windows/Fonts",
+    os.path.expanduser("~/AppData/Local/Microsoft/Windows/Fonts"),
+]
 
 
 def _find(names: list[str]) -> str | None:
     for name in names:
         for d in FONT_DIRS:
-            hits = glob.glob(os.path.join(d, "**", name), recursive=True) if os.path.isdir(d) else []
+            hits = (
+                glob.glob(os.path.join(d, "**", name), recursive=True) if os.path.isdir(d) else []
+            )
             if hits:
                 return sorted(hits)[0]
     return None
@@ -53,8 +71,10 @@ def font(role: str, size: int) -> ImageFont.FreeTypeFont:
     path = _find(FONTS[role])
     if path is None:
         # A card in Pillow's bitmap font would ship looking broken; better to stop and say why.
-        raise RuntimeError(f"no {role} font found (tried {', '.join(FONTS[role])}); "
-                           "install fonts-ibm-plex or pass a machine that has Georgia/Segoe or DejaVu")
+        raise RuntimeError(
+            f"no {role} font found (tried {', '.join(FONTS[role])}); "
+            "install fonts-ibm-plex or pass a machine that has Georgia/Segoe or DejaVu"
+        )
     return ImageFont.truetype(path, size)
 
 
@@ -123,8 +143,12 @@ def render(post: dict, out_path: str) -> str:
     # Foot: where to go, and the slogan with its disclaimer beside it.
     d.rectangle([0, H - FOOT, W, H], fill=ACCENT)
     d.text((MARGIN, H - 162), "internscout.org", font=font("serif", 54), fill=PAPER)
-    d.text((MARGIN, H - 88), "Built by one student, made for all students.  Not affiliated with UMass Amherst.",
-           font=font("sans", 26), fill=SOFT)
+    d.text(
+        (MARGIN, H - 88),
+        "Built by one student, made for all students.  Not affiliated with UMass Amherst.",
+        font=font("sans", 26),
+        fill=SOFT,
+    )
 
     img.save(out_path, "JPEG", quality=90, optimize=True, progressive=True)
     return out_path

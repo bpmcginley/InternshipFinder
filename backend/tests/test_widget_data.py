@@ -1,4 +1,5 @@
 """The embed's bounded feed must represent every field in the full open corpus."""
+
 import json
 import random
 from datetime import datetime, timezone
@@ -11,10 +12,18 @@ NOW = datetime(2026, 10, 19, 18, tzinfo=timezone.utc)
 
 
 def row(i, fields=None, **over):
-    x = {"id": str(i), "status": "open", "title": f"Intern {i}", "company_name": "Example",
-         "apply_url": f"https://careers.example/{i}", "field_tags": fields or ["swe"],
-         "posted_at": f"2026-10-{19 - i // 50:02d}T00:00:00Z", "first_seen": "2026-10-01",
-         "regions": [{"loc": "Boston, MA"}], "description": "not copied into the widget"}
+    x = {
+        "id": str(i),
+        "status": "open",
+        "title": f"Intern {i}",
+        "company_name": "Example",
+        "apply_url": f"https://careers.example/{i}",
+        "field_tags": fields or ["swe"],
+        "posted_at": f"2026-10-{19 - i // 50:02d}T00:00:00Z",
+        "first_seen": "2026-10-01",
+        "regions": [{"loc": "Boston, MA"}],
+        "description": "not copied into the widget",
+    }
     x.update(over)
     return x
 
@@ -46,9 +55,13 @@ def test_every_field_and_or_query_keeps_its_actual_newest_twelve_without_duplica
 
 
 def test_closed_expired_or_unsafe_rows_are_not_offered_and_only_display_fields_are_exported():
-    rows = [row(1, status="closed"), row(2, insights={"deadline": "2026-10-18"}),
-            row(3, apply_url="javascript:alert(1)"), row(4, apply_url="https://secret@example.com/a"),
-            row(5, insights={"deadline": "2026-10-19"}, profile="PRIVATE-SENTINEL", is_remote=True)]
+    rows = [
+        row(1, status="closed"),
+        row(2, insights={"deadline": "2026-10-18"}),
+        row(3, apply_url="javascript:alert(1)"),
+        row(4, apply_url="https://secret@example.com/a"),
+        row(5, insights={"deadline": "2026-10-19"}, profile="PRIVATE-SENTINEL", is_remote=True),
+    ]
     data = widget.build(rows, NOW)
     assert data["total"] == 1 and data["rows"][0]["id"] == "5"
     assert data["rows"][0]["location"] == "Remote"

@@ -5,6 +5,7 @@ The board list carries no description at all. The per-job call on the same API d
 left out for the reason SmartRecruiters' companyDescription is. That call is also the only place
 Rippling gives a posting date. Checked live on four tenants, all the same shape.
 """
+
 from __future__ import annotations
 import re
 from .common import board_item, counts_of, html_to_text, mark_complete
@@ -29,8 +30,10 @@ def parse_rippling(payload, co: dict) -> list[dict]:
             continue
         key = j.get("uuid") or j.get("url")
         if key in jobs:
-            counts.discard("duplicate")   # the same job's row for another location
-        e = jobs.setdefault(key, {"title": title, "url": j.get("url"), "locs": [], "uuid": j.get("uuid")})
+            counts.discard("duplicate")  # the same job's row for another location
+        e = jobs.setdefault(
+            key, {"title": title, "url": j.get("url"), "locs": [], "uuid": j.get("uuid")}
+        )
         label = (j.get("workLocation") or {}).get("label")
         if label and label not in e["locs"]:
             e["locs"].append(label)

@@ -1,4 +1,5 @@
 """Central configuration. The three search inputs are parameters, not hardcoded."""
+
 from __future__ import annotations
 import os
 from dataclasses import dataclass, field
@@ -11,18 +12,23 @@ _TERM_END = {"Winter": 2, "Spring": 5, "Summer": 8, "Fall": 12, "Year-round": 12
 def open_terms(today: date | None = None) -> tuple[tuple[str, int], ...]:
     """Every (season, year) this year or next that hasn't ended yet."""
     today = today or date.today()
-    return tuple((s, y) for y in (today.year, today.year + 1) for s, end in _TERM_END.items()
-                 if (y, end) >= (today.year, today.month))
+    return tuple(
+        (s, y)
+        for y in (today.year, today.year + 1)
+        for s, end in _TERM_END.items()
+        if (y, end) >= (today.year, today.month)
+    )
 
 
 @dataclass
 class Profile:
     """The configurable search: field, term, location."""
+
     name: str = "All fields · upcoming terms · United States"
     # field tags we keep (see classify.py for the tag vocabulary)
     # Accept every discipline the classifier knows (filter in the dashboard instead of
     # dropping at ingest). Narrow this tuple to restrict what gets collected.
-    fields: tuple[str, ...] = ()          # empty = accept all
+    fields: tuple[str, ...] = ()  # empty = accept all
     # term(s) to keep, as (season, year)
     terms: tuple[tuple[str, int], ...] = field(default_factory=open_terms)
     # shown by the API/dashboard; the actual geo rule lives in REGION below
@@ -35,6 +41,7 @@ class Profile:
 class Region:
     """Every US and US-remote role is kept. New England and the NYC metro (N miles of Midtown)
     are the baseline area, labeled separately and always given full detail fetches."""
+
     name: str = "United States"
     states: frozenset = frozenset({"ME", "NH", "VT", "MA", "RI", "CT"})
     nyc_center: tuple = (40.7580, -73.9855)
@@ -54,19 +61,26 @@ def wanted_states() -> frozenset:
     extra = os.environ.get("INTERNSCOUT_WANTED_STATES", "")
     return BASELINE_STATES | {s.strip().upper() for s in extra.split(",") if len(s.strip()) == 2}
 
+
 # Active profile (edit here or override via the API /profile endpoint later).
 PROFILE = Profile()
 
-DB_PATH = os.environ.get("INTERNSCOUT_DB", os.path.join(os.path.dirname(os.path.dirname(__file__)), "internscout.db"))
+DB_PATH = os.environ.get(
+    "INTERNSCOUT_DB", os.path.join(os.path.dirname(os.path.dirname(__file__)), "internscout.db")
+)
 DB_URL = f"sqlite:///{DB_PATH}"
 # Committed, auto-growing data: ATS board registry + geocode cache
-DATA_DIR = os.environ.get("INTERNSCOUT_DATA", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
+DATA_DIR = os.environ.get(
+    "INTERNSCOUT_DATA", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+)
 # Parallel board fetches per ingest run
 FETCH_WORKERS = int(os.environ.get("INTERNSCOUT_WORKERS", "16"))
 
 # Network etiquette
 HTTP_TIMEOUT = 25.0
-USER_AGENT = "InternScout/0.2 (student internship finder; +https://github.com/bpmcginley/InternshipFinder)"
+USER_AGENT = (
+    "InternScout/0.2 (student internship finder; +https://github.com/bpmcginley/InternshipFinder)"
+)
 
 # GitHub community lists (Tier 1). Each maps season->cycle year for that repo.
 GITHUB_LISTS = [
@@ -152,12 +166,20 @@ GOOGLE_JOBS_FOCUS_SEARCHES = int(os.environ.get("SERPAPI_FOCUS_SEARCHES", "2"))
 # that both turn over: each metro every 6 days, every metro-query pair within 36. Canadian postings
 # say "summer student" and "co-op" more than "internship", so the queries do too.
 GOOGLE_JOBS_CANADA_LOCATIONS = [
-    "Toronto, Ontario, Canada", "Montreal, Quebec, Canada", "Vancouver, British Columbia, Canada",
-    "Calgary, Alberta, Canada", "Ottawa, Ontario, Canada", "Waterloo, Ontario, Canada",
+    "Toronto, Ontario, Canada",
+    "Montreal, Quebec, Canada",
+    "Vancouver, British Columbia, Canada",
+    "Calgary, Alberta, Canada",
+    "Ottawa, Ontario, Canada",
+    "Waterloo, Ontario, Canada",
 ]
 GOOGLE_JOBS_CANADA_QUERIES = [
-    "summer student internship 2027", "co-op student 2027", "university internship summer 2027",
-    "engineering co-op student", "business analyst intern student", "research assistant summer student",
+    "summer student internship 2027",
+    "co-op student 2027",
+    "university internship summer 2027",
+    "engineering co-op student",
+    "business analyst intern student",
+    "research assistant summer student",
 ]
 GOOGLE_JOBS_CANADA_SEARCHES = int(os.environ.get("SERPAPI_CANADA_SEARCHES", "1"))
 
@@ -167,8 +189,12 @@ def canada_searches(day: int, n: int = GOOGLE_JOBS_CANADA_SEARCHES) -> list[tupl
     move on every day, and the query shifts one more each time the metros have all had a turn, so
     each metro meets every query within 36 days."""
     places, queries = GOOGLE_JOBS_CANADA_LOCATIONS, GOOGLE_JOBS_CANADA_QUERIES
-    return [(queries[(d + d // len(places)) % len(queries)], places[d % len(places)])
-            for d in (day + i for i in range(max(0, n)))]
+    return [
+        (queries[(d + d // len(places)) % len(queries)], places[d % len(places)])
+        for d in (day + i for i in range(max(0, n)))
+    ]
+
+
 # Google Jobs is location-driven; one search per location per query (watch your SerpApi quota).
 GOOGLE_JOBS_LOCATIONS = [
     "Boston, Massachusetts",
@@ -186,24 +212,57 @@ GOOGLE_JOBS_LOCATIONS = [
 ]
 # The metro searched for each state students pick (baseline states are covered above).
 STATE_METROS = {
-    "AL": "Birmingham, Alabama", "AK": "Anchorage, Alaska", "AZ": "Phoenix, Arizona",
-    "AR": "Little Rock, Arkansas", "CA": "San Francisco, California", "CO": "Denver, Colorado",
-    "DE": "Wilmington, Delaware", "DC": "Washington, District of Columbia", "FL": "Miami, Florida",
-    "GA": "Atlanta, Georgia", "HI": "Honolulu, Hawaii", "ID": "Boise, Idaho", "IL": "Chicago, Illinois",
-    "IN": "Indianapolis, Indiana", "IA": "Des Moines, Iowa", "KS": "Wichita, Kansas",
-    "KY": "Louisville, Kentucky", "LA": "New Orleans, Louisiana", "MD": "Baltimore, Maryland",
-    "MI": "Detroit, Michigan", "MN": "Minneapolis, Minnesota", "MS": "Jackson, Mississippi",
-    "MO": "St. Louis, Missouri", "MT": "Billings, Montana", "NE": "Omaha, Nebraska",
-    "NV": "Las Vegas, Nevada", "NM": "Albuquerque, New Mexico", "NC": "Charlotte, North Carolina",
-    "ND": "Fargo, North Dakota", "OH": "Columbus, Ohio", "OK": "Oklahoma City, Oklahoma",
-    "OR": "Portland, Oregon", "PA": "Philadelphia, Pennsylvania", "SC": "Charleston, South Carolina",
-    "SD": "Sioux Falls, South Dakota", "TN": "Nashville, Tennessee", "TX": "Dallas, Texas",
-    "UT": "Salt Lake City, Utah", "VA": "Arlington, Virginia", "WA": "Seattle, Washington",
-    "WV": "Charleston, West Virginia", "WI": "Milwaukee, Wisconsin", "WY": "Cheyenne, Wyoming",
+    "AL": "Birmingham, Alabama",
+    "AK": "Anchorage, Alaska",
+    "AZ": "Phoenix, Arizona",
+    "AR": "Little Rock, Arkansas",
+    "CA": "San Francisco, California",
+    "CO": "Denver, Colorado",
+    "DE": "Wilmington, Delaware",
+    "DC": "Washington, District of Columbia",
+    "FL": "Miami, Florida",
+    "GA": "Atlanta, Georgia",
+    "HI": "Honolulu, Hawaii",
+    "ID": "Boise, Idaho",
+    "IL": "Chicago, Illinois",
+    "IN": "Indianapolis, Indiana",
+    "IA": "Des Moines, Iowa",
+    "KS": "Wichita, Kansas",
+    "KY": "Louisville, Kentucky",
+    "LA": "New Orleans, Louisiana",
+    "MD": "Baltimore, Maryland",
+    "MI": "Detroit, Michigan",
+    "MN": "Minneapolis, Minnesota",
+    "MS": "Jackson, Mississippi",
+    "MO": "St. Louis, Missouri",
+    "MT": "Billings, Montana",
+    "NE": "Omaha, Nebraska",
+    "NV": "Las Vegas, Nevada",
+    "NM": "Albuquerque, New Mexico",
+    "NC": "Charlotte, North Carolina",
+    "ND": "Fargo, North Dakota",
+    "OH": "Columbus, Ohio",
+    "OK": "Oklahoma City, Oklahoma",
+    "OR": "Portland, Oregon",
+    "PA": "Philadelphia, Pennsylvania",
+    "SC": "Charleston, South Carolina",
+    "SD": "Sioux Falls, South Dakota",
+    "TN": "Nashville, Tennessee",
+    "TX": "Dallas, Texas",
+    "UT": "Salt Lake City, Utah",
+    "VA": "Arlington, Virginia",
+    "WA": "Seattle, Washington",
+    "WV": "Charleston, West Virginia",
+    "WI": "Milwaukee, Wisconsin",
+    "WY": "Cheyenne, Wyoming",
     "PR": "San Juan, Puerto Rico",
     # Provinces students pick (2026-10-01): the big metro in each, as SerpApi names it.
-    "ON": "Toronto, Ontario, Canada", "QC": "Montreal, Quebec, Canada", "BC": "Vancouver, British Columbia, Canada",
-    "AB": "Calgary, Alberta, Canada", "MB": "Winnipeg, Manitoba, Canada", "NS": "Halifax, Nova Scotia, Canada",
+    "ON": "Toronto, Ontario, Canada",
+    "QC": "Montreal, Quebec, Canada",
+    "BC": "Vancouver, British Columbia, Canada",
+    "AB": "Calgary, Alberta, Canada",
+    "MB": "Winnipeg, Manitoba, Canada",
+    "NS": "Halifax, Nova Scotia, Canada",
     "SK": "Saskatoon, Saskatchewan, Canada",
 }
 
@@ -212,6 +271,7 @@ def google_jobs_locations() -> list[str]:
     """Baseline metros first, then one metro per extra wanted state."""
     extra = sorted(s for s in wanted_states() - BASELINE_STATES if s in STATE_METROS)
     return GOOGLE_JOBS_LOCATIONS + [STATE_METROS[s] for s in extra]
+
 
 # SerpApi free tier = 250 searches/month. Google Jobs runs once a day and spends the plan evenly
 # (searches_per_month / 31, read from SerpApi's free Account API), never more than this cap;

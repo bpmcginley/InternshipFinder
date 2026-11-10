@@ -5,6 +5,7 @@ Registry shape: {ats: {token: {"name", "quant", "sector", "fails", "added"}}}
 sector is an employer label (health, nonprofit, quant_finance, ...); it never changes the score.
 Workday tokens are "tenant|wdN|site".
 """
+
 from __future__ import annotations
 import json
 import os
@@ -25,34 +26,76 @@ MAX_FAILS = 4  # consecutive failed runs before a board is dropped
 DROPPED_PATH = os.path.join(DATA_DIR, "dropped_boards.json")
 KEEP_OUT = {"dead": 45, "robots": 120}
 _DROPPED: dict[str, dict[str, dict]] = {}
-_REFUSED = [0]          # add_board calls turned away this run, for the [registry] line
+_REFUSED = [0]  # add_board calls turned away this run, for the [registry] line
 
 PATTERNS = [
     # job-boards.eu.greenhouse.io is a European employer's board; boards-api.greenhouse.io still
     # serves it, so widening the host is all that is needed and nothing downstream changes.
-    ("greenhouse", re.compile(r"(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/"
-                              r"(?:embed/job_app\?for=)?([A-Za-z0-9_-]+)", re.I)),
+    (
+        "greenhouse",
+        re.compile(
+            r"(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/"
+            r"(?:embed/job_app\?for=)?([A-Za-z0-9_-]+)",
+            re.I,
+        ),
+    ),
     ("greenhouse", re.compile(r"boards-api\.greenhouse\.io/v1/boards/([A-Za-z0-9_-]+)", re.I)),
     # Unlike Greenhouse, Lever's EU boards are not on api.lever.co - it 404s for them - so the
     # region rides in the token ("cirrus|eu") and lever.py picks its API host from that.
     ("lever", re.compile(r"jobs\.(?:(?P<r>eu)\.)?lever\.co/(?P<t>[A-Za-z0-9_.-]+)", re.I)),
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/([A-Za-z0-9_.%-]+)", re.I)),
-    ("workday", re.compile(r"https?://(?P<t>[a-z0-9-]+)\.(?P<wd>wd\d+)\.myworkdayjobs\.com/"
-                          r"(?:[a-z]{2}-[A-Z]{2}/)?(?P<s>[A-Za-z0-9_-]+)", re.I)),
+    (
+        "workday",
+        re.compile(
+            r"https?://(?P<t>[a-z0-9-]+)\.(?P<wd>wd\d+)\.myworkdayjobs\.com/"
+            r"(?:[a-z]{2}-[A-Z]{2}/)?(?P<s>[A-Za-z0-9_-]+)",
+            re.I,
+        ),
+    ),
     # Workday's other domain, where the tenant is a path segment instead of a subdomain:
     # wd1.myworkdaysite.com/recruiting/wf/WellsFargoJobs. Same CXS API underneath.
-    ("workday", re.compile(r"https?://(?P<wd>wd\d+\.myworkdaysite\.com)/(?:[a-z]{2}-[A-Z]{2}/)?"
-                          r"recruiting/(?P<t>[A-Za-z0-9_-]+)/(?P<s>[A-Za-z0-9_-]+)", re.I)),
-    ("smartrecruiters", re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)", re.I)),
+    (
+        "workday",
+        re.compile(
+            r"https?://(?P<wd>wd\d+\.myworkdaysite\.com)/(?:[a-z]{2}-[A-Z]{2}/)?"
+            r"recruiting/(?P<t>[A-Za-z0-9_-]+)/(?P<s>[A-Za-z0-9_-]+)",
+            re.I,
+        ),
+    ),
+    (
+        "smartrecruiters",
+        re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)", re.I),
+    ),
     ("workable", re.compile(r"apply\.workable\.com/([A-Za-z0-9_-]+)", re.I)),
     ("recruitee", re.compile(r"https?://([a-z0-9-]+)\.recruitee\.com", re.I)),
     ("bamboohr", re.compile(r"https?://([a-z0-9-]+)\.bamboohr\.com/(?:careers|jobs)", re.I)),
-    ("rippling", re.compile(r"ats\.rippling\.com/(?:embed/)?(?:[a-z]{2}-[A-Z]{2}/)?"
-                            r"([A-Za-z0-9_-]+)/jobs", re.I)),
-    ("oracle", re.compile(r"https?://([a-z0-9-]+\.fa(?:\.[a-z0-9]+)?\.oraclecloud\.com)/hcmUI/CandidateExperience/"
-                          r"[a-z]{2}(?:-[A-Za-z]{2})?/sites/([A-Za-z0-9_]+)", re.I)),
-    ("taleo", re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I)),
-    ("adp", re.compile(r"workforcenow\.adp\.com/.*?[?&]cid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", re.I)),
+    (
+        "rippling",
+        re.compile(
+            r"ats\.rippling\.com/(?:embed/)?(?:[a-z]{2}-[A-Z]{2}/)?"
+            r"([A-Za-z0-9_-]+)/jobs",
+            re.I,
+        ),
+    ),
+    (
+        "oracle",
+        re.compile(
+            r"https?://([a-z0-9-]+\.fa(?:\.[a-z0-9]+)?\.oraclecloud\.com)/hcmUI/CandidateExperience/"
+            r"[a-z]{2}(?:-[A-Za-z]{2})?/sites/([A-Za-z0-9_]+)",
+            re.I,
+        ),
+    ),
+    (
+        "taleo",
+        re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I),
+    ),
+    (
+        "adp",
+        re.compile(
+            r"workforcenow\.adp\.com/.*?[?&]cid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+            re.I,
+        ),
+    ),
     ("jobvite", re.compile(r"jobs\.jobvite\.com/(?:careers/)?([A-Za-z0-9_-]+)", re.I)),
     # The employer's own website is a required parameter of the Eightfold API and is not in the
     # URL, so a discovered token is the tenant alone and eightfold.py assumes <tenant>.com;
@@ -63,17 +106,42 @@ PATTERNS = [
     # The same jobs behind the employer's own host, which is a different product with a different
     # API - see sources/icims_site.py. The token is the host. The pattern above claims the
     # icims.com ones first, so what reaches here is only ever a branded one.
-    ("icims_site", re.compile(r"https?://([a-z0-9][a-z0-9.-]*\.[a-z]{2,})/jobs/\d+\S*[?&]icims=1", re.I)),
+    (
+        "icims_site",
+        re.compile(r"https?://([a-z0-9][a-z0-9.-]*\.[a-z]{2,})/jobs/\d+\S*[?&]icims=1", re.I),
+    ),
     # JazzHR: the tenant is the subdomain and the board is always at /apply.
     ("jazzhr", re.compile(r"https?://([a-z0-9-]+)\.applytojob\.com", re.I)),
 ]
-_BAD_TOKENS = {"embed", "job", "jobs", "wday", "login", "apply", "search", "v1", "oneclick-ui",
-               "j", "api", "www", "app", "careers", "rest"}
+_BAD_TOKENS = {
+    "embed",
+    "job",
+    "jobs",
+    "wday",
+    "login",
+    "apply",
+    "search",
+    "v1",
+    "oneclick-ui",
+    "j",
+    "api",
+    "www",
+    "app",
+    "careers",
+    "rest",
+}
 ATS_HOSTS = [  # recognised even when no token can be extracted
-    ("icims", "icims.com"), ("taleo", "taleo.net"), ("oracle", "oraclecloud.com"),
-    ("successfactors", "successfactors"), ("jobvite", "jobvite.com"), ("eightfold", "eightfold.ai"),
-    ("workable", "workable.com"), ("bamboohr", "bamboohr.com"), ("adp", "adp.com"),
-    ("greenhouse", "gh_jid="), ("jazzhr", "applytojob.com"),
+    ("icims", "icims.com"),
+    ("taleo", "taleo.net"),
+    ("oracle", "oraclecloud.com"),
+    ("successfactors", "successfactors"),
+    ("jobvite", "jobvite.com"),
+    ("eightfold", "eightfold.ai"),
+    ("workable", "workable.com"),
+    ("bamboohr", "bamboohr.com"),
+    ("adp", "adp.com"),
+    ("greenhouse", "gh_jid="),
+    ("jazzhr", "applytojob.com"),
 ]
 
 
@@ -104,7 +172,9 @@ def ats_of(url: str | None) -> tuple[str, str | None]:
             elif ats == "adp":
                 token = m.group(1).lower()
             elif ats in ("oracle", "recruitee", "bamboohr"):
-                token = f"{m.group(1).lower()}|{m.group(2)}" if ats == "oracle" else m.group(1).lower()
+                token = (
+                    f"{m.group(1).lower()}|{m.group(2)}" if ats == "oracle" else m.group(1).lower()
+                )
             return ats, token
     low = url.lower()
     for ats, needle in ATS_HOSTS:
@@ -130,7 +200,9 @@ def load_registry() -> dict:
     except FileNotFoundError:
         return {}
     except ValueError as e:
-        raise RuntimeError(f"{REGISTRY_PATH} is not valid JSON ({e}); restore it from git before running") from e
+        raise RuntimeError(
+            f"{REGISTRY_PATH} is not valid JSON ({e}); restore it from git before running"
+        ) from e
 
 
 def load_dropped() -> dict:
@@ -153,7 +225,9 @@ def kept_out(ats: str, token: str, today: date | None = None) -> bool:
         on = date.fromisoformat(hit.get("on", ""))
     except ValueError:
         return False
-    return (today or date.today()) - on < timedelta(days=KEEP_OUT.get(hit.get("why"), KEEP_OUT["dead"]))
+    return (today or date.today()) - on < timedelta(
+        days=KEEP_OUT.get(hit.get("why"), KEEP_OUT["dead"])
+    )
 
 
 def refused_count() -> int:
@@ -163,7 +237,10 @@ def refused_count() -> int:
 def drop(reg: dict, ats: str, token: str, why: str = "dead", today: date | None = None) -> None:
     """Take a board out of the registry and remember it, so discovery does not put it straight back."""
     reg.get(ats, {}).pop(token, None)
-    _DROPPED.setdefault(ats, {})[token.lower()] = {"on": (today or date.today()).isoformat(), "why": why}
+    _DROPPED.setdefault(ats, {})[token.lower()] = {
+        "on": (today or date.today()).isoformat(),
+        "why": why,
+    }
 
 
 def _save_dropped(today: date | None = None) -> None:
@@ -193,14 +270,19 @@ def save_registry(reg: dict) -> None:
     size is a bug upstream. REGISTRY_ALLOW_SHRINK=1 is the override for a deliberate clean-out.
     """
     os.makedirs(DATA_DIR, exist_ok=True)
-    out = {ats: dict(sorted(boards.items(), key=lambda kv: kv[0].lower())) for ats, boards in sorted(reg.items())}
+    out = {
+        ats: dict(sorted(boards.items(), key=lambda kv: kv[0].lower()))
+        for ats, boards in sorted(reg.items())
+    }
     try:
         with open(REGISTRY_PATH, encoding="utf-8") as f:
             had = _board_count(json.load(f))
     except (OSError, ValueError):
         had = 0
     if had >= 200 and _board_count(out) * 2 < had and not os.environ.get("REGISTRY_ALLOW_SHRINK"):
-        raise RuntimeError(f"refusing to save a registry of {_board_count(out)} boards over one of {had}")
+        raise RuntimeError(
+            f"refusing to save a registry of {_board_count(out)} boards over one of {had}"
+        )
     tmp = REGISTRY_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=1, ensure_ascii=False)
@@ -208,8 +290,15 @@ def save_registry(reg: dict) -> None:
     _save_dropped()
 
 
-def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, sector: str | None = None,
-              location: str | None = None) -> bool:
+def add_board(
+    reg: dict,
+    ats: str,
+    token: str,
+    name: str,
+    quant: bool = False,
+    sector: str | None = None,
+    location: str | None = None,
+) -> bool:
     sector = sector or ("quant_finance" if quant else None)
     boards = reg.setdefault(ats, {})
     lower = {t.lower(): t for t in boards}
@@ -224,7 +313,12 @@ def add_board(reg: dict, ats: str, token: str, name: str, quant: bool = False, s
     if kept_out(ats, token):
         _REFUSED[0] += 1
         return False
-    boards[token] = {"name": name or token, "quant": quant, "fails": 0, "added": date.today().isoformat()}
+    boards[token] = {
+        "name": name or token,
+        "quant": quant,
+        "fails": 0,
+        "added": date.today().isoformat(),
+    }
     if sector:
         boards[token]["sector"] = sector
     if location:
@@ -271,12 +365,21 @@ def rename_board(reg: dict, ats: str, token: str, name: str) -> bool:
 # Checked against all 3,156 boards in the registry: 67 names match, all 67 are genuinely
 # educational or university health systems, and none of the 9 that already carried a sector
 # disagreed with what this would have given them.
-_SECTOR_NAME_SKIP_RE = re.compile(r"credit union|\bbank\b|investment|asset management|"
-                                  r"\bcapital\b|ventures?\b", re.I)
-_SECTOR_NAME_HEALTH_RE = re.compile(r"\bhealth\b|hospital|\bmedical\b|\bclinic|cancer|"
-                                    r"medicine", re.I)
-_SECTOR_NAME_EDU_RE = re.compile(r"\buniversit(y|ies)\b|\bcollege\b|institute of technology|"
-                                 r"\bpolytechnic\b|\bschool of\b|community college", re.I)
+_SECTOR_NAME_SKIP_RE = re.compile(
+    r"credit union|\bbank\b|investment|asset management|"
+    r"\bcapital\b|ventures?\b",
+    re.I,
+)
+_SECTOR_NAME_HEALTH_RE = re.compile(
+    r"\bhealth\b|hospital|\bmedical\b|\bclinic|cancer|"
+    r"medicine",
+    re.I,
+)
+_SECTOR_NAME_EDU_RE = re.compile(
+    r"\buniversit(y|ies)\b|\bcollege\b|institute of technology|"
+    r"\bpolytechnic\b|\bschool of\b|community college",
+    re.I,
+)
 
 
 def sector_from_name(name: str) -> str | None:
@@ -361,13 +464,38 @@ def set_location(reg: dict, ats: str, token: str, location: str) -> bool:
 
 def seed_registry(reg: dict) -> int:
     from . import companies_seed as seed
+
     n = 0
-    for ats in ("GREENHOUSE", "LEVER", "ASHBY", "WORKDAY", "SMARTRECRUITERS", "WORKABLE", "RECRUITEE",
-                "BAMBOOHR", "RIPPLING", "ORACLE", "TALEO", "ADP", "JOBVITE", "SUCCESSFACTORS",
-                "EIGHTFOLD", "ICIMS", "ICIMS_SITE", "JAZZHR"):
+    for ats in (
+        "GREENHOUSE",
+        "LEVER",
+        "ASHBY",
+        "WORKDAY",
+        "SMARTRECRUITERS",
+        "WORKABLE",
+        "RECRUITEE",
+        "BAMBOOHR",
+        "RIPPLING",
+        "ORACLE",
+        "TALEO",
+        "ADP",
+        "JOBVITE",
+        "SUCCESSFACTORS",
+        "EIGHTFOLD",
+        "ICIMS",
+        "ICIMS_SITE",
+        "JAZZHR",
+    ):
         for co in getattr(seed, ats, []):
-            n += add_board(reg, ats.lower(), co["ats_token"], co["name"], co.get("is_quant_target", False),
-                           co.get("sector"), co.get("location"))
+            n += add_board(
+                reg,
+                ats.lower(),
+                co["ats_token"],
+                co["name"],
+                co.get("is_quant_target", False),
+                co.get("sector"),
+                co.get("location"),
+            )
             if co.get("sector"):
                 relabel_sector(reg, ats.lower(), co["ats_token"], co["sector"])
             if co.get("location"):
@@ -426,7 +554,9 @@ def record_closed(reg: dict, ats: str, token: str) -> None:
 
 
 def prune(reg: dict, today: date | None = None) -> int:
-    dead = [(a, t, v) for a, e in reg.items() for t, v in e.items() if v.get("fails", 0) >= MAX_FAILS]
+    dead = [
+        (a, t, v) for a, e in reg.items() for t, v in e.items() if v.get("fails", 0) >= MAX_FAILS
+    ]
     for a, t, v in dead:
         drop(reg, a, t, "robots" if v.get("closed") else "dead", today)
     return len(dead)
