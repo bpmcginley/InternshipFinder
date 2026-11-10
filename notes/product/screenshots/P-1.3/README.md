@@ -37,7 +37,7 @@ The isolated tools directory contains `node_modules/playwright-core`, `react`, a
 - Auto-Apply keeps its existing button, tooltip, disclosure state and label. The installed fixture retains selection and the custom-site access note without requesting a run or submission. Unit tests also retain the action callback and busy disabled state.
 - All 360 possible company-tile hues were measured through actual computed CSS. Minimum text contrast is **6.50:1 light** and **7.78:1 dark**. Initials are decorative, deterministic and use Unicode graphemes when available, with a code-point fallback; empty names use `?`.
 
-Baseline: 263 site tests passed before edits. Seven focused row-presentation tests pass. Full-suite, golden and final CI results are recorded on the PR.
+Baseline: 263 site tests passed before edits. The integrated suite passes all 270 tests, including seven focused row-presentation cases, against frozen parent `6a08f631`. The parent integrations did not change its dashboard HTML/app.js, so the before captures remain representative. Golden and final CI/review results are recorded on the PR.
 
 ## Visible strings and patterns
 
