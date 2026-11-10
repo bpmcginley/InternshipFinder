@@ -70,7 +70,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-2.1 Vocabulary inventory | Unassigned | - | - | Queued | Written inventory only; record meaningful differences as questions. |
 | 4 | WP-2.4 Config | Unassigned | - | - | Queued | Inventory worker URL consumers before generating area modules. |
-| 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | - | In review | Extract three role-index helpers, retaining the orders.js exports. |
+| 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | In review | Extract three role-index helpers, retaining the orders.js exports. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
@@ -435,4 +435,4 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 ## WP-4.2 role-index extraction
 
 - The first file move puts `shardOf`, `cleanRole`, and `readShard` in `worker/src/orders/roles.js`. Role-only patterns move with them, and the shared listing-ID/control patterns and bad-request factory have one home in `worker/src/orders/shared.js`. `orders.js` explicitly re-exports the existing public names.
-- Compared all moved bodies and declarations to the original bytes, and checked that the rest of `orders.js` differs only by imports and re-exports. The shard reader still fetches per call through the injected fetch and reads the billing URL at call time. The Node suite passed all 342 tests under Node 22.23.4, and all 15 local Workers tests passed in six files. Golden matched all 695 files.
+- Compared all moved bodies and declarations to the original bytes, and checked that the rest of `orders.js` differs only by imports and re-exports. The shard reader still fetches per call through the injected fetch and reads the billing URL at call time. The Node suite passed all 342 tests under Node 22.23.4, and all 15 local Workers tests passed in six files. Golden matched all 695 files. JavaScript lint reported zero errors or warnings. The Worker type report retained 914 existing errors.
