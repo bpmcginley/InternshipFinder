@@ -70,8 +70,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | In review | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config | Unassigned | - | - | Queued | Inventory worker URL consumers before generating area modules. |
-| 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | In review | Extract three role-index helpers, retaining the orders.js exports. |
-| 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | - | Prepared locally | Based on reviewed #216. Open after the role-index PR merges. |
+| 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Merged as `9ea5bc0a` after review and CI. Worker deployment remains with Bruce. |
+| 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | - | In review | File moves for the admin list and pilot code handlers. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
@@ -242,6 +242,8 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | No cutover yet; observation clock has not started. |
 
 ## Waiting for deploy
+
+- [PR #216](https://github.com/bpmcginley/InternshipFinder/pull/216), merged as `9ea5bc0a`: the Worker role-index extraction awaits Bruce's deployment.
 
 - [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175), merged as `f4504cb1`: counter allowlist expansion remains undeployed. Approved and published disclosure plus explicit operator deployment are still required. No worker/database deployment or extension release was performed.
 
@@ -442,4 +444,4 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Move the recent-order query and its row limit to `orders/admin.js`. Move the pilot code handler, alphabet and limit to `orders/pilot.js`. Shared text validation and conflict construction move to `orders/shared.js`. The legacy orders module retains all 39 exports.
 - Byte-compared eight moved declarations and every remaining statement outside import/export wiring. The pilot insert retains its single-statement cap and the original follow-up count. The existing terms literals and SQL bodies are exact.
-- Node 22.23.4 Worker suite passed all 342 tests. Local Workers runtime passed 15 tests in six files, checkout passed 40 tests, and Golden matched all 695 files. JavaScript lint reported zero errors or warnings. The Worker type report retained 914 existing errors. Independent review and CI apply after #216 merges and this branch opens. Worker deployment remains with Bruce.
+- Node 22.23.4 Worker suite passed all 342 tests. Local Workers runtime passed 15 tests in six files, checkout passed 40 tests, and Golden matched all 695 files. JavaScript lint reported zero errors or warnings. The Worker type report retained 914 existing errors. Integrated main `9ea5bc0a` by normal merge. Worker source and test blobs match the locally verified extraction. The unchanged checkout suite passed again. Independent review and CI are pending. Worker deployment remains with Bruce.
