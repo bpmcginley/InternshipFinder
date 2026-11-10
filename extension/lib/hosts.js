@@ -14,10 +14,24 @@
 // that only changes at a store review, so those are handled by an in-context request for that one
 // site.
 export const ATS_HOSTS = [
-  "myworkdayjobs.com", "myworkdaysite.com", "greenhouse.io", "lever.co", "ashbyhq.com",
-  "smartrecruiters.com", "oraclecloud.com", "icims.com", "taleo.net", "workable.com",
-  "rippling.com", "bamboohr.com", "jobvite.com", "recruitee.com", "adp.com",
-  "successfactors.com", "paylocity.com", "applytojob.com",
+  "myworkdayjobs.com",
+  "myworkdaysite.com",
+  "greenhouse.io",
+  "lever.co",
+  "ashbyhq.com",
+  "smartrecruiters.com",
+  "oraclecloud.com",
+  "icims.com",
+  "taleo.net",
+  "workable.com",
+  "rippling.com",
+  "bamboohr.com",
+  "jobvite.com",
+  "recruitee.com",
+  "adp.com",
+  "successfactors.com",
+  "paylocity.com",
+  "applytojob.com",
   // An ATS like the rest, though its boards read as employer subdomains: micron.eightfold.ai.
   "eightfold.ai",
 ];
@@ -27,14 +41,22 @@ export const ATS_HOSTS = [
 export const ATS_MATCHES = ATS_HOSTS.map((d) => `https://*.${d}/*`);
 
 export function hostOf(url) {
-  try { return new URL(url).hostname; } catch { return ""; }
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
 }
 
 // The narrowest pattern that covers this page: one scheme, one host. Asking for "tesla.com" reads very
 // differently to a student than asking for every site, so never widen this to <all_urls>.
 export function originPattern(url) {
   let u;
-  try { u = new URL(url); } catch { return null; }
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
   if (u.protocol !== "https:" && u.protocol !== "http:") return null;
   return `${u.protocol}//${u.hostname}/*`;
 }
