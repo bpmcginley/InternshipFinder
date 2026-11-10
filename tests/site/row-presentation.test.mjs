@@ -183,6 +183,13 @@ test("job-board labels move into Details and Other is absent", () => {
   assert.match(text(H.Why(props)), /Job board: Ashby/);
   for (const ats of ["other", "Other", " OTHER ", ""])
     assert.doesNotMatch(text(H.Why(rowProps({ ...rows[0], ats }))), /Job board:/);
+  for (const field_tags of [["swe", "other"], ["other"]]) {
+    const r = { ...rows[0], ats: "other", field_tags };
+    const facts = text(H.factsLine(r, new Set()));
+    assert.match(facts, field_tags.length > 1 ? /Software, Other/ : /Other/);
+    assert.doesNotMatch(facts, /Not tagged/);
+    assert.deepEqual(r.field_tags, field_tags, "taxonomy labels and source tags are preserved");
+  }
 });
 
 test("Auto-Apply keeps its action, busy state, access note and disclosure controls", () => {

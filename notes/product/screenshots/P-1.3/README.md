@@ -33,7 +33,7 @@ The isolated tools directory contains `node_modules/playwright-core`, `react`, a
 - The chosen region and additional-location count stay intact; the full raw locations remain in the tooltip. Canada and Texas-only remote qualifiers remain visible. No row object is normalized or changed.
 - Date-only postings retain their calendar date in the New York browser timezone. Today, yesterday and two days ago render as expected; the future posting shows its full date. The `time` element preserves the source date, the title has the full date, and screen readers receive the full date instead of duplicated visible text.
 - Salary, stipend and unpaid badges are visible; unknown and rejected zero pay remain `Pay not listed`. No currency or payment status is inferred.
-- Ashby appears in Details, not the collapsed row. Other has no job-board field. Escape closes Details and returns focus to its opener.
+- Ashby appears in Details, not the collapsed row. Other has no job-board field. The hand-off's instruction to hide Other applies to that job-board field; existing discipline tags, including Other alone or mixed with known tags, are preserved. Escape closes Details and returns focus to its opener.
 - Auto-Apply keeps its existing button, tooltip, disclosure state and label. The installed fixture retains selection and the custom-site access note without requesting a run or submission. Unit tests also retain the action callback and busy disabled state.
 - All 360 possible company-tile hues were measured through actual computed CSS. Minimum text contrast is **6.50:1 light** and **7.78:1 dark**. Initials are decorative, deterministic and use Unicode graphemes when available, with a code-point fallback; empty names use `?`.
 
