@@ -1822,7 +1822,10 @@ background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}.
 section.faq h2{font:600 var(--fs-5)/1.3 var(--serif);margin:28px 0 6px}section.faq p{margin:0;color:var(--ink2)}
 @media (max-width:560px){.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}.n{color:var(--ink3);font-size:var(--fs-2)}
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:var(--fs-3)}
-footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:var(--fs-7)}section.rel ul{columns:1}
+footer a{color:var(--ink2)}
+.distribution-links{gap:8px 24px;margin-bottom:16px}
+.distribution-links a,.widget-follow a{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline;text-underline-offset:3px}
+@media (max-width:560px){h1{font-size:var(--fs-7)}section.rel ul{columns:1}
 .job{grid-template-columns:1fr}.acts{grid-column:1;grid-row:auto;margin-top:var(--s2)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
 .tablewrap{overflow-x:auto;margin:16px 0 8px}table.data{width:100%;border-collapse:collapse;font-size:var(--fs-3)}
@@ -2055,6 +2058,14 @@ def ld_script(obj) -> str:
     return f'<script type="application/ld+json">{ld_json}</script>'
 
 
+def widget_follow(field: str) -> str:
+    """Link a field's canonical tag to the existing snippet builder, not its page slug."""
+    return (
+        f'<p class="follow widget-follow"><a href="/widget/builder.html?field={esc(quote(field, safe=""))}" '
+        'data-distribution="widget">Put these internships on your club or department site</a></p>'
+    )
+
+
 def footer_browse() -> str:
     """The footer's links to the employer index and the soonest summer's tracker (2026-10-07): every
     page then links both, so a crawler reaches every employer page in two steps from any page."""
@@ -2169,7 +2180,10 @@ def page(
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>{digest_footer}</footer>
+<footer><nav class="distribution-links" aria-label="More ways to use InternScout">
+<a href="https://github.com/bpmcginley/internships-every-major" data-distribution="list">Internships for every major on GitHub</a>
+<a href="/widget/builder.html" data-distribution="widget">Put live internships on your club or department site</a>
+</nav><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>{digest_footer}</footer>
 </div>
 {BEACON}
 {OFFER_TAG if OFFER_MARK in body else ""}
@@ -5078,6 +5092,7 @@ def build(
         #      f"{n} open {name} internships and co-ops for college students, updated {updated}. Employers
         #      include {emp}. Free search, no sign-up."
         co_ops = any("co_op" in (x.get("stage") or []) for x in items)
+        related += widget_follow(t)
         add(
             path,
             listing_title([f"{name} Internships", f"{field_short(t)} Internships"], len(items)),
