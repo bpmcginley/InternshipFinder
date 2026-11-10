@@ -69,7 +69,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-2.1 Vocabulary inventory | Unassigned | - | - | Queued | Written inventory only; record meaningful differences as questions. |
-| 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | - | In review | One public Worker origin; regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. Site and Worker integration follow separately after their overlapping packages. |
+| 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | In review | One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
+| 4 | WP-2.4 Config: site and Worker | Unassigned | - | - | Queued | Nine production consumers were verified. This PR covers the three extension and growth files. Dashboard, counter, buy, employer page, orders, and placement CLI remain. Coordinate the site files with Product and preserve the Worker environment overrides. |
 | 4 | WP-4.2 Orders split | Unassigned | - | - | Queued | File moves only; preserve exports, cycles, transactions, and mail behavior. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
