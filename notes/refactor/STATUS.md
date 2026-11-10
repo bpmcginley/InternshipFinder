@@ -43,7 +43,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI and green Pages. |
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
-| 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | Pending PR | Validated locally | Source-free Python and Node artifacts; no thresholds; independent review and CI pending. |
+| 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | In review | Source-free Python and Node artifacts; no thresholds; independent review and CI pending. |
 | 1 | WP-0.6 Shared CI setup | Unassigned | - | - | Queued | Preserve all effective workflow behavior; coordinate CI file ownership. |
 | 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
