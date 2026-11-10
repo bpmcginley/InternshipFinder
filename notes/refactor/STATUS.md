@@ -60,7 +60,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
 | 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
-| 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
+| 3 | WP-1.5 Cache versions | wp15_cache | `refactor/wp-1.5-asset-versions` | Pending draft | Helper ready; integration blocked | Isolated helper/tests only; Pages, golden and source HTML await product ownership coordination. |
 | 3 | WP-2.3 Worker contract | Unassigned | - | - | Queued | Inventory code routes and clients, not prose alone; include missing metrics route. |
 | 3 | WP-4.1 Migrations | Unassigned | - | - | Queued / operator gate | Deduplicated baseline and local tests; no remote action or deploy-script change. |
 | 3 | WP-4.4 Runner documentation | Unassigned | - | - | Queued | Preserve intentional Node/Workers scenario overlap. |
@@ -342,3 +342,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - All four retained PRs (#165, #175, #177, #178) remain merged with green Pages. The counter worker changes await approved disclosure and operator deployment; design-note implementation choices remain gated.
 
 - Recovery Pages run 42890454209 passed all jobs. JavaScript formatting #189 merged as `da5bc492` after independent final review and all nine checks passed; its Pages run must pass before this retry merges. Integrated its exact source and all tracker evidence by normal merge.
+
+## WP-1.5 isolated asset-version helper
+
+- Read both refactor documents in full, current status/AGENTS and product coordination section 3. Implementation uses its own worktree and branch. Scope approved by the lead is limited to new `backend/internscout/asset_versions.py`, its new test file, and this tracker entry. No Pages, golden-harness/fixture, source HTML, public script, or SEO-generator edits are included yet.
+- The standard-library helper identifies real local script/stylesheet attributes with HTMLParser source offsets and writes only URL values. It uses 12-character SHA-256 content fingerprints; preserves other query components and fragments; is deterministic/idempotent; leaves external/protocol-relative/data URLs, inline scripts, escaped examples and text-only elements unchanged. Every input is validated before any HTML write. Missing assets, escapes, filesystem links/junctions, wrong-case paths and ambiguous inputs fail with source-free diagnostics. Asset contents stay unchanged.
+- Focused tests: 27 passed, one skipped because Windows does not permit ordinary symlink creation; the real Windows junction rejection test passed. Ruff correctness and formatting checks pass. The production golden build matched all 695 files without refresh. A temporary copy of that review archive exercises the new helper separately; actual committed fixtures and public sources remain untouched.
+- Integration remains blocked on product claims: #187/#193 own dashboard HTML, #194 owns the generator/golden pair, and #200 owns install/count/golden. Future authorized integration must stamp after the unchanged paid-report step and before publication checks, exercise the same step in the golden harness, remove manual source versions after file release, and explain each approved built-HTML hash change. This draft must not merge in its isolated state. No force push, history rewrite, deployment, remote database action, release, outreach or paid provider call was performed.
