@@ -11,7 +11,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration is in progress. Mechanical formatting remains blocked by the notice period and open PRs; later waves do not start ahead of it. All six baseline suites passed.
+- Wave 1 complete: internal notes, shared CI, type reports, golden build, and coverage reporting merged with independent reviews, green checks, and green Pages. Wave 2 lint configuration merged in PR #183 with green Pages run 42871996393. Mechanical formatting remains blocked by the notice period and open PRs; later waves do not start ahead of it. All six baseline suites passed.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
 - Product-session coordination: read `notes/product/HANDOFF.md` section 3 from [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170). Refactor has structural right of way; avoid hot files claimed by open `product: ...` draft PRs. The notice above announces the upcoming WP-0.3 window with several hours to clear product PRs; formatting has not started.
@@ -52,7 +52,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | Merged | Independent review, green CI, and green Pages run 42865676691. |
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | [#174](https://github.com/bpmcginley/InternshipFinder/pull/174) | Merged | Independent review, green CI, and green Pages run 42867413022. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review, green CI, and green Pages run 42864974798. |
-| 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | In review | Correctness-only lint passes; final CI and independent review pending; no formatting. |
+| 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
 | 2 | WP-0.3 Python formatting | Unassigned | - | - | Waiting for quiet window | No other PRs open or packages running; mechanical-only PR and blame-ignore entry. |
 | 2 | WP-0.3 JavaScript formatting | Unassigned | - | - | Waiting for quiet window | Same quiet-window requirement; separate mechanical PR. |
 | 3 | WP-1.1 Leftovers | Unassigned | - | - | Queued | Verify all references before removal; preserve DB/models and MuseWork. |
@@ -252,10 +252,11 @@ None. No worker/database deployment or extension release was performed.
 | [#172 Type reports](https://github.com/bpmcginley/InternshipFinder/pull/172) | `c6ef372f` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42865676691) | Merged; report-only developer tooling. |
 | [#179 Golden build](https://github.com/bpmcginley/InternshipFinder/pull/179) | `2489edca` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42866406265) | Merged; fixed offline build and 687 output hashes. |
 | [#174 Coverage reports](https://github.com/bpmcginley/InternshipFinder/pull/174) | `10f28db5` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42867413022) | Merged; report-only coverage with source-free artifacts. |
+| [#183 Lint configuration](https://github.com/bpmcginley/InternshipFinder/pull/183) | `3923879c` | Independent agent review; all nine checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42871996393) | Merged; no formatting or runtime edits; 691 golden files unchanged. |
 
 ## Next update
 
-Finish the configuration-only lint PR and verify Pages after merge. Begin mechanical formatting only after the notice period and all other PRs clear. No later wave starts before Wave 2 completes; preserve all package-specific boundaries and product-session coordination.
+Next implementation: the separate Python and JavaScript mechanical-formatting PRs, only after 16:00 Eastern on 2026-11-10 and a fresh open-PR check confirms the quiet window. Until then, formatting and waves 3-7 remain queued. Fetch and reread both hand-offs/status files before resuming; use separate owned worktrees, independent reviews, all-green CI, and Pages verification after each merge. Do not close unrelated PRs to manufacture a quiet window.
 
 ## WP-0.6 validation and coordination
 
@@ -265,3 +266,10 @@ Finish the configuration-only lint PR and verify Pages after merge. Begin mechan
 - Parsed before/after YAML: workflow/job metadata (including triggers, conditions, permissions, concurrency, schedules, environment, timeouts) unchanged. Expanded shared actions and compared effective steps after ignoring comment-only lines; commands, environments, conditions, and order match. The deliberate setup difference is release.yml now explicitly selects Python 3.12 and Node 22, matching the existing test workflow rather than inheriting runner defaults. No extension release was run.
 - Relevant workflow-contract tests: 39 passed. The first test invocation from the repository root failed collection because the package is not installed yet; rerunning from the documented backend directory passed. This was invocation context, not a main failure or code change.
 - No runtime source, public output, or dependency versions used by product code changed. Golden validation will be run if WP-0.2 lands before this PR.
+
+## Wave-2 checkpoint
+
+- Completed: initial hand-off and tracker, all wave-0/1 packages, and the configuration-only part of WP-0.3. The full refactor is not complete. No mechanical formatting or later-wave implementation has begun.
+- The initial six-suite baseline and every marked verification item are recorded above, including corrections to the hand-off. New tests, lint, types, coverage, and golden jobs now run in CI. Existing type debt remains report-only; coverage has no thresholds.
+- The open-PR inventory at 18:13 UTC (13:13 Eastern) on 2026-11-10 contains #165, #175, #177, #178 and #180. These must clear before mechanical formatting under WP-0.3 and the product coordination rule. Preserve their branches and work; this session has not closed or merged them.
+- Original uncommitted work and MuseWork.md were not edited. No force pushes, history rewriting, worker/database deployment, extension release, paid AI calls, real submissions, outreach, or manually triggered publishing workflows were performed. Normal main merges triggered the existing Pages workflows, which are verified in the ledger.
