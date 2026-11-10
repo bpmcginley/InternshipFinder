@@ -5,7 +5,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 0: status tracker merged; WP-0.1 implementation and local validation are complete, awaiting independent review and green PR checks. All six baseline suites passed, with two documented local backend skips. Independent full-file audit results are recorded below.
+- Wave 0 is merged with green Pages. Wave 1 is in progress; WP-0.2 now has an offline golden harness and fixed fixtures under validation. All six baseline suites passed, with two documented local backend skips. Independent full-file audit results are recorded below.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
 - Pages runs on every push to main (`.github/workflows/pages.yml:14-16`), broader than the hand-off's examples. After every merge, verify the corresponding Pages run before the next merge. A failed publishing merge requires a new revert PR, independently reviewed and merged; never rewrite history.
@@ -40,8 +40,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | Wave | Package | Owner | Branch | PR | State | Next step / constraint |
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
-| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | In review | Local validation passed; independent review and green CI before lead merges. |
-| 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
+| 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI and green Pages; 21 internal-note files removed from the artifact. |
+| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | Pending PR | In review | Two repeated golden passes and full local backend passed; independent exact-head review and Linux CI before merge. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
 | 1 | WP-0.5 Coverage | Unassigned | - | - | Queued | Report-only Python and Node artifacts; no thresholds. |
 | 1 | WP-0.6 Shared CI setup | Unassigned | - | - | Queued | Preserve all effective workflow behavior; coordinate CI file ownership. |
@@ -180,6 +180,14 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 - First PR CI found one introduced workflow-contract failure: [run 42862662508](https://github.com/bpmcginley/InternshipFinder/actions/runs/42862662508) reported 1,479 passed and one failed. `test_placement_runs.py` requires the existing paid-listing report step immediately after the build. Moved only the new validation step after that report and before Pages configuration/upload, preserving the original adjacency and leaving the financial code, report step, and contract test unchanged. Reran `python -m pytest tests/test_placement_runs.py -q`: all 14 passed; checker tests and the 4,334-file artifact check also passed again. New-head CI and independent review are required before merge.
 - Golden output comparison is not yet available: WP-0.2 follows this package. Public source assets and generator code are unchanged; the planned output difference is removal of the two internal-note trees.
 
+### WP-0.2 Golden build
+
+- Added a test-only harness that stages production code and public static assets in an isolated temporary directory, omits real `docs/data`, seeds SQLite with 300 fixed synthetic listings, and runs the actual `export_static`, `seo_pages`, and `site_links` module entry points in separate subprocesses. No production clock hook or workflow edit is needed. Near-page generation retains its production setting, outside pytest's autouse override.
+- Fixed the UTC clock before imports, locale, hash seed, previous sitemap/noindex set, Search Console evidence, placements, prior page-content dates, empty previous export, and absent geocode cache. The subprocess environment excludes user config and credentials. Geocoding is disabled and socket/DNS attempts fail even if a production helper tries to swallow the error.
+- The initial artifact has 687 hashed files, including 501 near HTML pages, 73 feeds, eight employer pages and their hub, 147 cohort-detail records, active placement content, and all required page families. Fixed inputs also exercise a rejected expired placement and both retained and advanced content dates. The compressed review archive contains only the public fixture build's output bytes.
+- Windows text inputs are normalized to Linux checkout LF before building; generated output bytes are never normalized before SHA-256 comparison. Binary assets remain exact. The explicit refresh command and product-session baseline-update rule are documented in `backend/tests/fixtures/golden/README.md`.
+- Validation: the golden tests passed twice consecutively (two tests in 20.94s and 27.92s), including a one-character footer-template mutation rejected with changed-file diagnostics and a short diff. Full local backend: 1,480 passed and the same two environment skips in 97.15s. Independent preliminary review verified all 687 archive members exactly match manifest hashes and all fixture URLs use the reserved example domain. Linux CI must confirm the committed manifest before merge.
+
 ## Questions and external gates
 
 | ID | Affected scope | Question / gate | Current handling |
@@ -202,7 +210,8 @@ None. No worker refactor PR has merged, and no production action has been taken.
 |---|---|---|---|---|
 | [#167 Hand-offs](https://github.com/bpmcginley/InternshipFinder/pull/167) | `00cf10e0` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42859546750) | Merged; documentation only. |
 | [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | `64fd6400` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42861453089) | Merged; documentation only. |
+| [#169 WP-0.1 Internal notes](https://github.com/bpmcginley/InternshipFinder/pull/169) | `9f739770` | Independent review renewed after workflow-order fix; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) | Merged; internal-note publication removed. |
 
 ## Next update
 
-Finish WP-0.1 validation and independent review, merge under the rules above, then verify Pages before the next merge. Continue the waves without routine approval pauses; preserve all explicit package-specific boundaries.
+Finish Wave 1 validation and independent reviews, merge under the rules above, and verify Pages after each merge. Continue the waves without routine approval pauses; preserve explicit package-specific boundaries and the concurrent product-session rules.
