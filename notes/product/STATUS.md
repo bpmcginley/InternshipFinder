@@ -24,7 +24,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
 | A | P-1.7 Non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
-| A | P-1.10 Flyer page | Unassigned | - | - | Queued | Browser-local QR; no third-party requests. |
+| A | P-1.10 Flyer page | product lead | `codex/product-p1.10-flyer` | - | In progress | Browser-local QR, bounded campus tag; no third-party requests. |
 | A | P-1.11 Install and offer | Unassigned | - | - | Queued | Preserve permissions explanation; demo clip from Bruce. |
 | A | P-2.1 Follow design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
 | A | P-2.2 Top-up design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
