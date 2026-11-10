@@ -1,5 +1,6 @@
 """NYC government jobs from NYC Open Data (dataset kpav-sd4t), filtered to student roles
 (interns, college aides, fellows). Free, no key. Each posting links to its cityjobs.nyc.gov page."""
+
 from __future__ import annotations
 from datetime import date, datetime
 from .base import client
@@ -8,8 +9,10 @@ from ..classify import is_internship
 
 API = "https://data.cityofnewyork.us/resource/kpav-sd4t.json"
 LIMIT = 2000
-WHERE = ("career_level = 'Student' OR upper(business_title) like '%INTERN%' "
-         "OR upper(business_title) like '%FELLOW%' OR upper(civil_service_title) like '%COLLEGE AIDE%'")
+WHERE = (
+    "career_level = 'Student' OR upper(business_title) like '%INTERN%' "
+    "OR upper(business_title) like '%FELLOW%' OR upper(civil_service_title) like '%COLLEGE AIDE%'"
+)
 
 
 def _until(s: str | None) -> date | None:
@@ -19,11 +22,12 @@ def _until(s: str | None) -> date | None:
         return None
 
 
-def parse_nyc_jobs(rows: list[dict], today: date | None = None,
-                   counts: ScanCounts | None = None) -> list[dict]:
+def parse_nyc_jobs(
+    rows: list[dict], today: date | None = None, counts: ScanCounts | None = None
+) -> list[dict]:
     today = today or date.today()
     counts = counts if counts is not None else ScanCounts()
-    best: dict[str, dict] = {}   # the same job is posted once "Internal" and once "External"
+    best: dict[str, dict] = {}  # the same job is posted once "Internal" and once "External"
     with_id = 0
     for r in rows:
         jid = r.get("job_id")
@@ -47,16 +51,29 @@ def parse_nyc_jobs(rows: list[dict], today: date | None = None,
             continue
         lines = []
         if r.get("salary_range_from"):
-            lines.append(f"Salary: ${r['salary_range_from']} - ${r.get('salary_range_to') or r['salary_range_from']} "
-                         f"{r.get('salary_frequency') or ''}".strip())
+            lines.append(
+                f"Salary: ${r['salary_range_from']} - ${r.get('salary_range_to') or r['salary_range_from']} "
+                f"{r.get('salary_frequency') or ''}".strip()
+            )
         if until:
             lines.append(f"Apply by: {until.isoformat()}")
-        lines += [r.get("job_description") or "", r.get("minimum_qual_requirements") or "", r.get("preferred_skills") or ""]
-        out.append(board_item({"name": (r.get("agency") or "NYC Government").title()}, source="nyc_jobs",
-                              title=title, locations=["New York, NY"], url=f"https://cityjobs.nyc.gov/job/{jid}",
-                              posted_at=(r.get("posting_date") or "")[:10] or None,
-                              description=html_to_text("\n".join(l for l in lines if l.strip())),
-                              employment_type=emp))
+        lines += [
+            r.get("job_description") or "",
+            r.get("minimum_qual_requirements") or "",
+            r.get("preferred_skills") or "",
+        ]
+        out.append(
+            board_item(
+                {"name": (r.get("agency") or "NYC Government").title()},
+                source="nyc_jobs",
+                title=title,
+                locations=["New York, NY"],
+                url=f"https://cityjobs.nyc.gov/job/{jid}",
+                posted_at=(r.get("posting_date") or "")[:10] or None,
+                description=html_to_text("\n".join(l for l in lines if l.strip())),
+                employment_type=emp,
+            )
+        )
     return out
 
 
@@ -71,7 +88,7 @@ def fetch_nyc_jobs(report=None) -> list[dict]:
                 raise ValueError("NYC Open Data response is not a list of rows")
             counts.rows(len(rows))
             if len(rows) >= LIMIT:
-                counts.stop("row_limit")   # one request, filled: older matches may be cut off
+                counts.stop("row_limit")  # one request, filled: older matches may be cut off
             out = parse_nyc_jobs(rows, counts=counts)
     except Exception as e:
         print(f"[nyc_jobs] failed: {e}")
