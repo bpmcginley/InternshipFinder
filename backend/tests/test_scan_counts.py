@@ -4,6 +4,7 @@ Every board adapter reports what it saw before the pipeline: what the API said i
 says), the rows it read, the rows it discarded and why, and whether a cap stopped it. Non-board
 sources report a whole-source outcome. A measurement that was not made stays out of the report.
 """
+
 import json
 import sys
 from unittest.mock import Mock
@@ -13,14 +14,23 @@ import pytest
 
 from internscout import run_ingest
 from internscout.ingest_metrics import IngestMetrics
-from internscout.sources import common, github_lists, google_jobs, houseai, icims_site, nyc_jobs, uhn, usajobs
+from internscout.sources import (
+    common,
+    github_lists,
+    google_jobs,
+    houseai,
+    icims_site,
+    nyc_jobs,
+    uhn,
+    usajobs,
+)
 from internscout.sources.common import ScanCounts, counts_of, report_source
 from internscout.sources.jazzhr import parse_jazzhr
 from internscout.sources.jobvite import parse_jobvite
 
 from test_scan_completeness import ADAPTERS, NOISE, scan
 
-API_ADAPTERS = list(ADAPTERS)   # every adapter whose API can report a total
+API_ADAPTERS = list(ADAPTERS)  # every adapter whose API can report a total
 UNPAGED = {"workable", "bamboohr", "rippling"}
 
 
@@ -37,6 +47,7 @@ def balanced(counts: dict, returned: int) -> bool:
 
 
 # ------------------------------------------------------------------ board adapters, by group
+
 
 @pytest.mark.parametrize("ats", API_ADAPTERS)
 def test_api_adapters_report_discovered_read_and_discarded(ats):
@@ -55,11 +66,18 @@ def test_an_empty_board_is_measured_as_zero_not_left_unknown(ats):
     assert counts["discovered"] == 0 and counts["read"] == 0 and counts["discarded"] == {}
 
 
-@pytest.mark.parametrize("ats,stops", [
-    ("workday", {"dry_pages": 1}), ("oracle", {"page_cap": 1}), ("smartrecruiters", {"page_cap": 1}),
-    ("taleo", {"page_cap": 1}), ("eightfold", {"page_cap": 1}), ("icims_site", {"page_cap": 1}),
-    ("adp", {"page_cap": 1}),
-])
+@pytest.mark.parametrize(
+    "ats,stops",
+    [
+        ("workday", {"dry_pages": 1}),
+        ("oracle", {"page_cap": 1}),
+        ("smartrecruiters", {"page_cap": 1}),
+        ("taleo", {"page_cap": 1}),
+        ("eightfold", {"page_cap": 1}),
+        ("icims_site", {"page_cap": 1}),
+        ("adp", {"page_cap": 1}),
+    ],
+)
 def test_a_cap_is_reported_and_leaves_discovered_above_read(ats, stops):
     result, _ = scan(ats, ["Software Engineer Intern"], "capped")
     counts = result.counts.as_dict()
@@ -89,11 +107,25 @@ def test_a_total_without_its_rows_shows_the_gap():
 
 
 def test_rippling_location_rows_of_one_job_count_as_duplicates():
-    rows = [{"uuid": "u1", "name": "Data Intern", "url": "https://ats.rippling.com/acme/jobs/u1",
-             "workLocation": {"label": label}} for label in ("Boston, MA", "Austin, TX")]
+    rows = [
+        {
+            "uuid": "u1",
+            "name": "Data Intern",
+            "url": "https://ats.rippling.com/acme/jobs/u1",
+            "workLocation": {"label": label},
+        }
+        for label in ("Boston, MA", "Austin, TX")
+    ]
     co = {"name": "Acme", "ats_token": "acme", "sector": None, "location": None}
-    with httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(
-            200, json=rows) if r.url.path.endswith("/jobs") else httpx.Response(404))) as c:
+    with httpx.Client(
+        transport=httpx.MockTransport(
+            lambda r: (
+                httpx.Response(200, json=rows)
+                if r.url.path.endswith("/jobs")
+                else httpx.Response(404)
+            )
+        )
+    ) as c:
         result = run_ingest._fetch_board(c, "rippling", co)
     counts = result.counts.as_dict()
     assert len(result) == 1 and counts["read"] == 2 and counts["discarded"] == {"duplicate": 1}
@@ -101,63 +133,106 @@ def test_rippling_location_rows_of_one_job_count_as_duplicates():
 
 def test_workday_overlap_between_searches_is_counted_once_as_a_duplicate(monkeypatch):
     monkeypatch.setenv("WORKDAY_EXTRA_KEYWORDS", "co-op")
-    by_kw = {"intern": ["Software Engineer Intern", NOISE],
-             "co-op": ["Software Engineer Intern", "Mechanical Co-op"]}
+    by_kw = {
+        "intern": ["Software Engineer Intern", NOISE],
+        "co-op": ["Software Engineer Intern", "Mechanical Co-op"],
+    }
 
     def handle(request):
         if request.method != "POST":
             return httpx.Response(404)
         body = json.loads(request.content)
-        rows = by_kw[body["searchText"]][body["offset"]:body["offset"] + body["limit"]]
-        return httpx.Response(200, json={"total": len(by_kw[body["searchText"]]), "jobPostings": [
-            {"title": t, "externalPath": "/job/" + t.replace(" ", "-"), "locationsText": "Boston, MA"}
-            for t in rows]})
+        rows = by_kw[body["searchText"]][body["offset"] : body["offset"] + body["limit"]]
+        return httpx.Response(
+            200,
+            json={
+                "total": len(by_kw[body["searchText"]]),
+                "jobPostings": [
+                    {
+                        "title": t,
+                        "externalPath": "/job/" + t.replace(" ", "-"),
+                        "locationsText": "Boston, MA",
+                    }
+                    for t in rows
+                ],
+            },
+        )
 
     co = {"name": "Acme", "ats_token": "acme|wd1|Careers", "sector": None, "location": None}
     with httpx.Client(transport=httpx.MockTransport(handle)) as c:
         result = run_ingest._fetch_board(c, "workday", co)
     counts = result.counts.as_dict()
     assert len(result) == 2
-    assert counts == {"discovered": 4, "read": 4, "capped": False,
-                      "discarded": {"not_student": 1, "duplicate": 1}}
+    assert counts == {
+        "discovered": 4,
+        "read": 4,
+        "capped": False,
+        "discarded": {"not_student": 1, "duplicate": 1},
+    }
 
 
 def test_region_discards_are_their_own_reason():
     co = {"name": "Acme", "ats_token": "acme", "_counts": ScanCounts()}
     from internscout.sources.smartrecruiters import parse_smartrecruiters
-    parse_smartrecruiters({"content": [
-        {"id": "1", "name": "Data Intern", "location": {"city": "Boston", "region": "MA", "country": "us"}},
-        {"id": "2", "name": "Data Intern", "location": {"city": "Paris", "country": "fr"}},
-        {"id": "3", "name": "Accountant", "location": {"city": "Boston", "country": "us"}}]}, co, "acme")
+
+    parse_smartrecruiters(
+        {
+            "content": [
+                {
+                    "id": "1",
+                    "name": "Data Intern",
+                    "location": {"city": "Boston", "region": "MA", "country": "us"},
+                },
+                {"id": "2", "name": "Data Intern", "location": {"city": "Paris", "country": "fr"}},
+                {"id": "3", "name": "Accountant", "location": {"city": "Boston", "country": "us"}},
+            ]
+        },
+        co,
+        "acme",
+    )
     assert co["_counts"].discarded == {"outside_region": 1, "not_student": 1}
 
 
 # HTML adapters have no result total: read is measured, discovered never is.
 
+
 def _html_board(ats, body, token="acme"):
     co = {"name": "Acme", "ats_token": token, "sector": None, "location": None}
-    handle = lambda request: (httpx.Response(404) if request.url.path.endswith("robots.txt")
-                              or "/job/" in request.url.path or "/jobs/7" in request.url.path
-                              else httpx.Response(200, text=body))
+    handle = lambda request: (
+        httpx.Response(404)
+        if request.url.path.endswith("robots.txt")
+        or "/job/" in request.url.path
+        or "/jobs/7" in request.url.path
+        else httpx.Response(200, text=body)
+    )
     with httpx.Client(transport=httpx.MockTransport(handle)) as c:
         return run_ingest._fetch_board(c, ats, co)
 
 
 def test_jobvite_counts_rows_but_never_a_total():
-    page = ('<td class="jv-job-list-name"><a href="/acme/job/a1">Summer Intern</a></td>'
-            '<td class="jv-job-list-location">Boston, MA</td>'
-            '<td class="jv-job-list-name"><a href="/acme/job/b2">Agency Attorney</a></td>'
-            '<td class="jv-job-list-location">Boston, MA</td>')
+    page = (
+        '<td class="jv-job-list-name"><a href="/acme/job/a1">Summer Intern</a></td>'
+        '<td class="jv-job-list-location">Boston, MA</td>'
+        '<td class="jv-job-list-name"><a href="/acme/job/b2">Agency Attorney</a></td>'
+        '<td class="jv-job-list-location">Boston, MA</td>'
+    )
     result = _html_board("jobvite", page)
     assert result.counts.as_dict() == {"read": 2, "discarded": {"not_student": 1}, "capped": False}
 
 
 def test_jazzhr_counts_unreadable_entries_and_repeats():
     def item(slug, title):
-        return (f'<li class="list-group-item"><a href="https://acme.applytojob.com/apply/{slug}/x" >'
-                f'{title}</a></li>')
-    page = (item("a1", "Engineering Intern") + item("a1", "Engineering Intern")
-            + item("a2", "Account Director") + '<li class="list-group-item">no link here</li>')
+        return (
+            f'<li class="list-group-item"><a href="https://acme.applytojob.com/apply/{slug}/x" >'
+            f'{title}</a></li>'
+        )
+
+    page = (
+        item("a1", "Engineering Intern")
+        + item("a1", "Engineering Intern")
+        + item("a2", "Account Director")
+        + '<li class="list-group-item">no link here</li>'
+    )
     co = {"name": "Acme", "ats_token": "acme", "_counts": ScanCounts()}
     assert len(parse_jazzhr(page, co)) == 1
     counts = co["_counts"].as_dict()
@@ -166,10 +241,14 @@ def test_jazzhr_counts_unreadable_entries_and_repeats():
 
 
 def test_icims_portal_counts_cards_and_cross_keyword_repeats():
-    card = ('<li class="iCIMS_JobCardItem"><span class="field-label">Job Locations</span>'
-            '<span>US-MA-Boston</span><a href="https://acme.icims.com/jobs/7600/x/job?in_iframe=1" '
-            'class="iCIMS_Anchor"><h3>RN Internship</h3></a></li>')
-    result = _html_board("icims", card + card.replace("7600", "7601").replace("RN Internship", "Chef"))
+    card = (
+        '<li class="iCIMS_JobCardItem"><span class="field-label">Job Locations</span>'
+        '<span>US-MA-Boston</span><a href="https://acme.icims.com/jobs/7600/x/job?in_iframe=1" '
+        'class="iCIMS_Anchor"><h3>RN Internship</h3></a></li>'
+    )
+    result = _html_board(
+        "icims", card + card.replace("7600", "7601").replace("RN Internship", "Chef")
+    )
     counts = result.counts.as_dict()
     # Four keywords each read the same two cards: one internship kept, three repeats, four chefs.
     assert len(result) == 1 and "discovered" not in counts
@@ -178,8 +257,14 @@ def test_icims_portal_counts_cards_and_cross_keyword_repeats():
 
 def test_successfactors_counts_distinct_jobs_per_page():
     link = '<a href="/job/Boston-Data-Intern-MA-02110/{id}/" class="jobTitle-link">{t}</a>'
-    page = ("<html>" + " " * 2000 + link.format(id=1, t="Data Intern") + link.format(id=1, t="Data Intern")
-            + link.format(id=2, t="Director") + "</html>")
+    page = (
+        "<html>"
+        + " " * 2000
+        + link.format(id=1, t="Data Intern")
+        + link.format(id=1, t="Data Intern")
+        + link.format(id=2, t="Director")
+        + "</html>"
+    )
     result = _html_board("successfactors", page, token="careers.acme.com")
     counts = result.counts.as_dict()
     # Five keywords, two distinct jobs a page (the repeated link is one job).
@@ -188,6 +273,7 @@ def test_successfactors_counts_distinct_jobs_per_page():
 
 
 # ------------------------------------------------------------------ scan_boards and the report
+
 
 def _scan_with(monkeypatch, fetch, n=2):
     monkeypatch.setattr(run_ingest, "RETRY_PAUSE", 0)
@@ -209,9 +295,16 @@ def test_scan_boards_carries_counts_into_the_report(monkeypatch):
 
     report = _scan_with(monkeypatch, fetch)
     assert report["board_scans"]["fakeats"] == {
-        "boards": 2, "capped": 2, "stops": {"page_cap": 2}, "read_boards": 2, "read": 6,
-        "returned_by_read_boards": 2, "discarded": {"not_student": 4},
-        "discovered_boards": 2, "discovered": 10}
+        "boards": 2,
+        "capped": 2,
+        "stops": {"page_cap": 2},
+        "read_boards": 2,
+        "read": 6,
+        "returned_by_read_boards": 2,
+        "discarded": {"not_student": 4},
+        "discovered_boards": 2,
+        "discovered": 10,
+    }
     assert report["discrepancies"] == []
 
 
@@ -229,7 +322,9 @@ def test_a_retried_board_reports_only_the_attempt_that_counted(monkeypatch):
         counts_of(co).rows(4)
         if calls[co["ats_token"]] == 1:
             req = httpx.Request("GET", "https://example.test/")
-            raise httpx.HTTPStatusError("busy", request=req, response=httpx.Response(503, request=req))
+            raise httpx.HTTPStatusError(
+                "busy", request=req, response=httpx.Response(503, request=req)
+            )
         counts_of(co).discard("not_student", 3)
         return [{"title": "Intern"}]
 
@@ -240,21 +335,29 @@ def test_a_retried_board_reports_only_the_attempt_that_counted(monkeypatch):
 
 def test_reconciliation_flags_counts_that_do_not_add_up():
     m = IngestMetrics()
-    m.board_result("workday", "a", "success", count=3, scan={"discovered": 2, "read": 5,
-                                                              "discarded": {"not_student": 1},
-                                                              "capped": False})
-    m.board_result("oracle", "b", "success", count=4, scan={"read": 2, "discarded": {}, "capped": False})
-    m.board_result("jobvite", "c", "success", count=2, scan={"capped": False})   # nothing measured
+    m.board_result(
+        "workday",
+        "a",
+        "success",
+        count=3,
+        scan={"discovered": 2, "read": 5, "discarded": {"not_student": 1}, "capped": False},
+    )
+    m.board_result(
+        "oracle", "b", "success", count=4, scan={"read": 2, "discarded": {}, "capped": False}
+    )
+    m.board_result("jobvite", "c", "success", count=2, scan={"capped": False})  # nothing measured
     m.count("fetched", 3, source="workday")
     m.count("fetched", 7, source="oracle")
-    gaps = {(d["source"], d.get("check")): d.get("difference", d.get("unaccounted"))
-            for d in m.as_dict()["discrepancies"]}
+    gaps = {
+        (d["source"], d.get("check")): d.get("difference", d.get("unaccounted"))
+        for d in m.as_dict()["discrepancies"]
+    }
     assert gaps == {
         ("workday", "read=returned+discarded"): 1,
         ("workday", "discovered>=read"): 3,
         ("oracle", "read>=returned"): 2,
         ("oracle", "read=returned+discarded"): -2,
-        ("oracle", None): -3,   # boards returned 4, pipeline counted 7 fetched
+        ("oracle", None): -3,  # boards returned 4, pipeline counted 7 fetched
     }
     assert "discovered" not in m.as_dict()["board_scans"]["oracle"]
     assert m.as_dict()["board_scans"]["jobvite"] == {"boards": 1, "capped": 0}
@@ -262,8 +365,12 @@ def test_reconciliation_flags_counts_that_do_not_add_up():
 
 def test_scan_reasons_are_labels_not_text():
     m = IngestMetrics()
-    m.board_result("greenhouse", "x", "success", scan={"read": 1, "capped": False,
-                                                       "discarded": {"https://evil.test/?a=b": 1}})
+    m.board_result(
+        "greenhouse",
+        "x",
+        "success",
+        scan={"read": 1, "capped": False, "discarded": {"https://evil.test/?a=b": 1}},
+    )
     assert "evil" not in json.dumps(m.as_dict())
 
 
@@ -284,6 +391,7 @@ def test_one_search_without_a_total_makes_the_whole_scan_unmeasured():
 
 
 # ------------------------------------------------------------------ whole-source outcomes
+
 
 def _client(monkeypatch, module, handler):
     real = httpx.Client
@@ -309,29 +417,54 @@ def test_an_empty_feed_that_answered_is_empty(monkeypatch):
     m = IngestMetrics()
     _client(monkeypatch, nyc_jobs, lambda r: httpx.Response(200, json=[]))
     nyc_jobs.fetch_nyc_jobs(report=m.source_result)
-    _client(monkeypatch, uhn, lambda r: httpx.Response(200, json={"data": [
-        {"id": 1, "name": "Registered Nurse", "employment": "Full Time"}]}))
+    _client(
+        monkeypatch,
+        uhn,
+        lambda r: httpx.Response(
+            200, json={"data": [{"id": 1, "name": "Registered Nurse", "employment": "Full Time"}]}
+        ),
+    )
     uhn.fetch_uhn(report=m.source_result)
     sources = m.as_dict()["sources"]
-    assert sources["nyc_jobs"] == {"status": "empty", "returned": 0,
-                                   "scan": {"read": 0, "discarded": {}, "capped": False}}
+    assert sources["nyc_jobs"] == {
+        "status": "empty",
+        "returned": 0,
+        "scan": {"read": 0, "discarded": {}, "capped": False},
+    }
     assert sources["uhn"]["status"] == "empty"
-    assert sources["uhn"]["scan"] == {"discovered": 1, "read": 1, "discarded": {"not_student": 1},
-                                      "capped": False}
+    assert sources["uhn"]["scan"] == {
+        "discovered": 1,
+        "read": 1,
+        "discarded": {"not_student": 1},
+        "capped": False,
+    }
 
 
 def test_nyc_rows_and_their_discards_reconcile(monkeypatch):
-    row = {"job_id": "1", "business_title": "Summer Intern", "career_level": "Student",
-           "agency": "PARKS", "posting_type": "External"}
-    rows = [row, dict(row, posting_type="Internal"), {"business_title": "No id"},
-            dict(row, job_id="2", business_title="Director", career_level="Manager"),
-            dict(row, job_id="3", post_until="01-JAN-2020")]
+    row = {
+        "job_id": "1",
+        "business_title": "Summer Intern",
+        "career_level": "Student",
+        "agency": "PARKS",
+        "posting_type": "External",
+    }
+    rows = [
+        row,
+        dict(row, posting_type="Internal"),
+        {"business_title": "No id"},
+        dict(row, job_id="2", business_title="Director", career_level="Manager"),
+        dict(row, job_id="3", post_until="01-JAN-2020"),
+    ]
     m = IngestMetrics()
     _client(monkeypatch, nyc_jobs, lambda r: httpx.Response(200, json=rows))
     assert len(nyc_jobs.fetch_nyc_jobs(report=m.source_result)) == 1
     report = m.as_dict()
     assert report["sources"]["nyc_jobs"]["scan"]["discarded"] == {
-        "unreadable": 1, "duplicate": 1, "not_student": 1, "expired": 1}
+        "unreadable": 1,
+        "duplicate": 1,
+        "not_student": 1,
+        "expired": 1,
+    }
     assert report["discrepancies"] == []
 
 
@@ -339,11 +472,21 @@ def test_a_feed_failing_part_way_is_failed_with_what_it_had(monkeypatch):
     def handler(request):
         if request.url.params["Page"] == "2":
             return httpx.Response(503)
-        hit = {"MatchedObjectDescriptor": {"PositionTitle": "Student Trainee (Economist)",
-                                           "PositionLocation": [{"LocationName": "Washington, District of Columbia",
-                                                                 "CountryCode": "United States"}]}}
-        return httpx.Response(200, json={"SearchResult": {"SearchResultCountAll": 900,
-                                                          "SearchResultItems": [hit]}})
+        hit = {
+            "MatchedObjectDescriptor": {
+                "PositionTitle": "Student Trainee (Economist)",
+                "PositionLocation": [
+                    {
+                        "LocationName": "Washington, District of Columbia",
+                        "CountryCode": "United States",
+                    }
+                ],
+            }
+        }
+        return httpx.Response(
+            200, json={"SearchResult": {"SearchResultCountAll": 900, "SearchResultItems": [hit]}}
+        )
+
     m = IngestMetrics()
     _client(monkeypatch, usajobs, handler)
     assert len(usajobs.fetch_usajobs("key", "me@example.test", report=m.source_result)) == 1
@@ -363,18 +506,26 @@ def test_a_feed_without_its_key_is_skipped(monkeypatch):
 
 
 def test_one_community_list_failing_beside_one_that_loaded(monkeypatch):
-    lists = [{"source": "good", "url": "https://lists.test/good.json", "cycle_years": {}},
-             {"source": "broken", "url": "https://lists.test/broken.json", "cycle_years": {}},
-             {"source": "reshaped", "url": "https://lists.test/reshaped.json", "cycle_years": {}},
-             {"source": "quiet", "url": "https://lists.test/quiet.json", "cycle_years": {}}]
+    lists = [
+        {"source": "good", "url": "https://lists.test/good.json", "cycle_years": {}},
+        {"source": "broken", "url": "https://lists.test/broken.json", "cycle_years": {}},
+        {"source": "reshaped", "url": "https://lists.test/reshaped.json", "cycle_years": {}},
+        {"source": "quiet", "url": "https://lists.test/quiet.json", "cycle_years": {}},
+    ]
 
     def handler(request):
         name = request.url.path.rsplit("/", 1)[1]
         if name == "good.json":
-            return httpx.Response(200, json=[{"company_name": "A", "title": "SWE Intern", "url": "https://a.test/1"},
-                                             {"company_name": "B", "title": "x", "is_visible": False}, "junk"])
+            return httpx.Response(
+                200,
+                json=[
+                    {"company_name": "A", "title": "SWE Intern", "url": "https://a.test/1"},
+                    {"company_name": "B", "title": "x", "is_visible": False},
+                    "junk",
+                ],
+            )
         if name == "reshaped.json":
-            return httpx.Response(200, json={"listings": []})   # used to read as an empty list
+            return httpx.Response(200, json={"listings": []})  # used to read as an empty list
         if name == "quiet.json":
             return httpx.Response(200, json=[])
         return httpx.Response(404)
@@ -393,17 +544,34 @@ def test_one_community_list_failing_beside_one_that_loaded(monkeypatch):
 def _google(monkeypatch, failing):
     def handler(request):
         if request.url.path == "/account.json":
-            return httpx.Response(200, json={"searches_per_month": 5000, "total_searches_left": 4000})
+            return httpx.Response(
+                200, json={"searches_per_month": 5000, "total_searches_left": 4000}
+            )
         if request.url.params["location"] in failing:
             return httpx.Response(500)
-        return httpx.Response(200, json={"jobs_results": [
-            {"company_name": "MFA", "title": "Museum Intern", "location": request.url.params["location"],
-             "apply_options": [{"link": "https://x.test/1"}]}]})
+        return httpx.Response(
+            200,
+            json={
+                "jobs_results": [
+                    {
+                        "company_name": "MFA",
+                        "title": "Museum Intern",
+                        "location": request.url.params["location"],
+                        "apply_options": [{"link": "https://x.test/1"}],
+                    }
+                ]
+            },
+        )
+
     _client(monkeypatch, google_jobs, handler)
     monkeypatch.setenv("SERPAPI_KEY", "test")
     m = IngestMetrics()
-    google_jobs.fetch_google_jobs(["museum internship"], ["Boston, Massachusetts", "Austin, Texas"],
-                                  max_searches=2, report=m.source_result)
+    google_jobs.fetch_google_jobs(
+        ["museum internship"],
+        ["Boston, Massachusetts", "Austin, Texas"],
+        max_searches=2,
+        report=m.source_result,
+    )
     return m.as_dict()["sources"]["google_jobs"]
 
 
@@ -414,20 +582,26 @@ def test_google_jobs_some_searches_failing_is_partial(monkeypatch):
 
 def test_google_jobs_every_search_failing_is_failed_not_empty(monkeypatch):
     result = _google(monkeypatch, {"Austin, Texas", "Boston, Massachusetts"})
-    assert result == {"status": "failed", "returned": 0, "cause": "500",
-                      "scan": {"capped": False}}
+    assert result == {"status": "failed", "returned": 0, "cause": "500", "scan": {"capped": False}}
 
 
 def test_report_source_needs_no_collector():
-    report_source(None, "anything", error=ValueError("x"))   # a direct call records nothing
+    report_source(None, "anything", error=ValueError("x"))  # a direct call records nothing
 
 
 def test_the_cli_writes_source_outcomes_to_the_report(monkeypatch, tmp_path):
     # --public with every public feed unreachable: three failures, none of them an empty feed.
     path = tmp_path / "report.json"
     monkeypatch.setattr(sys, "argv", ["run_ingest", "--public", "--metrics", str(path)])
-    for name in ("seed_registry", "discover", "probe_boards", "label_boards", "label_sectors",
-                 "prune", "refused_count"):
+    for name in (
+        "seed_registry",
+        "discover",
+        "probe_boards",
+        "label_boards",
+        "label_sectors",
+        "prune",
+        "refused_count",
+    ):
         monkeypatch.setattr(run_ingest, name, lambda *a: 0)
     for name in ("save_registry", "save_cache"):
         monkeypatch.setattr(run_ingest, name, lambda *a: None)
@@ -440,5 +614,8 @@ def test_the_cli_writes_source_outcomes_to_the_report(monkeypatch, tmp_path):
     run_ingest.main()
     sources = json.loads(path.read_text())["sources"]
     assert {name: (r["status"], r["cause"]) for name, r in sources.items()} == {
-        "usajobs": ("failed", "ConnectError"), "nyc_jobs": ("failed", "ConnectError"),
-        "uhn": ("failed", "ConnectError"), "houseai": ("failed", "ConnectError")}
+        "usajobs": ("failed", "ConnectError"),
+        "nyc_jobs": ("failed", "ConnectError"),
+        "uhn": ("failed", "ConnectError"),
+        "houseai": ("failed", "ConnectError"),
+    }

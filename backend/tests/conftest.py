@@ -1,4 +1,5 @@
 """Shared test setup."""
+
 import pytest
 
 
@@ -21,10 +22,10 @@ def _no_real_state_files(monkeypatch, tmp_path):
     would otherwise leave it kept out for every test after it."""
     from internscout import discover
     from internscout.sources import google_jobs
+
     monkeypatch.setattr(discover, "DROPPED_PATH", str(tmp_path / "dropped_boards.json"))
     monkeypatch.setattr(discover, "_DROPPED", {})
     monkeypatch.setattr(google_jobs, "DAY_PATH", str(tmp_path / "google_jobs_day.json"))
-
 
 
 @pytest.fixture(autouse=True)
@@ -34,6 +35,7 @@ def _near_pages_only_where_tested(request, monkeypatch):
     if request.module.__name__.endswith("test_near_pages"):
         return
     from internscout import seo_pages
+
     monkeypatch.setattr(seo_pages, "NEAR_ON", False)
 
 

@@ -1,8 +1,9 @@
 # Directory listings kit
 
 Paste-ready copy for free directory and launch-site listings, so a listing takes a few minutes of
-pasting and one click on Submit. Researched 2026-10-02 (added 2026-10-02). Nothing here has been
-submitted; every submission needs the owner's own account (see "Before you start").
+pasting and one click on Submit. Researched 2026-10-02 (added 2026-10-02). Some submissions have
+since been made. For the dated status ledger and monitoring instructions see [BACKLINKS.md](BACKLINKS.md).
+Each account belongs to the owner (see "Before you start").
 
 Every block below is already inside that site's limits. Character counts are in brackets after the
 heading of each limited field. If a form shows a smaller counter than the one written here, the form

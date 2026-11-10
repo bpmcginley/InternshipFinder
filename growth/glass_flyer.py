@@ -26,6 +26,7 @@ Each spot's QR code carries ?utm_source=flyer-<spot>&utm_medium=print; the Worke
 as source "print", one channel per spot (worker/src/visits.js), so the weekly numbers say which wall
 worked. A spot is 1-16 lowercase letters or digits.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -51,7 +52,10 @@ CHROMES = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "google-chrome", "chromium", "chromium-browser", "msedge",
+    "google-chrome",
+    "chromium",
+    "chromium-browser",
+    "msedge",
 ]
 
 
@@ -66,8 +70,17 @@ def facts() -> dict:
 def qr_svg(url: str) -> str:
     """The code as inline SVG: black modules on white, level Q, a 4-module quiet zone, scaled by CSS."""
     buf = io.BytesIO()
-    segno.make(url, error="q", micro=False).save(buf, kind="svg", border=4, dark="#111111", light="#ffffff",
-                                                 xmldecl=False, svgns=True, nl=False, omitsize=True)
+    segno.make(url, error="q", micro=False).save(
+        buf,
+        kind="svg",
+        border=4,
+        dark="#111111",
+        light="#ffffff",
+        xmldecl=False,
+        svgns=True,
+        nl=False,
+        omitsize=True,
+    )
     return buf.getvalue().decode("utf-8")
 
 
@@ -117,19 +130,29 @@ body { font-family: "IBM Plex Sans", Arial, Helvetica, sans-serif; color: var(--
 .lead b { font-weight: 700 }
 """
 
-FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black'
-         '&family=IBM+Plex+Sans:wght@500;700&display=block">')
+FONTS = (
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black'
+    '&family=IBM+Plex+Sans:wght@500;700&display=block">'
+)
 
 
 # A small code in the footer's corner, the same on both sides, so a printed sheet says which spot's
 # QR code it carries when it is time to put it up (2026-10-06). Unknown spots print the tag itself.
-SPOT_CODES = {"general": "G", "worcesternorth": "WN", "worcestersouth": "WS", "ilcnorth": "ILC-N",
-              "haigismall": "HM", "studentunion": "SU"}
+SPOT_CODES = {
+    "general": "G",
+    "worcesternorth": "WN",
+    "worcestersouth": "WS",
+    "ilcnorth": "ILC-N",
+    "haigismall": "HM",
+    "studentunion": "SU",
+}
 
 
 def right(posted: str, code: str) -> str:
     """The footer's right-hand end: the posted date when there is one, then the spot code."""
-    bits = ([f"Posted {html.escape(posted)}"] if posted else []) + ([f'<span class="code">{html.escape(code)}</span>'] if code else [])
+    bits = ([f"Posted {html.escape(posted)}"] if posted else []) + (
+        [f'<span class="code">{html.escape(code)}</span>'] if code else []
+    )
     return f'<span class="date">{" &middot; ".join(bits)}</span>' if bits else ""
 
 
@@ -189,8 +212,10 @@ def back(f: dict, qr: str, posted: str, code: str = "") -> str:
 
 
 def document(body: str) -> str:
-    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>InternScout flyer</title>'
-            f'{FONTS}<style>{CSS}</style></head><body>{body}</body></html>')
+    return (
+        f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>InternScout flyer</title>'
+        f'{FONTS}<style>{CSS}</style></head><body>{body}</body></html>'
+    )
 
 
 def chrome() -> str:
@@ -205,22 +230,47 @@ def render(html_text: str, pdf: Path | None = None, png: Path | None = None) -> 
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "flyer.html"
         src.write_text(html_text, encoding="utf-8")
-        common = [exe, "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
-                  "--virtual-time-budget=15000", "--run-all-compositor-stages-before-draw"]
+        common = [
+            exe,
+            "--headless=new",
+            "--disable-gpu",
+            "--no-first-run",
+            "--hide-scrollbars",
+            "--virtual-time-budget=15000",
+            "--run-all-compositor-stages-before-draw",
+        ]
         if pdf:
-            subprocess.run(common + ["--no-pdf-header-footer", f"--print-to-pdf={pdf}", src.as_uri()],
-                           check=True, capture_output=True)
+            subprocess.run(
+                common + ["--no-pdf-header-footer", f"--print-to-pdf={pdf}", src.as_uri()],
+                check=True,
+                capture_output=True,
+            )
         if png:
             # 96 px per inch: one Letter page is 816 x 1056.
-            subprocess.run(common + ["--window-size=816,1056", "--force-device-scale-factor=1.25",
-                                     f"--screenshot={png}", src.as_uri()], check=True, capture_output=True)
+            subprocess.run(
+                common
+                + [
+                    "--window-size=816,1056",
+                    "--force-device-scale-factor=1.25",
+                    f"--screenshot={png}",
+                    src.as_uri(),
+                ],
+                check=True,
+                capture_output=True,
+            )
 
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--spots", default="campus", help="comma-separated posting spots, e.g. lib,isb,su")
+    ap.add_argument(
+        "--spots", default="campus", help="comma-separated posting spots, e.g. lib,isb,su"
+    )
     # was: default=today's date, then (2026-10-06) a blank "Posted ____" line. No date unless asked for.
-    ap.add_argument("--posted", default="", help='print "Posted <date>" in the footer, e.g. "Oct 7, 2026"; none by default')
+    ap.add_argument(
+        "--posted",
+        default="",
+        help='print "Posted <date>" in the footer, e.g. "Oct 7, 2026"; none by default',
+    )
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args(argv)
     spots = [s.strip().lower() for s in args.spots.split(",") if s.strip()]

@@ -1,4 +1,5 @@
 """Prefer existing indexed destinations in generated related-page recommendations."""
+
 from collections import Counter, defaultdict
 from html import escape, unescape
 import re
@@ -16,8 +17,11 @@ CATALOGUES = frozenset({"/internships/at/", "/internships/for/", "/internships/n
 def row(page, all_places=False):
     label = page["h1"] + (" (all places)" if all_places else "")
     count = len(page.get("items") or [])
-    return (f'<li><a href="{escape(page["path"], quote=True)}">{escape(label)}</a>'
-            + (f' <span class="n">{count:,}</span>' if count else '') + '</li>')
+    return (
+        f'<li><a href="{escape(page["path"], quote=True)}">{escape(label)}</a>'
+        + (f' <span class="n">{count:,}</span>' if count else '')
+        + '</li>'
+    )
 
 
 def prefer_indexed(pages):
@@ -66,18 +70,34 @@ def prefer_indexed(pages):
                 seen.add(target)
                 kept.append(replacement)
             recommended = match[1] + match[2] + match[3] + "".join(kept) + match[5] if kept else ""
-            more = ('<details class="browse-more"><summary>More ways to browse</summary><ul>'
-                    + ''.join(browse) + '</ul></details>') if browse else ''
+            more = (
+                (
+                    '<details class="browse-more"><summary>More ways to browse</summary><ul>'
+                    + ''.join(browse)
+                    + '</ul></details>'
+                )
+                if browse
+                else ''
+            )
             return recommended + more
 
         page["html"] = SECTIONS.sub(section, page["html"])
         if page.get("items") and not SECTIONS.search(page["html"]):
             # Use actual shared role IDs for the fallback, never an invented employer specialty.
-            shared = Counter(path for item in page["items"] for path in role_fields[str(item["id"])])
-            choices = [by_path[path] for path in sorted(shared, key=lambda p: (-shared[p], p))
-                       if path != page["path"]][:3]
+            shared = Counter(
+                path for item in page["items"] for path in role_fields[str(item["id"])]
+            )
+            choices = [
+                by_path[path]
+                for path in sorted(shared, key=lambda p: (-shared[p], p))
+                if path != page["path"]
+            ][:3]
             if choices:
-                extra = '<section class="rel"><h2>Related fields</h2><ul>' + ''.join(row(p) for p in choices) + '</ul></section>'
+                extra = (
+                    '<section class="rel"><h2>Related fields</h2><ul>'
+                    + ''.join(row(p) for p in choices)
+                    + '</ul></section>'
+                )
             elif "/internships/" in indexed:
                 extra = '<section class="rel"><h2>More internships</h2><ul><li><a href="/internships/">Browse internships by field and place</a></li></ul></section>'
             else:
