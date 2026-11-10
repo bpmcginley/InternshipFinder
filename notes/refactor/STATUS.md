@@ -5,7 +5,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 ## Current position
 
 - Hand-offs found on `origin/refactor/handoff-docs` and read in full before the audit. [PR #167](https://github.com/bpmcginley/InternshipFinder/pull/167) merged as `00cf10e0` after independent review and all checks passed. Its only changes were these two internal documents.
-- Wave 1: WP-0.1 merged with green Pages; shared CI merged and awaits Pages. Golden, type, and coverage packages are in progress. All six baseline suites passed; full Linux CI also passed all 1,480 backend tests.
+- Wave 1: internal notes, shared CI and type reports have merged. Golden and coverage packages are in progress; golden passed local tests and awaits Linux CI and final review. Publication verification remains lead-owned. All six baseline suites passed.
 - Baseline is clean main `57202cae`, before refactor changes. The original checkout contains unrelated uncommitted work and is untouched. Implementation uses separate, explicitly owned worktrees and branches.
 - External [PR #165](https://github.com/bpmcginley/InternshipFinder/pull/165) touches directory monitoring, growth documentation, and `growth/every_major_list.py`. Avoid those paths while it remains open. Recheck open PRs before every wave. Mechanical formatting waits until no other PR is open; this does not authorize closing or merging someone else's PR.
 - Product-session coordination: read `notes/product/HANDOFF.md` section 3 from [PR #170](https://github.com/bpmcginley/InternshipFinder/pull/170). Refactor has structural right of way; avoid hot files claimed by open `product: ...` draft PRs. Before WP-0.3 formatting, put “Formatting PRs next” at the top of this tracker and give the product session a few hours to clear its PRs; no announcement or formatting window has started yet.
@@ -42,8 +42,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 |---|---|---|---|---|---|---|
 | 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | Merged | Independent review, green CI and green Pages. |
 | 0 | WP-0.1 Internal notes | read_backend | `refactor/wp-0.1-internal-notes` | [#169](https://github.com/bpmcginley/InternshipFinder/pull/169) | Merged | Independent review, green CI, and green Pages run 42863632275. |
-| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | Pending | In progress | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
-| 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | In review | Local and Linux CI sanitized baselines recorded; final review and CI before merge. |
+| 1 | WP-0.2 Golden build | read_backend | `refactor/wp-0.2-golden-build` | [#179](https://github.com/bpmcginley/InternshipFinder/pull/179) | In review | Two repeated golden passes and full local backend passed; independent exact-head review and Linux CI before merge. |
+| 1 | WP-0.4 Type checks | read_worker | `refactor/wp-0.4-type-reports` | [#172](https://github.com/bpmcginley/InternshipFinder/pull/172) | Merged | Independent review and green CI; Pages confirmation pending. |
 | 1 | WP-0.5 Coverage | read_site_extension | `refactor/wp-0.5-coverage-reports` | Pending | In progress | Report-only Python and Node artifacts; no thresholds. |
 | 1 | WP-0.6 Shared CI setup | Lead | `refactor/wp-0.6-shared-ci` | [#171](https://github.com/bpmcginley/InternshipFinder/pull/171) | Merged | Independent review and green CI; Pages confirmation pending. |
 | 2 | WP-0.3 Lint configuration | Unassigned | - | - | Queued | Minimal passing rules and CI; avoid type/coverage config conflicts. |
@@ -191,6 +191,14 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 - Diagnostic stdout/stderr is captured without being printed. Reports contain only counts plus constrained repository-relative paths, line/column, severity, and rule identifiers. Messages, source snippets, exception stacks, and unknown diagnostic fields are discarded to prevent existing private literals from appearing in logs or artifacts. The new CI workflow uploads only these sanitized reports.
 - Validation: all three sanitizer tests pass locally and in Linux CI, covering message/continuation removal, path restrictions, and configuration failures. Both real checkers complete and produce the counts above; the site suite passes all 244 tests. Golden output is not yet available; no production build inputs or runtime code changed.
 
+### WP-0.2 Golden build
+
+- Added a test-only harness that stages production code and public static assets in an isolated temporary directory, omits real `docs/data`, seeds SQLite with 300 fixed synthetic listings, and runs the actual `export_static`, `seo_pages`, and `site_links` module entry points in separate subprocesses. No production clock hook or workflow edit is needed. Near-page generation retains its production setting, outside pytest's autouse override.
+- Fixed the UTC clock before imports, locale, hash seed, previous sitemap/noindex set, Search Console evidence, placements, prior page-content dates, empty previous export, and absent geocode cache. The subprocess environment excludes user config and credentials. Geocoding is disabled and socket/DNS attempts fail even if a production helper tries to swallow the error.
+- The initial artifact has 687 hashed files, including 501 near HTML pages, 73 feeds, eight employer pages and their hub, 147 cohort-detail records, active placement content, and all required page families. Fixed inputs also exercise a rejected expired placement and both retained and advanced content dates. The compressed review archive contains only the public fixture build's output bytes.
+- Windows text inputs are normalized to Linux checkout LF before building; generated output bytes are never normalized before SHA-256 comparison. Binary assets remain exact. The explicit refresh command and product-session baseline-update rule are documented in `backend/tests/fixtures/golden/README.md`.
+- Validation: the golden tests passed twice consecutively (two tests in 20.94s and 27.92s), including a one-character footer-template mutation rejected with changed-file diagnostics and a short diff. Full local backend: 1,480 passed and the same two environment skips in 97.15s. Independent preliminary review verified all 687 archive members exactly match manifest hashes and all fixture URLs use the reserved example domain. Linux CI must confirm the committed manifest before merge.
+
 ## Questions and external gates
 
 | ID | Affected scope | Question / gate | Current handling |
@@ -215,7 +223,7 @@ None. No worker/database deployment or extension release was performed.
 | [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | `64fd6400` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42861453089) | Merged; documentation only. |
 | [#169 Internal notes](https://github.com/bpmcginley/InternshipFinder/pull/169) | `9f739770` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) | Merged; approved internal-note URL removal. |
 | [#171 Shared CI](https://github.com/bpmcginley/InternshipFinder/pull/171) | `fc9f1fca` | Independent agent review; all checks green | Pending lead confirmation | Merged; existing workflow setup consolidated. |
-| [#172 Type reports](https://github.com/bpmcginley/InternshipFinder/pull/172) | Pending merge | Type-report CI passed; final-head CI/review pending | After merge | Open; report-only developer tooling. |
+| [#172 Type reports](https://github.com/bpmcginley/InternshipFinder/pull/172) | `c6ef372f` | Independent review and all checks green | Pending lead confirmation | Merged; report-only developer tooling. |
 
 ## Next update
 
