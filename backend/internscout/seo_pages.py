@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import logging
 import os
 import re
 import sys
@@ -32,6 +33,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
 from . import near_metros
+from .console_log import console
 
 SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
@@ -652,9 +654,10 @@ def load(site_dir: str) -> dict:
                 g["metro"] = m
                 x["keys"].add(m)
     if bad:
-        print(
+        console(
             f"[seo] warning: skipped {bad} malformed listing rows (see well_formed)",
             file=sys.stderr,
+            level=logging.WARNING,
         )
     listings = list(by_id.values())
     return {
@@ -6245,6 +6248,7 @@ def main(argv: list[str]) -> None:
         kept, dropped = placements.resolve(
             placements.read(placements_path), {str(x["id"]): x for x in LISTINGS}, today
         )
+        # GitHub Actions annotations must remain raw even in JSON log mode.
         for line in placements.warnings(kept, dropped):
             print(line)
         write_placements(site_dir, kept, today)
@@ -6257,14 +6261,14 @@ def main(argv: list[str]) -> None:
             except OSError:
                 print("::warning::placements report not written")
         pages = add_paid_boxes(pages, kept, today)
-        print(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
+        console(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
     write(site_dir, pages)
     # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
     # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.
     from . import role_index  # role_index imports this module, so not at the top
 
     shards = role_index.write(site_dir, LISTINGS, GENERATED or datetime.now(timezone.utc), today)
-    print(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
+    console(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
     from . import feeds  # feeds imports this module, so not at the top
 
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
@@ -6275,7 +6279,10 @@ def main(argv: list[str]) -> None:
     from . import widget_data
 
     widget_data.write(site_dir, LISTINGS, GENERATED, today_utc())
-    print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
+    message = f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+        message += f" into {site_dir}"
+    console(message)
 
 
 if __name__ == "__main__":

@@ -66,7 +66,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review, green CI, Pages 42903653178 and backend verified. |
 | 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary in review | Default text and streams preserved. Remaining sources follow the canary review. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
-| 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
+| 4 | WP-1.4 Page-build logging | wp14_pages_logging | `refactor/wp-1.4-logging-page-build` | - | Prepared | Plain console output and GitHub annotations preserved. JSON omits the output path. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | In review | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config | Unassigned | - | - | Queued | Inventory worker URL consumers before generating area modules. |
@@ -399,6 +399,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Existing tests patch legacy settings and entry functions; they also derive paths from physical `seo_pages.__file__`, mutate its exact SLOGAN assignment, and extract its literal CSS block. Keep these contracts meaningful and unchanged until deliberately redirected to actual new source locations. Preserve actual module CLI execution and its documented `__main__` versus canonical-module behavior.
 - Deferred-import count is not a cycle count: the measured direct back-edge pairs are seo_pages/feeds and seo_pages/role_index. External static importers measured four backend and eight growth modules; additional mentions include comments. Verify each actual caller rather than relying on the hand-off's broader counts.
 - When introducing site/render subpackages, update PR #199's explicit setuptools declarations and inspect built wheel members; editable imports alone can hide omitted packages. Golden fixtures must remain unchanged for these refactor extractions.
+
+## WP-1.4 page-build logging
+
+- On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
+- An offline comparison against the original generator matched complete default stdout and stderr after normalizing only the fixture directory. The JSON regression exercises both annotation paths, stderr and path redaction.
+- Focused SEO, placements, distribution, employer entry and golden tests passed (245 total). All 695 golden files matched, including the existing date assertions, and the golden mutation check passed. Ruff passed. Targeted Pyright matched all 12 existing SEO diagnostics by severity, rule and message.
 
 ## Orders extraction readiness (read-only)
 
