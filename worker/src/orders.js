@@ -25,9 +25,11 @@ import { CHECKS, addDays, checkPlacement, createPlacement, dayOf, daysBetween, e
 import { hex, hmacHex, sameHex, siteUrl, stripe } from "./billing.js";
 import { trySend, sendMail } from "./mail.js";
 import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
-import { CONTROL, LISTING_ID, bad } from "./orders/shared.js";
+import { LIMITS, LISTING_ID, bad, conflict, text } from "./orders/shared.js";
 import { readShard, shardOf } from "./orders/roles.js";
 
+export { listOrders } from "./orders/admin.js";
+export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
 export { readShard, shardOf } from "./orders/roles.js";
 
 // Prices in cents (Bruce, 2026-10-19: final). public_body is the price for a nonprofit or public body.
@@ -38,7 +40,6 @@ export const PRICES = {
 export const DAYS = 30;              // days each role runs
 export const FIELD_CAP = 5;          // paid roles running at once that share a field tag
 export const MAX_START_DAYS = 90;    // the start day is today up to this many days ahead
-export const PILOT_MAX = 5;          // pilot codes, ever
 export const TOKEN_HOURS = 48;       // the email link works this long
 export const UNVERIFIED_DAYS = 7;    // an order never confirmed is deleted after this
 export const CREDIT_DEFAULT_DAYS = 30;   // an unanswered unused-days offer becomes a refund after this
@@ -63,7 +64,6 @@ const REMIND_AFTER_MS = 24 * 3600e3;
 export const PER_ADDRESS_PER_DAY = 5;
 export const ALL_PER_DAY = 100;
 const ALL = "order:*";
-const ORDERS_SHOWN = 100;
 // Where Bruce's review links point. The Worker's own address; API_URL overrides it (wrangler dev).
 const DEFAULT_API = "https://internscout-api.bpmcginley.workers.dev";
 
@@ -88,9 +88,7 @@ const ORDER_ID = /^o-[0-9a-f]{16}$/;
 const CREDIT_ID = /^c-[0-9a-f]{16}$/;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const PILOT = /^[A-Z0-9-]{4,32}$/;
-const LIMITS = { name: 100, email: 254, company: 120, pilot_code: 32, reason: 200, note: 200 };
 
-const conflict = (code, message, extra) => new HttpError(409, code, message, extra);
 const notFound = () => new HttpError(404, "not_found", "No such endpoint");
 
 // ---------------------------------------------------------------- on or off
@@ -130,15 +128,6 @@ const longDay = (day) => new Date(day + "T00:00:00Z").toLocaleDateString("en-US"
 const rolesWord = (n) => (n === 1 ? "1 role" : `${n} roles`);
 const randomHex = (bytes) => hex(crypto.getRandomValues(new Uint8Array(bytes)));
 const fieldsOf = (list) => (list.length ? list : ["other"]);
-
-function text(body, field, { required = false } = {}) {
-  const v = body[field];
-  if (v != null && typeof v !== "string") throw bad(field, `${field} must be text`);
-  const s = (v || "").replace(CONTROL, " ").replace(/\s+/g, " ").trim();
-  if (required && !s) throw bad(field, `${field} is required`);
-  if (s.length > LIMITS[field]) throw bad(field, `${field} is too long (at most ${LIMITS[field]} characters)`);
-  return s;
-}
 
 // The email link: 32 random bytes, base64url. Only its SHA-256 (hex) is stored.
 export function newToken() {
@@ -1184,34 +1173,6 @@ async function defaultCredits(db, env, now, fetchImpl) {
       console.error("credit default failed:", e && e.name);
     }
   }
-}
-
-// ---------------------------------------------------------------- admin (Bruce's terminal)
-
-// GET /admin/orders: the recent orders, without the employer's name or email.
-export async function listOrders(db) {
-  const { results } = await db.prepare(
-    "SELECT o.id, o.created, o.status, o.package, o.start_day AS start, COALESCE(o.paid_amount, o.price) AS amount, " +
-    "o.company, (SELECT COUNT(*) FROM employer_order_roles r WHERE r.order_id = o.id) AS roles " +
-    "FROM employer_orders o ORDER BY o.created DESC, o.id LIMIT ?",
-  ).bind(ORDERS_SHOWN).all();
-  return { orders: results };
-}
-
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-// POST /admin/pilot-codes { note? }: a new pilot code, while fewer than PILOT_MAX have ever been made.
-// The count and the insert are one statement, so two at once can't make a sixth.
-export async function createPilotCode(db, body, now) {
-  const note = text(body, "note");
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  const code = "PILOT-" + [...bytes].map((b) => CODE_CHARS[b % CODE_CHARS.length]).join("");
-  const r = await db.prepare(
-    "INSERT INTO pilot_codes (code, created, note) SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM pilot_codes) < ?",
-  ).bind(code, now.toISOString(), note, PILOT_MAX).run();
-  if (!r.meta.changes) throw conflict("conflict", `All ${PILOT_MAX} pilot codes have been made`);
-  const made = await db.prepare("SELECT COUNT(*) AS n FROM pilot_codes").first("n");
-  return { code, note, created: now.toISOString(), made: Number(made), max: PILOT_MAX };
 }
 
 // ---------------------------------------------------------------- the emails (plain text)
