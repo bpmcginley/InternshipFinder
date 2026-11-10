@@ -1,11 +1,18 @@
 """Asset fingerprints must change only real local resource URLs."""
 
 import hashlib
+from datetime import datetime
+import json
 import os
+from pathlib import Path
+import tarfile
 
 import pytest
 
 from internscout.asset_versions import AssetVersionError, main, version_assets
+from internscout.page_dates import fingerprint
+
+from golden_build import STAMP
 
 
 def _put(root, name, content):
@@ -247,3 +254,61 @@ def test_cli_prints_counts_and_suppresses_source_values(tmp_path, capsys):
     assert "failed" in output.err
     assert "missing.js" not in output.err and "do-not-log" not in output.err
     assert str(tmp_path) not in output.err
+
+
+def test_actual_golden_asset_changes_preserve_semantic_fingerprints_and_dates(tmp_path):
+    archive_path = Path(__file__).parent / "fixtures/golden/expected.tar.gz"
+    with tarfile.open(archive_path, "r:gz") as archive:
+        for member in archive.getmembers():
+            assert member.isfile() and not Path(member.name).is_absolute()
+            assert ".." not in Path(member.name).parts
+        archive.extractall(tmp_path, filter="data")
+    # Force actual URL changes even after the committed archive already contains current hashes.
+    assets = ("js/count.js", "widget/share.css")
+    for name in assets:
+        path = tmp_path / name
+        path.write_bytes(path.read_bytes() + b"\n/* asset cache regression */\n")
+    before = {
+        path.relative_to(tmp_path).as_posix(): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    stamp = datetime.fromisoformat(STAMP)
+
+    def route(name):
+        if name == "index.html":
+            return "/"
+        return "/" + name[:-10] if name.endswith("/index.html") else "/" + name
+
+    fingerprints = {
+        name: fingerprint(route(name), content.decode("utf-8"), stamp, None)
+        for name, content in before.items()
+        if name.endswith(".html")
+    }
+    report = version_assets(tmp_path)
+    assert report.changed_files > 1
+    assert version_assets(tmp_path).changed_files == 0
+    for name, content in before.items():
+        after = (tmp_path / name).read_bytes()
+        if name in fingerprints:
+            assert (
+                fingerprint(route(name), after.decode("utf-8"), stamp, None) == fingerprints[name]
+            )
+        else:
+            assert after == content
+    for name in assets:
+        digest = _hash(before[name])
+        references = [
+            (tmp_path / path).read_text(encoding="utf-8")
+            for path in fingerprints
+            if name in before[path].decode("utf-8")
+        ]
+        assert references and all("v=" + digest in text for text in references)
+    dates = json.loads((tmp_path / "data/page-content-dates.json").read_bytes())["pages"]
+    assert dates["/pricing/"]["lastmod"] == "2026-11-01"
+    assert dates["/about/"]["lastmod"] == "2026-11-10"
+    # The date fingerprint still detects real visible link changes; it has not been weakened.
+    pricing = before["pricing/index.html"].decode("utf-8")
+    changed = pricing.replace('href="/"', 'href="/changed-visible-link/"', 1)
+    assert changed != pricing
+    assert fingerprint("/pricing/", changed, stamp, None) != fingerprints["pricing/index.html"]
