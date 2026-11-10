@@ -613,6 +613,12 @@
    "fails": 0,
    "added": "2026-09-17"
   },
+  "decodahealth": {
+   "name": "Decoda Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "dedalus-labs": {
    "name": "Dedalus Labs",
    "quant": false,
@@ -1435,6 +1441,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-07"
+  },
+  "maincode": {
+   "name": "Maincode",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "Marathon%20Fusion": {
    "name": "Marathon Fusion",
@@ -2361,6 +2373,12 @@
    "fails": 0,
    "added": "2026-10-08"
   },
+  "substrate": {
+   "name": "Substrate",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "subtotal": {
    "name": "Subtotal",
    "quant": false,
@@ -2648,6 +2666,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "vooma": {
+   "name": "Vooma",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "walrusfi": {
    "name": "Walrus",
