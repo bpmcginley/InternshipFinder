@@ -1,4 +1,4 @@
-Formatting complete; wave 3 in progress
+Wave 4 in progress
 
 **Authorization update, 2026-11-10:** Bruce explicitly authorized processing now, finishing and merging retained PRs #165, #175, #177 and #178, and notifying the Product/Growth Refactor session to continue. This supersedes the 16:00 earliest-start and empty-queue holds below. Reviews, green CI, Pages verification, protected guard code/tests, and production deployment restrictions remain in force. Product has been notified; formatting is merged and published, and coordinated product work has resumed. Design-note merges do not resolve unspecified pricing, privacy, retention or operator choices, nor enable payment/email implementation. Historical notice and inventories below record the earlier gate.
 
@@ -15,7 +15,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - Both hand-offs were read in full before the initial audit; original clean-main baseline is `57202cae` and all six suites passed. The original dirty checkout and MuseWork.md remain untouched.
 - Waves 0-2 are complete. JavaScript #189 and Python retry #192 have green Pages/backend verification. Python #190 was ordinarily reverted by #191 after a deployment timeout, then retried without source changes.
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
-- Wave 3 cleanup #196, migration preparation #198, packaging #199 and runner documentation #203 are merged. The first three have green publication/backend checks; #203 is the current publication verification. Docs index #195 and API contract #207 are in review; isolated cache helper #205 remains draft pending coordinated integration.
+- All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. The four manual source tag removals remain deferred under product ownership. Wave 4 work has started.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Counter #175 still awaits approved/published disclosure and operator deployment. Migration adoption and unspecified email/payment design choices remain operator decisions. Product claims #187/#193 app/index and #194/generated follow-ups; no refactor writes overlap those claims.
 
@@ -59,16 +59,16 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Merged | Independent review, green CI and green Pages run 42891570445. Safe subset formatted; protected/public/financial exclusions documented. |
 | 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | [#196](https://github.com/bpmcginley/InternshipFinder/pull/196) | Merged | Independent review, green CI, Pages 42897982856 and backend verified. |
 | 3 | WP-1.2 Python packaging | read_site_extension | `refactor/wp-1.2-packaging` | [#199](https://github.com/bpmcginley/InternshipFinder/pull/199) | Merged | Independent review, green CI, Pages 42902346112 and backend verified; 19 test moves and external import proof. |
-| 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | [#195](https://github.com/bpmcginley/InternshipFinder/pull/195) | In review | Topic index and current rules; model notes preserved pending Q1. |
-| 3 | WP-1.5 Cache versions | wp15_cache | `refactor/wp-1.5-asset-versions` | [#205](https://github.com/bpmcginley/InternshipFinder/pull/205) | Build integration in review; source cleanup deferred | Approved post-build content hashes and controlled golden-output refresh; four source tags remain product-owned. |
-| 3 | WP-2.3 Worker contract | wp23_contract | `refactor/wp-2.3-api-contract` | [#207](https://github.com/bpmcginley/InternshipFinder/pull/207) | In review | Complete route data and generated API; runtime router unchanged; Node/client completeness and generation checks pass. |
+| 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | [#195](https://github.com/bpmcginley/InternshipFinder/pull/195) | Merged | Independent review, green CI, Pages 42906475447 and backend verified. Model notes preserved pending Q1. |
+| 3 | WP-1.5 Cache versions | wp15_cache | `refactor/wp-1.5-asset-versions` | [#205](https://github.com/bpmcginley/InternshipFinder/pull/205) | Build integration merged; source cleanup deferred | Independent review, green CI, Pages 42914104660 and backend verified at merge `53008e6c`. Four manual source tags remain product-owned. |
+| 3 | WP-2.3 Worker contract | wp23_contract | `refactor/wp-2.3-api-contract` | [#207](https://github.com/bpmcginley/InternshipFinder/pull/207) | Merged | Independent review, green CI, Pages 42911710045 and backend verified. The runtime router is unchanged. |
 | 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | Independent review, green CI, Pages 42900208315 plus data-follow run 42900434412/backend verified. Operator adoption remains gated. |
-| 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review and green CI; Pages verification pending. |
+| 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review, green CI, Pages 42903653178 and backend verified. |
 | 4 | WP-1.4 Logging foundation/sources | Unassigned | - | - | Queued | Shared helper plus source adapters; preserve default output text and stream. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
 | 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
-| 4 | WP-2.1 Vocabulary inventory | Unassigned | - | - | Queued | Written inventory only; record meaningful differences as questions. |
+| 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | In review | One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
 | 4 | WP-2.4 Config: site and Worker | Unassigned | - | - | Queued | Nine production consumers were verified. This PR covers the three extension and growth files. Dashboard, counter, buy, employer page, orders, and placement CLI remain. Coordinate the site files with Product and preserve the Worker environment overrides. |
 | 4 | WP-4.2 Orders split | Unassigned | - | - | Queued | File moves only; preserve exports, cycles, transactions, and mail behavior. |
@@ -266,7 +266,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-Verify #203 Pages and backend, finish #195/#207 review and CI, then continue serialized wave-three merges. Coordinate #205 build/golden integration after product-owned changes clear; do not overwrite claimed files or weaken date assertions. Preserve separate worktrees, source-frozen review heads, all data history, and production/operator gates.
+Continue Wave 4 with the vocabulary inventory, logging, public config and orders split. Serialize merges with the product lead and verify Pages after publishing merges. Revisit the four deferred source tag removals once product ownership clears.
 
 ## WP-0.6 validation and coordination
 
