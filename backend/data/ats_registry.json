@@ -811,6 +811,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "f40d14d9-07f4-403d-802b-37453deccf0a": {
+   "name": "Klaviyo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "f7d8749a-72d6-407c-bf98-292ea630c73a": {
    "name": "Shield AI",
    "quant": false,
@@ -1562,6 +1568,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "social_research"
+  },
+  "mossrobotics": {
+   "name": "Moss",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "MUBI": {
    "name": "MUBI",
@@ -3206,9 +3218,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -5537,6 +5548,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "lgairesearch": {
+   "name": "LG AI Research",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "lgelectronics": {
    "name": "LG Electronics",
@@ -8136,6 +8153,12 @@
    "added": "2026-09-18",
    "sector": "government_policy"
   },
+  "careers.fm.com": {
+   "name": "FM Global",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "careers.foundationfinance.com": {
    "name": "Foundation Finance",
    "quant": false,
@@ -8212,6 +8235,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-25"
+  },
+  "careers.marzetticompany.com": {
+   "name": "The Marzetti Company",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "careers.mcdean.com": {
    "name": "M.C. Dean",
@@ -8386,6 +8415,13 @@
    "fails": 0,
    "added": "2026-10-12"
   },
+  "jobs.auburn.edu": {
+   "name": "Auburn University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10",
+   "sector": "education_research"
+  },
   "jobs.bjc.org": {
    "name": "BJC HealthCare",
    "quant": false,
@@ -8420,6 +8456,12 @@
    "added": "2026-09-18",
    "sector": "retail_consumer"
   },
+  "jobs.republicfinance.com": {
+   "name": "Republic Finance",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "jobs.statefarm.com": {
    "name": "State Farm",
    "quant": false,
@@ -8433,6 +8475,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "energy_environment"
+  },
+  "jobs.trilogyhs.com": {
+   "name": "Trilogy Health Services",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "jobs.uhsinc.com": {
    "name": "Universal Health Services",
@@ -11936,14 +11984,16 @@
   "textron|textron": {
    "name": "Textron",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-10"
   },
   "utsw|2": {
    "name": "UT Southwestern Medical Center",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-10"
   },
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
