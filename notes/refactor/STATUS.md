@@ -57,7 +57,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 2 | WP-0.3 Lint configuration | read_worker | `refactor/wp-0.3-lint-config` | [#183](https://github.com/bpmcginley/InternshipFinder/pull/183) | Merged | Independent review, all nine CI checks passed, and green Pages run 42871996393; no formatting. |
 | 2 | WP-0.3 Python formatting | Lead | `refactor/wp-0.3-python-format-retry` | [#192](https://github.com/bpmcginley/InternshipFinder/pull/192) | Merged; Pages pending | Merged as `182c02ce` after independent final review and green CI; no next merge until Pages passes. |
 | 2 | WP-0.3 JavaScript formatting | read_site_extension | `refactor/wp-0.3-js-format` | [#189](https://github.com/bpmcginley/InternshipFinder/pull/189) | Merged | Independent review, all nine checks green; Pages verification pending. Safe subset formatted; protected/public/financial exclusions documented. |
-| 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | Pending PR | In review | Backend 1,484 passed/two known skips; golden 695 unchanged; Ruff and move/reference/link audits passed. |
+| 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | [#196](https://github.com/bpmcginley/InternshipFinder/pull/196) | In review | Backend 1,484 passed/two known skips; golden 695 unchanged; Ruff and move/reference/link audits passed. |
 | 3 | WP-1.2 Python packaging | Unassigned | - | - | Queued | Classify growth tests before moving; preserve existing CLI invocations. |
 | 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
 | 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
