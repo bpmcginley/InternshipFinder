@@ -62,7 +62,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-1.3 Docs index | Unassigned | - | - | Queued / question | Index runbooks and refresh current rules; preserve model notes pending answer Q1. |
 | 3 | WP-1.5 Cache versions | Unassigned | - | - | Queued | Approved built-HTML changes; explain golden updates. |
 | 3 | WP-2.3 Worker contract | Unassigned | - | - | Queued | Inventory code routes and clients, not prose alone; include missing metrics route. |
-| 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | Pending | Local proof complete; review pending | One existing-schema baseline; 15 local D1 tests pass. Production adoption and recurring-backfill/deploy transition remain operator-gated. |
+| 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | In review | One existing-schema baseline; 15 local D1 tests pass. Production adoption and recurring-backfill/deploy transition remain operator-gated. |
 | 3 | WP-4.4 Runner documentation | Unassigned | - | - | Queued | Preserve intentional Node/Workers scenario overlap. |
 | 4 | WP-1.4 Logging foundation/sources | Unassigned | - | - | Queued | Shared helper plus source adapters; preserve default output text and stream. |
 | 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
@@ -350,3 +350,5 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Local Node 22.23.4 runtime result: **15 passed in six files**, including all 11 existing tests. Worker Node tests: **336 passed**. The full golden build matched **695 files**, unchanged; JavaScript lint reported **zero errors and warnings**. No provider calls, remote database commands, worker deployment or extension release were performed.
 - `worker/MIGRATIONS.md` documents operator-only adoption: verify actual production objects/backfill state and existing migration history, then mark only the verified baseline applied. Repository state and local tests cannot establish live schema history. The deploy-script transition remains a later gated change.
 - Explicit recurring-backfill gate: current deployments rerun `schema.sql`; named migrations execute once. The test demonstrates that later usage data is not backfilled by reapplying an already-recorded migration. A later deploy-script PR must preserve that recurring operation or obtain explicit approval for its behavior change. No such transition is made here.
+
+- PR #198 normally integrated product #188 main `1fde9f42`; golden 695 and lint zero/zero passed again. Product-owned publication recovery and the lead merge gate remain pending; recovered main will be integrated once before final review.
