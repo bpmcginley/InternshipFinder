@@ -1,0 +1,44 @@
+name: Type reports
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: type-reports-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  types:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install pinned type tools and Python imports
+        run: |
+          npm ci --ignore-scripts
+          python -m pip install -r backend/requirements.txt pillow cryptography
+      - name: Verify diagnostic redaction
+        run: node --test scripts/type_report.test.mjs
+      - name: Report Python type debt
+        run: npm run typecheck:python -- --output type-reports/python.json
+      - name: Report worker type debt
+        run: npm run typecheck:worker -- --output type-reports/worker.json
+      - name: Upload sanitized locations and counts
+        uses: actions/upload-artifact@v7
+        with:
+          name: type-reports
+          path: type-reports/*.json
+          if-no-files-found: error

@@ -1,0 +1,12 @@
+{
+  "name": "internscout-tooling",
+  "private": true,
+  "scripts": {
+    "typecheck:python": "node scripts/type_report.mjs python",
+    "typecheck:worker": "node scripts/type_report.mjs worker"
+  },
+  "devDependencies": {
+    "pyright": "1.1.414",
+    "typescript": "7.0.2"
+  }
+}
