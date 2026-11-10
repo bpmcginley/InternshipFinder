@@ -4313,6 +4313,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "echo": {
+   "name": "Echo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "echodynecorp": {
    "name": "Echodyne",
    "quant": false,
