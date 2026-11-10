@@ -294,3 +294,10 @@ Finish the explicitly authorized existing PR integrations, then the separate Pyt
 ## Retained PR #175 integration
 
 Bruce authorized the refactor lead to finish and merge this existing counter PR. Integration uses an isolated worktree and normal main merge, preserving upstream product work. Local Node 22.23.4 validation: worker 336 passed, Workers runtime 11 passed in five files; golden output matched 695 files without refresh. Final independent review and CI remain required. The only runtime change is the original fixed 16-name allowlist expansion; no client emitters, schema, published privacy policy, or deploy configuration changed. Proposed disclosure still requires approval and publication before an operator deploys the worker. No worker deployment or production database command was performed.
+
+
+## Publishing recovery: PR #190
+
+- Python formatting PR #190 merged as `f38bd93e` after independent exact-AST/comment/golden review and all nine CI checks passed. Pages build succeeded, but deployment was cancelled at its ten-minute timeout: run 42887701389, deployment job 130081009359. No later main push superseded it. No source/test/build failure was reported; deployment did not finish green.
+- Per HANDOFF section 3, prepared a new revert PR immediately. It reverses merge #190 with an ordinary revert commit, preserving all four retained PR merges and history. No manual publishing workflow was dispatched. The 166-file Python formatting remains available in its original branch for a later reviewed retry.
+- JavaScript formatting PR #189 is independently approved and all nine checks passed, but remains unmerged while publishing recovery is verified. Wave 3 implementation remains queued; read-only preparation is complete. Counter deployment/disclosure and design-note implementation gates remain unchanged.
