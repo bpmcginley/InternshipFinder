@@ -19131,8 +19131,9 @@
   "starrcompanies|wd1|careers": {
    "name": "Starr Insurance",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-10"
   },
   "starz|wd5|Starz": {
    "name": "Starz",

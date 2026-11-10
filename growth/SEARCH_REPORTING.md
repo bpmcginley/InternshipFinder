@@ -38,7 +38,7 @@ The October 28 content cohort uses comparators with returned October 12-18 impre
 Sun Life 54, UL Solutions 52 and Capital One 46. These replace the initially proposed low-traffic
 Sonos/Stryker/Pinterest/URBN set. They are observational comparisons across different employers,
 not randomized controls. The exposure rules, initial factual coverage and revert are documented
-in `reviews/2026-10-28-search-content-cohort/README.md`.
+in `notes/reviews/2026-10-28-search-content-cohort/README.md`.
 
 If Google supplies `metadata.first_incomplete_date`, every headline date ends before that boundary. The collector still requests `dataState: final` explicitly. When metadata is absent, it reports the three-day fallback instead of assuming the last nonzero row marks finalization. A zero-impression final day never slides the reporting window backward.
 
