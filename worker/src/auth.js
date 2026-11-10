@@ -5,9 +5,9 @@ import { isSessionToken, sessionUser } from "./session.js";
 
 const LEEWAY_S = 60;
 const JWKS_TTL_MS = 3600_000;
-const JWKS_RETRY_MS = 300_000;   // refetch early for an unknown kid, at most this often
-const jwksCache = new Map();     // url -> { keys, at }
-const MS_CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";   // personal Outlook/Hotmail accounts
+const JWKS_RETRY_MS = 300_000; // refetch early for an unknown kid, at most this often
+const jwksCache = new Map(); // url -> { keys, at }
+const MS_CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"; // personal Outlook/Hotmail accounts
 
 export function clearJwksCache() {
   jwksCache.clear();
@@ -26,7 +26,9 @@ const PROVIDERS = {
     authorize: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     jwks: "https://login.microsoftonline.com/common/discovery/v2.0/keys",
     // multi-tenant: the issuer must name the token's own tenant
-    issuerOk: (iss, claims) => typeof claims.tid === "string" && iss === `https://login.microsoftonline.com/${claims.tid}/v2.0`,
+    issuerOk: (iss, claims) =>
+      typeof claims.tid === "string" &&
+      iss === `https://login.microsoftonline.com/${claims.tid}/v2.0`,
   },
 };
 
@@ -45,8 +47,12 @@ export function tierOf(provider, claims, env) {
   const at = email.lastIndexOf("@");
   if (at < 0) return "general";
   const domain = email.slice(at + 1);
-  const extra = String(env.EDU_EXTRA_DOMAINS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (!(domain.endsWith(".edu") || extra.some((d) => domain === d || domain.endsWith("." + d)))) return "general";
+  const extra = String(env.EDU_EXTRA_DOMAINS || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (!(domain.endsWith(".edu") || extra.some((d) => domain === d || domain.endsWith("." + d))))
+    return "general";
   const yes = (v) => v === true || v === "true" || v === 1;
   if (provider === "google") return yes(claims.email_verified) ? "edu" : "general";
   // Microsoft's email claim is only trustworthy when the tenant owns the domain (optional claim xms_edov)
@@ -72,7 +78,8 @@ async function signingKey(url, kid, fetcher, now) {
     } catch {
       res = null;
     }
-    if (!res || !res.ok) throw new HttpError(502, "upstream", "Sign-in keys are unavailable; try again soon");
+    if (!res || !res.ok)
+      throw new HttpError(502, "upstream", "Sign-in keys are unavailable; try again soon");
     hit = { keys: (await res.json()).keys || [], at: now };
     jwksCache.set(url, hit);
   }
@@ -88,7 +95,11 @@ async function signingKey(url, kid, fetcher, now) {
 }
 
 // Checks signature, then iss/aud/exp. Returns { provider, claims, tier }.
-export async function verifyIdToken(token, env, { fetch: fetcher = globalThis.fetch, now = Date.now() } = {}) {
+export async function verifyIdToken(
+  token,
+  env,
+  { fetch: fetcher = globalThis.fetch, now = Date.now() } = {},
+) {
   const parts = String(token || "").split(".");
   if (parts.length !== 3) throw authError("Sign in first");
   let header, claims;
@@ -108,8 +119,12 @@ export async function verifyIdToken(token, env, { fetch: fetcher = globalThis.fe
   const key = await signingKey(p.jwks, header.kid, fetcher, now);
   let ok = false;
   try {
-    ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlBytes(parts[2]),
-      new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    ok = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      b64urlBytes(parts[2]),
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
+    );
   } catch {
     ok = false;
   }
@@ -119,8 +134,10 @@ export async function verifyIdToken(token, env, { fetch: fetcher = globalThis.fe
   if (!p.issuerOk(claims.iss, claims)) throw authError("Wrong token issuer");
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.includes(clientId)) throw authError("Wrong token audience");
-  if (typeof claims.exp !== "number" || claims.exp + LEEWAY_S < t) throw authError("Sign-in expired; sign in again");
-  if (typeof claims.nbf === "number" && claims.nbf - LEEWAY_S > t) throw authError("Token not valid yet");
+  if (typeof claims.exp !== "number" || claims.exp + LEEWAY_S < t)
+    throw authError("Sign-in expired; sign in again");
+  if (typeof claims.nbf === "number" && claims.nbf - LEEWAY_S > t)
+    throw authError("Token not valid yet");
   if (!claims.sub) throw authError("Token has no subject");
   return { provider, claims, tier: tierOf(provider, claims, env) };
 }
@@ -128,7 +145,10 @@ export async function verifyIdToken(token, env, { fetch: fetcher = globalThis.fe
 // user_hash = hex(sha256(provider | sub | HASH_SALT)). One hash per person per provider, across Microsoft tenants.
 export async function userHash(provider, claims, env) {
   if (!env.HASH_SALT) throw new HttpError(500, "server", "Server is missing HASH_SALT");
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${provider}|${claims.sub}|${env.HASH_SALT}`));
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${provider}|${claims.sub}|${env.HASH_SALT}`),
+  );
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 

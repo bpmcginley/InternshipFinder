@@ -6,7 +6,8 @@ import { abortableSleep as sleep, throwIfAborted } from "./abort.js";
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
 const THINKING_RESERVE = 8192; // Gemini counts thinking tokens against maxOutputTokens
 
-const textOfSystem = (system) => (Array.isArray(system) ? system.map((b) => b.text).join("\n\n") : String(system || ""));
+const textOfSystem = (system) =>
+  Array.isArray(system) ? system.map((b) => b.text).join("\n\n") : String(system || "");
 
 function partsOf(content, idToName) {
   if (typeof content === "string") return content ? [{ text: content }] : [];
@@ -23,10 +24,19 @@ function partsOf(content, idToName) {
         parts.push({ text: `${b.title ? `[${b.title}]\n` : ""}${src.data}` });
       }
     } else if (b.type === "tool_use") {
-      parts.push({ functionCall: { name: b.name, id: b.id, args: b.input || {} }, ...(b._sig ? { thoughtSignature: b._sig } : {}) });
+      parts.push({
+        functionCall: { name: b.name, id: b.id, args: b.input || {} },
+        ...(b._sig ? { thoughtSignature: b._sig } : {}),
+      });
     } else if (b.type === "tool_result") {
       const out = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
-      parts.push({ functionResponse: { name: idToName[b.tool_use_id] || "tool", id: b.tool_use_id, response: b.is_error ? { error: out } : { result: out } } });
+      parts.push({
+        functionResponse: {
+          name: idToName[b.tool_use_id] || "tool",
+          id: b.tool_use_id,
+          response: b.is_error ? { error: out } : { result: out },
+        },
+      });
     }
   }
   return parts;
@@ -34,7 +44,9 @@ function partsOf(content, idToName) {
 
 function toContents(messages) {
   const idToName = {};
-  for (const m of messages) for (const b of Array.isArray(m.content) ? m.content : []) if (b.type === "tool_use") idToName[b.id] = b.name;
+  for (const m of messages)
+    for (const b of Array.isArray(m.content) ? m.content : [])
+      if (b.type === "tool_use") idToName[b.id] = b.name;
   const contents = [];
   for (const m of messages) {
     const role = m.role === "assistant" ? "model" : "user";
@@ -60,13 +72,28 @@ function fromResponse(data) {
   for (const p of (cand.content && cand.content.parts) || []) {
     if (p.thought) continue;
     if (p.functionCall) {
-      content.push({ type: "tool_use", id: p.functionCall.id || `g${Date.now().toString(36)}_${n++}`, name: p.functionCall.name, input: p.functionCall.args || {}, ...(p.thoughtSignature ? { _sig: p.thoughtSignature } : {}) });
+      content.push({
+        type: "tool_use",
+        id: p.functionCall.id || `g${Date.now().toString(36)}_${n++}`,
+        name: p.functionCall.name,
+        input: p.functionCall.args || {},
+        ...(p.thoughtSignature ? { _sig: p.thoughtSignature } : {}),
+      });
     } else if (p.text != null || p.thoughtSignature) {
-      content.push({ type: "text", text: p.text || "", ...(p.thoughtSignature ? { _sig: p.thoughtSignature } : {}) });
+      content.push({
+        type: "text",
+        text: p.text || "",
+        ...(p.thoughtSignature ? { _sig: p.thoughtSignature } : {}),
+      });
     }
   }
   const fr = cand.finishReason;
-  const stop_reason = fr === "MAX_TOKENS" ? "max_tokens" : content.some((b) => b.type === "tool_use") ? "tool_use" : "end_turn";
+  const stop_reason =
+    fr === "MAX_TOKENS"
+      ? "max_tokens"
+      : content.some((b) => b.type === "tool_use")
+        ? "tool_use"
+        : "end_turn";
   return { content, stop_reason, usage: data.usageMetadata };
 }
 
@@ -82,12 +109,29 @@ export function buildGeminiBody({ system, messages, tools, max_tokens = 4096, th
   const sys = textOfSystem(system);
   if (sys) body.systemInstruction = { parts: [{ text: sys }] };
   if (tools && tools.length) {
-    body.tools = [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: t.input_schema })) }];
+    body.tools = [
+      {
+        functionDeclarations: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.input_schema,
+        })),
+      },
+    ];
   }
   return body;
 }
 
-export async function callGemini({ apiKey, model, system, messages, tools, max_tokens = 4096, thinking, signal }) {
+export async function callGemini({
+  apiKey,
+  model,
+  system,
+  messages,
+  tools,
+  max_tokens = 4096,
+  thinking,
+  signal,
+}) {
   if (!apiKey) throw new Error("No Gemini API key. Open Auto-Apply setup → Setup.");
   const body = buildGeminiBody({ system, messages, tools, max_tokens, thinking });
   let lastErr = "";
@@ -118,17 +162,33 @@ export async function callGemini({ apiKey, model, system, messages, tools, max_t
       return {};
     });
     throwIfAborted(signal);
-    if (!res.ok) throw new Error(`Gemini API ${res.status}: ${(data.error && data.error.message) || "request failed"}`);
+    if (!res.ok)
+      throw new Error(
+        `Gemini API ${res.status}: ${(data.error && data.error.message) || "request failed"}`,
+      );
     return fromResponse(data);
   }
   throw new Error(`Gemini API unavailable (${lastErr}). Try again shortly.`);
 }
 
 // ---------- InternScout Worker (worker/API.md → POST /ai) ----------
-export const WORKER_TASKS = ["resume_tailor", "autofill", "deep_dive", "field_match", "short_answer"];
+export const WORKER_TASKS = [
+  "resume_tailor",
+  "autofill",
+  "deep_dive",
+  "field_match",
+  "short_answer",
+];
 // Call-site kind → Worker task. agent = Auto-Apply steps, tailor = tailored resume, deep_dive = Deep Dive
 // (resume reading, interview, stories, voice), test = the tiny "Reply OK" check.
-const KIND_TASK = { agent: "autofill", tailor: "resume_tailor", deep_dive: "deep_dive", test: "short_answer", field_match: "field_match", short_answer: "short_answer" };
+const KIND_TASK = {
+  agent: "autofill",
+  tailor: "resume_tailor",
+  deep_dive: "deep_dive",
+  test: "short_answer",
+  field_match: "field_match",
+  short_answer: "short_answer",
+};
 export const taskFor = (kind) => KIND_TASK[kind] || "short_answer";
 
 export function buildWorkerRequest({ task, run_id, ...opts }) {
@@ -136,38 +196,75 @@ export function buildWorkerRequest({ task, run_id, ...opts }) {
   return { task, ...(run_id ? { run_id } : {}), request: buildGeminiBody(opts) };
 }
 
-const SIGN_IN_HINT = "Sign in with Google or Microsoft in the InternScout popup or Auto-Apply setup → Setup";
+const SIGN_IN_HINT =
+  "Sign in with Google or Microsoft in the InternScout popup or Auto-Apply setup → Setup";
 const OWN_KEY_HINT = "or add your own key under Auto-Apply setup → Setup → Advanced";
 
 // Turns a Worker error reply into an Error with .code and a message a student can act on.
 export function workerError(status, data = {}) {
-  const code = data.error || (status === 401 ? "auth" : status === 503 ? "paused" : status === 429 ? "rate" : status >= 500 ? "upstream" : "bad_request");
-  let msg, offer = null;
+  const code =
+    data.error ||
+    (status === 401
+      ? "auth"
+      : status === 503
+        ? "paused"
+        : status === 429
+          ? "rate"
+          : status >= 500
+            ? "upstream"
+            : "bad_request");
+  let msg,
+    offer = null;
   if (code === "auth") msg = `${SIGN_IN_HINT} to use AI features, then try again.`;
   else if (code === "cap") {
-    const label = { resume_tailor: "tailored-resume", autofill: "Auto-Apply", deep_dive: "Deep Dive", field_match: "field-matching", short_answer: "short-answer" }[data.task] || "AI";
-    const resets = data.resets ? ` It resets ${new Date(data.resets).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}.` : "";
+    const label =
+      {
+        resume_tailor: "tailored-resume",
+        autofill: "Auto-Apply",
+        deep_dive: "Deep Dive",
+        field_match: "field-matching",
+        short_answer: "short-answer",
+      }[data.task] || "AI";
+    const resets = data.resets
+      ? ` It resets ${new Date(data.resets).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}.`
+      : "";
     // The Worker sets `upgrade` only when the Supporter plan is switched on, so we never advertise
     // a plan that doesn't exist.
     // was: const more = data.upgrade ? " To raise it, open the InternScout dashboard and press Upgrade, or " : " To keep going now, ";
     // Since 2026-09-30 the Worker also names the next plan and what it gives this student (limits.js
     // upgradeOffer), so say that instead of a bare "Upgrade"; the job card adds a button for it.
-    const units = data.upgrade && data.resets && data.offer && data.offer.allowance ? data.offer.allowance[data.task] : null;
-    if (units) offer = { plan: data.offer.plan, label: data.offer.label || data.offer.plan, price: data.offer.price || "", units };
-    const more = offer ? ` ${offer.label}${offer.price ? ` (${offer.price})` : ""} gives you ${offer.units} a month: upgrade on the InternScout dashboard. Or, to keep going now, `
-      : data.upgrade ? " To raise it, open the InternScout dashboard and press Upgrade, or " : " To keep going now, ";
+    const units =
+      data.upgrade && data.resets && data.offer && data.offer.allowance
+        ? data.offer.allowance[data.task]
+        : null;
+    if (units)
+      offer = {
+        plan: data.offer.plan,
+        label: data.offer.label || data.offer.plan,
+        price: data.offer.price || "",
+        units,
+      };
+    const more = offer
+      ? ` ${offer.label}${offer.price ? ` (${offer.price})` : ""} gives you ${offer.units} a month: upgrade on the InternScout dashboard. Or, to keep going now, `
+      : data.upgrade
+        ? " To raise it, open the InternScout dashboard and press Upgrade, or "
+        : " To keep going now, ";
     // The Worker says which tier hit the cap; a student who already has the .edu allowance is not told to get one.
     const edu = data.tier === "edu" ? "" : " Accounts with a school .edu email get twice as much.";
     msg = data.resets
       ? `You've used this month's free ${label} allowance.${resets}${edu}${more}${OWN_KEY_HINT.replace(/^or /, "")}.`
       : `This run hit its AI call limit${data.message ? ` (${data.message})` : ""}. Finish it by hand, ${OWN_KEY_HINT}.`;
-  } else if (code === "rate") msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
+  } else if (code === "rate")
+    msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
   // Not this student's own limit: everyone's calls together hit the server's per-minute ceiling. Say so,
   // or they read it as a punishment and cut back for no reason.
-  else if (code === "busy") msg = `InternScout is busy right now: too many students are using AI this minute. It should clear in ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}.`;
-  else if (code === "paused") msg = `InternScout AI is paused for everyone until the monthly budget resets. Search still works; to keep applying, ${OWN_KEY_HINT.replace(/^or /, "")}.`;
+  else if (code === "busy")
+    msg = `InternScout is busy right now: too many students are using AI this minute. It should clear in ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}.`;
+  else if (code === "paused")
+    msg = `InternScout AI is paused for everyone until the monthly budget resets. Search still works; to keep applying, ${OWN_KEY_HINT.replace(/^or /, "")}.`;
   else if (code === "upstream") msg = "The AI service had a problem. Try again shortly.";
-  else msg = `InternScout rejected the request (${status}${data.message ? `: ${data.message}` : ""}).`;
+  else
+    msg = `InternScout rejected the request (${status}${data.message ? `: ${data.message}` : ""}).`;
   const e = new Error(msg);
   e.code = code;
   e.status = status;
@@ -186,7 +283,10 @@ export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused", "busy"]
 // A part with a thoughtSignature closes the text before it, because the signature belongs to that part.
 export function stitchChunks(chunks) {
   const parts = [];
-  let finishReason, usageMetadata, promptFeedback, seen = false;
+  let finishReason,
+    usageMetadata,
+    promptFeedback,
+    seen = false;
   for (const c of chunks) {
     if (!c || typeof c !== "object") continue;
     if (c.usageMetadata) usageMetadata = c.usageMetadata;
@@ -206,8 +306,11 @@ export function stitchChunks(chunks) {
     }
   }
   return {
-    candidates: seen ? [{ content: { role: "model", parts }, ...(finishReason ? { finishReason } : {}) }] : [],
-    ...(usageMetadata ? { usageMetadata } : {}), ...(promptFeedback ? { promptFeedback } : {}),
+    candidates: seen
+      ? [{ content: { role: "model", parts }, ...(finishReason ? { finishReason } : {}) }]
+      : [],
+    ...(usageMetadata ? { usageMetadata } : {}),
+    ...(promptFeedback ? { promptFeedback } : {}),
     complete: !!finishReason,
   };
 }
@@ -219,10 +322,15 @@ export async function readSSE(res) {
     if (!line.startsWith("data:")) return;
     const t = line.slice(5).trim();
     if (!t || t === "[DONE]") return;
-    try { chunks.push(JSON.parse(t)); } catch (e) { /* a cut-off last line: stitchChunks reports it as incomplete */ }
+    try {
+      chunks.push(JSON.parse(t));
+    } catch (e) {
+      /* a cut-off last line: stitchChunks reports it as incomplete */
+    }
   };
   if (res.body && res.body.getReader) {
-    const reader = res.body.getReader(), dec = new TextDecoder();
+    const reader = res.body.getReader(),
+      dec = new TextDecoder();
     let buf = "";
     for (;;) {
       const { done, value } = await reader.read();
@@ -238,7 +346,8 @@ export async function readSSE(res) {
   return chunks;
 }
 
-const isSSE = (res) => /event-stream/i.test((res.headers && res.headers.get && res.headers.get("content-type")) || "");
+const isSSE = (res) =>
+  /event-stream/i.test((res.headers && res.headers.get && res.headers.get("content-type")) || "");
 
 // Sends the same Gemini body to WORKER_URL/ai and parses the reply with the Gemini parser.
 // refreshToken(rejected): called once after a 401 with the token the Worker refused; returns a new token or null.
@@ -247,10 +356,21 @@ const isSSE = (res) => /event-stream/i.test((res.headers && res.headers.get && r
 // fetch has had no response for 30 seconds, and a tailored resume or a Deep Dive step can take longer
 // than that to finish. A stream answers as soon as Gemini starts, and the pieces are joined here.
 // Errors (401, 429, 503...) still come back as plain JSON, exactly as before.
-export async function callWorker({ url, token, refreshToken, task, run_id, signal, fetchImpl = fetch, sleepImpl = sleep, ...opts }) {
+export async function callWorker({
+  url,
+  token,
+  refreshToken,
+  task,
+  run_id,
+  signal,
+  fetchImpl = fetch,
+  sleepImpl = sleep,
+  ...opts
+}) {
   if (!token) throw workerError(401, { error: "auth" });
   const body = JSON.stringify(buildWorkerRequest({ task, run_id, ...opts }));
-  let refreshed = false, lastErr = null;
+  let refreshed = false,
+    lastErr = null;
   for (let attempt = 0; attempt < 4; attempt++) {
     throwIfAborted(signal);
     let res;
@@ -295,15 +415,18 @@ export async function callWorker({ url, token, refreshToken, task, run_id, signa
     const err = workerError(res.status, data);
     if (err.code === "auth" && !refreshed && refreshToken) {
       refreshed = true;
-      token = await refreshToken(token).catch(() => null);   // gets the rejected token, so a dead session can be dropped
+      token = await refreshToken(token).catch(() => null); // gets the rejected token, so a dead session can be dropped
       if (!token) throw err;
       attempt--;
       continue;
     }
     // "busy" waits up to a full minute, unlike "rate": the global bucket always empties at the minute
     // boundary, so the wait is bounded and the student did nothing wrong to have to sit out.
-    if ((err.code === "rate" && (err.retry_after || 0) <= 30) || (err.code === "busy" && (err.retry_after || 0) <= 60)
-        || err.code === "upstream") {
+    if (
+      (err.code === "rate" && (err.retry_after || 0) <= 30) ||
+      (err.code === "busy" && (err.retry_after || 0) <= 60) ||
+      err.code === "upstream"
+    ) {
       lastErr = err;
       await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt, signal);
       continue;

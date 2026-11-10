@@ -1,10 +1,39 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { emptyStore, upgradeStore, accountFor, confirmedFacts, profileForModel, factSuggestions, EMPTY_FACTS, DEMOGRAPHIC_KEYS, RESUME_FACTS, DASHBOARD_FACTS } from "../lib/store.js";
-import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue } from "../onboarding/profile.js";
+import {
+  emptyStore,
+  upgradeStore,
+  accountFor,
+  confirmedFacts,
+  profileForModel,
+  factSuggestions,
+  EMPTY_FACTS,
+  DEMOGRAPHIC_KEYS,
+  RESUME_FACTS,
+  DASHBOARD_FACTS,
+} from "../lib/store.js";
+import {
+  confirmProfileValue,
+  applyInterviewFacts,
+  dismissSuggestion,
+  planResumeImport,
+  applyResumeImport,
+  preselectedImports,
+  mergeProfileEdits,
+  focusStepHeading,
+  pendingResumeReview,
+  formatResumeValue,
+} from "../onboarding/profile.js";
 
-const extracted = (facts = {}, over = {}) => ({ facts, education: [], experience: [], projects: [], links: [],
-  skills: { technical: [], tools: [], soft: [] }, ...over });
+const extracted = (facts = {}, over = {}) => ({
+  facts,
+  education: [],
+  experience: [],
+  projects: [],
+  links: [],
+  skills: { technical: [], tools: [], soft: [] },
+  ...over,
+});
 
 test("AI interview summaries cannot confirm eligibility or reuse confirmation for changed answers", () => {
   const s = emptyStore();
@@ -13,7 +42,11 @@ test("AI interview summaries cannot confirm eligibility or reuse confirmation fo
   applyInterviewFacts(s.profile, { work_authorized: "Yes", needs_sponsorship: "No" });
   assert.equal(confirmedFacts(s).work_authorized, "Yes", "unchanged student confirmation survives");
   assert.equal(s.profile.facts.needs_sponsorship, "No", "suggestion is visible for review");
-  assert.equal(confirmedFacts(s).needs_sponsorship, "", "suggestion cannot become an automatic answer");
+  assert.equal(
+    confirmedFacts(s).needs_sponsorship,
+    "",
+    "suggestion cannot become an automatic answer",
+  );
   applyInterviewFacts(s.profile, { work_authorized: "No", over_18: { inferred: true } });
   assert.equal(confirmedFacts(s).work_authorized, "");
   assert.equal(s.profile.facts.over_18, "", "malformed AI output is ignored");
@@ -29,7 +62,8 @@ test("every fact an interview suggests stays out of confirmedFacts and the model
   const s = emptyStore();
   const keys = Object.keys(EMPTY_FACTS);
   applyInterviewFacts(s.profile, Object.fromEntries(keys.map((k) => [k, `INTERVIEW-${k}`])));
-  const ready = confirmedFacts(s), model = profileForModel(s);
+  const ready = confirmedFacts(s),
+    model = profileForModel(s);
   for (const k of keys) {
     assert.equal(s.profile.facts[k], `INTERVIEW-${k}`, `${k} is kept as a suggestion`);
     assert.equal(ready[k], unknownOrDecline(k), `${k} is not used`);
@@ -37,7 +71,12 @@ test("every fact an interview suggests stays out of confirmedFacts and the model
   }
   assert.ok(!JSON.stringify(model).includes("INTERVIEW-"));
   assert.equal(model.signup_email, "", "an interview email is not the sign-up email either");
-  assert.deepEqual(factSuggestions(s.profile).map((x) => x.key).sort(), [...keys].sort());
+  assert.deepEqual(
+    factSuggestions(s.profile)
+      .map((x) => x.key)
+      .sort(),
+    [...keys].sort(),
+  );
   for (const k of DEMOGRAPHIC_KEYS) assert.match(ready[k], /decline|don't wish/i, k);
 });
 
@@ -49,7 +88,8 @@ test("any source other than the student's own is held back for every key", () =>
       s.profile.sources.facts[k] = { source, value: `X-${k}` };
     }
     const ready = confirmedFacts(s);
-    for (const k of Object.keys(EMPTY_FACTS)) assert.equal(ready[k], unknownOrDecline(k), `${source}: ${k}`);
+    for (const k of Object.keys(EMPTY_FACTS))
+      assert.equal(ready[k], unknownOrDecline(k), `${source}: ${k}`);
   }
   // A reviewed resume counts for the contact details it fills in, the dashboard for major and class year,
   // and nothing else.
@@ -58,7 +98,8 @@ test("any source other than the student's own is held back for every key", () =>
     s.profile.facts[k] = `R-${k}`;
     s.profile.sources.facts[k] = { source: "resume", value: `R-${k}` };
   }
-  for (const k of DASHBOARD_FACTS) s.profile.sources.facts[k] = { source: "dashboard", value: `R-${k}` };
+  for (const k of DASHBOARD_FACTS)
+    s.profile.sources.facts[k] = { source: "dashboard", value: `R-${k}` };
   const ready = confirmedFacts(s);
   for (const k of Object.keys(EMPTY_FACTS)) {
     const ok = RESUME_FACTS.includes(k) || DASHBOARD_FACTS.includes(k);
@@ -70,16 +111,26 @@ test("Quick facts: a suggestion is used once taken, and turning it down brings b
   const s = emptyStore();
   s.profile.facts.citizenship = "U.S. citizen";
   confirmProfileValue(s.profile, "facts", "citizenship");
-  applyInterviewFacts(s.profile, { citizenship: "F-1 student visa", race: "Asian", clearance_eligible: "Yes" });
-  assert.equal(confirmedFacts(s).citizenship, "", "a suggestion that disagrees makes the answer unknown until the student decides");
-  assert.deepEqual(factSuggestions(s.profile).find((x) => x.key === "citizenship"),
-    { key: "citizenship", value: "F-1 student visa", source: "interview", kept: "U.S. citizen" });
+  applyInterviewFacts(s.profile, {
+    citizenship: "F-1 student visa",
+    race: "Asian",
+    clearance_eligible: "Yes",
+  });
+  assert.equal(
+    confirmedFacts(s).citizenship,
+    "",
+    "a suggestion that disagrees makes the answer unknown until the student decides",
+  );
+  assert.deepEqual(
+    factSuggestions(s.profile).find((x) => x.key === "citizenship"),
+    { key: "citizenship", value: "F-1 student visa", source: "interview", kept: "U.S. citizen" },
+  );
   dismissSuggestion(s.profile, "citizenship");
   assert.equal(confirmedFacts(s).citizenship, "U.S. citizen");
   dismissSuggestion(s.profile, "race");
   assert.equal(s.profile.facts.race, "Decline to self-identify");
   assert.equal(confirmedFacts(s).race, "Decline to self-identify");
-  confirmProfileValue(s.profile, "facts", "clearance_eligible");   // "Use this answer"
+  confirmProfileValue(s.profile, "facts", "clearance_eligible"); // "Use this answer"
   assert.equal(confirmedFacts(s).clearance_eligible, "Yes");
   assert.deepEqual(factSuggestions(s.profile), []);
   // The same value again changes nothing; a confirmed answer stays confirmed.
@@ -90,30 +141,57 @@ test("Quick facts: a suggestion is used once taken, and turning it down brings b
 
 test("new profiles leave factual eligibility/preferences unknown while retaining voluntary decline choices", () => {
   const { facts } = emptyStore().profile;
-  for (const k of ["work_authorized", "needs_sponsorship", "over_18", "willing_to_relocate", "willing_to_travel", "background_check", "drug_test", "non_compete", "worked_here_before", "hours_per_week", "languages"]) assert.equal(facts[k], "", k);
+  for (const k of [
+    "work_authorized",
+    "needs_sponsorship",
+    "over_18",
+    "willing_to_relocate",
+    "willing_to_travel",
+    "background_check",
+    "drug_test",
+    "non_compete",
+    "worked_here_before",
+    "hours_per_week",
+    "languages",
+  ])
+    assert.equal(facts[k], "", k);
   assert.equal(facts.gender, "Decline to self-identify");
   assert.equal(facts.veteran, "I don't wish to answer");
-  const old = upgradeStore({ version: 3, profile: { facts: { work_authorized: "Yes", needs_sponsorship: "Yes", first_name: "Sam" } } });
+  const old = upgradeStore({
+    version: 3,
+    profile: { facts: { work_authorized: "Yes", needs_sponsorship: "Yes", first_name: "Sam" } },
+  });
   assert.equal(old.profile.facts.work_authorized, "Yes", "existing answers survive");
   assert.equal(old.profile.facts.needs_sponsorship, "Yes");
   assert.deepEqual(old.profile.sources, { facts: {}, sections: {} });
 });
 
 test("legacy eligibility remains visible but is unavailable to applications until confirmed", () => {
-  const s = upgradeStore({ version: 3, profile: { facts: { work_authorized: "Yes", needs_sponsorship: "No", over_18: "Yes" } } });
+  const s = upgradeStore({
+    version: 3,
+    profile: { facts: { work_authorized: "Yes", needs_sponsorship: "No", over_18: "Yes" } },
+  });
   assert.equal(s.profile.facts.work_authorized, "Yes");
   assert.equal(confirmedFacts(s).work_authorized, "");
   assert.equal(profileForModel(s).facts.needs_sponsorship, "");
-  for (const key of ["work_authorized", "needs_sponsorship", "over_18"]) confirmProfileValue(s.profile, "facts", key);
+  for (const key of ["work_authorized", "needs_sponsorship", "over_18"])
+    confirmProfileValue(s.profile, "facts", key);
   assert.equal(confirmedFacts(s).work_authorized, "Yes");
   assert.equal(profileForModel(s).facts.needs_sponsorship, "No");
   s.profile.facts.work_authorized = "No";
-  assert.equal(confirmedFacts(s).work_authorized, "", "an unconfirmed later mutation cannot reuse old confirmation");
+  assert.equal(
+    confirmedFacts(s).work_authorized,
+    "",
+    "an unconfirmed later mutation cannot reuse old confirmation",
+  );
 });
 
 test("replacement updates imported contact details and clears removed resume sections", () => {
   const p = emptyStore().profile;
-  const first = extracted({ phone: "old-number", first_name: "Sam" }, { experience: [{ title: "Old job" }], projects: [{ name: "Old project" }] });
+  const first = extracted(
+    { phone: "old-number", first_name: "Sam" },
+    { experience: [{ title: "Old job" }], projects: [{ name: "Old project" }] },
+  );
   applyResumeImport(p, planResumeImport(p, first));
   const next = planResumeImport(p, extracted({ phone: "new-number", first_name: "Sam" }));
   assert.equal(next.filter((e) => e.conflict).length, 0);
@@ -129,8 +207,14 @@ test("manual and legacy values require explicit replacement, including intention
   confirmProfileValue(p, "facts", "phone");
   confirmProfileValue(p, "facts", "email"); // explicitly left blank
   p.projects = [{ name: "Legacy project" }];
-  const plan = planResumeImport(p, extracted({ phone: "resume-number", email: "resume@example.test" }));
-  assert.deepEqual(plan.filter((e) => e.conflict).map((e) => e.id), ["facts:email", "facts:phone", "sections:projects"]);
+  const plan = planResumeImport(
+    p,
+    extracted({ phone: "resume-number", email: "resume@example.test" }),
+  );
+  assert.deepEqual(
+    plan.filter((e) => e.conflict).map((e) => e.id),
+    ["facts:email", "facts:phone", "sections:projects"],
+  );
   applyResumeImport(p, plan);
   assert.equal(p.facts.phone, "confirmed-number");
   assert.equal(p.facts.email, "");
@@ -156,25 +240,50 @@ test("an extraction that matches a confirmed value does not erase its manual pro
   confirmProfileValue(p, "facts", "phone");
   applyResumeImport(p, planResumeImport(p, extracted({ phone: "manual-number" })));
   assert.equal(p.sources.facts.phone.source, "manual");
-  assert.ok(planResumeImport(p, extracted({ phone: "other-number" })).find((e) => e.key === "phone").conflict);
+  assert.ok(
+    planResumeImport(p, extracted({ phone: "other-number" })).find((e) => e.key === "phone")
+      .conflict,
+  );
 });
 
 // PR #94 review P2: a reply missing a section used to throw, with no way past it. Missing parts are now
 // "not read": left as they are, never cleared. Only a reply with nothing usable at all is refused.
 test("incomplete extraction cannot silently clear saved sections, and can still be saved", () => {
   const p = emptyStore().profile;
-  applyResumeImport(p, planResumeImport(p, extracted({ phone: "555" }, { experience: [{ title: "Job" }], projects: [{ name: "P" }] })));
+  applyResumeImport(
+    p,
+    planResumeImport(
+      p,
+      extracted({ phone: "555" }, { experience: [{ title: "Job" }], projects: [{ name: "P" }] }),
+    ),
+  );
   const plan = planResumeImport(p, { facts: {}, experience: [] });
-  assert.deepEqual(plan.map((e) => e.id), ["sections:experience"], "only what the reply contains is planned");
+  assert.deepEqual(
+    plan.map((e) => e.id),
+    ["sections:experience"],
+    "only what the reply contains is planned",
+  );
   applyResumeImport(p, plan);
   assert.deepEqual(p.experience, [], "a section the resume lists as empty is cleared");
   assert.equal(p.projects[0].name, "P", "a section the reply left out is kept");
   assert.equal(p.facts.phone, "555", "a contact field the reply left out is kept");
   // Malformed parts are treated as missing; skills missing a list gets an empty one.
-  const odd = planResumeImport(p, { facts: { phone: 7, email: "a@b.c" }, skills: { technical: ["Go"] }, projects: "x" });
-  assert.deepEqual(odd.map((e) => e.id), ["facts:email", "sections:skills"]);
-  assert.deepEqual(odd.find((e) => e.key === "skills").next, { technical: ["Go"], tools: [], soft: [] });
-  for (const bad of [null, [], {}, { facts: [] }, { experience: "x" }]) assert.throws(() => planResumeImport(p, bad), /Nothing could be read/);
+  const odd = planResumeImport(p, {
+    facts: { phone: 7, email: "a@b.c" },
+    skills: { technical: ["Go"] },
+    projects: "x",
+  });
+  assert.deepEqual(
+    odd.map((e) => e.id),
+    ["facts:email", "sections:skills"],
+  );
+  assert.deepEqual(odd.find((e) => e.key === "skills").next, {
+    technical: ["Go"],
+    tools: [],
+    soft: [],
+  });
+  for (const bad of [null, [], {}, { facts: [] }, { experience: "x" }])
+    assert.throws(() => planResumeImport(p, bad), /Nothing could be read/);
 });
 
 test("pending resume choices survive closing/reopening onboarding without retaining another file copy", () => {
@@ -183,14 +292,17 @@ test("pending resume choices survive closing/reopening onboarding without retain
   s.profile.facts.phone = "old-number";
   const plan = planResumeImport(s.profile, extracted({ phone: "new-number" }));
   s.settings.resume_import = { plan };
-  const reopened = structuredClone(s), pending = pendingResumeReview(reopened);
+  const reopened = structuredClone(s),
+    pending = pendingResumeReview(reopened);
   assert.equal(pending.file, reopened.files.resume);
   assert.deepEqual(pending.plan, plan);
   assert.equal(pending.plan.find((e) => e.key === "phone").conflict, true);
 });
 
 test("page edits preserve concurrent background changes to untouched fields and allow explicit removals", () => {
-  const before = emptyStore(), next = structuredClone(before), fresh = structuredClone(before);
+  const before = emptyStore(),
+    next = structuredClone(before),
+    fresh = structuredClone(before);
   next.profile.facts.phone = "page-edit";
   next.profile.skills = { technical: ["New skill"] };
   fresh.profile.facts.majors = "Background major";
@@ -206,25 +318,46 @@ test("page edits preserve concurrent background changes to untouched fields and 
 
 test("pending job-site accounts reuse credentials while still taking the signup path", () => {
   const s = emptyStore();
-  s.accounts.push({ domain: "example.test", email: "sam@example.test", password: "fixture", state: "pending" });
+  s.accounts.push({
+    domain: "example.test",
+    email: "sam@example.test",
+    password: "fixture",
+    state: "pending",
+  });
   const pending = accountFor(s, "https://example.test/jobs");
   assert.equal(pending.isNew, true);
   assert.equal(pending.password, "fixture");
   s.accounts[0].state = "confirmed";
   assert.equal(accountFor(s, "https://example.test/jobs").isNew, false);
   delete s.accounts[0].state;
-  assert.equal(accountFor(s, "https://example.test/jobs").isNew, false, "legacy saved accounts remain usable");
+  assert.equal(
+    accountFor(s, "https://example.test/jobs").isNew,
+    false,
+    "legacy saved accounts remain usable",
+  );
 });
 
 test("step focus lands on a keyboard-focusable heading without an extra scroll", () => {
-  const calls = [], heading = { focus: (opts) => calls.push(opts) };
-  focusStepHeading({ querySelector: (selector) => { assert.equal(selector, "h2"); return heading; } });
+  const calls = [],
+    heading = { focus: (opts) => calls.push(opts) };
+  focusStepHeading({
+    querySelector: (selector) => {
+      assert.equal(selector, "h2");
+      return heading;
+    },
+  });
   assert.equal(heading.tabIndex, -1);
   assert.deepEqual(calls, [{ preventScroll: true }]);
 });
 
 test("resume comparisons display readable details and explicitly show removed sections", () => {
   assert.equal(formatResumeValue([]), "Not listed");
-  assert.equal(formatResumeValue({ technical: ["JavaScript", "SQL"], tools: [], soft: [] }), "Technical: JavaScript, SQL");
-  assert.equal(formatResumeValue([{ school: "Fixture University", degree: "BS", grad_term: "Spring 2027" }]), "School: Fixture University\nDegree: BS\nGrad term: Spring 2027");
+  assert.equal(
+    formatResumeValue({ technical: ["JavaScript", "SQL"], tools: [], soft: [] }),
+    "Technical: JavaScript, SQL",
+  );
+  assert.equal(
+    formatResumeValue([{ school: "Fixture University", degree: "BS", grad_term: "Spring 2027" }]),
+    "School: Fixture University\nDegree: BS\nGrad term: Spring 2027",
+  );
 });

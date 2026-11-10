@@ -17,7 +17,14 @@
 // - settings.profile_synced_hash is the hash of the subset as the account holds it (as far as we know).
 //   Local and account agree when the local subset hashes to it.
 // Signed out, cloud_sync off, or a Worker without profile saving (404, 503 sync_off): nothing happens.
-import { loadStore, updateStore, emptyStore, deepMerge, EMPTY_FACTS, DEMOGRAPHIC_KEYS } from "./store.js";
+import {
+  loadStore,
+  updateStore,
+  emptyStore,
+  deepMerge,
+  EMPTY_FACTS,
+  DEMOGRAPHIC_KEYS,
+} from "./store.js";
 import { ensureToken, workerFetch } from "./auth.js";
 
 // Keys in profile.facts that never leave the device (the Worker also strips them, as a second line).
@@ -27,12 +34,13 @@ export { DEMOGRAPHIC_KEYS };
 // employer's own voluntary self-identification question lands there too, so any entry whose question
 // reads like one of the six stays on the device with them. Erring wide is fine: a dropped entry is only
 // asked again on the next device.
-export const DEMOGRAPHIC_QUESTION = /\b(gender|sex|race|racial|ethnic|ethnicity|hispanic|latin[oax]|veteran|military status|protected veteran|disabilit|handicap|lgbt|sexual orientation|transgender|self-identif)/i;
+export const DEMOGRAPHIC_QUESTION =
+  /\b(gender|sex|race|racial|ethnic|ethnicity|hispanic|latin[oax]|veteran|military status|protected veteran|disabilit|handicap|lgbt|sexual orientation|transgender|self-identif)/i;
 // Settings only the background writes. A page saving its own copy of the store keeps the stored values
 // of these, or it would undo a sync that happened while it was open.
 export const BACKGROUND_SETTINGS = ["cloud_sync", "profile_updated_at", "profile_synced_hash"];
-export const PENDING_KEY = "internscout.sync";       // { dirty_at: ISO } an edit not yet flushed
-export const RESTORED_KEY = "internscout.restored";  // { updated, at, shown } the last restore, for the UI
+export const PENDING_KEY = "internscout.sync"; // { dirty_at: ISO } an edit not yet flushed
+export const RESTORED_KEY = "internscout.restored"; // { updated, at, shown } the last restore, for the UI
 export const DEBOUNCE_MS = 5000;
 
 // ---------- pure ----------
@@ -43,7 +51,9 @@ export function withoutDemographics(facts) {
 }
 
 export function withoutDemographicAnswers(extra) {
-  return Object.fromEntries(Object.entries(extra || {}).filter(([q]) => !DEMOGRAPHIC_QUESTION.test(q)));
+  return Object.fromEntries(
+    Object.entries(extra || {}).filter(([q]) => !DEMOGRAPHIC_QUESTION.test(q)),
+  );
 }
 
 export function syncedSubset(s) {
@@ -51,8 +61,14 @@ export function syncedSubset(s) {
   const st = (s && s.settings) || {};
   return {
     // was: profile: { ...p, facts: withoutDemographics(p.facts) },
-    profile: { ...p, facts: withoutDemographics(p.facts), extra: withoutDemographicAnswers(p.extra),
-      ...(p.sources ? { sources: { ...p.sources, facts: withoutDemographics(p.sources.facts) } } : {}) },
+    profile: {
+      ...p,
+      facts: withoutDemographics(p.facts),
+      extra: withoutDemographicAnswers(p.extra),
+      ...(p.sources
+        ? { sources: { ...p.sources, facts: withoutDemographics(p.sources.facts) } }
+        : {}),
+    },
     settings: { onboarded: !!st.onboarded, deep_dive_at: st.deep_dive_at ?? null },
     dashboard_profile: (s && s.dashboard_profile) ?? null,
   };
@@ -61,14 +77,20 @@ export function syncedSubset(s) {
 // JSON with object keys sorted, so the same data always gives the same text (and hash).
 export function stableStringify(v) {
   if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
-  if (Array.isArray(v)) return `[${v.map((x) => (x === undefined ? "null" : stableStringify(x))).join(",")}]`;
-  return `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableStringify(v[k])}`).join(",")}}`;
+  if (Array.isArray(v))
+    return `[${v.map((x) => (x === undefined ? "null" : stableStringify(x))).join(",")}]`;
+  return `{${Object.keys(v)
+    .sort()
+    .filter((k) => v[k] !== undefined)
+    .map((k) => `${JSON.stringify(k)}:${stableStringify(v[k])}`)
+    .join(",")}}`;
 }
 
 // cyrb53: a fast 53-bit string hash. Only to notice changes; nothing secret depends on it.
 export function hashOf(v) {
   const str = stableStringify(v);
-  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  let h1 = 0xdeadbeef,
+    h2 = 0x41c6ce57;
   for (let i = 0; i < str.length; i++) {
     const c = str.charCodeAt(i);
     h1 = Math.imul(h1 ^ c, 2654435761);
@@ -139,8 +161,12 @@ export function decide(s, server) {
   // A device that has finished before never gives way to an older copy: its newer edits are pushed.
   // was: (!s.settings.onboarded && serverDone), which a resume replacement (onboarded=false at the time)
   // turned into a restore of the old profile, newer local work and all.
-  if (localHash === EMPTY_HASH || time(server.updated) > time(s.settings.profile_updated_at)
-      || (!finishedHere(s) && serverDone)) return "restore";
+  if (
+    localHash === EMPTY_HASH ||
+    time(server.updated) > time(s.settings.profile_updated_at) ||
+    (!finishedHere(s) && serverDone)
+  )
+    return "restore";
   return "push";
 }
 
@@ -158,7 +184,9 @@ export function isLocalEdit(oldValue, newValue) {
 export function restoredMessage(r) {
   if (!r) return "";
   const d = new Date(r.updated);
-  const when = isNaN(d) ? "" : ` (saved ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })})`;
+  const when = isNaN(d)
+    ? ""
+    : ` (saved ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })})`;
   return `Restored your Deep Dive from your account${when}.`;
 }
 
@@ -175,7 +203,12 @@ async function answer(res) {
   if (!res) return { status: 0, ok: false, data: {} };
   return { status: res.status, ok: res.ok, data: await res.json().catch(() => ({})) };
 }
-const failState = (status) => (status === 401 || status === 0 ? "signed_out_or_offline" : status === 413 ? "too_big" : "unavailable");
+const failState = (status) =>
+  status === 401 || status === 0
+    ? "signed_out_or_offline"
+    : status === 413
+      ? "too_big"
+      : "unavailable";
 
 // Moves a noted edit time into settings.profile_updated_at.
 async function stampPending() {
@@ -183,27 +216,42 @@ async function stampPending() {
   // was: read outside the lock and remove afterward, which could delete a newer edit's marker.
   // Revert: move marker I/O outside this callback and restore noteEdit's standalone marker write.
   let pend;
-  await updateStore(async (s) => {
-    pend = await local(PENDING_KEY);
-    if (!pend) return;
-    if (time(pend.dirty_at) > time(s.settings.profile_updated_at)) s.settings.profile_updated_at = pend.dirty_at;
-  }, {
-    afterSave: async () => { if (pend) await chrome.storage.local.remove(PENDING_KEY); },
-  });
+  await updateStore(
+    async (s) => {
+      pend = await local(PENDING_KEY);
+      if (!pend) return;
+      if (time(pend.dirty_at) > time(s.settings.profile_updated_at))
+        s.settings.profile_updated_at = pend.dirty_at;
+    },
+    {
+      afterSave: async () => {
+        if (pend) await chrome.storage.local.remove(PENDING_KEY);
+      },
+    },
+  );
 }
 
 async function restore(serverProfile, updated, expectedHash, epoch, expectedUpdated) {
-  let changed = false, localChanged = false, stopped = false;
+  let changed = false,
+    localChanged = false,
+    stopped = false;
   await updateStore((s) => {
-    if (!allowed(s, epoch)) { stopped = true; return; }
+    if (!allowed(s, epoch)) {
+      stopped = true;
+      return;
+    }
     const before = hashOf(syncedSubset(s));
     // 2026-10-23: a network reply must not replace edits made while it was pending (EXT-3).
     // was: restore unconditionally used the profile read before GET/PUT. Revert: remove this check.
     // 2026-10-23: a just-stamped manual edit may have the same hash as the GET snapshot.
     // was: hash alone; a delayed timestamp could let an older remote copy overwrite that edit.
     // Revert: remove the expectedUpdated comparison and its call arguments.
-    if (before !== expectedHash || (s.settings.profile_updated_at ?? null) !== (expectedUpdated ?? null)) {
-      localChanged = true; return;
+    if (
+      before !== expectedHash ||
+      (s.settings.profile_updated_at ?? null) !== (expectedUpdated ?? null)
+    ) {
+      localChanged = true;
+      return;
     }
     applyServer(s, serverProfile, updated);
     // The account's own hash, not the merged one: when this device kept something the account lacks
@@ -213,30 +261,42 @@ async function restore(serverProfile, updated, expectedHash, epoch, expectedUpda
   });
   if (stopped) return { state: "off" };
   if (localChanged) return { state: "local_changed" };
-  if (changed) await chrome.storage.local.set({ [RESTORED_KEY]: { updated, at: nowIso(), shown: false } });
+  if (changed)
+    await chrome.storage.local.set({ [RESTORED_KEY]: { updated, at: nowIso(), shown: false } });
   return { state: changed ? "restored" : "same", updated };
 }
 
 async function push(token, epoch) {
   const s = await loadStore();
   if (!allowed(s, epoch)) return { state: "off" };
-  const sub = syncedSubset(s), h = hashOf(sub);
+  const sub = syncedSubset(s),
+    h = hashOf(sub);
   if (h === EMPTY_HASH) return { state: "none" };
   const updated = s.settings.profile_updated_at || nowIso();
-  const r = await answer(await workerFetch("/profile", {
-    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ profile: toServer(sub), updated }),
-  }, token));
+  const r = await answer(
+    await workerFetch(
+      "/profile",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profile: toServer(sub), updated }),
+      },
+      token,
+    ),
+  );
   if (epoch !== syncEpoch) return { state: "off" };
   if (r.ok) {
     await updateStore((x) => {
       if (!allowed(x, epoch)) return;
       x.settings.profile_synced_hash = h;
       // Only when nothing newer was stamped meanwhile.
-      if (time(x.settings.profile_updated_at) <= time(updated)) x.settings.profile_updated_at = r.data.updated || updated;
+      if (time(x.settings.profile_updated_at) <= time(updated))
+        x.settings.profile_updated_at = r.data.updated || updated;
     });
     return { state: "pushed" };
   }
-  if (r.status === 409 && r.data && r.data.profile) return restore(r.data.profile, r.data.updated, h, epoch, s.settings.profile_updated_at);
+  if (r.status === 409 && r.data && r.data.profile)
+    return restore(r.data.profile, r.data.updated, h, epoch, s.settings.profile_updated_at);
   return { state: failState(r.status) };
 }
 
@@ -251,14 +311,24 @@ async function run({ pushOnly = false } = {}, epoch = syncEpoch) {
   // A push without a pull first only when this device has matched the account before; otherwise the
   // account may hold a newer Deep Dive that a blind push would bury.
   if (pushOnly && s.settings.profile_synced_hash != null) {
-    return hashOf(syncedSubset(s)) === s.settings.profile_synced_hash ? { state: "same" } : push(token, epoch);
+    return hashOf(syncedSubset(s)) === s.settings.profile_synced_hash
+      ? { state: "same" }
+      : push(token, epoch);
   }
   const r = await answer(await workerFetch("/profile", {}, token));
   if (epoch !== syncEpoch) return { state: "off" };
   if (!r.ok) return { state: failState(r.status) };
   switch (decide(s, r.data)) {
-    case "restore": return restore(r.data.profile, r.data.updated, hashOf(syncedSubset(s)), epoch, s.settings.profile_updated_at);
-    case "push": return push(token, epoch);
+    case "restore":
+      return restore(
+        r.data.profile,
+        r.data.updated,
+        hashOf(syncedSubset(s)),
+        epoch,
+        s.settings.profile_updated_at,
+      );
+    case "push":
+      return push(token, epoch);
     case "same":
       await updateStore((x) => {
         if (!allowed(x, epoch)) return;
@@ -269,7 +339,8 @@ async function run({ pushOnly = false } = {}, epoch = syncEpoch) {
         if (!x.settings.profile_updated_at) x.settings.profile_updated_at = r.data.updated || null;
       });
       return { state: "same" };
-    default: return { state: "none" };
+    default:
+      return { state: "none" };
   }
 }
 
@@ -301,11 +372,14 @@ export async function noteEdit() {
   await updateStore(async (s) => {
     const previous = await local(PENDING_KEY);
     const dirty_at = time(previous?.dirty_at) > time(dirty) ? previous.dirty_at : dirty;
-    if (time(dirty_at) > time(s.settings.profile_updated_at)) s.settings.profile_updated_at = dirty_at;
+    if (time(dirty_at) > time(s.settings.profile_updated_at))
+      s.settings.profile_updated_at = dirty_at;
     await chrome.storage.local.set({ [PENDING_KEY]: { dirty_at } });
   });
   clearTimeout(timer);
-  timer = setTimeout(() => { flush().catch(() => {}); }, DEBOUNCE_MS);
+  timer = setTimeout(() => {
+    flush().catch(() => {});
+  }, DEBOUNCE_MS);
 }
 
 // Service worker start: an edit noted before Chrome stopped the worker is sent now.
@@ -322,18 +396,31 @@ export async function setCloudSync(on) {
   // 2026-10-23: DELETE must finish after every older PUT, including a PUT already in flight.
   // was: DELETE ran beside sync, allowing PUT to recreate the deleted copy. Revert: remove queue.
   return queueOperation(async () => {
-  if (!on) {
-    const r = await answer(await workerFetch("/profile", { method: "DELETE" }));
-    // 2026-10-23: 503 cannot prove deletion, even sync_off may leave an existing encrypted row.
-    // was: every 503 counted as deleted. Revert: restore the old 503 exception.
-    if (!r.ok && r.status !== 404) {
-      return { ok: false, error: r.status === 401 || r.status === 0 ? "auth_or_network" : r.data.error || String(r.status), message: r.data.message || "" };
+    if (!on) {
+      const r = await answer(await workerFetch("/profile", { method: "DELETE" }));
+      // 2026-10-23: 503 cannot prove deletion, even sync_off may leave an existing encrypted row.
+      // was: every 503 counted as deleted. Revert: restore the old 503 exception.
+      if (!r.ok && r.status !== 404) {
+        return {
+          ok: false,
+          error:
+            r.status === 401 || r.status === 0
+              ? "auth_or_network"
+              : r.data.error || String(r.status),
+          message: r.data.message || "",
+        };
+      }
+      await updateStore((s) => {
+        s.settings.cloud_sync = false;
+        s.settings.profile_synced_hash = null;
+      });
+      return { ok: true };
     }
-    await updateStore((s) => { s.settings.cloud_sync = false; s.settings.profile_synced_hash = null; });
-    return { ok: true };
-  }
-  await updateStore((s) => { s.settings.cloud_sync = true; s.settings.profile_synced_hash = null; });
-  return { ok: true, ...(await run({}, epoch).catch(() => ({ state: "unavailable" }))) };
+    await updateStore((s) => {
+      s.settings.cloud_sync = true;
+      s.settings.profile_synced_hash = null;
+    });
+    return { ok: true, ...(await run({}, epoch).catch(() => ({ state: "unavailable" }))) };
   });
 }
 
@@ -360,7 +447,11 @@ export async function deleteSyncedAccount(removeAccount) {
   clearTimeout(timer);
   return queueOperation(async () => {
     const result = await removeAccount();
-    if (result.ok) await updateStore((s) => { s.settings.cloud_sync = false; s.settings.profile_synced_hash = null; });
+    if (result.ok)
+      await updateStore((s) => {
+        s.settings.cloud_sync = false;
+        s.settings.profile_synced_hash = null;
+      });
     return result;
   });
 }

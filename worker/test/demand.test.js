@@ -8,11 +8,18 @@ test("GET /demand needs DEMAND_TOKEN", async () => {
   const w = await setup();
   assert.equal((await w.api("GET", "/demand")).status, 401);
   assert.equal((await counts(w, "wrong")).status, 401);
-  assert.equal((await counts(w, await w.token())).status, 401, "a student token is not the CI token");
+  assert.equal(
+    (await counts(w, await w.token())).status,
+    401,
+    "a student token is not the CI token",
+  );
   assert.equal((await counts(w)).status, 200);
 
   const unset = await setup({ env: { DEMAND_TOKEN: "" } });
-  assert.equal((await unset.api("GET", "/demand", { headers: { Authorization: "Bearer " } })).status, 401);
+  assert.equal(
+    (await unset.api("GET", "/demand", { headers: { Authorization: "Bearer " } })).status,
+    401,
+  );
 });
 
 test("POST /demand replaces the user's row; GET counts states", async () => {
@@ -20,10 +27,16 @@ test("POST /demand replaces the user's row; GET counts states", async () => {
   const a = await w.token();
   const b = await w.token({ sub: "second" });
   assert.equal((await w.api("POST", "/demand", { body: { states: ["MA"] } })).status, 401);
-  assert.equal((await w.api("POST", "/demand", { token: a, body: { states: ["MA", "NY"] } })).status, 200);
+  assert.equal(
+    (await w.api("POST", "/demand", { token: a, body: { states: ["MA", "NY"] } })).status,
+    200,
+  );
   await w.api("POST", "/demand", { token: b, body: { states: ["ma", "remote", "MA"] } });
-  assert.deepEqual(await (await counts(w)).json(),
-    { states: { MA: 2, NY: 1, REMOTE: 1 }, users: 2, updated: "2026-09-14T10:05:30Z" });
+  assert.deepEqual(await (await counts(w)).json(), {
+    states: { MA: 2, NY: 1, REMOTE: 1 },
+    users: 2,
+    updated: "2026-09-14T10:05:30Z",
+  });
 
   await w.api("POST", "/demand", { token: a, body: { states: ["CA"] } });
   assert.deepEqual((await (await counts(w)).json()).states, { MA: 1, REMOTE: 1, CA: 1 });
@@ -42,7 +55,7 @@ test("only users active in the last 90 days count", async () => {
   const w = await setup();
   const token = await w.token();
   await w.api("POST", "/demand", { token, body: { states: ["TX"] } });
-  w.setNow(new Date("2026-12-14T10:05:30Z"));   // 91 days later
+  w.setNow(new Date("2026-12-14T10:05:30Z")); // 91 days later
   assert.equal((await (await counts(w)).json()).users, 0);
   // any signed-in visit marks the user active again
   await w.api("GET", "/me", { token: await w.token() });
@@ -52,7 +65,14 @@ test("only users active in the last 90 days count", async () => {
 test("Canadian provinces are counted like states (2026-10-01); a country is not", async () => {
   const w = await setup();
   const token = await w.token();
-  assert.equal((await w.api("POST", "/demand", { token, body: { states: ["on", "QC", "MA", "REMOTE"] } })).status, 200);
+  assert.equal(
+    (await w.api("POST", "/demand", { token, body: { states: ["on", "QC", "MA", "REMOTE"] } }))
+      .status,
+    200,
+  );
   assert.deepEqual((await (await counts(w)).json()).states, { MA: 1, ON: 1, QC: 1, REMOTE: 1 });
-  assert.equal((await w.api("POST", "/demand", { token, body: { states: ["CANADA"] } })).status, 400);
+  assert.equal(
+    (await w.api("POST", "/demand", { token, body: { states: ["CANADA"] } })).status,
+    400,
+  );
 });

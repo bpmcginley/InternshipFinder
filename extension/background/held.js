@@ -15,16 +15,24 @@
 import { isAtsHost, hostOf } from "../lib/hosts.js";
 
 export const HELD_KEY = "held_jobs";
-export const WANTED_KEY = "internscout.wanted";   // the site's localStorage key (docs/js/offer.js)
+export const WANTED_KEY = "internscout.wanted"; // the site's localStorage key (docs/js/offer.js)
 export const HELD_MAX = 100;
-export const HELD_TTL_MS = 14 * 864e5;            // forgotten after two weeks
-export const WANTED_TTL_MS = 3 * 864e5;           // an offer-bar click counts for three days
+export const HELD_TTL_MS = 14 * 864e5; // forgotten after two weeks
+export const WANTED_TTL_MS = 3 * 864e5; // an offer-bar click counts for three days
 
-const text = (v, n) => (typeof v === "string" || typeof v === "number" ? String(v).replace(/\s+/g, " ").trim().slice(0, n) : "");
+const text = (v, n) =>
+  typeof v === "string" || typeof v === "number"
+    ? String(v).replace(/\s+/g, " ").trim().slice(0, n)
+    : "";
 const httpUrl = (v) => {
   const s = typeof v === "string" ? v.trim() : "";
   if (s.length > 2000) return "";
-  try { const u = new URL(s); return u.protocol === "https:" || u.protocol === "http:" ? u.href : ""; } catch (e) { return ""; }
+  try {
+    const u = new URL(s);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "";
+  } catch (e) {
+    return "";
+  }
 };
 
 // One job from the dashboard's enqueue payload, or null. Same fields as background/queue.js addJobs.
@@ -33,15 +41,25 @@ export function cleanHeldJob(j) {
   const apply_url = httpUrl(j.apply_url);
   if (!apply_url) return null;
   const id = typeof j.id === "string" || typeof j.id === "number" ? text(j.id, 60) : "";
-  return { id: id || null, apply_url, company: text(j.company, 120), title: text(j.title, 160),
-    location: text(j.location, 200), description: String(typeof j.description === "string" ? j.description : "").slice(0, 6000) };
+  return {
+    id: id || null,
+    apply_url,
+    company: text(j.company, 120),
+    title: text(j.title, 160),
+    location: text(j.location, 200),
+    description: String(typeof j.description === "string" ? j.description : "").slice(0, 6000),
+  };
 }
 
 // The offer bar's record ({url, company, title, at} as JSON text) as a job, or null. Only a posting on a
 // supported job site, and only a recent one: anything else is ignored.
 export function wantedJob(raw, now = Date.now()) {
   let w;
-  try { w = typeof raw === "string" && raw.length < 5000 ? JSON.parse(raw) : null; } catch (e) { return null; }
+  try {
+    w = typeof raw === "string" && raw.length < 5000 ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
   if (!w || typeof w !== "object") return null;
   const at = Number(w.at);
   if (!Number.isFinite(at) || at > now + 5 * 60e3 || now - at > WANTED_TTL_MS) return null;
@@ -52,7 +70,9 @@ export function wantedJob(raw, now = Date.now()) {
 
 async function read(now) {
   const list = (await chrome.storage.local.get(HELD_KEY))[HELD_KEY];
-  return (Array.isArray(list) ? list : []).filter((j) => j && j.apply_url && now - (j.at || 0) < HELD_TTL_MS);
+  return (Array.isArray(list) ? list : []).filter(
+    (j) => j && j.apply_url && now - (j.at || 0) < HELD_TTL_MS,
+  );
 }
 
 // Adds jobs (already cleaned or not), newest last, one per apply link, at most HELD_MAX. Returns the count held.
@@ -70,10 +90,17 @@ export async function holdJobs(list, from = "dashboard", now = Date.now()) {
   return kept.length;
 }
 
-export async function heldJobs(now = Date.now()) { return read(now); }
+export async function heldJobs(now = Date.now()) {
+  return read(now);
+}
 
 // What the setup page shows: names only.
-export const heldSummary = (list) => (list || []).map((j) => ({ company: j.company || "", title: j.title || "", host: hostOf(j.apply_url) }));
+export const heldSummary = (list) =>
+  (list || []).map((j) => ({
+    company: j.company || "",
+    title: j.title || "",
+    host: hostOf(j.apply_url),
+  }));
 
 // Hands back the held jobs, for addJobs, and forgets them.
 export async function takeHeld(now = Date.now()) {
@@ -86,7 +113,10 @@ export const clearHeld = () => chrome.storage.local.remove(HELD_KEY);
 
 // One plain sentence for the setup page: "Acme, Software Intern" or "a posting on x.myworkdayjobs.com".
 export function heldLine(list) {
-  const name = (j) => (j.company && j.title ? `${j.company}, ${j.title}` : j.company || j.title || `a posting on ${j.host}`);
+  const name = (j) =>
+    j.company && j.title
+      ? `${j.company}, ${j.title}`
+      : j.company || j.title || `a posting on ${j.host}`;
   const n = (list || []).length;
   if (!n) return "";
   if (n === 1) return `Before setup you picked a posting to Auto-Apply: ${name(list[0])}.`;

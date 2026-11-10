@@ -34,16 +34,24 @@ async function write(q, fresh = null) {
     } catch (e) {
       if (j.id !== fresh) continue; // an older job: leave its file on it, as it was, and try again next write
       // Storage refused the file. The job must not be lost over it: it goes on with the original resume.
-      j.tailored = { status: "failed", error: "The browser had no room to keep the tailored resume, so your original is used." };
+      j.tailored = {
+        status: "failed",
+        error: "The browser had no room to keep the tailored resume, so your original is used.",
+      };
     }
   }
   await chrome.storage.local.set({ [KEY]: q });
-  for (const f of listeners) try { f(q); } catch (e) {}
+  for (const f of listeners)
+    try {
+      f(q);
+    } catch (e) {}
 }
 
 export const onQueueChange = (fn) => listeners.add(fn);
 export const getQueue = read;
-export async function getJob(id) { return (await read()).jobs[id]; }
+export async function getJob(id) {
+  return (await read()).jobs[id];
+}
 // The tailored file with its bytes, or null. A job saved before the bytes moved still has them on it.
 export async function getTailoredFile(id) {
   const j = await getJob(id);
@@ -57,13 +65,27 @@ export async function getTailoredFile(id) {
 export function publicJob(j) {
   if (!j) return null;
   const { pending, fastDone, tailored, ...rest } = j;
-  const t = tailored && { ...tailored, file: tailored.file ? { name: tailored.file.name, size: tailored.file.size } : null };
+  const t = tailored && {
+    ...tailored,
+    file: tailored.file ? { name: tailored.file.name, size: tailored.file.size } : null,
+  };
   return { ...rest, tailored: t || null, waiting: !!(pending && pending.waitId) };
 }
 export function publicQueue(q) {
   // was: publicJob(v) alone. tailor_wait and batch_left (U5) are worked out from the whole queue.
-  return { order: q.order, jobs: Object.fromEntries(Object.entries(q.jobs).map(([k, v]) => [k, {
-    ...publicJob(v), tailor_wait: tailorWaiting(q, v), batch_left: batchLeft(q, v) }])) };
+  return {
+    order: q.order,
+    jobs: Object.fromEntries(
+      Object.entries(q.jobs).map(([k, v]) => [
+        k,
+        {
+          ...publicJob(v),
+          tailor_wait: tailorWaiting(q, v),
+          batch_left: batchLeft(q, v),
+        },
+      ]),
+    ),
+  };
 }
 
 // ---------- tailored resumes in a batch (U5, 2026-10-14 UX audit) ----------
@@ -75,12 +97,15 @@ export function publicQueue(q) {
 // "for all" answers (batch_tailor on every job of the batch): tailored for all, or the original for all.
 // Answering only for that one job ("Use tailored", "Use my original") keeps asking job by job, as before.
 // The student still checks every application and presses Submit themselves.
-const pendingTailor = (k) => k.status === "needs_you" && !!k.tailored && k.tailored.status === "pending";
+const pendingTailor = (k) =>
+  k.status === "needs_you" && !!k.tailored && k.tailored.status === "pending";
 
 // A queued job that waits because another job of its batch is waiting on the tailored-resume question.
 export function tailorWaiting(q, j) {
   if (!j || j.status !== "queued" || !j.batch || j.batch_tailor) return false;
-  return Object.values(q.jobs).some((k) => k.id !== j.id && k.batch === j.batch && pendingTailor(k));
+  return Object.values(q.jobs).some(
+    (k) => k.id !== j.id && k.batch === j.batch && pendingTailor(k),
+  );
 }
 
 // How many other jobs of this job's batch a "for all" answer would still decide: ones waiting on their own
@@ -88,8 +113,12 @@ export function tailorWaiting(q, j) {
 // chosen isn't counted.
 export function batchLeft(q, j) {
   if (!j || !j.batch) return 0;
-  return Object.values(q.jobs).filter((k) => k.id !== j.id && k.batch === j.batch
-    && (pendingTailor(k) || (["queued", "needs_you"].includes(k.status) && !k.tailored))).length;
+  return Object.values(q.jobs).filter(
+    (k) =>
+      k.id !== j.id &&
+      k.batch === j.batch &&
+      (pendingTailor(k) || (["queued", "needs_you"].includes(k.status) && !k.tailored)),
+  ).length;
 }
 
 // The "for all" answer: every job of the batch remembers it; returns the ids of jobs of the batch whose
@@ -126,25 +155,52 @@ export function tailorChoice(mode, batch) {
 // waiting on the student; background/index.js schedule() asks this before starting one.
 export function studentBusyOn(q, activeTabId) {
   if (activeTabId == null) return null;
-  return Object.values(q.jobs).find((j) => j.tabId === activeTabId && ["needs_you", "ready_to_submit"].includes(j.status)) || null;
+  return (
+    Object.values(q.jobs).find(
+      (j) => j.tabId === activeTabId && ["needs_you", "ready_to_submit"].includes(j.status),
+    ) || null
+  );
 }
 
 export function addJobs(list) {
   return withLock(async () => {
     const q = await read();
-    const added = [], skipped = [];
+    const added = [],
+      skipped = [];
     // One Auto-Apply press is one batch (U5): the jobs it adds ask the tailored-resume question once.
     const batch = "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     for (const l of list) {
       if (!l || !/^https?:\/\//i.test(String(l.apply_url || ""))) continue;
-      const dup = Object.values(q.jobs).find((j) => ((l.id != null && j.listingId === l.id) || j.apply_url === l.apply_url) && !["failed"].includes(j.status));
-      if (dup) { skipped.push(dup.id); continue; }
+      const dup = Object.values(q.jobs).find(
+        (j) =>
+          ((l.id != null && j.listingId === l.id) || j.apply_url === l.apply_url) &&
+          !["failed"].includes(j.status),
+      );
+      if (dup) {
+        skipped.push(dup.id);
+        continue;
+      }
       const id = "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       q.jobs[id] = {
-        id, listingId: l.id ?? null, company: l.company || "", title: l.title || "", location: l.location || "",
-        apply_url: l.apply_url, description: String(l.description || "").slice(0, 6000),
-        status: "queued", reason: "", question: "", activity: "", summary: "", double_check: [],
-        tabId: l.tabId ?? null, steps: 0, log: [], created: Date.now(), updated: Date.now(), batch,
+        id,
+        listingId: l.id ?? null,
+        company: l.company || "",
+        title: l.title || "",
+        location: l.location || "",
+        apply_url: l.apply_url,
+        description: String(l.description || "").slice(0, 6000),
+        status: "queued",
+        reason: "",
+        question: "",
+        activity: "",
+        summary: "",
+        double_check: [],
+        tabId: l.tabId ?? null,
+        steps: 0,
+        log: [],
+        created: Date.now(),
+        updated: Date.now(),
+        batch,
       };
       q.order.push(id);
       added.push(id);
@@ -159,14 +215,18 @@ export function updateJob(id, patch) {
     const q = await read();
     if (!q.jobs[id]) return null;
     const had = !!(q.jobs[id].tailored && q.jobs[id].tailored.file && q.jobs[id].tailored.file.b64);
-    Object.assign(q.jobs[id], typeof patch === "function" ? patch(q.jobs[id]) : patch, { updated: Date.now() });
-    await write(q, had ? null : id);   // was: await write(q);
+    Object.assign(q.jobs[id], typeof patch === "function" ? patch(q.jobs[id]) : patch, {
+      updated: Date.now(),
+    });
+    await write(q, had ? null : id); // was: await write(q);
     return q.jobs[id];
   });
 }
 
 export function appendLog(id, entry) {
-  return updateJob(id, (j) => ({ log: [...(j.log || []), { at: Date.now(), ...entry }].slice(-200) }));
+  return updateJob(id, (j) => ({
+    log: [...(j.log || []), { at: Date.now(), ...entry }].slice(-200),
+  }));
 }
 
 export function removeJob(id) {
@@ -174,15 +234,23 @@ export function removeJob(id) {
     const q = await read();
     delete q.jobs[id];
     q.order = q.order.filter((x) => x !== id);
-    await chrome.storage.local.remove(["msgs_" + id, BLOB(id)]);   // was: only "msgs_" + id
+    await chrome.storage.local.remove(["msgs_" + id, BLOB(id)]); // was: only "msgs_" + id
     await write(q);
   });
 }
 
 export async function jobForTab(tabId) {
   const q = await read();
-  return Object.values(q.jobs).find((j) => j.tabId === tabId && !["submitted", "failed"].includes(j.status)) || null;
+  return (
+    Object.values(q.jobs).find(
+      (j) => j.tabId === tabId && !["submitted", "failed"].includes(j.status),
+    ) || null
+  );
 }
 
-export async function saveMsgs(id, msgs) { await chrome.storage.local.set({ ["msgs_" + id]: msgs }); }
-export async function loadMsgs(id) { return (await chrome.storage.local.get("msgs_" + id))["msgs_" + id] || []; }
+export async function saveMsgs(id, msgs) {
+  await chrome.storage.local.set({ ["msgs_" + id]: msgs });
+}
+export async function loadMsgs(id) {
+  return (await chrome.storage.local.get("msgs_" + id))["msgs_" + id] || [];
+}

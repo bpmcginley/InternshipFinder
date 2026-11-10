@@ -3,17 +3,35 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NOW, setup } from "./helpers.js";
 import { readFileSync } from "node:fs";
-import { ALL_PER_DAY, LIMITS, PER_ADDRESS_PER_DAY, WANTS, WANTS_NOW, WANTS_OLD, cleanLead, dropOldLeads } from "../src/leads.js";
+import {
+  ALL_PER_DAY,
+  LIMITS,
+  PER_ADDRESS_PER_DAY,
+  WANTS,
+  WANTS_NOW,
+  WANTS_OLD,
+  cleanLead,
+  dropOldLeads,
+} from "../src/leads.js";
 import { cleanup } from "../src/limits.js";
 
 const SITE = { Origin: "https://internscout.org", "CF-Connecting-IP": "203.0.113.7" };
 const GOOD = {
-  name: "  Dana   Reyes ", email: "dana.reyes@example.com", company: "Example Robotics",
-  title: "University Recruiting Lead", hiring_for: "mechanical and electrical engineering",
-  wants: ["board", "placement", "made-up"], message: "Summer 2027 interns.\r\nAbout 20 roles.", website: "",
+  name: "  Dana   Reyes ",
+  email: "dana.reyes@example.com",
+  company: "Example Robotics",
+  title: "University Recruiting Lead",
+  hiring_for: "mechanical and electrical engineering",
+  wants: ["board", "placement", "made-up"],
+  message: "Summer 2027 interns.\r\nAbout 20 roles.",
+  website: "",
 };
 const send = (w, body, headers = SITE) => w.api("POST", "/employer-interest", { body, headers });
-const leads = (w) => w.db.prepare("SELECT * FROM employer_leads ORDER BY id").all().then((r) => r.results);
+const leads = (w) =>
+  w.db
+    .prepare("SELECT * FROM employer_leads ORDER BY id")
+    .all()
+    .then((r) => r.results);
 const events = (w) => w.db.dump().event_counts.filter((r) => r.event === "employer_interest");
 
 test("a good send is stored, cleaned, and counted as a step", async () => {
@@ -23,22 +41,40 @@ test("a good send is stored, cleaned, and counted as a step", async () => {
   assert.deepEqual(await res.json(), { ok: true });
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://internscout.org");
   const [row] = await leads(w);
-  assert.deepEqual({ ...row, id: undefined }, {
-    id: undefined, created: NOW.toISOString(), name: "Dana Reyes", email: "dana.reyes@example.com",
-    company: "Example Robotics", title: "University Recruiting Lead",
-    hiring_for: "mechanical and electrical engineering",
-    // In the form's order, unknown boxes dropped.
-    wants: "placement,board", message: "Summer 2027 interns.\nAbout 20 roles.",
-  });
+  assert.deepEqual(
+    { ...row, id: undefined },
+    {
+      id: undefined,
+      created: NOW.toISOString(),
+      name: "Dana Reyes",
+      email: "dana.reyes@example.com",
+      company: "Example Robotics",
+      title: "University Recruiting Lead",
+      hiring_for: "mechanical and electrical engineering",
+      // In the form's order, unknown boxes dropped.
+      wants: "placement,board",
+      message: "Summer 2027 interns.\nAbout 20 roles.",
+    },
+  );
   // No address in the row; the rate count is under a salted hash, never the address itself.
   assert.ok(!JSON.stringify(row).includes("203.0.113.7"));
   assert.ok(!JSON.stringify(w.db.dump().rate).includes("203.0.113.7"));
-  assert.deepEqual(events(w), [{ day: "2026-09-14", event: "employer_interest", page: "employers", n: 1 }]);
+  assert.deepEqual(events(w), [
+    { day: "2026-09-14", event: "employer_interest", page: "employers", n: 1 },
+  ]);
 });
 
 test("the first form's boxes are still accepted from a cached page, and stored before the new ones", async () => {
   const w = await setup();
-  assert.equal((await send(w, { ...GOOD, wants: ["other", "promoted", "details", "featured", "majors_schools"] })).status, 200);
+  assert.equal(
+    (
+      await send(w, {
+        ...GOOD,
+        wants: ["other", "promoted", "details", "featured", "majors_schools"],
+      })
+    ).status,
+    200,
+  );
   const [row] = await leads(w);
   assert.equal(row.wants, "featured,promoted,majors_schools,details,other");
   assert.deepEqual(WANTS, [...WANTS_OLD, ...WANTS_NOW]);
@@ -49,8 +85,19 @@ test("the employers page offers exactly the current boxes, and none of the old o
   const boxes = [...html.matchAll(/name="wants" value="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(boxes, WANTS_NOW);
   // The placement rule: nothing promises rank, targeting or applicants, and the label words are never used.
-  const text = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
-  for (const banned of [/promoted/i, /sponsored/i, /featured/i, /reach students/i, /specific majors/i, /more applicants/i, /—/]) {
+  const text = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<script[\s\S]*?<\/script>/g, "")
+    .replace(/<[^>]+>/g, " ");
+  for (const banned of [
+    /promoted/i,
+    /sponsored/i,
+    /featured/i,
+    /reach students/i,
+    /specific majors/i,
+    /more applicants/i,
+    /—/,
+  ]) {
     assert.doesNotMatch(text, banned);
   }
   assert.match(text, /free for every employer, whether or not you ever pay/);
@@ -100,7 +147,11 @@ test("each field is checked and the answer names it", async () => {
 });
 
 test("limits are counted after trimming, and control characters are dropped", () => {
-  const lead = cleanLead({ ...GOOD, name: " " + "n".repeat(LIMITS.name) + " ", company: "Acme\u0000\u0007 Inc" });
+  const lead = cleanLead({
+    ...GOOD,
+    name: " " + "n".repeat(LIMITS.name) + " ",
+    company: "Acme\u0000\u0007 Inc",
+  });
   assert.equal(lead.name.length, LIMITS.name);
   assert.equal(lead.company, "Acme Inc");
 });
@@ -133,13 +184,17 @@ test("only the live site can send, so a local copy never writes a lead", async (
     if (!Origin) delete headers.Origin;
     assert.equal((await send(w, GOOD, headers)).status, 403, String(Origin));
   }
-  assert.equal((await send(w, GOOD, { ...SITE, Origin: "https://bpmcginley.github.io" })).status, 200);
+  assert.equal(
+    (await send(w, GOOD, { ...SITE, Origin: "https://bpmcginley.github.io" })).status,
+    200,
+  );
   assert.equal((await leads(w)).length, 1);
 });
 
 test("one address gets a few sends a day, and the next day it starts again", async () => {
   const w = await setup();
-  for (let i = 0; i < PER_ADDRESS_PER_DAY; i++) assert.equal((await send(w, GOOD)).status, 200, `send ${i + 1}`);
+  for (let i = 0; i < PER_ADDRESS_PER_DAY; i++)
+    assert.equal((await send(w, GOOD)).status, 200, `send ${i + 1}`);
   const res = await send(w, GOOD);
   assert.equal(res.status, 429);
   const out = await res.json();
@@ -151,12 +206,21 @@ test("one address gets a few sends a day, and the next day it starts again", asy
   // The next day the address may send again.
   w.setNow(new Date("2026-09-15T09:00:00Z"));
   assert.equal((await send(w, GOOD)).status, 200);
-  assert.deepEqual(events(w).map((r) => [r.day, r.n]), [["2026-09-14", PER_ADDRESS_PER_DAY + 1], ["2026-09-15", 1]]);
+  assert.deepEqual(
+    events(w).map((r) => [r.day, r.n]),
+    [
+      ["2026-09-14", PER_ADDRESS_PER_DAY + 1],
+      ["2026-09-15", 1],
+    ],
+  );
 });
 
 test("a flood from many addresses stops at the day's total", async () => {
   const w = await setup();
-  await w.db.prepare("INSERT INTO rate (user_hash, bucket, calls) VALUES ('lead:*', 'd:2026-09-14', ?)").bind(ALL_PER_DAY).run();
+  await w.db
+    .prepare("INSERT INTO rate (user_hash, bucket, calls) VALUES ('lead:*', 'd:2026-09-14', ?)")
+    .bind(ALL_PER_DAY)
+    .run();
   const res = await send(w, GOOD);
   assert.equal(res.status, 429);
   assert.equal((await leads(w)).length, 0);
@@ -173,7 +237,10 @@ test("the daily cron sweeps the rate counts and drops leads after a year", async
   await dropOldLeads(w.db, new Date("2027-03-04T07:17:00Z"));
   assert.equal((await leads(w)).length, 2, "both are under a year old");
   await dropOldLeads(w.db, new Date("2027-09-15T07:17:00Z"));
-  assert.deepEqual((await leads(w)).map((r) => r.email), ["later@example.com"]);
+  assert.deepEqual(
+    (await leads(w)).map((r) => r.email),
+    ["later@example.com"],
+  );
 });
 
 test("a preflight from the site is allowed", async () => {
