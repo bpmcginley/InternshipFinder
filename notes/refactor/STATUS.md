@@ -37,7 +37,7 @@ All six suites passed; tracked baseline files remained unchanged. The isolated d
 
 | Wave | Package | Owner | Branch | PR | State | Next step / constraint |
 |---|---|---|---|---|---|---|
-| 0 | Status tracker | read_worker | `refactor/status-tracker` | Pending | In progress | Consolidate audits and baseline; second-agent review before merge. |
+| 0 | Status tracker | read_worker | `refactor/status-tracker` | [#168](https://github.com/bpmcginley/InternshipFinder/pull/168) | In review | Audits and baseline consolidated; second-agent review and green CI before merge. |
 | 0 | WP-0.1 Internal notes | Unassigned | - | - | Queued | Move tracked notes, update references, enforce publication allow list; approved URL removal. |
 | 1 | WP-0.2 Golden build | Unassigned | - | - | Queued | Full actual build, fixed data/clock, two reproducible passes, deliberate mutation rejection. |
 | 1 | WP-0.4 Type checks | Unassigned | - | - | Queued | Report-only Python/worker checks; record initial counts. |
@@ -187,6 +187,7 @@ None. No worker refactor PR has merged, and no production action has been taken.
 | PR / package | Commit | Review / CI | Pages | Result |
 |---|---|---|---|---|
 | [#167 Hand-offs](https://github.com/bpmcginley/InternshipFinder/pull/167) | `00cf10e0` | Independent agent review; all checks green | [Green run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42859546750) | Merged; documentation only. |
+| [#168 Status tracker](https://github.com/bpmcginley/InternshipFinder/pull/168) | Pending merge | Independent review and CI pending | After merge | Open; documentation only. |
 
 ## Next update
 
