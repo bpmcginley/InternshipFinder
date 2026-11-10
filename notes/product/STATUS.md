@@ -23,7 +23,8 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | A | P-1.2 First screen | Unassigned | - | - | Queued | After P-1.1; plan-text edits require Bruce. |
 | A | P-1.3 Rows | Unassigned | - | - | Queued | After P-1.2; display-only data changes. |
 | A | P-1.4 Save and My list | Unassigned | - | - | Queued | After P-1.3; preserve existing statuses and return prompt. |
-| A | P-1.7 Non-generated distribution | Unassigned | - | - | Queued | Split app/install ownership; README portion waits for #165; email text needs Bruce. |
+| A | P-1.7a Widget builder and feed guide | audit_growth_generated | `codex/product-p1.7-widget-guide` | - | In progress | Separate builder preserves embed; guide uses existing feeds; screenshots and independent review required. |
+| A | P-1.7 Remaining non-generated distribution | Unassigned | - | - | Queued | Dashboard/install links separate; README waits for #165; email text needs Bruce. |
 | A | P-1.10 Flyer page | Unassigned | - | - | Queued | Browser-local QR; no third-party requests. |
 | A | P-1.11 Install and offer | Unassigned | - | - | Queued | Preserve permissions explanation; demo clip from Bruce. |
 | A | P-2.1 Follow design | Unassigned | - | - | Queued | Note first; needs-bruce before implementation. |
