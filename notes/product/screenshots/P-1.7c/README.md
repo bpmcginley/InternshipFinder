@@ -60,3 +60,17 @@ Ruff checks passed. Final golden and CI outcomes are recorded in the PR.
 The site startup report is not applicable: no dashboard, public site asset, or
 startup-loading behavior changes. Golden fixtures are not refreshed. No email,
 workflow dispatch, production API call, deployment, or extension release occurred.
+
+Technical integration after #208: main `0e63c13b` and its data refresh `fb62c4f0`
+were merged normally, retaining current data, public assets, cache-version build and golden manifest/archive
+without refresh. Only this package's new footer test moved, byte-identically,
+from `backend/tests/test_digest_footer.py` to `growth/tests/test_digest_footer.py`
+to follow #199's packaging layout. Digest source, fixture, HTML/text previews and
+all four screenshots remain identical to reviewed head `06b14973`. Rendering the
+synthetic fixture after integration reproduces both saved after previews exactly.
+
+Python 3.12 validation in an isolated editable environment: 111 digest, mocked
+sender, footer and packaging tests passed; both golden tests passed; scoped
+Ruff 0.17.4 and `git diff --check` passed. No existing moved test was edited.
+Final integration review and all CI checks are tracked in PR #202. Email-copy
+approval and merge remain Bruce's; technical integration grants neither.
