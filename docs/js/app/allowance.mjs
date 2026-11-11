@@ -76,7 +76,7 @@ export function createAllowance(browser, {
           : h("button", { type: "button", className: "btn", disabled: status === "loading", onClick: onLoad }, status === "loading" ? "Loading invite link…" : status === "error" ? "Retry invite link" : "Get my invite link")),
       h("p", { className: "muted", role: "status" }, status === "error" ? "Couldn't load your invite link. Try again." : note));
   }
-  function AllowancePanel({ signedIn, me, status, cfgStatus, allowance, resetDay, plans, busy, signIn, inviteBlock, onRetry, onConfigRetry, onCheckout, onClose }) {
+  function AllowancePanel({ signedIn, me, status, cfgStatus, allowance, resetDay, plans, busy, signIn, inviteBlock, topup, onRetry, onConfigRetry, onCheckout, onClose }) {
     return h("section", { id: "allowance-panel", className: "notice allowance-panel", "aria-labelledby": "allowance-title", tabIndex: -1 },
       h("h2", { id: "allowance-title" }, allowance && allowance.exhausted ? "No Auto-Apply runs left in your allowance" : "Your Auto-Apply allowance"),
       h("p", { id: "allowance-status", role: "status", "aria-live": "polite", "aria-atomic": true }, !signedIn ? ""
@@ -89,6 +89,13 @@ export function createAllowance(browser, {
           allowance.bonus > 0 && h("p", null, `Includes ${allowance.bonus.toLocaleString()} extra runs. Extra runs do not expire.`),
           h("p", { className: "muted" }, me.paused ? "AI use is temporarily paused. Search still works." : allowance.disabled ? "Auto-Apply is currently unavailable for this account." : "Per-run and other service limits can still apply."),
           !allowance.disabled && !me.paused && inviteBlock),
+      topup && h("section", { "aria-label": "Extra Auto-Apply runs" },
+        h("p", { role: "status", "aria-live": "polite", "aria-atomic": true }, topup.status === "loading" ? "Loading extra runs…" : topup.status === "error" ? TOPUP_UNAVAILABLE : topup.status === "opening" ? "Opening Stripe…" : ""),
+        topup.verified && h(F, null,
+          h("h3", null, "25 extra Auto-Apply runs for $3"),
+          h("p", null, "One payment. No subscription. Your extra runs do not expire. Tax, if any, is shown at checkout."),
+          h("p", null, "We use your monthly allowance first, then your extra runs. A run can fill one application. You still review and submit it yourself. Service limits still apply.")),
+        h("button", { id: "topup-action", type: "button", className: "btn", style: { minHeight: 44 }, "aria-disabled": !!busy || ["loading", "opening"].includes(topup.status), onClick: () => { if (!busy && !["loading", "opening"].includes(topup.status)) (topup.status === "error" ? topup.retry : topup.buy)(); } }, topup.status === "loading" ? "Loading extra runs…" : topup.status === "error" ? "Retry extra runs" : "Buy 25 extra runs")),
       cfgStatus === "error" && h(F, null, h("p", { role: "status" }, "Couldn't load account options."), h("button", { type: "button", className: "btn", onClick: onConfigRetry }, "Retry account options")),
       signedIn && allowance && h("div", { className: "allowance-plans" }, h("h3", null, "Available plans"),
         plans.length ? plans.map(pl => h("button", { key: pl.plan, type: "button", className: "btn", disabled: !!busy || status !== "ready", onClick: () => onCheckout(pl.plan) }, `${pl.label || IS.PLAN_LABELS[pl.plan] || pl.plan}${pl.price ? ` · ${pl.price}` : ""}`))
@@ -177,3 +184,92 @@ export async function billingAction({
     if (r && r.url) browser.location.assign(r.url);
     else setNote((r && r.error) || "Couldn't open billing. Try again.");
   }
+
+
+export const TOPUP_UNAVAILABLE = "Extra runs are not available right now. Your current allowance is unchanged.";
+export function topupEligible({ open, auth, cfgStatus, meStatus, allowance }) {
+  return !!(open && cfgStatus === "ready" && auth.cfg?.topups === true &&
+    typeof auth.token === "string" && auth.token.startsWith("iss_") &&
+    meStatus === "ready" && allowance?.exhausted && !allowance.disabled && !allowance.unlimited);
+}
+export function topupCheckoutUrl(value) {
+  if (typeof value !== "string" || value.length > 8192 || /[\\\s<>"]/.test(value)) return null;
+  try {
+    const u = new URL(value);
+    return u.origin === "https://checkout.stripe.com" && !u.username && !u.password &&
+      !value.slice(0, value.indexOf(u.pathname, 8)).includes("@") &&
+      /^\/c\/pay\/cs_[A-Za-z0-9_]{1,250}$/.test(u.pathname) ? value : null;
+  } catch { return null; }
+}
+// All response state belongs to this mounted panel and auth generation, never storage.
+export function createTopupActions(browser, { context, update, lock, onPurchase = () => {}, deadlineMs = 8000 }) {
+  let sequence = 0, active = null, verified = null;
+  const same = c => {
+    const n = context();
+    return n.eligible && n.token === c.token && n.generation === c.generation && n.workerUrl === c.workerUrl;
+  };
+  const cancel = () => { sequence++; active?.abort(); active = null; verified = null; };
+  async function request(path, method, c, controller) {
+    const base = new URL(c.workerUrl);
+    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/") throw Error("base");
+    const url = base.origin + path, started = browser.performance.now();
+    let last = started, reader, timer;
+    const check = () => {
+      const now = browser.performance.now();
+      if (!Number.isFinite(now) || now < last || now - started >= deadlineMs || controller.signal.aborted || !same(c)) throw Error("expired");
+      last = now;
+    };
+    const expired = new Promise((_, reject) => { timer = browser.setTimeout(() => { controller.abort(); reject(Error("timeout")); }, deadlineMs); });
+    const work = async () => {
+      check();
+      const response = await browser.fetch(url, { method, headers: { Authorization: "Bearer " + c.token }, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer", signal: controller.signal });
+      check();
+      if (response.status !== 200 || response.redirected || response.url !== url || !/(?:^|,)\s*no-store\s*(?:,|$)/i.test(response.headers.get("cache-control") || "")) throw Error("response");
+      if (Number(response.headers.get("content-length")) > 16384 || !response.body) throw Error("size");
+      reader = response.body.getReader();
+      let size = 0, text = "";
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      while (true) {
+        const part = await reader.read(); check();
+        if (part.done) break;
+        size += part.value.byteLength;
+        if (size > 16384) throw Error("size");
+        text += decoder.decode(part.value, { stream: true });
+      }
+      text += decoder.decode(); check();
+      return JSON.parse(text);
+    };
+    try { return await Promise.race([work(), expired]); }
+    finally { browser.clearTimeout(timer); controller.abort(); if (reader) void reader.cancel().catch(() => {}); }
+  }
+  async function load() {
+    if (active) return;
+    const c = { ...context() }; if (!c.eligible) return;
+    verified = null;
+    const seq = ++sequence, controller = new AbortController(); active = controller;
+    update({ status: "loading", verified: false });
+    try {
+      const r = await request("/billing/topup/offer", "GET", c, controller);
+      if (seq !== sequence || !same(c)) return;
+      if (r?.enabled !== true || r.offer?.amount !== 300 || r.offer?.currency !== "usd" || r.offer?.units !== 25) throw Error("offer");
+      verified = c; update({ status: "ready", verified: true });
+    } catch { if (seq === sequence && same(c)) update({ status: "error", verified: false }); }
+    finally { if (seq === sequence) active = null; }
+  }
+  async function buy() {
+    if (active || lock.current || !verified || !same(verified)) return;
+    const c = verified, seq = ++sequence, controller = new AbortController(), ticket = { kind: "topup" };
+    active = controller; lock.current = ticket; verified = null;
+    onPurchase();
+    update({ status: "opening", verified: true });
+    try {
+      const r = await request("/billing/topup/checkout", "POST", c, controller);
+      if (seq !== sequence || !same(c)) return;
+      const url = r?.status === "open" && topupCheckoutUrl(r.url);
+      if (!url) throw Error("checkout");
+      browser.location.assign(url);
+    } catch { if (seq === sequence && same(c)) update({ status: "error", verified: false }); }
+    finally { if (lock.current === ticket) lock.current = null; if (seq === sequence) active = null; }
+  }
+  return { load, buy, cancel };
+}
