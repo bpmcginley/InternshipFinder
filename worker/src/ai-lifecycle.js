@@ -15,7 +15,7 @@ import { canUpgrade } from "./billing.js";
 import { countEvent } from "./visits.js";
 import { reserveFirstFundedRun } from "./funded-run-admission.js";
 import { reserveFundedSibling } from "./funded-run-sibling.js";
-import { purchaseFrom, purchaseSpendable } from "./funded-purchase.js";
+import { purchasedRunsFor } from "./funded-purchase.js";
 import { fundedProviderResponse } from "./funded-provider.js";
 import { releaseFundedCall } from "./funded-run-callbacks.js";
 import { costCents, geminiUrl } from "./gemini.js";
@@ -101,19 +101,7 @@ export async function admitAiLifecycle(
           .first()
       )?.n || 0,
     );
-    purchased = allowPurchased
-      ? (
-          await db
-            .prepare(
-              "SELECT COALESCE(SUM(p.available),0) AS n " +
-                purchaseFrom +
-                " WHERE p.user_hash=? AND " +
-                purchaseSpendable,
-            )
-            .bind(user)
-            .first()
-        ).n
-      : 0;
+    purchased = allowPurchased ? await purchasedRunsFor(db, user) : 0;
   } catch {
     throw busy();
   }

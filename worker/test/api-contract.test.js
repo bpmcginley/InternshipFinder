@@ -151,7 +151,7 @@ test("webhook body bounds and placement JSON shape precede their downstream gate
   });
 });
 
-test("the original router's offline response bytes and headers stay fixed", async () => {
+test("offline routes match the original capture and signed-in cache policy", async () => {
   const fixture = JSON.parse(
     readFileSync(new URL("./fixtures/route-baseline.json", import.meta.url), "utf8"),
   );
@@ -171,7 +171,10 @@ test("the original router's offline response bytes and headers stay fixed", asyn
   const actual = await captureRouteResponses();
   assert.deepEqual(Object.keys(actual), Object.keys(fixture.responses));
   for (const [label, expected] of Object.entries(fixture.responses)) {
-    assert.deepEqual(actual[label], expected, label);
+    const headers = label === "me-synthetic-session"
+      ? { ...expected.headers, "cache-control": "no-store" }
+      : expected.headers;
+    assert.deepEqual(actual[label], { ...expected, headers }, label);
   }
 });
 
