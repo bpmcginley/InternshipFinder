@@ -359,3 +359,131 @@ export async function fundedSseUsageTrailerRequiresTerminalOutput(db) {
     assert.equal((await stored(db))?.state, extraContent ? "accepted" : undefined);
   }
 }
+export async function fundedMonotonicDeadlineCannotBeStarved(db) {
+  for (const phase of ["send", "read", "stream", "accept", "price"]) {
+    const options = await setup(db);
+    let elapsed = 0;
+    const delayed = {
+      prepare: db.prepare.bind(db),
+      batch: async (list) => {
+        const value = await db.batch(list);
+        if (phase === "accept") elapsed = 40;
+        return value;
+      },
+    };
+    const send = async () => {
+      if (phase === "send") elapsed = 40;
+      if (!["read", "stream"].includes(phase)) return new Response(JSON.stringify(answer()));
+      let pulls = 0;
+      return new Response(
+        new ReadableStream({
+          pull(c) {
+            if (++pulls === 1) c.enqueue(encoder.encode(phase === "stream" ? ": wait\n\n" : " "));
+            else {
+              elapsed = 40;
+              c.enqueue(
+                encoder.encode(phase === "stream" ? frame(answer()) : JSON.stringify(answer())),
+              );
+              c.close();
+            }
+          },
+        }),
+      );
+    };
+    await assert.rejects(
+      () =>
+        boundary({
+          ...options,
+          db: delayed,
+          send,
+          stream: phase === "stream",
+          limits: { ...limits, deadlineMs: 1 },
+          clock: () => elapsed,
+          setTimer: () => 1,
+          clearTimer: () => {},
+          price: () => {
+            if (phase === "price") elapsed = 40;
+            return 2;
+          },
+        }),
+      (e) => e.code === "upstream",
+    );
+    assert.equal(await budget(db), 6);
+    assert.equal(
+      (await stored(db)).state,
+      ["accept", "price"].includes(phase) ? "accepted" : "reserved",
+    );
+  }
+}
+export async function fundedCancelDuringPendingReadIsNotCleanEof(db) {
+  const options = await setup(db);
+  let cancelled = false;
+  const source = new ReadableStream({
+    start(c) {
+      c.enqueue(encoder.encode(frame(answer())));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  const result = await boundary({
+    ...options,
+    stream: true,
+    send: async () => new Response(source),
+  });
+  const reader = result.response.body.getReader();
+  await reader.read();
+  const pending = reader.read();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await reader.cancel();
+  await pending;
+  await result.completion;
+  assert.equal(cancelled, true);
+  assert.equal(await budget(db), 6);
+  assert.equal((await stored(db)).state, "accepted");
+}
+export async function fundedCancelWaitsForAlreadyRunningMeter(db) {
+  const options = await setup(db);
+  let calls = 0,
+    startMeter,
+    releaseMeter;
+  const started = new Promise((resolve) => {
+    startMeter = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    releaseMeter = resolve;
+  });
+  const delayed = {
+    prepare: db.prepare.bind(db),
+    batch: async (list) => {
+      const result = await db.batch(list);
+      if (++calls === 2) {
+        startMeter();
+        await gate;
+      }
+      return result;
+    },
+  };
+  const result = await boundary({
+    ...options,
+    db: delayed,
+    stream: true,
+    send: async () => new Response(frame(answer())),
+  });
+  let completed = false;
+  result.completion.then(() => {
+    completed = true;
+  });
+  const reader = result.response.body.getReader();
+  await reader.read();
+  const pending = reader.read();
+  await started;
+  await reader.cancel();
+  await pending;
+  assert.equal(completed, false);
+  releaseMeter();
+  await result.completion;
+  assert.equal(completed, true);
+  assert.equal(await budget(db), 2);
+  assert.equal(await stored(db), null);
+}

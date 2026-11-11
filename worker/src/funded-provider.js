@@ -52,6 +52,7 @@ export async function fundedProviderResponse({
   limits,
   setTimer = setTimeout,
   clearTimer = clearTimeout,
+  clock = () => performance.now(),
 }) {
   if (
     !limits ||
@@ -60,18 +61,41 @@ export async function fundedProviderResponse({
     ) ||
     typeof send !== "function" ||
     typeof price !== "function" ||
-    typeof stream !== "boolean"
+    typeof stream !== "boolean" ||
+    typeof clock !== "function"
   )
     throw pendingError();
+  const started = clock();
+  let last = started,
+    expired = false,
+    stopped = false;
+  // Timer tasks can be starved by ready stream reads. The monotonic clock is the
+  // deadline authority; the timer only wakes/cancels an otherwise stalled reader.
+  const checkDeadline = () => {
+    const current = clock();
+    if (
+      !Number.isFinite(current) ||
+      !Number.isFinite(started) ||
+      current < last ||
+      current - started >= limits.deadlineMs
+    )
+      expired = true;
+    last = current;
+    if (expired || stopped) throw upstreamError();
+  };
   let upstream;
   try {
+    checkDeadline();
     upstream = await send();
+    checkDeadline();
   } catch {
+    void upstream?.body?.cancel().catch(() => {});
     throw upstreamError();
   } // Unknown transport: retain reservation.
   if (!(upstream instanceof Response)) throw upstreamError();
   if (!upstream.ok) {
     void upstream.body?.cancel().catch(() => {});
+    checkDeadline();
     await releaseFundedCall(db, identity); // Explicit HTTP rejection, not an uncertain send.
     throw upstreamError();
   }
@@ -80,8 +104,8 @@ export async function fundedProviderResponse({
     decoder = new TextDecoder("utf-8", { fatal: true });
   const chunks = [];
   let total = 0,
-    expired = false,
     closed = false,
+    metering = false,
     accepted = false,
     terminal = false,
     usage = null,
@@ -95,18 +119,23 @@ export async function fundedProviderResponse({
     if (!closed) {
       closed = true;
       clearTimer(timer);
-      settleCompletion();
     }
+    if (!metering) settleCompletion();
   };
   const stop = () => {
+    stopped = true;
     void reader.cancel().catch(() => {});
     finish();
   };
-  const timer = setTimer(() => {
-    expired = true;
-    stop();
-  }, limits.deadlineMs);
+  const timer = setTimer(
+    () => {
+      expired = true;
+      stop();
+    },
+    Math.max(0, limits.deadlineMs - (last - started)),
+  );
   const meter = async () => {
+    checkDeadline();
     if (usage) {
       let cents;
       try {
@@ -114,16 +143,24 @@ export async function fundedProviderResponse({
       } catch {
         return;
       }
-      if (typeof cents === "number" && Number.isFinite(cents) && cents >= 0)
-        await meterFundedCall(db, identity, { cents, usage, model });
+      checkDeadline();
+      if (typeof cents === "number" && Number.isFinite(cents) && cents >= 0) {
+        metering = true;
+        try {
+          await meterFundedCall(db, identity, { cents, usage, model });
+        } finally {
+          metering = false;
+          if (closed) settleCompletion();
+        }
+      }
     }
   };
   const accept = async () => {
-    if (expired) throw upstreamError();
+    checkDeadline();
     const result = await acceptFundedCall(db, identity);
     if (result.status !== "accepted") throw pendingError();
     accepted = true;
-    if (expired) throw upstreamError();
+    checkDeadline();
   };
   const inspect = (data) => {
     const f = facts(data);
@@ -160,8 +197,9 @@ export async function fundedProviderResponse({
     return usable;
   };
   const read = async () => {
+    checkDeadline();
     const result = await reader.read();
-    if (expired) throw upstreamError();
+    checkDeadline();
     if (!result.done) {
       if (!(result.value instanceof Uint8Array)) throw upstreamError();
       total += result.value.byteLength;
@@ -180,6 +218,7 @@ export async function fundedProviderResponse({
       text += decoder.decode();
       const data = JSON.parse(text),
         f = facts(data);
+      checkDeadline();
       if (!f.usable) {
         if (f.terminal) await releaseFundedCall(db, identity);
         throw upstreamError();
@@ -192,17 +231,21 @@ export async function fundedProviderResponse({
         bytes.set(c, offset);
         offset += c.length;
       }
+      checkDeadline();
       clearTimer(timer);
       void meter()
         .catch(() => {})
         .finally(finish);
-      return { response: new Response(bytes, { status: 200, headers }), completion };
+      const response = new Response(bytes, { status: 200, headers });
+      checkDeadline();
+      return { response, completion };
     }
     // Hold every original byte until a complete usable event and durable acceptance.
     while (!accepted) {
       const r = await read();
       if (r.done) {
         scan(decoder.decode(), true);
+        checkDeadline();
         if (terminal) await releaseFundedCall(db, identity);
         throw upstreamError();
       }
@@ -212,7 +255,7 @@ export async function fundedProviderResponse({
     const body = new ReadableStream({
       async pull(controller) {
         try {
-          if (expired) throw upstreamError();
+          checkDeadline();
           if (chunks.length) {
             controller.enqueue(chunks.shift());
             return;
@@ -221,11 +264,13 @@ export async function fundedProviderResponse({
           if (r.done) {
             scan(decoder.decode(), true);
             if (terminal) await meter();
+            checkDeadline();
             controller.close();
             finish();
             return;
           }
           scan(decoder.decode(r.value, { stream: true }));
+          checkDeadline();
           controller.enqueue(r.value);
         } catch {
           controller.error(upstreamError());
@@ -236,7 +281,9 @@ export async function fundedProviderResponse({
         stop();
       },
     });
-    return { response: new Response(body, { status: 200, headers }), completion };
+    const response = new Response(body, { status: 200, headers });
+    checkDeadline();
+    return { response, completion };
   } catch (e) {
     stop();
     throw e instanceof HttpError ? e : upstreamError();
