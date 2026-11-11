@@ -1,0 +1,74 @@
+[
+  {
+    "phase": "before",
+    "name": "hub",
+    "width": 1280,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "phase": "before",
+    "name": "hub",
+    "width": 1280,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "phase": "before",
+    "name": "hub",
+    "width": 375,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "phase": "before",
+    "name": "hub",
+    "width": 375,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  }
+]
