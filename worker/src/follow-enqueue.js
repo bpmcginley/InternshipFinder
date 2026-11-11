@@ -21,9 +21,34 @@ const currentScopes = (count) =>
   "AND p.scope_generation=json_extract(a.value,'$.generation') " +
   "AND p.watermark=json_extract(a.value,'$.from')))";
 
+const noLiveJob =
+  "NOT EXISTS (SELECT 1 FROM follow_digest_outbox busy WHERE busy.subscriber_id=u.id " +
+  "AND busy.state IN ('queued','leased','attempting') AND busy.expires_at>?)";
+
+async function advanceEmptyWindow(db, subscriberId, advances, current, at, upperBound) {
+  // Evaluate the full-set check once, before any of its captured watermarks are updated.
+  const [result] = await db.batch([
+    db
+      .prepare(
+        "WITH captured(advances) AS (SELECT ?), ready(id) AS MATERIALIZED (" +
+          "SELECT u.id FROM follow_subscribers u CROSS JOIN captured c WHERE u.id=? AND " +
+          current +
+          " AND " +
+          noLiveJob +
+          " AND NOT EXISTS (SELECT 1 FROM follow_digest_outbox busy " +
+          "WHERE busy.state='attempting' AND busy.subscriber_id=u.id)) " +
+          "UPDATE follow_scope_progress SET watermark=? WHERE subscriber_id=(SELECT id FROM ready) " +
+          "AND watermark<? AND scope_key IN (SELECT json_extract(a.value,'$.scopeKey') " +
+          "FROM captured c,json_each(c.advances) a)",
+      )
+      .bind(advances, subscriberId, at, upperBound, upperBound),
+  ]);
+  return { status: result.meta.changes ? "advanced" : "conflict" };
+}
+
 // Trusted caller supplies already bounded public bytes, authoritative date/catalog and limits.
 // Return does not authorize transport. Callers must retain/retrieve the identical public digest
-// later; no public role facts are copied into the queue. Zero matches deliberately do not advance.
+// later. Only a complete, empty window without a competing job advances immediately.
 export async function enqueueFollowSnapshot(
   db,
   subscriberId,
@@ -66,14 +91,8 @@ export async function enqueueFollowSnapshot(
     { catalog, limits, upperBound },
   );
   if (matched.status !== "matched") return matched;
-  if (!matched.refs.length) return { status: "empty" };
-  // Reuse the existing outbox's canonical references and 32-KiB validation.
-  let payload;
-  try {
-    payload = payloadOf(matched.refs);
-  } catch {
-    return invalid("pending_bound");
-  }
+  if (!matched.refs.length && !scopes.some(({ watermark }) => watermark < upperBound))
+    return { status: "empty" };
   const advances = JSON.stringify(
     scopes.map((scope) => ({
       scopeKey: scope.scope_key,
@@ -84,12 +103,21 @@ export async function enqueueFollowSnapshot(
     })),
   );
   if (bytes(advances) > maxPendingBytes) return invalid("pending_bound");
+  const current = currentScopes(scopes.length);
+  if (!matched.refs.length)
+    return advanceEmptyWindow(db, subscriberId, advances, current, at, upperBound);
+  // Reuse the existing outbox's canonical references and 32-KiB validation.
+  let payload;
+  try {
+    payload = payloadOf(matched.refs);
+  } catch {
+    return invalid("pending_bound");
+  }
   const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", snapshot))]
     .map((n) => n.toString(16).padStart(2, "0"))
     .join("");
   const id = crypto.randomUUID(),
-    day = at.slice(0, 10),
-    current = currentScopes(scopes.length);
+    day = at.slice(0, 10);
   const result = await db.batch([
     db
       .prepare(
@@ -98,8 +126,8 @@ export async function enqueueFollowSnapshot(
           "SELECT ?,u.id,?,?,?,?,'queued' FROM follow_subscribers u CROSS JOIN captured c " +
           "WHERE u.id=? AND " +
           current +
-          " AND NOT EXISTS (SELECT 1 FROM follow_digest_outbox busy WHERE busy.subscriber_id=u.id " +
-          "AND busy.state IN ('queued','leased','attempting') AND busy.expires_at>?)" +
+          " AND " +
+          noLiveJob +
           " ON CONFLICT(subscriber_id,day) DO NOTHING",
       )
       .bind(
