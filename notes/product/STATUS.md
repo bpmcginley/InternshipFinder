@@ -73,6 +73,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| D | P-2.1z Archive-qualified subscriber batch | Product lead | `codex/product-p2.1z-archive-batch` | [#354](https://github.com/bpmcginley/InternshipFinder/pull/354) | Draft needs-bruce | Bounded confirmed-subscriber lookup and one verified archive read per page. 466 Node and 85 local Workers tests passed. Independent review, hosted checks, owner integration and activation pending. |
 | D | P-2.1u Archive-qualified follow enqueue | Product session | `codex/product-p2.1u-qualified-enqueue` | [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) | Draft needs-bruce | Dormant single-subscriber composition on #330. Uses verified archive coverage, fresh Worker time and a D1 write-time cutoff. No scheduler or sender. |
 | D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
 | 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged; Pages green | Independent review and all CI passed; Pages 42865303436. |
@@ -226,6 +227,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | Follow archive subscriber batch | [#354](https://github.com/bpmcginley/InternshipFinder/pull/354) adds an internal confirmed-subscriber batch with explicit bounds and existing queue checks. Scheduling, archive binding, owner integration and deployment remain pending. | Draft needs-bruce |
 | 2026-11-10 | P-2.1o budgeted digest attempt | [#310](https://github.com/bpmcginley/InternshipFinder/pull/310) composes the dormant strict digest claim and shared budget. Parent integration, owner cap and quota, dispatch wiring and deployment remain pending. | Draft needs-bruce, no sending activation |
 | 2026-11-10 | P-2.1n shared follow send budget | [#302](https://github.com/bpmcginley/InternshipFinder/pull/302) adds a dormant UTC-day attempt budget with no configured default. Owner quota verification, cap and existing order-mail reserve, parent integration and deployment remain pending. | Draft needs-bruce, no sending activation |
 | 2026-11-10 | P-2.1m pinned digest preparation | [#298](https://github.com/bpmcginley/InternshipFinder/pull/298), stacked on #295. Preparation proves the pinned public snapshot and current lease. The sender still needs fresh consent and an owner-approved deployment. | Draft needs-bruce |
