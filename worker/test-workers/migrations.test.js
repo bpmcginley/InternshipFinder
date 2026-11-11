@@ -16,10 +16,16 @@ const migrationNames = [
   "0004_topup_ledger.sql",
   "0005_topup_reconciliation.sql",
   "0006_topup_allocations.sql",
+  "0007_follow_request_deletion.sql",
   "0008_topup_checkout_attempts.sql",
+  "0009_follow_scope_progress.sql",
+  "0010_follow_pending_progress.sql",
   "0011_employer_posting_counts.sql",
+  "0012_follow_attempt_progress.sql",
   "0013_topup_attempt_revisions.sql",
+  "0014_follow_attempt_lookup.sql",
   "0015_topup_account_deletion.sql",
+  "0016_follow_send_budget.sql",
   "0017_funded_run_admission.sql",
   "0018_purchased_run_generations.sql",
 ];
@@ -76,10 +82,10 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(58);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(31);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(8);
-  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(0);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(62);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(34);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(11);
+  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 

@@ -172,6 +172,18 @@ export async function confirmFollow(db, raw, now = new Date()) {
           ")",
       )
       .bind(at, digest, at, cutoff(now)),
+    // Bind the first confirmed lifetime to its token generation in the same transaction.
+    // Already-confirmed flows (including owner linkage) must never rotate or repair progress.
+    db
+      .prepare(
+        "INSERT INTO follow_scope_progress (subscriber_id,scope_key,scope_generation,watermark) " +
+          "SELECT t.subscriber_id,t.scope_key,t.generation,? FROM follow_tokens t " +
+          "JOIN follow_subscriptions s ON s.subscriber_id=t.subscriber_id AND s.scope_key=t.scope_key " +
+          "WHERE s.confirmed_at IS NULL AND t.subscriber_id IN (" +
+          eligible +
+          ") AND t.token_hash=?",
+      )
+      .bind(at, digest, at, cutoff(now), digest),
     db
       .prepare(
         "UPDATE follow_subscriptions SET confirmed_at=COALESCE(confirmed_at,?), owner_user_hash=COALESCE(owner_user_hash," +
@@ -183,7 +195,7 @@ export async function confirmFollow(db, raw, now = new Date()) {
       .bind(at, digest, digest, at, cutoff(now), digest),
     db.prepare("DELETE FROM follow_tokens WHERE token_hash=? AND purpose='confirm'").bind(digest),
   ]);
-  return result[1].meta.changes > 0;
+  return result[2].meta.changes > 0;
 }
 
 export async function unsubscribeFollows(db, raw, now = new Date()) {
@@ -273,8 +285,8 @@ export async function deleteLinkedFollows(db, ownerUserHash) {
   ]);
 }
 
-export async function expireFollows(db, now = new Date()) {
-  await db.batch([
+export function followExpiryStatements(db, now) {
+  return [
     db
       .prepare(
         "DELETE FROM follow_tokens WHERE expires_at<=? OR (purpose='confirm' AND EXISTS " +
@@ -288,5 +300,9 @@ export async function expireFollows(db, now = new Date()) {
     db.prepare(
       "DELETE FROM follow_subscribers WHERE NOT EXISTS (SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id)",
     ),
-  ]);
+  ];
+}
+
+export async function expireFollows(db, now = new Date()) {
+  await db.batch(followExpiryStatements(db, now));
 }
