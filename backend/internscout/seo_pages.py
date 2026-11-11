@@ -34,6 +34,27 @@ from urllib.parse import quote, urlparse
 
 from . import near_metros
 from .console_log import console
+from .site.rules import (
+    MIN_COMBO as MIN_COMBO,
+    MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
+    MIN_EMPLOYERS_NEW as MIN_EMPLOYERS_NEW,
+    MIN_OPEN as MIN_OPEN,
+    NEAR_SAME as NEAR_SAME,
+    PRIORITY_FIELDS as PRIORITY_FIELDS,
+    PRIORITY_PLACES as PRIORITY_PLACES,
+    SPREAD as SPREAD,
+    keep_at as keep_at,
+    near_same as near_same,
+)
+from .site.text import (
+    join_words as join_words,
+    lower_name as lower_name,
+    money as money,
+    pct as pct,
+    plural as plural,
+    possessive as possessive,
+    safe_url as safe_url,
+)
 
 SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
@@ -95,58 +116,6 @@ AUTOFILL_HOSTS = (
 # school .edu account, and GENERAL_ALLOWANCE_PCT (50, rounded down) of it for any other email.
 FREE_EDU = {"autofill": 25, "resume_tailor": 10}
 FREE_GENERAL = {"autofill": 12, "resume_tailor": 5}
-MIN_OPEN = 5  # no page for fewer open listings than this
-# A field in one state needs more: at 5, 900 near-identical pages would be most of the site, the shape
-# search engines treat as doorway pages. At 15 about 400 remain, each a list worth reading.
-MIN_COMBO = 15
-# ...counting only postings filed in fewer states than this. One employer posting the same role in
-# 30 states would otherwise make 30 pages that differ only in the state's name.
-SPREAD = 10
-# Widened 2026-10-07: the field pages draw three times the click rate of the employer pages (Search
-# Console, 28 days to 2026-10-07: 6.1% against 2.0%), so there are more field-in-a-place pages where
-# students look. A field in a US metro (US_METRO_PAGES) gets a page at MIN_COMBO like a state; one of
-# the fields the growth plan markets first (growth/README.md, "Primary: market now": these are those
-# majors' tags in majors.json) in the Northeast, remote or a metro gets one at MIN_COMBO_PRIORITY. Every
-# page these rules add must also be its own list: MIN_EMPLOYERS_NEW employers at least (not one
-# employer's page under a place's name), and not near_same as a page already made (the field's own
-# page, the field in the metro's state, or another field in the same place).
-PRIORITY_FIELDS = frozenset(
-    {
-        "swe",
-        "hardware",
-        "data",
-        "math",
-        "finance",
-        "operations",
-        "supply_chain",
-        "consulting",
-        "hr",
-        "industrial",
-    }
-)
-PRIORITY_PLACES = frozenset(
-    {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "PA", "remote"}
-)  # and the metros
-MIN_COMBO_PRIORITY = 10
-MIN_EMPLOYERS_NEW = 3
-# Two pages whose full role lists overlap this much (shared roles over all roles of either, so a page
-# that holds 80% of a bigger one's roles is not "the same" until the bigger one is mostly it too) are
-# one list to a reader. A page already live is folded only at SAME_SHARE, so one hovering at the line
-# does not come and go between deploys (keep_at's reason).
-NEAR_SAME = 0.8
-
-
-def near_same(a: frozenset, b: frozenset, limit: float = NEAR_SAME) -> bool:
-    return bool(a | b) and len(a & b) >= limit * len(a | b)
-
-
-def keep_at(need: int) -> int:
-    """A page that is already live stays until it falls to two thirds of what a new page needs, so a
-    topic hovering at the line does not vanish and come back between deploys (a search engine that
-    finds a URL gone drops it, and takes weeks to trust it again)."""
-    return need * 2 // 3
-
-
 # Which field-in-a-place pages search engines are asked to index (2026-10-13). Search Console, 28 days to
 # 2026-10-13: 642 of ~1,554 pages indexed and ~687 "Discovered - currently not indexed", Google's sign that
 # it is rationing its visits to the site. Measured on that day's data, the field-in-a-place pages are the
@@ -572,11 +541,6 @@ def state_slug(key: str) -> str:
 esc = html.escape
 
 
-def safe_url(url) -> str | None:
-    u = (url or "").strip()
-    return u if u.lower().startswith(("https://", "http://")) else None
-
-
 # ---------------------------------------------------------------- data
 
 _TEXT = (str, type(None))
@@ -834,26 +798,6 @@ def near_home_first(items: list[dict]) -> list[dict]:
     ]
 
 
-def plural(n: int, one: str, many: str | None = None) -> str:
-    return f"{n:,} {one if n == 1 else (many or one + 's')}"
-
-
-def lower_name(name: str) -> str:
-    """A field title as it reads mid-sentence: "machine learning and AI", not "... and ai"."""
-    return " ".join(w if len(w) > 1 and w.isupper() else w.lower() for w in name.split())
-
-
-def join_words(words: list[str]) -> str:
-    words = [w for w in words if w]
-    return (
-        words[0]
-        if len(words) == 1
-        else ", ".join(words[:-1]) + " and " + words[-1]
-        if words
-        else ""
-    )
-
-
 # ---------------------------------------------------------------- page pieces
 
 
@@ -1061,11 +1005,6 @@ def pack(leads: list[str], extras: list[str], need: int = 2, aim: int = DESC_AIM
         if len(text) >= DESC_MIN:
             break
     return text
-
-
-def possessive(name: str) -> str:
-    """ "Bose's", "Mars's"; "the employer's" for a name too long or too odd to read well that way."""
-    return "the employer's" if len(name) > 24 or not name[-1:].isalnum() else f"{name}'s"
 
 
 def pay_words(pay: tuple | None) -> str:
@@ -2415,10 +2354,6 @@ def long_day(stamp) -> str:
     return f"{d:%B} {d.day}, {d.year}" if d else ""
 
 
-def money(v: float) -> str:
-    return f"${v:,.2f}".replace(".00", "")
-
-
 # Pay text whose numbers only look hourly (added 2026-10-02, found building /internships/highest-paying/):
 # "$110k" and "$95K – $100K" are yearly salaries written in thousands, and Maven Securities' employer
 # page said "$110 an hour"; "$75 to $100," ends in a comma, so the figure was cut off mid-number; and
@@ -3095,11 +3030,6 @@ ATS_NAMES = {
 }
 # was: ... "jobvite": "Jobvite"}. The last three (2026-10-04) are in SUPPORTED_ATS, so autoapply_card
 # can name them; no listing carries them yet, so no count on /about/ changes.
-
-
-def pct(k: int, n: int) -> str:
-    """k of n as a whole percent, rounded down like summary()'s "N% list pay"."""
-    return f"{k * 100 // n}%" if n else "0%"
 
 
 def site_facts(listings: list[dict]) -> dict:
