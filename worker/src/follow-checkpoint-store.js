@@ -77,8 +77,12 @@ export class FollowCheckpoint extends DurableObject {
       starts INTEGER NOT NULL,
       expires INTEGER NOT NULL,
       promoted TEXT,
+      replay_until INTEGER,
       body BLOB NOT NULL
     )`);
+    ctx.storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS checkpoint_initialized (flag INTEGER PRIMARY KEY CHECK (flag = 1))",
+    );
   }
 
   async #change(operation) {
@@ -104,10 +108,17 @@ export class FollowCheckpoint extends DurableObject {
   async read(maxBytes) {
     bound(maxBytes);
     return this.#change((sql, now) => {
-      const rows = sql.exec("SELECT slot, length(body) AS size FROM checkpoint WHERE starts <= ?", now).toArray();
-      if (rows.some((row) => row.size > maxBytes)) throw invalid();
-      return Object.fromEntries(rows.map(({ slot }) =>
-        [slot, sql.exec("SELECT body FROM checkpoint WHERE slot = ?", slot).one().body]));
+      const rows = sql.exec("SELECT slot, starts, length(body) AS size FROM checkpoint").toArray();
+      const live = rows.filter((row) => row.starts <= now);
+      if (live.some((row) => row.size > maxBytes)) throw invalid();
+      const accepted = rows.find((row) => row.slot === "accepted");
+      const state = accepted ? (accepted.starts <= now ? "active" : "unavailable")
+        : initialized(sql) ? "expired" : "never_seeded";
+      return {
+        state,
+        ...Object.fromEntries(live.map(({ slot }) =>
+          [slot, sql.exec("SELECT body FROM checkpoint WHERE slot = ?", slot).one().body])),
+      };
     });
   }
 
@@ -116,7 +127,7 @@ export class FollowCheckpoint extends DurableObject {
     return this.#change((sql, now) => {
       if (now < pending.starts || now >= pending.expires) return "stale";
       const accepted = slot(sql, "accepted");
-      if (!matchesPredecessor(accepted, pending, now)) return "stale";
+      if (!matchesPredecessor(sql, accepted, pending, now)) return "stale";
       const current = slot(sql, "pending");
       if (current) return current.digest === pending.digest ? "already_pending" : "stale";
       put(sql, "pending", pending, pending.prior, null);
@@ -135,13 +146,15 @@ export class FollowCheckpoint extends DurableObject {
         || now < accepted.starts || now >= accepted.expires) return "stale";
       const current = slot(sql, "accepted");
       if (current?.promoted === generation && current.target === accepted.target && current.prior === prior) {
-        return current.starts <= now ? "already_promoted" : "stale";
+        return current.starts <= now && now < current.replay_until ? "already_promoted" : "stale";
       }
       const pending = slot(sql, "pending");
       if (pending?.digest !== generation || pending.prior !== prior || pending.starts > now
-        || accepted.stamp < pending.stamp || !matchesPredecessor(current, pending, now)
+        || accepted.stamp < pending.stamp || !matchesPredecessor(sql, current, pending, now)
         || pending.target.split(":")[1] !== accepted.target.split(":")[1]) return "stale";
-      put(sql, "accepted", accepted, prior, generation);
+      const replayUntil = Math.min(pending.expires, current?.expires ?? pending.expires);
+      put(sql, "accepted", accepted, prior, generation, replayUntil);
+      sql.exec("INSERT OR IGNORE INTO checkpoint_initialized VALUES (1)");
       if (sql.exec("DELETE FROM checkpoint WHERE slot = 'pending' AND digest = ?", generation).rowsWritten !== 1) {
         throw new Error("follow checkpoint promotion could not clear pending");
       }
@@ -162,23 +175,27 @@ export class FollowCheckpoint extends DurableObject {
 
 function slot(sql, name) {
   return sql.exec(
-    "SELECT target, digest, prior, seed, stamp, starts, promoted FROM checkpoint WHERE slot = ?",
+    "SELECT target, digest, prior, seed, stamp, starts, expires, promoted, replay_until FROM checkpoint WHERE slot = ?",
     name,
   ).toArray()[0];
 }
 
-function matchesPredecessor(accepted, pending, now) {
-  return accepted
-    ? accepted.starts <= now && accepted.target + accepted.digest === pending.prior
-    : Boolean(pending.seed);
+function initialized(sql) {
+  return sql.exec("SELECT flag FROM checkpoint_initialized").toArray().length === 1;
 }
 
-function put(sql, slotName, entry, prior, generation) {
+function matchesPredecessor(sql, accepted, pending, now) {
+  return accepted
+    ? accepted.starts <= now && accepted.target + accepted.digest === pending.prior
+    : Boolean(pending.seed) && !initialized(sql);
+}
+
+function put(sql, slotName, entry, prior, generation, replayUntil = null) {
   sql.exec(
     `INSERT OR REPLACE INTO checkpoint
-      (slot, target, digest, prior, seed, stamp, starts, expires, promoted, body)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (slot, target, digest, prior, seed, stamp, starts, expires, promoted, replay_until, body)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     slotName, entry.target, entry.digest, prior, Number(Boolean(entry.seed)),
-    entry.stamp, entry.starts, entry.expires, generation, entry.bytes,
+    entry.stamp, entry.starts, entry.expires, generation, replayUntil, entry.bytes,
   );
 }

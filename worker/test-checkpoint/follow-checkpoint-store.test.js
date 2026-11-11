@@ -30,9 +30,9 @@ function pending(at, previous = SEED, tree = TREE) {
   });
 }
 
-function accepted(at, rows = [], tree = TREE) {
+function accepted(at, rows = [], tree = TREE, commit = ACCEPTED) {
   return body({
-    version: 1, accepted_commit: ACCEPTED, public_tree: tree,
+    version: 1, accepted_commit: commit, public_tree: tree,
     accepted_at: wire(at, "456"), rows,
   });
 }
@@ -40,7 +40,7 @@ function accepted(at, rows = [], tree = TREE) {
 const stub = () => env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId());
 const alarmAt = (object) => runInDurableObject(object, (_, state) => state.storage.getAlarm());
 const stored = (object) => runInDurableObject(object, (_, { storage }) =>
-  storage.sql.exec("SELECT slot, digest, starts, expires FROM checkpoint ORDER BY slot").toArray());
+  storage.sql.exec("SELECT slot, digest, starts, expires, replay_until FROM checkpoint ORDER BY slot").toArray());
 
 const localError = (object, operation, ...args) =>
   runInDurableObject(object, async (instance) => {
@@ -98,10 +98,10 @@ test("exact CAS, concurrent promotion, and replay preserve original expiry and n
   const before = await stored(object);
   expect(await object.promote(accepted(now - 45_000), MAX, options)).toBe("already_promoted");
   expect(await object.rejectPending(options.generation)).toBe(false);
-  expect(await object.read(MAX)).toEqual({ accepted: next, pending: future });
+  expect(await object.read(MAX)).toEqual({ state: "active", accepted: next, pending: future });
   expect(await stored(object)).toEqual(before);
   expect(await object.rejectPending(await digest(future))).toBe(true);
-  expect(await object.read(MAX)).toEqual({ accepted: next });
+  expect(await object.read(MAX)).toEqual({ state: "active", accepted: next });
 });
 
 test("alarms use earliest deadline, prune expired exact slots and rearm", async () => {
@@ -121,7 +121,7 @@ test("alarms use earliest deadline, prune expired exact slots and rearm", async 
   expect(await alarmAt(object)).toBe(deadline);
   // Trigger the real scheduled handler early, then simulate a due timestamp on persisted slots.
   expect(await runDurableObjectAlarm(object)).toBe(true);
-  expect(await object.read(MAX)).toEqual({ accepted: next, pending: future });
+  expect(await object.read(MAX)).toEqual({ state: "active", accepted: next, pending: future });
   expect(await alarmAt(object)).toBe(deadline);
   const due = (slot) => runInDurableObject(object, (_, { storage }) =>
     storage.sql.exec("UPDATE checkpoint SET expires = ? WHERE slot = ?", now, slot));
@@ -150,7 +150,7 @@ test("bounds, expiry and SQL/alarms rollback preserve the pending generation", a
     BEGIN SELECT RAISE(ABORT, 'synthetic rollback'); END`));
   const options = { predecessor: SEED, generation: await digest(original), checkedAt: wire(now - 1_000) };
   expect(await localError(object, "promote", accepted(now - 60_000), MAX, options)).toContain("synthetic rollback");
-  expect(await object.read(MAX)).toEqual({ pending: original });
+  expect(await object.read(MAX)).toEqual({ state: "never_seeded", pending: original });
   expect(await alarmAt(object)).toBe(alarm);
   // Throw after changing both resources to test the pinned runtime transaction boundary.
   await expect(runInDurableObject(object, async (_, { storage }) => storage.transaction(async () => {
@@ -180,5 +180,58 @@ test("expired accepted predecessor cannot authorize a still-live pending generat
   expect(await object.promote(accepted(now - 10_000), MAX, {
     predecessor: prior, generation: await digest(next), checkedAt: wire(now - 1_000),
   })).toBe("stale");
-  expect(await object.read(MAX)).toEqual({ pending: next });
+  expect(await object.read(MAX)).toEqual({ state: "expired", pending: next });
+});
+
+
+test("completed replay ends at the earlier original pending or predecessor cutoff", async () => {
+  const object = stub();
+  const now = Date.now();
+  const first = pending(now - 120_000);
+  const current = accepted(now - 60_000);
+  const seed = { predecessor: SEED, generation: await digest(first), checkedAt: wire(now - 1_000) };
+  await object.reservePending(first, MAX);
+  await object.promote(current, MAX, seed);
+  expect((await stored(object))[0].replay_until).toBe(now - 120_000 + DAY);
+
+  const oldCutoff = now + 60_000;
+  await runInDurableObject(object, (_, { storage }) =>
+    storage.sql.exec("UPDATE checkpoint SET expires = ? WHERE slot = 'accepted'", oldCutoff));
+  const prior = { commit: ACCEPTED, public_tree: TREE, checkpoint_sha256: await digest(current) };
+  const next = pending(now - 20_000, prior);
+  const promoted = accepted(now - 10_000, [], TREE, "7".repeat(40));
+  const options = { predecessor: prior, generation: await digest(next), checkedAt: wire(now - 1_000) };
+  expect(await object.reservePending(next, MAX)).toBe("pending");
+  expect(await object.promote(promoted, MAX, options)).toBe("promoted");
+  expect((await stored(object))[0].replay_until).toBe(oldCutoff);
+  expect(await object.promote(promoted, MAX, options)).toBe("already_promoted");
+
+  // Put the completed cutoff at the current SQLite time without waiting a full day.
+  await runInDurableObject(object, (_, { storage }) =>
+    storage.sql.exec("UPDATE checkpoint SET replay_until = CAST(ROUND(unixepoch('subsec')*1000) AS INTEGER)"));
+  const state = await stored(object);
+  expect(await object.promote(promoted, MAX, options)).toBe("stale");
+  expect(await stored(object)).toEqual(state);
+  expect(await object.read(MAX)).toEqual({ state: "active", accepted: promoted });
+});
+
+test("expired initialized storage stays distinct from an unused store across eviction", async () => {
+  const object = stub();
+  const now = Date.now();
+  expect(await object.read(MAX)).toEqual({ state: "never_seeded" });
+  const first = pending(now - 120_000);
+  const options = { predecessor: SEED, generation: await digest(first), checkedAt: wire(now - 1_000) };
+  await object.reservePending(first, MAX);
+  expect(await object.promote(accepted(now - 60_000), MAX, options)).toBe("promoted");
+  await runInDurableObject(object, (_, { storage }) =>
+    storage.sql.exec("UPDATE checkpoint SET expires = CAST(ROUND(unixepoch('subsec')*1000) AS INTEGER)"));
+  expect(await runDurableObjectAlarm(object)).toBe(true);
+  await evictDurableObject(object);
+  expect(await object.read(MAX)).toEqual({ state: "expired" });
+  expect(await object.reservePending(pending(now - 1_000), MAX)).toBe("stale");
+  expect(await stored(object)).toEqual([]);
+  const markers = await runInDurableObject(object, (_, { storage }) =>
+    storage.sql.exec("SELECT * FROM checkpoint_initialized").toArray());
+  expect(markers).toEqual([{ flag: 1 }]);
+  expect(await alarmAt(object)).toBeNull();
 });
