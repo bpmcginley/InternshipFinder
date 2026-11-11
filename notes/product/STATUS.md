@@ -120,6 +120,10 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 
 [Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281) composes exact #274 `478da886` with #255 `3d3a5cea` by ordinary merge. Complete confirmed-scope CAS, immutable snapshot digest/date and bounded pending advances are implemented without advancing durable watermarks. Prior active subscriber jobs block cross-day duplicates; cancellation/deletion erase pending metadata and preserve surviving-scope recovery. Migration 0010 and legacy schema are covered by local D1. Local evidence: 408 Node tests, 43 Workers/D1 tests, lint clean; independent review and fresh PR checks pending. [Contract and gates](P-2.1j-follow-enqueue.md). Zero-match/terminal progress finalization, producer, sender and activation remain deferred. Needs-bruce; no merge/deploy.
 
+## P-2.1k dormant attempt finalization
+
+[Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286) is based on exact #281 `e5191571`. Guarded snapshot attempts require valid current pending progress before taking a daily marker; accepted/uncertain durable attempts finalize only exact surviving generations before pending erasure. Pre-attempt cancellation advances nothing; post-attempt partial deletion becomes uncertain for snapshot jobs, while full deletion cascades and standalone compatibility is retained. Migration 0012/legacy parity, 417 Node tests, 51 actual local Workers/D1 tests and lint pass; final focused deletion/rollback checks also pass. [Contract and limits](P-2.1k-follow-finalization.md). Invalid data never authorizes guessed progress or extended retention. Independent review/fresh CI and owner integration remain pending; needs-bruce, no send/producer/cron/deploy.
+
 ## Waiting for Bruce
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
@@ -127,6 +131,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
 <<<<<<< HEAD
+| 2026-11-10 | P-2.1k dormant finalization worker merge | [Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286), stacked on #281. Local progress, deletion, rollback, malformed-data and migration tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender or deployment enabled. | - |
 | 2026-11-10 | P-2.1j dormant enqueue worker merge | [Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281), stacked on #274 with #255 integrated. Local transaction/retention tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender, finalizer or deployment enabled. | - |
 | 2026-11-10 | P-2.1i dormant scope progress worker merge | [Draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274), stacked on #261. Local migration and legacy-schema checks pass; independent review, PR checks, parent integration and owner merge remain pending. No queue, sender or deployment is enabled. | - |
 =======

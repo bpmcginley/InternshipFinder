@@ -95,7 +95,31 @@ async function dailyMarker(key, email, now) {
   return [...new Uint8Array(bytes)].map((n) => n.toString(16).padStart(2, "0")).join("");
 }
 
-export async function beginFollowDigestAttempt(db, key, id, lease, clock = () => new Date()) {
+// Snapshot jobs require valid immutable metadata and an exact current progress set. The
+// anti-join stops at the first extra confirmed scope; at most captured-count+1 are visited.
+const snapshotConsent =
+  "EXISTS (SELECT 1 FROM follow_valid_pending v WHERE v.job_id=follow_digest_outbox.id AND v.snapshot_at<=? " +
+  "AND NOT EXISTS (SELECT 1 FROM json_each(v.advances) a WHERE NOT EXISTS (" +
+  "SELECT 1 FROM follow_subscriptions s JOIN follow_scope_progress p " +
+  "ON p.subscriber_id=s.subscriber_id AND p.scope_key=s.scope_key " +
+  "WHERE s.subscriber_id=follow_digest_outbox.subscriber_id AND s.scope_key=json_extract(a.value,'$.scopeKey') " +
+  "AND s.confirmed_at=json_extract(a.value,'$.confirmedAt') " +
+  "AND p.scope_generation=json_extract(a.value,'$.generation') AND p.watermark=json_extract(a.value,'$.from')) " +
+  ") AND NOT EXISTS (SELECT 1 FROM follow_subscriptions s " +
+  "WHERE s.subscriber_id=follow_digest_outbox.subscriber_id AND s.confirmed_at IS NOT NULL " +
+  "AND s.scope_key NOT IN (SELECT json_extract(a.value,'$.scopeKey') FROM json_each(v.advances) a)))";
+
+// Compatibility for standalone dormant jobs. A present pending row still requires validation.
+export function beginFollowDigestAttempt(db, key, id, lease, clock = () => new Date()) {
+  return beginAttempt(db, key, id, lease, clock, false);
+}
+
+// Any future snapshot dispatcher must use this entry: absent metadata cannot use legacy fallback.
+export function beginFollowSnapshotAttempt(db, key, id, lease, clock = () => new Date()) {
+  return beginAttempt(db, key, id, lease, clock, true);
+}
+
+async function beginAttempt(db, key, id, lease, clock, requirePending) {
   if (typeof clock !== "function") invalid();
   const email = await db
     .prepare(
@@ -114,15 +138,22 @@ export async function beginFollowDigestAttempt(db, key, id, lease, clock = () =>
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
   ).toISOString();
   const valid = "id=? AND state='leased' AND lease_token=? AND lease_until>? AND expires_at>?";
+  const progress = requirePending
+    ? snapshotConsent
+    : "(NOT EXISTS (SELECT 1 FROM follow_pending_progress WHERE job_id=follow_digest_outbox.id) OR " +
+      snapshotConsent +
+      ")";
   const result = await db.batch([
     db
       .prepare(
         "INSERT INTO follow_digest_days (marker,expires_at) SELECT ?,? FROM follow_digest_outbox WHERE " +
           valid +
           ` AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND EXISTS ` +
-          "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) ON CONFLICT(marker) DO NOTHING",
+          "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) AND " +
+          progress +
+          " ON CONFLICT(marker) DO NOTHING",
       )
-      .bind(marker, midnight, id, lease, at, at, email),
+      .bind(marker, midnight, id, lease, at, at, email, at),
     // changes() is the preceding marker INSERT in this atomic D1 batch. Existing markers cannot
     // authorize a second attempt, even after unsubscribe/resubscribe or across enqueue days.
     db
