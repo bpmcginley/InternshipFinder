@@ -125,3 +125,12 @@ def test_oversize_or_invalid_catalog_rejects_all_staging():
         _stage({"CA": roles}, roles[:1])
     with pytest.raises(ValueError, match="Worker grammar"):
         _stage({"CA": [_role("1", "x" * 201, "https://example.com/apply")]})
+
+
+@pytest.mark.parametrize("port", ["invalid", "99999"])
+def test_invalid_direct_posting_port_is_excluded(port):
+    good = _role("1", "Example", "https://example.com:8443/apply")
+    bad = _role("2", "Invalid", f"https://example.com:{port}/apply")
+    stage = _stage({"CA": [good, bad]}, [good, bad])
+    assert dict(stage.posting_keys) == {"1": "example"}
+    assert "employer_key" not in json.loads(stage.files["first.json"])[1]

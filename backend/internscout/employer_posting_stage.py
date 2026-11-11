@@ -61,6 +61,7 @@ def _direct_posting(url):
         return False
     try:
         target = urlsplit(link)
+        _port = target.port  # Reject malformed and out-of-range explicit ports.
         host = target.hostname
         return bool(host and target.username is None and not any(c.isspace() for c in host))
     except ValueError:
