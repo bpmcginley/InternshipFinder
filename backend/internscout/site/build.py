@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from . import listing
+from .. import related_pages
+from . import field, listing
 
 Listings = list[dict]
 Groups = dict[str, Listings]
@@ -435,3 +436,97 @@ def indexable_catalog(pages: list[dict]) -> dict[str, tuple[str, int]]:
         for p in pages
         if p["index"]
     }
+
+
+@dataclass(frozen=True)
+class Stages:
+    """Typed phase boundaries supplied by the compatibility caller."""
+
+    fields: Callable[..., tuple[Groups, Groups]]
+    trackers: Callable[..., tuple[dict, list[str]]]
+    publish_tracker: Callable[[list[str]], None]
+    combinations: Callable[..., Cohorts]
+    majors: Callable[..., Majors]
+    employers: Callable[..., Employers]
+    page_writer: Callable[..., AddPage]
+    field_pages: Callable[..., list[tuple[str, str, int]]]
+    employer_pages: Callable[..., None]
+    kinds: Callable[..., tuple[list[listing.KindSelection], dict[str, str], list[str]]]
+    kind_pages: Callable[..., None]
+    near_and_new_pages: Callable[..., Listings]
+    reports: Callable[..., tuple[dict, str, dict | None, bool]]
+    hubs: Callable[..., None]
+    information: Callable[..., None]
+    finish: Callable[..., None]
+
+
+def assemble(
+    site_dir: str,
+    data: dict,
+    live: Live,
+    earning: frozenset[str],
+    context: field.Context,
+    digest_new: Listings,
+    digest_by_field: Counter,
+    enough: Enough,
+    employers_in: Callable[[Listings], int],
+    fold_at: Callable[[str], float],
+    stages: Stages,
+) -> list[dict]:
+    """Assemble pages in the order their links and membership decisions depend on."""
+    listings = data["listings"]
+    baseline = data["baseline"]
+    fields, states = stages.fields(listings, enough, employers_in, fold_at)
+    by_term, trackers = stages.trackers(listings, context.now, enough, employers_in)
+    stages.publish_tracker(trackers)
+    cohorts = stages.combinations(fields, states, enough, live, earning, employers_in, fold_at)
+    majors = stages.majors(listings, data["majors"], cohorts, enough)
+    employers = stages.employers(listings, enough)
+
+    pages: list[dict] = []
+    add = stages.page_writer(pages, listings, live, context.updated)
+    by_company = employers.by_company
+    majors_made = stages.field_pages(
+        add, context, cohorts, majors, by_company, digest_by_field, live, earning
+    )
+    stages.employer_pages(add, site_dir, context, cohorts, employers, live, earning)
+    kind_made, term_paths, trackers = stages.kinds(pages, listings, trackers, enough)
+    stages.kind_pages(
+        add, context, cohorts.fields, kind_made, term_paths, trackers, by_term, baseline
+    )
+    new = stages.near_and_new_pages(
+        add, pages, context, listings, digest_new, baseline, live, earning
+    )
+    facts, pay_path, rep, numbers = stages.reports(
+        add, context, listings, cohorts, kind_made, len(new), enough
+    )
+    stages.hubs(
+        add,
+        context,
+        cohorts,
+        by_company,
+        majors_made,
+        kind_made,
+        trackers,
+        len(listings),
+        len(new),
+        pay_path,
+        rep,
+        numbers,
+    )
+    stages.information(
+        add,
+        facts,
+        len(majors_made),
+        len(new),
+        rep,
+        context.updated,
+        numbers,
+        digest_new,
+        digest_by_field,
+    )
+    related_pages.prefer_indexed(pages)
+    stages.finish(
+        pages, live, by_company, cohorts, trackers, new, majors_made, facts, rep, context.updated
+    )
+    return pages

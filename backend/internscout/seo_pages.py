@@ -32,7 +32,7 @@ from statistics import median
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
-from . import near_metros, page_dates, related_pages, seo_role_details, widget_data
+from . import near_metros, page_dates, seo_role_details, widget_data
 from . import pay as _salary_pay
 from .console_log import console
 from .site import build as _build
@@ -4288,40 +4288,8 @@ def _fitted_page_title(title) -> str:
     return fit_title(*([title] if isinstance(title, str) else title))
 
 
-def build(
-    site_dir: str,
-    live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
-    held: set[str] | frozenset[str] = frozenset(),
-    earning: frozenset[str] | None = None,
-) -> list[dict]:
-    """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
-    whose lastmod the new one never goes below. held: the noindex pages it is serving now
-    (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
-    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex, but for
-    the near pages while NEAR_INDEX is off."""
-    global BEACON, BASELINE, GENERATED, DIGEST_FORM, TRACKER, EMPLOYERS, TEXTS, HOME, HOME_LIVE_DATE
-    earning = earning_paths() if earning is None else earning
-    # Served includes noindex pages for retention. Index decisions still receive raw live.
-    served = set(live) | set(held)
-    BEACON = beacon_from(site_dir)
-    DIGEST_FORM = digest_form_action(site_dir)
-    data = load(site_dir)
-    BASELINE = data["baseline"]
-    listings = data["listings"]
-    LISTINGS[:] = listings  # main resolves placements against this existing list object
-    now = _when(data["generated_at"]) or datetime.now(timezone.utc)
-    GENERATED = now
-    digest_new, digest_by_field, updated = _build.digest_summary(data, now, new_roles, SKIP_FIELDS)
-
-    enough = _build.retention_rule(served, MIN_OPEN, lambda need: keep_at(need))
-
-    def employers_in(items: list[dict]) -> int:
-        return _build.employer_count(items, employer_key)
-
-    def fold_at(path: str) -> float:
-        return SAME_SHARE if path in served else NEAR_SAME
-
-    fields, states = _build.select_fields_and_places(
+def _select_build_fields(listings, enough, employers_in, fold_at):
+    return _build.select_fields_and_places(
         listings,
         enough,
         skip_fields=SKIP_FIELDS,
@@ -4335,7 +4303,10 @@ def build(
         fold_at=fold_at,
         near_same=near_same,
     )
-    by_term, trackers = _build.select_trackers(
+
+
+def _select_build_trackers(listings, now, enough, employers_in):
+    return _build.select_trackers(
         listings,
         now,
         enough,
@@ -4346,9 +4317,16 @@ def build(
         min_kind=MIN_KIND,
         min_open=MIN_OPEN,
     )
+
+
+def _set_build_tracker(trackers: list[str]) -> None:
+    global TRACKER
     # Set the provisional footer tracker before any page is drawn.
     TRACKER = (trackers[0], tracker_path(trackers[0])) if trackers else None
-    cohorts = _build.select_combinations(
+
+
+def _select_build_combinations(fields, states, enough, live, earning, employers_in, fold_at):
+    return _build.select_combinations(
         fields,
         states,
         _build.CombinationRules(
@@ -4373,9 +4351,12 @@ def build(
         combo_indexed=combo_indexed,
         duplicates=duplicates,
     )
-    majors = _build.select_majors(
+
+
+def _select_build_majors(listings, major_data, cohorts, enough):
+    return _build.select_majors(
         listings,
-        data["majors"],
+        major_data,
         cohorts.fields,
         enough,
         skip_fields=SKIP_FIELDS,
@@ -4384,9 +4365,13 @@ def build(
         field_slug=field_slug,
         slugify=slugify,
     )
+
+
+def _register_build_employers(listings, enough):
+    global EMPLOYERS
     groups = _build.group_employers(listings, employer_key)
     EMPLOYERS = {}
-    employers = _build.register_employers(
+    return _build.register_employers(
         groups,
         EMPLOYERS,
         enough,
@@ -4398,8 +4383,9 @@ def build(
         student_share=student_share,
     )
 
-    pages: list[dict] = []
-    add = _build.page_writer(
+
+def _build_page_writer(pages, listings, live, updated):
+    return _build.page_writer(
         pages,
         listings,
         live,
@@ -4409,50 +4395,87 @@ def build(
         render=lambda *args, **kwargs: page(*args, **kwargs),
         schema_ids=lambda: (SITE, SITE_ID),
     )
-    context = _field.Context(("/internships/", "Internships"), now, updated)
-    by_company = employers.by_company
-    majors_made = _emit_field_pages(
-        add, context, cohorts, majors, by_company, digest_by_field, live, earning
-    )
-    _emit_employer_pages(add, site_dir, context, cohorts, employers, live, earning)
-    kind_made, term_paths, trackers = _build.select_kind_catalog(
-        pages, kinds, listings, trackers, enough, MIN_KIND, slugify
-    )
-    _emit_kind_and_tracker_pages(
-        add, context, cohorts.fields, kind_made, term_paths, trackers, by_term, data["baseline"]
-    )
-    new = _emit_near_and_new_pages(
-        add, pages, context, listings, digest_new, data["baseline"], live, earning
-    )
-    facts, pay_path, rep, numbers = _emit_report_pages(
-        add, context, listings, cohorts, kind_made, len(new), enough
-    )
-    _emit_hubs(
-        add,
-        context,
-        cohorts,
-        by_company,
-        majors_made,
-        kind_made,
-        trackers,
-        len(listings),
-        len(new),
-        pay_path,
-        rep,
-        numbers,
-    )
-    _emit_information_pages(
-        add, facts, len(majors_made), len(new), rep, updated, numbers, digest_new, digest_by_field
-    )
-    related_pages.prefer_indexed(pages)
 
+
+def _select_build_kinds(pages, listings, trackers, enough):
+    return _build.select_kind_catalog(pages, kinds, listings, trackers, enough, MIN_KIND, slugify)
+
+
+def _finish_build(pages, live, by_company, cohorts, trackers, new, majors_made, facts, rep, updated):
+    global TEXTS, HOME, HOME_LIVE_DATE
     HOME_LIVE_DATE = live.get("/") if isinstance(live, dict) else None
     HOME = home_browse(
         pages, by_company, cohorts.fields, cohorts.states, trackers, len(new) >= MIN_OPEN, len(majors_made)
     )
     made = _build.indexable_catalog(pages)
     TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)
-    return pages
+
+
+def build(
+    site_dir: str,
+    live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
+    held: set[str] | frozenset[str] = frozenset(),
+    earning: frozenset[str] | None = None,
+) -> list[dict]:
+    """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
+    whose lastmod the new one never goes below. held: the noindex pages it is serving now
+    (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
+    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex, but for
+    the near pages while NEAR_INDEX is off."""
+    global BEACON, BASELINE, GENERATED, DIGEST_FORM
+    earning = earning_paths() if earning is None else earning
+    # Served includes noindex pages for retention. Index decisions still receive raw live.
+    served = set(live) | set(held)
+    BEACON = beacon_from(site_dir)
+    DIGEST_FORM = digest_form_action(site_dir)
+    data = load(site_dir)
+    BASELINE = data["baseline"]
+    listings = data["listings"]
+    LISTINGS[:] = listings  # main resolves placements against this existing list object
+    now = _when(data["generated_at"]) or datetime.now(timezone.utc)
+    GENERATED = now
+    digest_new, digest_by_field, updated = _build.digest_summary(data, now, new_roles, SKIP_FIELDS)
+
+    enough = _build.retention_rule(served, MIN_OPEN, lambda need: keep_at(need))
+
+    def employers_in(items: list[dict]) -> int:
+        return _build.employer_count(items, employer_key)
+
+    def fold_at(path: str) -> float:
+        return SAME_SHARE if path in served else NEAR_SAME
+
+    stages = _build.Stages(
+        fields=_select_build_fields,
+        trackers=_select_build_trackers,
+        publish_tracker=_set_build_tracker,
+        combinations=_select_build_combinations,
+        majors=_select_build_majors,
+        employers=_register_build_employers,
+        page_writer=_build_page_writer,
+        field_pages=_emit_field_pages,
+        employer_pages=_emit_employer_pages,
+        kinds=_select_build_kinds,
+        kind_pages=_emit_kind_and_tracker_pages,
+        near_and_new_pages=_emit_near_and_new_pages,
+        reports=_emit_report_pages,
+        hubs=_emit_hubs,
+        information=_emit_information_pages,
+        finish=_finish_build,
+    )
+    return _build.assemble(
+        site_dir,
+        data,
+        live,
+        earning,
+        _field.Context(("/internships/", "Internships"), now, updated),
+        digest_new,
+        digest_by_field,
+        enough,
+        employers_in,
+        fold_at,
+        stages,
+    )
+
 
 
 # ---- the dashboard's "Browse" section (2026-10-07)
