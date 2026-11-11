@@ -9,7 +9,6 @@ from pathlib import Path, PureWindowsPath
 import shutil
 import stat
 import subprocess
-import tarfile
 import tempfile
 
 PUBLIC = "docs/data"
@@ -17,8 +16,8 @@ BRANCH = "refs/heads/data"
 TRACKING = "refs/remotes/origin/data"
 
 
-def git(root, *args):
-    r = subprocess.run(["git", *args], cwd=root, capture_output=True)
+def git(root, *args, data=None):
+    r = subprocess.run(["git", *args], cwd=root, input=data, capture_output=True)
     if r.returncode:
         raise ValueError(f"Git {args[0]} failed")
     return r.stdout
@@ -44,7 +43,8 @@ def parts_of(path):
 
 
 def materialize(root, pin, stage):
-    blobs = {}
+    blobs = []
+    paths = {}
     for record in git(root, "ls-tree", "-rz", pin, "--", PUBLIC).split(b"\0"):
         if not record:
             continue
@@ -57,41 +57,33 @@ def materialize(root, pin, stage):
             or not name.startswith(PUBLIC + "/")
         ):
             raise ValueError("Nonregular snapshot entry")
-        blobs[name] = oid
+        parts = parts_of(name.removeprefix(PUBLIC + "/"))
+        for end in range(1, len(parts) + 1):
+            prefix = "/".join(parts[:end])
+            if paths.setdefault(prefix.casefold(), prefix) != prefix:
+                raise ValueError("Aliased snapshot path")
+        path = stage.joinpath(*parts)
+        if not path.resolve().is_relative_to(stage.resolve()):
+            raise ValueError("Unsafe snapshot path")
+        blobs.append((path, oid))
     if not blobs:
         raise ValueError("Public snapshot is missing")
-    archived = git(root, "archive", "--format=tar", pin, "--", PUBLIC)
-    seen, installed = set(), set()
-    with tarfile.open(fileobj=io.BytesIO(archived)) as archive:
-        for member in archive:
-            if member.name in {"docs", PUBLIC} and member.isdir():
-                continue
-            if not member.name.startswith(PUBLIC + "/"):
-                raise ValueError("Unexpected archive path")
-            name = member.name.removeprefix(PUBLIC + "/")
-            path = stage.joinpath(*parts_of(name))
-            if name.casefold() in seen or not path.resolve().is_relative_to(stage.resolve()):
-                raise ValueError("Aliased archive path")
-            seen.add(name.casefold())
-            if member.isdir():
-                path.mkdir(parents=True, exist_ok=True)
-                continue
-            if not member.isfile() or member.name not in blobs:
-                raise ValueError("Unexpected archive member")
-            with archive.extractfile(member) as payload:
-                data = payload.read()
-            oid = (
-                hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data)
-                .hexdigest()
-                .encode("ascii")
-            )
-            if oid != blobs[member.name]:
-                raise ValueError("Archived file differs from pinned Git blob")
+
+    # Raw objects bypass working-tree encoding, line-ending and export attributes.
+    request = b"".join(oid + b"\n" for _, oid in blobs)
+    with io.BytesIO(git(root, "cat-file", "--batch", data=request)) as objects:
+        for path, oid in blobs:
+            header = objects.readline().split()
+            if len(header) != 3 or header[:2] != [oid, b"blob"] or not header[2].isdigit():
+                raise ValueError("Could not read the pinned public blob")
+            size = int(header[2])
+            data = objects.read(size)
+            if len(data) != size or objects.read(1) != b"\n":
+                raise ValueError("Incomplete pinned public blob")
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
-            installed.add(member.name)
-    if installed != blobs.keys():
-        raise ValueError("Archive omitted pinned public files")
+        if objects.read(1):
+            raise ValueError("Unexpected content after pinned public blobs")
 
 
 def fingerprint(root):
@@ -218,7 +210,7 @@ def main():
         pin = install(args.checkout)
     except ValueError as error:
         parser.exit(1, f"{error}\n")
-    except (OSError, tarfile.TarError):
+    except OSError:
         parser.exit(1, "Could not fetch or install public listing data.\n")
     print(f"Installed public listing snapshot {pin}.")
 

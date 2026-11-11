@@ -1,7 +1,9 @@
 """Test a local-only fetch helper against a scratch Git origin."""
 
 import importlib.util
+import io
 import os
+import tarfile
 from pathlib import Path
 import tempfile
 import unittest
@@ -216,7 +218,7 @@ class FetchTests(unittest.TestCase):
         self.assertFalse(self.target.exists())
         self.assertFalse((self.local / ".git/internscout-public-snapshot.json").exists())
 
-    def test_windows_unsafe_paths_and_archive_scope(self):
+    def test_windows_unsafe_paths(self):
         for name in (
             "../escape",
             "dir/../../escape",
@@ -232,10 +234,60 @@ class FetchTests(unittest.TestCase):
         ):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 fetch.parts_of(name)
-        self.put(self.writer, ".gitattributes", b"docs/data/listings/old.json export-ignore\n")
-        self.commit(self.writer)
+
+    def test_materialization_bypasses_real_git_text_and_export_attributes(self):
+        self.put(
+            self.writer,
+            ".gitattributes",
+            b"docs/data/index.json text eol=crlf\ndocs/data/listings/old.json export-ignore\n",
+        )
+        self.put(self.writer, "docs/data/index.json", b"first snapshot\n")
+        pin = self.commit(self.writer)
         self.git(self.writer, "push", "origin", "HEAD:refs/heads/data")
-        with self.assertRaisesRegex(ValueError, "Archive omitted"):
+        self.git(self.local, "config", "core.autocrlf", "true")
+        self.assertEqual(fetch.install(self.local), pin)
+        blob = self.git(self.local, "cat-file", "blob", f"{pin}:docs/data/index.json")
+        self.assertEqual((self.target / "index.json").read_bytes(), blob)
+        self.assertEqual((self.target / "listings/old.json").read_bytes(), b"old fixture")
+        with tarfile.open(
+            fileobj=io.BytesIO(
+                self.git(self.local, "archive", "--format=tar", pin, "--", "docs/data")
+            )
+        ) as archive:
+            encoded = archive.extractfile("docs/data/index.json").read()
+            self.assertNotEqual(encoded, blob)
+            self.assertEqual(encoded.replace(b"\r\n", b"\n"), blob)
+            self.assertNotIn("docs/data/listings/old.json", archive.getnames())
+
+    def test_rejects_case_aliased_parent_paths_and_symlink_blobs(self):
+        oid = (
+            self.git(self.writer, "rev-parse", "HEAD:docs/data/index.json").decode("ascii").strip()
+        )
+        self.git(
+            self.writer,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            f"100644,{oid},docs/data/Listings/alias.json",
+        )
+        self.git(self.writer, "commit", "-m", "Synthetic case alias")
+        self.git(self.writer, "push", "origin", "HEAD:refs/heads/data")
+        with self.assertRaisesRegex(ValueError, "Aliased snapshot path"):
+            fetch.install(self.local)
+        self.assertFalse(self.target.exists())
+        self.git(
+            self.writer, "update-index", "--force-remove", "--", "docs/data/Listings/alias.json"
+        )
+        self.git(
+            self.writer,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            f"120000,{oid},docs/data/symlink.json",
+        )
+        self.git(self.writer, "commit", "-m", "Synthetic symlink entry")
+        self.git(self.writer, "push", "origin", "HEAD:refs/heads/data")
+        with self.assertRaisesRegex(ValueError, "Nonregular snapshot entry"):
             fetch.install(self.local)
         self.assertFalse(self.target.exists())
 
