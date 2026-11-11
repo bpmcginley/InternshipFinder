@@ -320,7 +320,7 @@ def check(key: str, send: bool) -> int:
     except ProviderError as e:
         print(f"[digest] Check failed: {e}")
         return EXIT_PROVIDER
-    print(
+    console(
         f"[digest] {KEY_ENV} works: Buttondown answered the same-week check (API version {API_VERSION}). "
         "Nothing was sent."
     )
@@ -331,7 +331,7 @@ def check(key: str, send: bool) -> int:
             f"{when}) went out or is scheduled within six days."
         )
     else:
-        print("[digest] No email was sent or scheduled in the last six days.")
+        console("[digest] No email was sent or scheduled in the last six days.")
     return 0
 
 
@@ -475,7 +475,7 @@ def main(argv: list[str]) -> int:
     if digest.NO_ADDRESS in email["body"]:
         # In case digest.py and this script ever disagree about what a blank address is: the email
         # must never go out with the marker where the address belongs.
-        print(
+        console(
             f"[digest] Not sent: {ADDRESS_ENV} has no printable lines, so the email has no postal address."
         )
         return EXIT_REFUSED
