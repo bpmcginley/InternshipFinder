@@ -47,6 +47,7 @@ from . import facts as _facts
 from . import field as _field
 from .render import layout as _layout
 from . import listing as _listing
+from . import launch as _launch
 from . import llms as _llms
 from . import near as _near
 from . import numbers as _numbers
@@ -58,6 +59,7 @@ from .render import digest as _render_digest_module
 from .render import employer as _render_employer_module
 from .render import field as _render_field_module
 from .render import listing as _render_listing_module
+from .render import launch as _render_launch_module
 from .render import near as _render_near_module
 from .render import numbers as _render_numbers_module
 from .render import pay as _render_pay_module
@@ -1568,6 +1570,7 @@ def listing_body(
     faq: str = "",
     signup: str = "",
     details: dict | None = None,
+    export_stamp: datetime | None = None,
 ) -> str:
     return _render_listing_module.listing_body(
         items,
@@ -1586,6 +1589,7 @@ def listing_body(
         faq,
         signup,
         details,
+        export_stamp=export_stamp,
         per_page=_state().per_page,
         shown=shown,
         summary=summary,
@@ -3111,6 +3115,7 @@ def _select_employer_page(
     live,
     earning: frozenset,
     details: dict[str, tuple[tuple[str, str], ...]] | None,
+    export_stamp: datetime | None = None,
 ) -> _employer.Page:
     main = directory.company_fields[name]
     links = _employer.select_links(
@@ -3146,6 +3151,7 @@ def _select_employer_page(
         own_links=all(own_posting(x) for x in items),
         thin=not employer_indexed(len(items), path, live, earning),
         details=details,
+        export_stamp=export_stamp,
     )
 
 
@@ -3387,6 +3393,25 @@ def _emit_report_pages(
     )
 
 
+def _emit_launch_pages(add, pages, context, listings, live, earning, employers_in, fold_at):
+    models = _launch.select(
+        listings, pages, live, earning, employers_in=employers_in,
+        indexed=combo_indexed, near_same=near_same, fold_at=fold_at, places=PLACES,
+    )
+    links = []
+    for model in models:
+        rendered = _render_launch_module.render(
+            model, context, field_title=field_title, field_slug=field_slug,
+            state_slug=state_slug, metro_state=METRO_STATE, place_names=US_STATES,
+            dash_link=dash_link, listing_rows=_hooks().listing_rows,
+            autoapply_card=autoapply_card, per_page=_state().per_page,
+            existing_paths={page["path"] for page in pages},
+        )
+        add(**rendered)
+        links.append((model.path, rendered["h1"], len(model.items)))
+    return links
+
+
 def _emit_hubs(
     add: _build.AddPage,
     context: _field.Context,
@@ -3400,6 +3425,7 @@ def _emit_hubs(
     pay_path: str,
     rep: dict | None,
     numbers: bool,
+    launch_links=(),
 ) -> None:
     return _catalog.emit_hubs(
         add,
@@ -3414,6 +3440,7 @@ def _emit_hubs(
         pay_path,
         rep,
         numbers,
+        launch_links=launch_links,
         canada_keys=CANADA_KEYS,
         ca_metro_pages=CA_METRO_PAGES,
         ca_provinces=CA_PROVINCES,
@@ -3626,7 +3653,10 @@ def build_result(
     _state().baseline = data["baseline"]
     listings = data["listings"]
     _state().listings[:] = listings  # main resolves placements against this existing list object
-    now = _when(data["generated_at"]) or datetime.now(timezone.utc)
+    # The fact line must never turn the build-clock fallback into source evidence.
+    raw_stamp = data["generated_at"]
+    export_stamp = _when(raw_stamp) if isinstance(raw_stamp, str) else None
+    now = _when(raw_stamp) or datetime.now(timezone.utc)
     _state().generated = now
     digest_new, digest_by_field, updated = _build.digest_summary(data, now, _hooks().new_roles, SKIP_FIELDS)
 
@@ -3655,13 +3685,14 @@ def build_result(
         hubs=_emit_hubs,
         information=_emit_information_pages,
         finish=_finish_build,
+        launch_pages=_emit_launch_pages,
     )
     return _build.assemble(
         site_dir,
         data,
         live,
         earning,
-        _field.Context(("/internships/", "Internships"), now, updated),
+        _field.Context(("/internships/", "Internships"), now, updated, export_stamp),
         digest_new,
         digest_by_field,
         enough,

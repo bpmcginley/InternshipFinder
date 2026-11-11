@@ -161,6 +161,7 @@ def emit_employer_pages(
             live,
             earning,
             cohort_details if path in cohort_paths() else None,
+            export_stamp=context.export_stamp,
         )
         add(**render_employer_page(model))
 
@@ -368,6 +369,7 @@ def emit_hubs(
     state_slug: Callable[..., str],
     tracker_path: Callable[..., str],
     top_employers: Callable[..., list],
+    launch_links: list = (),
 ) -> None:
     root, updated = context.root, context.updated
     fields, states = cohorts.fields, cohorts.states
@@ -415,6 +417,7 @@ def emit_hubs(
         "Paste it into a Discord feed bot such as MonitoRSS, or Slack's <code>/feed subscribe</code>, "
         "and new roles appear in your club's channel as they are found.</p>"
         "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
+        + link_list("Selected terms and class years", launch_links)
         + link_list(
             "By field",
             sorted(

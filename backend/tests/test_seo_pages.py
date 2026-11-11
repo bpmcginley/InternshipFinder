@@ -1195,7 +1195,7 @@ def test_the_field_pages_opening_sentences_are_short(tmp_path):
         .split("</p>")[0]
     )
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", lede) if s]
-    assert sentences[0] == "41 open student roles in mechanical engineering." and sentences[
+    assert sentences[0] == "As of September 23, 2026, InternScout lists 41 open student roles in mechanical engineering." and sentences[
         1
     ].startswith("They range from")
     assert max(len(s.split()) for s in sentences) <= 25
