@@ -14,7 +14,7 @@ import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./de
 import { countEvent, countHit } from "./visits.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
-import { prepareTopupStripe, topupConfigured } from "./topup-stripe.js";
+import { prepareTopupStripe, topupConfigured, topupRecoveryConfigured } from "./topup-stripe.js";
 import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
 const employerPostingRuntime = createEmployerPostingRuntime();
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
@@ -375,7 +375,7 @@ const safeRouteHandlers = {
   // Since 2026-10-19 the same endpoint also takes the paid listing orders' payments (orders.js), which
   // can be on while the student plans are off.
   "POST /billing/webhook": async ({ request, db, env, now, d }) => {
-    if ((!paymentsOn(env, d.config) && !ordersOn(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
+    if ((!paymentsOn(env, d.config) && !ordersOn(env) && !topupRecoveryConfigured(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
     const body = await request.text();
     if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
     const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
