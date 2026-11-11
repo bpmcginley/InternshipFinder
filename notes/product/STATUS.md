@@ -333,6 +333,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | P-2.2ah Pending payment during account deletion | Draft claim. Return retry guidance when the existing atomic top-up deletion trigger blocks an unresolved payment. Preserve the deletion transaction and provider paths. | Needs-bruce. |
 | 2026-11-11 | Dormant outbound Worker compatibility | [#414](https://github.com/bpmcginley/InternshipFinder/pull/414) repairs the proven native redirect option in archive and top-up readers. Independent review, CI and coordinated integration required. All existing enablement/configuration gates remain. | Draft needs-bruce; no provider call or deployment |
 | 2026-11-11 | Optional employer publication adapter | Draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410), synthetic publication parity and paired screenshots verified; exact review/CI pending. | Owner source publication and coordinated activation remain pending; default off |
 | 2026-11-11 | P-2.3p employer Worker route | [#402](https://github.com/bpmcginley/InternshipFinder/pull/402) adds a default-off pinned-catalog route and private readiness. Independent review/CI, same-release publication and separate verified retention scheduling precede enablement. No production settings or remote operations. | Draft needs-bruce |
