@@ -21,7 +21,9 @@ from sqlalchemy.orm import selectinload
 from .console_log import console
 from .db import SessionLocal, init_db
 from .models import Listing, Application
-from .seo_pages import baseline_day, canada_first_scan, placeholder_pay
+from .pay import placeholder_pay
+from .public_data import public_data_dir
+from .site.source import baseline_day, canada_first_scan
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, non_cyber_security, stage_of, years_of
@@ -110,7 +112,9 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
     """Write <ST>.json (slim rows) and <ST>.desc.json ({id: description} for its open rows)."""
     shard_dir = os.path.join(out_dir, "listings")
     os.makedirs(shard_dir, exist_ok=True)
-    from . import seo_role_details, seo_pages
+    from . import seo_role_details
+    from .site import source
+    from .site.text import safe_url
 
     # This sidecar is replaced on every export. Only an unchanged carried row may keep an existing
     # check for up to seven days; its original check date/hash are never refreshed from an excerpt.
@@ -122,14 +126,14 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
         if (
             name in seo_role_details.COHORT_EMPLOYERS
             and x.get("status") == "open"
-            and seo_pages.well_formed(x)
-            and seo_pages.safe_url(x.get("apply_url"))
+            and source.well_formed(x)
+            and safe_url(x.get("apply_url"))
         ):
             cohorts[name].append(dict(x, keys=shard_keys(x)))
     visible = [
         x
         for name in sorted(cohorts)
-        for x in seo_pages.shown(seo_pages.dedupe_roles(cohorts[name]))
+        for x in source.shown(source.dedupe_roles(cohorts[name]))
     ]
     details = {}
     for x in visible:
@@ -906,4 +910,4 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
 if __name__ == "__main__":
     import sys
 
-    export(sys.argv[1] if len(sys.argv) > 1 else "docs/data")
+    export(sys.argv[1] if len(sys.argv) > 1 else public_data_dir())
