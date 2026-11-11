@@ -1,6 +1,7 @@
 """Prepare and publish one complete ingest snapshot on the existing data branch."""
 
 import argparse
+from datetime import datetime
 import io
 import json
 import os
@@ -79,6 +80,8 @@ def validate_tree(checkout, tree):
     names = set()
     with tarfile.open(fileobj=io.BytesIO(archive)) as snapshot:
         for member in snapshot:
+            if member.name in STATE and member.isdir():
+                raise ValueError("Unexpected state directory in ingest snapshot")
             if not owned(member.name) or member.isdir():
                 continue
             name = member.name.casefold()
@@ -86,13 +89,25 @@ def validate_tree(checkout, tree):
                 raise ValueError("Aliased or unexpected file in ingest snapshot")
             names.add(name)
             with snapshot.extractfile(member) as payload:
-                files[member.name.removeprefix(PUBLIC + "/")] = parse_json(payload.read())
+                value = parse_json(payload.read())
+                if member.name in STATE and not isinstance(value, dict):
+                    raise ValueError("Expected an ingest state object")
+                files[member.name.removeprefix(PUBLIC + "/")] = value
 
     if not REQUIRED <= files.keys():
         raise ValueError("Required public file missing from ingest snapshot")
     if any(not isinstance(files[name], dict) for name in REQUIRED - {"first.json"}):
         raise ValueError("Invalid public object in ingest snapshot")
     index = files["listings/index.json"]
+    generated = index.get("generated_at")
+    if not isinstance(generated, str) or generated != files["stats.json"].get("generated_at"):
+        raise ValueError("Snapshot index and statistics have different generation dates")
+    try:
+        offset = datetime.fromisoformat(generated).utcoffset()
+    except ValueError:
+        offset = None
+    if offset is None:
+        raise ValueError("Snapshot generation date must include a timezone")
     entries = index.get("files")
     first = index.get("first")
     preview = files["first.json"]
@@ -108,7 +123,7 @@ def validate_tree(checkout, tree):
 
     referenced = {"listings/index.json"}
     for key, entry in entries.items():
-        if not key or any(c in key for c in "/\\"):
+        if not key or any(c in key for c in "/\\:"):
             raise ValueError("Invalid shard key in ingest snapshot")
         shard = f"listings/{key}.json"
         desc = f"listings/{key}.desc.json"
@@ -127,11 +142,20 @@ def validate_tree(checkout, tree):
             or not isinstance(files.get(desc), dict)
         ):
             raise ValueError("Referenced shard or sidecar missing or invalid")
+        open_ids = {
+            str(row["id"])
+            for row in rows
+            if row.get("status") == "open" and type(row.get("id")) in (int, str)
+        }
+        if any(
+            key not in open_ids or not isinstance(value, str) for key, value in files[desc].items()
+        ):
+            raise ValueError("Invalid description for an open shard listing")
         referenced.update((shard, desc))
         check_counts(entry.get("count"), len(rows))
         check_counts(entry.get("open"), sum(row.get("status") == "open" for row in rows))
-    if referenced != {name for name in files if name.startswith("listings/")}:
-        raise ValueError("Unreferenced shard or sidecar in ingest snapshot")
+    if set(files) - set(STATE) != referenced | REQUIRED:
+        raise ValueError("Unexpected public file in ingest snapshot")
 
 
 def data_base(checkout):
@@ -230,6 +254,16 @@ def push_existing(checkout, expected):
     return result.returncode == 0
 
 
+def remote_tip(checkout):
+    git(checkout, "fetch", "--no-tags", "origin", f"{BRANCH}:{TRACKING}")
+    return revision(checkout, TRACKING)
+
+
+def publication_marker(checkout, commit):
+    tree = revision(checkout, f"{commit}:{PUBLIC}")
+    return f"[ingest-data] commit={commit} tree={tree}"
+
+
 def publish(checkout, state, message):
     base = data_base(checkout)
     git(checkout, "ls-remote", "--exit-code", "--heads", "origin", BRANCH)
@@ -239,7 +273,10 @@ def publish(checkout, state, message):
     tree = git(checkout, "write-tree").stdout.decode("ascii").strip()
     validate_tree(checkout, tree)
     if tree == revision(checkout, "HEAD^{tree}"):
-        return "No changes."
+        remote = remote_tip(checkout)
+        if not same_snapshot(checkout, base, remote):
+            raise ValueError("Concurrent update changed ingest-owned data; refusing no-op")
+        return "No changes.", remote
     git(checkout, "commit", "-m", message)
     if revision(checkout, "HEAD^{tree}") != tree:
         raise ValueError("Committed tree differs from the validated snapshot")
@@ -247,12 +284,11 @@ def publish(checkout, state, message):
     expected = base
     for attempt in range(3):
         if push_existing(checkout, expected):
-            return "Published validated data snapshot."
-        git(checkout, "fetch", "--no-tags", "origin", f"{BRANCH}:{TRACKING}")
-        remote = revision(checkout, TRACKING)
+            return "Published validated data snapshot.", revision(checkout, "HEAD")
+        remote = remote_tip(checkout)
         if ancestor(checkout, candidate, remote):
             if same_snapshot(checkout, candidate, remote):
-                return "Validated data snapshot already published."
+                return "Validated data snapshot already published.", remote
             raise ValueError("Data snapshot changed after publication")
         if (
             not ancestor(checkout, base, remote)
@@ -292,7 +328,9 @@ def main():
         elif args.command == "prepare":
             prepare(args.checkout, args.primary, args.state)
         else:
-            print(publish(args.checkout, args.state, args.message))
+            message, commit = publish(args.checkout, args.state, args.message)
+            print(message)
+            print(publication_marker(args.checkout, commit))
     except ValueError as error:
         parser.exit(1, f"{error}\n")
     except (OSError, tarfile.TarError):

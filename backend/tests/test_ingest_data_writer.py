@@ -1,5 +1,6 @@
 """Exercise the ingest writer with synthetic snapshots and a file-only remote."""
 
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -9,7 +10,19 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import ingest_data_writer as writer
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_module(path):
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+writer = load_module(ROOT / "scripts/ingest_data_writer.py")
+reader = load_module(ROOT / ".github/actions/public-data/listing_data.py")
+STAMP = "2026-11-11T05:00:00Z"
 
 INDEX = "docs/data/listings/index.json"
 SHARD = "docs/data/listings/MA.json"
@@ -26,6 +39,7 @@ def write(root, path, value):
 
 def index(key="MA"):
     return {
+        "generated_at": STAMP,
         "files": {
             key: {
                 "file": f"listings/{key}.json",
@@ -88,16 +102,17 @@ class IngestWriterTests(unittest.TestCase):
 
     def write_public(self, checkout, key="MA"):
         write(checkout, INDEX, index(key))
-        for name in ("majors", "stats", "seo-posting-details"):
+        for name in ("majors", "seo-posting-details"):
             write(checkout, f"docs/data/{name}.json", {})
+        write(checkout, "docs/data/stats.json", {"generated_at": STAMP})
         write(checkout, "docs/data/first.json", [])
         if key:
             write(
                 checkout,
                 f"docs/data/listings/{key}.json",
-                [{"status": "open"}, {"status": "closed"}],
+                [{"id": "open", "status": "open"}, {"id": "closed", "status": "closed"}],
             )
-            write(checkout, f"docs/data/listings/{key}.desc.json", {})
+            write(checkout, f"docs/data/listings/{key}.desc.json", {"open": "Synthetic role"})
 
     def update_snapshot(self):
         (self.data / SHARD).unlink()
@@ -144,7 +159,7 @@ class IngestWriterTests(unittest.TestCase):
 
         with patch.object(writer, "push_existing", wraps=writer.push_existing) as push:
             self.assertEqual(
-                writer.publish(self.data, self.state, "Publish"),
+                writer.publish(self.data, self.state, "Publish")[0],
                 "Published validated data snapshot.",
             )
         self.assertEqual(push.call_count, 2)
@@ -208,13 +223,42 @@ class IngestWriterTests(unittest.TestCase):
         writer.prepare(self.data, self.primary, self.state)
         good_tree = writer.revision(self.data, "HEAD^{tree}")
         tip = writer.revision(self.remote, writer.BRANCH)
-        for case in ("duplicate", "wrong-total", "wrong-open", "missing", "alias"):
+        for case in (
+            "duplicate",
+            "wrong-total",
+            "wrong-open",
+            "missing",
+            "alias",
+            "date",
+            "timezone",
+            "closed-sidecar",
+            "non-string-sidecar",
+            "extra-public",
+            "colon-key",
+        ):
             with self.subTest(case=case):
                 current = index()
                 if case == "duplicate":
                     (self.data / INDEX).write_text('{"files": {}, "files": {}}', encoding="utf8")
                 elif case == "missing":
                     (self.data / SIDECAR).unlink()
+                elif case in {"date", "timezone"}:
+                    generated = "2026-11-12T05:00:00Z" if case == "date" else "2026-11-11T05:00:00"
+                    write(self.data, "docs/data/stats.json", {"generated_at": generated})
+                    if case == "timezone":
+                        current["generated_at"] = generated
+                        write(self.data, INDEX, current)
+                elif case in {"closed-sidecar", "non-string-sidecar"}:
+                    write(
+                        self.data,
+                        SIDECAR,
+                        {"closed": "text"} if case == "closed-sidecar" else {"open": []},
+                    )
+                elif case == "extra-public":
+                    write(self.data, "docs/data/extra.json", {})
+                elif case == "colon-key":
+                    current["files"]["M:A"] = current["files"].pop("MA")
+                    write(self.data, INDEX, current)
                 else:
                     entry = current["files"]["MA"]
                     entry[{"wrong-total": "count", "wrong-open": "open", "alias": "file"}[case]] = (
@@ -228,21 +272,95 @@ class IngestWriterTests(unittest.TestCase):
                 self.assertEqual(writer.revision(self.remote, writer.BRANCH), tip)
                 self.git(self.data, "restore", "--staged", "--worktree", "--", writer.PUBLIC)
 
+    def test_staged_state_must_be_regular_json_object(self):
+        writer.prepare(self.data, self.primary, self.state)
+        path = writer.STATE[0]
+        write(self.state, Path(path).name, [])
+        with self.assertRaisesRegex(ValueError, "state object"):
+            writer.publish(self.data, self.state, "Bad state")
+        (self.data / path).unlink()
+        write(self.data, f"{path}/unexpected.json", {})
+        self.git(self.data, "add", "-A", "--", path)
+        tree = self.git(self.data, "write-tree").decode("ascii").strip()
+        with self.assertRaisesRegex(ValueError, "state directory"):
+            writer.validate_tree(self.data, tree)
+
+    def test_safe_reader_and_writer_markers(self):
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {})
+        real_push = writer.push_existing
+
+        def lost_ack(checkout, expected):
+            self.assertTrue(real_push(checkout, expected))
+            return False
+
+        with patch.object(writer, "push_existing", side_effect=lost_ack):
+            message, commit = writer.publish(self.data, self.state, "Publish")
+        self.assertEqual(message, "Validated data snapshot already published.")
+        tree = writer.revision(self.remote, f"{commit}:{writer.PUBLIC}")
+        self.assertEqual(
+            writer.publication_marker(self.data, commit),
+            f"[ingest-data] commit={commit} tree={tree}",
+        )
+
+        event_file = self.root / "event.json"
+        fixed = f"[listing-data] commit={commit} tree={tree}"
+        directory = self.data / writer.PUBLIC
+        with patch.dict(
+            os.environ, {"GITHUB_EVENT_NAME": "workflow_run", "GITHUB_EVENT_PATH": str(event_file)}
+        ):
+            write(self.root, event_file.name, {"workflow_run": {"id": 723, "other": "not logged"}})
+            self.assertEqual(reader.selection_marker(directory), fixed + " upstream_run=723")
+            for invalid in (True, -1, "123"):
+                write(self.root, event_file.name, {"workflow_run": {"id": invalid}})
+                self.assertEqual(reader.selection_marker(directory), fixed)
+        with patch.dict(
+            os.environ, {"GITHUB_EVENT_NAME": "push", "GITHUB_EVENT_PATH": str(event_file)}
+        ):
+            self.assertEqual(reader.selection_marker(directory), fixed)
+
     def test_noop_and_valid_empty_export(self):
         writer.prepare(self.data, self.primary, self.state)
-        self.assertEqual(writer.publish(self.data, self.state, "No changes"), "No changes.")
+        observed = writer.revision(self.remote, writer.BRANCH)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts/ingest_data_writer.py"),
+                "publish",
+                "data",
+                "state",
+                "--message",
+                "No changes",
+            ],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            ["No changes.", writer.publication_marker(self.data, observed)],
+        )
         (self.data / SHARD).unlink()
         (self.data / SIDECAR).unlink()
         self.write_public(self.data, None)
         self.assertEqual(
-            writer.publish(self.data, self.state, "Empty snapshot"),
+            writer.publish(self.data, self.state, "Empty snapshot")[0],
             "Published validated data snapshot.",
         )
         writer.validate_tree(self.remote, writer.BRANCH)
 
     def test_old_main_writer_catchup_and_ordinary_rollback(self):
         seed = writer.revision(self.remote, writer.BRANCH)
-        write(self.primary, SHARD, [{"status": "open", "old_writer": True}, {"status": "closed"}])
+        write(
+            self.primary,
+            SHARD,
+            [
+                {"id": "open", "status": "open", "old_writer": True},
+                {"id": "closed", "status": "closed"},
+            ],
+        )
         self.commit(self.primary, SHARD)
         self.git(self.primary, "push", "origin", "HEAD:refs/heads/main")
         self.assertFalse(writer.same_snapshot(self.remote, seed, "main"))
