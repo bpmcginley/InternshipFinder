@@ -15,6 +15,7 @@ import { countEvent, countHit } from "./visits.js";
 import { employerMetrics } from "./employer-metrics.js";
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
+import { maintainEmployerPostings } from "./employer-posting-maintenance.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
 import { socialVideo } from "./social-video.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
@@ -557,6 +558,9 @@ export default {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
     if (event && event.cron === CLOCK_CRON) {
       ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
+      if (env.EMPLOYER_POSTING_MAINTENANCE_ENABLED === "1") {
+        ctx.waitUntil(maintainEmployerPostings(env.DB, { enabled: true }));
+      }
       return;
     }
     if (event && event.cron === STUDENT_BILLING_CRON) {
