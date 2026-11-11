@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.join(ROOT, "backend"))
 import social  # noqa: E402
 from tests.seo_fixture_data import _row, _site  # noqa: E402
 
+pytestmark = pytest.mark.without_seo_facade
+
 _spec = importlib.util.spec_from_file_location(
     "instagram_c", os.path.join(ROOT, "growth", "instagram.py")
 )

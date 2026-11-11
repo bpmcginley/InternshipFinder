@@ -1,6 +1,14 @@
 """Shared test setup."""
 
+import sys
+
 import pytest
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "without_seo_facade: run in isolation without loading the legacy SEO module"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -30,13 +38,28 @@ def _no_real_state_files(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def _near_pages_only_where_tested(request, monkeypatch):
-    """Build the 500 near-city pages only in their own tests (test_near_pages.py) and in production:
-    they made every site build in the other tests about ten times slower (20 s suite to 3 min)."""
+    """Keep legacy site builds small outside the near-city page tests.
+
+    The 500 near-city pages increased the original suite from 20 seconds to three minutes.
+    """
     if request.module.__name__.endswith("test_near_pages"):
+        yield
+        return
+    legacy_name = "internscout.seo_pages"
+    if (
+        request.node.get_closest_marker("without_seo_facade") is not None
+        and sys.modules.get(legacy_name) is None
+    ):
+        yield
+        if sys.modules.get(legacy_name) is not None:
+            pytest.fail(
+                "A test marked without_seo_facade imported internscout.seo_pages", pytrace=False
+            )
         return
     from internscout import seo_pages
 
     monkeypatch.setattr(seo_pages, "NEAR_ON", False)
+    yield
 
 
 @pytest.fixture(autouse=True)
