@@ -1,3 +1,4 @@
+import { readAppSource } from "./app-fixture.mjs";
 // Import the same Core factory as the browser, with a fresh stand-in window for each test.
 // Kept outside docs/ so the test isn't published with the site.
 import { installCore } from "./core-fixture.mjs";
@@ -804,11 +805,11 @@ test("every filter goes into the address and comes back the same", () => {
 });
 
 test("the dashboard reads its filters from the address and writes them back with replaceState", () => {
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  assert.match(app, /const fromLink = \(\) => IS\.filtersFromUrl\(location\.search\);/);
+  const app = readAppSource();
+  assert.match(app, /const fromLink = \(\) => IS\.filtersFromUrl\(browser\.location\.search\);/);
   assert.match(
     app,
-    /IS\.filterSearch\(location\.search, f, initF\(p\)\);\s*if \(search !== location\.search\) history\.replaceState\(/,
+    /IS\.filterSearch\(browser\.location\.search, f, initF\(p\)\);\s*if \(search !== browser\.location\.search\) browser\.history\.replaceState\(/,
   );
   assert.doesNotMatch(app, /history\.pushState/);
   // The analytics beacon's single-page mode would count each replaceState as a page view.

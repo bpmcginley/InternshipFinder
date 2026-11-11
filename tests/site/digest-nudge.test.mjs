@@ -1,10 +1,12 @@
+import { useDigestPrompt } from "../../docs/js/app/navigation.mjs";
+import { saveProfileAction } from "../../docs/js/app/setup.mjs";
+import { useManualAppState } from "../../docs/js/app/tracker.mjs";
 import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
-const APP = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+const APP = readFileSync(new URL("../../docs/js/app/dashboard.mjs", import.meta.url), "utf8");
 const memory = () => {
   const map = new Map();
   return {
@@ -29,20 +31,16 @@ function load(local = memory()) {
     document: { documentElement: { dataset: {} } },
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
   installCore(ctx);
   return { IS: ctx.IS, local, ctx };
 }
 const eligible = { enabled: true, manual: true };
 
 test("a cached pre-invitation core leaves the optional prompt disabled without breaking rendering", () => {
-  const start = APP.indexOf("    const digestPrompt = useRef(null);");
-  const end = APP.indexOf("    const [digestNudge", start);
-  assert.ok(start > -1 && end > start);
+  assert.match(APP, /const digestPrompt = useDigestPrompt\(/);
   const ref = { current: null };
   const ctx = { IS: {}, useRef: () => ref };
-  vm.createContext(ctx);
-  assert.doesNotThrow(() => vm.runInContext(APP.slice(start, end), ctx));
+  assert.doesNotThrow(() => useDigestPrompt(ctx));
   assert.equal(ref.current.claim("interested", eligible), false);
   assert.doesNotThrow(() => ref.current.shown());
   assert.doesNotThrow(() => ref.current.finish("dismissed"));
@@ -164,9 +162,7 @@ test("deleting dashboard data removes the local email invitation preference", as
 // Run the actual UI action adapter against a tiny tracker, rather than simulating a second
 // copy of its policy. Queue updates retain setAppState; only the rendered row uses this wrapper.
 test("the manual status adapter preserves tracking and only offers on a new Interested selection", () => {
-  const start = APP.indexOf("    const offerDigestNudgeRef =");
-  const end = APP.indexOf("    const upd =", start);
-  assert.ok(start > -1 && end > start);
+  assert.match(APP, /const setManualAppState = useManualAppState\(/);
   const offers = [],
     updates = [],
     current = { a: "interested" };
@@ -183,8 +179,7 @@ test("the manual status adapter preserves tracking and only offers on a new Inte
       return fn;
     },
   };
-  vm.createContext(ctx);
-  vm.runInContext(APP.slice(start, end) + "globalThis.change = setManualAppState;", ctx);
+  ctx.change = useManualAppState(ctx);
   ctx.change("a", "interested");
   ctx.change("b", "applied");
   ctx.change("c", "none");
@@ -207,9 +202,7 @@ test("the manual status adapter preserves tracking and only offers on a new Inte
 });
 
 test("first manual profile save gives an existing invite priority; later edits never ask", () => {
-  const start = APP.indexOf("    function saveProfile(d) {");
-  const end = APP.indexOf("    // Focus goes back", start);
-  assert.ok(start > -1 && end > start);
+  assert.match(APP, /return saveProfileAction\(/);
   for (const [profile, invite, expected, pending = false] of [
     [null, true, []],
     [null, false, ["profile"]],
@@ -242,8 +235,7 @@ test("first manual profile save gives an existing invite priority; later edits n
       setNote() {},
       setTimeout() {},
     };
-    vm.createContext(ctx);
-    vm.runInContext(APP.slice(start, end), ctx);
+    ctx.saveProfile = data => saveProfileAction({ ...ctx, browser: ctx }, data);
     const data = { majors: ["Nursing"], fields: ["nursing"] };
     ctx.saveProfile(data);
     assert.deepEqual(offers, expected);

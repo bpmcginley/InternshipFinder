@@ -1,3 +1,4 @@
+import { createTestApp, readAppSource } from "./app-fixture.mjs";
 // The launch text for paid listings (S8, 2026-10-14; B2 plan section 9 PR 8, B1-data-privacy.md section 7):
 // the privacy page's #paid-listings section, the terms' employer section and the one-time dashboard notice.
 import { installCore } from "./core-fixture.mjs";
@@ -7,7 +8,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
-const PRIVACY = read("docs/privacy.html"), TERMS = read("docs/terms.html"), APP = read("docs/js/app.js");
+const PRIVACY = read("docs/privacy.html"), TERMS = read("docs/terms.html"), APP = readAppSource();
 const visible = html => html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
 const section = (html, id) => { const v = visible(html); const at = v.indexOf(`<h2 id="${id}">`); assert.ok(at >= 0, `#${id}`); const end = v.indexOf("<h2", at + 4); return v.slice(at, end < 0 ? undefined : end); };
 const words = html => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -131,8 +132,8 @@ function harness() {
     addEventListener() {}, postMessage() {}, location: { search: "", origin: "https://internscout.org" }, document: { documentElement: { dataset: {} }, addEventListener() {}, removeEventListener() {} } };
   ctx.window = ctx; vm.createContext(ctx);
   installCore(ctx);
-  vm.runInContext(APP.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));', "window.components = { PlaceNotice };"), ctx);
-  return ctx.components;
+  const components = createTestApp(ctx);
+  return components;
 }
 const text = n => typeof n === "string" ? n : n && n.children ? n.children.map(text).join("") : "";
 const nodes = (t, pred) => !t || typeof t !== "object" ? [] : [...(pred(t) ? [t] : []), ...t.children.flatMap(c => nodes(c, pred))];
