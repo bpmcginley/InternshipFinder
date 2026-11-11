@@ -839,6 +839,11 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - This PR preserved the five raw-error source adapters byte-for-byte. Q6 tracks decisions about their existing exception output.
 - The focused mocked source and adapter suites passed 144 tests. Golden snapshot and mutation checks both passed. Ruff is clean, and targeted Pyright exactly matches the nine existing diagnostics. Syntax trees match the previous revision after stripping logging-only changes from all 14 touched source modules. After merging main `acf2d347`, all 146 focused and golden tests passed, and source, test and shared-helper bytes matched their reviewed versions.
 
+## WP-6.2 placement report and console tests
+
+- The placement report and console tests use the canonical publisher with their original fixed UTC day and near-page setting. The qualified placement fixtures, recorder subprocess and workflow assertions are preserved. The cases still cover report placement, report failure and noninterference, and exact JSON diagnostics and workflow annotations.
+- The offline comparison matched all 53 assertions, 245 ordered page records across six publisher runs, six publication snapshots, 527 ordered writes and all 525 final fixture files. Stdout and stderr matched after replacing the scratch-directory prefix. All 18 focused cases passed with strict root fixtures, canonical donor identity, and facade, unqualified donor and sockets blocked. Both Golden checks matched all 836 artifacts.
+
 ## WP-1.4 backend logging closure
 
 - Audited `backend/internscout` at `fef33968` with the exact #235 and #236 runtime changes applied for counting, excluding console helper internals. Found 19 direct prints and 32 broad catches. This slice moves the remaining human-only stderr diagnostic in `asset_versions` and adds opt-in class-only telemetry to the previously silent catches in `geo._nominatim`, `probe._serves_job`, `probe.gh_host_token` and `probe._probe_one`. The geocoder still updates its monotonic rate marker and leaves failures uncached, and the probes retain their original fallback and candidate order. The Greenhouse detail catch adds the same type-only telemetry while preserving the list description and complete scan. NYC Jobs and USAJOBS count lines and USAJOBS's missing-settings line preserve their plain text.
