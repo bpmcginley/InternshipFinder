@@ -3013,6 +3013,7 @@
 "usa) pa moon township 04644 wm supercenter|PA":null,
 "usa) pa selinsgrove 02185 wm supercenter|PA":null,
 "usa) pa tarentum 03838 wm supercenter|PA":null,
+"usa) pa waynesboro 03633 wm supercenter|PA":null,
 "usa) pa woodland 06827 dispatch trucking|PA":null,
 "usa) pa wyncote 05229 wal-mart|PA":null,
 "usa-new jersey-edgewater park|NJ":null,
@@ -3104,6 +3105,10 @@
 -76.8706
 ],
 "wayne pa|PA":null,
+"waynesboro|PA":[
+39.7558,
+-77.5777
+],
 "waynesburg|PA":[
 39.8956,
 -80.1848
