@@ -2,30 +2,28 @@
 
 from html.parser import HTMLParser
 from pathlib import Path
-import posixpath
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import unquote
 
 ATTRIBUTE = ' data-employer-posting-counts="1"'
 
 
 class _Scripts(HTMLParser):
-    def __init__(self, text, page="/"):
+    def __init__(self, text):
         super().__init__(convert_charrefs=True)
         # HTMLParser counts LF only, not Unicode line/paragraph separators or CR.
         self.starts = [0] + [i + 1 for i, char in enumerate(text) if char == "\n"]
-        self.page = page
         self.matches = []
         self.pending = None
 
     def _counter(self, value):
         if not isinstance(value, str):
             return False
-        # Resolve first, so query strings, absolute URLs and relative aliases cannot hide
-        # another copy of the first-party counter from the exact serialization check.
-        value = value.strip(" \t\r\n\x00").replace("\t", "").replace("\r", "").replace("\n", "")
-        url = urlsplit(urljoin("https://internscout.org" + self.page, value.replace("\\", "/")))
-        normalized = posixpath.normpath("/" + unquote(url.path).lstrip("/"))
-        return url.hostname == "internscout.org" and normalized == "/js/count.js"
+        # Deliberately lexical and conservative, not a Python approximation of browser URL
+        # authority parsing. Any potential counter filename must use the one exact tag,
+        # including foreign hosts, slash-heavy/encoded hosts and cache-versioned aliases.
+        value = unquote(value).replace("\\", "/")
+        value = value.replace("\t", "").replace("\r", "").replace("\n", "").strip()
+        return "count.js" in value.lower()
 
     def handle_starttag(self, tag, attrs):
         if tag != "script":
@@ -46,8 +44,8 @@ class _Scripts(HTMLParser):
             self.pending = None
 
 
-def _mark(text, page="/"):
-    parser = _Scripts(text, page)
+def _mark(text):
+    parser = _Scripts(text)
     parser.feed(text)
     parser.close()
     if parser.pending is not None or len(parser.matches) != 1:
@@ -105,8 +103,6 @@ def stamp(root: Path, pages: list[dict]) -> None:
         if target.is_symlink() or target.is_junction() or not target.is_file():
             raise ValueError("Capture requires regular published pages")
         text = target.read_bytes().decode("utf-8")
-        parent = target.relative_to(root).parent.as_posix()
-        page = "/" if parent == "." else "/" + parent + "/"
-        prepared.append((target, _mark(text, page).encode("utf-8")))
+        prepared.append((target, _mark(text).encode("utf-8")))
     for target, raw in prepared:
         target.write_bytes(raw)

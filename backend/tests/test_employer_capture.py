@@ -95,11 +95,20 @@ def test_html_parser_offsets_count_only_lf(prefix):
         "../../js/count.js?x=1",
         "/js/%63ount.js",
         "/js/nested/../count.js",
+        "https:///internscout.org/js/count.js",
+        "https:////internscout.org/js/count.js",
+        "////internscout.org/js/count.js",
+        "https://%69nternscout.org/js/count.js",
+        "https://internscout%2eorg/js/count.js",
+        "https://ｉnternscout.org/js/count.js",
+        "https://untrusted.example/count.js",
+        "count.js?v=old",
+        "https:count.js",
     ],
 )
-def test_effective_counter_alias_cannot_hide_duplicate(src):
+def test_potential_counter_filename_cannot_hide_duplicate(src):
     with pytest.raises(ValueError, match="counter script"):
-        employer_capture._mark(TAG + f'<script defer src="{src}"></script>', "/internships/field/")
+        employer_capture._mark(TAG + f'<script defer src="{src}"></script>')
 
 
 @pytest.mark.parametrize("flags", [[], ["--employer-postings"]])
