@@ -314,12 +314,24 @@ export async function batchExpiryWithholdsCursor(db, equal) {
   const f = await fixture(db, { match: true, mode: "batch-expired" });
   await f.subscribe("second@example.test");
   await f.subscribe("third@example.test");
-  equal(await f.runBatch(2), { status: "unavailable" });
+  equal(await f.runBatch(1), { status: "unavailable" });
   equal(f.requests(), 2);
   equal(f.writes(), 1);
   equal((await f.rows("follow_digest_outbox")).length, 1);
-  equal(await f.runBatch(2), { status: "unavailable" });
+  equal(await f.runBatch(1), { status: "unavailable" });
   equal(f.writes(), 1);
+}
+
+export async function batchDatabaseAdmissionWithholdsCursor(db, equal) {
+  for (const mode of ["db-expired", "db-rollover"]) {
+    const f = await fixture(db, { match: true, mode });
+    await f.subscribe("lookahead@example.test");
+    equal(await f.runBatch(1), { status: "unavailable" });
+    equal(f.requests(), 2);
+    equal(f.writes(), 1);
+    equal(await f.rows("follow_digest_outbox"), []);
+    await db.prepare("DELETE FROM follow_subscribers").run();
+  }
 }
 
 export async function batchBoundsAndMalformedPage(db, equal) {

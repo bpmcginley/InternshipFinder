@@ -143,17 +143,32 @@ export async function enqueueFollowArchiveBatch(
   const latest = await reader.latestSnapshot();
   if (latest.status !== "ready") return latest;
   const matching = { catalog, limits, maxProgressBytes, maxPendingBytes };
+  function withinAdmission() {
+    const at = clock();
+    return Number.isFinite(+at) && at.toISOString() < latest.enqueueUntil;
+  }
   const counts = {};
   const page = results.slice(0, maxSubscribers);
   for (const { id } of page) {
-    // If admission expires after earlier subscribers committed, retry the same cursor.
-    const at = clock();
-    if (!Number.isFinite(+at) || at.toISOString() >= latest.enqueueUntil)
-      return { status: "unavailable" };
+    if (!withinAdmission()) return { status: "unavailable" };
     const result = await enqueueQualified(db, id, latest, clock, matching);
-    if (result.reason === "archive_admission") return { status: "unavailable" };
+    if (!withinAdmission() || result.reason === "archive_admission")
+      return { status: "unavailable" };
     counts[result.status] = (counts[result.status] ?? 0) + 1;
   }
+  // The transaction reports an admission rejection as a normal CAS conflict. Check both
+  // clocks before allowing a continuation, including when the last subscriber was rejected.
+  const databaseAt = await db
+    .prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at")
+    .first("at");
+  if (
+    !withinAdmission() ||
+    followInstant(databaseAt) === null ||
+    databaseAt < latest.at ||
+    databaseAt >= latest.enqueueUntil ||
+    databaseAt.slice(0, 10) !== day
+  )
+    return { status: "unavailable" };
   return {
     status: "processed",
     counts,
