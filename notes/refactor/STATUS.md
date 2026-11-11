@@ -98,7 +98,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
 | 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | Merged | `4ee6308b` records fixed offline responses for 42 exact routes and 44 additional cases. |
-| 5 | WP-4.3 Non-financial route table | wp42_orders | `refactor/wp-4.3-safe-table` | - | In review | Contract-keyed dispatch for 13 routes with the original gate and request order. |
+| 5 | WP-4.3 Non-financial route table | wp42_orders | `refactor/wp-4.3-safe-table` | [#259](https://github.com/bpmcginley/InternshipFinder/pull/259) | In review | Contract-keyed dispatch for 13 routes with the original gate and request order. |
 | 5 | WP-4.3 Financial and adjacent route wrappers | Unassigned | - | - | Question Q3 | The existing 29 switch routes preserve billing, paid-placement and AI allowance behavior. |
 | 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | In review | Page-state and file helpers only. All existing imports and safety tests remain valid. |
 | 5 | WP-5.2 Background agent | Unassigned | - | - | Queued | Separate move-only PR; guard and tests untouched; no version bump. |
