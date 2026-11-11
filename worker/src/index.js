@@ -13,6 +13,8 @@ import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
+import { topupCheckoutResponse } from "./topup-checkout-http.js";
+import { prepareTopupStripe } from "./topup-stripe.js";
 import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
 const employerPostingRuntime = createEmployerPostingRuntime();
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
@@ -23,7 +25,7 @@ import { socialVideo } from "./social-video.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
   livePlacements, pausePlacement, placementReport, refusePlacement, requireAdmin, rollupPlacementCounts, switchOn,
   updatePlacement } from "./placements.js";
-import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook, reconcileStudentBilling, STUDENT_BILLING_CRON } from "./billing.js";
+import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, siteUrl, verifyWebhook, reconcileStudentBilling, STUDENT_BILLING_CRON } from "./billing.js";
 import { MAX_ORDER_BYTES, availability, chooseCredit, confirmOrder, createPilotCode, creditInfo, listOrders, orderConfig,
   notePlacementFields, ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
 
@@ -37,14 +39,15 @@ const EXTENSION_ORIGINS = [
 ];
 // internscout.org is the site's own domain. The github.io origin stays for tabs opened before the
 // switch; GitHub Pages redirects every new visit to internscout.org.
-const DEFAULT_ORIGINS = ["https://internscout.org", "https://bpmcginley.github.io", "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
+const DASHBOARD_ORIGINS = ["https://internscout.org", "https://bpmcginley.github.io"];
+const DEFAULT_ORIGINS = [...DASHBOARD_ORIGINS, "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
 
 // Which client sent a request, by its Origin, for the funnel steps the Worker counts (visits.js
 // countEvent, added 2026-10-04): "extension", "dashboard" (the site) or "worker" (anything else).
 function clientOf(request) {
   const origin = request.headers.get("Origin") || "";
   if (EXTENSION_ORIGINS.includes(origin)) return "extension";
-  if (/^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/.test(origin)) return "dashboard";
+  if (DASHBOARD_ORIGINS.includes(origin)) return "dashboard";
   return "worker";
 }
 
@@ -305,6 +308,29 @@ const safeRouteHandlers = {
     // nothing, and gets the cheapest plan on offer.
     const { body } = await readJson(request, d.config.MAX_BODY_BYTES, true);
     return json(await checkout(db, env, d.config, user, body.plan, now, d.fetch));
+  },
+
+  "POST /billing/topup/checkout": async ({ request, db, env, d }) => {
+    const noStore = { "Cache-Control": "no-store" };
+    if (env.TOPUPS_ENABLED !== "1" || !paymentsOn(env))
+      return json({ status: "disabled" }, 503, noStore);
+    const origin = request.headers.get("Origin");
+    if (
+      !DASHBOARD_ORIGINS.includes(origin) ||
+      !corsHeaders(request, env)["Access-Control-Allow-Origin"]
+    )
+      return json({ status: "unavailable" }, 403, noStore);
+    return topupCheckoutResponse({
+      request,
+      db,
+      clock: d.now,
+      prepareAdapter() {
+        const site = siteUrl(env);
+        if (!DASHBOARD_ORIGINS.includes(site)) return { enabled: false };
+        const root = site + "/";
+        return prepareTopupStripe(env, { success: root, cancel: root }, d.fetch);
+      },
+    });
   },
 
   "POST /billing/portal": async ({ db, env, d, signIn }) => {

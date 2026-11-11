@@ -79,6 +79,7 @@ import "./session-copy-fence.test.js";
 import "./topup-session-copy-integration.test.js";
 import "./topup-checkout-service.test.js";
 import "./topup-checkout-http.test.js";
+import "./topup-checkout-route.test.js";
 
 import "./employer-catalog-cache.test.js";
 import "./employer-posting-counts.test.js";

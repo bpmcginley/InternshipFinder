@@ -152,9 +152,9 @@ test("the original router's offline response bytes and headers stay fixed", asyn
     readFileSync(new URL("./fixtures/route-baseline.json", import.meta.url), "utf8"),
   );
   assert.equal(fixture.capturedFrom, "067a033785214ec63d0d67b26b6ed1d54b940e16");
-  // The historical baseline stays immutable. The one new product route has its
-  // own offline HTTP/D1 tests; future additions must be named explicitly here.
-  const added = new Set(["POST /follows/unsubscribe"]);
+  // The historical baseline stays immutable. These later routes have their own
+  // offline HTTP/D1 tests; future additions must be named explicitly here.
+  const added = new Set(["POST /follows/unsubscribe", "POST /billing/topup/checkout"]);
   assert.equal(exactCases.length + added.size, ROUTES.length);
   assert.deepEqual(
     new Set([...exactCases.map(({ method, path }) => key(method, path)), ...added]),
