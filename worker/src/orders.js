@@ -25,10 +25,12 @@ import { CHECKS, addDays, checkPlacement, createPlacement, dayOf, daysBetween, e
 import { hex, sameHex, siteUrl, stripe } from "./billing.js";
 import { trySend, sendMail } from "./mail.js";
 import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
-import { CHECKOUT_HOLD_MS, CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, LIMITS, LISTING_ID, MAX_START_DAYS, UNVERIFIED_DAYS, bad, conflict, fieldsOf, money, rolesWord, text } from "./orders/shared.js";
+import { CHECKOUT_HOLD_MS, CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, LIMITS, LISTING_ID, MAX_START_DAYS, ORDER_ID, UNVERIFIED_DAYS, bad, conflict, fieldsOf, money, rolesWord, text } from "./orders/shared.js";
 import { readShard, shardOf } from "./orders/roles.js";
 import { busiest, fillPlacementFields, firstFit, fitAll, heldRoles, reserveCapacity, startDay } from "./orders/capacity.js";
 import { approvedMail, closedMail, creditMail, receivedMail, refusedMail, reviewMail, reviewSig, verifyMail } from "./orders/templates.js";
+import { loadOrder, orderRoles } from "./orders/records.js";
+import { esc, message, page } from "./orders/review-html.js";
 
 export { listOrders } from "./orders/admin.js";
 export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
@@ -74,7 +76,6 @@ export const WEBMAIL = new Set([
 
 // Only the site's own pages send the order, confirm and credit choice (a browser always sets Origin).
 const SITE = /^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/;
-const ORDER_ID = /^o-[0-9a-f]{16}$/;
 const CREDIT_ID = /^c-[0-9a-f]{16}$/;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const PILOT = /^[A-Z0-9-]{4,32}$/;
@@ -139,16 +140,6 @@ async function addressKey(request, env) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   return "order:" + (await tokenHash(`order|${ip}|${env.HASH_SALT}`));
 }
-
-// ---------------------------------------------------------------- loading
-
-async function loadOrder(db, id) {
-  if (typeof id !== "string" || !ORDER_ID.test(id)) return null;
-  return db.prepare("SELECT * FROM employer_orders WHERE id = ?").bind(id).first();
-}
-
-const orderRoles = async (db, id) =>
-  (await db.prepare("SELECT * FROM employer_order_roles WHERE order_id = ? ORDER BY rowid").bind(id).all()).results;
 
 // ---------------------------------------------------------------- 1. the order
 
@@ -490,36 +481,6 @@ async function disputed(db, env, order, now) {
 }
 
 // ---------------------------------------------------------------- 4. review
-
-const STYLE = "body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#111;background:#fff}" +
-  "h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse}td,th{text-align:left;" +
-  "vertical-align:top;padding:.2rem .8rem .2rem 0}.warn{color:#a40000;font-weight:600}.ok{color:#0a5a1f}" +
-  "form{margin:1rem 0;padding:1rem;border:1px solid #ccc}textarea{width:100%;font:inherit}button{font:inherit;padding:.4rem 1rem}" +
-  "li{margin:.4rem 0}code{word-break:break-all}";
-let styleHash;
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-// A self-contained page: no script at all, the one style block allowed by its hash, forms that post
-// back to this Worker only, and nothing kept by the browser or sent on as a referrer (the link is signed).
-async function page(title, body, status = 200) {
-  styleHash ||= btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(STYLE)))));
-  const html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\">" +
-    `<title>${esc(title)}</title><style>${STYLE}</style></head><body>${body}</body></html>`;
-  return new Response(html, {
-    status,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": `default-src 'none'; style-src 'sha256-${styleHash}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
-      "Cache-Control": "no-store",
-      "Referrer-Policy": "no-referrer",
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-    },
-  });
-}
-
-const message = (title, text, status) => page(title, `<h1>${esc(title)}</h1><p>${esc(text)}</p>`, status);
 
 // GET /employer/review?order=&sig=: everything Bruce needs for the sponsor checks, on one page.
 export async function reviewPage(db, env, params, now, fetchImpl) {

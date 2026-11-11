@@ -31,3 +31,5 @@ export const CREDIT_DEFAULT_DAYS = 30;   // an unanswered unused-days offer beco
 
 export const money = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
 export const rolesWord = (n) => (n === 1 ? "1 role" : `${n} roles`);
+
+export const ORDER_ID = /^o-[0-9a-f]{16}$/;

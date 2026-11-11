@@ -76,6 +76,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | - | Prepared locally | File move based on Worker config #223. Open after #223 merges. |
 | 4 | WP-4.2 Orders split, mail templates | wp42_orders | `refactor/wp-4.2-orders-templates` | - | Prepared locally | Plain-text file move based on field capacity. Open after the capacity PR merges. |
+| 4 | WP-4.2 Orders split, review HTML and records | wp42_orders | `refactor/wp-4.2-orders-review-records` | - | Prepared locally | Move the review HTML helpers and record readers after the mail-template PR merges. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
@@ -476,4 +477,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Move the seven mail constructors and their local formatting helpers to `worker/src/orders/templates.js`. The template module imports the existing billing helpers and reads them only when called. Its API default still comes from generated public config and each call still reads the current environment override. Shared timing, amount and role-count helpers move to `orders/shared.js`.
 - Byte-compared the complete template block, nine supporting declarations and all remaining non-wiring statements against capacity head `d6bb8491`. Queueing, delivery, environment access and signature order remain the same. Verified all 39 facade exports and kept the physical terms literals in `orders.js`.
+- Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
+
+## WP-4.2 review HTML and record readers
+
+- Move the review stylesheet, lazy hash, escaping, page and message helpers to `orders/review-html.js`, and the order and role readers to `orders/records.js`. The order ID pattern moves verbatim to shared code.
+- Verified both moved blocks and the shared pattern against mail-template head `e09348fe`. Every remaining orders.js byte matches after removing import wiring. The original CSP, lazy hash, SQL, physical terms literals and 39 facade exports are preserved.
 - Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
