@@ -280,6 +280,28 @@ While a subscription is active it returns `409 subscribed` instead: cancelling i
 first, so nothing keeps billing a card for an account that no longer exists here.
 
 ### `POST /ai` (auth)
+
+Internal rollout (off by default): absent/`legacy` `FUNDED_RUNS_MODE` uses existing
+admission and does not query the funded schema. After qualified migration and draining
+old handlers, `create` admits new funded generations; `drain` stops new generation
+creation while continuing existing ones through exact-call callbacks. Existing legacy
+runs can continue only through a guarded existing-row path, without inferred refundable
+funding. Never switch back to the legacy writer while funded generations can exist.
+Invalid modes, missing required response bounds, unavailable/ambiguous funded storage
+or a lost reservation acknowledgment fail closed; no fallback or automatic provider retry.
+
+Opted-in modes require explicit positive integer `FUNDED_RESPONSE_MAX_BYTES`,
+`FUNDED_RESPONSE_EVENT_BYTES` (no larger than the body bound), and
+`FUNDED_RESPONSE_DEADLINE_MS`. No production values are selected here. The deadline
+bounds the single provider attempt and response consumption; accepted output is fenced
+before exposure. Definite failures release only their call; uncertain transport,
+interruption and missing accounting retain the estimate. A pending admission/acceptance
+returns generic `503 busy`; existing recognized cap/rate/paused responses retain their
+contracts. Purchased first admission is separately disabled unless `FUNDED_PURCHASES=1`;
+enabling it requires the remaining purchase balance/disclosure and release qualification.
+These controls are deployment configuration, not client request fields. Request shape,
+success bytes/headers, and default legacy behavior remain unchanged.
+
 Body:
 ```json
 { "task": "autofill", "run_id": "uuid-from-client",
