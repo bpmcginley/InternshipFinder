@@ -33,3 +33,9 @@ export const money = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
 export const rolesWord = (n) => (n === 1 ? "1 role" : `${n} roles`);
 
 export const ORDER_ID = /^o-[0-9a-f]{16}$/;
+
+// Prices in cents (Bruce, 2026-10-19: final). public_body is the price for a nonprofit or public body.
+export const PRICES = {
+  one: { roles: 1, cents: 2900, public_body_cents: 1500 },
+  three: { roles: 3, cents: 6900, public_body_cents: 3500 },
+};

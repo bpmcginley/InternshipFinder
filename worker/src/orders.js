@@ -25,27 +25,24 @@ import { CHECKS, addDays, checkPlacement, dayOf, daysBetween, endPlacement, paus
 import { hex, sameHex, siteUrl, stripe } from "./billing.js";
 import { trySend, sendMail } from "./mail.js";
 import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
-import { CHECKOUT_HOLD_MS, CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, LIMITS, LISTING_ID, MAX_START_DAYS, ORDER_ID, UNVERIFIED_DAYS, bad, conflict, fieldsOf, money, rolesWord, text } from "./orders/shared.js";
+import { CHECKOUT_HOLD_MS, CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, LIMITS, LISTING_ID, MAX_START_DAYS, ORDER_ID, PRICES, UNVERIFIED_DAYS, bad, conflict, fieldsOf, money, rolesWord, text } from "./orders/shared.js";
 import { readShard, shardOf } from "./orders/roles.js";
 import { busiest, fillPlacementFields, firstFit, fitAll, heldRoles, reserveCapacity, startDay } from "./orders/capacity.js";
 import { approvedMail, closedMail, creditMail, refusedMail, reviewSig, verifyMail } from "./orders/templates.js";
 import { loadOrder, orderRoles } from "./orders/records.js";
 import { esc, message, page } from "./orders/review-html.js";
 import { ensurePlacements, markPaid, sendReview, settle } from "./orders/settlement.js";
+import { addressKey, newToken, ordersOn, randomHex, sigOk, siteOnly, tokenHash, tokenOk } from "./orders/access.js";
 
 export { listOrders } from "./orders/admin.js";
 export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
 export { readShard, shardOf } from "./orders/roles.js";
 export { availability, notePlacementFields } from "./orders/capacity.js";
-export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_START_DAYS, UNVERIFIED_DAYS } from "./orders/shared.js";
+export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_START_DAYS, PRICES, UNVERIFIED_DAYS } from "./orders/shared.js";
 export { TERMS_ARCHIVE, reviewSig } from "./orders/templates.js";
 export { listingEvent } from "./orders/settlement.js";
+export { newToken, ordersOn, tokenHash } from "./orders/access.js";
 
-// Prices in cents (Bruce, 2026-10-19: final). public_body is the price for a nonprofit or public body.
-export const PRICES = {
-  one: { roles: 1, cents: 2900, public_body_cents: 1500 },
-  three: { roles: 3, cents: 6900, public_body_cents: 3500 },
-};
 export const TOKEN_HOURS = 48;       // the email link works this long
 // The terms an order accepts: docs/terms.html's "Last updated" day (tests/site/buy.test.mjs holds the two
 // together), and the clickwrap box exactly as docs/employers/buy/ shows it, stored on every order (legal
@@ -76,19 +73,12 @@ export const WEBMAIL = new Set([
   "163.com", "126.com", "comcast.net", "verizon.net", "att.net", "sbcglobal.net", "duck.com",
 ]);
 
-// Only the site's own pages send the order, confirm and credit choice (a browser always sets Origin).
-const SITE = /^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/;
 const CREDIT_ID = /^c-[0-9a-f]{16}$/;
-const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const PILOT = /^[A-Z0-9-]{4,32}$/;
 
 const notFound = () => new HttpError(404, "not_found", "No such endpoint");
 
 // ---------------------------------------------------------------- on or off
-
-export const ordersOn = (env) =>
-  env.EMPLOYER_CHECKOUT === "1" && !!env.STRIPE_SECRET_KEY && !!env.STRIPE_WEBHOOK_SECRET && !!env.ADMIN_TOKEN &&
-  !!env.REVIEW_TO && !!env.ORDER_FROM && !!(env.EMAIL && typeof env.EMAIL.send === "function");
 
 export function requireOrders(env) {
   if (!ordersOn(env)) throw notFound();
@@ -104,43 +94,6 @@ export function orderConfig(env) {
     max_start_days: MAX_START_DAYS,
     terms_version: TERMS_VERSION,
   };
-}
-
-function siteOnly(request) {
-  if (!SITE.test(request.headers.get("Origin") || "")) {
-    throw new HttpError(403, "forbidden", "This is sent from internscout.org only");
-  }
-}
-
-// ---------------------------------------------------------------- small helpers
-
-const randomHex = (bytes) => hex(crypto.getRandomValues(new Uint8Array(bytes)));
-
-// The email link: 32 random bytes, base64url. Only its SHA-256 (hex) is stored.
-export function newToken() {
-  const b = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-export async function tokenHash(token) {
-  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
-}
-
-// Constant time over the two hashes (billing.js sameHex), so a guess learns nothing from the timing.
-async function tokenOk(token, hash) {
-  if (typeof token !== "string" || !TOKEN.test(token) || typeof hash !== "string" || !hash) return false;
-  return sameHex(await tokenHash(token), hash);
-}
-
-async function sigOk(env, id, sig) {
-  if (typeof id !== "string" || !ORDER_ID.test(id) || typeof sig !== "string" || !/^[0-9a-f]{64}$/.test(sig)) return false;
-  return sameHex(await reviewSig(env, id), sig);
-}
-
-async function addressKey(request, env) {
-  if (!env.HASH_SALT) throw new HttpError(500, "server", "Server is missing HASH_SALT");
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  return "order:" + (await tokenHash(`order|${ip}|${env.HASH_SALT}`));
 }
 
 // ---------------------------------------------------------------- 1. the order
