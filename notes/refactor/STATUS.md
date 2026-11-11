@@ -1,4 +1,4 @@
-Wave 4 implementation merged. Wave 5 queued.
+Wave 5 active. Wave 4 published.
 
 **Authorization update, 2026-11-10:** Bruce explicitly authorized processing now, finishing and merging retained PRs #165, #175, #177 and #178, and notifying the Product/Growth Refactor session to continue. This supersedes the 16:00 earliest-start and empty-queue holds below. Reviews, green CI, Pages verification, protected guard code/tests, and production deployment restrictions remain in force. Product has been notified; formatting is merged and published, and coordinated product work has resumed. Design-note merges do not resolve unspecified pricing, privacy, retention or operator choices, nor enable payment/email implementation. Historical notice and inventories below record the earlier gate.
 
@@ -16,7 +16,8 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - Waves 0-2 are complete. JavaScript #189 and Python retry #192 have green Pages/backend verification. Python #190 was ordinarily reverted by #191 after a deployment timeout, then retried without source changes.
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
 - All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. PR #230 removed the four manual source tags after Product released the files and merged as `789e72f0`.
-- The authorized Wave 4 logging, vocabulary inventory, public configuration and orders split are merged. The last logging merge passed Pages and its exact deployment check. Existing provider and credential output covered by Q6 and Q7 remains separate. Verify this checkpoint's publication before opening Wave 5.
+- The authorized Wave 4 logging, vocabulary inventory, public configuration and orders split are merged. The last logging merge passed Pages and its exact deployment check. Existing provider and credential output covered by Q6 and Q7 remains separate. The Wave 4 checkpoint #248 published through Pages 42940952578 and its exact deployment succeeded.
+- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is in independent review. The dashboard test-only follow-up #263 is also published.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Product published the counter disclosure in #225. Counter #175 and the Worker refactors still await operator deployment. Migration adoption, production sending and extension release remain operator actions. Product released the dashboard and SEO source after #217 and #208, respectively. Check open file claims again before each wave.
 
@@ -86,7 +87,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | [#231](https://github.com/bpmcginley/InternshipFinder/pull/231) | Merged | `fef33968`. Pages 42936798140 and backend verified. Field-capacity file move with exact SQL and all 39 facade exports preserved. |
 | 4 | WP-4.2 Orders split, remaining seams and tests | wp42_orders | `refactor/wp-4.2-orders-delivery` | [#239](https://github.com/bpmcginley/InternshipFinder/pull/239) | Merged | `4c78a8a2`. Pages 42937600170 and backend verified. Preserved all 39 facade exports and the registration order and assertions of all 43 order test cases. |
-| 5 | WP-3.1 Constants/helpers | wp21_inventory | `refactor/wp-3.1-site-helpers` | [#252](https://github.com/bpmcginley/InternshipFinder/pull/252) | In review | Move exact pure helpers and immutable thresholds into the installed site package with legacy re-exports. |
+| 5 | WP-3.1 Constants/helpers | wp21_inventory | `refactor/wp-3.1-site-helpers` | [#252](https://github.com/bpmcginley/InternshipFinder/pull/252) | Merged | `c00fb90f`. Pages 42942262592 and 42942269472 and both exact deployments succeeded. Pure helpers and immutable thresholds retain legacy re-exports. |
 | 5 | WP-3.2 Sitemap/feeds/llms | wp21_inventory | `refactor/wp-3.2-site-artifacts` | [#264](https://github.com/bpmcginley/InternshipFinder/pull/264) | In review | Move sitemap, robots, RSS and LLMS rendering and writes with legacy entry points and exact golden bytes. |
 | 5 | WP-3.3 Near family | Unassigned | - | - | Queued | Serial family PR; data/render split without output changes. |
 | 5 | WP-3.3 Employer family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
@@ -97,11 +98,11 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.3 Listing family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
-| 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | Merged | `4ee6308b` records fixed offline responses for 42 exact routes and 44 additional cases. |
-| 5 | WP-4.3 Non-financial route table | wp42_orders | `refactor/wp-4.3-safe-table` | [#259](https://github.com/bpmcginley/InternshipFinder/pull/259) | In review | Contract-keyed dispatch for 13 routes with the original gate and request order. |
+| 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | Merged | `4ee6308b` records fixed offline responses for 42 exact routes and 44 additional cases. Pages 42942714678 and the exact deployment succeeded. |
+| 5 | WP-4.3 Non-financial route table | wp42_orders | `refactor/wp-4.3-safe-table` | [#259](https://github.com/bpmcginley/InternshipFinder/pull/259) | Merged | `1712e648`. Pages 42943948562 and the exact deployment succeeded. Contract-keyed dispatch covers 13 routes with the original gate and request order. |
 | 5 | WP-4.3 Financial and adjacent route wrappers | Unassigned | - | - | Question Q3 | The existing 29 switch routes preserve billing, paid-placement and AI allowance behavior. |
-| 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | In review | Page-state and file helpers only. All existing imports and safety tests remain valid. |
-| 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | [#257](https://github.com/bpmcginley/InternshipFinder/pull/257) | In review | Extract prompt, snapshot, field options and interview prompt in separate commits. Existing loaders, state, safety tests and version are unchanged. |
+| 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | Merged | `1754f0c6`. Pages 42942005718 and the exact deployment succeeded. Page-state and file helpers retain imports and safety tests. |
+| 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | [#257](https://github.com/bpmcginley/InternshipFinder/pull/257) | Merged | `86627ff8`. Pages 42943168312 and the exact deployment succeeded. The loaders, state, safety tests and version are unchanged. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
 | 6 | WP-2.2 Design tokens | Unassigned | - | - | Queued | After Phase 3; preserve inlined output and distinct values. |
 | 6 | WP-5.1 Core modules | Unassigned | - | - | Question | Browser-support decision Q2 precedes implementation. |
@@ -294,7 +295,12 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-After the Wave 4 checkpoint publishes, open Wave 5 with one owner of the SEO source, Worker route characterization and the protected extension split. The fresh Product claim scan found no overlap with these first source moves. Avoid the shared Worker test entry and helpers claimed by Product. Q3 still covers financial routing changes beyond file moves.
+Complete independent review and current-head CI on WP-3.2 #264, then verify its Pages run and exact deployment before WP-3.3 implementation. Recheck Product file claims before the near-page extraction. Q3 still covers financial routing changes beyond file moves.
+
+## Dashboard ranking test clock
+
+- The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
+- Separate test-only [#263](https://github.com/bpmcginley/InternshipFinder/pull/263) pins one clock for both ranking paths in that fixture. It changes only `tests/site/dashboard.test.mjs`. It merged as `d827361a`, and Pages 42945086604 and the exact deployment succeeded.
 
 ## WP-1.4 sparse workflow diagnostics
 
