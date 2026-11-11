@@ -200,6 +200,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.1g scoped follow deletion worker merge | [#261](https://github.com/bpmcginley/InternshipFinder/pull/261) preserves reviewed dormant scoped deletion on requalified #256. Fresh checks and Bruce merge approval remain pending. Routing, disclosure and deployment remain separate. | Open needs-bruce |
 | 2026-11-10 | P-2.1e follow mail envelope worker merge | [#256](https://github.com/bpmcginley/InternshipFinder/pull/256) preserves the reviewed dormant renderer on requalified #243. Fresh checks and Bruce merge approval remain pending. Actual sender, postal address, DKIM, quota and deployment remain operator gates. | Open needs-bruce |
 | 2026-11-10 | P-2.1d one-click unsubscribe worker merge | [#243](https://github.com/bpmcginley/InternshipFinder/pull/243) is a dormant handler stacked on #229. Parent integration preserves the reviewed handler. Fresh checks and Bruce merge approval remain pending. | Open needs-bruce |
 | 2026-11-11 | Employer posting-key mapping | [#336](https://github.com/bpmcginley/InternshipFinder/pull/336) `4e2d3eff` passed independent review and nine checks. The proposed mapping includes direct organic links for closed dashboard listings that retain a posting link, with a 256 KiB uncompressed catalog limit. The exact design awaits approval. | Mapping decision pending |
