@@ -411,6 +411,35 @@ test("a stream cut off before the finish is retried, never acted on", async () =
   assert.deepEqual(out.content, [{ type: "text", text: "whole" }]);
 });
 
+test("a Worker backoff only waits when another request can follow", async (t) => {
+  const cases = [
+    ["transport", async () => { throw new TypeError("Network unavailable"); }, "upstream", [1500, 3000, 6000]],
+    ["incomplete stream", async () => sse([chunk([{ text: "Incomplete" }])]), "upstream", [1500, 3000, 6000]],
+    ["upstream response", async () => res(502, { error: "upstream" }), "upstream", [2000, 4000, 8000]],
+    ["rate limit", async () => res(429, { error: "rate", retry_after: 30 }), "rate", [30000, 30000, 30000]],
+    ["busy response", async () => res(503, { error: "busy", retry_after: 60 }), "busy", [60000, 60000, 60000]],
+  ];
+  for (const [label, fail, code, expectedWaits] of cases) {
+    await t.test(label, async () => {
+      let calls = 0;
+      const waits = [];
+      await assert.rejects(callWorker({
+        url: "u",
+        token: "t",
+        task: "autofill",
+        fetchImpl: async () => {
+          calls++;
+          return fail();
+        },
+        sleepImpl: async (ms) => waits.push(ms),
+        ...opts,
+      }), { code });
+      assert.equal(calls, 4);
+      assert.deepEqual(waits, expectedWaits);
+    });
+  }
+});
+
 test("MAX_TOKENS and a blocked prompt come through a stream unchanged", async () => {
   const long = await callWorker({ url: "u", token: "t", task: "deep_dive", fetchImpl: async () => sse([chunk([{ text: "a" }], { finishReason: "MAX_TOKENS" })]), ...opts });
   assert.equal(long.stop_reason, "max_tokens");
