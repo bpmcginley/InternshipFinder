@@ -7,7 +7,8 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
-import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { admitAiLifecycle, respondFundedAi } from "./ai-lifecycle.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
@@ -342,7 +343,14 @@ const safeRouteHandlers = {
     // The estimate is charged before Gemini is called and corrected after, so a call whose Worker
     // is cut off mid-reply (the student closes the tab) is still paid for in the books.
     const estimate = estimateCents(model, bytes, gem.generationConfig.maxOutputTokens, d.config, now);
-    const admitted = await admit(db, env, d.config, user, task, runId, now, tier(), plan, estimate);
+    const admission = await admitAiLifecycle(db, env, d.config, user, task, runId, now, tier(), plan, estimate);
+    if (admission.kind === "funded") {
+      const result = await respondFundedAi(admission, { env, config: d.config, fetcher: d.fetch, model, gem, stream, now, db });
+      later(ctx, result.completion);
+      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
+      return result.response;
+    }
+    const admitted = admission.admitted;
     let upstream;
     try {
       upstream = await callGemini(model, gem, stream, env, d.fetch);
