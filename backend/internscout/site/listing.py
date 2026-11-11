@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+from html import escape as esc
+
+from .layout import link_list, short_day, table
+from .text import plural
+
 Link = tuple[str, str, int]
 KindSelection = tuple[str, dict, list[dict]]
 
@@ -348,3 +353,109 @@ def listing_body(
         + f"<p class=\"follow\">Applying to a few? The free <a href=\"/install.html?from={esc(src)}\">Auto-Apply extension</a> "
         "fills in the application for you and stops at the submit button.</p>" + related
     )
+
+
+def render_tracker_page(
+    model: TrackerPage,
+    *,
+    count_floor: Callable[..., str],
+    fit_head: Callable[..., str],
+    long_day: Callable[..., str],
+    first_seen_since: str,
+    canada_since: str,
+) -> tuple[str, str, str, str]:
+    term, rows, roles = model.term, model.rows, model.roles
+    updated, term_path = model.updated, model.term_path
+    n = len(rows)
+    lead = (
+        f"As of {updated}, {plural(n, 'employer has', 'employers have')} opened {esc(term)} internships, "
+        f"with {roles:,} open roles between them; {model.opened_this_week:,} opened this week."
+    )
+    honest = (
+        "These are employers InternScout found on public job boards, not every employer that will hire "
+        f"for {esc(term)}. Newest first: “Opened” is the day the employer’s first {esc(term)} role was "
+        "posted or found."
+    )
+    floor_note = ""
+    if model.has_floor:
+        floor_note = (
+            "<p class=\"more\">A date with “by” is the day InternScout began recording when it first "
+            f"finds a posting ({long_day(first_seen_since)}, or {long_day(canada_since)} for roles in "
+            "Canada, which it added that day): those roles were already open then, perhaps for weeks.</p>"
+        )
+    trs = []
+    for day, exact, name, path, k in rows:
+        who = f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)
+        when = short_day(day) if exact else f"By {short_day(day)}"
+        trs.append([who, when, f"{k:,}"])
+    body = (
+        f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
+        f"<a class=\"cta\" href=\"{term_path}\">See every {esc(term)} role</a>"
+        + table(
+            ["Employer", "Opened", f"{esc(term)} roles"],
+            trs,
+            cls="data tracker",
+            label=f"Employers with {term} roles",
+        )
+        + floor_note
+        + "<p class=\"follow\">Roles found in the last week, whatever the term: "
+        "<a href=\"/internships/new/\">new internships this week</a>. "
+        "Every employer with five or more open roles: <a href=\"/internships/at/\">internships by employer</a>.</p>"
+    )
+    # 2026-10-13: a count floor (count_floor) that holds between refreshes; the exact count is in the
+    # description. was: [f"{term} Internships Open Now: {n:,} Employers", f"Which Companies Have Opened
+    # {term} Internships", f"{term} Internships Open Now"], whose first form never fit.
+    many = count_floor(n)
+    title = fit_head([f"{term} Internships Open Now"], [f": {many} Companies"] if many else [])
+    desc = (
+        f"{n:,} companies with {term} internships open now, found on public job boards, newest first "
+        f"with the day each opened. {model.opened_this_week:,} opened this week. Updated {updated}."
+    )
+    return title, desc, f"{term} internships: who’s open now", body
+
+
+def render_kind_page(
+    model: KindPage,
+    *,
+    count_floor: Callable[..., str],
+    dash_link: Callable[..., str],
+    fit_head: Callable[..., str],
+    kind_description: Callable[..., str],
+    listing_body: Callable[..., str],
+    tail: str,
+) -> dict:
+    path, k, items = model.path, model.kind, model.items
+    lead = ""
+    if model.tracker is not None:
+        term, tracker = model.tracker
+        lead = (
+            f"<p class=\"more\"><a href=\"{tracker}\">Which employers have opened "
+            f"{esc(term)} internships</a>, newest first, with the day each opened.</p>"
+        )
+    related = (
+        lead
+        + k.get("note", "")
+        + link_list(f"{k['h1'][0].upper()}{k['h1'][1:]} by field", model.related_fields)
+        + link_list("More ways to browse", model.related_kinds)
+    )
+    # A count floor stays useful between refreshes. fit_head trims the title if it does not fit.
+    floor = count_floor(len(items))
+    return {
+        "path": path,
+        "title": fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
+        "desc": kind_description(k, items, model.updated),
+        "h1": k["h1"],
+        "crumbs": [model.root, (path, k["crumb"])],
+        "body": listing_body(
+            items,
+            k["what"],
+            "",
+            model.now,
+            related,
+            dash=dash_link(**k["dash"]),
+            tail=k.get("tail", tail),
+            about=k.get("about", frozenset()),
+            src="seo-hub",
+        ),
+        "items": items,
+    }

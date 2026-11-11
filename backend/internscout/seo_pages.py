@@ -1484,54 +1484,14 @@ def tracker_page(
 
 
 def _render_tracker_page(model: _listing.TrackerPage) -> tuple[str, str, str, str]:
-    term, rows, roles = model.term, model.rows, model.roles
-    updated, term_path = model.updated, model.term_path
-    n = len(rows)
-    lead = (
-        f"As of {updated}, {plural(n, 'employer has', 'employers have')} opened {esc(term)} internships, "
-        f"with {roles:,} open roles between them; {model.opened_this_week:,} opened this week."
+    return _listing.render_tracker_page(
+        model,
+        count_floor=count_floor,
+        fit_head=fit_head,
+        long_day=long_day,
+        first_seen_since=FIRST_SEEN_SINCE,
+        canada_since=CANADA_SINCE,
     )
-    honest = (
-        "These are employers InternScout found on public job boards, not every employer that will hire "
-        f"for {esc(term)}. Newest first: “Opened” is the day the employer’s first {esc(term)} role was "
-        "posted or found."
-    )
-    floor_note = ""
-    if model.has_floor:
-        floor_note = (
-            "<p class=\"more\">A date with “by” is the day InternScout began recording when it first "
-            f"finds a posting ({long_day(FIRST_SEEN_SINCE)}, or {long_day(CANADA_SINCE)} for roles in "
-            "Canada, which it added that day): those roles were already open then, perhaps for weeks.</p>"
-        )
-    trs = []
-    for day, exact, name, path, k in rows:
-        who = f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)
-        when = short_day(day) if exact else f"By {short_day(day)}"
-        trs.append([who, when, f"{k:,}"])
-    body = (
-        f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
-        f"<a class=\"cta\" href=\"{term_path}\">See every {esc(term)} role</a>"
-        + table(
-            ["Employer", "Opened", f"{esc(term)} roles"],
-            trs,
-            cls="data tracker",
-            label=f"Employers with {term} roles",
-        )
-        + floor_note
-        + "<p class=\"follow\">Roles found in the last week, whatever the term: "
-        "<a href=\"/internships/new/\">new internships this week</a>. "
-        "Every employer with five or more open roles: <a href=\"/internships/at/\">internships by employer</a>.</p>"
-    )
-    # 2026-10-13: a count floor (count_floor) that holds between refreshes; the exact count is in the
-    # description. was: [f"{term} Internships Open Now: {n:,} Employers", f"Which Companies Have Opened
-    # {term} Internships", f"{term} Internships Open Now"], whose first form never fit.
-    many = count_floor(n)
-    title = fit_head([f"{term} Internships Open Now"], [f": {many} Companies"] if many else [])
-    desc = (
-        f"{n:,} companies with {term} internships open now, found on public job boards, newest first "
-        f"with the day each opened. {model.opened_this_week:,} opened this week. Updated {updated}."
-    )
-    return title, desc, f"{term} internships: who’s open now", body
 
 
 def shown(items: list[dict], state: str | None = None) -> list[dict]:
@@ -1910,47 +1870,7 @@ def _select_signup_form(
 
 
 def _render_signup_form(model: _digest.Signup | None) -> str:
-    if model is None:
-        return ""
-    pitch, field, heading = model.pitch, model.field, model.heading
-    what, placement, archive = model.what, model.placement, model.archive
-    box = ""
-    if field:
-        box = (
-            f'<label class="check"><input type="checkbox" name="tag" value="{esc(field)}"/> '
-            f"Save {esc(model.field_name)} with my subscription, so the email can be matched to it later</label>"
-        )
-    goes = "Your address and the field you tick go" if field else "Your address goes"
-    about = (
-        (
-            "One email on Mondays with the fields that gained the most new roles that week, a few postings "
-            "from each and a link to the rest. For now everyone gets the same email."
-        )
-        if what
-        else ""
-    )
-    lead = " ".join(p for p in (pitch, about) if p)
-    return (
-        f'<form class="digest" action="{esc(model.action)}" method="post" target="_blank" rel="noopener" '
-        f'aria-labelledby="digest-title" data-digest-placement="{esc(placement)}">'
-        f'<h2 id="digest-title">{esc(heading)}</h2>'
-        + (f"<p>{lead}</p>" if lead else "")
-        + box
-        + '<div class="digest-row"><label for="digest-email">Email</label>'
-        '<input id="digest-email" type="email" name="email" required autocomplete="email" spellcheck="false"/>'
-        '<button type="submit" class="cta">Email me new internships</button></div>'
-        # In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
-        '<input type="hidden" name="embed" value="1"/>'
-        "<p class=\"fine\">Buttondown opens in a new tab to finish. You'll get a confirmation email first, and "
-        f"nothing else arrives until you click its link. Unsubscribe any time. {goes} to Buttondown, which "
-        "sends the email, not to InternScout's servers. <a href=\"/privacy#digest\">Details</a>"
-        + (
-            f' · <a href="{esc(archive)}" target="_blank" rel="noopener">Browse past emails</a>'
-            if archive
-            else ""
-        )
-        + "</p></form>"
-    )
+    return _digest.render_signup_form(model)
 
 
 BEACON = ""  # set by build() from the site's own index.html
@@ -3009,112 +2929,16 @@ def pay_page(
 
 
 def _render_pay_page(model: _pay.Page) -> tuple[str, str, str]:
-    rep, now = model.report, model.now
-    x0, _, hi0 = rep["top"][0]
-    n, k = model.open_roles, model.hourly
-    grad = model.graduate
-    lede = (
-        f"The highest hourly pay listed on an open internship, co-op or research role is "
-        f"{esc(money(hi0))} an hour, at {company_link(x0.get('company_name') or '')} "
-        f"({esc(x0.get('title') or '')}). Across the {len(rep['roles']):,} open roles that list a clear "
-        f"hourly rate, the median is {esc(money(round(rep['median'], 2)))} an hour."
+    return _pay.render_pay_page(
+        model,
+        company_link=company_link,
+        dash_link=dash_link,
+        field_slug=field_slug,
+        field_title=field_title,
+        long_day=long_day,
+        pay_rows=pay_rows,
+        rate_words=rate_words,
     )
-    body = [
-        f"<p class=\"lede\">{lede}</p>",
-        f"<a class=\"cta\" href=\"{dash_link(paid=True)}\">See every paid role on the dashboard</a>",
-        "<section class=\"prose\"><h2>Top internships by listed hourly pay</h2>",
-        f"<p class=\"more\">The {len(rep['top'])} open roles with the highest listed rate, at most "
-        f"{model.per_employer} from one employer."
-        + (
-            f" {grad} of them {'is' if grad == 1 else 'are'} for graduate students (the title says PhD, "
-            "MBA, master’s or graduate)."
-            if grad
-            else ""
-        )
-        + "</p>",
-        f"<ul class=\"jobs\">{pay_rows(rep['top'], now)}</ul></section>",
-    ]
-    if rep["by_field"]:
-        rows = [
-            [
-                f"<a href=\"/internships/{field_slug(t)}/\">{esc(field_title(t))}</a>",
-                f"{c:,} of {model.field_totals[t]:,}",
-                esc(money(round(m, 2))),
-                esc(money(h)),
-            ]
-            for t, c, m, h in rep["by_field"]
-        ]
-        body.append(
-            "<section class=\"prose\"><h2>Listed pay by field</h2>"
-            f"<p>The {len(rep['by_field'])} fields where at least {model.min_field} open roles list an "
-            "hourly rate, by median rate. The count is of roles that list a rate, out of the field’s "
-            "open roles; most postings in every field give no rate.</p>"
-            + table(
-                ["Field", "Roles listing a rate", "Median", "Highest"],
-                rows,
-                label="Hourly pay by field",
-            )
-            + "</section>"
-        )
-    if rep["by_employer"]:
-        rows = [
-            [
-                company_link(nm),
-                f"{c:,}",
-                esc(money(round(m, 2))),
-                esc(rate_words(lo, hi).replace(" an hour", "")),
-            ]
-            for nm, c, m, lo, hi in rep["by_employer"]
-        ]
-        body.append(
-            "<section class=\"prose\"><h2>Top-paying employers</h2>"
-            f"<p>Employers with at least {model.min_employer} open roles that list an hourly rate, by "
-            f"median rate: the top {len(rows)} of {rep['employers_listing']:,}.</p>"
-            + table(
-                ["Employer", "Roles listing a rate", "Median", "Range"],
-                rows,
-                label="Hourly pay by employer",
-            )
-            + "</section>"
-        )
-    body.append(
-        "<section class=\"prose\"><h2>How this is counted</h2>"
-        f"<p>{model.paid:,} of the {n:,} open roles ({pct(model.paid, n)}) list pay or say they are paid, and "
-        f"{k:,} ({pct(k, n)}) give a clear hourly rate. A rate counts when the posting gives it per hour, or "
-        "as amounts under $200 with no unit, which is how student pay is usually written. Yearly salaries, "
-        "monthly or weekly pay and stipends are left out, never converted to an hourly figure "
-        f"(that leaves out {plural(rep['other_pay'], 'role')}), and so are amounts written in thousands "
-        "(“$100k”), placeholder figures such as “$0.00”, and pay text that is cut off. A range counts as "
-        "its midpoint in the medians, and roles are ranked by the top of their range. "
-        + (
-            f"Roles only in Canada ({rep['canada']:,} with a rate) are left out of this page, since their pay "
-            "is in Canadian dollars. "
-            if rep["canada"]
-            else ""
-        )
-        + "The same role "
-        "posted on two of an employer’s boards counts once. Every figure is what the employer’s posting "
-        "says; check the posting before you rely on it.</p>"
-        + (
-            "<p>Every role that lists pay or says it is paid, hourly or not: "
-            "<a href=\"/internships/paid/\">paid internships</a>.</p>"
-            if model.paid_page
-            else ""
-        )
-        + "</section>"
-    )
-    # was: title = f"Highest-Paying Internships – Up to {money(hi0)} an Hour Listed | InternScout" (67 characters)
-    title = [
-        f"Highest-Paying Internships – Up to {money(hi0)} an Hour Listed",
-        f"Highest-Paying Internships – Up to {money(hi0)} an Hour",
-        f"Highest-Paying Internships – Up to {money(hi0)}/Hour",
-        "Highest-Paying Internships",
-    ]
-    desc = (
-        f"The highest hourly pay listed on {len(rep['roles']):,} open internships, co-ops and research roles: "
-        f"top roles, median pay by field and top-paying employers. Updated {long_day(now.isoformat())}."
-    )
-    return title, desc, "".join(body)
 
 
 # ---- /about/
@@ -3311,175 +3135,11 @@ def numbers_page(
 
 
 def _render_numbers_page(model: _numbers.Page) -> tuple[list, str, str, list]:
-    n, new, now, updated = model.open_roles, model.new, model.now, model.updated
-    places_line = (
-        f"{model.us_state_count} of the 50 US states and "
-        f"{plural(model.province_count, 'Canadian province or territory', 'Canadian provinces and territories')}"
-    )
-    rows = [
-        ("Open roles", f"{n:,}"),
-        ("Employers", f"{model.employers:,}"),
-        ("Fields", f"{model.field_count}"),
-        ("Places", places_line),
-        ("New this week", f"{new:,}"),
-        ("List pay", f"{model.paid:,} ({pct(model.paid, n)})"),
-        ("Give an hourly rate", f"{model.hourly:,} ({pct(model.hourly, n)})"),
-        ("From applicant tracking systems", f"{model.from_boards:,} ({pct(model.from_boards, n)})"),
-    ]
-    facts = (
-        "<dl class=\"facts\">"
-        + "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in rows)
-        + "</dl>"
-    )
-
-    # Open roles. The co-op and research counts are the kind pages' own (kinds), so they match those
-    # pages and link to them; when neither page was made, nothing is said.
-    roles = [
-        f"On {esc(updated)} InternScout listed {esc(model.coverage)}.",
-        f"They are in {esc(places_line)}; {plural(model.canada, 'role is', 'roles are')} in Canada.",
-        f"{plural(new, 'of them was', 'of them were')} found in the week to {esc(updated)}.",
-    ]
-    bits = [f"<a href=\"{path}\">{count:,} {label}</a>" for path, count, label in model.kind_links]
-    if bits:
-        roles.append(f"Among them, as of {esc(updated)}: {join_words(bits)}.")
-
-    pay = [
-        f"{model.paid:,} of the {n:,} open roles ({pct(model.paid, n)}) list pay or say they are paid, as of {esc(updated)}.",
-        f"{model.hourly:,} ({pct(model.hourly, n)}) give a clear hourly rate.",
-    ]
-    if model.pay is not None:
-        pay.append(
-            f"Among the {model.pay.rate_count:,} that give one and are not only in Canada (the same role on two "
-            f"boards counted once), the median is {esc(money(round(model.pay.median, 2)))} an hour and the highest "
-            f"is {esc(money(model.pay.highest))} an hour, as of {esc(updated)}."
-        )
-        pay.append(
-            f"Roles only in Canada ({plural(model.pay.canada, 'role')} with a rate) are left out of the median and "
-            "the top rate, since their pay is in Canadian dollars; yearly salaries and stipends are never "
-            "turned into hourly figures. <a href=\"/internships/highest-paying/\">Highest-paying internships</a> "
-            "has the roles, fields and employers."
-        )
-
-    ats = [
-        f"{model.from_boards:,} of the {n:,} open roles ({pct(model.from_boards, n)}) come straight from employers' "
-        f"own applicant tracking systems, as of {esc(updated)}; the other {n - model.from_boards:,} are from "
-        "employers' own careers sites and public lists."
-    ]
-    if model.board_leader is not None:
-        name0, n0 = model.board_leader
-        ats.append(f"{esc(name0)} has the most, {n0:,} roles or {pct(n0, n)} of all open roles.")
-        if model.board_followers is not None:
-            # pct rounds down, and "JazzHR 132 (0%)" reads as none.
-            share = lambda k: pct(k, n) if k * 100 >= n else "under 1%"  # noqa: E731
-            ats.append(
-                "Then "
-                + esc(join_words([f"{nm} {k:,} ({share(k)})" for nm, k in model.board_followers]))
-                + "."
-            )
-
-    def linked(path: str | None, name: str, k: int) -> str:
-        return (f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)) + f" ({k:,})"
-
-    lead = (
-        f"The {len(model.fields)} largest of the {model.field_count} fields"
-        if model.field_count > model.limit
-        else f"{'Every field' if len(model.fields) > 1 else 'The one field'}"
-    )
-    largest = [
-        f"{lead}, by open roles on {esc(updated)}: "
-        + join_words([linked(*row) for row in model.fields])
-        + "."
-        + (" A role tagged with two fields counts in each." if len(model.fields) > 1 else "")
-    ]
-    where = []
-    if model.states:
-        lead = (
-            f"The {len(model.states)} US states with the most open roles"
-            if model.state_total > model.limit
-            else f"Open roles by US state"
-        )
-        where.append(
-            f"{lead} on {esc(updated)}: "
-            + join_words([linked(*row) for row in model.states])
-            + "."
-            + (" A role filed in two states counts in each." if len(model.states) > 1 else "")
-        )
-    if model.remote:
-        where.append(f"{plural(model.remote, 'open role')} can be done remotely.")
-    if model.provinces:
-        where.append(
-            f"In Canada, {'the most are' if len(model.provinces) > 1 else 'they are'} "
-            f"in {join_words([linked(*row) for row in model.provinces])}."
-        )
-
-    def section(title: str, sentences: list[str]) -> str:
-        return f"<h2>{esc(title)}</h2><p>{' '.join(sentences)}</p>"
-
-    body = (
-        f"<p class=\"lede\">As of {esc(updated)}, InternScout lists {esc(model.coverage)}. Every figure on this "
-        "page is counted from the open listings on that day, and the page is rebuilt with every update.</p>"
-        + facts
-        + "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
-        + "<section class=\"prose\">"
-        + section("Open roles", roles)
-        + section("Pay", pay)
-        + section("Where the listings come from", ats)
-        + section("The largest fields", largest)
-        + (section("Where the roles are", where) if where else "")
-        + section(
-            "How this is counted",
-            [
-                f"Every figure is counted from the listings open on {esc(updated)}, the same export the listing pages "
-                "are built from. Spellings of one employer count as one employer. Pay is what the posting says, and a "
-                "role that lists none is counted as listing none. A dated figure is true of that day; the page is "
-                "rebuilt, and the date moves, with every update."
-            ],
-        )
-        + "</section>"
-    )
-    desc = (
-        f"InternScout on {updated}: {n:,} open internships, co-ops and research roles from "
-        f"{plural(model.employers, 'employer')} in {plural(model.field_count, 'field')}. What they pay, and which "
-        "job boards they come from."
-    )
-    measured = [
-        ("Open roles", n),
-        ("Employers", model.employers),
-        ("Fields", model.field_count),
-        ("US states with open roles", model.us_state_count),
-        ("Canadian provinces and territories with open roles", model.province_count),
-        ("Roles in Canada", model.canada),
-        ("Roles found in the last week", new),
-        ("Roles that list pay or say they are paid", model.paid),
-        ("Roles that give an hourly rate", model.hourly),
-        ("Roles from employers' applicant tracking systems", model.from_boards),
-    ]
-    if model.pay is not None:
-        measured += [
-            ("Median listed hourly rate, USD, roles not only in Canada", round(model.pay.median, 2)),
-            ("Highest listed hourly rate, USD, roles not only in Canada", model.pay.highest),
-        ]
-    ld = {
-        "@context": "https://schema.org",
-        "@type": "Dataset",
-        "@id": SITE + NUMBERS_PATH,
-        "name": "InternScout by the numbers",
-        "url": SITE + NUMBERS_PATH,
-        "description": desc,
-        "dateModified": f"{now:%Y-%m-%d}",
-        "temporalCoverage": f"{now:%Y-%m-%d}",
-        "creator": {"@id": ORG_ID},
-        "publisher": {"@id": ORG_ID},
-        "isAccessibleForFree": True,
-        "variableMeasured": [
-            {"@type": "PropertyValue", "name": k, "value": v} for k, v in measured
-        ],
-    }
-    return (
-        [f"InternScout by the Numbers – {n:,} Open Roles", "InternScout by the Numbers"],
-        desc,
-        body,
-        [ld],
+    return _numbers.render_numbers_page(
+        model,
+        site=SITE,
+        numbers_path=NUMBERS_PATH,
+        org_id=ORG_ID,
     )
 
 
@@ -3709,21 +3369,7 @@ def _select_digest_examples(new: list[dict]) -> _digest.Examples:
 
 
 def _render_digest_examples(model: _digest.Examples | None) -> str:
-    if model is None or not model.rows:
-        return ""
-    dated = f" Snapshot: {model.generated.strftime('%B %d, %Y')}." if model.generated else ""
-    rows = "".join(
-        f'<li><a href="{esc(safe_url(row.url))}" target="_blank" rel="nofollow noopener">'
-        f'{esc(row.title)}</a> at {esc(row.company)} '
-        f'<span class="meta">({esc(row.location)})</span></li>'
-        for row in model.rows
-    )
-    return (
-        '<section class="prose digest-examples" aria-labelledby="digest-examples-title">'
-        '<h2 id="digest-examples-title">Examples from this week</h2>'
-        f'<p>Examples from roles found this week.{dated} Availability can change; check the employer’s posting.</p>'
-        f'<ul class="plain">{rows}</ul></section>'
-    )
+    return _digest.render_digest_examples(model)
 
 
 def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str, str, str]:
@@ -3751,121 +3397,27 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
 
 
 def _render_digest_page(model: _digest.Page) -> tuple[str, str, str]:
-    count = (
-        f"{model.count:,} new internships in the last week"
-        + (
-            f", the most in {esc(join_words(model.top_fields))}."
-            if model.top_fields
-            else "."
-        )
-        if model.count is not None
-        else ""
-    )
-    lede = (
-        f"<p class=\"lede\">{count + ' ' if count else ''}One free email every Monday with the internships, "
-        "co-ops and research roles InternScout found that week.</p>"
-    )
-    if model.form is not None:
-        body = (
-            lede
-            + _render_signup_form(model.form)
-            + _render_digest_examples(model.examples)
-            + "<section class=\"prose\"><h2>What you get</h2><ul class=\"plain\">"
-            "<li>One email on Mondays. It lists the fields that gained the most new roles that week, a few "
-            "postings from each, Northeast and remote first, and a link to the rest of each field.</li>"
-            "<li>For now everyone gets the same email.</li>"
-            "<li>A confirmation email comes first, and nothing else arrives until you click its link. Every "
-            "email has an unsubscribe link at the bottom.</li>"
-            "<li>Buttondown sends the email and keeps your address; InternScout's servers never see it. Open "
-            "and click tracking are off. <a href=\"/privacy#digest\">How the list is handled</a>.</li>"
-            "</ul></section>"
-        )
-    else:
-        where = (
-            "<a href=\"/internships/new/\">New this week</a> lists every role found in the last week, and "
-            "its RSS feed can follow it in a feed reader or a Discord or Slack channel."
-            if model.new_page
-            else "<a href=\"/internships/\">Browse open internships</a> by field, state or major."
-        )
-        body = lede + f"<p>Sign-ups for the email aren't open yet. Until they are, {where}</p>"
-    return (
-        "New internships in your inbox every Monday. Free.",
-        "One free email every Monday with the new internships, co-ops and research roles InternScout found "
-        "that week. Confirm once, unsubscribe any time.",
-        body,
-    )
+    return _digest.render_digest_page(model)
 
 
 def _render_kind_page(model: _listing.KindPage) -> dict:
-    path, k, items = model.path, model.kind, model.items
-    lead = ""
-    if model.tracker is not None:
-        term, tracker = model.tracker
-        lead = (
-            f"<p class=\"more\"><a href=\"{tracker}\">Which employers have opened "
-            f"{esc(term)} internships</a>, newest first, with the day each opened.</p>"
-        )
-    related = (
-        lead
-        + k.get("note", "")
-        + link_list(f"{k['h1'][0].upper()}{k['h1'][1:]} by field", model.related_fields)
-        + link_list("More ways to browse", model.related_kinds)
+    return _listing.render_kind_page(
+        model,
+        count_floor=count_floor,
+        dash_link=dash_link,
+        fit_head=fit_head,
+        kind_description=kind_description,
+        listing_body=listing_body,
+        tail=TAIL,
     )
-    # A count floor stays useful between refreshes. fit_head trims the title if it does not fit.
-    floor = count_floor(len(items))
-    return {
-        "path": path,
-        "title": fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
-        "desc": kind_description(k, items, model.updated),
-        "h1": k["h1"],
-        "crumbs": [model.root, (path, k["crumb"])],
-        "body": listing_body(
-            items,
-            k["what"],
-            "",
-            model.now,
-            related,
-            dash=dash_link(**k["dash"]),
-            tail=k.get("tail", TAIL),
-            about=k.get("about", frozenset()),
-            src="seo-hub",
-        ),
-        "items": items,
-    }
 
 
 def _render_new_page(model: _digest.NewPage) -> dict:
-    new, root, now, updated = model.items, model.root, model.now, model.updated
-    return {
-        "path": "/internships/new/",
-        "title": [f"New Internships This Week – {len(new):,} Found", "New Internships This Week"],
-        "desc": (
-            f"{len(new):,} internships, co-ops and research roles for college students found in the last week, "
-            f"Northeast and remote first. Updated {updated}. Free, no sign-up."
-        ),
-        "h1": "New internships this week",
-        "crumbs": [root, ("/internships/new/", "New this week")],
-        "body": listing_body(
-            new,
-            "found in the last week",
-            "",
-            now,
-            "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
-            f"{model.feed_limit} newest roles found this week, so a Discord or Slack channel can follow "
-            "just this one.</p>"
-            # The soonest summer's employers, newest-opened first (2026-10-07).
-            + (
-                f"<p class=\"more\">Employers rather than roles: <a href=\"{model.tracker[1]}\">"
-                f"{esc(model.tracker[0])} internships, who’s open now</a>, newest first.</p>"
-                if model.tracker
-                else ""
-            ),
-            dash=dash_link(new=True),
-            src="seo-hub",
-            signup=_render_signup_form(model.form),
-        ),
-        "items": new,
-    }
+    return _digest.render_new_page(
+        model,
+        dash_link=dash_link,
+        listing_body=listing_body,
+    )
 
 
 def llms_files(
@@ -4077,67 +3629,22 @@ def _select_near_body(
 
 
 def _render_near_body(model: _near.NearBody) -> str:
-    label, lname = near_metros.metro_label(model.metro), lower_name(model.field["name"])
-    key = "near:" + model.metro["cbsa"]  # no region is filed under this, so place() leads with regions[0]
-    items = model.items
-    dash = dash_link(model.dashboard_tags, ",".join(model.states))
-    out = []
-    if items:
-        lead = summary(items, f"in {lname}", f" near {label}", tail="")
-        if len(model.towns) > 1:
-            lead += " " + esc(f"By town: {counted(model.towns, 3)}.")
-        out.append(f"<p class=\"lede\">{lead}</p>")
-    else:
-        out.append(
-            f"<p class=\"lede\">{esc(f'InternScout has no open {lname} roles with a location near {label} right now.')} "
-            "Listings are collected from public job boards several times a day, so this page changes as "
-            "employers post.</p>"
-        )
-    out.append(f"<p class=\"fits\">{esc(near_how(model.metro, model.field))}</p>")
-    cta = f"Search {lname} roles in {join_words([US_STATES[k] for k in model.states])} on the dashboard"
-    out.append(f"<a class=\"cta\" href=\"{dash}\">{esc(cta)}</a>")
-    if items:
-        out.append(autoapply_card(items, "seo-near", key))
-        rows = listing_rows(items, model.now, key, model.path, "seo-near")
-        out.append(f"<ul class=\"jobs\">{rows}</ul>")
-        if len(items) > PER_PAGE:
-            out.append(
-                f"<p class=\"more\">Showing the {PER_PAGE} newest of {len(items):,}. "
-                f"<a href=\"{dash}\">See every one on the dashboard</a>.</p>"
-            )
-        out.append(chart_figure(items, key))
-    # Remote roles, apart and labelled: open to a student in this city, but not in it.
-    if model.remote_count:
-        words = (
-            f"{plural(model.remote_count, 'remote ' + lname + ' role')} "
-            f"{'is' if model.remote_count == 1 else 'are'} open to students anywhere in the US. "
-            "They are not counted above."
-        )
-    else:
-        words = f"No remote {lname} roles are open right now."
-    section = (
-        f"<section class=\"rel\"><h2>{esc('Remote ' + lname + ' roles')}</h2><p class=\"more\">{esc(words)}"
-        + (
-            f" <a href=\"{dash_link(model.dashboard_tags, 'remote')}\">See them on the dashboard</a>."
-            if model.remote_count
-            else ""
-        )
-        + "</p>"
+    return _near.render_near_body(
+        model,
+        autoapply_card=autoapply_card,
+        chart_figure=chart_figure,
+        counted=counted,
+        dash_link=dash_link,
+        listing_rows=listing_rows,
+        near_how=near_how,
+        summary=summary,
+        per_page=PER_PAGE,
+        place_names=US_STATES,
     )
-    if model.shown_remote is not None:
-        rows = listing_rows(model.shown_remote, model.now, "remote", model.path, "seo-near")
-        section += f"<ul class=\"jobs\">{rows}</ul>"
-    out.append(section + "</section>")
-    if items:
-        out.append(
-            "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
-            "<a href=\"feed.xml\">RSS feed</a></p>"
-        )
-    return "".join(out)
 
 
 def _near_footer() -> str:
-    return f"<p class=\"more\"><a href=\"{NEAR_ROOT}\">Every field near all 50 cities</a></p>"
+    return _near.render_footer(NEAR_ROOT)
 
 
 def near_pages(
@@ -4167,26 +3674,13 @@ def near_pages(
 
 
 def _render_near_page(model: _near.NearPage) -> dict:
-    body = model.body
-    f, m = body.field, body.metro
-    path, items = body.path, model.items
-    related = "".join(link_list(label, links) for label, links in model.related)
-    return {
-        "path": path,
-        "title": near_title(f, m, items),
-        "desc": near_description(f, m, items, body.remote_count, model.updated),
-        "h1": f"{f['name']} internships near {model.label}",
-        "crumbs": [
-            ("/internships/", "Internships"),
-            (NEAR_ROOT, "Near 50 US cities"),
-            (path, f"{f['name']} near {m['city']}"),
-        ],
-        "body": _render_near_body(body) + related + _near_footer(),
-        "items": items or None,
-        "state": "near:" + m["cbsa"],
-        "thin": not model.indexed,
-        "kind": "near",
-    }
+    return _near.render_near_page(
+        model,
+        near_description=near_description,
+        near_title=near_title,
+        near_root=NEAR_ROOT,
+        render_body=_render_near_body,
+    )
 
 
 def near_hub(hub: dict) -> tuple[list[str], str, str]:
@@ -4195,20 +3689,7 @@ def near_hub(hub: dict) -> tuple[list[str], str, str]:
 
 
 def _render_near_hub(groups: list[_near.LinkGroup]) -> tuple[list[str], str, str]:
-    sections = [link_list(title, links) for title, links in groups]
-    body = (
-        "<p class=\"lede\">Internships in ten of the largest college degree fields, near each of the 50 largest "
-        "US metro areas. The fields are the ten largest by bachelor's degrees awarded in 2021-22 (NCES Digest "
-        "2023, Table 322.10). The metro areas are the 50 largest by population (Census estimates for July 2025). "
-        "Each number is how many open roles have a location in that metro area now. A role in two cities "
-        "counts in both. Remote roles are listed apart on each page.</p>" + "".join(sections)
-    )
-    title = ["Internships by Field Near 50 US Cities", "Internships Near 50 US Cities"]
-    desc = (
-        "Internships in the ten largest college degree fields near the 50 largest US metro areas, counted by "
-        "city and field from open listings. Remote roles listed apart. Free, no sign-up."
-    )
-    return title, desc, body
+    return _near.render_near_hub(groups)
 
 
 def _select_employer_page(
@@ -4261,273 +3742,79 @@ def _select_employer_page(
 
 
 def _render_employer_page(model: _employer.Page) -> dict:
-    name, items, path, main = model.name, model.items, model.path, model.main
-    note = (
-        f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
-        f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>"
+    return _employer.render_employer_page(
+        model,
+        combo_label=combo_label,
+        dash_link=dash_link,
+        employer_breakdown=employer_breakdown,
+        employer_description=employer_description,
+        employer_offer=employer_offer,
+        employer_title=employer_title,
+        field_slug=field_slug,
+        field_title=field_title,
+        listing_body=listing_body,
+        state_slug=state_slug,
+        employer_facts=employer_facts,
     )
-    facts, questions = employer_facts(name, items, main)
-    related = (
-        employer_breakdown(name, items, main)
-        + questions
-        + note
-        + employer_offer(name)
-        + link_list("Similar employers", model.links.similar)
-        + link_list(
-            "Related fields",
-            [
-                (f"/internships/{field_slug(t)}/", field_title(t), count)
-                for t, count in model.links.fields
-            ],
-        )
-        # The field-in-a-place pages this employer's own roles are on, most of its roles first.
-        + link_list(
-            "Related internships by place",
-            [
-                (f"/internships/{field_slug(t)}/{state_slug(k)}/", combo_label(t, k), count)
-                for t, k, count in model.links.places
-            ],
-        )
-    )
-    desc = employer_description(
-        name,
-        len(items),
-        model.term,
-        model.named,
-        model.pay,
-        model.newest,
-        model.co_ops,
-        own_links=model.own_links,
-    )
-    return {
-        "path": path,
-        "title": employer_title(name, len(items), model.term),
-        "desc": desc,
-        "h1": f"Internships at {name}",
-        "crumbs": [model.root, ("/internships/at/", "By employer"), (path, name)],
-        "body": listing_body(
-            items,
-            f"at {name}",
-            "",
-            model.now,
-            related,
-            dash=dash_link(state=model.where, companies=model.spellings),
-            here=path,
-            extra=facts,
-            src="seo-employer",
-            details=model.details,
-        ),
-        "items": items,
-        "kind": "employer",
-        "thin": model.thin,
-    }
 
 
 def _render_field(model: _field.Field) -> dict:
-    t, path, items = model.tag, model.path, model.items
-    root, now, updated = model.context.root, model.context.now, model.context.updated
-    name = field_title(t)
-    related = link_list(
-        f"{name} internships by state",
-        [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in model.states],
+    return _field.render_field(
+        model,
+        dash_link=dash_link,
+        field_short=field_short,
+        field_title=field_title,
+        listing_body=listing_body,
+        listing_description=listing_description,
+        listing_title=listing_title,
+        signup_form=signup_form,
+        state_slug=state_slug,
+        widget_follow=widget_follow,
+        place_names=US_STATES,
     )
-    related += link_list(
-        f"{name} internships by city",
-        [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in model.cities],
-    )
-    related += link_list(f"Employers hiring in {lower_name(name)}", model.employers)
-    # The employer list stops at RELATED; the rest are a click away.
-    if model.more_employers is not None:
-        total, hiring = model.more_employers
-        related += (
-            f"<p class=\"more\"><a href=\"/internships/at/\">All {total:,} employers hiring "
-            f"now</a>, {hiring:,} of them in {esc(lower_name(name))}.</p>"
-        )
-    qa, co_ops = model.faq, model.co_ops
-    pitch = (
-        f"{model.signup_count:,} new {esc(lower_name(name))} internships in the last week."
-        if model.signup_count is not None
-        else ""
-    )
-    related += widget_follow(t)
-    return {
-        "path": path,
-        "title": listing_title([f"{name} Internships", f"{field_short(t)} Internships"], len(items)),
-        "desc": listing_description(
-            len(items),
-            f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
-            "",
-            items,
-            updated,
-        ),
-        "h1": f"{name} internships",
-        "crumbs": [root, (path, name)],
-        "body": listing_body(
-            items,
-            f"in {lower_name(name)}",
-            "",
-            now,
-            related,
-            dash=dash_link([t]),
-            fits=model.fits,
-            src="seo-field",
-            faq=faq_section(qa),
-            signup=signup_form(pitch, t),
-        ),
-        "items": items,
-        "ld": [faq_ld(qa)],
-        "kind": "field",
-    }
 
 
 def _render_place(model: _field.Place) -> dict:
-    k, path, items = model.key, model.path, model.items
-    root, now, updated = model.context.root, model.context.now, model.context.updated
-    where = US_STATES[k]
-    related = link_list(
-        f"Internships {in_place(k)} by field",
-        [
-            (f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
-            for t, n in model.fields
-        ],
+    return _field.render_place(
+        model,
+        dash_link=dash_link,
+        field_slug=field_slug,
+        field_title=field_title,
+        in_place=in_place,
+        listing_body=listing_body,
+        listing_description=listing_description,
+        listing_title=listing_title,
+        state_slug=state_slug,
+        place_names=US_STATES,
     )
-    related += link_list(
-        f"Internships {in_place(k)} by city",
-        [(f"/internships/{state_slug(m)}/", m, n) for m, n in model.cities],
-    )
-    crumbs = [root, (path, where)]
-    if model.parent_state is not None:
-        st = model.parent_state
-        crumbs = [root, (f"/internships/{state_slug(st)}/", US_STATES[st]), (path, where)]
-    loc = "remote" if k == "remote" else in_place(k)
-    head = f"Internships {'(Remote)' if k == 'remote' else in_place(k)}"
-    qa, co_ops = model.faq, model.co_ops
-    subjects = (
-        [f"Internships and Co-ops {in_place(k)}"] if model.canadian and co_ops else []
-    ) + [head]
-    return {
-        "path": path,
-        "title": listing_title(subjects, len(items)),
-        "desc": listing_description(
-            len(items),
-            "internships and co-ops" if co_ops else "internships",
-            "that are remote" if k == "remote" else loc,
-            items,
-            updated,
-        ),
-        "h1": f"Internships {'you can do remotely' if k == 'remote' else in_place(k)}",
-        "crumbs": crumbs,
-        "body": listing_body(
-            items,
-            "",
-            f" {loc}",
-            now,
-            related,
-            state=k,
-            dash=dash_link(state=k),
-            src="seo-state",
-            faq=faq_section(qa),
-        ),
-        "items": items,
-        "state": k,
-        "ld": [faq_ld(qa)],
-        "kind": "state",
-        "thin": model.thin,
-    }
 
 
 def _render_combo(model: _field.Combo) -> dict:
-    t, k, path, items = model.tag, model.key, model.path, model.items
-    root, now, updated = model.context.root, model.context.now, model.context.updated
-    name, where = field_title(t), US_STATES[k]
-    related = link_list(
-        f"{name} internships in other states",
-        [
-            (f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
-            for kk, n in model.states
-        ],
+    return _field.render_combo(
+        model,
+        dash_link=dash_link,
+        field_short=field_short,
+        field_slug=field_slug,
+        field_title=field_title,
+        in_place=in_place,
+        listing_body=listing_body,
+        listing_description=listing_description,
+        listing_title=listing_title,
+        state_slug=state_slug,
+        place_names=US_STATES,
+        place_short=PLACE_SHORT,
     )
-    related += link_list(
-        f"{name} internships by city",
-        [
-            (f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
-            for kk, n in model.cities
-        ],
-    )
-    loc = "remote" if k == "remote" else in_place(k)
-    at = "(Remote)" if k == "remote" else in_place(k)
-    at_short = PLACE_SHORT.get(k, at)
-    qa, co_ops = model.faq, model.co_ops
-    return {
-        "path": path,
-        "title": listing_title(
-            [
-                f"{name} Internships {at}",
-                f"{field_short(t)} Internships {at}",
-                f"{name} Internships {at_short}",
-                f"{field_short(t)} Internships {at_short}",
-            ],
-            len(items),
-        ),
-        "desc": listing_description(
-            len(items),
-            f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
-            "that are remote" if k == "remote" else loc,
-            items,
-            updated,
-        ),
-        "h1": f"{name} internships {loc}",
-        "crumbs": [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
-        "body": listing_body(
-            items,
-            f"in {lower_name(name)}",
-            f" {loc}",
-            now,
-            related,
-            state=k,
-            dash=dash_link([t], k),
-            src="seo-field",
-            faq=faq_section(qa),
-        ),
-        "items": items,
-        "state": k,
-        "ld": [faq_ld(qa)],
-        "thin": model.thin,
-        "kind": "combo",
-    }
 
 
 def _render_major(model: _field.Major) -> dict:
-    name, tags, path, items = model.name, model.tags, model.path, model.items
-    root, now, updated = model.context.root, model.context.now, model.context.updated
-    related = link_list(
-        f"Related fields for {name} majors",
-        [(f"/internships/{field_slug(t)}/", field_title(t), n) for t, n in model.fields],
+    return _field.render_major(
+        model,
+        dash_link=dash_link,
+        field_slug=field_slug,
+        field_title=field_title,
+        listing_body=listing_body,
+        listing_description=listing_description,
     )
-    return {
-        "path": path,
-        "title": [
-            f"Internships for {name} Majors – {len(items):,} Open",
-            f"Internships for {name} Majors",
-        ],
-        "desc": listing_description(
-            len(items), f"student roles for {name} majors", "", items, updated, audience=False
-        ),
-        "h1": f"Internships for {name} majors",
-        "crumbs": [root, ("/internships/for/", "By major"), (path, name)],
-        "body": listing_body(
-            items,
-            f"that fit {name} majors",
-            "",
-            now,
-            related,
-            dash=dash_link(tags),
-            fits=model.fits,
-            src="seo-hub",
-        ),
-        "items": items,
-        "kind": "major",
-    }
 
 
 # ---------------------------------------------------------------- build
