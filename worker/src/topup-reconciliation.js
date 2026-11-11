@@ -39,6 +39,7 @@ export async function readTopupRevision(db, paymentHash) {
 }
 
 export async function reconcileExistingTopup(db, paymentHash, revision, snapshot) {
+  const hashing = financialEvidenceDigest(snapshot);
   try {
     snapshot = structuredClone(snapshot);
   } catch {
@@ -104,7 +105,7 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
       paymentHash,
       topupFinanciallyResolved(snapshot, stored.previous),
       topupHistoryProven(snapshot, stored.previous, decision),
-      await financialEvidenceDigest(snapshot),
+      await hashing,
     ),
   ]);
   return state.meta.changes === 1 && balance.meta.changes === 1 && retention.meta.changes === 1

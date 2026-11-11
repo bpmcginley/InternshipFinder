@@ -405,3 +405,154 @@ export async function retirementCanonicalEvidence(db) {
   );
   assert.equal((await row(db, "topup_claims", contested.key)).state, "granted");
 }
+
+export async function retirementExactAssociation(db) {
+  for (const [column, value] of [
+    ["user_hash", "f".repeat(64)],
+    ["amount", 327],
+    ["amount", 299],
+    ["offer_version", "wrong"],
+    ["units", 26],
+    ["currency", "eur"],
+    ["state", "expired"],
+  ]) {
+    const f = await ready(db);
+    let read = false;
+    await db
+      .prepare(`UPDATE topup_checkout_attempts SET ${column}=? WHERE id=?`)
+      .bind(value, f.a.id)
+      .run();
+    assert.equal(
+      (
+        await retire(db, f, async () => {
+          read = true;
+          return f.r;
+        })
+      ).status,
+      "unavailable",
+    );
+    assert.equal(read, false);
+    assert.equal((await row(db, "topup_claims", f.key)).state, "granted");
+    assert.ok(
+      await db.prepare("SELECT id FROM topup_checkout_attempts WHERE id=?").bind(f.a.id).first(),
+    );
+  }
+  const absent = await ready(db);
+  await db.prepare("DELETE FROM topup_checkout_attempts WHERE id=?").bind(absent.a.id).run();
+  assert.equal((await retire(db, absent)).status, "unavailable");
+  const taxed = await ready(db);
+  assert.equal((await row(db, "topup_purchases", taxed.key)).amount, 327);
+  assert.equal(
+    await db
+      .prepare("SELECT amount FROM topup_checkout_attempts WHERE id=?")
+      .bind(taxed.a.id)
+      .first("amount"),
+    300,
+  );
+  assert.equal((await retire(db, taxed)).status, "retired");
+}
+
+export async function retirementImmutableTupleRaces(db) {
+  const changes = [
+    ["topup_purchases", "amount=?", [300]],
+    ["topup_purchases", "payment_id=?", ["pi_changed"]],
+    ["topup_purchases", "checkout_id=?", ["cs_changed"]],
+    ["topup_purchases", "user_hash=?", ["d".repeat(64)]],
+    ["topup_purchases", "offer_version=?", ["changed"]],
+    ["topup_purchases", "currency=?", ["eur"]],
+    ["topup_purchases", "granted=?,consumed=?", [26, 26]],
+    ["topup_purchases", "created=?", ["2020-01-02T00:00:00.000Z"]],
+    ["topup_checkout_attempts", "id=?", [crypto.randomUUID()]],
+    ["topup_checkout_attempts", "user_hash=?", ["e".repeat(64)]],
+    ["topup_checkout_attempts", "checkout_id=?", ["cs_changed_attempt"]],
+    ["topup_checkout_attempts", "offer_version=?", ["changed"]],
+    ["topup_checkout_attempts", "amount=?", [327]],
+    ["topup_checkout_attempts", "units=?", [26]],
+    ["topup_checkout_attempts", "currency=?", ["eur"]],
+    ["topup_checkout_attempts", "state=?", ["expired"]],
+    ["topup_checkout_attempts", "created=?", ["2020-01-02T00:00:00.000Z"]],
+  ];
+  for (const [table, set, values] of changes) {
+    const f = await ready(db);
+    assert.equal(
+      (
+        await retire(db, f, async () => {
+          await db
+            .prepare(
+              `UPDATE ${table} SET ${set} WHERE ${table === "topup_purchases" ? "payment_hash" : "id"}=?`,
+            )
+            .bind(...values, table === "topup_purchases" ? f.key : f.a.id)
+            .run();
+          return f.r;
+        })
+      ).status,
+      "stale",
+      table + set,
+    );
+    assert.equal((await row(db, "topup_claims", f.key)).state, "granted");
+    assert.ok(await row(db, "topup_retention", f.key));
+  }
+  const removed = await ready(db);
+  assert.equal(
+    (
+      await retire(db, removed, async () => {
+        await db.prepare("DELETE FROM topup_checkout_attempts WHERE id=?").bind(removed.a.id).run();
+        return removed.r;
+      })
+    ).status,
+    "stale",
+  );
+}
+
+export async function retirementStrictJsonFacts(db) {
+  const f = await ready(db);
+  const dates = [new Date("2020-01-01T00:00:00Z"), new Date("2026-01-01T00:00:00Z")];
+  for (const value of [
+    ...dates,
+    new Map([["created", 1]]),
+    new Set([1]),
+    new Number(1),
+    new (class Fact {
+      constructor() {
+        this.created = 1;
+      }
+    })(),
+    () => 1,
+    1n,
+  ]) {
+    assert.equal(await financialEvidenceDigest({ ...f.r, created: value }), null);
+    await age(db, f.key);
+    assert.equal((await retire(db, f, async () => ({ ...f.r, created: value }))).status, "pending");
+    assert.equal((await row(db, "topup_retention", f.key)).resolved_zero_since, null);
+    await refresh(db, f);
+  }
+  assert.notEqual(
+    await financialEvidenceDigest({ ...f.r, created: dates[0].toISOString() }),
+    await financialEvidenceDigest({ ...f.r, created: dates[1].toISOString() }),
+  );
+  let accessed = false;
+  const accessor = { ...f.r };
+  Object.defineProperty(accessor, "created", {
+    enumerable: true,
+    get() {
+      accessed = true;
+      return 1;
+    },
+  });
+  assert.equal(await financialEvidenceDigest(accessor), null);
+  assert.equal(accessed, false);
+  const custom = new (class Fact {
+    constructor() {
+      this.created = 1;
+    }
+  })();
+  const initial = await ready(db, { created: custom });
+  assert.equal((await row(db, "topup_retention", initial.key)).history_proven, 0);
+  assert.equal((await row(db, "topup_retention", initial.key)).evidence_digest, null);
+  const updated = await ready(db);
+  await refresh(db, updated, { created: custom });
+  assert.equal((await row(db, "topup_retention", updated.key)).history_proven, 0);
+  assert.equal((await row(db, "topup_retention", updated.key)).evidence_digest, null);
+  const sparse = { ...f.r, history: [, 1] };
+  assert.equal(await financialEvidenceDigest(sparse), null);
+}

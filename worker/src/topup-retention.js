@@ -26,34 +26,55 @@ export function topupFinanciallyResolved(snapshot, previous) {
 // Hash all available verified lifecycle facts, including any timestamps supplied by a
 // future reader. Object keys and refund/dispute ordering do not manufacture a new age.
 export async function financialEvidenceDigest(snapshot) {
-  if (
-    snapshot?.status !== "reversal_evidence" ||
-    typeof snapshot.livemode !== "boolean" ||
-    !/^pi_[A-Za-z0-9_]{1,250}$/.test(snapshot.paymentId || "") ||
-    !/^cs_[A-Za-z0-9_]{1,250}$/.test(snapshot.checkoutId || "") ||
-    !/^ch_[A-Za-z0-9_]{1,250}$/.test(snapshot.chargeId || "") ||
-    decideTopup({ ...snapshot, previous: initial }).disposition === "retry"
-  )
-    return null;
   try {
-    const { previous: _previous, ...value } = snapshot;
-    const order = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    value.refunds = [...value.refunds].sort(order);
-    value.disputes = [...value.disputes].sort(order);
     const canonical = (v) => {
-      if ((typeof v === "number" && !Number.isFinite(v)) || v === undefined)
-        throw new Error("Invalid financial fact");
-      if (Array.isArray(v)) return v.map(canonical);
-      if (v && typeof v === "object")
-        return Object.fromEntries(
-          Object.keys(v)
-            .sort()
-            .map((k) => [k, canonical(v[k])]),
-        );
-      return v;
+      if (v === null || typeof v === "string" || typeof v === "boolean") return v;
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      if (typeof v !== "object") throw new Error("Invalid financial fact");
+      const array = Array.isArray(v),
+        proto = Object.getPrototypeOf(v);
+      if (
+        (!array && proto !== Object.prototype && proto !== null) ||
+        (array && proto !== Array.prototype) ||
+        Object.getOwnPropertySymbols(v).length
+      )
+        throw new Error("Expected plain financial JSON");
+      const descriptors = Object.getOwnPropertyDescriptors(v);
+      if (array) {
+        if (Object.keys(descriptors).length !== v.length + 1)
+          throw new Error("Invalid financial array");
+        return Array.from({ length: v.length }, (_, i) => {
+          const d = descriptors[i];
+          if (!d || !d.enumerable || !("value" in d)) throw new Error("Invalid financial array");
+          return canonical(d.value);
+        });
+      }
+      return Object.fromEntries(
+        Object.keys(descriptors)
+          .sort()
+          .map((k) => {
+            const d = descriptors[k];
+            if (!d.enumerable || !("value" in d)) throw new Error("Invalid financial property");
+            return [k, canonical(d.value)];
+          }),
+      );
     };
+    const value = canonical(snapshot);
+    if (
+      value?.status !== "reversal_evidence" ||
+      typeof value.livemode !== "boolean" ||
+      !/^pi_[A-Za-z0-9_]{1,250}$/.test(value.paymentId || "") ||
+      !/^cs_[A-Za-z0-9_]{1,250}$/.test(value.checkoutId || "") ||
+      !/^ch_[A-Za-z0-9_]{1,250}$/.test(value.chargeId || "") ||
+      decideTopup({ ...value, previous: initial }).disposition === "retry"
+    )
+      return null;
+    delete value.previous;
+    const order = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    value.refunds.sort(order);
+    value.disputes.sort(order);
     const bytes = new TextEncoder().encode(
-      "internscout:financial-resolution:v1:" + JSON.stringify(canonical(value)),
+      "internscout:financial-resolution:v1:" + JSON.stringify(value),
     );
     if (bytes.length > 262144) return null;
     const hash = await crypto.subtle.digest("SHA-256", bytes);

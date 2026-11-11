@@ -7,6 +7,8 @@ import {
   topupHistoryProven,
   financialEvidenceDigest,
 } from "./topup-retention.js";
+// The supported pre-tax economics verified independently of the tax-inclusive charge.
+export const TOPUP_SETTLEMENT_TERMS = Object.freeze({ amount: 300, currency: "usd", units: 25 });
 const active = "a.state IN ('creating','open')";
 const uuid = (v) =>
   typeof v === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(v);
@@ -39,6 +41,8 @@ export async function captureTopupSettlement(db, attemptId) {
 // redirects. Decision prior state is initial ONLY because the guarded insert must win a
 // new durable claim. Existing/deleted/retired claims cannot enter this path.
 export async function settleFirstTopup(db, capture, payment, reversals, now = new Date()) {
+  // Validate original JSON types before structuredClone can erase custom prototypes.
+  const hashing = financialEvidenceDigest(reversals);
   let a, p, r;
   try {
     [a, p, r] = structuredClone([capture, payment, reversals]);
@@ -52,9 +56,9 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
     typeof a.user_hash !== "string" ||
     !/^[a-f0-9]{64}$/.test(a.user_hash) ||
     !validTopupOfferVersion(a.offer_version) ||
-    a.amount !== 300 ||
-    a.currency !== "usd" ||
-    a.units !== 25 ||
+    a.amount !== TOPUP_SETTLEMENT_TERMS.amount ||
+    a.currency !== TOPUP_SETTLEMENT_TERMS.currency ||
+    a.units !== TOPUP_SETTLEMENT_TERMS.units ||
     typeof a.created !== "string" ||
     !(a.checkout_id === null || validTopupCheckoutId(a.checkout_id)) ||
     p?.status !== "paid_evidence" ||
@@ -167,7 +171,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
       paymentHash,
       topupFinanciallyResolved(r, { loss: false }),
       topupHistoryProven(r, { loss: false, historyProven: true }, decision),
-      await financialEvidenceDigest(r),
+      await hashing,
     ),
     // Terminal state consumes this capture; no second increment can overflow.
     db.prepare("DELETE FROM topup_attempt_revisions WHERE attempt_id=? AND changes()=1").bind(a.id),
