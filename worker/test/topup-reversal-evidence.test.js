@@ -51,7 +51,7 @@ function provider(refunds = [], disputes = [], alter = () => {}) {
     counts[kind]++;
     assert.equal(options.method, "GET");
     assert.equal(options.body, undefined);
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.equal(options.headers["Stripe-Version"], "2026-08-26.dahlia");
     assert.equal(options.signal.aborted, false);
     let value;

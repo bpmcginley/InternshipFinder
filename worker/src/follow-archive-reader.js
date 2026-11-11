@@ -102,7 +102,7 @@ export function createFollowArchiveReader({
         if (controller.signal.aborted) fail();
         const response = await get(target, {
           method: "GET",
-          redirect: "error",
+          redirect: "manual",
           signal: controller.signal,
         });
         try {

@@ -50,7 +50,7 @@ describe("dormant archive reader in local Workers runtime", () => {
       calls.every(
         (c) =>
           c.method === "GET" &&
-          c.redirect === "error" &&
+          c.redirect === "manual" &&
           new URL(c.url).origin === "https://archive.example.test",
       ),
     ).toBe(true);

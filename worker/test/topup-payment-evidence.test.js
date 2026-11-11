@@ -58,7 +58,7 @@ function transport(data, calls = []) {
     calls.push(url);
     assert.equal(options.method, "GET");
     assert.equal(options.body, undefined);
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.equal(options.headers["Stripe-Version"], "2026-08-26.dahlia");
     assert.equal(options.headers["Idempotency-Key"], undefined);
     if (url === "https://api.stripe.com/v1/checkout/sessions/cs_fixture?expand[]=line_items")
