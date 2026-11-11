@@ -329,6 +329,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - Four discovery and link cases build with an explicit `BuildState(near_on=False)`, the canonical render hooks and the publisher writer. Their fixture bytes and assertions match the prior cases. The RSS cases pass the generated date from that state. The legacy sitemap-reader and widget, role-index and placement CLI cases still characterize their original entry points.
 - Offline legacy/canonical comparisons matched every file and ordered write across the sitemap, RSS discovery, LLMS and link fixtures. The four cases matched 20, 23, 35 and 86 files respectively. The generated link integration also passed with the facade and sockets blocked. The focused suite passed all 28 tests, including both Golden checks against 830 artifacts.
 
+## WP-6.2 advisor and launch tests
+
+- The advisor and launch suites use the shared listing fixtures. The migrated builds set near pages and earning explicitly, and each writer receives the state and hooks from its build. The thin launch case passes that build's date to the existing feed writer. All 95 assertions, test and parameter order, and the existing launch snapshot build settings match the previous suites.
+- The offline legacy and canonical runs matched 1,112 ordered page records over six builds, 67 ordered writes, all fixture files and RSS bytes. All 64 cases passed with the root pytest fixtures active and the facade, donor module and sockets blocked. The focused offline suite passed 109 cases, including both Golden checks against all 836 artifacts.
+
 ## WP-6.2 standalone Pages publisher
 
 - The Pages image adapter imports the standalone publisher only for `--site` and passes the existing landing-card renderer. The publisher uses a fresh `BuildState` for each run and explicit listing data, generation time and site settings for the downstream writers. The legacy CLI continues to serve compatibility callers.
