@@ -66,7 +66,9 @@ def check_snapshot(directory: Path) -> None:
                     raise ValueError
                 paths.add(name)
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        raise SystemExit("The public data branch does not contain a complete listing export.") from None
+        raise SystemExit(
+            "The public data branch does not contain a complete listing export."
+        ) from None
 
 
 def select(workspace: Path, sha: str) -> Path:
@@ -97,12 +99,46 @@ def select(workspace: Path, sha: str) -> Path:
     return directory
 
 
+def selection_marker(directory: Path, *, from_data: bool) -> str:
+    checkout = directory.parents[1]
+    commit, tree = (git_object(checkout, ref) for ref in ("HEAD", f"HEAD:{EXPORT.as_posix()}"))
+    source = "data" if from_data else "main-fallback"
+    marker = f"[listing-data] source={source} commit={commit} tree={tree}"
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_run":
+        event_path = os.environ.get("GITHUB_EVENT_PATH")
+        if event_path:
+            try:
+                with open(event_path, encoding="utf8") as event_file:
+                    run_id = json.load(event_file)["workflow_run"]["id"]
+            except (OSError, ValueError, KeyError, TypeError):
+                run_id = None
+            if type(run_id) is int and run_id > 0:
+                marker += f" upstream_run={run_id}"
+    return marker
+
+
+def git_object(checkout: Path, ref: str) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", ref],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+    )
+    oid = result.stdout.strip()
+    if result.returncode or not re.fullmatch(r"[0-9a-f]{40}", oid):
+        raise SystemExit("Could not identify the selected public data snapshot.")
+    return oid
+
+
 def main() -> None:
     workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
     if sys.argv[1] == "resolve":
         output = f"sha={resolve(workspace)}"
     else:
-        output = f"directory={select(workspace, os.environ['DATA_SHA'])}"
+        sha = os.environ["DATA_SHA"]
+        directory = select(workspace, sha)
+        output = f"directory={directory}"
+        print(selection_marker(directory, from_data=bool(sha)))
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as target:
         target.write(output + "\n")
 
