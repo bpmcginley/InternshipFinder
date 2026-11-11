@@ -61,4 +61,5 @@ def render(
         items=model.items,
         state=model.city,
         thin=not model.indexed,
+        share_card=(f"{name} internships", "Summer 2027") if model.field else None,
     )

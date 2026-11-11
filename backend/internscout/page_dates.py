@@ -117,6 +117,13 @@ class _Content(HTMLParser):
             if re.fullmatch(r"/internships/(?:at/)?[^/]+/", path)
             else None
         )
+        utc = stamp.astimezone(timezone.utc) if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+        weekly_label = f"{utc:%B} {utc.day}, {utc.year} at {utc:%H:%M} UTC"
+        self.weekly_date = (
+            re.compile(r"^([\d,]+ open student roles? first seen in the seven days ending )"
+                       + re.escape(weekly_label) + r"(?=\.)")
+            if re.fullmatch(r"/internships/for/[^/]+-majors/weekly/", path) else None
+        )
         if path.startswith("/internships/"):
             # The first listing FAQ answer, whose subject changes with its field/place.
             contexts.append((r"^([\d,]+ open [^.!?]* as of\s+)", r"(?=, from [\d,]+ employers?\.)"))
@@ -168,6 +175,8 @@ class _Content(HTMLParser):
     ) -> str:
         if fact_label and self.fact_date:
             text = self.fact_date.sub(r"\1[export date]", text)
+        if (fact_label or description) and self.weekly_date:
+            text = self.weekly_date.sub(r"\1[export window]", text)
         for pattern in self.routine:
             text = pattern.sub(r"\1[export date]", text)
         # "Updated" is routine only in the common template label or an actual generated listing

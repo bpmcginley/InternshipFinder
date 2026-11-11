@@ -204,7 +204,10 @@ def emit_kind_and_tracker_pages(
             related_kinds=listing.related_kinds(kind_made, path),
             tracker=tracker,
         )
-        add(**render_kind_page(model))
+        page = render_kind_page(model)
+        if term is not None:
+            page["share_card"] = ("Internships", term)
+        add(**page)
 
     # The trackers themselves (tracker_page), each under its term page in the breadcrumb trail.
     for t in trackers:
@@ -215,7 +218,8 @@ def emit_kind_and_tracker_pages(
         # The roles of the employers listed, one per role (was: len(unique_roles(items)), which also
         # counted rows whose employer name is not a name, real_company).
         t_, d_, h_, b_ = tracker_page(t, rows, sum(r[4] for r in rows), now, updated, term_path)
-        add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_, dated=items)
+        add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_,
+            dated=items, share_card=("Who is open now", t))
 
 
 def emit_near_and_new_pages(
@@ -370,6 +374,7 @@ def emit_hubs(
     tracker_path: Callable[..., str],
     top_employers: Callable[..., list],
     launch_links: list = (),
+    advisor_links: list = (),
 ) -> None:
     root, updated = context.root, context.updated
     fields, states = cohorts.fields, cohorts.states
@@ -407,7 +412,14 @@ def emit_hubs(
         "Internships by major",
         [root, ("/internships/for/", "By major")],
         "<p class=\"lede\">Pick your major to see open roles that fit it. Each page counts only what is "
-        "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: (p[1], p[0]))),
+        "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: (p[1], p[0])))
+        + (
+            '<section class="rel distribution-links"><h2>Weekly pages to forward</h2>'
+            '<p>Share a weekly page with students interested in a major. Each page uses the export date shown.</p><ul>'
+            + ''.join(f'<li><a href="{esc(path)}">{esc(name)}</a></li>' for path, name in advisor_links)
+            + '</ul></section>'
+            if advisor_links else ""
+        ),
     )
     hub = (
         f"<p class=\"lede\">{listing_count:,} open internships, co-ops, research positions and "
