@@ -3,12 +3,14 @@
 import re
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
+from html import escape
 
 from internscout import seo_pages as sp
+from internscout.site.render import layout
 
 
 def test_table_preserves_headers_values_and_safe_visible_labels():
-    html = sp.table(
+    html = layout.table(
         ["Employer", "Opened &amp; found", "Roles"],
         [
             ["SyntheticInternationalLaboratory", "By Sep 17, 2026", "30"],
@@ -63,7 +65,9 @@ def test_tracker_uses_shared_headers_and_escapes_employer_data():
 
 
 def test_ragged_rows_keep_every_value_and_numeric_first_columns_remain_cells():
-    table = ET.fromstring(sp.table(["Known"], [["12", "Unheaded value"]], num_from=0)).find("table")
+    table = ET.fromstring(layout.table(["Known"], [["12", "Unheaded value"]], num_from=0)).find(
+        "table"
+    )
     row = table.find("./tbody/tr")
     assert [cell.tag for cell in row] == ["td", "td"]
     assert all(cell.get("class") == "num" and cell.get("role") == "cell" for cell in row)
@@ -72,8 +76,8 @@ def test_ragged_rows_keep_every_value_and_numeric_first_columns_remain_cells():
 
 
 def test_escaped_hostile_column_labels_stay_text_in_headers_and_phone_labels():
-    label = sp.esc('<img src=x onerror="alert(1)"> & details')
-    table = ET.fromstring(sp.table(["Name", label], [["Example", "Value"]])).find("table")
+    label = escape('<img src=x onerror="alert(1)"> & details')
+    table = ET.fromstring(layout.table(["Name", label], [["Example", "Value"]])).find("table")
     assert table.find("./thead/tr/th[2]").text == '<img src=x onerror="alert(1)"> & details'
     assert (
         table.find("./tbody/tr/td/span[@class='cell-label']").text

@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from internscout import seo_pages
+from internscout.site.render import layout
 
 
 class _Visible(HTMLParser):
@@ -257,11 +258,11 @@ def test_homepage_has_only_site_identity_and_pricing_keeps_visible_product_offer
 def test_product_without_google_required_offers_or_ratings_is_rejected():
     product = {key: value for key, value in seo_pages.PRODUCT.items() if key != "offers"}
     with pytest.raises(AssertionError):
-        _assert_collection_schema(seo_pages.ld_script(product), "/pricing/")
+        _assert_collection_schema(layout.ld_script(product), "/pricing/")
 
 
 def test_nested_job_posting_is_rejected():
-    bad = seo_pages.ld_script(
+    bad = layout.ld_script(
         {
             "@context": "https://schema.org",
             "@graph": [
@@ -277,7 +278,7 @@ def test_nested_job_posting_is_rejected():
 
 
 def test_invisible_faq_answer_is_rejected():
-    bad = seo_pages.ld_script(seo_pages.faq_ld([("A visible question?", "An invisible answer.")]))
+    bad = layout.ld_script(layout.faq_ld([("A visible question?", "An invisible answer.")]))
     with pytest.raises(AssertionError):
         _assert_collection_schema(bad + "<h2>A visible question?</h2>", "/internships/")
 
@@ -298,7 +299,7 @@ def test_invisible_faq_answer_is_rejected():
 )
 def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
     question, answer = "A visible question?", "An answer readers cannot see."
-    ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
+    ld = layout.ld_script(layout.faq_ld([(question, answer)]))
     # The question is visible, but a nested paragraph's text inherits its ancestor's hidden state.
     html = ld + f'<h2>{question}</h2><div {attrs}><section><p>{answer}</p></section></div>'
     with pytest.raises(AssertionError):
@@ -318,5 +319,5 @@ def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
 )
 def test_hidden_void_elements_and_closed_subtrees_do_not_hide_visible_siblings(prefix):
     question, answer = "A visible question?", "A visible answer."
-    ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
+    ld = layout.ld_script(layout.faq_ld([(question, answer)]))
     _assert_collection_schema(ld + prefix + f'<h2>{question}</h2><p>{answer}</p>', "/internships/")
