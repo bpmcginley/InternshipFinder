@@ -137,6 +137,9 @@ def stage(name, work):
             str(work / "placements-report.json"),
         ]
         module = "internscout.seo_pages"
+    elif name == "assets":
+        args = [str(work / "site")]
+        module = "internscout.asset_versions"
     else:
         args = [str(work / "site")]
         module = "internscout.site_links"
@@ -162,7 +165,7 @@ def build(work):
         INTERNSCOUT_DATA=str(work / "backend" / "data"),
         INTERNSCOUT_GEOCODE="0",
     )
-    for name in ("export", "pages", "links"):
+    for name in ("export", "pages", "assets", "links"):
         result = subprocess.run(
             [
                 sys.executable,
@@ -247,7 +250,7 @@ def refresh(files):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--refresh", action="store_true")
-    parser.add_argument("--stage", choices=["export", "pages", "links"])
+    parser.add_argument("--stage", choices=["export", "pages", "assets", "links"])
     parser.add_argument("--workspace", type=Path)
     args = parser.parse_args()
     if args.stage:

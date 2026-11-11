@@ -52,6 +52,8 @@ PER_EMPLOYER = 2  # ...and at most this many from one employer, so one big poste
 
 UTM = "utm_source=digest&utm_medium=email"
 HOME_URL = f"{sp.SITE}/?{UTM}"
+EVERY_MAJOR_URL = "https://github.com/bpmcginley/internships-every-major"
+EVERY_MAJOR_LABEL = "Internships for every major on GitHub"
 SLOGAN = "Built by one student, made for all students."
 WHY = "You're getting this because you signed up for new-internship emails at internscout.org."
 # The sender replaces this with the email provider's own unsubscribe link for each subscriber.
@@ -475,6 +477,7 @@ def render_html(digest: dict, fields=None, postal_address=None) -> str:
 <div style="border-top:1px solid {RULE};padding-top:16px;{SANS};font-size:13px;line-height:1.55;color:{INK3}">
 <p style="margin:0 0 8px;font-size:14px;font-weight:bold;color:{INK}">{esc(SLOGAN)}</p>
 <p style="margin:0 0 8px">{esc(affiliation())}</p>
+<p style="margin:0 0 8px">{_a(EVERY_MAJOR_URL, EVERY_MAJOR_LABEL, f"color:{INK2};text-decoration:underline")}</p>
 <p style="margin:0 0 8px">{esc(WHY)} <a href="{UNSUBSCRIBE}" style="color:{INK2};text-decoration:underline">Unsubscribe</a></p>
 <p style="margin:0">{address_html}</p>
 </div>
@@ -540,7 +543,20 @@ def render_text(digest: dict, fields=None, postal_address=None) -> str:
                 f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles: {_link(s.get('url'))}",
             ]
     address = _address(postal_address)
-    out += ["", "", "-" * 40, SLOGAN, "", affiliation(), "", WHY, f"Unsubscribe: {UNSUBSCRIBE}", ""]
+    out += [
+        "",
+        "",
+        "-" * 40,
+        SLOGAN,
+        "",
+        affiliation(),
+        "",
+        f"{EVERY_MAJOR_LABEL}: {EVERY_MAJOR_URL}",
+        "",
+        WHY,
+        f"Unsubscribe: {UNSUBSCRIBE}",
+        "",
+    ]
     out += address or [NO_ADDRESS]
     return "\n".join(out) + "\n"
 

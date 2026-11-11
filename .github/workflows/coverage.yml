@@ -28,6 +28,7 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install -r requirements.txt -r requirements-coverage.txt pytest pillow cryptography
+          python -m pip install --no-deps -e ..
           sudo apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: the Reel render test is skipped"
       - name: Measure backend and growth coverage
         working-directory: backend
@@ -35,7 +36,7 @@ jobs:
           COVERAGE_FILE: ../coverage/python/.coverage
         # No traceback/source values in coverage-job diagnostics. Normal test CI
         # remains separate; XML contains filenames, line numbers and hit counts.
-        run: python -m pytest tests/ -q --tb=no --show-capture=no --cov=internscout --cov=../growth --cov-report=term --cov-report=xml:../coverage/python/coverage.xml
+        run: python -m pytest tests/ ../growth/tests/ -q --tb=no --show-capture=no --cov-config=../pyproject.toml --cov=internscout --cov=../growth --cov-report=term --cov-report=xml:../coverage/python/coverage.xml
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
