@@ -71,7 +71,7 @@ async function loadCatalog(descriptor, fetcher, signal, clock) {
     live();
     response = await fetcher(url, {
       signal,
-      redirect: "error",
+      redirect: "manual",
       credentials: "omit",
       ...(published ? { method: "GET", cache: "no-store" } : {}),
     });

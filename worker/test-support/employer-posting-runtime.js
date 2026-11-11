@@ -44,7 +44,7 @@ async function fixture(db) {
     };
   const fetcher = async (url, options) => {
     loads++;
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.equal(options.credentials, "omit");
     assert.ok(options.signal instanceof AbortSignal);
     return reply(url, '["acme"]');
