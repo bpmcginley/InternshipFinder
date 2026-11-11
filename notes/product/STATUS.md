@@ -116,6 +116,10 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is built on exact #261 `e29eb17cf736b8e16f233781fe6c93c0eab4b4e7`: stable confirmed-scope identity, persisted matching watermark and bounded single-subscriber read only. Migration 0009 and the rerunnable legacy schema are both exercised in actual local D1. Local validation: 395 Node tests, 31 D1 tests, zero JavaScript lint errors/warnings. [Contract and evidence](P-2.1i-scope-progress.md). Independent review and PR CI are pending. No queue transaction, sender, producer, activation or retention change; #266 is excluded and #255 integration remains separate. Needs-bruce; parent integration and owner merge/deployment gates remain.
 
+## P-2.1j dormant transactional enqueue
+
+[Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281) composes exact #274 `478da886` with #255 `3d3a5cea` by ordinary merge. Complete confirmed-scope CAS, immutable snapshot digest/date and bounded pending advances are implemented without advancing durable watermarks. Prior active subscriber jobs block cross-day duplicates; cancellation/deletion erase pending metadata and preserve surviving-scope recovery. Migration 0010 and legacy schema are covered by local D1. Local evidence: 407 Node tests, 42 Workers/D1 tests, lint clean; independent review and fresh PR checks pending. [Contract and gates](P-2.1j-follow-enqueue.md). Zero-match/terminal progress finalization, producer, sender and activation remain deferred. Needs-bruce; no merge/deploy.
+
 ## Waiting for Bruce
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
@@ -123,6 +127,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
 <<<<<<< HEAD
+| 2026-11-10 | P-2.1j dormant enqueue worker merge | [Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281), stacked on #274 with #255 integrated. Local transaction/retention tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender, finalizer or deployment enabled. | - |
 | 2026-11-10 | P-2.1i dormant scope progress worker merge | [Draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274), stacked on #261. Local migration and legacy-schema checks pass; independent review, PR checks, parent integration and owner merge remain pending. No queue, sender or deployment is enabled. | - |
 =======
 | 2026-11-10 | P-2.1f dormant matching merge | [#255](https://github.com/bpmcginley/InternshipFinder/pull/255), stacked on #243. Pure matching only; review/CI and owner merge needed. Draft public snapshot contract is unpublished; production limits/producer, consent/watermark/queue integration and sending/deployment gates remain pending. | - |
