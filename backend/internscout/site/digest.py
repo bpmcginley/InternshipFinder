@@ -81,7 +81,7 @@ def select_examples(
     *,
     sort_newest: Callable[[list[dict]], list[dict]],
     dedupe: Callable[[list[dict]], list[dict]],
-    safe_link: Callable[[str], str | None],
+    safe_link: Callable[[str | None], str | None],
     employer_key: Callable[[str], str],
     place: Callable[[dict], str],
 ) -> Examples:
