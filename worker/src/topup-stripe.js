@@ -1,0 +1,217 @@
+// Dormant trusted adapter. Explicit fetch only; never import from a runtime route yet.
+import { stripe, siteUrl, paymentsOn, managedPayments } from "./billing.js";
+import { validTopupCheckoutId } from "./topup-ledger.js";
+const OFFER = Object.freeze({
+  verified: true,
+  version: "topup-v1",
+  amount: 300,
+  currency: "usd",
+  units: 25,
+});
+const unavailable = () => new Error("Top-up checkout is unavailable");
+const uuid = (value) =>
+  typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
+function callback(value, origin) {
+  if (typeof value !== "string" || /[\\\s]/.test(value)) throw unavailable();
+  const url = new URL(value);
+  if (
+    url.protocol !== "https:" ||
+    url.origin !== origin ||
+    url.username ||
+    url.password ||
+    url.hash
+  )
+    throw unavailable();
+  return url.href;
+}
+function checkoutUrl(value, id) {
+  if (typeof value !== "string" || value.length > 8192 || /[\\\s]/.test(value)) throw unavailable();
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw unavailable();
+  }
+  if (
+    url.origin !== "https://checkout.stripe.com" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/c/pay/" + id
+  )
+    throw unavailable();
+  return url.href;
+}
+export async function prepareTopupStripe(env, callbacks, fetchImpl) {
+  if (
+    !env ||
+    env.TOPUPS_ENABLED !== "1" ||
+    !paymentsOn(env) ||
+    typeof fetchImpl !== "function" ||
+    typeof env.STRIPE_PRICE_TOPUP !== "string" ||
+    !/^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+  )
+    return { enabled: false };
+  // Snapshot private configuration. Price/session paths and raw errors must never reach logs.
+  const config = { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    priceId = env.STRIPE_PRICE_TOPUP,
+    managed = managedPayments(env);
+  const safeFetch = async (...args) => {
+    try {
+      const r = await fetchImpl(args[0], { ...args[1], redirect: "error" });
+      if (!r.ok) throw unavailable();
+      return r;
+    } catch {
+      throw unavailable();
+    }
+  };
+  const request = async (path, form = {}, key = null, method = "GET") => {
+    try {
+      return await stripe(config, path, form, safeFetch, key, method);
+    } catch {
+      throw unavailable();
+    }
+  };
+  let success, cancel, price;
+  try {
+    const site = new URL(siteUrl(env));
+    if (
+      site.protocol !== "https:" ||
+      site.username ||
+      site.password ||
+      site.pathname !== "/" ||
+      site.search ||
+      site.hash
+    )
+      throw unavailable();
+    success = callback(callbacks?.success, site.origin);
+    cancel = callback(callbacks?.cancel, site.origin);
+    price = await request("prices/" + encodeURIComponent(priceId) + "?expand[]=product");
+    if (
+      !price ||
+      price.object !== "price" ||
+      price.id !== priceId ||
+      price.active !== true ||
+      price.type !== "one_time" ||
+      price.billing_scheme !== "per_unit" ||
+      price.recurring !== null ||
+      price.custom_unit_amount !== null ||
+      price.transform_quantity !== null ||
+      price.currency !== "usd" ||
+      price.unit_amount !== 300 ||
+      Number(price.unit_amount_decimal) !== 300 ||
+      price.tax_behavior !== "exclusive" ||
+      typeof price.livemode !== "boolean" ||
+      price.product?.object !== "product" ||
+      price.product.active !== true ||
+      price.product.deleted
+    )
+      throw unavailable();
+  } catch {
+    return { enabled: false };
+  }
+  const attemptOk = (a) =>
+    a &&
+    uuid(a.id) &&
+    typeof a.user_hash === "string" &&
+    /^[a-f0-9]{64}$/.test(a.user_hash) &&
+    a.offer_version === OFFER.version &&
+    a.amount === 300 &&
+    a.currency === "usd" &&
+    a.units === 25;
+  const metadata = (a) => ({
+    kind: "autofill_topup",
+    attempt_id: a.id,
+    user_hash: a.user_hash,
+    offer_version: OFFER.version,
+    units: "25",
+  });
+  function verified(session, a) {
+    const items = session?.line_items,
+      item = items?.data?.[0],
+      tax = session?.total_details;
+    if (
+      !session ||
+      session.object !== "checkout.session" ||
+      !validTopupCheckoutId(session.id) ||
+      session.mode !== "payment" ||
+      session.status !== "open" ||
+      session.payment_status !== "unpaid" ||
+      session.livemode !== price.livemode ||
+      session.client_reference_id !== a.user_hash ||
+      session.currency !== "usd" ||
+      session.amount_subtotal !== 300 ||
+      session.success_url !== success ||
+      session.cancel_url !== cancel ||
+      session.ui_mode !== "hosted_page" ||
+      !Object.entries(metadata(a)).every(([k, v]) => session.metadata?.[k] === v) ||
+      items?.object !== "list" ||
+      items.has_more !== false ||
+      !Array.isArray(items.data) ||
+      items.data.length !== 1 ||
+      !item ||
+      item.quantity !== 1 ||
+      item.price?.id !== priceId ||
+      item.price.unit_amount !== 300 ||
+      item.price.currency !== "usd" ||
+      item.amount_subtotal !== 300 ||
+      item.currency !== "usd" ||
+      tax?.amount_discount !== 0 ||
+      tax.amount_shipping !== 0 ||
+      !Number.isSafeInteger(tax.amount_tax) ||
+      tax.amount_tax < 0 ||
+      !Number.isSafeInteger(session.amount_total) ||
+      session.amount_total !== 300 + tax.amount_tax
+    )
+      throw unavailable();
+    return {
+      status: "open",
+      checkoutId: session.id,
+      attemptId: a.id,
+      userHash: a.user_hash,
+      offerVersion: a.offer_version,
+      amount: a.amount,
+      currency: a.currency,
+      units: a.units,
+      url: checkoutUrl(session.url, session.id),
+    };
+  }
+  return {
+    enabled: true,
+    offer: OFFER,
+    async create(a) {
+      if (
+        !attemptOk(a) ||
+        a.state !== "creating" ||
+        a.checkout_id !== null ||
+        a.idempotencyKey !== "topup-checkout:" + a.id
+      )
+        throw unavailable();
+      const form = {
+        mode: "payment",
+        ui_mode: "hosted_page",
+        "line_items[0][price]": priceId,
+        "line_items[0][quantity]": "1",
+        client_reference_id: a.user_hash,
+        success_url: success,
+        cancel_url: cancel,
+        "adaptive_pricing[enabled]": "false",
+        "expand[]": "line_items",
+      };
+      for (const [k, v] of Object.entries(metadata(a))) {
+        form[`metadata[${k}]`] = v;
+        form[`payment_intent_data[metadata][${k}]`] = v;
+      }
+      if (managed) form["managed_payments[enabled]"] = "true";
+      return verified(await request("checkout/sessions", form, a.idempotencyKey, "POST"), a);
+    },
+    async readOpen(a) {
+      if (!attemptOk(a) || a.state !== "open" || !validTopupCheckoutId(a.checkout_id))
+        throw unavailable();
+      const session = await request(
+        "checkout/sessions/" + encodeURIComponent(a.checkout_id) + "?expand[]=line_items",
+      );
+      if (session?.id !== a.checkout_id) throw unavailable();
+      return verified(session, a);
+    },
+  };
+}
