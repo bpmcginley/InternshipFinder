@@ -315,6 +315,8 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 
 ## WP-0.6 validation and coordination
 
+- WP-0.6 CI follow-up: Backend install steps timed out after pip succeeded in [#343 attempt 1](https://github.com/bpmcginley/InternshipFinder/actions/runs/43033106291/attempts/1) and [Product #341](https://github.com/bpmcginley/InternshipFinder/actions/runs/43033512226). The Backend and Python coverage jobs now reuse FFmpeg and FFprobe when both are present and cap the optional APT install at three minutes with a ten-second kill grace period. Both jobs still require pip and warn on optional installation failure. Offline Bash stubs passed six cases per job.
+
 - Product-session coordination read from PR #170 (`notes/product/HANDOFF.md` section 3 and the new refactor section 4 bullet). Refactor has structural right of way; inspect product draft PR claims before each wave. Before formatting, publish "Formatting PRs next" at the top of this tracker and allow a few hours for product PRs to clear. Do not alter product-owned work.
 - WP-0.1 merged as `9f739770`; [Pages run 42863632275](https://github.com/bpmcginley/InternshipFinder/actions/runs/42863632275) is green, including the publication boundary tests.
 - WP-0.6 adds Python 3.12/optional-backend-install and Node 22 composite actions. Sparse checkouts using a local action include `.github/actions`. Each of the 12 existing workflows uses shared setup. New wave-1 report workflows have separate owners and are not edited by this package.
