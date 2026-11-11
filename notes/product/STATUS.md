@@ -132,6 +132,10 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 
 [Draft #298](https://github.com/bpmcginley/InternshipFinder/pull/298) is based on exact #295 `a1f3c19c`. Preparation loads only the queued public snapshot pin, verifies exact bytes and matched role references, and rechecks the live lease after loading. The loader receives no address or link. The actual sender still needs a fresh guarded attempt. The producer, transport, owner integration and deployment remain pending.
 
+## P-2.1n dormant shared follow send budget
+
+[Draft #302](https://github.com/bpmcginley/InternshipFinder/pull/302) is based on exact #298 `e9a5a857`. Migration 0016 and equivalent legacy schema add one shared UTC-day attempt count with an explicit cap and monotonic clock fence. Local 424 Node and 60 D1 tests pass. Independent review, fresh CI, owner cap/quota, parent integration and deployment remain pending. [Contract](P-2.1n-follow-send-budget.md). No sender or outbox binding.
+
 ## Waiting for Bruce
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
@@ -142,6 +146,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | 2026-11-10 | P-2.1k dormant finalization worker merge | [Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286), stacked on #281. Local progress, deletion, rollback, malformed-data and migration tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender or deployment enabled. | - |
 | 2026-11-10 | P-2.1l empty-window progress | [#295](https://github.com/bpmcginley/InternshipFinder/pull/295), stacked on #286. Complete empty snapshots can advance exact current scopes without a digest job. Review, CI, parent integration and owner merge remain pending. | Draft needs-bruce |
 | 2026-11-10 | P-2.1m pinned digest preparation | [#298](https://github.com/bpmcginley/InternshipFinder/pull/298), stacked on #295. Preparation proves the pinned public snapshot and current lease. The sender still needs fresh consent and an owner-approved deployment. | Draft needs-bruce |
+| 2026-11-10 | P-2.1n shared follow send budget | [#302](https://github.com/bpmcginley/InternshipFinder/pull/302) adds a dormant UTC-day attempt budget with no configured default. Owner quota verification, cap and existing order-mail reserve, parent integration and deployment remain pending. | Draft needs-bruce, no sending activation |
 | 2026-11-10 | P-2.1j dormant enqueue worker merge | [Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281), stacked on #274 with #255 integrated. Local transaction/retention tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender, finalizer or deployment enabled. | - |
 | 2026-11-10 | P-2.1i dormant scope progress worker merge | [Draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274), stacked on #261. Local migration and legacy-schema checks pass; independent review, PR checks, parent integration and owner merge remain pending. No queue, sender or deployment is enabled. | - |
 =======
