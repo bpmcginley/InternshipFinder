@@ -1,3 +1,4 @@
+import "./employer-retention.test.js";
 // Lets `node --test worker/test/` run the whole folder (Node resolves a directory to index.js).
 import "./auth.test.js";
 import "./billing.test.js";
@@ -28,6 +29,8 @@ import "./social-video.test.js";
 // 2026-10-23: directory runs resolve this entry point; new sprint regressions must run in CI too.
 import "./employer-funnel.test.js";
 import "./employer-metrics.test.js";
+import "./employer-metrics-response.test.js";
+import "./employer-posting-report.test.js";
 import "./campaign-reports.test.js";
 import "./employer-revenue-cron.test.js";
 
@@ -39,6 +42,20 @@ import "./api-contract.test.js";
 import "./follows.test.js";
 import "./follow-management.test.js";
 import "./follow-outbox.test.js";
+import "./follow-retention.test.js";
+import "./follow-unsubscribe.test.js";
+import "./follow-mail.test.js";
+import "./follow-request-deletion.test.js";
+import "./follow-matching.test.js";
+import "./follow-progress.test.js";
+import "./follow-enqueue.test.js";
+import "./follow-send-budget.test.js";
+import "./follow-budgeted-attempt.test.js";
+import "./follow-finalization.test.js";
+import "./follow-archive-reader.test.js";
+import "./follow-archive-enqueue.test.js";
+import "./follow-digest-delivery.test.js";
+import "./follow-delivery-tick.test.js";
 
 import "./topup-ledger.test.js";
 import "./topup-decisions.test.js";
@@ -60,6 +77,11 @@ import "./session-copy-fence.test.js";
 import "./topup-session-copy-integration.test.js";
 import "./topup-checkout-service.test.js";
 import "./topup-checkout-http.test.js";
+
+import "./employer-catalog-cache.test.js";
+import "./employer-posting-counts.test.js";
+import "./employer-request-safe.test.js";
+
 import "./funded-run-admission.test.js";
 import "./funded-run-callbacks.test.js";
 import "./funded-run-sibling.test.js";
