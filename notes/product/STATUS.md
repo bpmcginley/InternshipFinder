@@ -4,6 +4,8 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
+- **P-2.3v native dashboard key claim:** isolated native row rendering/test/evidence package on `f73efa65`. Existing organic direct links may consume validated same-release public employer keys; saved-only/paid/Auto-Apply controls excluded. Classic assets, capture flag, shared golden/allowlist and live publication stay unchanged.
+
 - **P-2.3u employer publication adapter:** draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) on published `45ccddda` adds an explicit default-off publisher option. It captures the selected export once, validates same-release annotations/catalog, and renders from that captured input. Default 830-file golden is unchanged; opted-in synthetic output has 831 files and passes the publication allowlist. Full Python/growth and site Node suites pass; paired visual evidence is unchanged. Independent review/CI remain pending. No writer, workflow, browser activation or Worker configuration change.
 
 - **Verified employer runtime release:** main `b64bb927` was deployed at 19:01:09 UTC on November 11, 2026. Exact [Pages 43082660526](https://github.com/bpmcginley/InternshipFinder/actions/runs/43082660526) and [tests 43082660544](https://github.com/bpmcginley/InternshipFinder/actions/runs/43082660544) passed; all 4,984 App publication files were byte-identical. API probes and brand-video HEAD 200/range 206 passed. Maintenance was enabled separately; employer intake remains off. Scheduled cap proof is still pending.
