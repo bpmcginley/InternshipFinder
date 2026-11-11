@@ -323,6 +323,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - After [#380](https://github.com/bpmcginley/InternshipFinder/pull/380) published, Product released the two donor helpers and ten callers. On `a673000f`, `_row` and `_site` moved byte-for-byte into a test-only module. The original donor imports both names for existing callers. The ten released files use the new fixture path, and the campaign test drops its unused facade import. All other test statements, fixtures and monkeypatches are unchanged.
 - All 350 focused and Golden tests passed against the unchanged 794-file Golden. The 64 isolated growth tests also passed with facade imports and sockets blocked. The isolated harness reused the actual CI-event, private-state and Workday safety fixtures and omitted only the legacy near-page fixture. Product's retained advisor, fact-line and launch tests passed through the original aliases.
 
+## WP-6.2 discovery and link integration tests
+
+- Four discovery and link cases build with an explicit `BuildState(near_on=False)`, the canonical render hooks and the publisher writer. Their fixture bytes and assertions match the prior cases. The RSS cases pass the generated date from that state. The legacy sitemap-reader and widget, role-index and placement CLI cases still characterize their original entry points.
+- Offline legacy/canonical comparisons matched every file and ordered write across the sitemap, RSS discovery, LLMS and link fixtures. The four cases matched 20, 23, 35 and 86 files respectively. The generated link integration also passed with the facade and sockets blocked. The focused suite passed all 28 tests, including both Golden checks against 830 artifacts.
+
 ## WP-6.2 standalone Pages publisher
 
 - The Pages image adapter imports the standalone publisher only for `--site` and passes the existing landing-card renderer. The publisher uses a fresh `BuildState` for each run and explicit listing data, generation time and site settings for the downstream writers. The legacy CLI continues to serve compatibility callers.

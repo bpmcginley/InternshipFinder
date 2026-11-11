@@ -4,7 +4,8 @@ import json
 import shutil
 from pathlib import Path
 
-from internscout import feeds, seo_pages, site_links
+from internscout import feeds, site_links
+from tests.site_publish_fixture import write_site
 
 
 def put(root, path, text=""):
@@ -88,9 +89,8 @@ def test_generated_fixture_and_static_pages_have_direct_existing_destinations(tm
     )
     put(tmp_path, "data/listings/MA.json", json.dumps(listings))
     put(tmp_path, "data/majors.json", '{"majors":[]}')
-    pages = seo_pages.build(str(tmp_path))
-    seo_pages.write(str(tmp_path), pages)
-    feeds.write_all(str(tmp_path), pages, seo_pages.GENERATED)
+    pages, state = write_site(str(tmp_path))
+    feeds.write_all(str(tmp_path), pages, state.generated)
     report = site_links.audit(tmp_path)
     assert report["problems"] == []
     assert report["internal_references"] > 100
