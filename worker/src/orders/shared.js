@@ -25,3 +25,9 @@ export const MAX_START_DAYS = 90;    // the start day is today up to this many d
 export const CHECKOUT_HOLD_MS = 35 * 60_000;
 
 export const fieldsOf = (list) => (list.length ? list : ["other"]);
+
+export const UNVERIFIED_DAYS = 7;    // an order never confirmed is deleted after this
+export const CREDIT_DEFAULT_DAYS = 30;   // an unanswered unused-days offer becomes a refund after this
+
+export const money = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
+export const rolesWord = (n) => (n === 1 ? "1 role" : `${n} roles`);

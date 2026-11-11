@@ -22,19 +22,20 @@ import { bumpUnder } from "./limits.js";
 import { EMAIL, isBot } from "./leads.js";
 import { CHECKS, addDays, checkPlacement, createPlacement, dayOf, daysBetween, endPlacement, pausePlacement,
   refusePlacement, switchOn, updatePlacement } from "./placements.js";
-import { hex, hmacHex, sameHex, siteUrl, stripe } from "./billing.js";
+import { hex, sameHex, siteUrl, stripe } from "./billing.js";
 import { trySend, sendMail } from "./mail.js";
 import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
-import { CHECKOUT_HOLD_MS, DAYS, FIELD_CAP, LIMITS, LISTING_ID, MAX_START_DAYS, bad, conflict, fieldsOf, text } from "./orders/shared.js";
+import { CHECKOUT_HOLD_MS, CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, LIMITS, LISTING_ID, MAX_START_DAYS, UNVERIFIED_DAYS, bad, conflict, fieldsOf, money, rolesWord, text } from "./orders/shared.js";
 import { readShard, shardOf } from "./orders/roles.js";
-import { WORKER_URL } from "./public-config.js";
 import { busiest, fillPlacementFields, firstFit, fitAll, heldRoles, reserveCapacity, startDay } from "./orders/capacity.js";
+import { approvedMail, closedMail, creditMail, receivedMail, refusedMail, reviewMail, reviewSig, verifyMail } from "./orders/templates.js";
 
 export { listOrders } from "./orders/admin.js";
 export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
 export { readShard, shardOf } from "./orders/roles.js";
 export { availability, notePlacementFields } from "./orders/capacity.js";
-export { DAYS, FIELD_CAP, MAX_START_DAYS } from "./orders/shared.js";
+export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_START_DAYS, UNVERIFIED_DAYS } from "./orders/shared.js";
+export { TERMS_ARCHIVE, reviewSig } from "./orders/templates.js";
 
 // Prices in cents (Bruce, 2026-10-19: final). public_body is the price for a nonprofit or public body.
 export const PRICES = {
@@ -42,15 +43,11 @@ export const PRICES = {
   three: { roles: 3, cents: 6900, public_body_cents: 3500 },
 };
 export const TOKEN_HOURS = 48;       // the email link works this long
-export const UNVERIFIED_DAYS = 7;    // an order never confirmed is deleted after this
-export const CREDIT_DEFAULT_DAYS = 30;   // an unanswered unused-days offer becomes a refund after this
 // The terms an order accepts: docs/terms.html's "Last updated" day (tests/site/buy.test.mjs holds the two
 // together), and the clickwrap box exactly as docs/employers/buy/ shows it, stored on every order (legal
 // review round 4, 2026-10-19). was: "2026-10-19", and only the version was stored.
 export const TERMS_VERSION = "2026-10-20";
 export const TERMS_BOX = "I have read and accept the InternScout terms, including the section for employers, on behalf of my company, and I am authorized to accept them for it.";
-// Each published version of the terms is kept unchanged under a git tag terms-YYYY-MM-DD (ORDERS.md).
-export const TERMS_ARCHIVE = "https://github.com/bpmcginley/InternshipFinder/blob/terms-";
 export const MAX_ORDER_BYTES = 4_000;
 export const MAX_FORM_BYTES = 4_000;
 
@@ -62,8 +59,6 @@ const REMIND_AFTER_MS = 24 * 3600e3;
 export const PER_ADDRESS_PER_DAY = 5;
 export const ALL_PER_DAY = 100;
 const ALL = "order:*";
-// Where Bruce's review links point. The Worker's own address; API_URL overrides it (wrangler dev).
-const DEFAULT_API = WORKER_URL;
 
 // The site build drops a placement for these reasons when its role has gone (placement_runs.reason).
 export const CLOSE_REASONS = ["listing_gone", "closed", "url_changed", "deadline"];
@@ -116,11 +111,6 @@ function siteOnly(request) {
 
 // ---------------------------------------------------------------- small helpers
 
-const apiUrl = (env) => (env.API_URL || DEFAULT_API).replace(/\/+$/, "");
-const money = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
-const longDay = (day) => new Date(day + "T00:00:00Z").toLocaleDateString("en-US",
-  { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" });
-const rolesWord = (n) => (n === 1 ? "1 role" : `${n} roles`);
 const randomHex = (bytes) => hex(crypto.getRandomValues(new Uint8Array(bytes)));
 
 // The email link: 32 random bytes, base64url. Only its SHA-256 (hex) is stored.
@@ -139,8 +129,6 @@ async function tokenOk(token, hash) {
   return sameHex(await tokenHash(token), hash);
 }
 
-// The review link's signature: hex HMAC-SHA256 under ADMIN_TOKEN of "review:" + order id.
-export const reviewSig = (env, id) => hmacHex(env.ADMIN_TOKEN, "review:" + id);
 async function sigOk(env, id, sig) {
   if (typeof id !== "string" || !ORDER_ID.test(id) || typeof sig !== "string" || !/^[0-9a-f]{64}$/.test(sig)) return false;
   return sameHex(await reviewSig(env, id), sig);
@@ -970,113 +958,4 @@ async function defaultCredits(db, env, now, fetchImpl) {
       console.error("credit default failed:", e && e.name);
     }
   }
-}
-
-// ---------------------------------------------------------------- the emails (plain text)
-
-const sign = (env) => `\nInternScout\n${siteUrl(env)}\n`;
-const roleList = (roles) => roles.map((r) => `- ${r.title || r.t}${(r.location || r.loc) ? ", " + (r.location || r.loc) : ""}`).join("\n");
-
-function verifyMail(env, order, roles, token) {
-  const link = `${siteUrl(env)}/employers/buy/?order=${order.id}&t=${token}`;
-  return {
-    to: order.email, replyTo: env.REVIEW_TO,
-    subject: "Confirm your InternScout listing order",
-    text: `Hello ${order.name},\n\nYou asked to list ${rolesWord(roles.length)} from ${order.employer} on InternScout for ` +
-      `${DAYS} days from ${longDay(order.start_day)}:\n\n${roleList(roles)}\n\n` +
-      (order.pilot_code
-        ? "You entered a pilot code, so there is nothing to pay. Open this link within 48 hours to confirm the order:\n"
-        : `To confirm this address and go on to payment (${money(order.price)}), open this link within 48 hours:\n`) +
-      `${link}\n\nIf you did not ask for this, ignore this email. Nothing is charged, and the order is deleted after ` +
-      `${UNVERIFIED_DAYS} days.\n${sign(env)}`,
-  };
-}
-
-function receivedMail(env, order, roles) {
-  return {
-    to: order.email, replyTo: env.REVIEW_TO,
-    subject: `We have your InternScout listing order ${order.id}`,
-    text: `Hello ${order.name},\n\nWe have your order ${order.id}: ${rolesWord(roles.length)} from ${order.employer}, ` +
-      `${DAYS} days each from ${longDay(order.start_day)}.\n\n${roleList(roles)}\n\n` +
-      (order.pilot_code ? "This is a pilot order, so there is nothing to pay.\n\n"
-        : `You paid ${money(order.paid_amount)}. Stripe emails your receipt and invoice separately.\n\n`) +
-      "We review every order within 2 business days and email you when it is approved. If we can't list a role, " +
-      "we refund the full amount and tell you why. Until we approve it, you can cancel it for a full refund by " +
-      "replying to this email.\n\n" +
-      `You accepted the InternScout terms, including the section for employers, as they read on ${longDay(order.terms_version)} ` +
-      `(version ${order.terms_version}):\n${siteUrl(env)}/terms.html#employers\n` +
-      `A copy of that version, kept unchanged: ${TERMS_ARCHIVE}${order.terms_version}/docs/terms.html#employers\n\n` +
-      "If you have a question, reply to this email.\n" + sign(env),
-  };
-}
-
-async function reviewMail(env, order, roles, reminder) {
-  const link = `${apiUrl(env)}/employer/review?order=${order.id}&sig=${await reviewSig(env, order.id)}`;
-  return {
-    to: env.REVIEW_TO,
-    subject: `${reminder ? "Reminder: still waiting, " : "Review "}listing order ${order.id}: ${order.employer}`,
-    text: (reminder ? `Order ${order.id} has waited more than a day for your decision.\n\n` : `Order ${order.id} waits for your decision.\n\n`) +
-      `Employer (role index): ${order.employer}\nCompany typed: ${order.company}\nContact: ${order.name}, ${order.email} ` +
-      `(domain ${order.email_domain})\nNonprofit or public body: ${order.public_body ? "yes, claimed" : "no"}\n` +
-      `Package: ${order.package}, ${rolesWord(roles.length)}\nPaid: ${money(order.paid_amount)} (${order.paid_ref})\n` +
-      `Start: ${order.start_day}\n\nRoles:\n${roles.map((r) => `- ${r.title}: ${r.apply_url}`).join("\n")}\n\n` +
-      `Approve or refuse here:\n${link}\n`,
-  };
-}
-
-function approvedMail(env, order, done) {
-  return {
-    to: order.email, replyTo: env.REVIEW_TO,
-    subject: `Your InternScout listing order ${order.id} is approved`,
-    text: `Hello ${order.name},\n\nYour order ${order.id} is approved. These roles show in a separate, labelled box on ` +
-      "InternScout on these days (UTC):\n\n" +
-      done.map(({ role, p }) => `- ${role.title}: ${longDay(p.start_day)} through ${longDay(addDays(p.end_day, -1))}`).join("\n") +
-      "\n\nThey appear once the site next updates. Paying does not change where any listing ranks or how it is scored. " +
-      "If a role closes early, we email you about its unused days.\n" + sign(env),
-  };
-}
-
-function refusedMail(env, order, reason, refunded) {
-  return {
-    to: order.email, replyTo: env.REVIEW_TO,
-    subject: `Your InternScout listing order ${order.id}`,
-    text: `Hello ${order.name},\n\nWe are not able to list order ${order.id}. The reason: ${reason}\n\n` +
-      (refunded > 0
-        ? `We refunded the full amount, ${money(refunded)}, to the card you paid with. Stripe says a refund usually shows within 5 to 10 business days.\n\n`
-        : order.pilot_code ? "This was a pilot order, so there was nothing to pay or refund. Your pilot code can be used again.\n\n"
-        : "Nothing was charged, so there is nothing to refund.\n\n") +
-      "If you have a question, reply to this email.\n" + sign(env),
-  };
-}
-
-function closedMail(env, order, role, first, unused, amount, credit) {
-  const head = `Hello ${order.name},\n\n${role.title} (order ${order.id}) stopped appearing on InternScout on ${longDay(first)}, ` +
-    "because the posting closed, moved to a new address or passed its deadline. So its paid listing has ended.\n\n";
-  if (!credit) {
-    return { to: order.email, replyTo: env.REVIEW_TO, subject: "Your InternScout listing has ended early",
-      text: head + (order.pilot_code ? "It was a pilot listing, so there is nothing to refund.\n" : "There is nothing left to refund.\n") +
-        "\nIf the role is open again at a new address, reply to this email.\n" + sign(env) };
-  }
-  const link = `${siteUrl(env)}/employers/buy/?credit=${credit.id}&t=${credit.token}`;
-  const by = longDay(addDays((credit.offer_sent_at || credit.created).slice(0, 10), CREDIT_DEFAULT_DAYS));
-  return {
-    to: order.email, replyTo: env.REVIEW_TO,
-    subject: "Your InternScout listing ended early: choose a refund or a credit",
-    text: head + `${unused} of its ${DAYS} days were not used. They are worth ${money(amount)}. You can choose:\n\n` +
-      `- a refund of ${money(amount)} to the card you paid with, or\n- a one-time promotion code worth ${money(amount)} for a future listing order.\n\n` +
-      `Choose here: ${link}\n\nIf you do not choose by ${by}, we refund it.\n` + sign(env),
-  };
-}
-
-function creditMail(env, order, credit, kind) {
-  const text = kind === "credit"
-    ? `Your promotion code is ${credit.promotion_code}\n\nIt is worth ${money(credit.amount)} off one future InternScout listing ` +
-      "order and works once. Enter it on the Stripe payment page.\n"
-    : (kind === "default" ? `You did not choose within ${CREDIT_DEFAULT_DAYS} days, so we refunded the unused days. ` : "") +
-      `We refunded ${money(credit.amount)} to the card you paid with. Stripe says a refund usually shows within 5 to 10 business days.\n`;
-  return {
-    to: order.email, replyTo: env.REVIEW_TO,
-    subject: kind === "credit" ? "Your InternScout promotion code" : "We refunded your unused InternScout listing days",
-    text: `Hello ${order.name},\n\n${text}` + sign(env),
-  };
 }
