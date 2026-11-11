@@ -7,10 +7,12 @@ No explicit year -> mapped from the repo's cycle_years by season.
 
 from __future__ import annotations
 import json
+import logging
 import re
 from .base import client
 from .common import ScanCounts, report_source
 from ..config import GITHUB_LISTS, PROFILE
+from ..console_log import console
 
 
 def _parse(
@@ -74,7 +76,11 @@ def fetch_github_lists(lists=None, report=None) -> list[dict]:
                 counts.reported(len(payload))  # the file is the whole list
                 items = _parse(payload, spec["source"], spec["cycle_years"], counts)
             except Exception as e:
-                print(f"[github_lists] {spec['source']} failed: {e}")
+                console(
+                    f"[github_lists] list fetch failed: {type(e).__name__}",
+                    level=logging.WARNING,
+                    exception_type=type(e).__name__,
+                )
                 report_source(report, spec["source"], error=e)
                 continue
             results.extend(items)

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from datetime import date, datetime
+import logging
 from .base import client
 from .common import ScanCounts, board_item, html_to_text, report_source
 from ..classify import is_internship
@@ -92,7 +93,11 @@ def fetch_nyc_jobs(report=None) -> list[dict]:
                 counts.stop("row_limit")  # one request, filled: older matches may be cut off
             out = parse_nyc_jobs(rows, counts=counts)
     except Exception as e:
-        print(f"[nyc_jobs] failed: {e}")
+        console(
+            f"[nyc_jobs] failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
         report_source(report, "nyc_jobs", error=e)
         return []
     console(f"[nyc_jobs] {len(out)} student postings")

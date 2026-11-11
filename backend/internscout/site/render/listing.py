@@ -180,6 +180,7 @@ def listing_body(
     listing_rows: Callable[..., str],
     chart_figure: Callable[..., str],
     esc: Callable[[str], str],
+    export_stamp: datetime | None = None,
 ) -> str:
     more = len(items) - per_page
     order = "newest" if state else "newest, Northeast and remote first,"
@@ -198,8 +199,13 @@ def listing_body(
         if detail_count
         else ""
     )
+    dated = (
+        f"As of {export_stamp:%B} {export_stamp.day}, {export_stamp.year}, InternScout lists "
+        if export_stamp is not None
+        else ""
+    )
     return (
-        f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>"
+        f"<p class=\"lede\">{esc(dated)}{summary(items, what, where, tail, about)}</p>"
         + fits_line(fits or [])
         + extra
         + f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"

@@ -126,13 +126,16 @@ test("U4: sign-in is asked for only on InternScout's AI once known signed out, a
   assert.equal(readAfterSignIn(S({ files: { resume: null } })), false);
 });
 
-test("U4: the pages use them: Setup's step tick, its Next label and warning, the Files sign-in and its read", () => {
+test("U4 and P-3.3: resume first, with sign-in before reading on InternScout's AI", () => {
   const onb = read("onboarding/onboarding.js");
   assert.match(onb, /setup: setupDone\(S, signedIn\),/);
-  assert.match(onb, /navButtons\(null, "files", "Next: add your resume"\)/);
+  assert.match(onb, /explicitStep \? requestedStep : rerun \? "review" : "files"/);
+  assert.match(onb, /navButtons\(null, "files", "Add your resume"\)/);
   assert.match(onb, /You aren't signed in yet\. Reading your resume and Auto-Apply both need it, so sign in above first\./);
   assert.match(onb, /<div id="files-signin" hidden><\/div>/);
-  assert.match(onb, /if \(inp\.dataset\.slot === "resume" && hasKey\(S\) && !signInNeeded\(S, signedIn\)\) extract/);
+  assert.match(onb, /box\.hidden = !S\.files\.resume \|\| !signInNeeded\(S, signedIn\)/);
+  assert.match(onb, /hasKey\(S\) && \(!isWorker\(S\.ai\) \|\| signedIn === true\)/);
+  assert.match(onb, /queuedResume = S\.files\.resume/);
   assert.match(onb, /if \(readAfterSignIn\(S, \{ extracting, pending: !!pendingResumeImport \}\)\) extract/);
   assert.match(onb, /refreshSignIn\(\);\s*$/);
 });
