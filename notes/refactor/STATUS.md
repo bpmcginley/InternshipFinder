@@ -314,6 +314,12 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - After [#380](https://github.com/bpmcginley/InternshipFinder/pull/380) published, Product released the two donor helpers and ten callers. On `a673000f`, `_row` and `_site` moved byte-for-byte into a test-only module. The original donor imports both names for existing callers. The ten released files use the new fixture path, and the campaign test drops its unused facade import. All other test statements, fixtures and monkeypatches are unchanged.
 - All 350 focused and Golden tests passed against the unchanged 794-file Golden. The 64 isolated growth tests also passed with facade imports and sockets blocked. The isolated harness reused the actual CI-event, private-state and Workday safety fixtures and omitted only the legacy near-page fixture. Product's retained advisor, fact-line and launch tests passed through the original aliases.
 
+## WP-6.2 standalone Pages publisher
+
+- The Pages image adapter imports the standalone publisher only for `--site` and passes the existing landing-card renderer. The publisher uses a fresh `BuildState` for each run and explicit listing data, generation time and site settings for the downstream writers. The legacy CLI continues to serve compatibility callers.
+- Offline comparisons on the current Product and native Core baseline matched all 808 normal artifacts, 742 ordered writes, the placement report and console output. The run without placements matched 807 artifacts and 740 writes. The malformed placement and unwritable report case matched 808 artifacts and 742 writes. All runs used Git-pinned Core stamping and passed the publication allowlist.
+- The new publisher ran with the legacy facade blocked. The no-placement case also blocked the placement-service import. The `--site` regression exercises card generation, the dashboard share map and role index with sockets blocked. The advisor pages matched the default-off baseline. The direct no-argument commands also matched 527 files and console bytes. The offline targeted suite passed 351 tests and 14 subtests, with two Windows symlink skips.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
