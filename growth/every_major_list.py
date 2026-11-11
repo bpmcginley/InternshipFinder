@@ -39,6 +39,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 import digest  # noqa: E402
 
 TERM = "Summer 2027"
@@ -376,9 +377,10 @@ def main(argv: list[str]) -> None:
     files = build(args.site, live, args.repo)
     write(args.out, files)
     size = len(files["README.md"].encode("utf-8"))
-    print(
-        f"[list] wrote README.md ({size:,} bytes) and {len(files) - 1} field files into {args.out}"
-    )
+    message = f"[list] wrote README.md ({size:,} bytes) and {len(files) - 1} field files"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+        message += f" into {args.out}"
+    console(message)
 
 
 if __name__ == "__main__":

@@ -15,10 +15,15 @@ Without --submit it only prints what it would send.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from internscout.console_log import console  # noqa: E402
 
 HOST = "internscout.org"
 # Public by design: the engines fetch https://internscout.org/<KEY>.txt (docs/<KEY>.txt) and send
@@ -84,12 +89,13 @@ def main(argv: list[str]) -> int:
         return 2
     old, new = entries(args[0]), entries(args[1])
     if not new:
-        print(f"[indexnow] {args[1]} has no URLs; nothing sent")
+        target = "new sitemap" if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json" else args[1]
+        console(f"[indexnow] {target} has no URLs; nothing sent")
         return 0
     urls = changed(old, new)
     added = sum(1 for u in urls if u not in old)
     gone = sum(1 for u in urls if u not in new)
-    print(
+    console(
         f"[indexnow] {len(urls)} changed: {added} new, {gone} removed, {len(urls) - added - gone} updated"
     )
     if urls and "--submit" in argv:
@@ -97,7 +103,7 @@ def main(argv: list[str]) -> int:
         # job red so it is visible and retryable. was: report the codes and always exit zero.
         # Revert: remove the accepted() branch to restore best-effort, non-signalling submission.
         statuses = submit(urls)
-        print(f"[indexnow] submitted, HTTP {statuses}")
+        console(f"[indexnow] submitted, HTTP {statuses}")
         if not accepted(statuses):
             print(
                 "::error::IndexNow did not accept every batch; the site deployed, but recrawl notification needs attention"
