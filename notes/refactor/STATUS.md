@@ -259,6 +259,8 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | G2 | WP-0.3 formatting | Original 16:00 Eastern and empty-queue restrictions superseded by Bruce's explicit 2026-11-10 instruction to finish queued PRs and proceed now. | Continue file ownership, separate worktrees, independent review, green CI and Pages gates. |
 | G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | No cutover yet; observation clock has not started. |
 
+Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held pending GitGuardian classification of an inherited historical generic alert. All 75 parsed description records match between the historical and current shards after accounting for byte order. Scanner disposition and published data are untouched.
+
 ## Waiting for deploy
 
 - [PR #239](https://github.com/bpmcginley/InternshipFinder/pull/239), merged as `4c78a8a2`: the remaining order module and test split awaits Bruce's Worker deployment.
