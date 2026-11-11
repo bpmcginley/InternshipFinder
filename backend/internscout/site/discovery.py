@@ -74,8 +74,6 @@ def write_robots(site_dir: str, site: str) -> None:
 
 
 def live_paths(sitemap: str, site_path: re.Pattern[str]) -> dict[str, str]:
-    """path -> lastmod ("" if none) for every page in the sitemap the site was serving before this
-    build; empty if there was none."""
     try:
         with open(sitemap, encoding="utf-8") as f:
             text = f.read()

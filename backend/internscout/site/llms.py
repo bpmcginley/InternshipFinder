@@ -36,11 +36,6 @@ def llms_files(
     top: Callable[[Counter, int], list],
     word_list: Callable[[list[str]], str],
 ) -> dict[str, str]:
-    """The two llmstxt.org files: llms.txt, an H1, a one-paragraph summary and lists of links to the
-    pages that matter; llms-full.txt, the longer description an assistant can quote from. made is
-    every page this build wrote (path -> (heading, open roles)), so neither links a page that isn't
-    there. Dated from the data, like everything else a build writes."""
-
     def link(path: str, label: str | None = None, note: str = "") -> str:
         return f"- [{label or made[path][0]}]({site}{path})" + (f": {note}" if note else "")
 

@@ -34,7 +34,8 @@ from urllib.parse import quote, urlparse
 
 from . import near_metros
 from .console_log import console
-from .site import discovery, llms
+from .site import discovery as _discovery
+from .site import llms as _llms
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
     MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
@@ -4043,8 +4044,11 @@ def llms_files(
     new: int,
     updated: str,
 ) -> dict[str, str]:
-    """Render LLMS text with the current SEO build configuration."""
-    return llms.llms_files(
+    """The two llmstxt.org files: llms.txt, an H1, a one-paragraph summary and lists of links to the
+    pages that matter; llms-full.txt, the longer description an assistant can quote from. made is
+    every page this build wrote (path -> (heading, open roles)), so neither links a page that isn't
+    there. Dated from the data, like everything else a build writes."""
+    return _llms.llms_files(
         f,
         made,
         rep,
@@ -5751,9 +5755,9 @@ def write(site_dir: str, pages: list[dict]) -> None:
     now = GENERATED or datetime.now(timezone.utc)  # was: now = datetime.now(timezone.utc)
     with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(not_found(f"{now:%B} {now.day}, {now.year}"))
-    discovery.write_sitemap(site_dir, pages, home_lastmod, SITE, esc)
-    discovery.write_robots(site_dir, SITE)
-    llms.write(site_dir, TEXTS)
+    _discovery.write_sitemap(site_dir, pages, home_lastmod, SITE, esc)
+    _discovery.write_robots(site_dir, SITE)
+    _llms.write(site_dir, TEXTS)
     page_dates.write(site_dir, content_dates)  # 2026-10-23: persist hashes, not page membership.
     # The thin pages this deploy serves (INDEX_COMBO), for the next deploy's held_paths (2026-10-13).
     with open(os.path.join(site_dir, HELD_FILE), "w", encoding="utf-8", newline="\n") as f:
@@ -5779,8 +5783,9 @@ def write(site_dir: str, pages: list[dict]) -> None:
 
 
 def live_paths(sitemap: str) -> dict[str, str]:
-    """Read the prior sitemap using the current site-path matcher."""
-    return discovery.live_paths(sitemap, SITE_PATH)
+    """path -> lastmod ("" if none) for every page in the sitemap the site was serving before this
+    build; empty if there was none."""
+    return _discovery.live_paths(sitemap, SITE_PATH)
 
 
 SITE_PATH = re.compile("^" + re.escape(SITE))

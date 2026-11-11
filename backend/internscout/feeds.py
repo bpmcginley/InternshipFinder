@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 
 from . import seo_pages as sp
-from .site import rss as site_rss
+from .site import rss as _site_rss
 
 ITEMS = 25  # newest roles per feed; readers and bots only look at what is new since last time
 
@@ -42,7 +42,7 @@ def rss(
     state: str | None = None,
     limit: int | None = ITEMS,
 ) -> str:
-    return site_rss.rss(
+    return _site_rss.rss(
         path,
         h1,
         items,
@@ -64,4 +64,4 @@ def write_all(site_dir: str, pages: list[dict], now: datetime | None = None) -> 
     Dated from the data (seo_pages.GENERATED, set by build), not the clock: lastBuildDate is when a
     feed's content last changed, and a clock date made every feed a new file on every deploy."""
     now = now or sp.GENERATED or datetime.now(timezone.utc)  # was: now = datetime.now(timezone.utc)
-    return site_rss.write_all(site_dir, pages, now, rss, ITEMS)
+    return _site_rss.write_all(site_dir, pages, now, rss, ITEMS)
