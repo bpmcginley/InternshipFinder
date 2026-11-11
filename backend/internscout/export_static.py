@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlsplit
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+from .console_log import console
 from .db import SessionLocal, init_db
 from .models import Listing, Application
 from .seo_pages import baseline_day, canada_first_scan, placeholder_pay
@@ -861,34 +862,44 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
         os.remove(legacy)
     _dump(stats, os.path.join(out_dir, "stats.json"), indent=2)
     _dump(majors_export(), os.path.join(out_dir, "majors.json"))
-    print(
+    console(
         f"[export] {carried} of {len(listings)} listings kept a first-seen date from the "
         f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days"
     )
-    print(
+    console(
         f"[export] {held} listings held from the last export because their board came back "
         f"with half or less of what it had"
     )
-    print(
+    console(
         f"[export] {closed} listings from the last export left the site because a complete "
         f"scan of their board this run did not find them "
         f"({len(canonical(completed_boards))} boards read to the end)"
     )
     index = write_shards(listings, out_dir, generated_at)
     unplaced = [x for x in listings if not shard_keys(x)]
-    print(
+    json_log = os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json"
+    written = (
         f"[export] wrote {len(listings) - len(unplaced)} listings "
-        f"({len(index['files'])} state files) to {out_dir}"
+        f"({len(index['files'])} state files)"
     )
+    console(written if json_log else f"{written} to {out_dir}")
     if unplaced:
-        print(
+        message = (
             f"[export] {len(unplaced)} listings name no US location today's rules can place, so "
-            f"they are in no state file and the site cannot show them: "
-            + "; ".join(
-                f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
-                for x in unplaced[:5]
-            )
+            "they are in no state file and the site cannot show them"
         )
+        if json_log:
+            # Keep raw employer and location samples out of the structured record.
+            console(message)
+        else:
+            console(
+                message
+                + ": "
+                + "; ".join(
+                    f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
+                    for x in unplaced[:5]
+                )
+            )
     return stats
 
 
