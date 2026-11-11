@@ -51,6 +51,10 @@ test("unsubscribe bounds streaming bytes independently of Content-Length", async
   const headers = { "Content-Type": FORM_TYPE };
   const db = { prepare: () => ({ bind: () => ({ run: async () => ({ meta: { changes: 0 } }) }) }) };
   assert.equal((await handleFollowUnsubscribe(form(bodyOf(4096), headers), db, TOKEN)).status, 204);
+  assert.equal(
+    (await handleFollowUnsubscribe(form(bodyOf(4097), headers), noDb, TOKEN)).status,
+    400,
+  );
 
   let cancelled = false;
   const stream = new ReadableStream({
