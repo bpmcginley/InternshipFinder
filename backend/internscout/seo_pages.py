@@ -802,8 +802,9 @@ def listing_body(
     faq: str = "",
     signup: str = "",
     details: dict | None = None,
+    export_stamp: datetime | None = None,
 ) -> str:
-    return _legacy_call(_runtime.listing_body, items, what, where, now, related, state, dash, fits, here, tail, about, extra, src, faq, signup, details)
+    return _legacy_call(_runtime.listing_body, items, what, where, now, related, state, dash, fits, here, tail, about, extra, src, faq, signup, details, export_stamp=export_stamp)
 
 
 long_day = _runtime.long_day

@@ -75,6 +75,7 @@ def render_field(
             src="seo-field",
             faq=faq_section(qa),
             signup=signup_form(pitch, t),
+            export_stamp=model.context.export_stamp,
         ),
         "items": items,
         "ld": [faq_ld(qa)],

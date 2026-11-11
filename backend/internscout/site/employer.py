@@ -44,6 +44,7 @@ class Page:
     own_links: bool
     thin: bool
     details: dict[str, tuple[tuple[str, str], ...]] | None
+    export_stamp: datetime | None = None
 
 
 def select_links(
