@@ -65,9 +65,15 @@ jobs:
       - uses: ./.github/actions/python
         if: steps.token.outputs.ready == 'true'
 
+      - name: Select public listing data
+        id: public-data
+        if: steps.token.outputs.ready == 'true'
+        uses: ./.github/actions/public-data
+
       - name: Build the list
         if: steps.token.outputs.ready == 'true'
         env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
           # A backstop, as in pages.yml: the build breaks every tie itself.
           PYTHONHASHSEED: "0"
         # The live sitemap tells seo_pages which pages the site serves now, so every field page the list
