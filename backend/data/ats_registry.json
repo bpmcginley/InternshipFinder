@@ -3900,6 +3900,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "chukmedia": {
+   "name": "ChukMedia",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "civisanalytics": {
    "name": "Civis Analytics",
    "quant": false,
@@ -11630,6 +11636,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "exacare-inc": {
+   "name": "exacare ai",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "fluidai-medical-careers": {
    "name": "NERv Technology Inc. D.B.A. FluidAI Medical",
    "quant": false,
@@ -12750,6 +12762,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "aaregional|wd503|search": {
+   "name": "Piedmont Airlines",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "aba|wd1|aba": {
    "name": "American Bankers Association",
    "quant": false,
@@ -13815,9 +13833,8 @@
   "beigene|wd5|beigene": {
    "name": "BeOne",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-11"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "belk|wd1|careers": {
    "name": "Belk",
@@ -17102,8 +17119,9 @@
   "marmon|wd501|Marmon_MSIP_Internships": {
    "name": "Marmon Holdings",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-11"
   },
   "mars|wd3|external": {
    "name": "Mars",
@@ -17995,12 +18013,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "pacificlife|wd1|PacificLifeCareers": {
-   "name": "Pacific Life",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-26"
   },
   "pae|wd1|amentum_careers": {
    "name": "Amentum",
