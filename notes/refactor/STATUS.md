@@ -380,6 +380,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
 - All 65 marked tests passed with the root fixtures active, strict marker checking, and the facade and sockets blocked. The full offline backend and growth suite on `b3b3d049` passed 1,865 tests and 11 subtests with eight local or optional skips. After feed defaults [#411](https://github.com/bpmcginley/InternshipFinder/pull/411), the 65 standalone cases, both lazy cases, and 35 combined feed, widget, near-page and Golden checks passed. The Node 22 Worker suite passed all 726 tests.
 
+## WP-6.2 page-date tests
+
+- Page-date tests read the live sitemap before each publishing build and write using that build's canonical state and hooks. Comparison dates and the near-page exception use the existing state settings. The pricing-copy correction uses the existing pricing hook. The numeric page path resolves to the same constant.
+- Offline legacy and canonical runs matched all 39 assertions, all 1,412 ordered page records across 42 builds, 40 sitemap reads and publication snapshots, 811 ordered writes and 428 final fixture files. Each snapshot contained identical sitemap and date-manifest bytes. All 31 cases passed with real root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 134 focused cases included both Golden checks against all 836 artifacts.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
@@ -485,6 +490,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Validation: full backend suite **1,484 passed, two known optional-dependency skips** in 198.20s; standalone golden build matched all **695 files** without refresh; Ruff correctness checks passed. The move-content audit verified all 24 files against Git blobs, allowing only the two exact path substitutions; all three relative Markdown links and four external review references resolve. DB/models/schemas remain byte-identical. Remaining legacy-name search matches are historical notes and FastAPI classification vocabulary. `git diff --check` passed. Final CI and independent review remain required.
 
 - Final integration: normally merged recovered main `e009644f`, including automated data refresh `79e85` and the product recovery ledger. Approved deletions, dependency removals, archive moves and six path repairs are unchanged. Current data and product files match recovered main exactly. Product #197 recovery Pages run 42896131695 and its exact-commit backend check are verified green. Fresh final-head CI/review remain required before lead merge.
+
+## WP-6.2 role-index tests
+
+- The role-index suite uses the canonical location formatter, standalone build and publisher CLI. Its integration test scopes the original near-page setting and fixed October 19 UTC day to the same three builds and two publisher runs. The role fixtures, build-alone check, date and shard assertions stay intact.
+- The offline comparison matched all 26 assertions, 21 ordered page records, 65 ordered writes, all 62 fixture files and console output. All three build phases wrote no files, and both publisher runs passed identical role-index and widget inputs with the fixed day. All 11 cases passed with the real root fixtures, strict markers, and the facade and sockets blocked. The 26 focused tests included both Golden checks against all 836 artifacts.
 
 ## WP-4.1 local migration preparation
 
