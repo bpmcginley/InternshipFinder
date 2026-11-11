@@ -3,7 +3,7 @@
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { hasHostAccess, hostOf } from "../lib/hosts.js";
-import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, hasLocalResume, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
+import { loadStore, updateStore, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, hasLocalResume, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
@@ -17,69 +17,14 @@ import "../agent/guard.js";
 import { pageGone, postingGone, pageBulk, deadPage } from "./page-state.js";
 export { pageGone, postingGone, pageBulk, deadPage };
 
+import { TOOLS, trimHistory, toolResult, buildSystem } from "./agent-prompt.js";
+import { MAX_FIELD_FAILS, formatSnapshot, preFilledLine, NO_PROGRESS_HELP, freshProgress, progressCheck, pageKey } from "./agent-snapshot.js";
+export { TOOLS, trimHistory, buildSystem };
+export { formatSnapshot, preFilledLine, SAME_SNAPSHOTS_MAX, TURNS_PER_PAGE_MAX, NO_PROGRESS_HELP, freshProgress, progressCheck } from "./agent-snapshot.js";
+
 const MAX_STEPS = 40;
-const MAX_FIELD_FAILS = 3;
 const PAGE_FILES = ["agent/guard.js", "agent/actions.js", "agent/dom.js"];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const RULES = `You are InternScout's application agent. You operate a real browser tab to complete an internship application for the candidate below, one page at a time, up to but NEVER including the final submission.
-
-HOW IT WORKS
-- Each turn you get a SNAPSHOT: fields ([ref] kind *required "label" = current value, options), buttons, headings, errors. Act with tools using refs from the LATEST snapshot. You may call several tools in one turn; they run in order, then you get a fresh snapshot.
-- Contact fields may already be filled by a fast pre-fill; check values and fix anything wrong.
-
-FILLING
-- Fill every field the profile supports, required and optional. Leave optional fields blank only when nothing in the profile fits.
-- Use the candidate's real facts only. Never invent employers, dates, GPAs, awards, skills, or links. If a REQUIRED answer is missing and cannot be reasonably derived, call ask_user (one clear question).
-- Choice fields (select, react_select, listbox, combobox, radio_group): pass the option text that matches the profile's meaning. If a select fails, the result lists real options; retry with one of them. A react_select marked searchable loads options from a search (school, city, discipline): pass the full proper name, e.g. the school's official name.
-- Work authorization and visa sponsorship are different questions. Read each label carefully.
-- EEO / demographic / veteran / disability questions: use the profile facts (default "decline to self-identify").
-- Dates: match the field format (type=date needs YYYY-MM-DD; month/year splits need separate values).
-- Uploads: use upload with resume for resume/CV fields; cv, transcript, cover_letter when those files exist. If a cover letter file is required but missing and there is a text box, write one instead.
-- Free-text questions (why this company, describe a project, cover letter text, additional info): write in the candidate's VOICE, grounded in their stories/experience and the job description. Specific, honest, plain, no clichés or filler. Default 80-180 words; respect any character or word limit. Never mention being an AI.
-
-NAVIGATION
-- On a job description page, click Apply / Apply now / I'm interested.
-- On Workday prefer "Apply Manually" (or "Autofill with Resume" only if manual is absent). After finishing a page click Next / Continue / Save and Continue.
-- "Add" buttons (Add Work Experience, Add Education) open sub-forms; add the candidate's entries (most recent first, at most 3 jobs and all current schools).
-- If validation errors appear, fix them before moving on.
-
-ACCOUNTS
-- If the site needs an account, follow the ACCOUNT line: sign in if one exists, otherwise create one with the given email. Use fill_secret for EVERY password and confirm-password field; never type a password with fill. Tick required account terms/privacy checkboxes.
-- Always take the email route ("Sign in with email", "Use your email"), never "Sign in with Google/Apple/LinkedIn/Facebook". Those need the student's own Google or Apple password, which InternScout does not have and must never ask for, and they open the provider's own window where nothing here can follow.
-- Email verification, SMS or 2FA → pause_for_user with a short instruction.
-- CAPTCHA PRESENT on a form: it is the human's to solve at submit time. Fill everything else, then call ready_to_submit and put "solve the CAPTCHA" in double_check. Only pause_for_user if the CAPTCHA must be solved before you can continue (e.g. before Next or Sign in).
-
-FINISHING
-- The final submit button is reserved for the human and is blocked in code. Buttons marked BLOCKED must not be clicked.
-- The final button is not always called Submit. Once the application has answers in it, a button saying Apply, Send, Finish, Done or Confirm on the last page or a review page is the final one: never click it, call ready_to_submit.
-- An empty or unconfirmed factual profile value is UNKNOWN. Ask the student for required eligibility answers; never infer authorization, sponsorship, citizenship, age, or consent from a resume or other facts.
-- When all pages are complete and only final submission remains (review page, or the last page whose main button is Submit), call ready_to_submit with a one-line summary and anything worth double-checking.
-- If stuck (same page three times with no progress, broken widget, site error, page not an application), call pause_for_user and say what the human should do.
-Keep any text outside tool calls to one short line.`;
-
-export const TOOLS = [
-  { name: "fill", description: "Type text into a text/textarea/rich_text field (also works for choice fields by option text).",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, text: { type: "string" } }, required: ["ref", "text"] } },
-  { name: "select", description: "Choose an option in a select, react_select, listbox, combobox or radio_group by visible option text.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, option: { type: "string" } }, required: ["ref", "option"] } },
-  { name: "check", description: "Set a checkbox on or off.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, checked: { type: "boolean" } }, required: ["ref", "checked"] } },
-  { name: "upload", description: "Attach one of the candidate's saved files to a file field.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, file: { type: "string", enum: ["resume", "cv", "transcript", "cover_letter"] } }, required: ["ref", "file"] } },
-  { name: "click", description: "Click a button or link (Apply, Next, Continue, Add, Sign in, Create account). Final submit buttons are blocked.",
-    input_schema: { type: "object", properties: { ref: { type: "string" } }, required: ["ref"] } },
-  { name: "fill_secret", description: "Fill a password or confirm-password field with the stored account password for this site. The password is never shown to you.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, secret: { type: "string", enum: ["account_password"] } }, required: ["ref", "secret"] } },
-  { name: "wait", description: "Wait for the page to load or a spinner to finish.",
-    input_schema: { type: "object", properties: { seconds: { type: "number" } }, required: ["seconds"] } },
-  { name: "ask_user", description: "Ask the human for a missing fact needed to answer a required question. The job pauses until they answer.",
-    input_schema: { type: "object", properties: { question: { type: "string" }, why: { type: "string" } }, required: ["question"] } },
-  { name: "pause_for_user", description: "Hand control to the human (CAPTCHA, email verification, 2FA, broken page, anything you cannot do).",
-    input_schema: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } },
-  { name: "ready_to_submit", description: "Everything is filled and only the final submit remains. Ends the run.",
-    input_schema: { type: "object", properties: { summary: { type: "string" }, double_check: { type: "array", items: { type: "string" } } }, required: ["summary"] } },
-];
 
 // ---------- tab + page plumbing ----------
 async function ensureTab(job) {
@@ -207,82 +152,6 @@ async function act(tabId, fullRef, action, payload) {
   }
 }
 
-// A dropdown that already holds an answer only needs its option count: the model reads the value, and
-// a full list of countries or schools repeated on every step was a large share of each snapshot. An
-// empty one, or one that has failed, keeps its list, because those are the ones the model must choose for.
-const LISTED_CHOICES = ["select", "react_select"];
-const hasValue = (v) => v !== undefined && v !== null && v !== "" && v !== false;
-// A native <select> whose placeholder option carries a value ("-1", "0") reads back as "Select One"
-// (dom.js valueOf), yet it holds no answer and its real options are what the model needs. Close
-// to the test dom.js uses to drop that option from the list, with a word boundary so "Selected" is an answer.
-const PLACEHOLDER_VALUE = /^[-–—.\s]*(select|choose|please select)\b|^\s*--/i;
-const answered = (v) => hasValue(v) && !PLACEHOLDER_VALUE.test(String(v));
-
-export function formatSnapshot(frames, fails = {}) {
-  const index = {};
-  const lines = [];
-  // Labels of fields this snapshot already shows with a value; see preFilledLine.
-  const shown = new Set();
-  let hasFinal = false;
-  // Every blocked button seen, for consentOnly below.
-  const blocked = [];
-  // A frame whose heading or step indicator says review / confirm (guard.js pageContext).
-  const reviewStep = frames.some((f) => f.reviewStep);
-  const top = frames.find((f) => f.frameId === 0) || frames[0];
-  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown, reviewStep, consentOnly: false };
-  lines.push(`URL: ${top.url}`, `TITLE: ${top.title}`);
-  for (const f of frames) {
-    if (f.frameId !== 0 && !f.elements.length && !f.buttons.length) continue;
-    if (f.frameId !== 0) lines.push(`--- iframe: ${f.url}`);
-    if (f.headings.length) lines.push(`HEADINGS: ${f.headings.join(" | ")}`);
-    if (f.step) lines.push(`STEP: ${f.step}`);
-    if (f.captcha) lines.push("CAPTCHA PRESENT");
-    if (f.errors.length) lines.push(`ERRORS: ${f.errors.join(" | ")}`);
-    lines.push("FIELDS:");
-    if (!f.elements.length) lines.push("(none)");
-    for (const e of f.elements) {
-      const ref = `${f.frameId}:${e.ref}`;
-      index[ref] = { kind: e.kind, label: e.label || e.question || "", url: f.url };
-      let s = `[${ref}] ${e.kind}${e.type && e.type !== "text" ? `(${e.type})` : ""}${e.required ? " *" : ""} "${e.label}"`;
-      if (e.question) s += ` in "${e.question}"`;
-      s += ` = ${JSON.stringify(e.value === undefined ? "" : e.value)}`;
-      if (answered(e.value) && e.label) shown.add(e.label);
-      // was: every choice field listed all its options and its placeholder, filled or not.
-      const brief = LISTED_CHOICES.includes(e.kind) && answered(e.value) && !fails[ref];
-      if (e.options && e.options.length) s += brief ? ` (${e.options.length} options)` : ` options: ${e.options.join(" | ")}`;
-      if (e.placeholder && !brief) s += ` placeholder=${JSON.stringify(e.placeholder)}`;
-      if (e.maxlength) s += ` maxlength=${e.maxlength}`;
-      if (e.error) s += ` ERROR: ${e.error}`;
-      if ((fails[ref] || 0) >= MAX_FIELD_FAILS) s += " (failed 3 times: skip it or pause_for_user if required)";
-      lines.push(s);
-    }
-    lines.push("BUTTONS:");
-    for (const b of f.buttons) {
-      const ref = `${f.frameId}:${b.ref}`;
-      index[ref] = { kind: "button", label: b.text, url: f.url };
-      if (b.blocked) { hasFinal = true; blocked.push(b); }
-      lines.push(`[${ref}] "${b.text}"${b.blocked ? (b.consent ? " BLOCKED (asks the student to agree; human only)" : " BLOCKED (final submit, human only)") : ""}${b.menu === "open" ? " (menu already open: click one of its items, not this again)" : ""}`);
-    }
-    if (f.text) lines.push(`PAGE TEXT: ${f.text}`);
-  }
-  // The only buttons held back are bare Accept / I agree buttons (guard.js isConsent), and the page does
-  // not say it is the review step: a page asking the student to agree to something, not a finished
-  // application. The run pauses there rather than saying "Ready to submit" (PR #99, 2026-10-14).
-  const consentOnly = !reviewStep && blocked.length > 0 && blocked.every((b) => b.consent);
-  return { text: lines.join("\n"), index, top, hasFinal, shown, reviewStep, consentOnly };
-}
-
-// fastFill reports "Label = value" for each field it filled, and the snapshot right after it shows the
-// same fields with the same values, so the line said everything twice. Name only what the snapshot
-// does not show (a field that lost its value again, a file chip the page doesn't read back).
-// was: `Pre-filled: ${pre.join("; ")}`
-export function preFilledLine(pre, shown) {
-  if (!pre.length) return "";
-  const rest = pre.filter((p) => !shown.has(String(p).split(" = ")[0]));
-  if (!rest.length) return `Pre-filled ${pre.length} field(s) from the profile; their values are in the snapshot.`;
-  return `Pre-filled: ${rest.join("; ")}`;
-}
-
 // A code sitting in your inbox is yours to fetch, so the agent stops there and hands the tab
 // back. Checked here, before the model gets a turn, so the pause costs no AI call and does not
 // depend on the model choosing to call pause_for_user.
@@ -301,71 +170,6 @@ function gateIn(frames) {
     if (g) return g;
   }
   return null;
-}
-
-// Old snapshots are the bulk of the context; keep only the latest (was: the last two). The tool
-// results after each step already say what was filled and what failed, so the page before this one
-// only repeated fields the model had seen, at full price on every later step of the run.
-const KEEP_SNAPSHOTS = 1;
-// Tool results from before the last two model turns are cut to "ok" or the start of the error
-// (2026-10-04). A failed select returns every real option, and act() echoes back what it set, so old
-// results were the next-largest thing re-sent at full price on every step. Each tool_result keeps its
-// tool_use_id, so every tool call still has its answer and the request stays valid.
-const KEEP_RESULT_TURNS = 2;
-function shortResult(b) {
-  const raw = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
-  if (!b.is_error) {
-    // A human's answer to ask_user, and the other short notes, are plain strings worth keeping;
-    // what act() returns is a JSON object, and only the fact that it worked matters later.
-    try { const o = JSON.parse(raw); if (o && typeof o === "object") return "ok"; } catch (e) {}
-    return raw;
-  }
-  if (raw.startsWith("failed: ")) return raw;   // already trimmed on an earlier step
-  let err = raw;
-  try { const o = JSON.parse(raw); if (o && typeof o === "object") err = String(o.error || o.message || raw); } catch (e) {}
-  return "failed: " + err.slice(0, 120);
-}
-export function trimHistory(msgs) {
-  let seen = 0, turns = 0;
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const m = msgs[i];
-    if (m.role === "assistant") { turns++; continue; }
-    if (m.role !== "user" || !Array.isArray(m.content)) continue;
-    for (const b of m.content) {
-      if (b.type === "text" && b.text.startsWith("SNAPSHOT")) {
-        seen++;
-        if (seen > KEEP_SNAPSHOTS) b.text = "SNAPSHOT (older page state removed)";
-      }
-      // The results in a user message answer the assistant turn before it, so a message with two or
-      // more assistant turns after it answers a turn older than the last two.
-      if (b.type === "tool_result" && turns >= KEEP_RESULT_TURNS) b.content = shortResult(b);
-    }
-  }
-}
-
-const toolResult = (id, content, isError) => ({ type: "tool_result", tool_use_id: id, content: typeof content === "string" ? content : JSON.stringify(content), ...(isError ? { is_error: true } : {}) });
-
-// was: .slice(0, 5000). The description now sits in the fixed opening of every request (buildSystem),
-// where after the first step it is read from Gemini's cache at a tenth of the price, so more of it
-// costs little and grounds the free-text answers better.
-function jobIntro(job) {
-  return `JOB\nCompany: ${job.company}\nTitle: ${job.title}\nLocation: ${job.location || ""}\nApply URL: ${job.apply_url}\n` +
-    `Description:\n${(job.description || "(read it from the page)").slice(0, 8000)}`;
-}
-
-// The part of every request that stays the same for a whole run: rules, the candidate, the job.
-// Gemini 3.x serves a request's repeated opening from its cache (a tenth of the input price) only
-// once that opening is about 4,096 tokens long. Rules, tools and profile came to roughly 3,000, so in
-// September under 1% of Auto-Apply's 1.25M input tokens were cached and every step paid full price
-// for the same text. The job used to open the first message instead (was: content.push(jobIntro(job))
-// on the first turn), after the part the cache can match; here it lifts the fixed opening past the
-// threshold. Nothing in it may change between steps of a run, or the cache misses from that point.
-export function buildSystem(store, job) {
-  return [
-    { type: "text", text: RULES },
-    { type: "text", text: `CANDIDATE PROFILE (JSON)\n${JSON.stringify(profileForModel(store))}` },
-    { type: "text", text: jobIntro(job), cache_control: { type: "ephemeral" } },
-  ];
 }
 
 function accountLine(store, url) {
@@ -438,29 +242,6 @@ async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch))
   }
   return job;
 }
-
-// ---------- no-progress breaker ----------
-// A run that keeps clicking a button that does nothing, or circles one page, spends a model turn on
-// every pass until MAX_STEPS, and on the InternScout AI every turn is the student's allowance. Pause
-// instead, before the next model call, once the page has come back identical three times running or
-// one page has had twelve turns. Only a pause: nothing here clicks or submits anything.
-// "One page" is the URL plus the step the page says it is on, because Workday keeps one URL for every
-// step of its application and a long one would otherwise read as twelve turns on the same page.
-export const SAME_SNAPSHOTS_MAX = 3;
-export const TURNS_PER_PAGE_MAX = 12;
-export const NO_PROGRESS_HELP = "The page isn't changing after several tries. Finish this step by hand, then press Resume.";
-export const freshProgress = () => ({ stuckSame: 0, lastText: null, turnsHere: 0, lastUrl: null });
-export function progressCheck(state, snapText, url, asleep = false) {
-  const next = {
-    // A sleeping tab answers with the same picture whatever happened; the sleepy gate in loop() owns that case.
-    stuckSame: !asleep && snapText === state.lastText ? state.stuckSame + 1 : 0,
-    lastText: snapText,
-    turnsHere: url === state.lastUrl ? state.turnsHere + 1 : 0,
-    lastUrl: url,
-  };
-  return { stop: next.stuckSame >= SAME_SNAPSHOTS_MAX || next.turnsHere >= TURNS_PER_PAGE_MAX, state: next };
-}
-const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter(Boolean)].join(" | ");
 
 // ---------- main loop ----------
 export const RESUME_REVIEW_HELP = "Finish reviewing your resume in Auto-Apply setup, then press Resume.";

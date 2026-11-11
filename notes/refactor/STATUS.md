@@ -97,10 +97,10 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.3 Listing family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
-| 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Characterize responses first; financial wrapper changes paused under Q3. |
+| 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | In review | Fixed offline responses for 42 exact routes and 44 transport, guard and special cases. |
+| 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Start after response characterization. Financial wrapper changes remain paused under Q3. |
 | 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | In review | Page-state and file helpers only. All existing imports and safety tests remain valid. |
-| 5 | WP-5.2 Background agent | Unassigned | - | - | Queued | Separate move-only PR; guard and tests untouched; no version bump. |
-| 5 | WP-5.2 Onboarding | Unassigned | - | - | Queued | Separate PR; preserve UI text and reproducible packaging. |
+| 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | [#257](https://github.com/bpmcginley/InternshipFinder/pull/257) | In review | Extract prompt, snapshot, field options and interview prompt in separate commits. Existing loaders, state, safety tests and version are unchanged. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
 | 6 | WP-2.2 Design tokens | Unassigned | - | - | Queued | After Phase 3; preserve inlined output and distinct values. |
 | 6 | WP-5.1 Core modules | Unassigned | - | - | Question | Browser-support decision Q2 precedes implementation. |
@@ -495,11 +495,25 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Byte comparison matches both moved blocks apart from two new leaf export keywords and matches all remaining source outside import wiring. All existing extension tests, guard, manifest, background entry point and onboarding loader are byte-identical. This preserves the 14 protected safety tests, MAIN and isolated injection order, and onboarding startup order.
 - Node 22.23.4 passed 348 extension tests, both packaging tests passed, and an offline probe matched PDF, text, DOCX, lazy Mammoth, size and truncation behavior. Both actual ZIP variants reproduced across builds with 53 members each. Compared to main, only the two importing members differ and the two leaf modules are new. Both golden checks passed against 695 expected site files. JavaScript lint reported zero errors or warnings.
 
+## WP-5.2 remaining extension leaves
+
+- Background prompt rules, tool schema, history trimming, request construction, snapshot formatting and progress calculations move into two modules. The agent keeps all 35 public exports and owns tab injection, asynchronous job generations, scheduler interactions and runtime tool execution. Its existing field-failure limit remains shared by snapshot formatting and tool dispatch.
+- Onboarding field options and interview prompt construction move into two modules. The existing prompt call passes the live onboarding store at the same point in the turn. Render, save and restore state, event wiring and the Mammoth loader retain their existing order. The guard, manifest, background entry point, onboarding HTML and every extension test are unchanged.
+- Exact declaration-source and AST comparisons account for 22 background and eight onboarding moves. The new interview function parameter and its call argument are the only expression-level wiring changes. Verified all 35 legacy names and moved public binding identities using native imports.
+- Node 22.23.4 passed 348 extension tests, and both packaging tests passed. Both ZIP variants reproduced across local builds with 57 members. Relative imports resolve in both ZIPs, and compared with #251 the only archive differences are two facade files and four new modules. Golden matched all 695 site files. JavaScript lint reported zero errors and warnings.
+
 ## Orders extraction readiness (read-only)
 
 - Audit at main `7728e02b` verified 39 exports. Keep literal TERMS_VERSION/TERMS_BOX assignments in legacy orders.js: unchanged buy tests read them directly. Preserve the billing/orders live-binding cycle and listing settlement before student handling; introduce no eager imported-value reads or configuration snapshots.
 - The only top-level mutable local is the review styleHash cache; keep it with the renderer. Exported PRICES/WEBMAIL/CLOSE_REASONS objects retain shared identity. readShard has no module cache; preserve injected-fetch edge-cache options rather than adding memoization.
 - Safest first file-move boundary is shardOf/cleanRole/readShard plus necessary shared regex/error helpers. Existing durable outbox stays in order-mail.js. Preserve every db.batch boundary/statement order, cron job order and names, SQL/email/style literals, default fetch expressions, and all facade exports. The shared settlement-race scenario remains unchanged across both adapters. This is preparation only, not later-wave implementation or financial-behavior approval.
+
+## WP-4.3 offline route response baseline
+
+- Captured 86 responses from unchanged router main `067a0337`. The checked-in fixture records status, observable header values and exact body bytes as UTF-8 or hex. The test reads this fixture and compares live responses. The contract is used only to check that every exact route is represented.
+- Cases cover all 42 exact routes, global OPTIONS, media GET and HEAD, unmatched routes, method/path normalization, allowed and denied CORS, representative auth and gate order, and media success, range and error paths. Each request uses an independent local D1 adapter and fixed time. Media alone uses a narrow fake fetch, and any other fetch or mail attempt fails the test.
+- The test runs through the existing API contract entry, preserving Product ownership of the Worker test index and helpers. No runtime code, route gates, financial behavior, production commands or golden fixtures changed.
+- Node 22.23.4 passed 343 Worker tests. Local Workers passed 15 tests in six files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics. Golden matched all 695 files.
 
 ## WP-2.3 Worker API contract validation
 

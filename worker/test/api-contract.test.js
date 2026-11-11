@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { AUTH, ROUTES, SPECIAL_ROUTES } from "../src/api-contract.js";
 import { generateApi } from "../scripts/generate-api.mjs";
 import { handle } from "../src/index.js";
+import { captureRouteResponses, exactCases } from "../test-support/route-baseline.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (path) => readFileSync(join(root, path), "utf8").replaceAll("\r\n", "\n");
@@ -89,6 +90,20 @@ test("global preflight, media delegation and fallback are explicit, without chan
   );
   assert.equal(head.status, 200);
   assert.equal(await head.text(), "");
+});
+
+test("the original router's offline response bytes and headers stay fixed", async () => {
+  const fixture = JSON.parse(
+    readFileSync(new URL("./fixtures/route-baseline.json", import.meta.url), "utf8"),
+  );
+  assert.equal(fixture.capturedFrom, "067a033785214ec63d0d67b26b6ed1d54b940e16");
+  assert.equal(exactCases.length, ROUTES.length);
+  assert.deepEqual(new Set(exactCases.map(({ method, path }) => key(method, path))), declared);
+  const actual = await captureRouteResponses();
+  assert.deepEqual(Object.keys(actual), Object.keys(fixture.responses));
+  for (const [label, expected] of Object.entries(fixture.responses)) {
+    assert.deepEqual(actual[label], expected, label);
+  }
 });
 
 test("generated API markdown is current", () => {

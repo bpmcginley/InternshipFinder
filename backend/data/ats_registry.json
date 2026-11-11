@@ -3248,9 +3248,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 2,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-11"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -15094,8 +15093,9 @@
   "elekta|wd3|Elekta_Careers": {
    "name": "Elekta",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-11"
   },
   "elementfleet|wd3|External_Career_Site": {
    "name": "Element Fleet Management",
