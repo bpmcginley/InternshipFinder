@@ -1,5 +1,5 @@
 // Dormant preparation only. A sender must still claim an attempt under fresh consent.
-import { followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
+import { followInstant, followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
 import { payloadOf } from "./follow-outbox.js";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -11,10 +11,22 @@ function stamp(clock) {
   return iso.length === 24 ? iso : null;
 }
 
+function stillLeased(row, at, previous) {
+  return (
+    row &&
+    at &&
+    at >= previous &&
+    followInstant(row.lease_until) !== null &&
+    followInstant(row.expires_at) !== null &&
+    at < row.lease_until &&
+    at < row.expires_at
+  );
+}
+
 function leasedSnapshot(db, jobId, lease, at) {
   return db
     .prepare(
-      "SELECT o.subscriber_id,o.payload,v.snapshot_at,v.advances,p.snapshot_digest " +
+      "SELECT o.subscriber_id,o.payload,o.lease_until,o.expires_at,v.snapshot_at,v.advances,p.snapshot_digest " +
         "FROM follow_digest_outbox o JOIN follow_valid_pending v ON v.job_id=o.id " +
         "JOIN follow_pending_progress p ON p.job_id=o.id " +
         "WHERE o.id=? AND o.state='leased' AND o.lease_token=? AND o.lease_until>? " +
@@ -47,7 +59,8 @@ export async function prepareLeasedFollowDigest(
   const at = stamp(clock);
   if (!at) return unavailable();
   const pinned = await leasedSnapshot(db, jobId, lease, at);
-  if (!pinned) return unavailable();
+  const loadingAt = stamp(clock);
+  if (!stillLeased(pinned, loadingAt, at)) return unavailable();
 
   let matched;
   try {
@@ -81,9 +94,12 @@ export async function prepareLeasedFollowDigest(
   }
 
   const checked = stamp(clock);
-  if (!checked || checked < at) return unavailable();
+  if (!stillLeased(pinned, checked, loadingAt)) return unavailable();
   const current = await leasedSnapshot(db, jobId, lease, checked);
-  if (!current || Object.keys(pinned).some((key) => current[key] !== pinned[key]))
+  if (
+    !stillLeased(current, stamp(clock), checked) ||
+    Object.keys(pinned).some((key) => current[key] !== pinned[key])
+  )
     return unavailable();
   return { status: "ready", subscriberId: pinned.subscriber_id, roles: matched.roles };
 }

@@ -8,7 +8,7 @@ const keys = (value, expected) =>
   typeof value === "object" &&
   !Array.isArray(value) &&
   Object.keys(value).sort().join(",") === expected;
-const instant = (value) => {
+export const followInstant = (value) => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value))
     return null;
   const time = Date.parse(value);
@@ -67,7 +67,7 @@ export function matchFollowSnapshot(input, follows, { catalog, limits, upperBoun
     !["companies", "fields", "states"].every((key) => catalog[key] instanceof Set)
   )
     return invalid("configuration");
-  const upper = instant(upperBound);
+  const upper = followInstant(upperBound);
   if (upper === null || !(input instanceof Uint8Array) || input.byteLength > limits.maxBytes)
     return invalid("snapshot_bound");
   let snapshot;
@@ -83,7 +83,7 @@ export function matchFollowSnapshot(input, follows, { catalog, limits, upperBoun
     snapshot.generated_at !== upperBound
   )
     return invalid("snapshot_contract");
-  const lower = instant(snapshot.covers_after);
+  const lower = followInstant(snapshot.covers_after);
   if (
     lower === null ||
     lower >= upper ||
@@ -118,7 +118,7 @@ export function matchFollowSnapshot(input, follows, { catalog, limits, upperBoun
       !list(role.states, catalog.states)
     )
       return invalid("role_contract");
-    const first = instant(role.first_seen);
+    const first = followInstant(role.first_seen);
     if (first === null || first <= lower || first > upper) return invalid("role_time");
     seen.add(role.id);
     firstSeen.set(role.id, first);
@@ -146,8 +146,8 @@ export function matchFollowSnapshot(input, follows, { catalog, limits, upperBoun
     }
     scopes.add(follow.scope_key);
     if (follow.confirmed_at === null && follow.watermark === null) continue;
-    const confirmed = instant(follow.confirmed_at),
-      prior = follow.watermark === null ? confirmed : instant(follow.watermark);
+    const confirmed = followInstant(follow.confirmed_at),
+      prior = follow.watermark === null ? confirmed : followInstant(follow.watermark);
     const after = Math.max(confirmed, prior);
     if (confirmed === null || prior === null || after > upper || after < lower)
       return invalid("follow_window");

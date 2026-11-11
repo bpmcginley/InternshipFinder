@@ -571,6 +571,33 @@ export async function prepareLeaseFences(db, equal) {
   await confirm(db, "beta");
   const job = await enqueue(db, a.subscriberId);
   const lease = await leaseFollowDigest(db, job.id, now);
+  for (const expiresDuring of [1, 2]) {
+    let time = now,
+      reads = 0,
+      loads = 0;
+    const delayedRead = {
+      prepare(sql) {
+        return {
+          bind: (...args) => ({
+            first: async () => {
+              const row = await db
+                .prepare(sql)
+                .bind(...args)
+                .first();
+              if (++reads === expiresDuring) time = new Date(+now + 5 * 60_000);
+              return row;
+            },
+          }),
+        };
+      },
+    };
+    const load = async () => {
+      loads++;
+      return snapshot();
+    };
+    equal(await prepare(delayedRead, job.id, lease, load, () => time), { status: "unavailable" });
+    equal(loads, expiresDuring - 1);
+  }
   for (const offset of [-1, 5 * 60_000]) {
     let time = now;
     const delayed = async () => {
