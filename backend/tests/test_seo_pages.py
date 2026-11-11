@@ -2271,7 +2271,7 @@ def test_a_thin_field_in_a_place_page_is_built_and_linked_but_kept_out_of_search
     assert COMBO not in open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
     from internscout import feeds
 
-    feeds.write_all(site, list(built.values()))  # and its feed, for the club channels
+    feeds.write_all(site, list(built.values()), state.generated)  # and its feed, for the club channels
     assert os.path.exists(
         os.path.join(site, "internships", "mechanical-engineering", "massachusetts", "feed.xml")
     )
@@ -2418,7 +2418,7 @@ def test_a_noindex_page_is_still_live_for_keep_at(tmp_path):
 
 
 def test_index_combo_zero_indexes_every_page_again(tmp_path):
-    pages = _build_pages(_combo_site(tmp_path, runtime.MIN_COMBO), index_combo=0)
+    pages = _build_pages(_combo_site(tmp_path, runtime.MIN_COMBO), earning=frozenset(), index_combo=0)
     built = {p["path"]: p for p in pages}
     assert built[COMBO]["index"] and not any(
         v["thin"] for v in built.values() if v["kind"] != "near"
