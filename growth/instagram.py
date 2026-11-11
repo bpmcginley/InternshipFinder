@@ -50,6 +50,10 @@ from datetime import datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import metrics  # noqa: E402  (the D1 database, account and API helper the analytics copy uses)
+if __package__:
+    from .public_config import WORKER_HOST
+else:
+    from public_config import WORKER_HOST
 
 GRAPH = "https://graph.instagram.com"
 UA = {"User-Agent": "InternScout-brand-posts/1.0 (+https://internscout.org)"}
@@ -259,7 +263,7 @@ def _public_video_url(video_url: str) -> None:
     name = url.path.removeprefix("/social-video/")
     if (
         url.scheme != "https"
-        or url.netloc != "internscout-api.bpmcginley.workers.dev"
+        or url.netloc != WORKER_HOST
         or not url.path.startswith("/social-video/")
         or len(name) > 120
         or not re.fullmatch(r"\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.mp4", name)

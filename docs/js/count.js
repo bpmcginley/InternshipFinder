@@ -185,6 +185,10 @@
     var a = t ? t.closest("a[href]") : null;
     if (a) digestCount("click", a);
     if (a) employerCount("click", a);
+    // Only these two marked distribution links use the product's daily totals.
+    var distribution = a && a.getAttribute ? a.getAttribute("data-distribution") : "";
+    if (distribution === "list") window.ISCount("list_link_click");
+    if (distribution === "widget") window.ISCount("widget_link_click");
     // was: if (a && /^https:\/\/chromewebstore\.google\.com\//.test(a.href)) window.ISCount("install_click");
     // Since 2026-10-07 a link to the listing's reviews page (".../reviews") is a "review_click" instead:
     // someone who already has the extension going to review it, not someone going to install it.
