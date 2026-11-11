@@ -47,16 +47,38 @@ const currency = {
 // The 8 in the true Kubernetes alias is not a resume metric. Other numbers keep their exact form.
 const quantityText = (text) => String(text || "").replace(/\bk8s\b/gi, "Kubernetes");
 export const numbersIn = (text) => quantityText(text).match(/\d+(?:[.,]\d+)*/g) || [];
+const magnitudes = { thousand: "k", k: "k", million: "m", m: "m", billion: "b", b: "b" };
+const moneyUnits = new Set(Object.values(currency));
+const timeUnits = units.filter(([unit]) =>
+  ["hour", "minute", "second", "day", "week", "month", "year"].includes(unit),
+);
 function quantities(raw) {
-  const text = quantityText(raw);
-  const out = [];
-  for (const m of text.matchAll(/(?:(?<!\w)(USD|US\$|EUR|€|GBP|£|\$)[ \t]*)?(\d+(?:[.,]\d+)*)/gi)) {
-    const after = text.slice(m.index + m[0].length);
-    const suffix = after.replace(/^[ \t]*(?:-[ \t]*)?/, "");
-    const unit = m[1]
-      ? currency[m[1].toLowerCase()]
-      : units.find(([, re]) => re.test(suffix))?.[0] || "bare";
-    out.push(`${m[2]}:${unit}`);
+  const text = quantityText(raw),
+    out = [];
+  for (const m of text.matchAll(
+    /(?:(?<!\w)([+-])?(USD|US\$|EUR|€|GBP|£|\$)[ \t]*)?([+-])?(\d+(?:[.,]\d+)*)/gi,
+  )) {
+    const after = text.slice(m.index + m[0].length).replace(/^[ \t]*(?:-[ \t]*)?/, "");
+    const magnitude = /^(thousand|million|billion|k|m|b)\b[ \t]*/i.exec(after);
+    let suffix = magnitude ? after.slice(magnitude[0].length) : after;
+    let matched = units.find(([, re]) => re.test(suffix));
+    let unit = m[2] ? currency[m[2].toLowerCase()] : matched?.[0] || "bare";
+    const money = moneyUnits.has(unit);
+    // Short magnitudes require a currency: m never silently becomes million minutes/months.
+    const scale =
+      magnitude && (money || magnitude[1].length > 1) ? magnitudes[magnitude[1].toLowerCase()] : "";
+    if (magnitude && !scale) {
+      suffix = after;
+      matched = units.find(([, re]) => re.test(suffix));
+      unit = matched?.[0] || "bare";
+    }
+    const rest = matched ? suffix.slice(matched[1].exec(suffix)[0].length) : suffix;
+    const rate = /^[ \t]*(?:\/|per[ \t]+)[ \t]*/i.exec(rest);
+    const period = rate && timeUnits.find(([, re]) => re.test(rest.slice(rate[0].length)))?.[0];
+    // Only explicit monetary/percentage signs and slash/per time rates are interpreted here.
+    // Date-range hyphens, ordinary prose and implied causality remain outside this check.
+    const sign = (money || unit.startsWith("percent")) && (m[1] === "-" || m[3] === "-") ? "-" : "";
+    out.push(`${sign}${m[4]}:${unit}:${scale}:${period || ""}`);
   }
   return out;
 }

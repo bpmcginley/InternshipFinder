@@ -197,3 +197,72 @@ test("Kubernetes spelling alias survives the shared number check in every format
     }).xml.includes(after),
   );
 });
+
+test("currency magnitudes cannot be invented in any of the three resume validators", () => {
+  const before = "Saved $40",
+    after = "Saved $40 million";
+  const s = storeOf([before]);
+  assert.equal(
+    applyTailoring(s, { experience: [{ i: 0, bullets: [{ from: 0, text: after }] }] }).resume
+      .experience[0].bullets[0],
+    before,
+  );
+  assert.equal(
+    applyDocTailoring(docOf([before]), {
+      entries: [{ s: 0, e: 0, bullets: [{ from: 0, text: after }] }],
+    }).doc.sections[0].entries[0].bullets[0],
+    before,
+  );
+  const xml = wordOf([before]);
+  assert.equal(
+    applyDocxTailoring(xml, bulletGroups(xml), {
+      groups: [{ g: 0, bullets: [{ from: 0, text: after }] }],
+    }).xml,
+    xml,
+  );
+});
+
+test("currency magnitude aliases keep the same numeric value; time abbreviations stay distinct", () => {
+  for (const [before, after] of [
+    ["Saved $40 million", "Saved 40 million dollars"],
+    ["Saved $40m", "Saved $40 million"],
+    ["Saved 40 thousand USD", "Saved US$40k"],
+    ["Saved EUR 40 billion", "Saved 40b EUR"],
+    ["Worked 40 mins", "Worked 40 minutes"],
+    ["Worked 40 mos", "Worked 40 months"],
+  ]) {
+    assert.equal(unsupported(after, before), false, after);
+    assert.equal(
+      applyTailoring(storeOf([before]), {
+        experience: [{ i: 0, bullets: [{ from: 0, text: after }] }],
+      }).resume.experience[0].bullets[0],
+      after,
+    );
+  }
+  for (const [before, after] of [
+    ["Saved $40", "Saved $40m"],
+    ["Saved $40m", "Saved $40b"],
+    ["Worked 40 mins", "Worked 40 million minutes"],
+    ["Saved $40 million", "Saved $40000000"],
+  ])
+    assert.equal(unsupported(after, before), true, after);
+});
+
+test("explicit signs and slash/per time rates are preserved without interpreting date-range hyphens", () => {
+  for (const [before, after] of [
+    ["Saved -$40", "Saved $40"],
+    ["Changed -40%", "Changed 40%"],
+    ["Paid $40/hour", "Paid $40 per year"],
+    ["Paid $40 per hour", "Paid $40"],
+  ])
+    assert.equal(unsupported(after, before), true, after);
+  for (const [before, after] of [
+    ["Saved -$40", "Saved $-40"],
+    ["Changed +40%", "Changed 40 percent"],
+    ["Paid $40/hour", "Paid 40 dollars per hr"],
+    ["Worked 2024-2025", "Worked 2024 to 2025"],
+  ])
+    assert.equal(unsupported(after, before), false, after);
+  // Implied prose rates and semantic direction are intentionally not interpreted.
+  assert.equal(unsupported("Saved $40 yearly", "Saved $40"), false);
+});
