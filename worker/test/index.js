@@ -41,3 +41,4 @@ import "./follow-management.test.js";
 import "./follow-outbox.test.js";
 
 import "./topup-ledger.test.js";
+import "./topup-decisions.test.js";
