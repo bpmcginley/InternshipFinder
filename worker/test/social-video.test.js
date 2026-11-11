@@ -31,9 +31,9 @@ test("public brand MP4 streams from one repository without credentials, analytic
   assert.deepEqual(new Uint8Array(await res.arrayBuffer()), bytes);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, RAW);
-  assert.equal(calls[0].options.redirect, "error");
+  assert.equal(calls[0].options.redirect, "manual");
   assert.deepEqual(Object.keys(calls[0].options.headers), ["User-Agent"]);
-  assert.equal(calls[0].options.cf.cacheTtlByStatus["400-599"], -1);
+  assert.equal(calls[0].options.cf.cacheTtlByStatus["300-599"], -1);
 });
 
 test("HEAD asks upstream only for metadata and returns no body; existing CORS still applies", async () => {
