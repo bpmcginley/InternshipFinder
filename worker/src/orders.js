@@ -25,6 +25,13 @@ import { CHECKS, addDays, checkPlacement, createPlacement, dayOf, daysBetween, e
 import { hex, hmacHex, sameHex, siteUrl, stripe } from "./billing.js";
 import { trySend, sendMail } from "./mail.js";
 import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
+import { LIMITS, LISTING_ID, bad, conflict, text } from "./orders/shared.js";
+import { readShard, shardOf } from "./orders/roles.js";
+import { WORKER_URL } from "./public-config.js";
+
+export { listOrders } from "./orders/admin.js";
+export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
+export { readShard, shardOf } from "./orders/roles.js";
 
 // Prices in cents (Bruce, 2026-10-19: final). public_body is the price for a nonprofit or public body.
 export const PRICES = {
@@ -34,7 +41,6 @@ export const PRICES = {
 export const DAYS = 30;              // days each role runs
 export const FIELD_CAP = 5;          // paid roles running at once that share a field tag
 export const MAX_START_DAYS = 90;    // the start day is today up to this many days ahead
-export const PILOT_MAX = 5;          // pilot codes, ever
 export const TOKEN_HOURS = 48;       // the email link works this long
 export const UNVERIFIED_DAYS = 7;    // an order never confirmed is deleted after this
 export const CREDIT_DEFAULT_DAYS = 30;   // an unanswered unused-days offer becomes a refund after this
@@ -59,9 +65,8 @@ const REMIND_AFTER_MS = 24 * 3600e3;
 export const PER_ADDRESS_PER_DAY = 5;
 export const ALL_PER_DAY = 100;
 const ALL = "order:*";
-const ORDERS_SHOWN = 100;
 // Where Bruce's review links point. The Worker's own address; API_URL overrides it (wrangler dev).
-const DEFAULT_API = "https://internscout-api.bpmcginley.workers.dev";
+const DEFAULT_API = WORKER_URL;
 
 // The site build drops a placement for these reasons when its role has gone (placement_runs.reason).
 export const CLOSE_REASONS = ["listing_gone", "closed", "url_changed", "deadline"];
@@ -79,19 +84,12 @@ export const WEBMAIL = new Set([
 
 // Only the site's own pages send the order, confirm and credit choice (a browser always sets Origin).
 const SITE = /^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/;
-const SHARD = /^[a-z0-9_]$/;
-const LISTING_ID = /^[0-9a-f]{16}$/;
-const FIELD = /^[a-z0-9_-]{1,40}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ORDER_ID = /^o-[0-9a-f]{16}$/;
 const CREDIT_ID = /^c-[0-9a-f]{16}$/;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const PILOT = /^[A-Z0-9-]{4,32}$/;
-const CONTROL = /[\u0000-\u001F\u007F]/g;
-const LIMITS = { name: 100, email: 254, company: 120, pilot_code: 32, reason: 200, note: 200 };
 
-const bad = (field, message) => new HttpError(400, "bad_request", message, { field });
-const conflict = (code, message, extra) => new HttpError(409, code, message, extra);
 const notFound = () => new HttpError(404, "not_found", "No such endpoint");
 
 // ---------------------------------------------------------------- on or off
@@ -132,15 +130,6 @@ const rolesWord = (n) => (n === 1 ? "1 role" : `${n} roles`);
 const randomHex = (bytes) => hex(crypto.getRandomValues(new Uint8Array(bytes)));
 const fieldsOf = (list) => (list.length ? list : ["other"]);
 
-function text(body, field, { required = false } = {}) {
-  const v = body[field];
-  if (v != null && typeof v !== "string") throw bad(field, `${field} must be text`);
-  const s = (v || "").replace(CONTROL, " ").replace(/\s+/g, " ").trim();
-  if (required && !s) throw bad(field, `${field} is required`);
-  if (s.length > LIMITS[field]) throw bad(field, `${field} is too long (at most ${LIMITS[field]} characters)`);
-  return s;
-}
-
 // The email link: 32 random bytes, base64url. Only its SHA-256 (hex) is stored.
 export function newToken() {
   const b = crypto.getRandomValues(new Uint8Array(32));
@@ -168,58 +157,6 @@ async function addressKey(request, env) {
   if (!env.HASH_SALT) throw new HttpError(500, "server", "Server is missing HASH_SALT");
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   return "order:" + (await tokenHash(`order|${ip}|${env.HASH_SALT}`));
-}
-
-// ---------------------------------------------------------------- the role index
-
-export const shardOf = (key) => {
-  const c = String(key || "").charAt(0);
-  return /^[a-z0-9]$/.test(c) ? c : "_";
-};
-
-// One role from the index, or null when anything about it is not the shape we expect. The index is our
-// own file, but it comes over the network, so nothing in it is trusted to be well formed.
-function cleanRole(r) {
-  if (!r || typeof r !== "object" || Array.isArray(r)) return null;
-  const str = (v, max, required = true) => {
-    if (v == null && !required) return "";
-    if (typeof v !== "string") return null;
-    const s = v.replace(CONTROL, " ").replace(/\s+/g, " ").trim();
-    return (!s && required) || s.length > max ? null : s;
-  };
-  const id = typeof r.id === "string" && LISTING_ID.test(r.id) ? r.id : null;
-  const k = str(r.k, 120), co = str(r.co, 120), t = str(r.t, 200), loc = str(r.loc, 200, false), u = str(r.u, 2000);
-  if (!id || k == null || co == null || t == null || loc == null || u == null) return null;
-  try {
-    const url = new URL(u);
-    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return null;
-  } catch {
-    return null;
-  }
-  const f = Array.isArray(r.f) ? r.f.filter((x) => typeof x === "string" && FIELD.test(x)) : [];
-  return { id, k, co, t, loc, u, f: [...new Set(f)].slice(0, 20), unpaid: r.unpaid === true };
-}
-
-// The open roles in one shard of the site's role index (backend role_index.py), by id. A shard file
-// the site does not have (404) is an empty shard: no employer there has open roles today.
-export async function readShard(env, shard, fetchImpl) {
-  if (typeof shard !== "string" || !SHARD.test(shard)) throw bad("shard", "shard must be one of a-z, 0-9 or _");
-  let res, data = null;
-  try {
-    // The site's file changes once per build; a few minutes of edge cache spares GitHub Pages.
-    res = await fetchImpl(`${siteUrl(env)}/data/roles/${shard}.json`, { cf: { cacheTtl: 300, cacheEverything: true } });
-    if (res.status === 404) return new Map();
-    if (res.ok) data = await res.json();
-  } catch {}
-  if (!data || typeof data !== "object" || !Array.isArray(data.roles)) {
-    throw new HttpError(502, "roles_unavailable", "The list of open roles can't be read right now. Please try again in a few minutes.");
-  }
-  const roles = new Map();
-  for (const r of data.roles.slice(0, 20_000)) {
-    const c = cleanRole(r);
-    if (c && !roles.has(c.id)) roles.set(c.id, c);
-  }
-  return roles;
 }
 
 // ---------------------------------------------------------------- the field cap
@@ -1237,34 +1174,6 @@ async function defaultCredits(db, env, now, fetchImpl) {
       console.error("credit default failed:", e && e.name);
     }
   }
-}
-
-// ---------------------------------------------------------------- admin (Bruce's terminal)
-
-// GET /admin/orders: the recent orders, without the employer's name or email.
-export async function listOrders(db) {
-  const { results } = await db.prepare(
-    "SELECT o.id, o.created, o.status, o.package, o.start_day AS start, COALESCE(o.paid_amount, o.price) AS amount, " +
-    "o.company, (SELECT COUNT(*) FROM employer_order_roles r WHERE r.order_id = o.id) AS roles " +
-    "FROM employer_orders o ORDER BY o.created DESC, o.id LIMIT ?",
-  ).bind(ORDERS_SHOWN).all();
-  return { orders: results };
-}
-
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-// POST /admin/pilot-codes { note? }: a new pilot code, while fewer than PILOT_MAX have ever been made.
-// The count and the insert are one statement, so two at once can't make a sixth.
-export async function createPilotCode(db, body, now) {
-  const note = text(body, "note");
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  const code = "PILOT-" + [...bytes].map((b) => CODE_CHARS[b % CODE_CHARS.length]).join("");
-  const r = await db.prepare(
-    "INSERT INTO pilot_codes (code, created, note) SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM pilot_codes) < ?",
-  ).bind(code, now.toISOString(), note, PILOT_MAX).run();
-  if (!r.meta.changes) throw conflict("conflict", `All ${PILOT_MAX} pilot codes have been made`);
-  const made = await db.prepare("SELECT COUNT(*) AS n FROM pilot_codes").first("n");
-  return { code, note, created: now.toISOString(), made: Number(made), max: PILOT_MAX };
 }
 
 // ---------------------------------------------------------------- the emails (plain text)
