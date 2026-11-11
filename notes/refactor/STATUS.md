@@ -330,6 +330,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - Four discovery and link cases build with an explicit `BuildState(near_on=False)`, the canonical render hooks and the publisher writer. Their fixture bytes and assertions match the prior cases. The RSS cases pass the generated date from that state. The legacy sitemap-reader and widget, role-index and placement CLI cases still characterize their original entry points.
 - Offline legacy/canonical comparisons matched every file and ordered write across the sitemap, RSS discovery, LLMS and link fixtures. The four cases matched 20, 23, 35 and 86 files respectively. The generated link integration also passed with the facade and sockets blocked. The focused suite passed all 28 tests, including both Golden checks against 830 artifacts.
 
+## WP-6.2 discovery facade closure
+
+- At `54b9aa16`, discovery uses the shared publisher fixture and canonical sitemap and slogan bindings. The pay fixture moved intact to the shared test-data module. Its existing legacy consumers keep using the same fixture, and discovery can run without importing its former donor module.
+- The four original and migrated discovery cases produced the same 98 output and fixture files byte-for-byte. All four passed with the actual root conftest active and the legacy facade, donor imports and sockets blocked. All 141 discovery, links, feeds, legacy SEO and Golden tests passed.
+
 ## WP-6.2 standalone Pages publisher
 
 - The Pages image adapter imports the standalone publisher only for `--site` and passes the existing landing-card renderer. The publisher uses a fresh `BuildState` for each run and explicit listing data, generation time and site settings for the downstream writers. The legacy CLI continues to serve compatibility callers.
