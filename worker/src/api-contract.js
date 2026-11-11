@@ -1,4 +1,4 @@
-// Documentation data only. The runtime router does not import or enforce this table.
+// Route keys also support exact dispatch. Descriptive auth and gate labels are documentation.
 // Shapes describe checked-in code; deployment and feature configuration remain operator-owned.
 /**
  * @param {string} method
