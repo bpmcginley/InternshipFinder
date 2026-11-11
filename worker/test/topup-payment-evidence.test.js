@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readTopupPaymentEvidence } from "../src/topup-payment-evidence.js";
-import { attempt, session, reply } from "../test-support/topup-stripe.js";
+import { attempt, session } from "../test-support/topup-stripe.js";
+const reply = (value) => new Response(JSON.stringify(value));
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
 const offer = () => ({
   version: "topup-v1",
