@@ -1,7 +1,12 @@
 // Dormant trusted-storage boundary: no provider, route, expiry or deletion integration.
 import { referenceHash, validTopupCheckoutId, validTopupOfferVersion } from "./topup-ledger.js";
 import { decideTopup } from "./topup-decisions.js";
-import { topupFinanciallyResolved, topupRetentionStatement } from "./topup-retention.js";
+import {
+  topupFinanciallyResolved,
+  topupRetentionStatement,
+  topupHistoryProven,
+  financialEvidenceDigest,
+} from "./topup-retention.js";
 const active = "a.state IN ('creating','open')";
 const uuid = (v) =>
   typeof v === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(v);
@@ -157,7 +162,13 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
         "UPDATE topup_checkout_attempts SET checkout_id=?,state='settled' WHERE id=? AND changes()=1",
       )
       .bind(p.checkoutId, a.id),
-    topupRetentionStatement(db, paymentHash, topupFinanciallyResolved(r, { loss: false })),
+    topupRetentionStatement(
+      db,
+      paymentHash,
+      topupFinanciallyResolved(r, { loss: false }),
+      topupHistoryProven(r, { loss: false, historyProven: true }, decision),
+      await financialEvidenceDigest(r),
+    ),
     // Terminal state consumes this capture; no second increment can overflow.
     db.prepare("DELETE FROM topup_attempt_revisions WHERE attempt_id=? AND changes()=1").bind(a.id),
   ]);
