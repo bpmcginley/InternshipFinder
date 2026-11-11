@@ -33,14 +33,16 @@ export async function getSessionTopupCheckout(
     const select = (at, revision) =>
       db
         .prepare(
-          "SELECT COALESCE(r.revision,0) AS revision FROM topup_checkout_attempts a " +
+          "SELECT COALESCE(r.revision,0) AS revision, s.expires FROM topup_checkout_attempts a " +
             "LEFT JOIN topup_attempt_revisions r ON r.attempt_id=a.id " +
+            "JOIN sessions s ON s.id=? AND s.user_hash=a.user_hash " +
             "WHERE a.id=? AND a.user_hash=? AND a.checkout_id=? AND a.state='open' " +
             "AND a.offer_version=? AND a.amount=? AND a.currency=? AND a.units=? " +
-            "AND EXISTS(SELECT 1 FROM sessions s WHERE s.id=? AND s.user_hash=a.user_hash AND s.expires>?)" +
+            "AND s.expires>?" +
             (revision === undefined ? "" : " AND COALESCE(r.revision,0)=?"),
         )
         .bind(
+          sessionHash,
           a.id,
           userHash,
           a.checkout_id,
@@ -48,7 +50,6 @@ export async function getSessionTopupCheckout(
           a.amount,
           a.currency,
           a.units,
-          sessionHash,
           at,
           ...(revision === undefined ? [] : [revision]),
         );
@@ -80,7 +81,8 @@ export async function getSessionTopupCheckout(
     )
       return { status: "unavailable" };
     const current = await select(fresh().toISOString(), before.revision).first();
-    if (!current) return { status: "unavailable" };
+    // The database await may outlast the exact matched session expiry.
+    if (!current || !(Date.parse(current.expires) > +fresh())) return { status: "unavailable" };
     return { status: "open", url: url.href };
   } catch {
     // No provider errors, attempt records, tokens or identifiers cross this service boundary.

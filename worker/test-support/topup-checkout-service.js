@@ -6,7 +6,10 @@ import { attempt, callbacks, env, price, reply, session } from "./topup-stripe.j
 const user = "a".repeat(64);
 const at = new Date("2026-11-11T12:00:00Z");
 
-async function fixture(db, { onRead = async () => {}, createFails = false } = {}) {
+async function fixture(
+  db,
+  { onRead = async () => {}, afterFinalRead = async () => {}, createFails = false } = {},
+) {
   const login = await createSession(db, { user, tier: "edu", provider: "google" }, at);
   let current,
     posts = 0,
@@ -29,12 +32,30 @@ async function fixture(db, { onRead = async () => {}, createFails = false } = {}
     }
     return reply(current);
   });
+  const database = {
+    batch: (statements) => db.batch(statements),
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.includes("AND COALESCE(r.revision,0)=?")) return statement;
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              const row = await statement.bind(...args).first();
+              await afterFinalRead({ row, setNow: (value) => (now = value) });
+              return row;
+            },
+          };
+        },
+      };
+    },
+  };
   return {
     adapter,
     token: login.token,
     calls: () => ({ posts, gets }),
     run: (capability = adapter, identity = user, token = login.token) =>
-      getSessionTopupCheckout(db, identity, token, capability, () => new Date(now)),
+      getSessionTopupCheckout(database, identity, token, capability, () => new Date(now)),
   };
 }
 
@@ -168,4 +189,21 @@ export async function readFailureAndDisable(db) {
   };
   assert.deepEqual(await f.run(disabled), { status: "disabled" });
   assert.equal(f.calls().posts, 1);
+}
+
+export async function expiresWhileFinalReadResolves(db) {
+  const expiry = +at + 1000;
+  let finalReads = 0;
+  const f = await fixture(db, {
+    onRead: () =>
+      db.prepare("UPDATE sessions SET expires=?").bind(new Date(expiry).toISOString()).run(),
+    afterFinalRead: ({ row, setNow }) => {
+      assert.ok(row, "SQL matched before expiry");
+      finalReads++;
+      setNow(expiry);
+    },
+  });
+  assert.deepEqual(await f.run(), { status: "unavailable" });
+  assert.equal(finalReads, 1);
+  assert.deepEqual(f.calls(), { posts: 1, gets: 1 });
 }
