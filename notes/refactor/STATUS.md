@@ -109,7 +109,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 6 | WP-5.1 App modules | Unassigned | - | - | Question | After core and Q2; preserve window.IS consumers. |
 | 6 | WP-5.1 Buy modules | Unassigned | - | - | Question | Last, alone; checkout boundary Q3 and unchanged checkout tests. |
 | 6 | WP-5.3 Shared pure code | Unassigned | - | - | Queued | Preserve profile/scoring/id semantics; package-time copies and staleness check. |
-| 6 | WP-6.1.1 DATA_DIR | Unassigned | - | - | Queued | Single setting; default remains docs/data. |
+| 6 | WP-6.1.1 DATA_DIR | wp14_logging | `refactor/wp-6.1.1-public-data` | - | In progress | Locate public listing exports with `INTERNSCOUT_PUBLIC_DATA`; default remains `docs/data`. |
 | 6 | WP-6.1.2 Test fixtures | Unassigned | - | - | Queued | Replace verified real-data dependencies with fixed fixtures. |
 | 6 | WP-6.1.3 Reader workflows | Unassigned | - | - | Queued | Separate data checkout with main fallback; preserve triggers and permissions. |
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
