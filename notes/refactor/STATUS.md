@@ -70,10 +70,11 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Pipeline/export logging | wp21_inventory | `refactor/wp-1.4-logging-pipeline` | [#221](https://github.com/bpmcginley/InternshipFinder/pull/221) | Merged | `acf2d347`. Pages 42935296078 and backend verified. Existing default console output preserved. JSON omits provider labels, employer/location examples and the output directory. |
 | 4 | WP-1.4 Page-build logging | wp14_pages_logging | `refactor/wp-1.4-logging-page-build` | [#220](https://github.com/bpmcginley/InternshipFinder/pull/220) | Merged | Merged as `f358eefa`. Pages 42922011172, 42922021386 and backend verified. Plain console output and GitHub annotations preserved. JSON omits the output path. |
 | 4 | WP-1.4 Backend auxiliary logging | wp21_inventory | `refactor/wp-1.4-logging-backend-tools` | [#235](https://github.com/bpmcginley/InternshipFinder/pull/235) | Merged | `f98760d2`. Pages 42938415694, 42938425292 and backend verified. Focus diagnostics and placement success count. Raw JSON, coverage Markdown, CLI usage and GitHub annotations stay unchanged. |
-| 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
+| 4 | WP-1.4 Growth logging, operator reports | wp42_orders | `refactor/wp-1.4-logging-growth-safe` | [#222](https://github.com/bpmcginley/InternshipFinder/pull/222) | Merged | `a75e028d`. Audience and outreach summaries preserve default output. JSON omits the local outreach path. |
 | 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | Merged | `add6dc3d`. Pages 42936198622 and backend verified. Default flyer/campaign output and artifacts are preserved. |
 | 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | Merged | `fe368a40`. Pages 42937318825 and backend verified. Every Major and title discovery success summaries only. |
 | 4 | WP-1.4 Growth preview status logging | wp14_logging | `refactor/wp-1.4-logging-growth-status` | [#240](https://github.com/bpmcginley/InternshipFinder/pull/240) | Merged | `ab47c025`. Pages 42938139159 and backend verified. Eight preflight or local-render summaries. Provider and payload paths remain separate. |
+| 4 | WP-1.4 Sparse workflow logging | wp42_orders | `refactor/wp-1.4-logging-sparse` | [#242](https://github.com/bpmcginley/InternshipFinder/pull/242) | Merged | `bf7b5209`. Pages 42938874890, 42938884055 and backend verified. Both notify jobs passed. Four sparse jobs include the shared standard-library logger. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
 | 4 | WP-2.4 Config: Worker | Lead | `refactor/wp-2.4-worker-config` | [#223](https://github.com/bpmcginley/InternshipFinder/pull/223) | Merged | Merged as `e3822e4f`. Pages 42934103714 and backend verified. The generated Worker module supplies orders and the placement CLI. Both environment overrides remain evaluated at call time. |
@@ -290,6 +291,12 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 Finish the remaining Wave 4 logging reviews and verify each publication. Then open Wave 5 with one owner of the SEO source, Worker route characterization and the protected extension split. Confirm Product file claims before assigning work.
 
+## WP-1.4 sparse workflow diagnostics
+
+- Move IndexNow human counts and submission summaries plus Keep schedule and guard diagnostics to the shared console. Plain output stays byte-identical. JSON omits a local sitemap path and arbitrary guard names, and exception records contain only the existing class name. IndexNow usage, the raw Actions error annotation and the catch-up output file's bare skip key are preserved.
+- Four existing sparse checkout steps add only `backend/internscout`. Reverse comparison reproduced the exact baseline workflows, including actions, events, schedules, permissions and parameters. Parsed helper functions outside each CLI main match the original, including dispatch and submission request code.
+- Focused offline tests passed 32 cases. Golden matched all 695 files and Ruff passed. A separate Git sparse checkout exercised the notify and guard shape and the Keep schedule shape with Python's site packages disabled and network blocked. The test uses local time-zone data files on Windows for the existing zoneinfo dependency. Keep schedule requests used a local fake transport.
+
 ## WP-0.6 validation and coordination
 
 - Product-session coordination read from PR #170 (`notes/product/HANDOFF.md` section 3 and the new refactor section 4 bullet). Refactor has structural right of way; inspect product draft PR claims before each wave. Before formatting, publish "Formatting PRs next" at the top of this tracker and allow a few hours for product PRs to clear. Do not alter product-owned work.
@@ -366,6 +373,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Recovery Pages run 42890454209 passed all jobs. JavaScript formatting #189 merged as `da5bc492` after independent final review and all nine checks passed; its Pages run must pass before this retry merges. Integrated its exact source and all tracker evidence by normal merge.
 
+
+## WP-1.4 growth operator diagnostics
+
+- Audited 126 direct print calls in growth production modules at main `14143d37`. Moved the four audience display call sites and the single outreach summary to the shared console helper. The weekly report consumes `audience.tiers()` directly, and the outreach workflow uploads the two draft files from its output directory. Neither reads the operator console lines.
+- Plain output preserves the report's tier order, blank lines, summary and stdout. JSON mode formats the same audience counts and published major labels, and removes the local outreach destination. Draft file content and filenames stay the same. Both commands reuse their existing imports for direct script and package entry points.
+- Deferred workflow payloads include the report Markdown, directory monitor JSON, digest schedule GitHub output and metrics JSON. Product owns digest and every-major changes, and WP-2.4 owns the social and Instagram config edits. Credential flow, raw provider error messages and remaining publish/draft diagnostics need separate review before migration.
+- Focused mocked console and existing outreach/report checks passed 28 tests. After normal integration with main `cb0f5f98`, the same checks and public config checks passed 30 tests. Golden matched all 695 files. Ruff correctness and committed-file format checks and Git diff checks passed.
 
 ## WP-1.1 unused local server and review archive
 
