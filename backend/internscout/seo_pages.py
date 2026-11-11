@@ -38,6 +38,7 @@ from .site import digest as _digest
 from .site import discovery as _discovery
 from .site import employer as _employer
 from .site import field as _field
+from .site import listing as _listing
 from .site import llms as _llms
 from .site import near as _near
 from .site import numbers as _numbers
@@ -1450,23 +1451,16 @@ def opened_on(x: dict, year: int, baseline: str | None) -> tuple | None:
 def opened_rows(items: list[dict], year: int, baseline: str | None) -> list[tuple]:
     """One row per employer with roles in `items`: (day, exact, name, page or None, roles), newest-opened
     first. One employer's spellings are one row (employer_key), named as its employer page is."""
-    groups: dict[str, list] = {}
-    for x in items:
-        if x.get("company_name") and real_company(
-            x["company_name"]
-        ):  # not "APPLY NOW" (real_company)
-            groups.setdefault(employer_key(x["company_name"]), []).append(x)
-    rows = []
-    for _, its in sorted(groups.items()):
-        names = Counter(x["company_name"] for x in its)
-        path = next((EMPLOYERS[n] for n in sorted(names) if n in EMPLOYERS), None)
-        name = min(names, key=lambda n: (-names[n], len(n), n))
-        days = [d for d in (opened_on(x, year, baseline) for x in its) if d]
-        if not days:
-            continue
-        day, exact = min(days, key=lambda d: (d[0], not d[1]))
-        rows.append((day, exact, name, path, len(dedupe_roles(its))))
-    return sorted(rows, key=lambda r: (-r[0].toordinal(), not r[1], r[2].lower(), r[2]))
+    return _listing.opened_rows(
+        items,
+        year,
+        baseline,
+        employers=EMPLOYERS,
+        real_company=real_company,
+        employer_key=employer_key,
+        opened_on=opened_on,
+        dedupe_roles=dedupe_roles,
+    )
 
 
 def short_day(day) -> str:
@@ -1477,12 +1471,18 @@ def tracker_page(
     term: str, rows: list[tuple], roles: int, now: datetime, updated: str, term_path: str
 ) -> tuple[str, str, str, str]:
     """(title, description, h1, body) for one summer's tracker."""
-    today = now.astimezone(timezone.utc).date()
-    week = [r for r in rows if r[1] and (today - r[0]).days < NEW_DAYS]
+    return _render_tracker_page(
+        _listing.select_tracker(term, rows, roles, now, updated, term_path, NEW_DAYS)
+    )
+
+
+def _render_tracker_page(model: _listing.TrackerPage) -> tuple[str, str, str, str]:
+    term, rows, roles = model.term, model.rows, model.roles
+    updated, term_path = model.updated, model.term_path
     n = len(rows)
     lead = (
         f"As of {updated}, {plural(n, 'employer has', 'employers have')} opened {esc(term)} internships, "
-        f"with {roles:,} open roles between them; {len(week):,} opened this week."
+        f"with {roles:,} open roles between them; {model.opened_this_week:,} opened this week."
     )
     honest = (
         "These are employers InternScout found on public job boards, not every employer that will hire "
@@ -1490,7 +1490,7 @@ def tracker_page(
         "posted or found."
     )
     floor_note = ""
-    if any(not r[1] for r in rows):
+    if model.has_floor:
         floor_note = (
             "<p class=\"more\">A date with “by” is the day InternScout began recording when it first "
             f"finds a posting ({long_day(FIRST_SEEN_SINCE)}, or {long_day(CANADA_SINCE)} for roles in "
@@ -1522,7 +1522,7 @@ def tracker_page(
     title = fit_head([f"{term} Internships Open Now"], [f": {many} Companies"] if many else [])
     desc = (
         f"{n:,} companies with {term} internships open now, found on public job boards, newest first "
-        f"with the day each opened. {len(week):,} opened this week. Updated {updated}."
+        f"with the day each opened. {model.opened_this_week:,} opened this week. Updated {updated}."
     )
     return title, desc, f"{term} internships: who’s open now", body
 
@@ -4031,6 +4031,44 @@ def _render_digest_page(model: _digest.Page) -> tuple[str, str, str]:
     )
 
 
+def _render_kind_page(model: _listing.KindPage) -> dict:
+    path, k, items = model.path, model.kind, model.items
+    lead = ""
+    if model.tracker is not None:
+        term, tracker = model.tracker
+        lead = (
+            f"<p class=\"more\"><a href=\"{tracker}\">Which employers have opened "
+            f"{esc(term)} internships</a>, newest first, with the day each opened.</p>"
+        )
+    related = (
+        lead
+        + k.get("note", "")
+        + link_list(f"{k['h1'][0].upper()}{k['h1'][1:]} by field", model.related_fields)
+        + link_list("More ways to browse", model.related_kinds)
+    )
+    # A count floor stays useful between refreshes. fit_head trims the title if it does not fit.
+    floor = count_floor(len(items))
+    return {
+        "path": path,
+        "title": fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
+        "desc": kind_description(k, items, model.updated),
+        "h1": k["h1"],
+        "crumbs": [model.root, (path, k["crumb"])],
+        "body": listing_body(
+            items,
+            k["what"],
+            "",
+            model.now,
+            related,
+            dash=dash_link(**k["dash"]),
+            tail=k.get("tail", TAIL),
+            about=k.get("about", frozenset()),
+            src="seo-hub",
+        ),
+        "items": items,
+    }
+
+
 def _render_new_page(model: _digest.NewPage) -> dict:
     new, root, now, updated = model.items, model.root, model.now, model.updated
     return {
@@ -5136,74 +5174,28 @@ def build(
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
     # already uses is skipped, like a field slug that names a state.
     taken = {p["path"] for p in pages}
-    kind_made = []
-    for k in kinds(listings):
-        path = f"/internships/{k['slug']}/"
-        items = [x for x in listings if k["pick"](x)]
-        if path not in taken and enough(len(items), path, MIN_KIND):
-            kind_made.append((path, k, items))
+    kind_made = _listing.select_kinds(kinds(listings), listings, taken, enough, MIN_KIND)
     term_paths = {f"/internships/{slugify(t)}/": t for t in trackers}
     trackers = [
         t for t in trackers if any(p == f"/internships/{slugify(t)}/" for p, _, _ in kind_made)
     ]
-    for path, k, items in kind_made:
-        by_tag = Counter(
-            t for x in items for t in set(x.get("field_tags") or []) - SKIP_FIELDS if t in fields
-        )
-        # A summer's term page leads with its employers, newest-opened first (2026-10-07).
-        lead = (
-            f"<p class=\"more\"><a href=\"{tracker_path(term_paths[path])}\">Which employers have opened "
-            f"{esc(term_paths[path])} internships</a>, newest first, with the day each opened.</p>"
-            if path in term_paths and term_paths[path] in trackers
-            else ""
-        )
-        related = (
-            lead
-            + k.get("note", "")
-            + link_list(
-                f"{k['h1'][0].upper()}{k['h1'][1:]} by field",
-                [
-                    (f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                    for t in top(by_tag, RELATED)
-                ],
-            )  # was: for t, _ in top.most_common(RELATED)
-            + link_list(
-                "More ways to browse",
-                [
-                    (p, kk["h1"][0].upper() + kk["h1"][1:], len(v))
-                    for p, kk, v in kind_made
-                    if p != path
-                ],
-            )
-        )
-        n = f"{len(items):,}"
-        # The title loses what follows the count, then the count (2026-10-05): "Research Internships for
-        # Undergraduates – 534 Open" is 64 with the suffix. was: k["title"].format(n=n) + " | InternScout"
-        # 2026-10-13: the subject and its tails apart (fit_head), the count a floor (count_floor) and no
-        # dash. was: full = k["title"].format(n=n), one string with " – {n} Open", and the forms
-        # [full, full up to the count, full.split(" – ")[0]].
-        floor = count_floor(len(items))
-        add(
-            path,
-            fit_head([k["title"]], [tl.format(n=floor) for tl in k["tails"]] if floor else []),
-            kind_description(
-                k, items, updated
-            ),  # 2026-10-23; was: k["desc"].format(n=n, updated=updated)
-            k["h1"],
-            [root, (path, k["crumb"])],
-            listing_body(
-                items,
-                k["what"],
-                "",
-                now,
-                related,
-                dash=dash_link(**k["dash"]),
-                tail=k.get("tail", TAIL),
-                about=k.get("about", frozenset()),
-                src="seo-hub",
+    for path, kind, items in kind_made:
+        term = term_paths.get(path)
+        tracker = (term, tracker_path(term)) if term is not None and term in trackers else None
+        model = _listing.KindPage(
+            path=path,
+            kind={key: value for key, value in kind.items() if key != "pick"},
+            items=items,
+            root=root,
+            now=now,
+            updated=updated,
+            related_fields=_listing.related_fields(
+                items, fields, SKIP_FIELDS, top, field_slug, field_title, RELATED
             ),
-            items,
+            related_kinds=_listing.related_kinds(kind_made, path),
+            tracker=tracker,
         )
+        add(**_render_kind_page(model))
 
     # The trackers themselves (tracker_page), each under its term page in the breadcrumb trail.
     for t in trackers:
