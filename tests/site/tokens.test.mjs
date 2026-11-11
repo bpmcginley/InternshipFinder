@@ -12,7 +12,7 @@ test("the generated token blocks are current with tokens.css", () => {
   assert.deepEqual(updateTokenCopies(), [], "run node scripts/generate_tokens.mjs");
 });
 
-test("the generator validates the last target before writing any files", () => {
+function withTokenFixture(run) {
   const dir = mkdtempSync(join(tmpdir(), "internscout-tokens-"));
   const script = "scripts/generate_tokens.mjs";
   const targets = [
@@ -28,6 +28,14 @@ test("the generator validates the last target before writing any files", () => {
       mkdirSync(dirname(file), { recursive: true });
       copyFileSync(new URL("../../" + path, import.meta.url), file);
     }
+    run(dir, script, targets);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("the generator validates the last target before writing any files", () => {
+  withTokenFixture((dir, script, targets) => {
     const source = join(dir, "tokens.css");
     const original = readFileSync(source, "utf8");
     const edited = original.replace(/--paper:[^;]+;/, "--paper:#010203;");
@@ -47,9 +55,24 @@ test("the generator validates the last target before writing any files", () => {
     for (const [index, path] of targets.entries()) {
       assert.deepEqual(readFileSync(join(dir, path)), before[index], path);
     }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  });
+});
+
+test("the generator keeps whitespace inside a wrapped token value", () => {
+  withTokenFixture((dir, script, targets) => {
+    const source = join(dir, "tokens.css");
+    const original = readFileSync(source, "utf8");
+    const edited = original.replace("--shadow-pop:0 10px 30px", "--shadow-pop:0\n  10px 30px");
+    assert.notEqual(edited, original);
+    writeFileSync(source, edited);
+
+    const result = spawnSync(process.execPath, [join(dir, script)], { encoding: "utf8" });
+    assert.equal(result.status, 0);
+    for (const path of targets) {
+      const output = readFileSync(join(dir, path), "utf8");
+      assert.match(output, /--shadow-pop:0\s+10px 30px/);
+    }
+  });
 });
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");

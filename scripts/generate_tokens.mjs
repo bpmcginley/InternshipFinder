@@ -28,9 +28,26 @@ function findBlock(css, file) {
 }
 
 function compactBody(body, breakBefore) {
-  const flat = body.split("\n").map((line) => line.trim()).join("").replace(/;$/, "");
+  // Quoted strings, comments and escapes can contain characters that look like separators.
+  const tokens = /\/\*[\s\S]*?\*\/|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|\\[\s\S]|[()[\];]/g;
+  const declarations = [];
+  let depth = 0;
+  let start = 0;
+  for (const { 0: token, index } of body.matchAll(tokens)) {
+    if (token === "(" || token === "[") depth++;
+    else if (token === ")" || token === "]") depth--;
+    else if (token === ";" && depth === 0) {
+      declarations.push(body.slice(start, index).trimStart());
+      start = index + 1;
+    }
+  }
+  const tail = body.slice(start).trimStart();
+  if (tail) declarations.push(tail);
+
   // Retain the historical line wrap in the four compact copies.
-  return breakBefore ? flat.replace(`;${breakBefore}:`, `;\n${breakBefore}:`) : flat;
+  return declarations.map((declaration) =>
+    breakBefore && declaration.startsWith(breakBefore + ":") ? "\n" + declaration : declaration
+  ).join(";");
 }
 
 export function updateTokenCopies({ write = false } = {}) {
