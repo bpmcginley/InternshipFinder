@@ -143,42 +143,58 @@ export function createEmployerCatalogCache({
     return promise;
   }
 
+  async function match(key) {
+    const at = time();
+    if (at === null) {
+      drop();
+      return null;
+    }
+    if (cached && at >= cached.expires) cached = null;
+    if (!cached && at < retryAt) return null;
+    const entry = cached || (await (pending?.promise || start(at)));
+    const current = time();
+    if (current === null) {
+      drop();
+      return null;
+    }
+    if (!entry || entry !== cached || current >= entry.expires) {
+      if (entry === cached) cached = null;
+      return null;
+    }
+    try {
+      const accepted = entry.known(key);
+      if (typeof accepted !== "boolean") throw new Error("Invalid membership predicate");
+      const finished = time();
+      if (finished === null) {
+        drop();
+        return null;
+      }
+      if (entry !== cached || finished >= entry.expires) {
+        cached = null;
+        return null;
+      }
+      if (!accepted) return null;
+      // Recheck this exact snapshot when the caller resumes and admits the click.
+      return (checked) =>
+        Number.isSafeInteger(checked) &&
+        checked >= last &&
+        checked < entry.expires &&
+        entry === cached;
+    } catch {
+      drop();
+      return null;
+    }
+  }
+
   return Object.freeze({
+    match,
     async has(key) {
-      const at = time();
-      if (at === null) {
-        drop();
-        return false;
-      }
-      if (cached && at >= cached.expires) cached = null;
-      if (!cached && at < retryAt) return false;
-      const entry = cached || (await (pending?.promise || start(at)));
-      const current = time();
-      if (current === null) {
-        drop();
-        return false;
-      }
-      if (!entry || entry !== cached || current >= entry.expires) {
-        if (entry === cached) cached = null;
-        return false;
-      }
-      try {
-        const accepted = entry.known(key);
-        if (typeof accepted !== "boolean") throw new Error("Invalid membership predicate");
-        const finished = time();
-        if (finished === null) {
-          drop();
-          return false;
-        }
-        if (entry !== cached || finished >= entry.expires) {
-          cached = null;
-          return false;
-        }
-        return accepted;
-      } catch {
-        drop();
-        return false;
-      }
+      const isCurrent = await match(key);
+      if (!isCurrent) return false;
+      const checked = time();
+      if (checked !== null) return isCurrent(checked);
+      drop();
+      return false;
     },
   });
 }

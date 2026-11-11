@@ -25,11 +25,13 @@ export async function employerCachedCounterScenario(db) {
   const address = "192.0.2.90";
   let time = start,
     loads = 0,
-    finishLoad;
+    finishLoad,
+    crossingExpiry = false,
+    expiryReads = 0;
   const count = createCachedEmployerPostingCounter({
     db,
     maxBytes: 64,
-    now: () => new Date(time),
+    now: () => new Date(crossingExpiry && ++expiryReads === 5 ? time + 1 : time),
     load() {
       loads++;
       if (loads === 1) return new Response('["acme"]');
@@ -48,6 +50,15 @@ export async function employerCachedCounterScenario(db) {
   eq(await count.count(event("newco"), address), false, "unknown key denied");
   eq(loads, 1, "same snapshot reused");
 
+  time = start + 299_999;
+  // The counter and the cache use four reads before control returns to the D1 admission fence.
+  crossingExpiry = true;
+  eq(
+    await count.count(event(), address),
+    false,
+    "expiry between cache match and D1 admits nothing",
+  );
+  crossingExpiry = false;
   time = start + 300_000;
   eq(await count.count(event(), address), false, "duplicate keys invalidate expired refresh");
   time += 4_999;

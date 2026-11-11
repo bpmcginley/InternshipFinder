@@ -57,9 +57,12 @@ export function createEmployerMinuteBudget(schedule = setTimeout, cancel = clear
 
 // Shared by counter instances in this isolate, including after snapshot replacement.
 const employerMinuteBudget = createEmployerMinuteBudget();
+const permanentMatch = () => true;
 
 export function createEmployerPostingCounter({ db, keys, now = () => new Date() }) {
-  return employerPostingCounter(db, catalog(keys), now);
+  const known = catalog(keys);
+  const match = known && ((key) => (known(key) ? permanentMatch : null));
+  return employerPostingCounter(db, match, now);
 }
 
 export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = () => new Date() }) {
@@ -70,11 +73,11 @@ export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = (
     now: () => now().getTime(),
     loadTimeoutMs: 5_000,
   });
-  return employerPostingCounter(db, cache.has, now);
+  return employerPostingCounter(db, cache.match, now);
 }
 
 // Cleanup has to succeed for the current UTC day before accepting counts.
-function employerPostingCounter(db, known, now) {
+function employerPostingCounter(db, match, now) {
   let readyDay = null;
   let cleanupVersion = 0;
   return {
@@ -82,7 +85,7 @@ function employerPostingCounter(db, known, now) {
       const version = ++cleanupVersion;
       readyDay = null;
       const at = now();
-      if (!known || !instant(at)) return false;
+      if (!match || !instant(at)) return false;
       const day = at.toISOString().slice(0, 10);
       const cutoff = new Date(at.getTime() - 90 * DAY).toISOString().slice(0, 10);
       try {
@@ -119,7 +122,7 @@ function employerPostingCounter(db, known, now) {
     },
     async count(body, address) {
       const at = now();
-      if (!known || !instant(at)) return false;
+      if (!match || !instant(at)) return false;
       const day = at.toISOString().slice(0, 10);
       const version = cleanupVersion;
       if (readyDay !== day || !employerMinuteBudget(address, at)) return false;
@@ -135,14 +138,16 @@ function employerPostingCounter(db, known, now) {
       )
         return false;
       const company = body.c;
-      if (!(await known(company))) return false;
+      const isCurrent = await match(company);
+      if (!isCurrent) return false;
       const checked = now();
       if (
         !instant(checked) ||
         checked.getTime() < at.getTime() ||
         checked.toISOString().slice(0, 10) !== day ||
         readyDay !== day ||
-        cleanupVersion !== version
+        cleanupVersion !== version ||
+        !isCurrent(checked.getTime())
       )
         return false;
       // D1 batch is one transaction. The second write follows only a successful company

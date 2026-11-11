@@ -61,7 +61,7 @@ function fixture(options = {}) {
   };
 }
 
-test("catalog fetch and validation are single-flight; only membership escapes", async () => {
+test("catalog fetch and validation are single-flight; membership checks expose no keys", async () => {
   const gate = deferred();
   const f = fixture({
     parse: async () => {
@@ -75,9 +75,19 @@ test("catalog fetch and validation are single-flight; only membership escapes", 
   assert.equal(f.loads(), 1);
   assert.equal(f.parses(), 1);
   assert.equal(await f.cache.has("unknown"), false);
-  assert.deepEqual(Object.keys(f.cache), ["has"]);
+  assert.deepEqual(Object.keys(f.cache), ["match", "has"]);
   assert.equal(Object.isFrozen(f.cache), true);
   assert.equal(f.timers.size, 0);
+});
+
+test("a matched catalog still has to be current when the caller resumes", async () => {
+  const f = fixture();
+  const isCurrent = await f.cache.match("acme");
+  assert.equal(isCurrent(299_999), true);
+  assert.equal(isCurrent(300_000), false);
+  f.set(300_000);
+  assert.equal(await f.cache.has("acme"), true);
+  assert.equal(isCurrent(299_999), false);
 });
 
 test("catalog expires at exactly 300 seconds from load start, not validation completion", async () => {
