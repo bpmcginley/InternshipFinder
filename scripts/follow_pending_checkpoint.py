@@ -83,29 +83,40 @@ def _check_predecessor(predecessor):
         raise _reject("invalid expected predecessor")
 
 
-def _raw_git(checkout, *args):
+def _candidate_git(checkout):
+    checkout = Path(checkout).resolve()
+    if not (checkout / ".git").exists():
+        raise _reject("candidate requires an explicit Git checkout")
     env = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
     env.update(
         GIT_ALLOW_PROTOCOL="",
-        GIT_CEILING_DIRECTORIES=str(Path(checkout).resolve().parent),
         GIT_CONFIG_GLOBAL=os.devnull,
         GIT_CONFIG_NOSYSTEM="1",
         GIT_NO_LAZY_FETCH="1",
     )
-    return git(checkout, *args, no_replace=True, env=env).stdout
+    resolved = (
+        git(
+            checkout,
+            "rev-parse",
+            "--show-toplevel",
+            "--absolute-git-dir",
+            no_replace=True,
+            env=env,
+        )
+        .stdout.decode("utf-8")
+        .splitlines()
+    )
+    if len(resolved) != 2 or Path(resolved[0]).resolve() != checkout:
+        raise _reject("candidate requires an explicit Git checkout")
+    env.update(GIT_DIR=str(Path(resolved[1]).resolve()), GIT_WORK_TREE=str(checkout))
 
+    def run(*args):
+        return git(checkout, *args, no_replace=True, env=env).stdout
 
-def _revision(checkout, ref):
-    return _raw_git(checkout, "rev-parse", "--verify", ref).decode("ascii").strip()
-
-
-def _object_size(checkout, ref):
-    return int(_raw_git(checkout, "cat-file", "-s", ref))
+    return run
 
 
 def _candidate_source(checkout, candidate, predecessor, identity, bounds):
-    if not (Path(checkout) / ".git").exists():
-        raise _reject("candidate requires an explicit Git checkout")
     if (
         not _git_id(candidate)
         or len(candidate) != len(predecessor.commit)
@@ -118,30 +129,37 @@ def _candidate_source(checkout, candidate, predecessor, identity, bounds):
         )
     ):
         raise _reject("malformed pending source identity")
+    raw_git = _candidate_git(checkout)
+
+    def revision(ref):
+        return raw_git("rev-parse", "--verify", ref).decode("ascii").strip()
+
+    def object_size(ref):
+        return int(raw_git("cat-file", "-s", ref))
+
     if any(
-        _raw_git(checkout, "cat-file", "-t", commit).strip() != b"commit"
+        raw_git("cat-file", "-t", commit).strip() != b"commit"
         for commit in (candidate, predecessor.commit)
     ):
         raise _reject("pending commit identity must name a commit object")
-    if _object_size(checkout, candidate) > bounds.max_source_bytes:
+    if object_size(candidate) > bounds.max_source_bytes:
         raise _reject("candidate commit byte bound")
-    raw = _raw_git(checkout, "cat-file", "commit", candidate)
+    raw = raw_git("cat-file", "commit", candidate)
     headers = raw.split(b"\n\n", 1)[0].splitlines()
     parents = [line[7:] for line in headers if line.startswith(b"parent ")]
     trees = [line[5:] for line in headers if line.startswith(b"tree ")]
     if parents != [predecessor.commit.encode("ascii")] or len(trees) != 1:
         raise _reject("candidate must have exact raw predecessor")
-    tree = _revision(checkout, f"{candidate}^{{tree}}")
-    prior_tree = _revision(checkout, f"{predecessor.commit}^{{tree}}")
-    prior_public = _revision(checkout, f"{predecessor.commit}:{PUBLIC}")
+    tree = revision(f"{candidate}^{{tree}}")
+    prior_tree = revision(f"{predecessor.commit}^{{tree}}")
+    prior_public = revision(f"{predecessor.commit}:{PUBLIC}")
     if (
         trees[0] != tree.encode("ascii")
         or tree == prior_tree
         or prior_public != predecessor.public_tree
     ):
         raise _reject("candidate tree, no-op or predecessor public tree")
-    changed = _raw_git(
-        checkout,
+    changed = raw_git(
         "diff-tree",
         "-r",
         "--no-commit-id",
@@ -159,13 +177,13 @@ def _candidate_source(checkout, candidate, predecessor, identity, bounds):
     if any(not owned(path.decode("utf-8")) for path in changed.split(b"\0")[:-1]):
         raise _reject("candidate changed a path outside the owned snapshot")
 
-    public_tree = _revision(checkout, f"{candidate}:{PUBLIC}")
-    listing_tree = _revision(checkout, f"{candidate}:{PUBLIC}/listings")
-    if _object_size(checkout, listing_tree) > bounds.max_source_bytes:
+    public_tree = revision(f"{candidate}:{PUBLIC}")
+    listing_tree = revision(f"{candidate}:{PUBLIC}/listings")
+    if object_size(listing_tree) > bounds.max_source_bytes:
         raise _reject("pending listing tree byte bound")
     expected = {"index.json", *(f"{key}.json" for key in identity.shard_sha256)}
     actual = set()
-    for entry in _raw_git(checkout, "ls-tree", "-z", listing_tree).split(b"\0")[:-1]:
+    for entry in raw_git("ls-tree", "-z", listing_tree).split(b"\0")[:-1]:
         meta, _, name = entry.partition(b"\t")
         mode, kind, _ = meta.split()
         filename = name.decode("utf-8")
@@ -180,10 +198,10 @@ def _candidate_source(checkout, candidate, predecessor, identity, bounds):
     def blob(path):
         nonlocal remaining
         ref = f"{candidate}:{PUBLIC}/{path}"
-        remaining -= _object_size(checkout, ref)
+        remaining -= object_size(ref)
         if remaining < 0:
             raise _reject("pending source byte bound")
-        return _raw_git(checkout, "cat-file", "blob", ref)
+        return raw_git("cat-file", "blob", ref)
 
     index = blob("listings/index.json")
     shards = {f"listings/{key}.json": blob(f"listings/{key}.json") for key in identity.shard_sha256}
