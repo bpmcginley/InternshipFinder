@@ -1,4 +1,12 @@
 // Dormant digest storage only. No transport or production caller imports this module.
+import {
+  debitFollowSendBudget,
+  followBudgetStamp,
+  followSendBudgetAvailable,
+  observeFollowSendBudget,
+  validFollowSendCap,
+} from "./follow-send-budget.js";
+
 const DAY = 86400_000,
   LEASE = 5 * 60_000;
 const encoder = new TextEncoder();
@@ -9,7 +17,7 @@ const invalid = () => {
   throw new Error("Invalid digest outbox input");
 };
 
-function payloadOf(refs) {
+export function payloadOf(refs) {
   if (!Array.isArray(refs) || !refs.length) invalid();
   const seen = new Set();
   for (const ref of refs) {
@@ -95,7 +103,56 @@ async function dailyMarker(key, email, now) {
   return [...new Uint8Array(bytes)].map((n) => n.toString(16).padStart(2, "0")).join("");
 }
 
-export async function beginFollowDigestAttempt(db, key, id, lease, clock = () => new Date()) {
+// Snapshot jobs require valid immutable metadata and an exact current progress set. The
+// anti-join stops at the first extra confirmed scope; at most captured-count+1 are visited.
+const snapshotConsent =
+  "EXISTS (SELECT 1 FROM follow_valid_pending v WHERE v.job_id=follow_digest_outbox.id AND v.snapshot_at<=? " +
+  "AND NOT EXISTS (SELECT 1 FROM json_each(v.advances) a WHERE NOT EXISTS (" +
+  "SELECT 1 FROM follow_subscriptions s JOIN follow_scope_progress p " +
+  "ON p.subscriber_id=s.subscriber_id AND p.scope_key=s.scope_key " +
+  "WHERE s.subscriber_id=follow_digest_outbox.subscriber_id AND s.scope_key=json_extract(a.value,'$.scopeKey') " +
+  "AND s.confirmed_at=json_extract(a.value,'$.confirmedAt') " +
+  "AND p.scope_generation=json_extract(a.value,'$.generation') AND p.watermark=json_extract(a.value,'$.from')) " +
+  ") AND NOT EXISTS (SELECT 1 FROM follow_subscriptions s " +
+  "WHERE s.subscriber_id=follow_digest_outbox.subscriber_id AND s.confirmed_at IS NOT NULL " +
+  "AND s.scope_key NOT IN (SELECT json_extract(a.value,'$.scopeKey') FROM json_each(v.advances) a)))";
+
+// Compatibility for standalone dormant jobs. A present pending row still requires validation.
+export function beginFollowDigestAttempt(db, key, id, lease, clock = () => new Date()) {
+  return beginAttempt(db, key, id, lease, clock, false);
+}
+
+// Strict snapshot claim for existing callers. Missing pending metadata cannot use legacy fallback.
+export function beginFollowSnapshotAttempt(db, key, id, lease, clock = () => new Date()) {
+  return beginAttempt(db, key, id, lease, clock, true);
+}
+
+// A future snapshot sender must use this budgeted boundary. A paused result leaves the
+// pre-attempt lease reclaimable and should stop that scheduler pass without immediate retries.
+export async function beginBudgetedFollowSnapshotAttempt(
+  db,
+  key,
+  id,
+  lease,
+  cap,
+  clock = () => new Date(),
+) {
+  if (!validFollowSendCap(cap)) return "unavailable";
+  try {
+    return (await beginAttempt(db, key, id, lease, clock, true, cap)) || "unavailable";
+  } catch {
+    // A lost batch response may have committed. Never authorize transport or retry here.
+    return "unavailable";
+  }
+}
+
+function budgetClock(clock) {
+  const stamp = followBudgetStamp(clock());
+  if (!stamp) invalid();
+  return new Date(stamp);
+}
+
+async function beginAttempt(db, key, id, lease, clock, requirePending, cap = null) {
   if (typeof clock !== "function") invalid();
   const email = await db
     .prepare(
@@ -104,42 +161,96 @@ export async function beginFollowDigestAttempt(db, key, id, lease, clock = () =>
     .bind(id)
     .first("email");
   if (!email) return false;
-  const preparedAt = clock();
+  const preparedAt = cap === null ? clock() : budgetClock(clock);
   const marker = await dailyMarker(key, email, preparedAt);
-  const now = clock();
+  const now = cap === null ? clock() : budgetClock(clock);
   // No stale preparation can claim yesterday's budget. Caller may prepare again without sending.
   if (dayOf(now) !== dayOf(preparedAt) || +now < +preparedAt) return false;
   const at = iso(now);
-  const midnight = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
-  ).toISOString();
+  const midnight =
+    cap === null
+      ? new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+        ).toISOString()
+      : plus(new Date(at.slice(0, 10) + "T00:00:00.000Z"), DAY);
+  if (cap !== null && midnight.length !== 24) return false;
   const valid = "id=? AND state='leased' AND lease_token=? AND lease_until>? AND expires_at>?";
-  const result = await db.batch([
+  const progress = requirePending
+    ? snapshotConsent
+    : "(NOT EXISTS (SELECT 1 FROM follow_pending_progress WHERE job_id=follow_digest_outbox.id) OR " +
+      snapshotConsent +
+      ")";
+  const budgetGuard = cap === null ? "" : " AND " + followSendBudgetAvailable;
+  const budgetArgs = cap === null ? [] : [at, cap];
+  const markerInsert = db
+    .prepare(
+      "INSERT INTO follow_digest_days (marker,expires_at) SELECT ?,? FROM follow_digest_outbox WHERE " +
+        valid +
+        ` AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND EXISTS ` +
+        "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) AND " +
+        progress +
+        budgetGuard +
+        " ON CONFLICT(marker) DO NOTHING",
+    )
+    .bind(marker, midnight, id, lease, at, at, email, at, ...budgetArgs);
+  // changes() is the preceding marker INSERT in this atomic D1 batch. Existing markers cannot
+  // authorize a second attempt, even after unsubscribe/resubscribe or across enqueue days.
+  const claim = db
+    .prepare(
+      "UPDATE follow_digest_outbox SET state='attempting',attempted_at=?,lease_until=MIN(?,expires_at,?) WHERE " +
+        valid +
+        " AND changes()=1",
+    )
+    .bind(at, plus(now, LEASE), midnight, id, lease, at, at);
+  const cancel = db
+    .prepare(
+      "UPDATE follow_digest_outbox SET state='cancelled',payload=NULL,lease_token=NULL,lease_until=NULL " +
+        "WHERE id=? AND state='leased' AND lease_token=?" +
+        budgetGuard,
+    )
+    .bind(id, lease, ...budgetArgs);
+  if (cap === null) return (await db.batch([markerInsert, claim, cancel]))[1].meta.changes > 0;
+
+  const results = await db.batch([
+    // The attempt may extend lease_until. Keep the exact pre-claim deadlines from this
+    // same transaction so a delayed response cannot authorize work under an expired lease.
+    db
+      .prepare("SELECT lease_until,expires_at FROM follow_digest_outbox WHERE " + valid)
+      .bind(id, lease, at, at),
+    observeFollowSendBudget(db, at),
+    markerInsert,
+    claim,
+    debitFollowSendBudget(db, at, cap, true),
+    cancel,
     db
       .prepare(
-        "INSERT INTO follow_digest_days (marker,expires_at) SELECT ?,? FROM follow_digest_outbox WHERE " +
-          valid +
-          ` AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND EXISTS ` +
-          "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) ON CONFLICT(marker) DO NOTHING",
+        "SELECT o.state,o.lease_until,o.expires_at,b.attempts FROM follow_digest_outbox o " +
+          "JOIN follow_send_budget b ON b.slot=1 AND b.observed_at=? " +
+          "WHERE o.id=? AND o.lease_token=?",
       )
-      .bind(marker, midnight, id, lease, at, at, email),
-    // changes() is the preceding marker INSERT in this atomic D1 batch. Existing markers cannot
-    // authorize a second attempt, even after unsubscribe/resubscribe or across enqueue days.
-    db
-      .prepare(
-        "UPDATE follow_digest_outbox SET state='attempting',attempted_at=?,lease_until=MIN(?,expires_at,?) WHERE " +
-          valid +
-          " AND changes()=1",
-      )
-      .bind(at, plus(now, LEASE), midnight, id, lease, at, at),
-    db
-      .prepare(
-        "UPDATE follow_digest_outbox SET state='cancelled',payload=NULL,lease_token=NULL,lease_until=NULL " +
-          "WHERE id=? AND state='leased' AND lease_token=?",
-      )
-      .bind(id, lease),
+      .bind(at, id, lease),
   ]);
-  return result[1].meta.changes > 0;
+  const checked = budgetClock(clock).toISOString();
+  if (checked < at || checked >= midnight || !results.every(({ success }) => success)) return false;
+  const [original, , , claimed, debited, , current] = results;
+  const row = current.results[0];
+  if (!liveDeadlines(original.results[0], checked) || !liveDeadlines(row, checked)) return false;
+  if (claimed.meta.changes === 1 && debited.meta.changes === 1 && row.state === "attempting")
+    return "claimed";
+  if (row.state === "leased" && row.attempts >= cap) return "paused";
+  return false;
+}
+
+function liveDeadlines(row, checked) {
+  return (
+    row &&
+    [row.lease_until, row.expires_at].every(
+      (value) =>
+        typeof value === "string" &&
+        followBudgetStamp(new Date(value)) === value &&
+        checked < value,
+    )
+  );
 }
 
 // Caller reports a known acceptance or uncertainty; there is deliberately no retry transition.
@@ -164,9 +275,9 @@ export async function finishFollowDigestAttempt(db, id, lease, outcome, now = ne
   return result[1].meta.changes > 0;
 }
 
-export async function expireFollowOutbox(db, now = new Date()) {
+export function followOutboxExpiryStatements(db, now) {
   const at = iso(now);
-  await db.batch([
+  return [
     db
       .prepare(
         "UPDATE follow_digest_outbox SET state='uncertain',payload=NULL,lease_token=NULL,lease_until=NULL " +
@@ -181,5 +292,43 @@ export async function expireFollowOutbox(db, now = new Date()) {
       .bind(at),
     db.prepare("DELETE FROM follow_digest_outbox WHERE created<=?").bind(plus(now, -7 * DAY)),
     db.prepare("DELETE FROM follow_digest_days WHERE expires_at<=?").bind(at),
-  ]);
+  ];
+}
+
+export async function expireFollowOutbox(db, now = new Date()) {
+  await db.batch(followOutboxExpiryStatements(db, now));
+}
+
+// Dormant final transport fence. No caller may await other work after true before handoff.
+// Snapshot consent is the same exact generation/progress check used by the budgeted claim.
+export async function authorizeFollowSnapshotTransport(db, id, lease, subscriberId, email, clock) {
+  try {
+    const at = budgetClock(clock).toISOString();
+    const results = await db.batch([
+      db
+        .prepare(
+          "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at FROM follow_digest_outbox " +
+            "JOIN follow_subscribers u ON u.id=follow_digest_outbox.subscriber_id " +
+            "WHERE follow_digest_outbox.id=? AND state='attempting' AND lease_token=? " +
+            "AND subscriber_id=? AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
+            "AND attempted_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            "AND substr(attempted_at,1,10)=date('now') " +
+            "AND lease_until>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            "AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            `AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND ${snapshotConsent}`,
+        )
+        .bind(id, lease, subscriberId, email, at, at.slice(0, 10), at),
+    ]);
+    const checked = budgetClock(clock).toISOString();
+    return (
+      checked >= at &&
+      checked.slice(0, 10) === at.slice(0, 10) &&
+      results.length === 1 &&
+      results[0].success === true &&
+      results[0].results.length === 1 &&
+      liveDeadlines(results[0].results[0], checked)
+    );
+  } catch {
+    return false;
+  }
 }
