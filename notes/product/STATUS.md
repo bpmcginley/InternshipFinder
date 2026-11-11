@@ -4,7 +4,7 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
-- **P-2.3v native dashboard key claim:** isolated native row rendering/test/evidence package on `f73efa65`. Existing organic direct links may consume validated same-release public employer keys; saved-only/paid/Auto-Apply controls excluded. Classic assets, capture flag, shared golden/allowlist and live publication stay unchanged.
+- **P-2.3v native dashboard keys [#419](https://github.com/bpmcginley/InternshipFinder/pull/419):** draft source/evidence on `f73efa65`; 340 local site tests pass. Native organic direct posting anchors consume validated same-release keys; saved-only/paid/Auto-Apply controls excluded. Eight 1280/375 light/dark Browse/My list visual pairs are identical. Classic assets and capture/publication stay unchanged. Independent review and coordinated golden refresh remain pending; Checkout owns shared fixture/allowlist work.
 
 - **P-2.3u employer publication adapter:** draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) on published `45ccddda` adds an explicit default-off publisher option. It captures the selected export once, validates same-release annotations/catalog, and renders from that captured input. Default 830-file golden is unchanged; opted-in synthetic output has 831 files and passes the publication allowlist. Full Python/growth and site Node suites pass; paired visual evidence is unchanged. Independent review/CI remain pending. No writer, workflow, browser activation or Worker configuration change.
 

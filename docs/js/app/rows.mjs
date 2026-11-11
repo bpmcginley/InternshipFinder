@@ -135,6 +135,21 @@ export function createRows(browser, {
           onClick: onToggle, onKeyDown }, open ? "Hide details" : "Details"));
   }
 
+  // Only the selected public export supplies this key. Local saved snapshots never do.
+  const postingEncoder = typeof browser.TextEncoder === "function" ? new browser.TextEncoder() : null;
+  function employerPostingKey(r) {
+    const key = r.employer_key, href = r.apply_url;
+    if (r._savedMissing || !["open", "closed"].includes(r.status) || !postingEncoder ||
+        typeof key !== "string" || !key || key.length > 200 || key !== key.trim() ||
+        /[\u0000-\u001f\u007f\ud800-\udfff]/u.test(key) || postingEncoder.encode(key).length > 200 ||
+        typeof href !== "string" || !/^https?:\/\//i.test(href) || /[\u0000-\u001f\u007f\\]/.test(href)) return undefined;
+    try {
+      const target = new browser.URL(href);
+      if (!target.hostname || target.username || target.password || /^https?:\/\/[^/?#]*@/i.test(href)) return undefined;
+    } catch (e) { return undefined; }
+    return key;
+  }
+
   // The listing row (A2 component 4, D9 to D11, 2026-10-14). Three short lines instead of five columns:
   //   1. the company (semibold, ink), then the title;
   //   2. one grey facts line: field, place, term, then pay (tabular figures, or "Pay not listed");
@@ -202,7 +217,7 @@ export function createRows(browser, {
           // was: an underlined link; a secondary button now (D9), with the shared external-link icon.
           // was: named "Open posting (opens in a new tab)" and "Auto-Apply" on every row; the row is in the name now (U12).
           // onOpen (U9): remembered so the page can ask "Did you apply?" when the student comes back.
-          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined, onClick: () => onOpen(r) },
+          r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined, "data-employer-key": employerPostingKey(r), onClick: () => onOpen(r) },
             "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, `, ${who} (opens in a new tab)`)) : h("span", { className: "muted" }, "No link"),
           !job && canAuto && !r._savedMissing && r.apply_url && h("button", { type: "button", className: "rowbtn", title: "Fills from your resume. You review and submit.", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
             "Auto-Apply", h("span", { className: "sr" }, ": " + who)),
