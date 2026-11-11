@@ -77,7 +77,7 @@ export async function stripeReservationRoundTrip(db) {
     current;
   const adapter = await prepareTopupStripe(env, callbacks, async (url, options) => {
     assert.equal(options.headers["Stripe-Version"], "2026-08-26.dahlia");
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     if (url.includes("/prices/")) return reply(price());
     if (options.method === "POST") {
       posts++;

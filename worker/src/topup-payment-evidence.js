@@ -131,7 +131,7 @@ export async function readTopupPaymentEvidence(
         // Throw before billing's logger can include a private object path or provider error body.
         const response = await fetchImpl(url, {
           ...options,
-          redirect: "error",
+          redirect: "manual",
           signal: controller.signal,
         });
         if (stopped || performance.now() >= deadline || response.ok !== true) {
