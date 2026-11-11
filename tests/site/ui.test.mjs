@@ -402,7 +402,7 @@ test("Escape closes the setup card unless a picker already used it (D13)", () =>
   assert.equal(closed, 1);
 });
 
-test("before a profile a row has no score, offers Rank for my major, and Report is gone from the row (D9 to D11)", () => {
+test("before a profile a row has no score or repeated ranking prompt, and Report is gone from the row", () => {
   const harness = uiHarness();
   let ranked = 0;
   const [tr] = harness.render(
@@ -412,8 +412,8 @@ test("before a profile a row has no score, offers Rank for my major, and Report 
   const s = text(tr);
   assert.doesNotMatch(s, /\b98\b/);
   assert.doesNotMatch(s, /Report/);
-  nodes(tr, (n) => n.type === "button" && text(n) === "Rank for my major")[0].props.onClick();
-  assert.equal(ranked, 1);
+  assert.doesNotMatch(s, /Rank for my major/);
+  assert.equal(ranked, 0);
   const details = nodes(tr, (n) => n.props.className === "whybtn details")[0];
   assert.equal(details.props["aria-controls"], "why-7");
   // One facts line: field, place, term and pay together under the title.
@@ -505,12 +505,10 @@ test("Open posting is remembered, and back on the page the row asks once: Mark a
     [7, true],
     [7, false],
   ]);
-  // Focus goes to the row's status, which now shows the answer.
+  // Browse keeps focus on its replacement Save toggle after the prompt leaves.
   await new Promise((r) => setTimeout(r, 5));
   assert.ok(
-    harness.events.some(
-      ([e, label]) => e === "focus" && label === "Your status for Data Intern at Acme",
-    ),
+    harness.events.some(([e, label]) => e === "focus" && label === "Save Data Intern at Acme"),
   );
   // Not asked once the status says more than Interested, or while Auto-Apply holds the row.
   for (const extra of [
@@ -577,13 +575,19 @@ test("a row's repeated controls carry the company and title in their names (U12)
     text(nodes(tree, (n) => n.props.className === "rowbtn")[0]),
     "Auto-Apply: Acme, Data Intern",
   );
+  assert.equal(nodes(tree, (n) => n.type === "select").length, 0);
   assert.equal(
-    nodes(tree, (n) => n.type === "select")[0].props["aria-label"],
-    "Your status for Data Intern at Acme",
+    nodes(tree, (n) => n.props["aria-pressed"] !== undefined)[0].props["aria-label"],
+    "Save Data Intern at Acme",
   );
   assert.equal(
     nodes(tree, (n) => n.type === "input")[0].props["aria-label"],
     "Select Acme, Data Intern",
+  );
+  tree = harness.render(harness.components.Row, rowProps({ myList: true }));
+  assert.equal(
+    nodes(tree, (n) => n.type === "select")[0].props["aria-label"],
+    "Your status for Data Intern at Acme",
   );
   tree = harness.render(harness.components.Row, rowProps({ canTry: true }));
   assert.equal(

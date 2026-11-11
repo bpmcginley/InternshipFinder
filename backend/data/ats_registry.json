@@ -3087,6 +3087,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "addepar1": {
+   "name": "Addepar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "advancedspace": {
    "name": "Advanced Space",
    "quant": false,
@@ -3242,8 +3248,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -13556,8 +13563,9 @@
   "bakerhughes|wd5|BakerHughes": {
    "name": "Baker Hughes",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "bakertilly|wd5|BTCareers": {
    "name": "Baker Tilly",
@@ -16446,8 +16454,9 @@
   "invesco|wd1|IVZ": {
    "name": "Invesco",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-10"
   },
   "invesco|wd1|IVZearlycareers": {
    "name": "Invesco",
@@ -16460,6 +16469,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "investquebec|wd10|ext": {
+   "name": "Investissement Québec",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "iqvia|wd1|IQVIA": {
    "name": "IQVIA",
@@ -16666,16 +16681,14 @@
   "kiongroup|wd3|KION_SCS": {
    "name": "KION Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "kiongroup|wd3|kiongroup": {
    "name": "KION Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "kla|wd1|AnnArbor": {
    "name": "KLA",
@@ -17849,9 +17862,8 @@
   "onehealthineers|wd3|SHSJB": {
    "name": "Varian",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "onto|wd1|onto_careers": {
    "name": "Onto Innovation",
@@ -18742,9 +18754,8 @@
   "scj|wd5|External_Career_Site": {
    "name": "SC Johnson",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "scottishwater|wd3|External_Careers": {
    "name": "Scottish Water",
