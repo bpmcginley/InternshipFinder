@@ -76,6 +76,10 @@ jobs:
 
       - uses: ./.github/actions/python
 
+      - name: Select public listing data
+        id: public-data
+        uses: ./.github/actions/public-data
+
       - name: Card fonts and Pillow
         # IBM Plex is the site's typeface (growth/cards.py falls back to DejaVu without it).
         # ffmpeg stitches the Thursday Reel (growth/reels.py). Without it the Reel is skipped and
@@ -88,6 +92,7 @@ jobs:
       - name: Post
         id: post
         env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           MASTODON_URL: ${{ secrets.MASTODON_URL }}

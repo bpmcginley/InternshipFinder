@@ -26,8 +26,13 @@ jobs:
 
       - uses: ./.github/actions/python
 
+      - name: Select public listing data
+        id: public-data
+        uses: ./.github/actions/public-data
+
       - name: Write the report
         env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
           # Optional: Cloudflare token with Account Analytics: Read. Without it the Visits section says so.
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           INTERNSCOUT_DEMAND_URL: ${{ secrets.INTERNSCOUT_DEMAND_URL }}
