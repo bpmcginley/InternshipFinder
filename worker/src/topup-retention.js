@@ -1,4 +1,4 @@
-// Evidence prerequisite only. No retirement, provider read, clock injection or scheduler.
+// Trusted retention evidence only. No provider read, clock injection or scheduler.
 import { decideTopup } from "./topup-decisions.js";
 const initial = { deleted: false, fullRefund: false, loss: false, held: false, heldDisputeIds: [] };
 
@@ -23,22 +23,118 @@ export function topupFinanciallyResolved(snapshot, previous) {
   );
 }
 
+// Hash all available verified lifecycle facts, including any timestamps supplied by a
+// future reader. Object keys and refund/dispute ordering do not manufacture a new age.
+export async function financialEvidenceDigest(snapshot) {
+  try {
+    const canonical = (v) => {
+      if (v === null || typeof v === "string" || typeof v === "boolean") return v;
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      if (typeof v !== "object") throw new Error("Invalid financial fact");
+      const array = Array.isArray(v),
+        proto = Object.getPrototypeOf(v);
+      if (
+        (!array && proto !== Object.prototype && proto !== null) ||
+        (array && proto !== Array.prototype) ||
+        Object.getOwnPropertySymbols(v).length
+      )
+        throw new Error("Expected plain financial JSON");
+      const descriptors = Object.getOwnPropertyDescriptors(v);
+      if (array) {
+        if (Object.keys(descriptors).length !== v.length + 1)
+          throw new Error("Invalid financial array");
+        return Array.from({ length: v.length }, (_, i) => {
+          const d = descriptors[i];
+          if (!d || !d.enumerable || !("value" in d)) throw new Error("Invalid financial array");
+          return canonical(d.value);
+        });
+      }
+      return Object.fromEntries(
+        Object.keys(descriptors)
+          .sort()
+          .map((k) => {
+            const d = descriptors[k];
+            if (!d.enumerable || !("value" in d)) throw new Error("Invalid financial property");
+            return [k, canonical(d.value)];
+          }),
+      );
+    };
+    const value = canonical(snapshot);
+    if (
+      value?.status !== "reversal_evidence" ||
+      typeof value.livemode !== "boolean" ||
+      ![value.paymentId, value.checkoutId, value.chargeId].every((id) => typeof id === "string") ||
+      !/^pi_[A-Za-z0-9_]{1,250}$/.test(value.paymentId || "") ||
+      !/^cs_[A-Za-z0-9_]{1,250}$/.test(value.checkoutId || "") ||
+      !/^ch_[A-Za-z0-9_]{1,250}$/.test(value.chargeId || "") ||
+      decideTopup({ ...value, previous: initial }).disposition === "retry"
+    )
+      return null;
+    delete value.previous;
+    const order = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    value.refunds.sort(order);
+    value.disputes.sort(order);
+    const bytes = new TextEncoder().encode(
+      "internscout:financial-resolution:v1:" + JSON.stringify(value),
+    );
+    if (bytes.length > 262144) return null;
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(hash)].map((n) => n.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
+
+// Unknown history cannot be repaired by an apparently clean current observation. Every
+// nonterminal governing cause must remain stored, or future cleanup could forget it.
+export function topupHistoryProven(snapshot, previous, decision) {
+  const current = decideTopup({ ...snapshot, previous: initial });
+  const terminal = (d) => ["won", "warning_closed", "prevented"].includes(d.status);
+  return (
+    current.disposition !== "retry" &&
+    (!previous.fullRefund || current.fullRefundSeen) &&
+    previous.historyProven === true &&
+    !previous.loss &&
+    !decision.lossSeen &&
+    decision.disposition !== "retry" &&
+    (previous.heldDisputeIds || []).every((id) =>
+      snapshot.disputes.some(
+        (d) => d.id === id && (terminal(d) || decision.heldDisputeIds.includes(id)),
+      ),
+    ) &&
+    snapshot.disputes.every((d) => terminal(d) || decision.heldDisputeIds.includes(d.id))
+  );
+}
+
 // Append after a successful guarded settlement/balance write in the SAME D1 batch.
 // Failed CAS means changes()=0 and cannot alter the anchor. A successful refresh preserves
 // continuous resolution/zero time; unresolved evidence clears both. Database UTC owns time.
-export function topupRetentionStatement(db, paymentHash, resolved) {
+export function topupRetentionStatement(
+  db,
+  paymentHash,
+  resolved,
+  historyProven = false,
+  digest = null,
+) {
   return db
     .prepare(
-      "INSERT INTO topup_retention(payment_hash,resolved_at,resolved_zero_since) " +
+      "INSERT INTO topup_retention(payment_hash,resolved_at,resolved_zero_since,history_proven,evidence_digest) " +
         "SELECT payment_hash,CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END," +
         "CASE WHEN ? AND available+held=0 THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END " +
-        "FROM topup_purchases WHERE payment_hash=? AND changes()=1 " +
+        ",?,? FROM topup_purchases WHERE payment_hash=? AND changes()=1 " +
         "ON CONFLICT(payment_hash) DO UPDATE SET " +
-        "resolved_at=CASE WHEN excluded.resolved_at IS NOT NULL THEN COALESCE(topup_retention.resolved_at,excluded.resolved_at) END," +
+        "history_proven=topup_retention.history_proven AND excluded.history_proven, " +
+        "resolved_at=CASE WHEN excluded.resolved_at IS NOT NULL THEN CASE WHEN topup_retention.evidence_digest IS excluded.evidence_digest THEN COALESCE(topup_retention.resolved_at,excluded.resolved_at) ELSE excluded.resolved_at END END," +
         "resolved_zero_since=CASE WHEN excluded.resolved_zero_since IS NOT NULL " +
-        "THEN COALESCE(topup_retention.resolved_zero_since,excluded.resolved_zero_since) END",
+        "THEN CASE WHEN topup_retention.evidence_digest IS excluded.evidence_digest THEN COALESCE(topup_retention.resolved_zero_since,excluded.resolved_zero_since) ELSE excluded.resolved_zero_since END END, evidence_digest=excluded.evidence_digest",
     )
-    .bind(Number(resolved), Number(resolved), paymentHash);
+    .bind(
+      Number(resolved),
+      Number(resolved),
+      Number(historyProven && digest !== null),
+      digest,
+      paymentHash,
+    );
 }
 
 // An associated but untrustworthy current snapshot cannot preserve an old cleanup anchor.

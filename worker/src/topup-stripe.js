@@ -8,6 +8,21 @@ const OFFER = Object.freeze({
   currency: "usd",
   units: 25,
 });
+export function topupConfigured(env) {
+  return (
+    env?.TOPUPS_ENABLED === "1" &&
+    paymentsOn(env) &&
+    typeof env.STRIPE_PRICE_TOPUP === "string" &&
+    /^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+  );
+}
+
+export function topupDisplayOffer(adapter) {
+  if (adapter?.enabled !== true || adapter.offer !== OFFER) return null;
+  const { amount, currency, units } = OFFER;
+  return { amount, currency, units };
+}
+
 const unavailable = () => new Error("Top-up checkout is unavailable");
 const uuid = (value) =>
   typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
@@ -146,15 +161,11 @@ export async function prepareTopupStripe(
   timeoutMs = TOPUP_CHECKOUT_BOUNDS.timeoutMs,
 ) {
   if (
-    !env ||
-    env.TOPUPS_ENABLED !== "1" ||
-    !paymentsOn(env) ||
+    !topupConfigured(env) ||
     typeof fetchImpl !== "function" ||
     !Number.isInteger(timeoutMs) ||
     timeoutMs < 1 ||
-    timeoutMs > TOPUP_CHECKOUT_BOUNDS.timeoutMs ||
-    typeof env.STRIPE_PRICE_TOPUP !== "string" ||
-    !/^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+    timeoutMs > TOPUP_CHECKOUT_BOUNDS.timeoutMs
   )
     return { enabled: false };
   // Snapshot private configuration. Price/session paths and raw errors must never reach logs.

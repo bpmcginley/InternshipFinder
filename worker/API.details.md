@@ -636,13 +636,22 @@ the offer above, sends an offer email that failed, and refunds offers unanswered
 
 ## One-time Auto-Apply checkout
 
+`GET /billing/topup/offer` uses the same origin, current-session and configuration gates
+as checkout. The optional `topups: true` in `GET /config` is a configuration hint only.
+It requires no provider request and carries no price or account information. The
+authenticated offer route checks current Auto-Apply availability, verifies the configured
+one-time Price and product, rechecks service availability and session identity, and returns
+200 with `{enabled: true, offer: {amount, currency, units}}` and `Cache-Control: no-store`.
+Amount is in minor currency units. The response contains no provider references.
+
 `POST /billing/topup/checkout` defaults off. It requires the exact `TOPUPS_ENABLED` and
 `PAYMENTS_ENABLED` opt-ins and the existing private Stripe configuration. It accepts the
 two existing HTTPS dashboard Origins, `https://internscout.org` and
 `https://bpmcginley.github.io`, only when permitted by the configured CORS list.
 
 An existing session bearer authorizes the request without sliding its expiry. The server
-validates the configured offer before reserving a checkout. The configured first-party
+validates current Auto-Apply availability and the configured offer before reserving a
+checkout. The configured first-party
 dashboard root is the return destination for both completion and cancellation. The handler
 ignores request body and query fields. The existing reservation permits one active checkout
 attempt per account.
