@@ -37,13 +37,17 @@ python -m internscout.run_ingest --export ../docs/data     # full run, several m
 #   --workers N parallel board fetches
 ```
 
-To preview the published snapshot, run `python scripts/fetch_listing_data.py` from the repository root before starting the server.
+To preview the latest data-branch snapshot, run `python scripts/fetch_listing_data.py` from the repository root before starting the server. It installs only the public files in `docs/data`.
+
+For local ingest, point `INTERNSCOUT_DATA` at an existing local copy of `backend/data` from the data branch to reuse the board registry and caches. This setting selects a directory on disk.
 
 Log long runs to a file. Then serve the repo root and open the dashboard:
 
 ```bash
 python -m http.server 8000     # http://localhost:8000/docs/
 ```
+
+When running `scripts/startup_budget.py --baseline-ref`, choose a local Git ref containing `docs/data/first.json`, such as `origin/data` or a pre-retirement commit.
 
 Coverage report (field clusters with fewer than 15 open listings in the baseline states):
 
