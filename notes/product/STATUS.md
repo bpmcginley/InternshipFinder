@@ -324,7 +324,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-11 | Chrome 0.6.0 verified final-review handoff | Draft branch `codex/product-extension-local-review` on frozen #440. Narrow offline eligibility and manual-submit handoff evidence in progress. | Draft needs-bruce |
+| 2026-11-11 | Chrome 0.6.0 verified final-review handoff | [#455](https://github.com/bpmcginley/InternshipFinder/pull/455), stacked on frozen #440. Offline Worker-call and Chrome evidence in [the package note](P-0.6.0-final-review.md). Independent review, exact CI and owner integration and release remain pending. | Draft needs-bruce |
 | 2026-11-11 | Dormant outbound Worker compatibility | [#414](https://github.com/bpmcginley/InternshipFinder/pull/414) repairs the proven native redirect option in archive and top-up readers. Independent review, CI and coordinated integration required. All existing enablement/configuration gates remain. | Draft needs-bruce; no provider call or deployment |
 | 2026-11-11 | Optional employer publication adapter | Draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410), synthetic publication parity and paired screenshots verified; exact review/CI pending. | Owner source publication and coordinated activation remain pending; default off |
 | 2026-11-11 | P-2.3p employer Worker route | [#402](https://github.com/bpmcginley/InternshipFinder/pull/402) adds a default-off pinned-catalog route and private readiness. Independent review/CI, same-release publication and separate verified retention scheduling precede enablement. No production settings or remote operations. | Draft needs-bruce |

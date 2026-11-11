@@ -550,3 +550,106 @@ test("a completed restored profile without its local resume makes no tab, model 
     assert.equal(data.store.settings.onboarded, true);
   } finally { data.store.files.resume = saved; chrome.tabs.create = create; }
 });
+
+
+test("verified final review skips only the redundant Worker call", async (t) => {
+  const base = { ...window.ISDom };
+  const execute = chrome.scripting.executeScript, fetch = globalThis.fetch;
+  const ai = data.store.ai, sessionKey = "internscout.session";
+  const url = "https://boards.greenhouse.io/acme/jobs/1";
+  const cases = [
+    ["qualified review", 1, "ready_to_submit"],
+    ["ambiguous document evidence", 2, "ready_to_submit"],
+    ["alternate control", 2, "ready_to_submit"],
+    ["consent control", 2, "needs_you"],
+    ["changed document", 2, "ready_to_submit"],
+    ["field error on the preceding fill", 2, "ready_to_submit"],
+    ["late editable field", 2, "needs_you"],
+    ["takeover during the proof", 1, "needs_you"],
+  ];
+  try {
+    data.store.ai = { provider: "internscout" };
+    data[sessionKey] = { token: "iss_synthetic", expires: "2099-01-01T00:00:00Z" };
+    for (const [name, expectedCalls, status] of cases) await t.test(name, async () => {
+      const id = await newJob();
+      let phase = "fill", proofReads = 0, highlighted = 0;
+      const requests = [];
+      window.ISDom.snapshot = () => {
+        const review = phase !== "fill", late = phase === "late";
+        return {
+          url, title: "Synthetic internship", headings: [review ? "Review Your Application" : "Application"],
+          step: review ? "2" : "1", errors: [], captcha: false, reviewStep: review,
+          elements: review && !late ? [] : [{ ref: "e1", kind: "text", label: late ? "New required answer" : "Name", required: true, value: "" }],
+          buttons: !review ? [{ ref: "b1", text: "Next" }] : name === "consent control"
+            ? [{ ref: "b2", text: "I agree", blocked: true, consent: true }]
+            : [{ ref: "b2", text: "Submit Application", blocked: true },
+              ...(name === "alternate control" ? [{ ref: "b3", text: "Continue" }] : [])],
+          text: "", filledFields: review ? 1 : 0, busy: false, frozen: false,
+        };
+      };
+      window.ISDom.mark = () => phase;
+      window.ISDom.act = async (ref, kind) => {
+        actions.push(kind + ":" + ref);
+        if (kind === "click" && ref === "b1") phase = "review";
+        if (kind === "fill" && name === "field error on the preceding fill") return { ok: true, field_error: "Invalid" };
+        return { ok: true };
+      };
+      window.ISDom.highlight = () => {
+        highlighted++;
+        if (name === "late editable field") phase = "late";
+        return { final: true, missing: 0 };
+      };
+      chrome.scripting.executeScript = async (options) => {
+        // The browser proof itself is also exercised in a real synthetic Chrome document.
+        if (options.target.documentIds && options.world === "ISOLATED") {
+          proofReads++;
+          if (name === "takeover during the proof") await takeBack(id, TOOK_OVER);
+          const result = name === "ambiguous document evidence" || phase === "late" ? null : Array(32).fill(1);
+          return [{ frameId: 0, documentId: "original", result }];
+        }
+        const documentId = name === "changed document" && phase !== "fill" ? "replacement" : "original";
+        return (await execute(options)).map((r) => ({ ...r, documentId }));
+      };
+      globalThis.fetch = async (target, options) => {
+        assert.equal(new URL(target).pathname, "/ai");
+        const body = JSON.parse(options.body);
+        assert.equal(body.task, "autofill");
+        requests.push(body);
+        const tool = (name, args) => ({ functionCall: { name, args } });
+        if (requests.length === 2 && name === "late editable field") {
+          assert.match(JSON.stringify(body), /New required answer/);
+        }
+        const parts = requests.length === 1
+          ? [tool("fill", { ref: "0:e1", text: "Sample" }), tool("click", { ref: "0:b1" })]
+          : name === "late editable field" || name === "consent control"
+            ? [tool("pause_for_user", { reason: "Check the new prompt." })]
+            : [tool("ready_to_submit", { summary: "Human review" })];
+        const event = JSON.stringify({ candidates: [{ content: { parts }, finishReason: "STOP" }] });
+        return new Response("data: " + event + "\r\n\r\n", { headers: { "content-type": "text/event-stream" } });
+      };
+      await runJob(id);
+      const job = await getJob(id);
+      assert.equal(job.status, status);
+      assert.equal(requests.length, expectedCalls);
+      assert.equal(new Set(requests.map((body) => body.run_id)).size, 1);
+      assert.deepEqual(actions, ["fill:e1", "click:b1"]);
+      if (name === "qualified review") {
+        assert.equal(proofReads, 2);
+        assert.equal(highlighted, 1);
+        assert.equal(job.summary, "Check every answer before you submit.");
+        assert.equal(job.pending.results.length, 2);
+        assert.equal((await loadMsgs(id)).length, 2);
+      }
+      if (name === "takeover during the proof") {
+        assert.equal(job.reason, TOOK_OVER.reason);
+        assert.equal(highlighted, 0);
+      }
+    });
+  } finally {
+    Object.assign(window.ISDom, base);
+    chrome.scripting.executeScript = execute;
+    globalThis.fetch = fetch;
+    data.store.ai = ai;
+    delete data[sessionKey];
+  }
+});
