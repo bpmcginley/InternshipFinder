@@ -132,6 +132,7 @@ class _AssetTags(HTMLParser):
         self.lines = [0] + [match.end() for match in re.finditer("\n", source)]
         self.edits: list[tuple[int, int, str]] = []
         self.references, self.plaintext = 0, False
+        self.buy_marker = False
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if self.plaintext:
@@ -159,16 +160,30 @@ class _AssetTags(HTMLParser):
         attribute = "src" if tag == "script" else None
         if tag == "link" and "stylesheet" in (values.get("rel") or "").lower().split():
             attribute = "href"
+        buy_marker = tag == "span" and values.get("id") == "buy-native-entry"
+        if buy_marker:
+            if (
+                self.buy_marker
+                or self.path.relative_to(self.root).as_posix() != "employers/buy/index.html"
+                or "hidden" not in values
+            ):
+                raise AssetVersionError("Invalid Buy module entry marker")
+            self.buy_marker = True
+            attribute = "data-src"
         if attribute is None:
             return
         url = values.get(attribute)
         if not url:
+            if buy_marker:
+                raise AssetVersionError("Missing Buy module entry URL")
             return
         try:
             parsed = urlsplit(url)
         except ValueError:
             raise AssetVersionError("Malformed asset URL") from None
         if parsed.scheme or parsed.netloc or not parsed.path:
+            if buy_marker:
+                raise AssetVersionError("Buy module entry must use a local URL")
             return
         decoded = unquote(parsed.path)
         if "\\" in decoded or "\0" in decoded or decoded.startswith("//"):
@@ -197,9 +212,11 @@ class _AssetTags(HTMLParser):
             raise AssetVersionError("Local asset must be a non-HTML file")
         logical_name = logical.relative_to(self.root).as_posix()
         graph = next((item for item in self.module_entries if item.is_entry(logical_name)), None)
+        if buy_marker != (graph == core_graph.BUY):
+            raise AssetVersionError("Buy module entry requires the checkout loader marker")
         if graph is not None:
             entry = self.module_entries[graph]
-            if tag != "script" or (values.get("type") or "").lower() != "module":
+            if not buy_marker and (tag != "script" or (values.get("type") or "").lower() != "module"):
                 raise AssetVersionError(f"{graph.name} entry must be loaded as a module")
             if "?" in url or "#" in url or entry is None:
                 raise AssetVersionError(f"{graph.name} entry requires an unqualified graph URL")
