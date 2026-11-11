@@ -8,11 +8,14 @@ import hashlib
 import html
 from html.parser import HTMLParser
 import json
+import logging
 import os
 from pathlib import Path
 import re
 import sys
 from urllib.parse import unquote, unquote_plus, urlsplit
+
+from .console_log import console
 
 
 class AssetVersionError(ValueError):
@@ -242,7 +245,12 @@ def main(argv: list[str] | None = None) -> int:
         report = version_assets(args.site_dir)
     except (AssetVersionError, OSError, UnicodeError) as error:
         message = str(error) if isinstance(error, AssetVersionError) else "Unreadable site input"
-        print("Asset versioning failed: " + message, file=sys.stderr)
+        console(
+            "Asset versioning failed: " + message,
+            file=sys.stderr,
+            level=logging.ERROR,
+            exception_type=type(error).__name__,
+        )
         return 1
     print(json.dumps(asdict(report), sort_keys=True))
     return 0
