@@ -186,6 +186,8 @@ Clean baseline `9f739770`: all 244 site tests passed, no skips; `python scripts/
 
 The golden harness now covers static assets as well as generated pages. Each site PR refreshes both manifest and archive from the integrated tree, identifies intentional path changes, and preserves other packages' outputs. New public paths also require exact site-allowlist entries. P-1.5b intentionally changed 555 generated HTML files and page-content metadata for navigation and narrow-screen tables; listing data and other static assets were preserved.
 
+| C | P-2.3m Employer release staging | Product session | `codex/product-p2.3m-employer-staging` | — | Draft needs-bruce | Dormant complete-export annotations and matching catalog on #331. Pages, dashboard, renderers and live collection remain separate. |
+
 ## Waiting for Bruce
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
