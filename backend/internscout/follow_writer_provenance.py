@@ -40,17 +40,6 @@ class WriterProvenance:
     rows: Mapping[str, FirstSeenLineage]
     lineage: Mapping[tuple[str, str], FirstSeenLineage]
 
-    def for_adapter(self, provenance_type, evidence_type):
-        """Construct #334's types once that adapter is available to the caller."""
-        return provenance_type(
-            self.identity.index_sha256,
-            self.identity.shard_sha256,
-            {
-                role_id: evidence_type(proof.raw_first_seen, proof.verified_utc, proof.observed_by)
-                for role_id, proof in self.rows.items()
-            },
-        )
-
 
 class _EvidenceUnavailable(ValueError):
     pass
