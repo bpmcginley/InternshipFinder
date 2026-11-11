@@ -13,7 +13,7 @@ export async function recoverTopupAttempt(
   attemptId,
   originalOffer,
   fetchImpl,
-  { candidateCheckoutId, clock = () => new Date(), beforeApply } = {},
+  { candidateCheckoutId, clock = () => new Date(), beforeApply, session } = {},
 ) {
   if (typeof fetchImpl !== "function" || typeof clock !== "function") return pending();
   let offer;
@@ -24,7 +24,7 @@ export async function recoverTopupAttempt(
   }
   const config = { STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY };
   // This durable fence precedes BOTH authoritative reads, including unsuccessful reads.
-  const captured = await captureTopupSettlement(db, attemptId);
+  const captured = await captureTopupSettlement(db, attemptId, session);
   if (!captured) return { status: "inactive" };
   const get = (url, options) => {
     if (options?.method !== "GET" || options.body != null)
@@ -40,7 +40,7 @@ export async function recoverTopupAttempt(
   );
   if (payment.status === "expired_evidence") {
     if (beforeApply && !(await beforeApply())) return pending();
-    return expireTopupCheckout(db, captured, payment);
+    return expireTopupCheckout(db, captured, payment, session);
   }
   if (payment.status !== "paid_evidence") return pending();
   // The same payment object supplies charge/mode/amount identity to the reversal reader
@@ -58,5 +58,5 @@ export async function recoverTopupAttempt(
   }
   // Storage errors propagate; a failed batch must not be reported as successful recovery.
   // Stale results are returned unchanged: a later caller must recapture AND reread.
-  return settleFirstTopup(db, captured, payment, reversals, now);
+  return settleFirstTopup(db, captured, payment, reversals, now, session);
 }

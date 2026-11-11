@@ -5,7 +5,7 @@ import { recoverVerifiedTopupCheckoutEvent } from "../src/topup-checkout-events.
 import { recoverTopupAttempt as recover } from "../src/topup-attempt-recovery.js";
 import { captureTopupSettlement } from "../src/topup-first-settlement.js";
 import { deleteUser } from "../src/limits.js";
-import { createSession } from "../src/session.js";
+import { createSession, sessionTokenHash } from "../src/session.js";
 import { recoverAttachedTopup } from "../src/topup-attached-recovery.js";
 import { attempt, session } from "./topup-stripe.js";
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
@@ -465,7 +465,7 @@ export async function verifiedCheckoutRefreshesOnlyConfiguredModeAndCurrentAttem
 
 const attachedEnv = { ...env, STRIPE_PRICE_TOPUP: offer.priceId };
 async function signedIn(db, user) {
-  return (await createSession(db, { user, tier: "free", provider: "google" }, now)).token;
+  return (await createSession(db, { user, tier: "free", provider: "google" }, new Date())).token;
 }
 
 export async function attachedRecoveryWithSalesDisabled(db) {
@@ -564,6 +564,110 @@ export async function attachedRecoveryKeepsAmbiguousHistoricalEvidencePending(db
     });
     assert.equal(f.calls.length, scenario === "expiry reached during read" ? 1 : 2);
     assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+    await noGrant(db);
+  }
+}
+
+export async function attachedRecoveryFencesEachFirstMutation(db) {
+  const prefixes = {
+    capture: "INSERT INTO topup_attempt_revisions",
+    settlement: "INSERT INTO topup_claims",
+    expiry: "UPDATE topup_checkout_attempts SET checkout_id=?,state='expired'",
+  };
+  for (const kind of ["revoked", "expired"]) {
+    for (const [boundary, prefix] of Object.entries(prefixes)) {
+      const f = await setup(db);
+      const token = await signedIn(db, f.a.user_hash);
+      const id = await sessionTokenHash(token);
+      // A different valid session for the same account cannot authorize this request.
+      await signedIn(db, f.a.user_hash);
+      const { at } = await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at").first();
+      const workerClock = () => new Date(Date.parse(at) - 60000);
+      if (boundary === "expiry") {
+        f.checkout.status = "expired";
+        f.checkout.payment_status = "unpaid";
+        f.checkout.payment_intent = null;
+      }
+      let hit = false;
+      const sqlByStatement = new WeakMap();
+      const guarded = {
+        prepare(sql) {
+          const statement = db.prepare(sql);
+          return {
+            bind(...values) {
+              const bound = statement.bind(...values);
+              sqlByStatement.set(bound, sql);
+              return bound;
+            },
+          };
+        },
+        async batch(statements) {
+          if (!hit && sqlByStatement.get(statements[0])?.startsWith(prefix)) {
+            hit = true;
+            const cut =
+              kind === "revoked"
+                ? "DELETE FROM sessions WHERE id=?"
+                : "UPDATE sessions SET expires=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?";
+            await db.prepare(cut).bind(id).run();
+          }
+          return db.batch(statements);
+        },
+      };
+      assert.deepEqual(
+        await recoverAttachedTopup(guarded, attachedEnv, token, f.fetch, workerClock),
+        {
+          status: kind === "revoked" ? "auth" : "pending",
+        },
+      );
+      assert.equal(hit, true);
+      assert.equal(f.calls.length, { capture: 1, expiry: 2, settlement: 10 }[boundary]);
+      assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+      const revisions = await rows(db, "topup_attempt_revisions");
+      assert.deepEqual(
+        revisions.map(({ revision }) => revision),
+        boundary === "capture" ? [] : [1],
+      );
+      await noGrant(db);
+      assert.equal((await rows(db, "topup_retention")).length, 0);
+    }
+  }
+}
+
+export async function attachedRecoveryDistinguishesUncertainSessionLookups(db) {
+  for (const failure of ["initial database lookup", "later database lookup", "invalid clock"]) {
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    let read = 0;
+    const unreliable = {
+      batch: (statements) => db.batch(statements),
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        if (!sql.includes("FROM sessions WHERE id = ?")) return statement;
+        return {
+          bind(...values) {
+            const bound = statement.bind(...values);
+            return {
+              first() {
+                read++;
+                if (
+                  failure === "initial database lookup" ||
+                  (failure === "later database lookup" && read === 2)
+                )
+                  return Promise.reject(new Error("Synthetic session storage error"));
+                return bound.first();
+              },
+            };
+          },
+        };
+      },
+    };
+    const testClock = () => (failure === "invalid clock" && read > 0 ? new Date(NaN) : now);
+    assert.deepEqual(
+      await recoverAttachedTopup(unreliable, attachedEnv, token, f.fetch, testClock),
+      { status: "pending" },
+    );
+    assert.equal(f.calls.length, 0);
+    assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
     await noGrant(db);
   }
 }

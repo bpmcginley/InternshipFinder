@@ -1,4 +1,5 @@
-import { sessionUser } from "./session.js";
+import { HttpError } from "./http.js";
+import { sessionTokenHash, sessionUser } from "./session.js";
 import { recoverTopupAttempt } from "./topup-attempt-recovery.js";
 import { validTopupCheckoutId } from "./topup-ledger.js";
 import {
@@ -18,36 +19,39 @@ export async function recoverAttachedTopup(db, env, token, fetchImpl, clock = ()
     latest = at;
     return new Date(at);
   };
-  const readSession = async () => {
-    const session = await sessionUser(db, token, { now: +fresh(), refresh: false });
-    return Date.parse(session.expires) > +fresh() ? session : null;
+  const readSession = async (expectedUser) => {
+    try {
+      const session = await sessionUser(db, token, { now: +fresh(), refresh: false });
+      if (
+        !(Date.parse(session.expires) > +fresh()) ||
+        (expectedUser !== undefined && expectedUser !== session.user)
+      )
+        return { status: "auth" };
+      return { status: "authorized", user: session.user };
+    } catch (error) {
+      return error instanceof HttpError && error.status === 401 && error.code === "auth"
+        ? { status: "auth" }
+        : pending();
+    }
   };
 
-  let user;
-  try {
-    user = (await readSession())?.user;
-  } catch (error) {
-    if (error?.status === 401) return { status: "auth" };
-    return pending();
-  }
-  if (!user) return { status: "auth" };
+  const initial = await readSession();
+  if (initial.status !== "authorized") return initial;
+  const { user } = initial;
   if (!topupRecoveryConfigured(env) || typeof fetchImpl !== "function") return pending();
   const config = {
     STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
     STRIPE_PRICE_TOPUP: env.STRIPE_PRICE_TOPUP,
   };
-  const authorized = async () => {
-    try {
-      return (await readSession())?.user === user;
-    } catch {
-      return false;
-    }
+  const sessionFailure = async () => {
+    const result = await readSession(user);
+    return result.status === "authorized" ? null : result;
   };
   const get = async (url, options) => {
     if (
       options?.method !== "GET" ||
       options.body != null ||
-      !(await authorized()) ||
+      (await sessionFailure()) ||
       options.signal?.aborted
     )
       throw new Error("Recovery request refused");
@@ -62,11 +66,13 @@ export async function recoverAttachedTopup(db, env, token, fetchImpl, clock = ()
       )
       .bind(user)
       .first();
-    if (!(await authorized())) return { status: "auth" };
+    const selectionFailure = await sessionFailure();
+    if (selectionFailure) return selectionFailure;
     if (!a) return { status: "inactive" };
     if (a.state !== "open" || !validTopupCheckoutId(a.checkout_id)) return pending();
     const checkout = await readTopupAssociation(config, "checkout/sessions", a.checkout_id, get);
-    if (!(await authorized())) return { status: "auth" };
+    const checkoutFailure = await sessionFailure();
+    if (checkoutFailure) return checkoutFailure;
     if (
       checkout?.object !== "checkout.session" ||
       checkout.id !== a.checkout_id ||
@@ -82,14 +88,17 @@ export async function recoverAttachedTopup(db, env, token, fetchImpl, clock = ()
       return pending();
     const offer = historicalTopupOffer(config, a.offer_version, checkout.livemode);
     if (!offer) return pending();
+    const session = Object.freeze({ user, id: await sessionTokenHash(token) });
     const result = await recoverTopupAttempt(db, config, a.id, offer, get, {
       candidateCheckoutId: a.checkout_id,
       clock: fresh,
-      beforeApply: authorized,
+      beforeApply: async () => !(await sessionFailure()),
+      session,
     });
-    if (!(await authorized())) return { status: "auth" };
+    const outcomeFailure = await sessionFailure();
+    if (outcomeFailure) return outcomeFailure;
     return ["settled", "expired"].includes(result.status) ? { status: result.status } : pending();
   } catch {
-    return (await authorized()) ? pending() : { status: "auth" };
+    return (await sessionFailure()) ?? pending();
   }
 }

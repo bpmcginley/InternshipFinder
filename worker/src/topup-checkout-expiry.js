@@ -2,9 +2,11 @@
 // never a browser cancellation, webhook delta, elapsed timer or provider error.
 import { referenceHash, validTopupCheckoutId, validTopupOfferVersion } from "./topup-ledger.js";
 
+import { sessionWriteFence } from "./session.js";
+
 // Capture with captureTopupSettlement BEFORE reading the provider. A stale result requires
 // a new capture AND a new authoritative read. No grant, provider write or deletion here.
-export async function expireTopupCheckout(db, capture, evidence) {
+export async function expireTopupCheckout(db, capture, evidence, session) {
   let a, e;
   try {
     [a, e] = structuredClone([capture, evidence]);
@@ -38,6 +40,7 @@ export async function expireTopupCheckout(db, capture, evidence) {
   )
     return { status: "retry" };
   const checkoutHash = await referenceHash("checkout", e.livemode, e.checkoutId);
+  const fence = sessionWriteFence(session, "topup_checkout_attempts.user_hash");
   const [expired, consumed] = await db.batch([
     db
       .prepare(
@@ -45,7 +48,8 @@ export async function expireTopupCheckout(db, capture, evidence) {
           "WHERE id=? AND state IN ('creating','open') AND state=? AND checkout_id IS ? " +
           "AND user_hash=? AND offer_version=? AND amount=? AND currency=? AND units=? AND created=? " +
           "AND EXISTS(SELECT 1 FROM topup_attempt_revisions WHERE attempt_id=? AND revision=?) " +
-          "AND NOT EXISTS(SELECT 1 FROM topup_claims WHERE checkout_hash=?)",
+          "AND NOT EXISTS(SELECT 1 FROM topup_claims WHERE checkout_hash=?)" +
+          fence.sql,
       )
       .bind(
         e.checkoutId,
@@ -61,6 +65,7 @@ export async function expireTopupCheckout(db, capture, evidence) {
         a.id,
         a.revision,
         checkoutHash,
+        ...fence.args,
       ),
     // Consumed only after a successful terminal CAS, without an overflowing increment.
     db.prepare("DELETE FROM topup_attempt_revisions WHERE attempt_id=? AND changes()=1").bind(a.id),
