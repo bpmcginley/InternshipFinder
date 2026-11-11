@@ -9,6 +9,7 @@ from datetime import timezone
 import httpx
 
 from ..config import USER_AGENT
+from ..console_log import console_exception
 from ..geo import REMOTE_RE, _NON_US, state_of
 
 # 2026-10-23: retain complete fetched text until export extracts eligibility (DQ-1).
@@ -82,7 +83,8 @@ def robots_allows(c, base: str, path: str) -> bool:
             if "<html" in body[:400].lower():
                 body = ""
             _ROBOTS[base] = robots_rules(body)
-        except Exception:
+        except Exception as e:
+            console_exception("[sources] robots lookup failed", type(e).__name__)
             _ROBOTS[base] = []  # nothing said is nothing forbidden
     return not robots_blocks(_ROBOTS[base], path)
 
