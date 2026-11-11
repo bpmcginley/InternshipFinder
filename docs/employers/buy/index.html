@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <!-- The employer buy page (added 2026-10-19; worker/ORDERS.md "The flow"). Hand-written like
      /employers/, whose head, colours, nav and footer it copies (tests/site/tokens.test.mjs keeps the
-     token block equal). All of its work is in /js/buy.js: it asks the Worker for /employer/config first and
+     token block equal). The classic entry /js/buy.js selects the renderer and asks for /employer/config first. The page
      shows nothing for sale unless that says enabled, with the prices in cents from there. It is also where
      the Worker's email links and Stripe send people back to (?order=&t=, ?paid=, ?cancelled=1,
      ?credit=&t=). Not in the sitemap and noindex for now. Every line must fit the placement rule on
