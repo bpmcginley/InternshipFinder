@@ -38,7 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          sparse-checkout: growth
+          sparse-checkout: |
+            growth
+            backend/internscout
       - id: guard
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -53,10 +55,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check out the existing data branch
+        uses: actions/checkout@v7
+        with:
+          ref: refs/heads/data
+          path: .ingest-data
+          sparse-checkout: |
+            docs/data
+            backend/data
+
       - uses: ./.github/actions/python
         with:
           cache: pip
           install-backend: 'true'
+
+      - name: Prepare the isolated ingest snapshot
+        run: |
+          data="$GITHUB_WORKSPACE/.ingest-data"
+          state="$RUNNER_TEMP/internscout-ingest-state"
+          python3 scripts/ingest_data_writer.py prepare "$data" "$GITHUB_WORKSPACE" "$state"
+          {
+            printf 'INTERNSCOUT_PUBLIC_DATA=%s/docs/data\n' "$data"
+            printf 'INTERNSCOUT_DATA=%s\n' "$state"
+          } >> "$GITHUB_ENV"
 
       # Extra states (beyond New England + NY/NJ) that get detail calls and Google searches:
       # the states students picked (Worker GET /demand, counts only) plus the optional repo variable.
@@ -90,7 +111,7 @@ jobs:
         # The ingest report (counts per source, board and filter) goes to the runner's temp folder and
         # is kept as a run artifact below, not in docs/data, which the website serves to everyone.
         run: |
-          python -m internscout.run_ingest --export "${{ github.workspace }}/docs/data" --metrics "${{ runner.temp }}/ingest-report.json"
+          python -m internscout.run_ingest --export "$INTERNSCOUT_PUBLIC_DATA" --metrics "${{ runner.temp }}/ingest-report.json"
 
       - name: Keep the ingest report
         if: always()
@@ -110,24 +131,12 @@ jobs:
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
           USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
           USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
-        run: python -m internscout.coverage "${{ github.workspace }}/docs/data/listings"
+        run: python -m internscout.coverage "$INTERNSCOUT_PUBLIC_DATA/listings"
 
       - name: Commit updated data
         run: |
-          git config user.name  "internscout-bot"
-          git config user.email "actions@github.com"
-          # probe_cache.json earns its name only if it survives the run that filled it.
-          git add -A docs/data backend/data/ats_registry.json backend/data/dropped_boards.json backend/data/geocache.json backend/data/probe_cache.json backend/data/google_jobs_day.json
-          if git diff --staged --quiet; then
-            echo "No changes."
-          else
-            git commit -m "data: refresh listings ($(date -u +%FT%TZ))"
-            # A run that waited in the queue checked out an older commit; replay onto main and keep this run's data.
-            for i in 1 2 3; do
-              git push && break
-              [ "$i" = 3 ] && exit 1
-              # --autostash: the run leaves other tracked files dirty, and rebase refuses to
-              # start on a dirty tree, which turned every raced push into a lost data commit.
-              git pull --rebase --autostash -X theirs origin main
-            done
-          fi
+          data="$GITHUB_WORKSPACE/.ingest-data"
+          git -C "$data" config user.name "internscout-bot"
+          git -C "$data" config user.email "actions@github.com"
+          python3 scripts/ingest_data_writer.py publish "$data" "$INTERNSCOUT_DATA" \
+            --message "data: refresh listings ($(date -u +%FT%TZ))"
