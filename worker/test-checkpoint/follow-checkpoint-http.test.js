@@ -190,3 +190,30 @@ test("measured-scale canonical checkpoint stays byte-exact through HTTP and SQLi
   expect(response.headers.get("Follow-Pending-Bytes")).toBe(String(input.byteLength));
   expect(await sha(await response.arrayBuffer())).toBe(await sha(input));
 });
+
+
+test("mixed Git object widths and impossible time bounds never occupy the SQLite pending slot", async () => {
+  for (const width of [40, 64]) {
+    const endpoint = `https://width-${width}.local${PREFIX}`;
+    const now = Date.now() - 60_000;
+    const record = JSON.parse(new TextDecoder().decode(stageBytes(now, {
+      checkpoint_sha256: null, commit: "1".repeat(width), public_tree: "2".repeat(width),
+    })));
+    const other = width === 40 ? 64 : 40;
+    const invalid = { ...record, candidate_commit: "5".repeat(other),
+      candidate_tree: "6".repeat(other), public_tree: "2".repeat(other) };
+    expect((await SELF.fetch(endpoint + "/stage", post(encode(invalid)))).status).toBe(400);
+    const valid = { ...record, candidate_commit: "5".repeat(width),
+      candidate_tree: "6".repeat(width), public_tree: "2".repeat(width) };
+    const impossible = { ...valid, covers_after: valid.prepared_at };
+    expect((await SELF.fetch(endpoint + "/stage", post(encode(impossible)))).status).toBe(400);
+    const badEvidence = { ...valid, rows: [[
+      ...valid.rows[0].slice(0, 3), wire(now + 1),
+    ]] };
+    expect((await SELF.fetch(endpoint + "/stage", post(encode(badEvidence)))).status).toBe(400);
+    const before = await SELF.fetch(endpoint, { headers: auth() });
+    expect(before.headers.get("Follow-Pending-Bytes")).toBe("0");
+    expect(await (await SELF.fetch(endpoint + "/stage", post(encode(valid)))).json())
+      .toEqual({ status: "pending" });
+  }
+});

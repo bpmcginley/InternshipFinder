@@ -72,10 +72,13 @@ function checkpoint(raw, stage) {
     || !instant(record.covers_after) || !record.covers_after.endsWith("000Z")
     || !matches(DIGEST, record.index_sha256)
     || !Array.isArray(record.rows)) return false;
+  const recordedAt = stage ? record.prepared_at : record.accepted_at;
+  if (!instant(recordedAt) || record.covers_after >= recordedAt.slice(0, -4) + "000Z") return false;
   if (stage ? (!predecessor(record.predecessor)
+    || record.candidate_commit?.length !== record.predecessor.commit.length
     || !gitPair(record.candidate_commit, record.candidate_tree)
-    || !gitPair(record.candidate_commit, record.public_tree) || !instant(record.prepared_at))
-    : (!gitPair(record.accepted_commit, record.public_tree) || !instant(record.accepted_at))) return false;
+    || !gitPair(record.candidate_commit, record.public_tree))
+    : !gitPair(record.accepted_commit, record.public_tree)) return false;
 
   const shards = record.shard_sha256;
   if (!shards || typeof shards !== "object" || Array.isArray(shards)) return false;
@@ -87,7 +90,8 @@ function checkpoint(raw, stage) {
     if (!Array.isArray(row) || row.length !== 4
       || !matches(/^[a-f0-9]{16}$/, row[0]) || row[0] <= last
       || !rawInstant(row[1])
-      || !["observed_by", "verified_utc"].includes(row[2]) || !instant(row[3])) return false;
+      || !["observed_by", "verified_utc"].includes(row[2]) || !instant(row[3])
+      || row[3] > (row[2] === "observed_by" ? record.covers_after : recordedAt)) return false;
     last = row[0];
   }
   return canonical(record) === text;
