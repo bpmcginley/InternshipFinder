@@ -27,6 +27,7 @@ import httpx
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from .config import DATA_DIR, USER_AGENT
+from .console_log import console_exception
 from .discover import add_board, ats_of
 from .sources.common import robots_blocks, robots_rules
 from .sources.workday import HEADERS as WD_HEADERS
@@ -194,7 +195,8 @@ def _serves_job(c, token: str, jid: str) -> bool:
             c.get(f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{jid}").status_code
             == 200
         )
-    except Exception:
+    except Exception as error:
+        console_exception("[probe] Greenhouse job check failed", type(error).__name__)
         return False
 
 
@@ -211,8 +213,8 @@ def gh_host_token(c, url: str, jid: str, name: str = "") -> str | None:
     try:
         page = c.get(url, timeout=GH_PAGE_TIMEOUT)
         cands = [t for t in GH_TOKEN.findall(page.text or "") if t.lower() not in GH_NOT_TOKENS]
-    except Exception:
-        pass
+    except Exception as error:
+        console_exception("[probe] Greenhouse careers page lookup failed", type(error).__name__)
     for tok in dict.fromkeys(cands + (slugs_for(name) if name else [])):
         if _serves_job(c, tok, jid):
             return tok
@@ -293,7 +295,8 @@ def _probe_one(c, name: str) -> tuple[str, str] | None:
                     # Most probes answer True and the slug is the token; Workday answers with the
                     # tenant|pod|site triple it resolved, which no slug could have spelled.
                     return ats, (hit if isinstance(hit, str) else slug)
-            except Exception:
+            except Exception as error:
+                console_exception("[probe] board candidate check failed", type(error).__name__)
                 continue
     return None
 

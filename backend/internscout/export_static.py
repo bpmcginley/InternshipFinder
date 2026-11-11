@@ -18,9 +18,12 @@ from urllib.parse import parse_qs, urlsplit
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+from .console_log import console
 from .db import SessionLocal, init_db
 from .models import Listing, Application
-from .seo_pages import baseline_day, canada_first_scan, placeholder_pay
+from .pay import placeholder_pay
+from .public_data import public_data_dir
+from .site.source import baseline_day, canada_first_scan
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
 from .classify import STAGES, never_student, non_cyber_security, stage_of, years_of
@@ -109,7 +112,9 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
     """Write <ST>.json (slim rows) and <ST>.desc.json ({id: description} for its open rows)."""
     shard_dir = os.path.join(out_dir, "listings")
     os.makedirs(shard_dir, exist_ok=True)
-    from . import seo_role_details, seo_pages
+    from . import seo_role_details
+    from .site import source
+    from .site.text import safe_url
 
     # This sidecar is replaced on every export. Only an unchanged carried row may keep an existing
     # check for up to seven days; its original check date/hash are never refreshed from an excerpt.
@@ -121,14 +126,14 @@ def write_shards(listings: list[dict], out_dir: str, generated_at: str) -> dict:
         if (
             name in seo_role_details.COHORT_EMPLOYERS
             and x.get("status") == "open"
-            and seo_pages.well_formed(x)
-            and seo_pages.safe_url(x.get("apply_url"))
+            and source.well_formed(x)
+            and safe_url(x.get("apply_url"))
         ):
             cohorts[name].append(dict(x, keys=shard_keys(x)))
     visible = [
         x
         for name in sorted(cohorts)
-        for x in seo_pages.shown(seo_pages.dedupe_roles(cohorts[name]))
+        for x in source.shown(source.dedupe_roles(cohorts[name]))
     ]
     details = {}
     for x in visible:
@@ -861,38 +866,48 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
         os.remove(legacy)
     _dump(stats, os.path.join(out_dir, "stats.json"), indent=2)
     _dump(majors_export(), os.path.join(out_dir, "majors.json"))
-    print(
+    console(
         f"[export] {carried} of {len(listings)} listings kept a first-seen date from the "
         f"last export; {sum(1 for x in listings if x['is_new'])} new in {NEW_DAYS} days"
     )
-    print(
+    console(
         f"[export] {held} listings held from the last export because their board came back "
         f"with half or less of what it had"
     )
-    print(
+    console(
         f"[export] {closed} listings from the last export left the site because a complete "
         f"scan of their board this run did not find them "
         f"({len(canonical(completed_boards))} boards read to the end)"
     )
     index = write_shards(listings, out_dir, generated_at)
     unplaced = [x for x in listings if not shard_keys(x)]
-    print(
+    json_log = os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json"
+    written = (
         f"[export] wrote {len(listings) - len(unplaced)} listings "
-        f"({len(index['files'])} state files) to {out_dir}"
+        f"({len(index['files'])} state files)"
     )
+    console(written if json_log else f"{written} to {out_dir}")
     if unplaced:
-        print(
+        message = (
             f"[export] {len(unplaced)} listings name no US location today's rules can place, so "
-            f"they are in no state file and the site cannot show them: "
-            + "; ".join(
-                f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
-                for x in unplaced[:5]
-            )
+            "they are in no state file and the site cannot show them"
         )
+        if json_log:
+            # Keep raw employer and location samples out of the structured record.
+            console(message)
+        else:
+            console(
+                message
+                + ": "
+                + "; ".join(
+                    f"{x.get('company_name')} - {x.get('location_raw') or 'no location'}"
+                    for x in unplaced[:5]
+                )
+            )
     return stats
 
 
 if __name__ == "__main__":
     import sys
 
-    export(sys.argv[1] if len(sys.argv) > 1 else "docs/data")
+    export(sys.argv[1] if len(sys.argv) > 1 else public_data_dir())

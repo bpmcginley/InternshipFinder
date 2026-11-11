@@ -61,3 +61,14 @@ def console(
     # These were unconditional prints. Global logging filters and factories are for other loggers.
     record = logging.LogRecord(_logger.name, level, "", 0, line, (), None)
     _logger.handle(record)
+
+
+def console_exception(context: str, exception_type: str) -> None:
+    """Report a previously silent failure with fixed context and the exception class name."""
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+        return
+    try:
+        console(context, level=logging.WARNING, exception_type=exception_type)
+    except Exception:
+        # New telemetry must not interrupt the caller's existing fallback.
+        pass

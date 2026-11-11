@@ -5,9 +5,11 @@ authoritative scan. Sampled searches and failed/capped scans cannot prove closur
 """
 
 from __future__ import annotations
+import os
 from collections import Counter
 from datetime import datetime, timezone
 from sqlalchemy import select
+from .console_log import console
 from .db import SessionLocal, init_db
 from .models import Listing, SourceLink, Company, Application
 from .config import PROFILE
@@ -216,13 +218,18 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
         metrics.count("persisted", len(merged))
 
     if verbose:
-        print(f"[pipeline] {stats}; {placed} bare town names placed by their board")
-        print(
+        console(f"[pipeline] {stats}; {placed} bare town names placed by their board")
+        console(
             "[pipeline] by state:",
             dict(Counter(it["geo"]["state"] for it in merged.values()).most_common()),
         )
-        print(
-            "[pipeline] by source:",
-            dict(Counter(s for it in merged.values() for s, _ in it["_sources"]).most_common()),
-        )
+        source_counts = Counter(s for it in merged.values() for s, _ in it["_sources"])
+        if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
+            # Community list records can supply their own source names.
+            console(
+                f"[pipeline] source associations: {sum(source_counts.values())}, "
+                f"distinct source names: {len(source_counts)}"
+            )
+        else:
+            console("[pipeline] by source:", dict(source_counts.most_common()))
     return stats
