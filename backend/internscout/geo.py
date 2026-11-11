@@ -14,6 +14,7 @@ import re
 import threading
 import time
 from .config import DATA_DIR
+from .console_log import console_exception
 
 REMOTE_RE = re.compile(r"\b(remote|anywhere|work from home|wfh|virtual)\b", re.I)
 _US_STATES = {
@@ -966,8 +967,9 @@ def _nominatim(city: str, st: str):
             data = r.json()
             if data:
                 coords = [round(float(data[0]["lat"]), 4), round(float(data[0]["lon"]), 4)]
-        except Exception:
+        except Exception as error:
             _last_call = time.monotonic()
+            console_exception("[geo] geocoding request failed", type(error).__name__)
             return None  # network trouble: don't cache, try again next run
         _last_call = time.monotonic()
         cache[key] = coords

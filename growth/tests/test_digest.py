@@ -519,3 +519,28 @@ def test_the_command_reads_a_placements_file_only_with_the_switch(tmp_path, monk
     assert digest.main(["digest.py", site, "--out", str(out), "--placements", str(elsewhere)]) == 0
     assert (out / "digest.html").read_text(encoding="utf-8").count("Paid listing") == 1
     assert (out / "digest.txt").read_text(encoding="utf-8").count("Paid listing") == 1
+
+def test_preview_json_summary_omits_subject_and_path_without_changing_artifacts(
+    tmp_path, capsys, monkeypatch
+):
+    site = _site(tmp_path / "site", {"MA": [_row(i) for i in range(6)]})
+    out = tmp_path / "private-preview"
+    args = ["digest.py", site, "--out", str(out)]
+
+    monkeypatch.delenv("INTERNSCOUT_LOG_FORMAT", raising=False)
+    assert digest.main(args) == 0
+    plain = capsys.readouterr()
+    assert plain.err == "" and str(out) in plain.out
+    names = {"digest.html", "digest.txt", "digest.json"}
+    baseline = {path.name: path.read_bytes() for path in out.iterdir()}
+    assert baseline.keys() == names
+
+    monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
+    assert digest.main(args) == 0
+    result = capsys.readouterr()
+    assert result.err == ""
+    assert json.loads(result.out) == {
+        "level": "INFO",
+        "message": "[digest] wrote digest preview (1 of 1 fields shown, 6 new roles in the Northeast or remote)",
+    }
+    assert {path.name: path.read_bytes() for path in out.iterdir()} == baseline
