@@ -10,7 +10,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 
 | Method and path | Authentication | Feature gate | Request shape | Response shape |
 |---|---|---|---|---|
-| `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation |
+| `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation |
 | `GET /config` | public | none | none | JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean} |
 | `GET /me` | user | none | none | JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, tier, paused, allowance: {task: {used, limit, bonus?}}} |
 | `POST /session` | provider-id | none | Authorization: Bearer provider ID token; no body | JSON {session, account, email, provider, tier, expires} |

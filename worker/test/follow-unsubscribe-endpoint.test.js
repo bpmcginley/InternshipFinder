@@ -15,6 +15,30 @@ const post = (
 const noDb = { prepare: () => assert.fail("No storage access") };
 const dbFor = (run) => ({ prepare: () => ({ bind: () => ({ run }) }) });
 const call = (request, DB = noDb, extra = {}) => handle(request, { DB, ...extra }, undefined, deps);
+function fakeTimers() {
+  let scheduled = 0;
+  const active = new Map();
+  return {
+    get scheduled() {
+      return scheduled;
+    },
+    active,
+    setTimeout(fn, ms) {
+      assert.equal(ms, 5000);
+      active.set(++scheduled, fn);
+      return scheduled;
+    },
+    clearTimeout(id) {
+      active.delete(id);
+    },
+    expire() {
+      for (const [id, fn] of [...active]) {
+        active.delete(id);
+        fn();
+      }
+    },
+  };
+}
 const status = async (response, expected) => {
   assert.equal(response.status, expected);
   assert.equal(response.headers.get("Cache-Control"), "no-store");
@@ -99,11 +123,15 @@ test("unavailable storage is retryable without logging request targets or intern
 });
 
 test("four in-flight slots bound storage work and release on completion or failure", async () => {
-  const endpoint = createFollowUnsubscribeEndpoint();
+  const timers = fakeTimers();
+  const endpoint = createFollowUnsubscribeEndpoint(timers);
   const releases = [];
   const db = dbFor(() => new Promise((resolve, reject) => releases.push({ resolve, reject })));
   const pending = Array.from({ length: 4 }, () => endpoint(post(), db, NOW));
   while (releases.length < 4) await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(timers.scheduled, 4);
+  assert.equal(timers.active.size, 0, "body deadlines are cleared before D1 begins");
+  timers.expire(); // A body timer must never release a slot while deletion is still in flight.
   const busy = await endpoint(post(), noDb, NOW);
   assert.equal(busy.headers.get("Retry-After"), "60");
   await status(busy, 503);
@@ -123,4 +151,60 @@ test("four in-flight slots bound storage work and release on completion or failu
     ),
     204,
   );
+});
+
+test("one absolute body deadline cancels four stalled readers and frees slots without D1", async () => {
+  const timers = fakeTimers();
+  const endpoint = createFollowUnsubscribeEndpoint(timers);
+  let cancelled = 0;
+  const controllers = [];
+  const pending = Array.from({ length: 4 }, () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controllers.push(controller);
+      },
+      cancel() {
+        cancelled += 1;
+        return new Promise(() => {});
+      },
+    });
+    return endpoint(
+      new Request(URL, {
+        method: "POST",
+        body,
+        duplex: "half",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      }),
+      noDb,
+      NOW,
+    );
+  });
+  const encode = (text) => new TextEncoder().encode(text);
+  controllers[1].enqueue(encode("List-Unsubscribe=One-Click")); // Complete field, but no EOF.
+  controllers[2].enqueue(encode("List-Unsubscribe="));
+  await Promise.resolve();
+  controllers[2].enqueue(encode("One-Click"));
+  await Promise.resolve();
+  assert.equal(timers.scheduled, 4, "chunks cannot extend the original deadline");
+  await status(await endpoint(post(), noDb, NOW), 503);
+  timers.expire();
+  for (const response of await Promise.all(pending)) {
+    assert.equal(response.headers.get("Retry-After"), "60");
+    await status(response, 503);
+  }
+  assert.equal(cancelled, 4);
+  assert.equal(timers.active.size, 0);
+  let writes = 0;
+  await status(
+    await endpoint(
+      post(),
+      dbFor(async () => {
+        writes += 1;
+        return { meta: { changes: 0 } };
+      }),
+      NOW,
+    ),
+    204,
+  );
+  assert.equal(writes, 1, "only the later complete request can reach storage");
 });
