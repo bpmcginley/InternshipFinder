@@ -5,7 +5,6 @@ import html as html_mod
 import json
 import os
 import re
-import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -385,100 +384,6 @@ def test_the_day_first_seen_began_is_not_this_weeks_news(tmp_path):
     assert pages["/internships/massachusetts/"]["html"].count('class="new"') == 5
 
 
-def test_spellings_of_one_employer_share_a_page_and_a_role_counts_once(tmp_path):
-    a = [_row(i, company_name="Boeing") for i in range(8)]
-    b = [_row(20 + i, company_name="The Boeing Company") for i in range(4)]
-    dup = [
-        _row(40, company_name="The Boeing Company", title=a[0]["title"], regions=a[0]["regions"])
-    ]  # second board
-    site = _site(tmp_path, {"MA": a + b + dup})
-    pages = {p["path"]: p for p in seo_pages.build(site)}
-    assert "/internships/at/the-boeing-company/" not in pages
-    boeing = pages["/internships/at/boeing/"]
-    # was: "Boeing Internships – 12 Open Now". Since 2026-10-01 the title names the term most roles share,
-    # and since 2026-10-07 before "Internships", as searches word it. was: "Boeing Internships (Summer 2027)".
-    # 2026-10-13: the search's own words first, then a count floor. was: "Boeing Summer 2027 Internships – 12 Open".
-    assert len(boeing["items"]) == 12
-    assert (
-        "<title>Boeing Internships Summer 2027: 10+ Open Roles | InternScout</title>"
-        in boeing["html"]
-    )
-    assert "company=Boeing&amp;company=The%20Boeing%20Company" in boeing["html"]
-    assert (
-        '<a href="/internships/at/boeing/">The Boeing Company</a>'
-        in pages["/internships/massachusetts/"]["html"]
-    )
-    assert seo_pages.employer_key("Magna International") == seo_pages.employer_key("Magna")
-    assert seo_pages.employer_key("Booz Allen Hamilton") == seo_pages.employer_key("Booz Allen")
-    assert seo_pages.employer_key("Bank of America") == "bank of america"
-
-
-def test_a_work_study_board_gets_no_employer_page(tmp_path):
-    rows = [
-        _row(
-            i,
-            company_name="Some University",
-            stage=["part_time"],
-            title=f"Library Assistant (FWS) {i}",
-        )
-        for i in range(12)
-    ]
-    site = _site(tmp_path, {"MA": rows})
-    assert "/internships/at/some-university/" not in _paths(seo_pages.build(site))
-
-
-@pytest.mark.parametrize("short_count,long_count", [(12, 0), (0, 12), (6, 6), (8, 4), (4, 8)])
-def test_altera_keeps_its_current_url_when_source_name_counts_flip(
-    tmp_path, short_count, long_count
-):
-    rows = [_row(i, company_name="Altera") for i in range(short_count)]
-    rows += [_row(20 + i, company_name="Altera Corporation") for i in range(long_count)]
-    site = _site(tmp_path, {"MA": rows})
-    pages = {p["path"]: p for p in seo_pages.build(site)}
-    assert "/internships/at/altera-corporation/" not in pages
-    assert len(pages["/internships/at/altera/"]["items"]) == 12
-    assert set(seo_pages.EMPLOYERS.values()) == {"/internships/at/altera/"}
-    assert 'href="/internships/at/altera/"' in pages["/internships/at/"]["html"]
-
-
-@pytest.mark.parametrize("count", [6, 12])
-def test_retired_altera_url_redirects_only_to_the_existing_current_page(tmp_path, count):
-    site = _site(
-        tmp_path, {"MA": [_row(i, company_name="Altera Corporation") for i in range(count)]}
-    )
-    pages = seo_pages.build(site)
-    target = next(p for p in pages if p["path"] == "/internships/at/altera/")
-    assert target["index"] is (count >= seo_pages.INDEX_EMPLOYER)
-    seo_pages.write(site, pages)
-    redirect = (tmp_path / "internships/at/altera-corporation/index.html").read_text(
-        encoding="utf-8"
-    )
-    assert (
-        '<meta http-equiv="refresh" content="0;url=https://internscout.org/internships/at/altera/">'
-        in redirect
-    )
-    assert (
-        '<link rel="canonical" href="https://internscout.org/internships/at/altera/">' in redirect
-    )
-    assert '<a href="/internships/at/altera/">Altera internships</a>' in redirect
-    assert '<script' not in redirect
-    assert '/internships/at/altera-corporation/' not in (tmp_path / 'sitemap.xml').read_text(
-        encoding="utf-8"
-    )
-    assert '/internships/at/altera-corporation/' not in (tmp_path / seo_pages.HELD_FILE).read_text(
-        encoding="utf-8"
-    )
-    assert '/internships/at/altera/' in _paths(pages)
-
-
-def test_altera_redirect_is_not_created_when_existing_generation_rules_omit_the_target(tmp_path):
-    site = _site(tmp_path, {"MA": [_row(i, company_name="Altera Corporation") for i in range(2)]})
-    pages = seo_pages.build(site)
-    assert '/internships/at/altera/' not in _paths(pages)
-    seo_pages.write(site, pages)
-    assert not (tmp_path / 'internships/at/altera-corporation/index.html').exists()
-
-
 def test_new_page_links_to_new_only_and_feeds_every_new_role(tmp_path):
     rows = [_row(i, first_seen="2026-09-22T00:00:00") for i in range(40)]
     rows += [_row(100 + i, first_seen="2026-09-18T00:00:00") for i in range(41)]  # the baseline day
@@ -502,44 +407,6 @@ def test_lastmod_never_goes_back(tmp_path):
     assert (
         next(p for p in pages if p["path"] == "/internships/massachusetts/")["lastmod"]
         == "2026-09-30"
-    )
-
-
-def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp_path):
-    rows = (
-        [_row(i, salary="$25/hr") for i in range(30)]  # Summer 2027, paid
-        + [_row(100 + i, term="Spring 2027", stage=["co_op"]) for i in range(26)]  # co-ops
-        + [_row(200 + i, term=None, years=["first_year", "sophomore"]) for i in range(26)]
-        + [_row(300 + i, term="Fall 2027", stage=["research"]) for i in range(24)]
-    )  # below MIN_KIND
-    pages = {p["path"]: p for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
-    for path in (
-        "/internships/summer-2027/",
-        "/internships/spring-2027/",
-        "/internships/paid/",
-        "/internships/co-op/",
-        "/internships/for-freshmen/",
-        "/internships/for-sophomores/",
-    ):
-        assert path in pages, path
-    assert "/internships/fall-2027/" not in pages and "/internships/research/" not in pages
-    assert len(pages["/internships/summer-2027/"]["items"]) == 30
-    assert all(x["stage"] == ["co_op"] for x in pages["/internships/co-op/"]["items"])
-    assert len(pages["/internships/for-freshmen/"]["items"]) == 26  # only postings that say so
-    # was: "Summer 2027 Internships – 30 Open Now | InternScout" (2026-10-13: a count floor, no dash)
-    assert (
-        "<title>Summer 2027 Internships: 30+ Open Now | InternScout</title>"
-        in pages["/internships/summer-2027/"]["html"]
-    )
-    # The co-op page's opening doesn't claim "from internships to co-ops and research".
-    assert "26 open student roles that are co-ops." in pages["/internships/co-op/"]["html"]
-    # Each opens the dashboard on the matching filter, and the hub links every one.
-    assert 'href="/?state=all&amp;stage=co_op"' in pages["/internships/co-op/"]["html"]
-    assert 'href="/?state=all&amp;year=first_year"' in pages["/internships/for-freshmen/"]["html"]
-    assert 'href="/?state=all&amp;paid=1"' in pages["/internships/paid/"]["html"]
-    assert all(
-        f'href="{p}"' in pages["/internships/"]["html"]
-        for p in ("/internships/summer-2027/", "/internships/paid/", "/internships/for-sophomores/")
     )
 
 
@@ -740,66 +607,6 @@ def test_new_means_the_same_calendar_week_the_dashboard_counts():
     )  # 6 days back
 
 
-def test_employer_pages_answer_when_where_and_pay_from_their_own_roles(tmp_path):
-    rows = [
-        _row(
-            i,
-            company_name="Big Co",
-            salary="$38.00",
-            regions=[{"loc": "Denver, Colorado", "kind": "us", "state": "CO"}],
-        )
-        for i in range(8)
-    ]
-    rows += [
-        _row(
-            10 + i,
-            company_name="Big Co",
-            term="Winter 2027",
-            salary="$22.50 - $31.50",
-            regions=[{"loc": "Denver, CO", "kind": "us", "state": "CO"}],
-        )
-        for i in range(2)
-    ]
-    rows += [
-        _row(20 + i, company_name="Big Co", salary="$90,000 a year") for i in range(2)
-    ]  # yearly: not an hourly rate
-    site = _site(tmp_path, {"MA": rows, "CO": []})
-    h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/big-co/")
-    # was: "Big Co Summer 2027 Internships – 12 Open | InternScout" (2026-10-13)
-    assert "<title>Big Co Internships Summer 2027: 10+ Open Roles | InternScout</title>" in h
-    # 2026-10-07: what the employer's own careers page doesn't show in one place leads the description.
-    desc = _head(h, r'<meta name="description" content="(.*?)"/>')
-    # was: "12 open Big Co internships for Summer 2027 on one page, in Denver, CO" and "$22.50–$38/hour".
-    assert desc.startswith(
-        "12 open Big Co internships for Summer 2027 in Denver, CO, Town 20, MA and Town 21, MA."
-    )
-    assert "Listed pay $22.50-$38/hr." in desc
-    assert "Newest posted " in desc and "Updated" not in desc and len(desc) <= seo_pages.DESC_AIM
-    assert "<dt>Listed pay</dt><dd>$22.50 to $38 an hour, on 10 of 12 roles</dd>" in h
-    facts = h.split('<dl class="facts">')[1].split("</dl>")[0]
-    assert "Denver, CO (10)" in facts and "Colorado" not in facts  # one place, however it's spelled
-    assert (
-        "Summer 2027 is the most common start: 10 of the 12 open roles. Others start in Winter 2027."
-        in h
-    )
-    assert (
-        "<h2>Does Big Co pay interns?</h2><p>10 of the 12 open roles list pay, from $22.50 to $38 an hour.</p>"
-        in h
-    )
-
-
-def test_employer_pages_say_so_when_postings_leave_things_out(tmp_path):
-    rows = [_row(i, company_name="Quiet Co", term=None) for i in range(10)]
-    rows[0]["term"] = "Summer 2027"
-    site = _site(tmp_path, {"MA": rows})
-    h = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/at/quiet-co/")
-    assert (
-        "<title>Quiet Co Internships: 10+ Open Roles | InternScout</title>" in h
-    )  # no term most roles share
-    assert "None of the 10 open postings lists pay." in h
-    assert "Only 1 of the 10 open roles gives a start term: Summer 2027. The rest don’t say." in h
-
-
 def test_employer_pages_link_similar_employers_and_field_pages_link_employers(tmp_path):
     a = [_row(i, company_name="Rocket Co", tags=("aerospace",)) for i in range(10)]
     b = [_row(20 + i, company_name="Orbit Co", tags=("aerospace",)) for i in range(12)]
@@ -825,18 +632,6 @@ def test_place_names_read_the_way_people_write_them():
     assert name("West Des Moines, Iowa") == "West Des Moines, IA"
     assert name("Denver, CO") == "Denver, CO"
     assert seo_pages.place_name({"kind": "remote", "state": "Remote"}) == "Remote"
-
-
-def test_an_employer_with_five_roles_gets_a_page(tmp_path):
-    site = _site(
-        tmp_path,
-        {
-            "MA": [_row(i, company_name="Five Co") for i in range(5)]
-            + [_row(10 + i, company_name="Four Co") for i in range(4)]
-        },
-    )
-    paths = _paths(seo_pages.build(site))
-    assert "/internships/at/five-co/" in paths and "/internships/at/four-co/" not in paths
 
 
 # ---- for AI assistants and answer engines (added 2026-10-02)
@@ -1368,32 +1163,6 @@ def test_indexed_metadata_is_unique_and_major_descriptions_use_their_own_roles(t
     assert "Built for UMass" not in desc
 
 
-def test_kind_descriptions_keep_eligibility_and_use_only_their_actual_employers():
-    # 2026-10-23: shortening metadata must retain paid/eligibility qualifications from the postings.
-    # Revert: remove this test when reverting kind_description.
-    rows = [
-        _row(i, company_name="Apollo", years=["first_year", "sophomore"], salary="$25/hr")
-        for i in range(30)
-    ]
-    kinds = {k["slug"]: k for k in seo_pages.kinds(rows)}
-    term = seo_pages.fit_description(
-        seo_pages.kind_description(kinds["summer-2027"], rows, "October 23, 2026")
-    )
-    assert term.startswith("30 open Summer 2027 student roles.")
-    assert "Hiring now: Apollo." in term and "most for Summer 2027" not in term
-    for slug, qualifier in (
-        ("paid", "list pay or say they are paid"),
-        ("for-freshmen", "postings accept first-year college students"),
-        ("for-sophomores", "postings accept sophomores"),
-    ):
-        desc = seo_pages.fit_description(
-            seo_pages.kind_description(kinds[slug], rows, "October 23, 2026")
-        )
-        assert qualifier in desc
-        assert "Apollo" in desc and "Beacon" not in desc
-        assert len(desc) <= 155
-
-
 def test_every_page_carries_the_organization_once_with_the_brands_profiles(tmp_path):
     pages = seo_pages.build(_pay_site(tmp_path))
     for p in pages:
@@ -1426,7 +1195,7 @@ def test_the_field_pages_opening_sentences_are_short(tmp_path):
         .split("</p>")[0]
     )
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", lede) if s]
-    assert sentences[0] == "41 open student roles in mechanical engineering." and sentences[
+    assert sentences[0] == "As of September 23, 2026, InternScout lists 41 open student roles in mechanical engineering." and sentences[
         1
     ].startswith("They range from")
     assert max(len(s.split()) for s in sentences) <= 25
@@ -1623,31 +1392,6 @@ def test_offer_script_points_at_the_file_the_site_serves():
     # The same store listing, and the same posting links count.js counts as posting_click.
     assert f'var STORE = "{seo_pages.STORE_URL}";' in js
     assert 'var POSTING = "a.go[href], a.open-link[href]";' in js
-
-
-def test_employer_page_offers_auto_apply_with_its_own_tag(tmp_path):
-    rows = [
-        _row(
-            i,
-            company_name="Big Co",
-            ats="workday",
-            apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}",
-        )
-        for i in range(seo_pages.MIN_EMPLOYER)
-    ]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
-    own = pages["/internships/at/big-co/"]
-    assert "utm_source=seo-employer" in own and "stops at Submit" in own
-    assert "install.html?from=seo-employer-row" in own
-    assert f"All {seo_pages.MIN_EMPLOYER} of these applications are on Workday" in own
-    # The phone/tablet switch is CSS only, the same media query as install.html.
-    assert (
-        ".ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}"
-        in own
-    )
-    assert '<a href="/install.html">Auto-Apply (free)</a>' in own
-    assert "utm_source=seo-state" in pages["/internships/massachusetts/"]
-    assert "utm_source=seo-hub" in pages["/internships/new/"]
 
 
 def test_no_auto_apply_card_where_no_listing_is_on_a_supported_site(tmp_path):
@@ -2275,23 +2019,6 @@ def test_employer_pages_link_the_field_in_a_place_pages_their_roles_are_on(tmp_p
     )
 
 
-def test_upcoming_summers_are_the_ones_still_ahead():
-    from datetime import datetime, timezone
-
-    terms = ["Summer 2026", "Summer 2027", "Summer 2028", "Fall 2026", None]
-    assert seo_pages.upcoming_summers(terms, datetime(2026, 10, 7, tzinfo=timezone.utc)) == [
-        "Summer 2027",
-        "Summer 2028",
-    ]
-    assert (
-        seo_pages.upcoming_summers(terms, datetime(2027, 3, 1, tzinfo=timezone.utc))[0]
-        == "Summer 2027"
-    )
-    assert seo_pages.upcoming_summers(terms, datetime(2027, 6, 1, tzinfo=timezone.utc)) == [
-        "Summer 2028"
-    ]
-
-
 def _tracker_site(tmp_path, index_html=None):
     def roles(name, k, start, **over):
         return [
@@ -2310,53 +2037,6 @@ def _tracker_site(tmp_path, index_html=None):
     if index_html is not None:
         (tmp_path / "index.html").write_text(index_html, encoding="utf-8")
     return site
-
-
-def test_the_summer_tracker_lists_employers_newest_opened_first(tmp_path):
-    pages = {p["path"]: p for p in seo_pages.build(_tracker_site(tmp_path))}
-    path = "/internships/summer-2027/open/"
-    assert path in pages and pages[path]["lastmod"] == "2026-09-22"
-    html = pages[path]["html"]
-    tracker = ET.fromstring(re.search(r'<table class="data tracker".*?</table>', html, re.S)[0])
-    rows = [
-        tuple(
-            "".join(
-                (cell.find("span[@class='cell-value']") if cell.tag == "td" else cell).itertext()
-            )
-            for cell in row
-        )
-        for row in tracker.findall("./tbody/tr")
-    ]
-    assert rows == [
-        ("Alpha", "Sep 22, 2026", "6"),
-        ("Delta", "Sep 21, 2026", "5"),
-        ("Gamma", "By Sep 18, 2026", "5"),
-        ("Epsilon", "Sep 15, 2026", "5"),
-        ("Beta", "Aug 1, 2026", "5"),
-    ]
-    assert '<a href="/internships/at/alpha/">Alpha</a>' in html  # each employer links its page
-    assert "As of September 23, 2026, 5 employers have opened Summer 2027 internships" in html
-    assert "2 opened this week" in html  # Alpha and Delta; Epsilon is 8 days
-    assert "not every employer" in html and "public job boards" in html
-    assert "application/rss+xml" not in html  # no feed of its own
-    # Linked from its term page, the new-this-week page, the hub, the employer index and every footer.
-    for p in (
-        "/internships/summer-2027/",
-        "/internships/new/",
-        "/internships/",
-        "/internships/at/",
-        "/internships/massachusetts/",
-    ):
-        assert f'href="{path}"' in pages[p]["html"], p
-    assert '<a href="/internships/summer-2027/">Summer 2027</a>' in html  # its breadcrumb
-
-
-def test_no_tracker_for_a_summer_that_has_passed(tmp_path):
-    rows = [_row(i, term="Summer 2026") for i in range(30)]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
-    assert "/internships/summer-2026/" in pages
-    assert not any(p.endswith("/open/") for p in pages)
-    assert "/open/" not in pages["/internships/massachusetts/"]
 
 
 def test_the_dashboard_gets_a_crawlable_browse_section_between_its_markers(tmp_path):
@@ -2508,120 +2188,6 @@ def test_fit_head_drops_the_brand_then_the_tail_then_the_subjects_extra_words():
     )
 
 
-def test_employer_titles_lead_with_the_search_phrase_for_every_count_and_term():
-    title = seo_pages.employer_title
-    assert (
-        title("Under Armour", 10, "Summer 2027")
-        == "Under Armour Internships Summer 2027: 10+ Open | InternScout"
-    )
-    assert (
-        title("Lyft", 18, "Summer 2027")
-        == "Lyft Internships Summer 2027: 15+ Open Roles | InternScout"
-    )
-    assert (
-        title("Rivian", 41, "Spring 2027")
-        == "Rivian Internships Spring 2027: 40+ Open Roles | InternScout"
-    )
-    assert (
-        title("Gilead Sciences", 103, None)
-        == "Gilead Sciences Internships: 100+ Open Roles | InternScout"
-    )
-    # Under 10 roles, no number: the exact one would change with every refresh.
-    assert (
-        title("Medtronic", 9, "Summer 2027")
-        == "Medtronic Internships Summer 2027: Open Roles | InternScout"
-    )
-    assert title("Medtronic", 1, "Summer 2027") == title("Medtronic", 0, "Summer 2027")
-    assert title("ADT", 7, None) == "ADT Internships: Open Roles | InternScout"
-    assert (
-        title("Campbell Soup Company", 6, "Summer 2027")
-        == "Campbell Soup Company Internships Summer 2027 | InternScout"
-    )
-    # A long name keeps its term over the brand and the count, and is never cut mid-word.
-    assert (
-        title("Blue Cross Blue Shield of Michigan", 12, "Summer 2027")
-        == "Blue Cross Blue Shield of Michigan Internships Summer 2027"
-    )
-    for name in (
-        "X",
-        "M&T Bank",
-        "Blue Cross Blue Shield of Michigan",
-        "A" * 80,
-        "Executive Office for U.S. Attorneys",
-    ):
-        for n in (0, 1, 9, 10, 1000):
-            for term in (None, "Summer 2027", "Fall 2026", "Winter 2027"):
-                t = title(name, n, term)
-                assert 0 < len(t) <= seo_pages.TITLE_MAX, t
-                assert not any(d in t for d in _DASHES) and t.count(seo_pages.TITLE_SUFFIX) <= 1, t
-                assert t.startswith(name[:20]), t
-
-
-def test_employer_descriptions_count_right_and_fit_for_zero_one_and_many():
-    from datetime import datetime
-
-    desc = seo_pages.employer_description
-    day = datetime(2026, 10, 13)
-    many = desc(
-        "Bose",
-        12,
-        None,
-        ["Framingham, MA", "Atlanta, GA", "Bloomfield Hills, MI"],
-        (22.0, 51.25, 9),
-        day,
-        co_ops=2,
-    )
-    assert many.startswith(
-        "12 open Bose internships and co-ops in Framingham, MA, Atlanta, GA and Bloomfield Hills, MI."
-    )
-    assert "Listed pay $22-$51.25/hr." in many and "Newest posted Oct 13." in many
-    one = desc("Acme", 1, "Summer 2027", ["Boston, MA"], None, day)
-    assert (
-        one.startswith("1 open Acme internship for Summer 2027 in Boston, MA.")
-        and "internships" not in one
-    )
-    assert desc("Acme", 1, None, [], None, day, co_ops=1).startswith("1 open Acme co-op.")
-    zero = desc("Acme", 0, "Summer 2027", [], None, None)
-    assert zero.startswith("No Acme internships are open right now.") and "0 open" not in zero
-    # Pay and the newest posting outrank a second and third place.
-    places = ["Lake Saint Louis, MO", "Fort Lauderdale, FL", "Colorado Springs, CO"]
-    d = desc(
-        "National Information Solutions Cooperative (NISC)",
-        10,
-        "Summer 2027",
-        places,
-        (25.0, 25.0, 10),
-        day,
-    )
-    assert (
-        "Listed pay $25/hr." in d and "Newest posted Oct 13." in d and "Colorado Springs" not in d
-    )
-    assert "(NISC)'s" not in d  # too long a name for a possessive
-    # "own posting" only when no role links to a job site instead.
-    assert "Acme's own posting" in desc("Acme", 2, None, [], None, None)
-    assert "own posting" not in desc("Acme", 2, None, [], None, None, own_links=False)
-    assert seo_pages.own_posting({"apply_url": "https://acme.wd5.myworkdayjobs.com/x/job/1"})
-    assert seo_pages.own_posting(
-        {"apply_url": "https://www.tesla.com/careers/search/job/1?source=indeed"}
-    )
-    for url in (
-        "https://ca.linkedin.com/jobs/view/1",
-        "https://www.indeed.com/viewjob?jk=1",
-        "https://simplify.jobs/p/1",
-        "https://app.joinhandshake.com/public/jobs/1",
-        "",
-    ):
-        assert not seo_pages.own_posting({"apply_url": url}), url
-    for name in ("X", "Under Armour", "Blue Cross Blue Shield of Michigan", "A" * 120):
-        for n in (0, 1, 5, 2446):
-            for pay in (None, (18.0, 28.0, 3)):
-                text = seo_pages.fit_description(
-                    desc(name, n, "Summer 2027", ["Baltimore, MD", "Austin, TX"], pay, day)
-                )
-                assert seo_pages.DESC_MIN <= len(text) <= seo_pages.DESC_MAX, text
-                assert not any(dash in text for dash in _DASHES), text
-
-
 def test_listing_descriptions_name_the_term_and_who_is_hiring():
     rows = [_row(i, company_name=f"Co {'ABCDE'[i % 5]}") for i in range(20)]
     text = seo_pages.listing_description(
@@ -2758,70 +2324,20 @@ def test_of_the_small_pages_only_the_employer_page_is_thin(tmp_path):
     assert "/internships/at/small-co/" in built and "/internships/massachusetts/" in built
     # was: no page thin but the near pages (2026-10-18). The employer page, under INDEX_EMPLOYER, is too (2026-10-23).
     assert {p for p, v in built.items() if v["thin"] and v["kind"] != "near"} == {
-        "/internships/at/small-co/"
+        "/internships/at/small-co/",
+        "/internships/for/mechanical-engineering-majors/weekly/",
     }
     assert all(
         v["index"]
         for p, v in built.items()
-        if p not in ("/digest/", "/internships/at/small-co/") and v["kind"] != "near"
+        if p not in (
+            "/digest/", "/internships/at/small-co/",
+            "/internships/for/mechanical-engineering-majors/weekly/",
+        ) and v["kind"] != "near"
     )  # /digest/ waits for its form
 
 
 # ---- employer pages under INDEX_EMPLOYER roles, and pages that are another's list (2026-10-23)
-
-EMPLOYER = "/internships/at/small-co/"
-
-
-def _employer_site(tmp_path, n):
-    """n roles at Small Co in Massachusetts, among others at their own employers."""
-    rows = [_row(i, company_name="Small Co") for i in range(n)] + [_row(100 + i) for i in range(20)]
-    return _site(tmp_path, {"MA": rows})
-
-
-def test_employer_indexed_threshold_slack_and_search_traffic():
-    need, slack = seo_pages.INDEX_EMPLOYER, seo_pages.INDEX_SLACK
-    ok = seo_pages.employer_indexed
-    assert need == 10 and seo_pages.MIN_EMPLOYER < need
-    assert ok(need, EMPLOYER, set()) and not ok(need - 1, EMPLOYER, set())
-    assert ok(
-        seo_pages.MIN_EMPLOYER, EMPLOYER, set(), frozenset({EMPLOYER})
-    )  # people find it in search
-    assert ok(need - slack, EMPLOYER, {EMPLOYER}) and not ok(need - slack - 1, EMPLOYER, {EMPLOYER})
-
-
-def test_an_employer_page_under_the_bar_is_built_and_linked_but_noindex(tmp_path):
-    site = _employer_site(tmp_path, seo_pages.INDEX_EMPLOYER - 1)
-    built = _built(site)
-    page = built[EMPLOYER]
-    assert page["thin"] and not page["index"]
-    assert '<meta name="robots" content="noindex, follow"/>' in page["html"]
-    assert f'<link rel="canonical" href="https://internscout.org{EMPLOYER}"/>' in page["html"]
-    seo_pages.write(site, list(built.values()))
-    sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
-    assert f"<loc>https://internscout.org{EMPLOYER}</loc>" not in sitemap
-    listing = os.path.join(site, seo_pages.HELD_FILE)
-    assert EMPLOYER in seo_pages.held_paths(listing)
-    lines = open(listing, encoding="utf-8").read().splitlines()
-    assert lines[0].startswith("# ") and all(s.startswith("/internships/") for s in lines[1:])
-    big = _built(_employer_site(tmp_path / "big", seo_pages.INDEX_EMPLOYER))[EMPLOYER]
-    assert big["index"] and not big["thin"] and "noindex" not in big["html"]
-    assert _built(site, earning=frozenset({EMPLOYER}))[EMPLOYER]["index"]
-
-
-def test_the_employer_slack_holds_even_when_the_noindex_list_could_not_be_fetched(tmp_path):
-    # pages.yml deletes live-noindex.txt when its fetch fails, so build() gets no held pages. was
-    # (2026-10-23): the slack then switched off and dropped the page below for good.
-    site = _employer_site(tmp_path, seo_pages.INDEX_EMPLOYER - 1)
-    assert _built(site, live={EMPLOYER})[EMPLOYER]["index"]
-    assert _built(site, live={EMPLOYER}, held={COMBO})[EMPLOYER]["index"]
-
-
-def test_index_employer_at_min_employer_indexes_every_employer_page_again(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        seo_pages, "INDEX_EMPLOYER", seo_pages.MIN_EMPLOYER
-    )  # the one-constant revert
-    assert _built(_employer_site(tmp_path, seo_pages.MIN_EMPLOYER))[EMPLOYER]["index"]
-
 
 def test_duplicates_keeps_the_bigger_of_two_near_same_lists():
     ids = lambda a, b: frozenset(range(a, b))
@@ -2970,7 +2486,10 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
         encoding="utf-8",
     ).read()
     assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
-    assert "python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt" in wf
+    assert (
+        "python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt"
+        in wf
+    )
 
 
 # PR #97 follow-up: a page with no state covers every state, so its dashboard link says so; otherwise

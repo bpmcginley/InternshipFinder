@@ -10,6 +10,7 @@ fellowship, REU, ...). New-grad and early-career jobs are dropped.
 
 from __future__ import annotations
 import re
+from .vocabulary import STAGE_LABELS, YEAR_LABELS
 
 # 2026-10-23: was bare test engineer and crypto. Physical testing and cryptography are not
 # software/finance without domain evidence. Explicit software and crypto-asset roles still match.
@@ -415,16 +416,8 @@ RULES = [
 # Safety, and Environment culture", "Internal Controls". normalize classifies the title alone,
 # and on titles, against every open listing, they changed 95 and rescued 76 from "other".
 
-STAGES = (
-    "internship",
-    "co_op",
-    "research",
-    "fellowship",
-    "early_insight",
-    "part_time",
-    "apprenticeship",
-)
-YEARS = ("first_year", "sophomore", "junior", "senior", "masters", "phd")
+STAGES = tuple(key for key, _ in STAGE_LABELS)
+YEARS = tuple(key for key, _ in YEAR_LABELS)
 _UNDERGRAD = YEARS[:4]
 
 _STAGE_RULES = [

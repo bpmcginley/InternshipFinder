@@ -1,6 +1,10 @@
 """Exact public output from real export, Pages build, feeds, widget and link audit."""
 
+from io import BytesIO
 import json
+import re
+
+from PIL import Image
 
 from golden_build import build, differences, prepare
 
@@ -36,6 +40,26 @@ def test_full_build_matches_golden(tmp_path):
         p.startswith("internships/for/") and p != "internships/for/index.html" for p in files
     )
     assert any(p.endswith("feed.xml") for p in files)
+    cards = [path for path in files if path.endswith("/share.png")]
+    assert len(cards) == 14
+    assert "internships/summer-2027/software-engineering/share.png" in cards
+    assert "internships/at/bose/share.png" not in cards
+    for path in cards:
+        html = files[path.removesuffix("share.png") + "index.html"]
+        image_url = f"https://internscout.org/{path}".encode()
+        assert b'<meta property="og:image" content="' + image_url + b'"/>' in html
+        assert b'<meta name="twitter:image" content="' + image_url + b'"/>' in html
+        with Image.open(BytesIO(files[path])) as image:
+            assert (image.format, image.size) == ("PNG", (1200, 630))
+    match = re.search(
+        rb'<script type="application/json" id="landing-share-views">([^<]+)</script>',
+        files["index.html"],
+    )
+    assert match is not None
+    views = json.loads(match[1])
+    assert views["swe/all"] == "/internships/software-engineering/"
+    assert views["swe/MA"] == "/internships/software-engineering/massachusetts/"
+    assert all(path.lstrip("/") + "index.html" in files for path in views.values())
     assert any(b"<!--paid-->" in data for data in files.values())
     assert json.loads(files["data/seo-posting-details.json"])["records"]
     assert json.loads(files["data/placements.json"])["placements"]
@@ -53,7 +77,7 @@ def test_full_build_matches_golden(tmp_path):
 def test_one_character_template_change_is_detected(tmp_path):
     work = tmp_path / "mutated"
     prepare(work)
-    template = work / "backend" / "internscout" / "seo_pages.py"
+    template = work / "backend" / "internscout" / "site" / "assets.py"
     source = template.read_text(encoding="utf-8")
     original = 'SLOGAN = "Built by one student, made for all students."'
     assert source.count(original) == 1
