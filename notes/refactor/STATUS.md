@@ -586,6 +586,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) merged at `c84cea3b`. Pages runs 42949557934 and 42949563654 and the exact deployment succeeded.
 - Move 15 employer-specific test functions and their private fixture into `test_seo_employer.py`, keeping shared helpers at their existing imports. All assertions and decorators match the original source. Cross-family tests remain in `test_seo_pages.py`. Backend collection retained all 1,166 tests, with only the 20 moved case paths changing. All 219 focused tests and Ruff passed.
 
+## WP-6.2 employer links, role details and widget tests
+
+- Employer entry and posting-link tests use the shared fixtures and canonical rendering. The paid box still uses the sponsored link without organic posting annotations. Role-detail builds preserve sitemap and publication order. The widget case runs the canonical publisher with the same fixed date and complete listing input while page and feed writers are stubbed.
+- The offline comparison matched all 109 assertions, 1,106 ordered page records across eight builds, three publication snapshots, 127 ordered writes, all 61 final fixture files, paid markup, console output and widget inputs. All 52 cases passed with root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 92 focused tests included both Golden checks against all 836 artifacts.
+- The generated distribution and phone migration at `df978c48` and the dated opening-count migration at `5ec2bbba` passed their exact Pages runs. Each 4,996-file publication matched the [#419 artifact](https://github.com/bpmcginley/InternshipFinder/pull/419) byte-for-byte, and all 141 listing files matched data commit `fa207ade`. [#428 Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43092791350) · [#431 Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43093185735).
+
 ## WP-3.3 listing test follow-up
 
 - [#300](https://github.com/bpmcginley/InternshipFinder/pull/300) merged as `cc2c0211`. Pages 42959357666 and the exact deployment succeeded.
@@ -797,6 +803,11 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - Offline verification: 246 focused tests passed with one existing optional cryptography skip. The real synthetic Reel check ran. Both Golden tests passed with 695 artifact paths. Ruff and diff checks passed.
 - The Instagram and metrics direct CLIs use a temporary checkout import path. Their existing workflow checkouts already contain the shared standard-library logger. No workflow or packaging edit. The diagnostic-only scope is supported by syntax-tree comparisons of the four status modules and actual artifact and stdout comparisons for digest. After integrating main `f98760d2`, the authored sources and tests stayed byte-identical, and the socket-denied focused and golden run passed 233 with two local dependency skips. Ruff passed.
 
+## WP-6.2 screenshot reproduction scripts
+
+- The synthetic P-1.9 employer stress page still uses the pinned `f6e599ef` renderer before and uses the current canonical renderer after. The previous after-mode searched the facade for a function that had become an alias. Both fixture pages match their reference bytes and preserve the hostile-name escaping and employer entry link.
+- P-2.3n and P-4.1 import the shared listing fixture directly. Offline comparisons matched all 128 P-2.3n files and all 762 P-4.1 files, including 636 site files and the five pilot pages. All three scripts ran with sockets blocked. The import-blocked runs used the exact pending fixture-consumer heads from [#434](https://github.com/bpmcginley/InternshipFinder/pull/434) and [#445](https://github.com/bpmcginley/InternshipFinder/pull/445). Both Golden checks passed against all 836 artifacts.
+
 ## WP-1.4 page-build logging
 
 - On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
@@ -853,6 +864,11 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - JSON mode reports source, operation and exception class from 13 previously silent broad catches: 11 ATS detail reads, the HouseAI detail read, and the shared robots lookup. Default mode leaves those catches silent. The shared console_exception helper preserves fallbacks even if the opt-in write raises BrokenPipeError or RuntimeError.
 - This PR preserved the five raw-error source adapters byte-for-byte. Q6 tracks decisions about their existing exception output.
 - The focused mocked source and adapter suites passed 144 tests. Golden snapshot and mutation checks both passed. Ruff is clean, and targeted Pyright exactly matches the nine existing diagnostics. Syntax trees match the previous revision after stripping logging-only changes from all 14 touched source modules. After merging main `acf2d347`, all 146 focused and golden tests passed, and source, test and shared-helper bytes matched their reviewed versions.
+
+## WP-6.2 placement report and console tests
+
+- The placement report and console tests use the canonical publisher with their original fixed UTC day and near-page setting. The qualified placement fixtures, recorder subprocess and workflow assertions are preserved. The cases still cover report placement, report failure and noninterference, and exact JSON diagnostics and workflow annotations.
+- The offline comparison matched all 53 assertions, 245 ordered page records across six publisher runs, six publication snapshots, 527 ordered writes and all 525 final fixture files. Stdout and stderr matched after replacing the scratch-directory prefix. All 18 focused cases passed with strict root fixtures, canonical donor identity, and facade, unqualified donor and sockets blocked. Both Golden checks matched all 836 artifacts.
 
 ## WP-1.4 backend logging closure
 
