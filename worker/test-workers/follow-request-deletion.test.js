@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { expect, it } from "vitest";
 import { queueFollowDigest } from "../src/follow-outbox.js";
 import { deleteFollowRequest, mintFollowRequestDeletion } from "../src/follow-request-deletion.js";
+import { deleteLastPendingScope } from "../test-support/follow-request-deletion.js";
 import {
   confirmFollow,
   expireFollows,
@@ -36,6 +37,11 @@ const scope = ({ subscriberId, scopeKey }) =>
     )
     .bind(subscriberId, scopeKey)
     .first();
+
+it("deleting the final pending scope removes a historically confirmed subscriber in D1", async () => {
+  await setup();
+  await deleteLastPendingScope(db, (actual, expected) => expect(actual).toEqual(expected));
+});
 
 it("scoped delete links are hashed, expire with the confirmation, and cascade on reissue or unsubscribe", async () => {
   await setup();

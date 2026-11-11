@@ -46,8 +46,7 @@ export async function deleteFollowRequest(db, token, now = new Date()) {
       .bind(...args),
     db
       .prepare(
-        `DELETE FROM follow_subscribers WHERE confirmed_at IS NULL
-        AND id IN (SELECT t.subscriber_id ${live})
+        `DELETE FROM follow_subscribers WHERE id IN (SELECT t.subscriber_id ${live})
         AND NOT EXISTS (SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id)`,
       )
       .bind(...args),

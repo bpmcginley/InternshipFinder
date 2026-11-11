@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { deleteFollowRequest, mintFollowRequestDeletion } from "../src/follow-request-deletion.js";
+import { deleteLastPendingScope } from "../test-support/follow-request-deletion.js";
+import { fakeD1 } from "./helpers.js";
+
+test("deleting the final pending scope removes a historically confirmed subscriber", async () => {
+  await deleteLastPendingScope(fakeD1(), assert.deepEqual);
+});
 
 test("request deletion and confirmation credentials are not interchangeable", async () => {
   const noDb = {
