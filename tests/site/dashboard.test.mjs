@@ -7,7 +7,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import vm from "node:vm";
 
 const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
-function loadCore() {
+function loadCore(now) {
   const store = () => {
     const m = new Map();
     return {
@@ -31,6 +31,13 @@ function loadCore() {
     document: { documentElement: { dataset: {} } },
     console,
   };
+  if (now !== undefined) {
+    ctx.Date = class extends Date {
+      static now() {
+        return now;
+      }
+    };
+  }
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(CORE, ctx);
@@ -181,7 +188,7 @@ const PROFILES = {
     states: [],
   },
 };
-const scorer = (p) => {
+const scorer = (p, score = IS.score) => {
   const { direct, related } = IS.profileFields(p, MAJORS);
   const ctx = {
     p,
@@ -194,7 +201,7 @@ const scorer = (p) => {
   return (x) => {
     let v = m.get(x);
     if (!v) {
-      v = IS.score(x, ctx);
+      v = score(x, ctx);
       m.set(x, v);
     }
     return v;
@@ -236,19 +243,20 @@ test("the list comes out in exactly the old order for every sort, profile and se
 
 test("rows that arrive file by file, scored once each, sort the same as all rows at once", () => {
   // The page keeps each row's score as its file lands and only sorts again; the result has to match a
-  // fresh score of everything.
+  // fresh score of everything at the same instant, so freshness decay cannot change the comparison.
+  const ranking = loadCore(Date.now());
   const all = loadAll();
   const p = PROFILES.cs,
-    cachedS = scorer(p),
+    cachedS = scorer(p, ranking.score),
     seen = [];
   const files = [];
   for (let i = 0; i < all.length; i += 2500) files.push(all.slice(i, i + 2500));
   let got = [];
   for (const f of files) {
     seen.push(...f);
-    got = ids(IS.sortRows(seen.slice(), "score", cachedS, null));
+    got = ids(ranking.sortRows(seen.slice(), "score", cachedS, null));
   }
-  const want = ids(legacySort(all.slice(), "score", scorer(p), false, null));
+  const want = ids(legacySort(all.slice(), "score", scorer(p, ranking.score), false, null));
   assert.deepEqual(got, want);
 });
 
