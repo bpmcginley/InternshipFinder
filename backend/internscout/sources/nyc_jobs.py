@@ -6,6 +6,7 @@ from datetime import date, datetime
 from .base import client
 from .common import ScanCounts, board_item, html_to_text, report_source
 from ..classify import is_internship
+from ..console_log import console
 
 API = "https://data.cityofnewyork.us/resource/kpav-sd4t.json"
 LIMIT = 2000
@@ -94,6 +95,6 @@ def fetch_nyc_jobs(report=None) -> list[dict]:
         print(f"[nyc_jobs] failed: {e}")
         report_source(report, "nyc_jobs", error=e)
         return []
-    print(f"[nyc_jobs] {len(out)} student postings")
+    console(f"[nyc_jobs] {len(out)} student postings")
     report_source(report, "nyc_jobs", items=out, counts=counts)
     return out
