@@ -14,7 +14,7 @@ change. Updating this file does **not** change the listing. The public 0.5.7 lis
 
 The first three fixes were merged after the 0.5.7 package was built. They are already implemented on
 main and are included in the 0.5.8 candidate; this is not a claim that 0.5.8 has been published.
-See `reviews/releases/extension-0.5.8.md` for release gates and package verification.
+See `notes/reviews/releases/extension-0.5.8.md` for release gates and package verification.
 
 ## Description history (2026-10-06)
 

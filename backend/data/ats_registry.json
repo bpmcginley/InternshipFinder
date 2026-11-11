@@ -3087,6 +3087,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "addepar1": {
+   "name": "Addepar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "advancedspace": {
    "name": "Advanced Space",
    "quant": false,
@@ -13557,8 +13563,9 @@
   "bakerhughes|wd5|BakerHughes": {
    "name": "Baker Hughes",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-10"
   },
   "bakertilly|wd5|BTCareers": {
    "name": "Baker Tilly",
@@ -16447,8 +16454,9 @@
   "invesco|wd1|IVZ": {
    "name": "Invesco",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-10"
   },
   "invesco|wd1|IVZearlycareers": {
    "name": "Invesco",
@@ -16461,6 +16469,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "investquebec|wd10|ext": {
+   "name": "Investissement Québec",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "iqvia|wd1|IQVIA": {
    "name": "IQVIA",
@@ -16926,10 +16940,9 @@
   "lsu|wd1|lsuwaiver": {
    "name": "Louisiana State University (LSU)",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-10"
+   "sector": "education_research"
   },
   "lthc|wd1|ExcellusBCBSCareers": {
    "name": "Excellus BCBS",

@@ -4,7 +4,7 @@ Planned window: October 20–November 2, 2026. Review: November 3. Owner: Bruce.
 If distribution starts late, extend its measurement period to two complete weeks after actual distribution; the November 3 check is interim or inconclusive until then.
 This extends the existing [campaign kit](README.md), [campus kit](../OUTREACH.md),
 [signup measurement procedure](../SIGNUP_MEASUREMENT.md) and five-student pilot in
-`reviews/2026-10-16-post-release/student-pilot.md` (prepared in PR #124). It creates no
+`notes/reviews/2026-10-16-post-release/student-pilot.md` (prepared in PR #124). It creates no
 new signup service, publishing schedule or recurring automation. No recruitment, partner
 contact, post, or email has been sent for this experiment.
 
