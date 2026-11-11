@@ -1,4 +1,4 @@
-"""A forwardable static weekly edition. No signup or email-delivery promise."""
+"""A forwardable weekly edition with explicitly supplied signup rendering."""
 
 from __future__ import annotations
 
@@ -6,10 +6,18 @@ from collections.abc import Callable
 from html import escape as esc
 
 from ..advisor import Edition
+from ..digest import Signup
 from ..text import plural
+from .digest import render_signup_form
 
 
-def render(model: Edition, *, listing_rows: Callable[..., str], limit: int = 40) -> dict:
+def render(
+    model: Edition,
+    *,
+    listing_rows: Callable[..., str],
+    limit: int = 40,
+    advisor_signup: Signup | None = None,
+) -> dict:
     name = esc(model.name)
     title = f"Weekly internships for {model.name} majors"
     if model.state == "unmapped":
@@ -38,6 +46,7 @@ def render(model: Edition, *, listing_rows: Callable[..., str], limit: int = 40)
         else "Browse open roles for this major"
     )
     body += f'<p><a class="cta" href="{esc(model.parent)}">{label}</a></p>'
+    body += render_signup_form(advisor_signup, advisor=True)
     return {
         "path": model.path,
         "title": title,
