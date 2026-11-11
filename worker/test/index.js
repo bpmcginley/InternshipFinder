@@ -39,3 +39,4 @@ import "./settlement-race.test.js";
 import "./api-contract.test.js";
 import "./employer-catalog-cache.test.js";
 import "./employer-posting-counts.test.js";
+import "./employer-request-safe.test.js";

@@ -201,3 +201,122 @@ export function createEmployerCatalogCache({
     },
   });
 }
+
+// Isolate-shared mode: load belongs to the calling request, never to this cache.
+// Only parsed membership, timestamps and a plain generation token survive a call.
+// A competing request fails closed instead of awaiting or cancelling another's I/O.
+export function createRequestSafeEmployerCatalogCache({
+  parse,
+  maxBytes,
+  now = Date.now,
+  schedule = setTimeout,
+  cancel = clearTimeout,
+  loadTimeoutMs = 5_000,
+}) {
+  if (
+    typeof parse !== "function" ||
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes < 1 ||
+    !Number.isSafeInteger(loadTimeoutMs) ||
+    loadTimeoutMs < 1 ||
+    loadTimeoutMs > TTL
+  )
+    throw new TypeError("Invalid catalog cache options");
+  let cached = null,
+    pending = null,
+    last = 0,
+    retryAt = 0;
+  const time = (value) => {
+    try {
+      const at = value === undefined ? now() : value;
+      if (!Number.isSafeInteger(at) || at < last || at > Number.MAX_SAFE_INTEGER - TTL - RETRY)
+        return null;
+      last = at;
+      return at;
+    } catch {
+      return null;
+    }
+  };
+  const drop = () => {
+    cached = null;
+    pending = null; // Never calls the owner's abort, reader or timer.
+    retryAt = last + RETRY;
+  };
+  async function match(key, load) {
+    const at = time();
+    if (at === null) {
+      drop();
+      return null;
+    }
+    if (cached && at >= cached.expires) cached = null;
+    if (pending) {
+      if (at >= pending.deadline) drop();
+      return null;
+    }
+    if (!cached) {
+      if (at < retryAt || typeof load !== "function") return null;
+      const token = { deadline: at + loadTimeoutMs, expires: at + TTL };
+      pending = token;
+      let known;
+      // The existing bounded reader/timeout stays entirely within its owner request.
+      const owner = createEmployerCatalogCache({
+        load,
+        maxBytes,
+        now,
+        schedule,
+        cancel,
+        loadTimeoutMs,
+        parse: async (text) => {
+          known = await parse(text);
+          return typeof known === "function" ? () => true : null;
+        },
+      });
+      const lease = await owner.match(key);
+      const finished = time();
+      if (pending !== token) return null; // A late owner cannot replace a newer generation.
+      if (finished === null || finished >= token.deadline || !lease || !lease(finished)) {
+        drop();
+        return null;
+      }
+      pending = null;
+      cached = { known, expires: token.expires };
+    }
+    const entry = cached;
+    try {
+      const accepted = entry.known(key),
+        checked = time();
+      if (typeof accepted !== "boolean" || checked === null) {
+        drop();
+        return null;
+      }
+      if (checked >= entry.expires) {
+        cached = null;
+        return null;
+      }
+      if (!accepted) return null;
+      return (value) => {
+        if (cached !== entry) return false;
+        const checked = time(value);
+        if (checked === null) {
+          drop();
+          return false;
+        }
+        if (checked >= entry.expires) {
+          cached = null;
+          return false;
+        }
+        return true;
+      };
+    } catch {
+      drop();
+      return null;
+    }
+  }
+  return Object.freeze({
+    match,
+    async has(key, load) {
+      const lease = await match(key, load);
+      return lease ? lease(time()) : false;
+    },
+  });
+}

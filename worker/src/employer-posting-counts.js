@@ -1,5 +1,8 @@
 // Dormant core: no production caller, URL, migration or shared limiter.
-import { createEmployerCatalogCache } from "./employer-catalog-cache.js";
+import {
+  createEmployerCatalogCache,
+  createRequestSafeEmployerCatalogCache,
+} from "./employer-catalog-cache.js";
 
 export const EMPLOYER_POSTING_EVENT = "employer_posting_open";
 export const employerPostingCountsEnabled = (env) => env?.EMPLOYER_POSTING_COUNTS_ENABLED === "1";
@@ -60,6 +63,33 @@ export function createEmployerMinuteBudget(schedule = setTimeout, cancel = clear
 // Shared by counter instances in this isolate, including after snapshot replacement.
 const employerMinuteBudget = createEmployerMinuteBudget();
 const permanentMatch = () => true;
+const validBody = (body) =>
+  body &&
+  typeof body === "object" &&
+  !Array.isArray(body) &&
+  Object.keys(body).length === 2 &&
+  Object.hasOwn(body, "e") &&
+  Object.hasOwn(body, "c") &&
+  body.e === EMPLOYER_POSTING_EVENT &&
+  isEmployerPostingKey(body.c);
+
+// A server-only, single-use receipt: no IP, request, binding or persistent identifier.
+class Admission {
+  #value;
+  constructor(company, at) {
+    this.#value = { company, at };
+  }
+  take() {
+    const value = this.#value;
+    this.#value = null;
+    return value;
+  }
+}
+export function admitEmployerPosting(body, address, at) {
+  return validBody(body) && employerMinuteBudget(address, at)
+    ? new Admission(body.c, at.getTime())
+    : null;
+}
 
 export function createEmployerPostingCounter({ db, keys, now = () => new Date() }) {
   const known = catalog(keys);
@@ -76,6 +106,21 @@ export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = (
     loadTimeoutMs: 5_000,
   });
   return employerPostingCounter(db, cache.match, now);
+}
+
+// Only this parsed catalog may be shared across requests. No loader or D1 binding is retained.
+export function createRequestSafeEmployerPostingCatalog({ maxBytes, now = Date.now }) {
+  return createRequestSafeEmployerCatalogCache({ parse: parseCatalog, maxBytes, now });
+}
+
+// Construct inside the owning request; the caller still owns retention/health sequencing.
+export function createRequestScopedEmployerPostingCounter({
+  db,
+  cache,
+  load,
+  now = () => new Date(),
+}) {
+  return employerPostingCounter(db, (key) => cache.match(key, load), now);
 }
 
 // Cleanup has to succeed for the current UTC day before accepting counts.
@@ -124,64 +169,73 @@ function employerPostingCounter(db, match, now) {
     },
     async count(body, address) {
       const at = now();
-      if (!match || !instant(at)) return false;
-      const day = at.toISOString().slice(0, 10);
-      const version = cleanupVersion;
-      if (readyDay !== day || !employerMinuteBudget(address, at)) return false;
       if (
-        !body ||
-        typeof body !== "object" ||
-        Array.isArray(body) ||
-        Object.keys(body).length !== 2 ||
-        !Object.hasOwn(body, "e") ||
-        !Object.hasOwn(body, "c") ||
-        body.e !== EMPLOYER_POSTING_EVENT ||
-        !isEmployerPostingKey(body.c)
+        !match ||
+        !instant(at) ||
+        readyDay !== at.toISOString().slice(0, 10) ||
+        !employerMinuteBudget(address, at) ||
+        !validBody(body)
       )
         return false;
-      const company = body.c;
-      const isCurrent = await match(company);
-      if (!isCurrent) return false;
-      const checked = now();
-      const checkedTime = instant(checked) ? checked.getTime() : NaN;
+      return countKnown(body.c, at);
+    },
+    async countAdmitted(admission) {
+      if (!(admission instanceof Admission)) return false;
+      const value = admission.take();
+      const fresh = now();
       if (
-        !isCurrent(checkedTime) ||
-        !Number.isFinite(checkedTime) ||
-        checkedTime < at.getTime() ||
-        checked.toISOString().slice(0, 10) !== day ||
-        readyDay !== day ||
-        cleanupVersion !== version
+        !value ||
+        !instant(fresh) ||
+        fresh.getTime() < value.at ||
+        fresh.toISOString().slice(0, 10) !== new Date(value.at).toISOString().slice(0, 10)
       )
         return false;
-      // D1 batch is one transaction. The second write follows only a successful company
-      // increment; failure rolls both back. No full-day scan, IP, or historical rollup.
-      try {
-        const results = await db.batch([
-          db
-            .prepare(
-              `
+      return countKnown(value.company, new Date(value.at));
+    },
+  };
+  async function countKnown(company, at) {
+    const day = at.toISOString().slice(0, 10),
+      version = cleanupVersion;
+    if (!match || readyDay !== day) return false;
+    const isCurrent = await match(company);
+    if (!isCurrent) return false;
+    const checked = now();
+    const checkedTime = instant(checked) ? checked.getTime() : NaN;
+    if (
+      !isCurrent(checkedTime) ||
+      !Number.isFinite(checkedTime) ||
+      checkedTime < at.getTime() ||
+      checked.toISOString().slice(0, 10) !== day ||
+      readyDay !== day ||
+      cleanupVersion !== version
+    )
+      return false;
+    // D1 batch is one transaction. The second write follows only a successful company
+    // increment; failure rolls both back. No full-day scan, IP, or historical rollup.
+    try {
+      const results = await db.batch([
+        db
+          .prepare(
+            `
           INSERT INTO employer_posting_counts(day, company, n)
           SELECT ?, ?, 1
           WHERE (SELECT n FROM employer_posting_day_caps WHERE day = ?) < 50000
           ON CONFLICT(day, company) DO UPDATE SET n = n + 1 WHERE n < 1000
         `,
-            )
-            .bind(day, company, day),
-          db
-            .prepare(
-              "UPDATE employer_posting_day_caps SET n = n + 1 WHERE day = ? AND changes() = 1",
-            )
-            .bind(day),
-        ]);
-        if (!results.every((result) => result.success)) {
-          readyDay = null;
-          return false;
-        }
-        return results.every((result) => result.meta.changes === 1);
-      } catch {
+          )
+          .bind(day, company, day),
+        db
+          .prepare("UPDATE employer_posting_day_caps SET n = n + 1 WHERE day = ? AND changes() = 1")
+          .bind(day),
+      ]);
+      if (!results.every((result) => result.success)) {
         readyDay = null;
         return false;
       }
-    },
-  };
+      return results.every((result) => result.meta.changes === 1);
+    } catch {
+      readyDay = null;
+      return false;
+    }
+  }
 }
