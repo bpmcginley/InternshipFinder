@@ -696,6 +696,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Standalone feeds snapshot the canonical site URL and configured build date on first use, as the legacy import did. When no date is available, they use the current UTC time. An already-loaded legacy facade still supplies its current URL and last build date, so direct overrides and callers that omit the date after a legacy build still work. If standalone RSS captured the defaults first, a later canonical facade import initializes from that same snapshot. The legacy CLI continues passing its build date explicitly.
 - A fresh subprocess generated a feed with the legacy facade blocked. The offline legacy CLI comparison matched 815 files, including 75 feeds, and console output. All 161 focused tests passed, including the standalone Pages publisher and Golden build. Product's publisher, renderers and Golden fixtures are outside this slice.
 
+## WP-6.2 role-index tests
+
+- The role-index suite uses the canonical location formatter, standalone build and publisher CLI. Its integration test scopes the original near-page setting and fixed October 19 UTC day to the same three builds and two publisher runs. The role fixtures, build-alone check, date and shard assertions stay intact.
+- The offline comparison matched all 26 assertions, 21 ordered page records, 65 ordered writes, all 62 fixture files and console output. All three build phases wrote no files, and both publisher runs passed identical role-index and widget inputs with the fixed day. All 11 cases passed with the real root fixtures, strict markers, and the facade and sockets blocked. The 26 focused tests included both Golden checks against all 836 artifacts.
+
 ## WP-5.1 Buy retention before activation
 
 - Product released the publication allowlist and Golden pair after [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) published as `b3b3d049` through [Pages 43084811385](https://github.com/bpmcginley/InternshipFinder/actions/runs/43084811385). The exact deployment succeeded and all 4,980 public files matched. The retention package starts from `f73efa65` after [#411](https://github.com/bpmcginley/InternshipFinder/pull/411) and reserves only the three Buy module names and their immutable generation paths.
