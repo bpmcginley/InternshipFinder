@@ -39,6 +39,7 @@ from .site import employer as _employer
 from .site import field as _field
 from .site import llms as _llms
 from .site import near as _near
+from .site import numbers as _numbers
 from .site import pay as _pay
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
@@ -3496,20 +3497,43 @@ def numbers_page(
     updated: str,
 ) -> tuple[list, str, str, list]:
     """(title forms, description, body, JSON-LD) of /internships/by-the-numbers/."""
-    n = f["open"]
+    model = _numbers.select_page(
+        f,
+        listings,
+        fields,
+        states,
+        rep,
+        new,
+        kind_made,
+        now,
+        updated,
+        coverage=coverage_line(f),
+        limit=NUMBERS_TOP,
+        places=PLACES,
+        canadian_provinces=CA_PROVINCES,
+        place_names=US_STATES,
+        field_title=field_title,
+        field_slug=field_slug,
+        state_slug=state_slug,
+    )
+    return _render_numbers_page(model)
+
+
+def _render_numbers_page(model: _numbers.Page) -> tuple[list, str, str, list]:
+    n, new, now, updated = model.open_roles, model.new, model.now, model.updated
     places_line = (
-        f"{len(f['states'])} of the 50 US states and "
-        f"{plural(len(f['provinces']), 'Canadian province or territory', 'Canadian provinces and territories')}"
+        f"{model.us_state_count} of the 50 US states and "
+        f"{plural(model.province_count, 'Canadian province or territory', 'Canadian provinces and territories')}"
     )
     rows = [
         ("Open roles", f"{n:,}"),
-        ("Employers", f"{f['employers']:,}"),
-        ("Fields", f"{len(f['fields'])}"),
+        ("Employers", f"{model.employers:,}"),
+        ("Fields", f"{model.field_count}"),
         ("Places", places_line),
         ("New this week", f"{new:,}"),
-        ("List pay", f"{f['paid']:,} ({pct(f['paid'], n)})"),
-        ("Give an hourly rate", f"{f['hourly']:,} ({pct(f['hourly'], n)})"),
-        ("From applicant tracking systems", f"{f['from_boards']:,} ({pct(f['from_boards'], n)})"),
+        ("List pay", f"{model.paid:,} ({pct(model.paid, n)})"),
+        ("Give an hourly rate", f"{model.hourly:,} ({pct(model.hourly, n)})"),
+        ("From applicant tracking systems", f"{model.from_boards:,} ({pct(model.from_boards, n)})"),
     ]
     facts = (
         "<dl class=\"facts\">"
@@ -3520,122 +3544,88 @@ def numbers_page(
     # Open roles. The co-op and research counts are the kind pages' own (kinds), so they match those
     # pages and link to them; when neither page was made, nothing is said.
     roles = [
-        f"On {esc(updated)} InternScout listed {esc(coverage_line(f))}.",
-        f"They are in {esc(places_line)}; {plural(f['canada'], 'role is', 'roles are')} in Canada.",
+        f"On {esc(updated)} InternScout listed {esc(model.coverage)}.",
+        f"They are in {esc(places_line)}; {plural(model.canada, 'role is', 'roles are')} in Canada.",
         f"{plural(new, 'of them was', 'of them were')} found in the week to {esc(updated)}.",
     ]
-    kinds_n = {k["slug"]: (path, len(items)) for path, k, items in kind_made}
-    bits = []
-    for slug, label in (("co-op", "co-ops"), ("research", "research positions")):
-        if slug in kinds_n:
-            path, k = kinds_n[slug]
-            bits.append(f"<a href=\"{path}\">{k:,} {label}</a>")
+    bits = [f"<a href=\"{path}\">{count:,} {label}</a>" for path, count, label in model.kind_links]
     if bits:
         roles.append(f"Among them, as of {esc(updated)}: {join_words(bits)}.")
 
     pay = [
-        f"{f['paid']:,} of the {n:,} open roles ({pct(f['paid'], n)}) list pay or say they are paid, as of {esc(updated)}.",
-        f"{f['hourly']:,} ({pct(f['hourly'], n)}) give a clear hourly rate.",
+        f"{model.paid:,} of the {n:,} open roles ({pct(model.paid, n)}) list pay or say they are paid, as of {esc(updated)}.",
+        f"{model.hourly:,} ({pct(model.hourly, n)}) give a clear hourly rate.",
     ]
-    if rep:
+    if model.pay is not None:
         pay.append(
-            f"Among the {len(rep['roles']):,} that give one and are not only in Canada (the same role on two "
-            f"boards counted once), the median is {esc(money(round(rep['median'], 2)))} an hour and the highest "
-            f"is {esc(money(rep['top'][0][2]))} an hour, as of {esc(updated)}."
+            f"Among the {model.pay.rate_count:,} that give one and are not only in Canada (the same role on two "
+            f"boards counted once), the median is {esc(money(round(model.pay.median, 2)))} an hour and the highest "
+            f"is {esc(money(model.pay.highest))} an hour, as of {esc(updated)}."
         )
         pay.append(
-            f"Roles only in Canada ({plural(rep['canada'], 'role')} with a rate) are left out of the median and "
+            f"Roles only in Canada ({plural(model.pay.canada, 'role')} with a rate) are left out of the median and "
             "the top rate, since their pay is in Canadian dollars; yearly salaries and stipends are never "
             "turned into hourly figures. <a href=\"/internships/highest-paying/\">Highest-paying internships</a> "
             "has the roles, fields and employers."
         )
 
-    # Where the listings come from: every tracking system ATS_NAMES knows, largest first.
-    boards = sorted(f["boards"].items(), key=lambda kv: (-kv[1], kv[0]))
     ats = [
-        f"{f['from_boards']:,} of the {n:,} open roles ({pct(f['from_boards'], n)}) come straight from employers' "
-        f"own applicant tracking systems, as of {esc(updated)}; the other {n - f['from_boards']:,} are from "
+        f"{model.from_boards:,} of the {n:,} open roles ({pct(model.from_boards, n)}) come straight from employers' "
+        f"own applicant tracking systems, as of {esc(updated)}; the other {n - model.from_boards:,} are from "
         "employers' own careers sites and public lists."
     ]
-    if boards:
-        name0, n0 = boards[0]
+    if model.board_leader is not None:
+        name0, n0 = model.board_leader
         ats.append(f"{esc(name0)} has the most, {n0:,} roles or {pct(n0, n)} of all open roles.")
-        if len(boards) > 1:
+        if model.board_followers is not None:
             # pct rounds down, and "JazzHR 132 (0%)" reads as none.
             share = lambda k: pct(k, n) if k * 100 >= n else "under 1%"  # noqa: E731
             ats.append(
                 "Then "
-                + esc(join_words([f"{nm} {k:,} ({share(k)})" for nm, k in boards[1:NUMBERS_TOP]]))
+                + esc(join_words([f"{nm} {k:,} ({share(k)})" for nm, k in model.board_followers]))
                 + "."
             )
 
     def linked(path: str | None, name: str, k: int) -> str:
         return (f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)) + f" ({k:,})"
 
-    top_fields = sorted(f["fields"].items(), key=lambda kv: (-kv[1], kv[0]))[:NUMBERS_TOP]
     lead = (
-        f"The {len(top_fields)} largest of the {len(f['fields'])} fields"
-        if len(f["fields"]) > NUMBERS_TOP
-        else f"{'Every field' if len(top_fields) > 1 else 'The one field'}"
+        f"The {len(model.fields)} largest of the {model.field_count} fields"
+        if model.field_count > model.limit
+        else f"{'Every field' if len(model.fields) > 1 else 'The one field'}"
     )
     largest = [
         f"{lead}, by open roles on {esc(updated)}: "
-        + join_words(
-            [
-                linked(f"/internships/{field_slug(t)}/" if t in fields else None, field_title(t), k)
-                for t, k in top_fields
-            ]
-        )
+        + join_words([linked(*row) for row in model.fields])
         + "."
-        + (" A role tagged with two fields counts in each." if len(top_fields) > 1 else "")
+        + (" A role tagged with two fields counts in each." if len(model.fields) > 1 else "")
     ]
-    by_state = Counter(
-        k
-        for x in listings
-        for k in x["keys"]
-        if k in PLACES and k not in CA_PROVINCES and k not in ("DC", "PR")
-    )
-    top_states = sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))[:NUMBERS_TOP]
-    remote = sum(1 for x in listings if "remote" in x["keys"])
     where = []
-    if top_states:
+    if model.states:
         lead = (
-            f"The {len(top_states)} US states with the most open roles"
-            if len(by_state) > NUMBERS_TOP
+            f"The {len(model.states)} US states with the most open roles"
+            if model.state_total > model.limit
             else f"Open roles by US state"
         )
         where.append(
             f"{lead} on {esc(updated)}: "
-            + join_words(
-                [
-                    linked(
-                        f"/internships/{state_slug(k)}/" if k in states else None, US_STATES[k], c
-                    )
-                    for k, c in top_states
-                ]
-            )
+            + join_words([linked(*row) for row in model.states])
             + "."
-            + (" A role filed in two states counts in each." if len(top_states) > 1 else "")
+            + (" A role filed in two states counts in each." if len(model.states) > 1 else "")
         )
-    if remote:
-        where.append(f"{plural(remote, 'open role')} can be done remotely.")
-    provinces = sorted(
-        (
-            (k, c)
-            for k, c in Counter(k for x in listings for k in x["keys"] if k in CA_PROVINCES).items()
-        ),
-        key=lambda kv: (-kv[1], kv[0]),
-    )[:3]
-    if provinces:
+    if model.remote:
+        where.append(f"{plural(model.remote, 'open role')} can be done remotely.")
+    if model.provinces:
         where.append(
-            f"In Canada, {'the most are' if len(provinces) > 1 else 'they are'} in {join_words([linked(f'/internships/{state_slug(k)}/' if k in states else None, US_STATES[k], c) for k, c in provinces])}."
+            f"In Canada, {'the most are' if len(model.provinces) > 1 else 'they are'} "
+            f"in {join_words([linked(*row) for row in model.provinces])}."
         )
 
     def section(title: str, sentences: list[str]) -> str:
         return f"<h2>{esc(title)}</h2><p>{' '.join(sentences)}</p>"
 
     body = (
-        f"<p class=\"lede\">As of {esc(updated)}, InternScout lists {esc(coverage_line(f))}. Every figure on this "
+        f"<p class=\"lede\">As of {esc(updated)}, InternScout lists {esc(model.coverage)}. Every figure on this "
         "page is counted from the open listings on that day, and the page is rebuilt with every update.</p>"
         + facts
         + "<a class=\"cta\" href=\"/\">Open the dashboard</a>"
@@ -3658,25 +3648,25 @@ def numbers_page(
     )
     desc = (
         f"InternScout on {updated}: {n:,} open internships, co-ops and research roles from "
-        f"{plural(f['employers'], 'employer')} in {plural(len(f['fields']), 'field')}. What they pay, and which "
+        f"{plural(model.employers, 'employer')} in {plural(model.field_count, 'field')}. What they pay, and which "
         "job boards they come from."
     )
     measured = [
         ("Open roles", n),
-        ("Employers", f["employers"]),
-        ("Fields", len(f["fields"])),
-        ("US states with open roles", len(f["states"])),
-        ("Canadian provinces and territories with open roles", len(f["provinces"])),
-        ("Roles in Canada", f["canada"]),
+        ("Employers", model.employers),
+        ("Fields", model.field_count),
+        ("US states with open roles", model.us_state_count),
+        ("Canadian provinces and territories with open roles", model.province_count),
+        ("Roles in Canada", model.canada),
         ("Roles found in the last week", new),
-        ("Roles that list pay or say they are paid", f["paid"]),
-        ("Roles that give an hourly rate", f["hourly"]),
-        ("Roles from employers' applicant tracking systems", f["from_boards"]),
+        ("Roles that list pay or say they are paid", model.paid),
+        ("Roles that give an hourly rate", model.hourly),
+        ("Roles from employers' applicant tracking systems", model.from_boards),
     ]
-    if rep:
+    if model.pay is not None:
         measured += [
-            ("Median listed hourly rate, USD, roles not only in Canada", round(rep["median"], 2)),
-            ("Highest listed hourly rate, USD, roles not only in Canada", rep["top"][0][2]),
+            ("Median listed hourly rate, USD, roles not only in Canada", round(model.pay.median, 2)),
+            ("Highest listed hourly rate, USD, roles not only in Canada", model.pay.highest),
         ]
     ld = {
         "@context": "https://schema.org",
