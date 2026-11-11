@@ -324,6 +324,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - On `e43c1ea4`, open Product claims covered neither employer-entry test file. Four pure employer CTA cases now call the existing site runtime helpers directly, with the same copy, escaping, company-only prefill and disclosure assertions. The generated employer-page case still exercises the legacy build entry and its shared fixtures.
 - The two test files and the Golden build and mutation checks passed all seven cases against the 699-file fixture. Three standalone CTA cases also passed with legacy facade imports and sockets blocked. Runtime, fixtures and publishing entry points have the same bytes.
 
+## WP-6.2 employer breakdown tests
+
+- At `fd182e58`, the employer breakdown suite uses the canonical renderer and listing validator. Its three builds use fresh state and hooks with near pages disabled. The default earnings lookup and the explicit empty earnings set keep their prior meaning. Fixture and assertion ASTs match after resolving the canonical names.
+- The original and migrated builds produced the same 30 ordered records and exact HTML bytes. All six tests passed with the actual root fixtures active and the legacy facade and sockets blocked. All 30 targeted and Golden tests passed against the unchanged 836-file fixture.
+
 ## WP-6.2 shared listing test fixtures
 
 - After [#380](https://github.com/bpmcginley/InternshipFinder/pull/380) published, Product released the two donor helpers and ten callers. On `a673000f`, `_row` and `_site` moved byte-for-byte into a test-only module. The original donor imports both names for existing callers. The ten released files use the new fixture path, and the campaign test drops its unused facade import. All other test statements, fixtures and monkeypatches are unchanged.
