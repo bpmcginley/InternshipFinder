@@ -232,6 +232,7 @@ its own Stripe price id is set. When paid plans are on, `payments` looks like
 and otherwise it is `{ "enabled": false, "plans": [] }`.
 
 ### `GET /me` (auth)
+The authenticated response is served with `Cache-Control: no-store`.
 ```json
 { "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
   "can_upgrade": true, "can_manage": false,
@@ -247,10 +248,13 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
   this student (at their own tier, so a non-.edu account sees its share), or `null` when there is none.
   The dashboard and the extension's Upgrade button quote it.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
-- **Invite units** (see `GET /invite`) are already in `limit`: it is the month's allowance, or what was
-  used if invite units took the student past it, plus the invite units left. So `limit - used` is always
-  what they can still run, and an older client needs no change. A task with invite units left also
-  carries `"bonus": 3`.
+- **Invite units** (see `GET /invite`) are already in `limit`. A task with invite units left also
+  carries `"bonus": 3`, which always refers to invite units.
+- **Purchased Auto-Apply runs** appear as an optional positive `allowance.autofill.purchased` count.
+  It reflects unused purchased runs that clear the ledger's hold, refund and revocation checks.
+  The count stays visible when sales or funded creation are off. When funded purchased creation is
+  ready and the Auto-Apply allowance is enabled and finite, these runs are already included in
+  `limit - used`. Clients can show the separate balance without adding it to that remainder again.
 
 ### `GET /invite` (auth)
 The student's own invite link, made on first ask:
