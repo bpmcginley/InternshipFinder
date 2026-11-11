@@ -32,8 +32,10 @@ from statistics import median
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
-from . import near_metros
+from . import near_metros, page_dates, related_pages, seo_role_details, widget_data
+from . import pay as _salary_pay
 from .console_log import console
+from .site import build as _build
 from .site import digest as _digest
 from .site import discovery as _discovery
 from .site import employer as _employer
@@ -223,7 +225,7 @@ def employer_indexed(n: int, path: str, live, earning: frozenset[str] = frozense
 
 
 def duplicates(
-    lists: dict[str, frozenset], indexed: set[str], earning: frozenset[str], live=frozenset()
+    lists: dict[str, frozenset], indexed: set[str], earning: frozenset[str], live: _build.Live = frozenset()
 ) -> set[str]:
     """The paths of one family (path -> its role ids) near_same as an indexed page of the family that
     stays indexed: one in the live sitemap before one out of it, then the bigger, then by path. Only
@@ -710,9 +712,7 @@ _AMOUNT = re.compile(r"\d[\d,]*(?:\.\d+)?")
 def placeholder_pay(salary) -> bool:
     # 2026-10-23: shared with normalization/export; was zero-only here.
     # Revert: restore the zero-only implementation with pay.py and core.js.
-    from .pay import placeholder_pay as invalid_pay
-
-    return invalid_pay(salary)
+    return _salary_pay.placeholder_pay(salary)
 
 
 def real_salary(x: dict) -> str | None:
@@ -4768,304 +4768,26 @@ def _render_major(model: _field.Major) -> dict:
 # ---------------------------------------------------------------- build
 
 
-def build(
-    site_dir: str,
-    live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
-    held: set[str] | frozenset[str] = frozenset(),
-    earning: frozenset[str] | None = None,
-) -> list[dict]:
-    """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
-    whose lastmod the new one never goes below. held: the noindex pages it is serving now
-    (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
-    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex, but for
-    the near pages while NEAR_INDEX is off."""
-    global BEACON, BASELINE, GENERATED, DIGEST_FORM
-    earning = earning_paths() if earning is None else earning
-    # Served now, indexed or not: what keep_at and fold_at ask. was: path in live (no noindex pages).
-    served = set(live) | set(held)
-    BEACON = beacon_from(site_dir)
-    DIGEST_FORM = digest_form_action(site_dir)
-    d = load(site_dir)
-    BASELINE = d["baseline"]
-    listings = d["listings"]
-    LISTINGS[:] = listings  # for main(): placements resolve against these (2026-10-14)
-    now = _when(d["generated_at"]) or datetime.now(timezone.utc)
-    GENERATED = now
-    # The weekly email's numbers for the sign-up forms (2026-10-06): this week's new roles counted as the
-    # email counts them (new_roles), in all and per field, so a page never quotes a number the email
-    # wouldn't. A field's is quoted only when it reaches DIGEST_MIN_NEW, the email's bar for a section.
-    digest_new = new_roles(d, now)
-    digest_by_field = Counter(
-        t for x in digest_new for t in set(x.get("field_tags") or []) - SKIP_FIELDS
-    )
-    updated = f"{now:%B} {now.day}, {now.year}"
-    pages: list[dict] = []
-
-    by_field: dict[str, list] = {}
-    by_state: dict[str, list] = {}
-    # Sets are walked in sorted order everywhere below: a set of strings iterates in hash order, which
-    # changes from one Python run to the next, and 170 of the pages came out different on two builds
-    # of the same data (test_two_builds_are_identical).
-    for x in listings:
-        for t in sorted(
-            set(x.get("field_tags") or []) - SKIP_FIELDS
-        ):  # was: in set(...) - SKIP_FIELDS
-            by_field.setdefault(t, []).append(x)
-        for k in sorted(x["keys"]):  # was: for k in x["keys"]:
-            if k in US_STATES:
-                by_state.setdefault(k, []).append(x)
-
-    def enough(n: int, path: str, need: int = MIN_OPEN) -> bool:
-        return n >= need or (path in served and n >= keep_at(need))  # was: path in live
-
-    fields = {t: v for t, v in by_field.items() if enough(len(v), f"/internships/{field_slug(t)}/")}
-    states = {k: v for k, v in by_state.items() if enough(len(v), f"/internships/{state_slug(k)}/")}
-
-    def ids(items: list[dict]) -> frozenset:
-        return frozenset(x["id"] for x in items)
-
-    def fold_at(path: str) -> float:
-        return SAME_SHARE if path in served else NEAR_SAME  # was: path in live
-
-    def employers_in(items: list[dict]) -> int:
-        return len({employer_key(x["company_name"]) for x in items if x.get("company_name")})
-
-    # A US metro gets a page only when it is its own list (2026-10-07): enough employers, and not most
-    # of its state's page under a second name.
-    for m in sorted(US_METRO_PAGES):
-        path, parent = f"/internships/{state_slug(m)}/", by_state.get(METRO_STATE[m], [])
-        if m in states and (
-            employers_in(states[m]) < MIN_EMPLOYERS_NEW
-            or near_same(ids(states[m]), ids(parent), fold_at(path))
-        ):
-            del states[m]
-    # Which summers get a "who's open now" page (2026-10-07): the ones still ahead whose term page is made
-    # (MIN_KIND roles, as kinds()), with MIN_OPEN employers or more. Decided before any page is drawn,
-    # since every page's footer links the soonest one (TRACKER).
-    global TRACKER
-    by_term = {}
-    for x in listings:
-        by_term.setdefault(x.get("term"), []).append(x)
-    trackers = [
-        t
-        for t in upcoming_summers(by_term, now)
-        if enough(len(by_term[t]), f"/internships/{slugify(t)}/", MIN_KIND)
-        and enough(employers_in(by_term[t]), tracker_path(t), MIN_OPEN)
-    ]
-    TRACKER = (trackers[0], tracker_path(trackers[0])) if trackers else None
-    # A field slug and a state slug must never name the same folder.
-    state_slugs = {state_slug(k) for k in states}
-    fields = {t: v for t, v in fields.items() if field_slug(t) not in state_slugs}
-
-    combos: dict[tuple[str, str], list] = {}
-    widen = []  # the 2026-10-07 rules' candidates, made after
-    for t, items in sorted(fields.items()):  # was: for t, items in fields.items():
-        for k in sorted(states):  # was: for k in states:
-            hit = [x for x in items if k in x["keys"]]
-            local = [x for x in hit if len(x["keys"] & PLACES) < SPREAD]
-            path = f"/internships/{field_slug(t)}/{state_slug(k)}/"
-            if k not in US_METRO_PAGES and enough(len(local), path, MIN_COMBO):
-                combos[(t, k)] = hit
-                continue
-            priority = t in PRIORITY_FIELDS and (k in PRIORITY_PLACES or k in US_METRO_PAGES)
-            if (
-                (k in US_METRO_PAGES or priority)
-                and hit
-                and enough(len(local), path, MIN_COMBO_PRIORITY if priority else MIN_COMBO)
-            ):
-                widen.append((t, k, hit, path))
-    # The widened pages, biggest first (then by name, so every build agrees), each kept only when it is
-    # its own list: MIN_EMPLOYERS_NEW employers, and not near_same as the field's page, the field in the
-    # metro's state, or a page already made for another field in the same place ("engineering" and
-    # "mechanical" in Houston can be one list). Biggest first, so of two such pages the fuller one stays.
-    for t, k, hit, path in sorted(widen, key=lambda w: (-len(w[2]), w[0], w[1])):
-        mine = ids(hit)
-        rivals = [ids(fields[t])] + [
-            ids(v)
-            for (tt, kk), v in sorted(combos.items())
-            if kk == k or (tt == t and kk == METRO_STATE.get(k))
-        ]
-        if employers_in(hit) >= MIN_EMPLOYERS_NEW and not any(
-            near_same(mine, r, fold_at(path)) for r in rivals
-        ):
-            combos[(t, k)] = hit
-    combos = dict(sorted(combos.items()))
-    # Pages that are another page's list under a second name (duplicates, 2026-10-23): each field's
-    # places, then the place pages.
-    combo_path = {(t, k): f"/internships/{field_slug(t)}/{state_slug(k)}/" for t, k in combos}
-    inside = set()
-    for t in sorted({t for t, _ in combos}):
-        family = {combo_path[(tt, k)]: ids(v) for (tt, k), v in combos.items() if tt == t}
-        inside |= duplicates(
-            family,
-            {
-                p
-                for (tt, k), p in combo_path.items()
-                if tt == t and combo_indexed(len(combos[(tt, k)]), p, live, earning)
-            },
-            earning,
-            live,
-        )
-    place_lists = {f"/internships/{state_slug(k)}/": ids(v) for k, v in states.items()}
-    inside |= duplicates(place_lists, set(place_lists), earning, live)
-
-    # A major whose page would show what a field page, or an earlier major's page, already shows would
-    # be a second URL for the same list. It gets no page of its own: the majors hub links it to that
-    # page, and that page names it. "Shows" is the PER_PAGE listings on the page (shown), not every
-    # listing behind it: matching only identical full lists let /internships/health/,
-    # /for/nursing-majors/ and /for/nutrition-majors/ all show the same 40 postings, each its own
-    # canonical page, because the majors pulled in a few more roles that never made the first 40.
-    owners = [(shown_ids(v), f"/internships/{field_slug(t)}/") for t, v in sorted(fields.items())]
-    # was: owner = {frozenset(x["id"] for x in v): f"/internships/{field_slug(t)}/" for t, v in fields.items()}
-    major_rows, fits = [], {}
-    for m in d["majors"]:
-        tags = [t for t in m.get("tags") or [] if t not in SKIP_FIELDS]
-        items = [x for x in listings if set(x.get("field_tags") or []) & set(tags)]
-        if m.get("level") not in (None, "undergrad") or not enough(
-            len(items), f"/internships/for/{slugify(m['name'])}-majors/"
-        ):
-            continue
-        name = m["name"]
-        mine = shown_ids(items)
-        path = next((p for ids, p in owners if same_list(ids, mine)), None)
-        if path is None:
-            path = f"/internships/for/{slugify(name)}-majors/"
-            owners.append((mine, path))
-        # was: ids = frozenset(x["id"] for x in items)
-        #      path = owner.setdefault(ids, f"/internships/for/{slugify(name)}-majors/")
-        major_rows.append((m, tags, items, path))
-        fits.setdefault(path, []).append(name)
-
-    # Employers with enough open roles get a page ("Amgen internships" is a common search). Spellings
-    # of one employer share a page (employer_key), a role posted on two boards counts once, and only
-    # employers whose roles are mostly internships, co-ops, research or fellowships qualify: a
-    # university's work-study board is jobs for its own students, not internships for everyone.
-    global EMPLOYERS
-    groups: dict[str, list] = {}
-    for x in listings:
-        if x.get("company_name"):
-            groups.setdefault(employer_key(x["company_name"]), []).append(x)
-    EMPLOYERS = {}
-    by_company: dict[str, list] = {}  # display name -> its roles, one row each
-    spellings: dict[str, list] = {}  # display name -> every name its listings use
-    # Ties go to the key and to the name itself, so which spelling names the page, and which of two
-    # employers whose names slug alike gets the folder, is the same on every build.
-    for key, items in sorted(
-        groups.items(), key=lambda kv: (-len(kv[1]), kv[0])
-    ):  # was: key=lambda kv: -len(kv[1])
-        names = Counter(x["company_name"] for x in items)
-        name = min(names, key=lambda n: (-names[n], len(n), n))  # was: (-names[n], len(n))
-        items = dedupe_roles(items)
-        path = f"/internships/at/{EMPLOYER_SLUGS.get(key, slugify(name))}/"  # was: slugify(name)
-        # was: if (not slugify(name) or ...   (real_company since 2026-10-07)
-        if (
-            not slugify(name)
-            or not real_company(name)
-            or path in EMPLOYERS.values()
-            or student_share(items) < 0.5
-            or not enough(len(items), path, MIN_EMPLOYER)
-        ):
-            continue
-        by_company[name], spellings[name] = items, sorted(names)
-        EMPLOYERS.update({n: path for n in names})
-
-    # index (2026-10-06): False makes the page noindex and keeps it out of the sitemap (/digest/ until
-    # the sign-up form has an address). was: every page was indexed.
-    # dated (2026-10-07): the listings a page without a list of its own is about (a tracker's term), which
-    # date it and make it a CollectionPage like a listing page, without a feed.
-    # thin (2026-10-13, INDEX_COMBO): built and linked, but "noindex, follow" and out of the sitemap.
-    # kind (2026-10-14): field, state (a province, city and Remote too), combo (a field in a place), major or
-    # employer, for the listing pages a paid listing's box may go on (PLACEMENT_KINDS); None for the rest.
-    def add(
-        path,
-        title,
-        desc,
-        h1,
-        crumbs,
-        body,
-        items=None,
-        state=None,
-        ld=(),
-        index=True,
-        dated=None,
-        thin=False,
-        kind=None,
-    ):
-        # lastmod is the day the page's newest listing was found: it moves when the page gains a
-        # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
-        about = items if items is not None else dated
-        found = [
-            str(x.get("first_seen") or "")[:10] for x in (listings if about is None else about)
-        ]
-        # The live sitemap's lastmod is a floor: when the newest role on a page closes, the newest left
-        # is older, and a lastmod that goes backwards is one a search engine stops trusting.
-        found.append(live.get(path) or "" if isinstance(live, dict) else "")
-        lastmod = max((f for f in found if f), default=None)
-        # `title` is one form or several, longest first, without the suffix: fit_title picks the longest
-        # that fits and adds " | InternScout" (2026-10-05). The description is clamped the same day.
-        # was: every caller passed one title ending in " | InternScout", and the description as written.
-        # A Head is fitted already (fit_head, 2026-10-13); fit_title would add a second suffix to a short one.
-        if not isinstance(title, Head):
-            title = fit_title(*([title] if isinstance(title, str) else title))
-        desc = fit_description(desc)
-        if about is not None:  # was: if items is not None:
-            # A listing page is a CollectionPage of the site (2026-10-05), dated like its sitemap entry.
-            ld = [
-                *ld,
-                {
-                    "@context": "https://schema.org",
-                    "@type": "CollectionPage",
-                    "@id": SITE + path,
-                    "url": SITE + path,
-                    "name": h1,
-                    "description": desc,
-                    "isPartOf": {"@id": SITE_ID},
-                    **({"dateModified": lastmod} if lastmod else {}),
-                },
-            ]
-        pages.append(
-            {
-                "path": path,
-                "html": page(
-                    path,
-                    title,
-                    desc,
-                    h1,
-                    crumbs,
-                    body,
-                    updated,
-                    index=index,
-                    feed=items is not None,
-                    ld=ld,
-                    thin=thin,
-                ),
-                "items": items,
-                "h1": h1,
-                "state": state,
-                "lastmod": lastmod,
-                "index": index and not thin,
-                "thin": thin,
-                "kind": kind,
-            }
-        )
-        # 2026-10-23: retain the real live date separately from first_seen for monotonic migration.
-        # was: both collapsed into lastmod; revert: remove this metadata with page_dates.
-        pages[-1]["lastmod_floor"] = live.get(path) if isinstance(live, dict) else None
-        # was: ... page(..., ld=ld), ..., "index": index})
-
-    # Each listing page's src (2026-10-04, see autoapply_card): seo-field for a field and a field in a
-    # state, seo-state for a state, province or city, seo-employer, and seo-hub for the rest.
-    root = ("/internships/", "Internships")
+def _emit_field_pages(
+    add: _build.AddPage,
+    context: _field.Context,
+    cohorts: _build.Cohorts,
+    majors: _build.Majors,
+    by_company: _build.Groups,
+    digest_by_field: Counter,
+    live: _build.Live,
+    earning: frozenset[str],
+) -> list[tuple[str, str, int]]:
+    fields, states, combos, inside = cohorts.fields, cohorts.states, cohorts.combos, cohorts.inside
+    fits, updated = majors.fits, context.updated
     page_name = {EMPLOYERS[nm]: nm for nm in by_company}  # employer page -> the name it goes by
-
-    field_context = _field.Context(root, now, updated)
     for t, items in sorted(fields.items()):
         path = f"/internships/{field_slug(t)}/"
         top_states = _field.counts_by_place(combos, t)
         employers, hiring = _field.hiring_links(items, EMPLOYERS, page_name, RELATED)
         fresh_n = digest_by_field[t]
         model = _field.Field(
-            context=field_context,
+            context=context,
             tag=t,
             path=path,
             items=items,
@@ -5084,7 +4806,7 @@ def build(
         path = f"/internships/{state_slug(k)}/"
         parent = METRO_STATE[k] if k in US_METRO_PAGES and METRO_STATE[k] in states else None
         place_model = _field.Place(
-            context=field_context,
+            context=context,
             key=k,
             path=path,
             items=items,
@@ -5102,7 +4824,7 @@ def build(
         path = f"/internships/{field_slug(t)}/{state_slug(k)}/"
         others = _field.counts_by_place(combos, t, exclude=k)
         combo_model = _field.Combo(
-            context=field_context,
+            context=context,
             tag=t,
             key=k,
             path=path,
@@ -5116,14 +4838,14 @@ def build(
         add(**_render_combo(combo_model))
 
     majors_made = []
-    for m, tags, items, path in major_rows:
+    for m, tags, items, path in majors.rows:
         name = m["name"]
         majors_made.append((path, name, len(items)))
         if path != f"/internships/for/{slugify(name)}-majors/":
             continue  # folded into the field or major page with the same listings
         rel_tags = [t for t in (m.get("related") or []) if t in fields]
         major_model = _field.Major(
-            context=field_context,
+            context=context,
             name=name,
             tags=tags,
             path=path,
@@ -5132,17 +4854,25 @@ def build(
             fits=[n for n in fits[path] if n != name],
         )
         add(**_render_major(major_model))
+    return majors_made
 
-    # Each employer's main fields, for "Similar employers": others that hire in the same fields.
+
+def _emit_employer_pages(
+    add: _build.AddPage,
+    site_dir: str,
+    context: _field.Context,
+    cohorts: _build.Cohorts,
+    employers: _build.Employers,
+    live: _build.Live,
+    earning: frozenset[str],
+) -> None:
+    by_company, spellings = employers.by_company, employers.spellings
+    fields, combos = cohorts.fields, cohorts.combos
+    root, now = context.root, context.now
     company_fields = {
         nm: top(Counter(t for x in its for t in set(x.get("field_tags") or []) - SKIP_FIELDS), 3)
         for nm, its in by_company.items()
     }
-
-    # 2026-10-28: small, explicit content cohort; was: no description sidecars were read here.
-    # Read only the displayed cohort rows once, without changing any page/index membership.
-    # Revert: empty seo_role_details.COHORT_PATHS or remove this load and the details argument below.
-    from . import seo_role_details
 
     cohort_details = seo_role_details.load(
         site_dir,
@@ -5171,14 +4901,18 @@ def build(
         )
         add(**_render_employer_page(model))
 
-    # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
-    # already uses is skipped, like a field slug that names a state.
-    taken = {p["path"] for p in pages}
-    kind_made = _listing.select_kinds(kinds(listings), listings, taken, enough, MIN_KIND)
-    term_paths = {f"/internships/{slugify(t)}/": t for t in trackers}
-    trackers = [
-        t for t in trackers if any(p == f"/internships/{slugify(t)}/" for p, _, _ in kind_made)
-    ]
+
+def _emit_kind_and_tracker_pages(
+    add: _build.AddPage,
+    context: _field.Context,
+    fields: _build.Groups,
+    kind_made: list[_listing.KindSelection],
+    term_paths: dict[str, str],
+    trackers: list[str],
+    by_term: dict,
+    baseline: str | None,
+) -> None:
+    root, now, updated = context.root, context.now, context.updated
     for path, kind, items in kind_made:
         term = term_paths.get(path)
         tracker = (term, tracker_path(term)) if term is not None and term in trackers else None
@@ -5202,12 +4936,24 @@ def build(
         term_path, path = f"/internships/{slugify(t)}/", tracker_path(t)
         year = int(t.split()[1])
         items = by_term[t]
-        rows = opened_rows(items, year, d["baseline"])
+        rows = opened_rows(items, year, baseline)
         # The roles of the employers listed, one per role (was: len(unique_roles(items)), which also
         # counted rows whose employer name is not a name, real_company).
         t_, d_, h_, b_ = tracker_page(t, rows, sum(r[4] for r in rows), now, updated, term_path)
         add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_, dated=items)
 
+
+def _emit_near_and_new_pages(
+    add: _build.AddPage,
+    pages: list[dict],
+    context: _field.Context,
+    listings: _build.Listings,
+    digest_new: _build.Listings,
+    baseline: str | None,
+    live: _build.Live,
+    earning: frozenset[str],
+) -> _build.Listings:
+    root, now, updated = context.root, context.now, context.updated
     # "<field> internships near <city>" (2026-10-18, near_pages): all 500 built, the thin ones noindex. Judged
     # against the list pages made so far, so one that repeats a field, place or employer page stays out of search.
     rivals = [frozenset(x["id"] for x in p["items"]) for p in pages if p["index"] and p["items"]]
@@ -5226,7 +4972,7 @@ def build(
             thin=not NEAR_INDEX,
         )  # 2026-10-23: a hub of noindex pages. was: no thin (indexed)
 
-    new = [x for x in listings if fresh(x, now, d["baseline"])]
+    new = [x for x in listings if fresh(x, now, baseline)]
     if len(new) >= MIN_OPEN:
         new_model = _digest.NewPage(
             items=new,
@@ -5246,7 +4992,20 @@ def build(
         add(**_render_new_page(new_model))
         # A single club feed carries more of the week's new listings than a typical feed.
         pages[-1]["feed_limit"] = new_model.feed_limit
+    return new
 
+
+def _emit_report_pages(
+    add: _build.AddPage,
+    context: _field.Context,
+    listings: _build.Listings,
+    cohorts: _build.Cohorts,
+    kind_made: list[_listing.KindSelection],
+    new_count: int,
+    enough: _build.Enough,
+) -> tuple[dict, str, dict | None, bool]:
+    root, now, updated = context.root, context.now, context.updated
+    fields, states = cohorts.fields, cohorts.states
     # The highest listed hourly pay (2026-10-02), made before the hubs so the hub can link it. Kept
     # like any other page once live (enough), since its URL is the one a search result points at.
     facts = site_facts(listings)
@@ -5267,7 +5026,7 @@ def build(
     numbers = enough(len(listings), NUMBERS_PATH, MIN_KIND)
     if numbers:
         t_, d_, b_, ld_ = numbers_page(
-            facts, listings, fields, states, rep, len(new), kind_made, now, updated
+            facts, listings, fields, states, rep, new_count, kind_made, now, updated
         )
         add(
             NUMBERS_PATH,
@@ -5278,7 +5037,25 @@ def build(
             b_,
             ld=ld_,
         )
+    return facts, pay_path, rep, numbers
 
+
+def _emit_hubs(
+    add: _build.AddPage,
+    context: _field.Context,
+    cohorts: _build.Cohorts,
+    by_company: _build.Groups,
+    majors_made: list[tuple[str, str, int]],
+    kind_made: list[_listing.KindSelection],
+    trackers: list[str],
+    listing_count: int,
+    new_count: int,
+    pay_path: str,
+    rep: dict | None,
+    numbers: bool,
+) -> None:
+    root, updated = context.root, context.updated
+    fields, states = cohorts.fields, cohorts.states
     # Hubs last, so they only link to pages that exist.
     add(
         "/internships/at/",
@@ -5316,7 +5093,7 @@ def build(
         "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: (p[1], p[0]))),
     )
     hub = (
-        f"<p class=\"lede\">{len(listings):,} open internships, co-ops, research positions and "
+        f"<p class=\"lede\">{listing_count:,} open internships, co-ops, research positions and "
         "fellowships for college students, collected from employer job boards and public programs. "
         "Browse by field, by state or by major, or open the dashboard to rank them for you.</p>"
         "<p>Every page below has an RSS feed of its new listings (the link at the bottom of the page). "
@@ -5358,8 +5135,8 @@ def build(
         "</a></li>"
         + (f"<li><a href=\"{NEAR_ROOT}\">By field near 50 US cities</a></li>" if NEAR_ON else "")
         + (
-            f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{len(new):,}</span></li>"
-            if len(new) >= MIN_OPEN
+            f"<li><a href=\"/internships/new/\">New this week</a> <span class=\"n\">{new_count:,}</span></li>"
+            if new_count >= MIN_OPEN
             else ""
         )
         + "".join(
@@ -5378,27 +5155,38 @@ def build(
         )
         + "</ul></section>"
     )
-    # was: f"Browse {len(listings):,} Open Internships by Field, State and Major | InternScout" (70 characters)
+    # was: f"Browse {listing_count:,} Open Internships by Field, State and Major | InternScout" (70 characters)
     add(
         "/internships/",
         [
-            f"Browse {len(listings):,} Open Internships by Field, State and Major",
-            f"{len(listings):,} Internships by Field, State and Major",
+            f"Browse {listing_count:,} Open Internships by Field, State and Major",
+            f"{listing_count:,} Internships by Field, State and Major",
             "Browse Internships by Field, State and Major",
         ],
-        f"{len(listings):,} open internships, co-ops and research roles for college students, updated "
+        f"{listing_count:,} open internships, co-ops and research roles for college students, updated "
         f"{updated}. Browse by field, state or major. Free, no sign-up.",
         "Browse internships",
         [root],
         hub,
         ld=[ORGANIZATION, WEBSITE],
     )
-    # was: "Browse internships", [root], hub)   (no JSON-LD: a one-item breadcrumb is none, see page)
 
+
+def _emit_information_pages(
+    add: _build.AddPage,
+    facts: dict,
+    majors_count: int,
+    new_count: int,
+    rep: dict | None,
+    updated: str,
+    numbers: bool,
+    digest_new: _build.Listings,
+    digest_by_field: Counter,
+) -> None:
     # What InternScout is, for people and for answer engines (2026-10-02). After the hubs: they link
     # only pages that exist.
-    qa = about_answers(facts, len(majors_made), len(new), rep, updated, numbers)
-    # was: qa = about_answers(facts, len(majors_made), len(new), rep)
+    qa = about_answers(facts, majors_count, new_count, rep, updated, numbers)
+    # was: qa = about_answers(facts, majors_count, new_count, rep)
     t_, d_, b_, ld_ = about_page(facts, qa, updated)
     add(
         "/about/",
@@ -5430,7 +5218,7 @@ def build(
     )
     # The weekly email's own page (2026-10-06), the one address the brand posts, the extension, flyers
     # and clubs link. Indexed only once the form has an address; until then it says sign-ups aren't open.
-    t_, d_, b_ = digest_page(digest_new, digest_by_field, len(new) >= MIN_OPEN)
+    t_, d_, b_ = digest_page(digest_new, digest_by_field, new_count >= MIN_OPEN)
     add(
         DIGEST_PATH,
         t_,
@@ -5440,24 +5228,177 @@ def build(
         b_,
         index=bool(DIGEST_FORM),
     )
-    # 2026-10-23: was: related sections recommended noindex destinations without consulting the
-    # finished page list. Prefer indexed recommendations, retaining the full browsing catalogues.
-    # Revert: remove these two lines; no page's eligibility, canonical or sitemap inclusion changes.
-    from .related_pages import prefer_indexed
 
-    prefer_indexed(pages)
-    global TEXTS, HOME, HOME_LIVE_DATE
+
+def _fitted_page_title(title) -> str:
+    if isinstance(title, Head):
+        return title
+    return fit_title(*([title] if isinstance(title, str) else title))
+
+
+def build(
+    site_dir: str,
+    live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
+    held: set[str] | frozenset[str] = frozenset(),
+    earning: frozenset[str] | None = None,
+) -> list[dict]:
+    """live: the pages the site is serving now (live_paths), which get the lower keep_at bar and
+    whose lastmod the new one never goes below. held: the noindex pages it is serving now
+    (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
+    search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex, but for
+    the near pages while NEAR_INDEX is off."""
+    global BEACON, BASELINE, GENERATED, DIGEST_FORM, TRACKER, EMPLOYERS, TEXTS, HOME, HOME_LIVE_DATE
+    earning = earning_paths() if earning is None else earning
+    # Served includes noindex pages for retention. Index decisions still receive raw live.
+    served = set(live) | set(held)
+    BEACON = beacon_from(site_dir)
+    DIGEST_FORM = digest_form_action(site_dir)
+    data = load(site_dir)
+    BASELINE = data["baseline"]
+    listings = data["listings"]
+    LISTINGS[:] = listings  # main resolves placements against this existing list object
+    now = _when(data["generated_at"]) or datetime.now(timezone.utc)
+    GENERATED = now
+    digest_new, digest_by_field, updated = _build.digest_summary(data, now, new_roles, SKIP_FIELDS)
+
+    enough = _build.retention_rule(served, MIN_OPEN, lambda need: keep_at(need))
+
+    def employers_in(items: list[dict]) -> int:
+        return _build.employer_count(items, employer_key)
+
+    def fold_at(path: str) -> float:
+        return SAME_SHARE if path in served else NEAR_SAME
+
+    fields, states = _build.select_fields_and_places(
+        listings,
+        enough,
+        skip_fields=SKIP_FIELDS,
+        known_places=US_STATES,
+        metros=US_METRO_PAGES,
+        metro_state=METRO_STATE,
+        min_employers=MIN_EMPLOYERS_NEW,
+        field_slug=field_slug,
+        state_slug=state_slug,
+        employers_in=employers_in,
+        fold_at=fold_at,
+        near_same=near_same,
+    )
+    by_term, trackers = _build.select_trackers(
+        listings,
+        now,
+        enough,
+        upcoming_summers=upcoming_summers,
+        slugify=slugify,
+        tracker_path=tracker_path,
+        employers_in=employers_in,
+        min_kind=MIN_KIND,
+        min_open=MIN_OPEN,
+    )
+    # Set the provisional footer tracker before any page is drawn.
+    TRACKER = (trackers[0], tracker_path(trackers[0])) if trackers else None
+    cohorts = _build.select_combinations(
+        fields,
+        states,
+        _build.CombinationRules(
+            places=PLACES,
+            metros=US_METRO_PAGES,
+            metro_state=METRO_STATE,
+            priority_fields=PRIORITY_FIELDS,
+            priority_places=PRIORITY_PLACES,
+            spread=SPREAD,
+            minimum=MIN_COMBO,
+            priority_minimum=MIN_COMBO_PRIORITY,
+            min_employers=MIN_EMPLOYERS_NEW,
+        ),
+        enough,
+        live=live,
+        earning=earning,
+        field_slug=field_slug,
+        state_slug=state_slug,
+        employers_in=employers_in,
+        fold_at=fold_at,
+        near_same=near_same,
+        combo_indexed=combo_indexed,
+        duplicates=duplicates,
+    )
+    majors = _build.select_majors(
+        listings,
+        data["majors"],
+        cohorts.fields,
+        enough,
+        skip_fields=SKIP_FIELDS,
+        shown_ids=shown_ids,
+        same_list=same_list,
+        field_slug=field_slug,
+        slugify=slugify,
+    )
+    groups = _build.group_employers(listings, employer_key)
+    EMPLOYERS = {}
+    employers = _build.register_employers(
+        groups,
+        EMPLOYERS,
+        enough,
+        employer_slugs=EMPLOYER_SLUGS,
+        minimum=MIN_EMPLOYER,
+        slugify=slugify,
+        real_company=real_company,
+        dedupe_roles=dedupe_roles,
+        student_share=student_share,
+    )
+
+    pages: list[dict] = []
+    add = _build.page_writer(
+        pages,
+        listings,
+        live,
+        updated,
+        fit_title=_fitted_page_title,
+        fit_description=lambda desc: fit_description(desc),
+        render=lambda *args, **kwargs: page(*args, **kwargs),
+        schema_ids=lambda: (SITE, SITE_ID),
+    )
+    context = _field.Context(("/internships/", "Internships"), now, updated)
+    by_company = employers.by_company
+    majors_made = _emit_field_pages(
+        add, context, cohorts, majors, by_company, digest_by_field, live, earning
+    )
+    _emit_employer_pages(add, site_dir, context, cohorts, employers, live, earning)
+    kind_made, term_paths, trackers = _build.select_kind_catalog(
+        pages, kinds, listings, trackers, enough, MIN_KIND, slugify
+    )
+    _emit_kind_and_tracker_pages(
+        add, context, cohorts.fields, kind_made, term_paths, trackers, by_term, data["baseline"]
+    )
+    new = _emit_near_and_new_pages(
+        add, pages, context, listings, digest_new, data["baseline"], live, earning
+    )
+    facts, pay_path, rep, numbers = _emit_report_pages(
+        add, context, listings, cohorts, kind_made, len(new), enough
+    )
+    _emit_hubs(
+        add,
+        context,
+        cohorts,
+        by_company,
+        majors_made,
+        kind_made,
+        trackers,
+        len(listings),
+        len(new),
+        pay_path,
+        rep,
+        numbers,
+    )
+    _emit_information_pages(
+        add, facts, len(majors_made), len(new), rep, updated, numbers, digest_new, digest_by_field
+    )
+    related_pages.prefer_indexed(pages)
+
     HOME_LIVE_DATE = live.get("/") if isinstance(live, dict) else None
     HOME = home_browse(
-        pages, by_company, fields, states, trackers, len(new) >= MIN_OPEN, len(majors_made)
+        pages, by_company, cohorts.fields, cohorts.states, trackers, len(new) >= MIN_OPEN, len(majors_made)
     )
-    # llms.txt names only pages search engines are asked to index (2026-10-13): not /digest/ before it has a
-    # form, nor a thin page. was: every page made.
-    made = {
-        p["path"]: (p["h1"], len(p["items"]) if p["items"] is not None else 0)
-        for p in pages
-        if p["index"]
-    }
+    made = _build.indexable_catalog(pages)
     TEXTS = llms_files(facts, made, rep, len(majors_made), len(by_company), len(new), updated)
     return pages
 
@@ -5695,8 +5636,6 @@ def today_utc() -> str:
 def write(site_dir: str, pages: list[dict]) -> None:
     # 2026-10-23: date real visible changes, including corrections and closures, after all page
     # decisions. was: only max(first_seen, live lastmod); see page_dates for the one-line revert.
-    from . import page_dates
-
     now = GENERATED or datetime.now(timezone.utc)
     content_dates, home_lastmod = page_dates.refresh(
         site_dir, pages, now, HOME, HOME_START, HOME_END, LISTINGS, home_floor=HOME_LIVE_DATE
@@ -5840,8 +5779,6 @@ def main(argv: list[str]) -> None:
     # feeds imports is a second copy whose build() never ran, so its GENERATED is None.
     feeds.write_all(site_dir, built, GENERATED)  # was: feeds.write_all(site_dir, pages)
     # The embedded widget needs real per-field coverage, not the dashboard's 60-row preview.
-    from . import widget_data
-
     widget_data.write(site_dir, LISTINGS, GENERATED, today_utc())
     message = f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt"
     if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
