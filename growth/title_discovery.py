@@ -22,7 +22,9 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "backend"))
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
 from internscout.console_log import console  # noqa: E402
 
 # These are topic tags, not majors or employer eligibility requirements.
@@ -124,7 +126,7 @@ def _text(value: object) -> str:
 
 
 def _time(value: object) -> datetime | None:
-    return sp._when(value)
+    return site_source._when(value)
 
 
 def _recent(value: object, now: datetime) -> bool:
@@ -180,7 +182,7 @@ def make_pack(data: dict, now: datetime) -> dict:
         keys = (
             ("id", str(row["id"])),
             ("url", url_key(row["apply_url"])),
-            ("role", sp.employer_key(row["company_name"]), _text(row["title"]).casefold()),
+            ("role", site_source.employer_key(row["company_name"]), _text(row["title"]).casefold()),
         )
         for key in keys:
             if key in owners:
@@ -205,7 +207,7 @@ def make_pack(data: dict, now: datetime) -> dict:
             # term in the title before using it as a marketing search example.
             if field == "marketing" and not MARKETING_EXAMPLE.search(title):
                 continue
-            title_key, employer_key = title.casefold(), sp.employer_key(employer)
+            title_key, employer_key = title.casefold(), site_source.employer_key(employer)
             if title_key in titles or employer_key in employers or len(title.split()) < 2:
                 continue
             titles.add(title_key)
@@ -228,8 +230,8 @@ def make_pack(data: dict, now: datetime) -> dict:
                 break
         if len(selected) != TITLES_PER_SHEET:
             continue
-        label = sp.field_title(field)
-        url = sp.SITE + "/?" + urlencode({"field": field, "state": ",".join(STATES)}, safe=",")
+        label = site_taxonomy.field_title(field)
+        url = site_assets.SITE + "/?" + urlencode({"field": field, "state": ",".join(STATES)}, safe=",")
         sheet = {
             "field": field,
             "field_label": label,
@@ -247,7 +249,7 @@ def make_pack(data: dict, now: datetime) -> dict:
             + f"{ELIGIBILITY_NOTE}\n\nSearch the field: {url}\n"
             + "Keep this list for your next search or send it to a classmate exploring this field."
         )
-        path = url.removeprefix(sp.SITE)
+        path = url.removeprefix(site_assets.SITE)
         sheet["captions_by_channel"] = {
             channel: sheet["caption"].replace(
                 url, tagged(path, channel, campaign, f"titles_{field}")
@@ -350,7 +352,7 @@ def render_sheet(sheet: dict, snapshot_at: str):
 
 
 def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict:
-    pack = make_pack(sp.load(site_dir), now or datetime.now(timezone.utc))
+    pack = make_pack(site_source.load(site_dir), now or datetime.now(timezone.utc))
     # Render all sheets before writing; a layout failure cannot leave a half-written new pack.
     images = [
         (sheet["image"], render_sheet(sheet, pack["snapshot_at"])) for sheet in pack["sheets"]
