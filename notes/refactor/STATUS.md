@@ -66,21 +66,21 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | Independent review, green CI, Pages 42900208315 plus data-follow run 42900434412/backend verified. Operator adoption remains gated. |
 | 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review, green CI, Pages 42903653178 and backend verified. |
 | 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary merged | Independent review and green CI. Merged as `14143d37`. Pages 42920918176 and backend verified. |
-| 4 | WP-1.4 Remaining safe source logging | wp14_logging | `refactor/wp-1.4-logging-other-sources` | [#236](https://github.com/bpmcginley/InternshipFinder/pull/236) | Merged | Merged as `d709af9a`. Shared exception telemetry after pipeline #221. Q5 raw-exception adapters remain paused. |
-| 4 | WP-1.4 Pipeline/export logging | wp21_inventory | `refactor/wp-1.4-logging-pipeline` | [#221](https://github.com/bpmcginley/InternshipFinder/pull/221) | Merged | Merged as `acf2d347`. Existing default console output preserved. JSON omits provider labels, employer/location examples and the output directory. |
+| 4 | WP-1.4 Remaining safe source logging | wp14_logging | `refactor/wp-1.4-logging-other-sources` | [#236](https://github.com/bpmcginley/InternshipFinder/pull/236) | In review | Shared exception telemetry after pipeline #221. Q5 raw-exception adapters remain paused. |
+| 4 | WP-1.4 Pipeline/export logging | wp21_inventory | `refactor/wp-1.4-logging-pipeline` | [#221](https://github.com/bpmcginley/InternshipFinder/pull/221) | In review | Existing default console output preserved. JSON omits provider labels, employer/location examples and the output directory. |
 | 4 | WP-1.4 Page-build logging | wp14_pages_logging | `refactor/wp-1.4-logging-page-build` | [#220](https://github.com/bpmcginley/InternshipFinder/pull/220) | Merged | Merged as `f358eefa`. Pages 42922011172, 42922021386 and backend verified. Plain console output and GitHub annotations preserved. JSON omits the output path. |
 | 4 | WP-1.4 Growth logging, operator reports | wp42_orders | `refactor/wp-1.4-logging-growth-safe` | [#222](https://github.com/bpmcginley/InternshipFinder/pull/222) | In review | Audience and outreach summaries preserve default output. JSON omits the local outreach path. |
-| 4 | WP-1.4 Growth logging, remaining scopes | Unassigned | - | - | Queued / scoped holds | Preserve workflow payloads. Coordinate claimed modules and review raw provider errors and credentials separately. |
-| 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | Merged | Merged as `add6dc3d`. Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
-| 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | Merged | Merged as `fe368a40`. Every Major and title discovery success summaries only. |
+| 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
+| 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | In review | Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
+| 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | In review | Every Major and title discovery success summaries only. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
 | 4 | WP-2.4 Config: Worker | Lead | `refactor/wp-2.4-worker-config` | [#223](https://github.com/bpmcginley/InternshipFinder/pull/223) | Merged | Merged as `e3822e4f`. Pages 42934103714 and backend verified. The generated Worker module supplies orders and the placement CLI. Both environment overrides remain evaluated at call time. |
 | 4 | WP-2.4 Config: site | Lead | `refactor/wp-2.4-site-config` | [#232](https://github.com/bpmcginley/InternshipFinder/pull/232) | Merged | Merged as `83f98c0d`. The generator projects five inline endpoint values into four site files. The current values already match. The contract scanner checks the configured origin, and Product has released the dashboard source. |
 | 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Merged as `9ea5bc0a` after review and CI. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
-| 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | [#231](https://github.com/bpmcginley/InternshipFinder/pull/231) | Merged | Merged as `fef33968`. Field-capacity file move with exact SQL and all 39 facade exports preserved. |
-| 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
+| 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | [#231](https://github.com/bpmcginley/InternshipFinder/pull/231) | Merged | Merged as `fef33968`. Pages verification pending at integration. Field-capacity file move with exact SQL and all 39 facade exports preserved. |
+| 4 | WP-4.2 Orders split, remaining seams and tests | wp42_orders | `refactor/wp-4.2-orders-delivery` | [#239](https://github.com/bpmcginley/InternshipFinder/pull/239) | In review | Combined file moves for mail templates, review helpers, readers, settlement, checkout, review, refunds and cron. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
 | 5 | WP-3.3 Near family | Unassigned | - | - | Queued | Serial family PR; data/render split without output changes. |
@@ -250,6 +250,8 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | No cutover yet; observation clock has not started. |
 
 ## Waiting for deploy
+
+- [PR #231](https://github.com/bpmcginley/InternshipFinder/pull/231), merged as `fef33968`: the Worker capacity extraction awaits Bruce's deployment.
 
 - [PR #223](https://github.com/bpmcginley/InternshipFinder/pull/223), merged as `e3822e4f`: the Worker config extraction awaits Bruce's deployment.
 
@@ -509,6 +511,31 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Move the 197-line field-cap block to `worker/src/orders/capacity.js`. Its two public functions still come from `orders.js`, and seven internal functions are imported where their existing callers run. Move the shared timing, field limits and empty-field fallback declarations to `orders/shared.js`. The private hold-status and date patterns move with capacity.
 - Byte-compared the complete moved block, all seven supporting declarations and the remaining non-wiring statements against Worker config head `05dd42cf`. The five reservation statements stay in their existing batch order. All 39 facade exports remain available with direct re-exports, and cron still uses the named `fillPlacementFields` function first after its existing cleanup and gate. Terms literals stay in the facade.
 - Node 22.23.4 passed all 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests, and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics. On Windows ARM64 the runtime required the lockfile-pinned x64 workerd artifact from the npm cache. Normal integration with main `e3822e4f` preserved all Worker and buy-test blobs. The checkout suite passed 40 tests again and Golden matched all 695 files with the incoming product fixtures. Worker deployment remains with Bruce.
+
+## WP-4.2 plain-text mail templates
+
+- Move the seven mail constructors and their local formatting helpers to `worker/src/orders/templates.js`. The template module imports the existing billing helpers and reads them only when called. Its API default still comes from generated public config and each call still reads the current environment override. Shared timing, amount and role-count helpers move to `orders/shared.js`.
+- Byte-compared the complete template block, nine supporting declarations and all remaining non-wiring statements against capacity head `d6bb8491`. Queueing, delivery, environment access and signature order remain the same. Verified all 39 facade exports and kept the physical terms literals in `orders.js`.
+- Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
+
+## WP-4.2 review HTML and record readers
+
+- Move the review stylesheet, lazy hash, escaping, page and message helpers to `orders/review-html.js`, and the order and role readers to `orders/records.js`. The order ID pattern moves verbatim to shared code.
+- Verified both moved blocks and the shared pattern against mail-template head `e09348fe`. Every remaining orders.js byte matches after removing import wiring. The original CSP, lazy hash, SQL, physical terms literals and 39 facade exports are preserved.
+- Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
+
+## WP-4.2 paid settlement
+
+- Move the complete paid block to `orders/settlement.js`. Its Stripe helper is read at call time and `billing.js` still calls `listingEvent` through `orders.js`. The legacy module exports the same 39 names and keeps the physical terms literals.
+- Byte comparison against `c23bce4e` matched the entire paid block and all other orders.js bytes outside import and export wiring. Existing SQL, call order, idempotency keys, notifications, cron callbacks and handler behavior are preserved.
+- Node 22.23.4 passed all 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
+
+## WP-4.2 remaining order modules and test split
+
+- Combined the prepared mail templates, review HTML and records, and settlement moves with isolated commits for shared access, checkout, review decisions, credits/refunds and cron. The facade keeps its original 39 exports, physical terms literals, configuration and gate entry points. Checkout reads the terms bindings only when called. Billing imports remain lazy through the existing live bindings.
+- Compared all 104 declarations from the pre-capacity `orders.js` at `05dd42cf` with their current locations. Every original declaration body matched byte-for-byte. All module references resolve, and the checkout, settlement, review, refund and cron SQL, mail, provider and idempotency order remains in the original function bodies.
+- The original Node test entry point imports four consecutive case files in their old registration order, with the original shared fixtures. All 43 test bodies match after accounting for one relative dynamic import path, which still resolves to the same Worker entry point. The shared Node/D1 settlement race is unchanged.
+- Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics. Normal integration with main `fef33968` preserved the reviewed implementation and tests. The Worker, local Workers, checkout and golden runs passed again. Worker deployment remains with Bruce.
 
 ## WP-1.4 growth operator diagnostics
 
