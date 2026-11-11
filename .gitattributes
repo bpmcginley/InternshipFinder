@@ -3,3 +3,4 @@ scripts/publish_extension_release.sh text eol=lf
 
 # Core graph URLs use the exact Git blob bytes on every platform.
 docs/js/core/*.mjs text eol=lf
+docs/js/app/*.mjs text eol=lf
