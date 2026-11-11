@@ -889,6 +889,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "formulary": {
+   "name": "Formulary Financial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "forus": {
    "name": "Forus",
    "quant": false,
