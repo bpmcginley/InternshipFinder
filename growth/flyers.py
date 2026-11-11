@@ -10,6 +10,8 @@ actual size in color or grayscale.
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 from reportlab.graphics.barcode import qr
@@ -146,8 +148,18 @@ def second(path: Path) -> None:
 
 
 if __name__ == "__main__":
+    # The checkout script also works without an editable install.
+    sys.path.insert(0, str(ROOT / "backend"))
+    try:
+        from internscout.console_log import console
+    finally:
+        sys.path.pop(0)
+
     register_fonts()
     OUT.mkdir(parents=True, exist_ok=True)
     first(OUT / "internscout-flyer-find-your-fit.pdf")
     second(OUT / "internscout-flyer-summer-2027.pdf")
-    print(f"Wrote two US Letter flyers to {OUT}")
+    message = "Wrote two US Letter flyers"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+        message += f" to {OUT}"
+    console(message)

@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 from internscout import seo_pages  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 PRIMARY, SECONDARY, THIN = 200, 100, 10
 
@@ -35,7 +36,7 @@ def tiers(site_dir: str):
 
 def main():
     rows, when = tiers(sys.argv[1] if len(sys.argv) > 1 else "docs")
-    print(f"Data from {when}\n")
+    console(f"Data from {when}\n")
     for title, keep in (
         ("Primary: market now", lambda n: n >= PRIMARY),
         ("Secondary", lambda n: SECONDARY <= n < PRIMARY),
@@ -43,10 +44,10 @@ def main():
         ("Not yet: fix the data first", lambda n: n < THIN),
     ):
         group = [r for r in rows if keep(r["near"])]
-        print(f"{title} ({len(group)})")
+        console(f"{title} ({len(group)})")
         for r in group:
-            print(f"  {r['near']:5d} nearby  {r['all']:6d} nationwide  {r['major']}")
-        print()
+            console(f"  {r['near']:5d} nearby  {r['all']:6d} nationwide  {r['major']}")
+        console()
 
 
 if __name__ == "__main__":

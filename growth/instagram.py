@@ -46,6 +46,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+# Keep direct checkout invocation working without an editable install.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+try:
+    from internscout.console_log import console
+finally:
+    sys.path.pop(0)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -389,13 +397,13 @@ def main(argv: list[str]) -> int:
     )
     secret = os.environ.get("INSTAGRAM_TOKEN")
     if not secret:
-        print("[instagram] no INSTAGRAM_TOKEN; nothing sent")
+        console("[instagram] no INSTAGRAM_TOKEN; nothing sent")
         record_status(status_path, requested, "not_configured")
         return 0
     try:
         token = token_for_run(secret, os.environ.get("CLOUDFLARE_API_TOKEN"))
         if not post:
-            print("[instagram] nothing to post this run; token checked")
+            console("[instagram] nothing to post this run; token checked")
             record_status(status_path, requested, "no_post")
             return 0
         fallback_reason = "video_not_generated" if requested == "reel" else None
