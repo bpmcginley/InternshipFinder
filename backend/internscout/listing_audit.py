@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 from .dedupe import _canon_job
+from .public_data import public_data_dir
 
 DEFAULT_FIELDS = (
     "swe",
@@ -126,7 +127,7 @@ def audit(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, default=Path("docs/data"))
+    parser.add_argument("--data", type=Path, default=Path(public_data_dir()))
     parser.add_argument("--fields", default=",".join(DEFAULT_FIELDS))
     parser.add_argument("--per-field", type=int, default=4)
     parser.add_argument("--out", type=Path)

@@ -44,7 +44,7 @@ def test_old_postings_a_scan_just_reached_are_not_new():
 def test_a_field_without_a_page_links_the_dashboard_instead(monkeypatch):
     items = [_x(i, f"Co {i}") for i in range(6)]
     # Below seo_pages.MIN_OPEN open roles the field has no landing page.
-    text, url = social.compose("ml", items, social.sp.MIN_OPEN - 1)
+    text, url = social.compose("ml", items, social.site_rules.MIN_OPEN - 1)
     assert url == "https://internscout.org/?field=ml" and text.endswith(url)
     # A field whose slug is a state's gets no page either: the state's page has that path.
     monkeypatch.setattr(social.digest, "STATE_SLUGS", {"machine-learning-ai"})
@@ -180,7 +180,7 @@ def test_every_account_posting_is_a_green_run(tmp_path, monkeypatch, capsys):
 def test_a_post_links_the_dashboard_when_the_field_has_too_few_open_roles(
     tmp_path, no_accounts, capsys, monkeypatch
 ):
-    monkeypatch.setattr(social.sp, "MIN_OPEN", 50)  # six open roles: no page
+    monkeypatch.setattr(social.site_rules, "MIN_OPEN", 50)  # six open roles: no page
     assert social.main(["social.py", _site(tmp_path, _now() - timedelta(hours=1))]) == 0
     assert capsys.readouterr().out.rstrip().endswith("https://internscout.org/?field=data")
 
