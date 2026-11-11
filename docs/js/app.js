@@ -1,7 +1,7 @@
 // InternScout dashboard UI. Plain JS with React.createElement (no build step, no Babel).
 (function () {
   "use strict";
-  const { useState, useEffect, useMemo, useRef, useCallback, useId } = React;
+  const { useState, useEffect, useMemo, useRef, useCallback, useId, useLayoutEffect = useEffect } = React;
   const h = React.createElement, F = React.Fragment;
   const IS = window.IS, C = IS.C;
   const ADMIN = new URLSearchParams(location.search).get("admin") === "1";
@@ -12,6 +12,99 @@
   const EXT_NOTICE_KEY = "internscout.extnotice.v1";
   // The one-time notice that paid listings have started (S8, 2026-10-14): hidden for good in this browser.
   const PLACE_NOTICE_KEY = "internscout.placements.notice.v1";
+  const ARRIVAL_KEY = "internscout.allowance.return.v1", ARRIVAL_TTL = 10 * 60 * 1000;
+  // Only a one-use intent flag and expiry cross sign-in, never a URL, plan or account value.
+  function arrivalFlag(action, storage, now = Date.now()) {
+    try {
+      storage = storage || window.sessionStorage;
+      if (action === "save") { storage.setItem(ARRIVAL_KEY, JSON.stringify({ show: true, expiresAt: now + ARRIVAL_TTL })); return; }
+      const raw = storage.getItem(ARRIVAL_KEY); storage.removeItem(ARRIVAL_KEY);
+      const v = raw && JSON.parse(raw);
+      return action === "take" && !!(v && v.show === true && Number.isFinite(v.expiresAt) && v.expiresAt > now && v.expiresAt <= now + ARRIVAL_TTL);
+    } catch (e) { return false; }
+  }
+  function configuredPlans(cfg) {
+    return cfg && cfg.payments && cfg.payments.enabled && Array.isArray(cfg.payments.plans) ? cfg.payments.plans.filter(p => p && typeof p.plan === "string" && p.plan && Number.isFinite(p.multiplier) && p.multiplier > 1) : [];
+  }
+  function allowanceArrival(search, cfg) {
+    const q = new URLSearchParams(search), plan = q.get("upgrade");
+    return { plan: configuredPlans(cfg).some(p => p.plan === plan) ? plan : "", generic: q.get("out_of_runs") === "1" };
+  }
+  function clearArrivalKeys(keys) {
+    const url = new URL(location.href); keys.forEach(k => url.searchParams.delete(k));
+    history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+  }
+  function runAllowance(me, cfg) {
+    const a = me && me.allowance && me.allowance.autofill;
+    if (!a || !Number.isFinite(a.used) || a.used < 0 || (a.limit !== null && (!Number.isFinite(a.limit) || a.limit < 0))) return null;
+    const unlimited = a.limit === null, left = unlimited ? null : Math.max(0, a.limit - a.used);
+    // /me.limit is a compatibility value including prior usage and bonus. Only these
+    // /config tables describe this account exactly; paid general tables are not supplied.
+    const table = cfg && cfg.allowance, tier = me.plan === "free" ? me.tier : me.tier === "edu" ? me.plan : null;
+    const disabled = a.limit === 0 || !!(tier && table && table[tier] && table[tier].autofill === 0);
+    const summary = `${a.used.toLocaleString()} Auto-Apply runs used this month; ` + (unlimited ? "no monthly run limit." : `${left.toLocaleString()} runs left in your allowance.`);
+    return { summary, left, unlimited, disabled, exhausted: !disabled && !me.paused && a.limit > 0 && left === 0, bonus: Number.isFinite(a.bonus) && a.bonus > 0 ? a.bonus : 0 };
+  }
+  const bounded = promise => new Promise(resolve => {
+    const timer = setTimeout(() => resolve(null), 8000);
+    Promise.resolve(promise).then(v => { clearTimeout(timer); resolve(v); }, () => { clearTimeout(timer); resolve(null); });
+  });
+  const bonusWords = bonus => Object.entries(bonus || {}).filter(([k, n]) => IS.ALLOWANCE_LABELS[k] && Number.isFinite(n) && n > 0)
+    .map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k])}`).join(" and ");
+  function countArrivalOnce(seen, event) { if (!seen.has(event)) { seen.add(event); IS.count(event); } }
+  function focusArrival(panel) {
+    const active = document.activeElement;
+    if (!panel || (active && active !== document.body && active !== document.documentElement)) return false;
+    panel.focus(); panel.scrollIntoView({ block: "start" }); return true;
+  }
+  function visibleFocusAnchor() {
+    const node = document.activeElement;
+    if (!node || node === document.body || node === document.documentElement) return null;
+    const box = node.getBoundingClientRect();
+    return box.bottom > 0 && box.top < innerHeight ? { node, top: box.top } : null;
+  }
+  function restoreArrivalAnchor(anchor) {
+    if (!anchor || !anchor.node.isConnected || document.activeElement !== anchor.node) return;
+    const shift = anchor.node.getBoundingClientRect().top - anchor.top;
+    if (shift) window.scrollBy({ top: shift, behavior: "instant" });
+  }
+  function validInvite(r) {
+    try { return !!(r && ["https:", "http:"].includes(new URL(r.link).protocol) && Number.isInteger(r.max) && r.max >= 0 && Number.isInteger(r.rewarded) && r.rewarded >= 0 && bonusWords(r.bonus)); }
+    catch (e) { return false; }
+  }
+  function InviteBlock({ invite, status, note, onLoad, onCopy }) {
+    const words = invite && bonusWords(invite.bonus), capped = invite && invite.rewarded >= invite.max;
+    return h("section", { className: "invite", "aria-label": "Invite a classmate" },
+      h("h3", null, invite && invite.bonus.autofill > 0 && !capped ? "Invite a classmate: share extra runs" : "Invite a classmate"),
+      h("p", null, invite ? (capped ? `Your invite reward limit is reached. Eligible new classmates can still get ${words}; you will not receive more invite rewards.` : `You each get ${words}.`)
+        : "New classmates who join through your link with a verified .edu email in their first week can get extra AI use. Load your link to check your reward eligibility."),
+      invite && h("p", { className: "muted" }, `For classmates with a verified .edu email, in their first week. Your rewarded invites: ${invite.rewarded} of ${invite.max}.`),
+      h("div", { className: "invite-row" },
+        invite && h("input", { id: "invite-link", type: "text", readOnly: true, value: invite.link, "aria-label": "Your invite link", onFocus: e => e.target.select() }),
+        invite ? h("button", { type: "button", className: "btn", onClick: onCopy }, "Copy link")
+          : h("button", { type: "button", className: "btn", disabled: status === "loading", onClick: onLoad }, status === "loading" ? "Loading invite link…" : status === "error" ? "Retry invite link" : "Get my invite link")),
+      h("p", { className: "muted", role: "status" }, status === "error" ? "Couldn't load your invite link. Try again." : note));
+  }
+  function AllowancePanel({ signedIn, me, status, cfgStatus, allowance, resetDay, plans, busy, signIn, inviteBlock, onRetry, onConfigRetry, onCheckout, onClose }) {
+    return h("section", { id: "allowance-panel", className: "notice allowance-panel", "aria-labelledby": "allowance-title", tabIndex: -1 },
+      h("h2", { id: "allowance-title" }, allowance && allowance.exhausted ? "No Auto-Apply runs left in your allowance" : "Your Auto-Apply allowance"),
+      h("p", { id: "allowance-status", role: "status", "aria-live": "polite", "aria-atomic": true }, !signedIn ? ""
+        : allowance ? (status === "loading" ? "Refreshing your allowance… " : "") + allowance.summary
+        : status === "loading" ? "Loading your allowance…" : "Couldn't load your allowance."),
+      !signedIn ? h(F, null, h("p", null, "Sign in to see your allowance, invite link and available plans. Searching stays free without sign-in."), cfgStatus === "loading" && h("p", { role: "status" }, "Loading sign-in options…"), signIn)
+        : !allowance ? status !== "loading" && h("button", { type: "button", className: "btn", onClick: onRetry }, "Retry allowance")
+        : h(F, null,
+          allowance.exhausted && h("p", null, `Monthly allowance resets on ${resetDay} (UTC).`),
+          allowance.bonus > 0 && h("p", null, `Includes ${allowance.bonus.toLocaleString()} extra runs. Extra runs do not expire.`),
+          h("p", { className: "muted" }, me.paused ? "AI use is temporarily paused. Search still works." : allowance.disabled ? "Auto-Apply is currently unavailable for this account." : "Per-run and other service limits can still apply."),
+          !allowance.disabled && !me.paused && inviteBlock),
+      cfgStatus === "error" && h(F, null, h("p", { role: "status" }, "Couldn't load account options."), h("button", { type: "button", className: "btn", onClick: onConfigRetry }, "Retry account options")),
+      signedIn && allowance && h("div", { className: "allowance-plans" }, h("h3", null, "Available plans"),
+        plans.length ? plans.map(pl => h("button", { key: pl.plan, type: "button", className: "btn", disabled: !!busy || status !== "ready", onClick: () => onCheckout(pl.plan) }, `${pl.label || IS.PLAN_LABELS[pl.plan] || pl.plan}${pl.price ? ` · ${pl.price}` : ""}`))
+          : h("p", null, cfgStatus === "loading" ? "Loading plan options…" : cfgStatus === "error" ? "Plan options could not be loaded." : "No plan upgrade is available for this account."),
+        plans.length > 0 && h("p", { className: "muted" }, "Optional monthly plans. Checkout opens only when you choose a plan. Cancel any time.")),
+      h("button", { type: "button", className: "btn quiet", onClick: onClose }, "Not now"));
+  }
   const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
   const MYLIST_KEY = "internscout.mylist.v1", VISIT_KEY = "internscout.visit.v1";
@@ -582,6 +675,58 @@
     return on;
   }
 
+  // Native disclosure also works in the static header without JavaScript.
+  function SiteNav({ children }) {
+    const root = useRef(null), lastFocus = useRef(null);
+    useEffect(() => {
+      const box = root.current, details = box.querySelector("details"), summary = box.querySelector("summary");
+      const mq = window.matchMedia("(max-width: 760px)");
+      const resize = () => {
+        const active = document.activeElement === document.body ? lastFocus.current : document.activeElement;
+        if (!mq.matches) {
+          details.open = false;
+          if (active === summary) box.querySelector("nav a").focus();
+        } else if (!details.open && box.querySelector("nav").contains(active)) summary.focus();
+      };
+      const outside = event => {
+        if (!box.contains(event.target)) lastFocus.current = null;
+        if (!details.open || box.contains(event.target)) return;
+        if (box.contains(document.activeElement)) summary.focus({ preventScroll: true });
+        details.open = false;
+      };
+      mq.addEventListener("change", resize);
+      document.addEventListener("pointerdown", outside);
+      return () => { mq.removeEventListener("change", resize); document.removeEventListener("pointerdown", outside); };
+    }, []);
+    return h("div", { className: "site-navigation", ref: root,
+      onFocus: event => { lastFocus.current = event.target; },
+      onKeyDown: event => {
+        const details = root.current.querySelector("details");
+        if (event.key === "Escape" && details.open) {
+          details.open = false; root.current.querySelector("summary").focus(); event.stopPropagation();
+        }
+      },
+      onBlur: event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          // A breakpoint can hide the focused control before its change event fires.
+          if (event.relatedTarget || event.target.getClientRects().length) lastFocus.current = null;
+          root.current.querySelector("details").open = false;
+        }
+      },
+      onClick: event => {
+        const link = event.target.closest("nav a");
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === "_blank") return;
+        root.current.querySelector("details").open = false;
+        // Same-page links keep their destination focus instead of returning to Menu.
+        const url = new URL(link.href);
+        if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search && url.hash) {
+          const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
+          if (target) target.focus();
+        }
+      }
+    }, h("details", null, h("summary", { "aria-controls": "site-links" }, "Menu")), children);
+  }
+
   // ---------- landing ----------
   // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide }) {
   // `plans` is the Worker's /config payments.plans, so the prices shown here are the ones Stripe is
@@ -982,7 +1127,8 @@
     const [note, setNote] = useState("");
     // A classmate's invite code waiting for sign-in, and the student's own invite panel (worker/src/referral.js).
     const [invited, setInvited] = useState(() => IS.ls.get(IS.INVITE_KEY, null));
-    const [invite, setInvite] = useState(null);
+    const [inviteState, setInviteState] = useState(null);
+    const inviteRequest = useRef(0);
     const [inviteNote, setInviteNote] = useState("");
     // The one-time invite nudge (added 2026-10-02; core.js inviteNudgeDue): on for the rest of this page
     // load once a first Auto-Apply or first profile triggers it, until Not now or the panel opens.
@@ -994,16 +1140,35 @@
       ? IS.createDigestNudge() : { claim: () => false, shown() {}, finish() {} };
     const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
+    const billingRequest = useRef(0);
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
     // auth.token is the bearer sent to the Worker (a session code or an ID token); auth.who is
     // IS.authInfo() of the sign-in it came from ({ email, sub, exp, signin, session }), because a
     // session code can't be decoded the way an ID token could.
-    const [auth, setAuth] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
+    const [auth, setAuthState] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
+    const authRef = useRef(auth);
+    const setAuth = useCallback(update => { const next = typeof update === "function" ? update(authRef.current) : update; authRef.current = next; setAuthState(next); }, []);
+    const invite = inviteState && inviteState.token === auth.token ? inviteState.data : null;
+    const inviteStatus = inviteState && inviteState.token === auth.token ? inviteState.status : "idle";
+    const [cfgStatus, setCfgStatus] = useState("loading");
+    const configRequest = useRef(0);
+    const loadConfig = useCallback(async () => {
+      const seq = ++configRequest.current; setCfgStatus("loading");
+      const cfg = await bounded(IS.fetchWorkerConfig());
+      if (seq !== configRequest.current) return;
+      setAuth(a => ({ ...a, cfg })); setCfgStatus(cfg ? "ready" : "error");
+    }, []);
     const signedIn = (x, source) => { const who = IS.authInfo(x); return who ? { token: who.token, who, source } : { token: null, who: null }; };
     // was (twice): IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.tokenOk(r.token)) setAuth(a => ({ ...a, token: r.token, source: "extension" })); });
     // The extension answers { token, email, account, expires } for a session and { token } for an ID token.
-    const askExtension = () => IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.authOk(r)) setAuth(a => ({ ...a, ...signedIn(r, "extension") })); });
+    const askExtension = () => {
+      const before = authRef.current;
+      return IS.ext.call({ type: "auth:token" }, 1500).then(r => {
+        if (authRef.current.token !== before.token || authRef.current.source !== before.source) return;
+        if (r && r.token && IS.authOk(r)) setAuth(a => ({ ...a, ...signedIn(r, "extension") }));
+      });
+    };
     const { info, queue, profile: extProfile } = useExtension();
 
     useEffect(() => { IS.ls.set(LANDING_KEY, true); }, []);
@@ -1126,7 +1291,7 @@
         if (r && r.token) setAuth(a => ({ ...a, ...signedIn(r.session || r.token, "page") }));
         if (r && r.error) setNote("Sign-in didn't work: " + r.error);
       });
-      IS.fetchWorkerConfig().then(cfg => setAuth(a => ({ ...a, cfg })));
+      loadConfig();
     }, []);
     useEffect(() => {
       if (!info.installed || auth.token) return;
@@ -1146,22 +1311,34 @@
     useEffect(() => { if (auth.token && p) IS.postDemand(auth.token, p); }, [auth.token, p]);
     // was: const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
     const who = auth.token ? auth.who : null;
-    const [me, setMe] = useState(null);
+    const [meResult, setMeResult] = useState(null), meRequest = useRef(0);
+    const me = meResult && meResult.token === auth.token ? meResult.data : null;
+    const meStatus = meResult && meResult.token === auth.token ? meResult.status : "loading";
     // An ID token lasts about an hour, a session until sign-out or a year unused. When either runs out
     // (or the Worker refuses it), stop showing "Signed in": take a fresh one from the extension if it
     // has one, otherwise show the sign-in buttons again.
     const dropToken = useCallback(() => {
       // was: IS.signOut(); setAuth(a => ({ ...a, token: null }));
-      IS.signOut(); setAuth(a => ({ ...a, token: null, who: null }));
+      arrivalFlag("clear"); IS.signOut(); setAuth(a => ({ ...a, token: null, who: null }));
       if (info.installed) askExtension();
     }, [info.installed]);
+    const loadMe = useCallback(async (token = authRef.current.token) => {
+      if (!token || token !== authRef.current.token) return null;
+      const seq = ++meRequest.current;
+      setMeResult(previous => ({ token, data: previous && previous.token === token ? previous.data : null, status: "loading" }));
+      const data = await bounded(IS.fetchMe(token));
+      if (token !== authRef.current.token || seq !== meRequest.current) return null;
+      setMeResult({ token, data, status: runAllowance(data) ? "ready" : "error" });
+      if (!data && !IS.authOk(authRef.current.who)) dropToken();
+      return data;
+    }, [dropToken]);
     useEffect(() => {
-      setMe(null);
+      setMeResult(null); setInviteState(null); setInviteNote(""); inviteRequest.current++;
       if (!auth.token) return;
-      let live = true, last = Date.now();
+      let last = Date.now();
       // was: ... else if (!IS.tokenOk(auth.token)) dropToken(); });
       // authOk is also false once the Worker has answered 401 for this token (a session it ended).
-      const load = () => IS.fetchMe(auth.token).then(m => { if (!live) return; if (m) setMe(m); else if (!IS.authOk(auth.who)) dropToken(); });
+      const load = () => loadMe(auth.token);
       load();
       // was: const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
       // was: const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
@@ -1174,13 +1351,20 @@
       // Coming back to the tab after an Auto-Apply run: the "left this month" text should be current.
       const onVis = () => { if (document.visibilityState === "visible" && Date.now() - last > 60000) { last = Date.now(); load(); } };
       document.addEventListener("visibilitychange", onVis);
-      return () => { live = false; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); };
-    }, [auth.token, dropToken]);
+      return () => { meRequest.current++; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); };
+    }, [auth.token, loadMe]);
 
     // The extension's Upgrade button (a job paused on a used-up allowance) opens /?upgrade=<plan>.
     // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
     // gives, then presses checkout here themselves.
-    const [upgradeAsk, setUpgradeAsk] = useState(() => new URLSearchParams(location.search).get("upgrade") || "");
+    const [arrival] = useState(() => ({ search: location.search, returned: arrivalFlag("take") }));
+    const [arrivalDismissed, setArrivalDismissed] = useState(false);
+    const arrivalEvents = useRef(new Set());
+    const countArrival = event => countArrivalOnce(arrivalEvents.current, event);
+    const arrivalRoute = allowanceArrival(arrival.search, auth.cfg);
+    const upgradeAsk = !arrivalDismissed && (arrivalRoute.plan || arrivalRoute.generic || arrival.returned);
+    const [checkoutReturn] = useState(() => new URLSearchParams(location.search).get("upgraded") === "1");
+    const dismissArrival = () => { arrivalFlag("clear"); setArrivalDismissed(true); document.getElementById("listings")?.focus(); };
     // The header's sign-in is one quiet button until pressed (2026-10-05); this is whether it has been.
     const [signInOpen, setSignInOpen] = useState(false);
     // was: the plans announcement (2026-10-04), shown above the list until dismissed (plansSeen, hidePlans).
@@ -1196,22 +1380,29 @@
     // the queue holds a filled application.
     const [reviewHidden, setReviewHidden] = useState(() => { try { return localStorage.getItem(IS.REVIEW_LINE_KEY) === "hidden"; } catch (e) { return false; } });
     const hideReview = () => { try { localStorage.setItem(IS.REVIEW_LINE_KEY, "hidden"); } catch (e) { } setReviewHidden(true); };
-    useEffect(() => { if (upgradeAsk) history.replaceState(null, "", location.pathname); }, []);
+    useEffect(() => {
+      const keys = [...(arrivalRoute.plan ? ["upgrade"] : []), ...(arrivalRoute.generic ? ["out_of_runs"] : [])];
+      if (keys.length) clearArrivalKeys(keys);
+    }, [arrivalRoute.plan, arrivalRoute.generic]);
 
     // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
     // moment later, so check once now and once shortly after before saying anything.
     useEffect(() => {
-      if (!new URLSearchParams(location.search).has("upgraded")) return;
-      history.replaceState(null, "", location.pathname);
-      setNote("Thanks for supporting InternScout. Your larger allowance is being switched on…");
-      const check = n => IS.fetchMe(auth.token).then(m => {
-        if (m) setMe(m);
-        if (m && m.plan && m.plan !== "free") setNote(`You're on the ${IS.PLAN_LABELS[m.plan] || m.plan} plan. Your AI allowance is now larger.`);
-        else if (n > 0) setTimeout(() => check(n - 1), 3000);
-        else setNote("Payment received. If the larger allowance hasn't appeared in a minute, reload the page.");
-      });
-      if (auth.token) check(4);
-    }, [auth.token]);
+      if (!checkoutReturn) return;
+      clearArrivalKeys(["upgraded"]);
+      if (!auth.token) return;
+      const token = auth.token; let live = true, timer;
+      setNote("Checking your updated plan…");
+      const check = async n => {
+        const m = await loadMe(token);
+        if (!live || token !== authRef.current.token) return;
+        if (m && m.plan && m.plan !== "free") setNote(`You're on the ${IS.PLAN_LABELS[m.plan] || m.plan} plan.`);
+        else if (n > 0) timer = setTimeout(() => check(n - 1), 3000);
+        else setNote("Your plan has not updated yet. Retry your allowance in a minute.");
+      };
+      check(4);
+      return () => { live = false; clearTimeout(timer); };
+    }, [auth.token, checkoutReturn, loadMe]);
 
     // The filters in the address (U10, 2026-10-14; IS.filterSearch in core.js): only what differs from the
     // defaults, so with nothing set the address is plain. replaceState, not pushState: changing a filter
@@ -1233,7 +1424,7 @@
     // a later .edu sign-in. Anything else (unreachable, 5xx, 429, a 401 while Google rotates its
     // keys, an error this page doesn't know) keeps it and tries once more per sign-in or session.
     const INVITE_FINAL = ["bad_invite", "own_invite", "not_new", "already_claimed"];
-    const inviteOffer = auth.cfg && auth.cfg.invite;
+    const inviteOffer = auth.cfg && auth.cfg.invite && bonusWords(auth.cfg.invite.bonus) ? auth.cfg.invite : null;
     const inviteWords = inviteOffer ? Object.entries(inviteOffer.bonus || {}).map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k] || k)}`).join(" and ") : "";
     useEffect(() => {
       if (!auth.token || !invited || !inviteOffer) return;
@@ -1250,7 +1441,9 @@
       // was: const attempt = `${sub}|${claims.iat || ""}|${invited}`;
       const attempt = `${sub}|${claims.signin || ""}|${invited}`;
       if (IS.ss.get(IS.INVITE_TRIED_KEY) === attempt) return;
-      IS.claimInvite(auth.token, invited).then(r => {
+      const token = auth.token;
+      IS.claimInvite(token, invited).then(r => {
+        if (token !== authRef.current.token) return;
         // was: if (!r) return;
         // was: if (r.error === "edu_only") { setNote(r.message); return; }
         // The code is kept for a later school-account sign-in, so the same personal account was asked
@@ -1264,25 +1457,25 @@
         IS.ss.del(IS.INVITE_TRIED_KEY); IS.ls.del(IS.INVITE_KEY); setInvited(null);
         if (r.ok) {
           setNote(`Invite accepted: you ${r.inviter_rewarded ? "and your classmate each got" : "got"} ${inviteWords}. They're used after your monthly allowance and don't expire.`);
-          IS.fetchMe(auth.token).then(m => { if (m) setMe(m); });
+          loadMe(token);
         } else if (r.error && r.error !== "already_claimed" && r.message) setNote(r.message);
       });
     }, [auth.token, invited, !!inviteOffer]);
-    async function openInvite() {
-      if (invite) { setInvite(null); return; }
-      setInviteNote("");
-      const r = await IS.fetchInvite(auth.token);
-      // was: if (r) setInvite(r); else setNote("Couldn't load your invite link. Try again in a minute.");
-      // An opened panel (from the nudge or the Account menu) retires the nudge for good, and counts as the
-      // "invite_open" step (worker/src/visits.js EVENTS), once per page load like every step.
-      if (r) { setInvite(r); setNudge(false); IS.markInviteNudge("opened"); IS.count("invite_open"); }
-      else setNote("Couldn't load your invite link. Try again in a minute.");
+    async function openInvite(retry = false) {
+      if (inviteStatus !== "idle" && retry !== true) { inviteRequest.current++; setInviteState(null); return; }
+      const token = authRef.current.token; if (!token || !inviteOffer) return;
+      const seq = ++inviteRequest.current; setInviteNote(""); setInviteState({ token, data: null, status: "loading" });
+      const r = await bounded(IS.fetchInvite(token));
+      if (token !== authRef.current.token || seq !== inviteRequest.current) return;
+      if (validInvite(r)) {
+        setInviteState({ token, data: r, status: "ready" }); setNudge(false); IS.markInviteNudge("opened"); IS.count("invite_open");
+      } else setInviteState({ token, data: null, status: "error" });
     }
     // A good moment just happened (first Auto-Apply queued, first profile saved): offer the invite
     // once, if it can be offered at all. Marked as shown straight away, so a reload never repeats it.
     function offerNudge() {
       if (nudge) return true;
-      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return false;
+      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: inviteStatus !== "idle" || !!showAllowance, seen: IS.inviteNudgeSeen() })) return false;
       IS.markInviteNudge(); setNudge(true); return true;
     }
     function offerDigestNudge(action) {
@@ -1291,27 +1484,32 @@
     function finishDigestNudge(how) {
       digestPrompt.current.finish(how); setDigestNudge(false);
     }
-    async function shareInvite() {
-      // was: const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
-      // The Worker gives the .edu tier to any verified school email (Google, or a school Microsoft
-      // account whose domain is verified), so eligibility is worded by email, not provider. Google is
-      // still the recommended button: many school Microsoft tenants block unverified publishers.
-      const text = `InternScout finds internships for your major. Sign in through my link with your school (.edu) email and we both get ${inviteWords}.`;
-      if (navigator.share) {
-        try { await navigator.share({ title: "InternScout", text, url: invite.link }); setInviteNote("Sent"); return; }
-        catch (e) { if (e && e.name === "AbortError") return; }
+    async function copyInvite() {
+      if (!invite || inviteState.token !== authRef.current.token) return;
+      const token = authRef.current.token, link = invite.link;
+      try {
+        await navigator.clipboard.writeText(link);
+        if (token === authRef.current.token) setInviteNote("Link copied");
+      } catch (e) {
+        if (token !== authRef.current.token) return;
+        const input = document.getElementById("invite-link"); if (input) { input.focus(); input.select(); }
+        setInviteNote("Select the link and copy it. Clipboard access is unavailable.");
       }
-      try { await navigator.clipboard.writeText(invite.link); setInviteNote("Link copied"); }
-      catch (e) { setInviteNote("Select the link above and copy it"); }
     }
 
-    async function billing(kind, plan) {
+    async function billing(kind, plan, fromArrival = false) {
+      const token = authRef.current.token;
+      if (!token || !meResult || meResult.token !== token || (kind === "checkout" && (meStatus !== "ready" || !upgrades.some(p => p.plan === plan)))) return;
+      const seq = ++billingRequest.current;
+      if (fromArrival && kind === "checkout") countArrival("out_of_runs_plan");
       if (kind === "checkout") IS.count("checkout");
       setBusy(kind === "checkout" ? "Opening Stripe…" : "Opening your billing page…");
-      const r = await IS.billingUrl(auth.token, kind, plan);
+      const r = await bounded(IS.billingUrl(token, kind, plan));
+      if (seq !== billingRequest.current) return;
       setBusy("");
-      if (r.url) location.assign(r.url);
-      else setNote(r.error);
+      if (token !== authRef.current.token) return;
+      if (r && r.url) location.assign(r.url);
+      else setNote((r && r.error) || "Couldn't open billing. Try again.");
     }
 
     // profile sync with the extension
@@ -1394,7 +1592,7 @@
         try { localStorage.removeItem("internscout.gh_token"); } catch (e) { } setGhToken("");
       }
       // was: setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
-      profileRef.current = null; quickFirstSave.current = false; setP(null); setQuickMessage(""); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); setQuickOpen(true); IS.ls.del(SKIP_KEY);
+      arrivalFlag("clear"); profileRef.current = null; quickFirstSave.current = false; setP(null); setQuickMessage(""); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); setQuickOpen(true); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
       setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : (r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.")
         + (info.installed ? " The extension keeps its own copy of your profile and files: removing it at chrome://extensions deletes that copy." : ""));
@@ -1705,7 +1903,7 @@
     const digestFields = [...ctx.direct].filter(t => t !== "other" && /^[a-z_]{2,32}$/.test(t));
     // Optional paid plans. The Worker only advertises the tiers whose Stripe price it actually has,
     // so a tier that isn't set up yet never appears as a button the student can press.
-    const payPlans = auth.cfg && auth.cfg.payments && auth.cfg.payments.enabled ? auth.cfg.payments.plans || [] : [];
+    const payPlans = configuredPlans(auth.cfg);
     // Only what is actually a step up from the plan they are on: a Supporter sees Pro, not Supporter.
     const myMult = (payPlans.find(pl => pl.plan === (me && me.plan)) || {}).multiplier || 1;
     const upgrades = me && me.can_upgrade ? payPlans.filter(pl => pl.multiplier > myMult) : [];
@@ -1714,31 +1912,41 @@
     // Out of Auto-Apply runs: say when they come back and how to get more now. Only for a real
     // allowance (limit > 0): a limit of 0 is Auto-Apply switched off, and limits.js won't spend
     // invite runs on a switched-off task, so "used up" and "invite a classmate" would both be wrong.
-    const autoAllow = me && me.allowance && me.allowance.autofill;
+    const allowance = runAllowance(me, auth.cfg);
     // was: ... && !me.paused && inviteOffer && autoAllow && ...: the notice only showed while invites were on,
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
-    const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    const outOfRuns = !!(auth.token && allowance && allowance.exhausted);
+    const showAllowance = !arrivalDismissed && (upgradeAsk || outOfRuns);
+    const arrivalFocused = useRef(false);
+    const arrivalInserted = useRef(false), arrivalAnchor = useRef(null);
+    if (showAllowance && !arrivalInserted.current) arrivalAnchor.current = visibleFocusAnchor();
+    useLayoutEffect(() => {
+      if (!showAllowance || arrivalInserted.current) return;
+      arrivalInserted.current = true; restoreArrivalAnchor(arrivalAnchor.current); arrivalAnchor.current = null;
+    }, [showAllowance]);
+    useEffect(() => {
+      if (!showAllowance || !upgradeAsk || arrivalFocused.current) return;
+      const panel = document.getElementById("allowance-panel");
+      if (panel) { arrivalFocused.current = true; focusArrival(panel); }
+    }, [showAllowance, upgradeAsk]);
+    useEffect(() => {
+      if (!showAllowance) return;
+      const panel = document.getElementById("allowance-panel"); if (!panel) return;
+      if (!window.IntersectionObserver) {
+        const box = panel.getBoundingClientRect(); if (box.bottom > 0 && box.top < innerHeight) countArrival("out_of_runs_view");
+        return;
+      }
+      const observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) { countArrival("out_of_runs_view"); observer.disconnect(); }
+      });
+      observer.observe(panel); return () => observer.disconnect();
+    }, [showAllowance]);
     // Kept as shown only once it is actually on screen, so a higher-priority notice (or setup) that
     // covers it until a reload doesn't use it up unseen. was: kept as shown when offered (review of #123).
     const digestVisible = !!(digestNudge && digestOn && !setupOpen && !nudge && !invite && !outOfRuns && !upgradeAsk);
     useEffect(() => { if (digestVisible && digestPrompt.current.shown) digestPrompt.current.shown(); }, [digestVisible]);
     // The review line (see reviewHidden above). It waits behind any other notice rather than stacking.
     const reviewLine = !reviewHidden && !note && !nudge && !digestNudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
-    // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
-    // upgrade_offer, at their tier; a Worker from before 2026-09-30 sends none, so no run count).
-    const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
-    const offerRuns = offerPl && me && me.upgrade_offer && me.upgrade_offer.plan === offerPl.plan && me.upgrade_offer.allowance
-      ? me.upgrade_offer.allowance.autofill : null;
-    // was: const offerBtn = (label) => offerPl && h("button", { ... offerPl ... });
-    // `pl` lets the ?upgrade= notice offer the plan /pricing/ named rather than always the next one up.
-    const offerBtn = (label, pl = offerPl) => pl && h("button", { type: "button", className: "btn primary", disabled: !!busy, title: upgradeTitle(pl),
-      onClick: () => billing("checkout", pl.plan) }, label || `Get ${pl.label}${pl.price ? ` · ${pl.price}` : ""}`);
-    // /pricing/ links here as /?upgrade=supporter or /?upgrade=pro (2026-10-05). The named plan, when it
-    // is one this student can move up to; otherwise the next one up, as before.
-    const askedPl = upgrades.find(pl => pl.plan === upgradeAsk) || offerPl;
-    const askedRuns = askedPl && me && me.upgrade_offer && me.upgrade_offer.plan === askedPl.plan && me.upgrade_offer.allowance
-      ? me.upgrade_offer.allowance.autofill : null;
-    const offerWords = offerPl && (offerRuns ? `${offerPl.label} gives you ${offerRuns} a month. ` : `${offerPl.label} gives you ${offerPl.multiplier}× the allowance. `);
     // me.month is the Worker's UTC month ("2026-09"); the allowance resets on the 1st of the next one.
     const monthMatch = /^(\d{4})-(\d{2})$/.exec((me && me.month) || "");
     const resetDay = monthMatch
@@ -1756,7 +1964,7 @@
       // was: h("button", { ... }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
       // The " (UMass email)" suffix was wrong twice over: no account has to be UMass, and nothing has
       // to be .edu at all. A .edu only doubles the allowance, which the tooltip now says.
-      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
+      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => { if (showAllowance) arrivalFlag("save"); IS.startSignIn(auth.cfg, pr.id); }, title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
     // In the header, one quiet button until it is pressed (2026-10-05 audit): two full-weight sign-in
     // buttons were the most prominent thing on a page whose point is that search needs no account, and
     // "optional" lived in a tooltip. The note says it in visible words once the choice opens.
@@ -2003,7 +2211,7 @@
         // under them the page's h1 with the pain line and the free search as the first action.
         h("div", { className: "brand" },
           h("a", { className: "mark", href: "/" }, "InternScout"),
-          h("nav", { className: "sitenav", "aria-label": "Site" },
+          h(SiteNav, null, h("nav", { id: "site-links", className: "sitenav", "aria-label": "Site" },
             h("a", { href: "internships/" }, "Browse"),
             // Always shown, like the static nav before the app loads (no flash): /digest/ itself says
             // whether sign-ups are open. was: digestOn && h("a", ...) (review of #123).
@@ -2013,7 +2221,7 @@
             h("a", { href: "compare/" }, "Compare"),
             h("a", { href: "about/" }, "About"),
             // 2026-10-23: was: employers could only find the footer link. Revert: omit this anchor.
-            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns"))),
+            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns")))),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
         // header keeps the everyday actions and the account details live in the Account menu.
@@ -2036,14 +2244,14 @@
             spendText: info.spend && info.spend.calls > 0 ? `Estimated AI cost: $${info.spend.month_usd.toFixed(2)}${info.spend.budget ? ` of $${info.spend.budget}` : ""}` : null,
             items: [
               auth.token && inviteOffer && { key: "invite", group: "share", label: invite ? "Hide your invite link" : "Invite classmates", onClick: openInvite,
-                desc: `You and each classmate who joins with a .edu email get ${inviteWords}.` },
+                desc: "New .edu classmates can earn extra AI use. Check your reward eligibility." },
               ...(auth.token ? upgrades.map(pl => ({ key: pl.plan, group: "plan", label: `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`, onClick: () => billing("checkout", pl.plan),
                 disabled: !!busy, title: upgradeTitle(pl), desc: `${pl.multiplier}× your monthly AI allowance. Cancel any time.` })) : []),
               auth.token && me && me.can_manage && { key: "manage", group: "plan", label: "Manage plan", onClick: () => billing("portal"), disabled: !!busy,
                 desc: "Change your card or cancel, on Stripe's own page." },
               // was: onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); }
               // signOut(true) also ends the session on the Worker, so the code can't be used again.
-              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } },
+              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { arrivalFlag("clear"); IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } },
             ].filter(Boolean),
             admin: ADMIN ? [
               { key: "rescan", label: "Rescan", desc: "Run the scanner on GitHub now", onClick: rescan, disabled: !!busy },
@@ -2082,6 +2290,11 @@
               : h("a", { className: "btn", href: installUrl("hero"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome · free"))))),
 
       h("main", { id: "main" },
+      h("div", { id: "allowance-announcement", className: "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, showAllowance ? "Auto-Apply allowance options are open." : ""),
+      showAllowance && h(AllowancePanel, { signedIn: !!auth.token, me, status: meStatus, cfgStatus, allowance, resetDay,
+        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy, signIn: signInProviders,
+        inviteBlock: inviteOffer && h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => { countArrival("out_of_runs_invite"); openInvite(true); }, onCopy: () => { countArrival("out_of_runs_invite"); copyInvite(); } }),
+        onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: dismissArrival }),
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
       // counters or any statement of what is here. Now the figures come first while the setup card is
       // open with no profile saved; once there is a profile the card is an edit form and the old order
@@ -2101,7 +2314,7 @@
         h("button", { type: "button", "aria-label": "Close this message", onClick: () => { clearTimeout(selTimer.current); setSelNote(""); } }, h("span", { className: "i i-cross", "aria-hidden": true })))),
       // The one-time invite nudge (2026-10-02), right under the "Queued" or "Profile saved" note it follows.
       // It steps aside for the out-of-runs notice, which already offers the invite, and for the panel itself.
-      nudge && auth.token && inviteOffer && !invite && !outOfRuns && h("div", { className: "notice", role: "status" },
+      nudge && auth.token && inviteOffer && inviteStatus === "idle" && !showAllowance && h("div", { className: "notice", role: "status" },
         h("b", null, inviteOffer.bonus && inviteOffer.bonus.autofill ? "Nice work. Want more free Auto-Apply runs? " : "Nice work. Want more free AI use? "),
         // The same terms as the invite panel: the reward lands when a new classmate ("joins": first week,
         // worker/src/referral.js) signs in through the link with a .edu email, for up to REFERRAL.maxRewards.
@@ -2113,35 +2326,10 @@
       invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
         // was: `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
         `Sign in with your school (.edu) email (Google works for most schools) and you'll both get ${inviteWords}. Searching needs no account.`),
-      // The invite link hides while the invite panel below is already open; the plan buttons are in the header.
-      // was: the invite came first and the plans were "above", which since the Account menu (2026-09-26)
-      // they no longer are. The plan now has its own button here, and the invite follows when on.
-      outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
-        `They come back on ${resetDay}. `,
-        offerPl && h(F, null, offerWords, offerBtn(), " "),
-        inviteOffer && (invite ? `${offerPl ? "Or share" : "Share"} your invite link below.` : h(F, null,
-          h("a", { href: "#", onClick: prevent(openInvite) }, offerPl ? "Or invite a classmate" : "Invite a classmate"),
-          // An inviter is rewarded for their first REFERRAL.maxRewards classmates only (worker/src/referral.js).
-          `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates.`))),
-      // Arrived from the extension's Upgrade button, with runs still left or before /me has loaded.
-      !outOfRuns && upgradeAsk && h("div", { className: "notice" },
-        !auth.token ? "Sign in (top right) to pick a plan. A plan raises how many Auto-Apply runs you get each month. "
-          : !me ? "Loading your plan… "
-          // was: offerPl ? ... offerRuns ... offerBtn("Continue to checkout") (always the next plan up)
-          : askedPl ? h(F, null, h("b", null, `${askedPl.label}${askedPl.price ? ` · ${askedPl.price}` : ""}. `),
-            askedRuns ? `${askedRuns} Auto-Apply runs a month. Cancel any time. ` : `${askedPl.multiplier}× the monthly AI allowance. Cancel any time. `,
-            offerBtn("Continue to checkout", askedPl), " ")
-          : `You're on the ${IS.PLAN_LABELS[me.plan] || me.plan} plan${me.plan === "free" ? "" : " already"}. `,
-        h("a", { href: "#", onClick: prevent(() => setUpgradeAsk("")) }, "Not now")),
-      auth.token && invite && h("div", { className: "notice invite" },
-        h("b", null, "Invite classmates. "),
-        // was: `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
-        `Each classmate who signs in through your link with a school (.edu) email in their first week gets ${inviteWords}, and so do you`
-          + ` (for up to ${invite.max} classmates; ${invite.rewarded} so far).`,
-        h("div", { className: "invite-row" },
-          h("input", { id: "invite-link", type: "text", readOnly: true, value: invite.link, "aria-label": "Your invite link", onFocus: e => e.target.select() }),
-          h("button", { type: "button", className: "btn primary", onClick: shareInvite }, navigator.share ? "Share link" : "Copy link"),
-          inviteNote && h("span", { className: "muted", role: "status" }, inviteNote))),
+      !showAllowance && auth.token && inviteStatus !== "idle" && h("div", { className: "notice" },
+        h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => openInvite(true), onCopy: copyInvite })),
+      !showAllowance && !arrivalDismissed && new URLSearchParams(arrival.search).get("upgrade") && cfgStatus === "error" && h("div", { className: "notice", role: "status" }, "Couldn't load account options. ",
+        h("button", { type: "button", className: "btn", onClick: loadConfig }, "Retry account options")),
 
       h("section", { id: "results", "aria-labelledby": "listings" },
       h("h2", { id: "listings", className: "sr", tabIndex: -1 }, myList ? "My list" : "Listings"),
@@ -2277,6 +2465,8 @@
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
           // was: h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
           h("a", { href: installUrl("dashboard-footer"), target: "_blank", rel: "noopener" }, "Install extension"),
+          h("a", { href: "https://github.com/bpmcginley/internships-every-major", "data-distribution": "list" }, "Internships for every major on GitHub"),
+          h("a", { href: "widget/builder.html", "data-distribution": "widget" }, "Put live internships on your club or department site"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
           C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs")),
