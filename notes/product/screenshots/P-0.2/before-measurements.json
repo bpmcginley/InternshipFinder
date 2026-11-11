@@ -1,0 +1,74 @@
+[
+  {
+    "width": 1280,
+    "theme": "light",
+    "bounds": {
+      "x": 312,
+      "y": 209.21875,
+      "width": 678,
+      "height": 580.59375
+    },
+    "viewport": 1280,
+    "document": 1280,
+    "date": "Last updated October 27, 2026",
+    "text": null,
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "bounds": {
+      "x": 312,
+      "y": 209.21875,
+      "width": 678,
+      "height": 580.59375
+    },
+    "viewport": 1280,
+    "document": 1280,
+    "date": "Last updated October 27, 2026",
+    "text": null,
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "bounds": {
+      "x": 42,
+      "y": -133.515625,
+      "width": 313,
+      "height": 1266.75
+    },
+    "viewport": 375,
+    "document": 375,
+    "date": "Last updated October 27, 2026",
+    "text": null,
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "bounds": {
+      "x": 42,
+      "y": -133.515625,
+      "width": 313,
+      "height": 1266.75
+    },
+    "viewport": 375,
+    "document": 375,
+    "date": "Last updated October 27, 2026",
+    "text": null,
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  }
+]
