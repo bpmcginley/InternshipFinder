@@ -370,6 +370,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - At `f11ff1a9`, the two generated test modules use the canonical site runtime and explicit build settings. The widget helper is the same binding the old facade exported. The isolated distribution build disables near pages and keeps the default-off settings. Fixture values and all assertion ASTs match the prior tests.
 - With the actual root conftest active, all six distribution tests and five phone tests passed while legacy imports and sockets were blocked. All 24 targeted, publisher, widget and Golden tests passed against the unchanged 836-file fixture.
 
+## WP-6.2 structured data tests
+
+- At `df978c48`, the structured-data suite uses canonical runtime constants and builds with fresh explicit state and hooks. The default earnings lookup stays in place, and near pages stay disabled for the fixture. All 18 ordered page records, HTML bytes, input fixture files and assertion ASTs match the legacy path.
+- All 20 tests passed with the actual root conftest active and the legacy facade and sockets blocked. All 33 targeted and Golden tests passed against the unchanged 836-file fixture.
+
 ## WP-6.2 standalone test fixture
 
 - The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
