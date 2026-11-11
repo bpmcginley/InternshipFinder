@@ -24,6 +24,7 @@ export { formatSnapshot, preFilledLine, SAME_SNAPSHOTS_MAX, TURNS_PER_PAGE_MAX, 
 
 const MAX_STEPS = 40;
 const PAGE_FILES = ["agent/guard.js", "agent/actions.js", "agent/dom.js"];
+const TOOL_INPUT_SCHEMAS = new Map(TOOLS.map(({ name, input_schema }) => [name, input_schema]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- tab + page plumbing ----------
@@ -704,31 +705,53 @@ async function loop(id, run) {
 // Names no button that could be the final one: only the ways to a next page.
 export const EARLY_READY_PUSHBACK = "No blocked final button is visible yet, so there may be more pages. If there is a Next, Continue or Save and Continue button, use it and keep filling. If this page only shows your answers for review, or nothing is left but the final button, call ready_to_submit again.";
 
+function matchesToolArgument(value, { type, enum: choices, items }) {
+  if (choices && !choices.includes(value)) return false;
+  if (type === "number") return Number.isFinite(value);
+  if (type === "array")
+    return Array.isArray(value) && value.every((item) => matchesToolArgument(item, items));
+  return typeof value === type;
+}
+
+function acceptsToolInput(schema, input) {
+  return (
+    input !== null && typeof input === "object" && !Array.isArray(input) &&
+    schema.required.every((key) => Object.hasOwn(input, key)) &&
+    Object.entries(schema.properties).every(
+      ([key, property]) => !Object.hasOwn(input, key) || matchesToolArgument(input[key], property),
+    )
+  );
+}
+
 async function execTool(u, ctx) {
-  const { name, input = {} } = u;
+  const { name, input } = u;
+  const schema = TOOL_INPUT_SCHEMAS.get(name);
+  if (!schema) return { content: `Unknown tool ${name}`, isError: true };
+  if (!acceptsToolInput(schema, input))
+    return { content: `Invalid arguments for ${name}. Use the tool's required fields and declared types.`, isError: true };
   const { tabId, index, store, job, fails } = ctx;
   // gen goes with every action, so the page refuses one from a run the student has stopped (dom.js halt).
   const checkedAct = async (tab, ref, action, payload = {}) => {
     if (ctx.active && !(await ctx.active())) return { ok: false, cancelled: true, error: "The student stopped this run." };
     return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen });
   };
-  const needsRef = ["fill", "select", "check", "upload", "click", "fill_secret"].includes(name);
-  const t = needsRef ? index[input.ref] : null;
+  const needsRef = schema.required.includes("ref");
+  const t = needsRef && Object.hasOwn(index, input.ref) ? index[input.ref] : null;
   if (needsRef && !t) return { content: `Unknown ref ${input.ref}. Use refs from the latest snapshot.`, isError: true };
   if (needsRef && (fails[input.ref] || 0) >= MAX_FIELD_FAILS) return { content: "This field already failed 3 times. Skip it, or pause_for_user if it is required.", isError: true };
 
   let r;
   switch (name) {
     case "fill":
-      r = await checkedAct(tabId, input.ref, "fill", { text: String(input.text ?? "") });
+      r = await checkedAct(tabId, input.ref, "fill", { text: input.text });
       if (r.ok) await logAnswer(job, t.label, input.text, t.kind);
       break;
     case "select":
-      r = await checkedAct(tabId, input.ref, "select", { option: String(input.option ?? "") });
+      r = await checkedAct(tabId, input.ref, "select", { option: input.option });
       if (r.ok) await logAnswer(job, t.label, r.chosen || input.option, t.kind);
       break;
     case "check":
-      r = await checkedAct(tabId, input.ref, "check", { checked: !!input.checked });
+      r = await checkedAct(tabId, input.ref, "check", { checked: input.checked });
       break;
     case "upload": {
       // Was: ... && job.tailored.file; the bytes now live off the job (see queue.js).
@@ -785,7 +808,7 @@ async function execTool(u, ctx) {
       break;
     }
     case "wait":
-      await sleep(Math.min(10, Math.max(1, Number(input.seconds) || 2)) * 1000);
+      await sleep(Math.min(10, Math.max(1, input.seconds || 2)) * 1000);
       return { content: "Waited." };
     case "ask_user":
       return { stop: true, kind: "ask", question: input.question, why: input.why };

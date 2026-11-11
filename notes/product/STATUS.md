@@ -497,3 +497,7 @@ Node 22 serial site suite passed 316/316 and both golden tests passed. Both stam
 ## P-0.2 final disclosure integration
 
 Normally integrated published dashboard main `2a8176db`, preserving reviewed privacy source and all 16 screenshots from `14696ba9`. Both stamped artifacts were regenerated; 695 hashes match and only privacy.html differs from main. Every other public path and page-content-date record is identical, including dashboard/storage/allowance/distribution output. The privacy artifact itself is byte-identical to the original reviewed after capture. 316 serial Node 22 site tests and two golden tests passed; the publication checker found zero problems. Final CI and independent incremental review remain required. Disclosure wording is approved; publish it before owner worker deployment. No deployment, release, mail or provider action occurred.
+
+## Chrome 0.6.0 Auto-Apply tool input validation
+
+The agent checks required fields and declared types before taking action. An explicit false stays false and invalid calls return a tool error without mutating the form. The two targeted offline regressions fail on the original code and pass with the change. All 358 extension tests and scoped lint pass. Draft for post-refactor 0.6.0 qualification.

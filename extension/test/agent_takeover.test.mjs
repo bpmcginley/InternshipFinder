@@ -82,6 +82,58 @@ async function newJob() {
 const FILL_CLICK_READY = [use("t1", "fill", { ref: "0:e1", text: "Because." }), use("t2", "click", { ref: "0:b1" }), use("t3", "ready_to_submit", { summary: "Done" })];
 const TOOK_OVER = { status: "needs_you", reason: "You took over. Press Resume to hand it back.", activity: "" };
 
+test("a checkbox action requires a boolean and preserves an explicit false", async () => {
+  const id = await newJob();
+  const dom = window.ISDom, snapshot = dom.snapshot, act = dom.act;
+  const received = [];
+  dom.snapshot = () => {
+    const page = snapshot();
+    return { ...page, elements: [...page.elements, { ref: "e2", kind: "checkbox", label: "Optional updates", checked: true }] };
+  };
+  dom.act = async (ref, action, payload) => {
+    received.push({ ref, action, checked: payload.checked });
+    return { ok: true };
+  };
+  replies = [[
+    use("invalid-check", "check", { ref: "0:e2", checked: "false" }),
+    use("valid-check", "check", { ref: "0:e2", checked: false }),
+    use("pause", "pause_for_user", { reason: "Please review." }),
+  ]];
+  try {
+    await runJob(id);
+    assert.deepEqual(received, [{ ref: "e2", action: "check", checked: false }]);
+    const job = await getJob(id);
+    assert.equal(job.status, "needs_you");
+    assert.equal(job.pending.results[0].is_error, true);
+    assert.equal(job.pending.results[1].is_error, undefined);
+  } finally {
+    dom.snapshot = snapshot;
+    dom.act = act;
+  }
+});
+
+test("malformed tool inputs return errors before browser or review actions", async () => {
+  const id = await newJob();
+  replies = [[
+    use("null", "fill", null),
+    use("typed", "fill", { ref: "0:e1", text: 12 }),
+    use("missing", "check", { ref: "0:e1" }),
+    use("array", "click", [{ ref: "0:b1" }]),
+    use("file", "upload", { ref: "0:e1", file: "other" }),
+    use("secret", "fill_secret", { ref: "0:e1" }),
+    use("wait", "wait", { seconds: "1" }),
+    use("ready", "ready_to_submit", { summary: "Done", double_check: ["Review", 3] }),
+    use("pause", "pause_for_user", { reason: "Please review." }),
+  ]];
+  await runJob(id);
+  const job = await getJob(id);
+  assert.deepEqual(actions, []);
+  assert.equal(job.status, "needs_you");
+  assert.equal(job.reason, "Please review.");
+  assert.equal(job.pending.results.length, 8);
+  assert.ok(job.pending.results.every((result) => result.is_error && /Invalid arguments/.test(result.content)));
+});
+
 test("a reply that arrives after Take over does nothing and leaves the student's status alone", async () => {
   const id = await newJob();
   replies = [FILL_CLICK_READY];
@@ -269,7 +321,7 @@ test("typing a generated password keeps signup pending instead of claiming an ex
   data.store.settings.signup_email = "fixture@example.test";
   const snapshot = window.ISDom.snapshot;
   window.ISDom.snapshot = () => ({ ...snapshot(), elements: [{ ref: "e1", kind: "password", label: "Password", value: "" }] });
-  replies = [[use("secret", "fill_secret", { ref: "0:e1" }), use("pause", "pause_for_user", { reason: "Fixture sign-up unfinished" })]];
+  replies = [[use("secret", "fill_secret", { ref: "0:e1", secret: "account_password" }), use("pause", "pause_for_user", { reason: "Fixture sign-up unfinished" })]];
   try {
     await runJob(id);
     assert.equal(data.store.accounts.length, 1);
@@ -371,7 +423,7 @@ test("a password typed into an ATS iframe is saved and confirmed under the ifram
     elements: signedUp ? [] : [{ ref: "p1", kind: "password", label: "Password", value: "" }],
   });
   onAct = async (a) => { if (a === "fill") signedUp = true; };
-  replies = [[use("s", "fill_secret", { ref: "3:p1" })], [use("p", "pause_for_user", { reason: "fixture" })]];
+  replies = [[use("s", "fill_secret", { ref: "3:p1", secret: "account_password" })], [use("p", "pause_for_user", { reason: "fixture" })]];
   try {
     await runJob(id);
     assert.equal(data.store.accounts.length, 1);
