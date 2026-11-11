@@ -35,7 +35,8 @@ class Graph:
 
 CORE = Graph("Core", "js/core", "js/modules")
 APP = Graph("App", "js/app", "js/app-modules")
-GRAPHS = (CORE, APP)
+BUY = Graph("Buy", "js/buy", "js/buy-modules")
+GRAPHS = (CORE, APP, BUY)
 
 
 @dataclass(frozen=True)
