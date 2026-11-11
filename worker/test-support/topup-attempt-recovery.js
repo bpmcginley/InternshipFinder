@@ -98,7 +98,7 @@ async function setup(db, state = "open") {
   data.fetch = async (url, options) => {
     assert.equal(options.method, "GET");
     assert.equal(options.body, undefined);
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.equal(options.headers["Stripe-Version"], "2026-08-26.dahlia");
     data.calls.push(url);
     await data.before(url);

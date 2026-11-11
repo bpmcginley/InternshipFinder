@@ -147,7 +147,7 @@ async function setup(db) {
   f.fetch = async (url, options) => {
     assert.equal(options.method, "GET");
     assert.equal(options.body, undefined);
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.ok(options.signal);
     assert.equal(options.headers["Stripe-Version"], "2026-08-26.dahlia");
     f.calls.push(url);
