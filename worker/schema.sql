@@ -814,3 +814,9 @@ CREATE TABLE IF NOT EXISTS topup_checkout_attempts (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS topup_checkout_one_active ON topup_checkout_attempts(user_hash)
   WHERE state IN ('creating','open');
+
+-- Dormant pre-provider fence. Consumed on settlement; removed with an erased attempt.
+CREATE TABLE IF NOT EXISTS topup_attempt_revisions (
+  attempt_id TEXT PRIMARY KEY NOT NULL REFERENCES topup_checkout_attempts(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK(typeof(revision) = 'integer' AND revision > 0 AND revision <= 9007199254740991)
+);

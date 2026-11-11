@@ -11,7 +11,7 @@ export const validTopupOfferVersion = (value) =>
 export const validTopupCheckoutId = (value) =>
   typeof value === "string" && /^cs_[A-Za-z0-9_]{1,250}$/.test(value);
 
-async function referenceHash(kind, live, id) {
+export async function referenceHash(kind, live, id) {
   const bytes = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(`internscout:topup:v1:${live ? "live" : "test"}:${kind}:${id}`),
