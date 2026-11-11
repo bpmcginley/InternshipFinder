@@ -232,7 +232,7 @@ export async function readTopupReversalEvidence(
     )
       fail();
     live();
-    return { status: "reversal_evidence", ...second };
+    return { status: "reversal_evidence", chargeId: e.chargeId, livemode: e.livemode, ...second };
   }
   try {
     return await Promise.race([

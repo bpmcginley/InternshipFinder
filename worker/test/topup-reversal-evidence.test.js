@@ -92,6 +92,8 @@ test("complete stable multi-page traversals return only normalized evidence", as
   );
   const result = await run(p);
   assert.equal(result.status, "reversal_evidence");
+  assert.equal(result.chargeId, evidence.chargeId);
+  assert.equal(result.livemode, evidence.livemode);
   assert.equal(result.refunds.length, 120);
   assert.equal(result.disputes.length, 1);
   assert.equal(result.refundsComplete, true);

@@ -48,3 +48,4 @@ import "./topup-checkout.test.js";
 import "./topup-stripe.test.js";
 import "./topup-payment-evidence.test.js";
 import "./topup-reversal-evidence.test.js";
+import "./topup-first-settlement.test.js";
