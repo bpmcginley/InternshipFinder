@@ -344,15 +344,20 @@ export async function pendingLifetime(db, equal) {
   equal((await pending(db)).length, 1);
   equal(await finishFollowDigestAttempt(db, first.id, lease, "uncertain", now), true);
   equal(await pending(db), []);
+  original[0].watermark = now.toISOString(); // P-2.1k consumes an uncertain claimed window.
   equal(await progress(db), original);
   equal((await rows(db, "follow_digest_days")).length, 1);
   const tomorrow = new Date(+now + 86400_000);
+  const freshSnapshot = JSON.parse(new TextDecoder().decode(snapshot(tomorrow.toISOString())));
+  freshSnapshot.roles.forEach((role) => {
+    role.first_seen = new Date(+now + 1).toISOString();
+  });
   equal(
     (
       await enqueue(
         db,
         a.subscriberId,
-        snapshot(tomorrow.toISOString()),
+        new TextEncoder().encode(JSON.stringify(freshSnapshot)),
         { upperBound: tomorrow.toISOString() },
         tomorrow,
       )
