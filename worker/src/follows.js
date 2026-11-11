@@ -83,7 +83,7 @@ export async function requestFollow(db, email, input, catalog, now = new Date())
 }
 
 // Random generation + 256-bit secret; only the hash and generation enter D1.
-// Confirmation reissues invalidate previous links in the same scope. Unsubscribe links
+// Confirmation/management reissues invalidate previous links in the same scope. Unsubscribe links
 // remain valid until deletion, including previously delivered links after a later dispatch.
 export async function mintFollowToken(
   db,
@@ -93,7 +93,7 @@ export async function mintFollowToken(
   now = new Date(),
 ) {
   if (
-    !["confirm", "unsubscribe"].includes(purpose) ||
+    !["confirm", "manage", "unsubscribe"].includes(purpose) ||
     !owner(ownerUserHash) ||
     (purpose === "confirm" ? !scopeKey : scopeKey !== "" || ownerUserHash !== null)
   )
@@ -101,7 +101,10 @@ export async function mintFollowToken(
   const generation = crypto.randomUUID(),
     raw = generation + "." + hex(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await hash(raw);
-  let expiry = purpose === "unsubscribe" ? null : new Date(now.getTime() + 7 * DAY).toISOString();
+  let expiry =
+    purpose === "unsubscribe"
+      ? null
+      : new Date(now.getTime() + (purpose === "manage" ? 30 * 60_000 : 7 * DAY)).toISOString();
   if (purpose === "confirm") {
     const subscription = await db
       .prepare(
@@ -188,6 +191,65 @@ export async function unsubscribeFollows(db, raw, now = new Date()) {
   const result = await db
     .prepare("DELETE FROM follow_subscribers WHERE id IN (" + liveToken + ")")
     .bind(await tokenHash(raw), "unsubscribe", stamp(now))
+    .run();
+  return result.meta.changes > 0;
+}
+
+// A management link can inspect/remove any scope for its email, but never confirms or links one.
+// Read-only, including invalid/expired links: future GET/prefetch must call only inspection/listing.
+export async function listManagedFollows(db, raw, now = new Date()) {
+  const digest = await tokenHash(raw),
+    at = stamp(now);
+  const result = await db.batch([
+    db.prepare(liveToken).bind(digest, "manage", at),
+    db
+      .prepare(
+        "SELECT scope_key,created,confirmed_at FROM follow_subscriptions WHERE subscriber_id IN (" +
+          liveToken +
+          ") ORDER BY scope_key",
+      )
+      .bind(digest, "manage", at),
+  ]);
+  return result[0].results.length ? result[1].results : null;
+}
+
+// Explicit management action. Keep the token for further actions within its original 30-minute
+// lifetime, unless the last scope is removed. Tokens for the removed scope cannot confirm it later.
+export async function removeManagedFollow(db, raw, scopeKey, now = new Date()) {
+  if (typeof scopeKey !== "string") invalid();
+  const digest = await tokenHash(raw),
+    at = stamp(now);
+  const result = await db.batch([
+    db
+      .prepare(
+        "DELETE FROM follow_tokens WHERE purpose='confirm' AND scope_key=? AND subscriber_id IN (" +
+          liveToken +
+          ")",
+      )
+      .bind(scopeKey, digest, "manage", at),
+    db
+      .prepare(
+        "DELETE FROM follow_subscriptions WHERE scope_key=? AND subscriber_id IN (" +
+          liveToken +
+          ")",
+      )
+      .bind(scopeKey, digest, "manage", at),
+    db
+      .prepare(
+        "DELETE FROM follow_subscribers WHERE id IN (" +
+          liveToken +
+          ") AND NOT EXISTS " +
+          "(SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id)",
+      )
+      .bind(digest, "manage", at),
+  ]);
+  return result[1].meta.changes > 0;
+}
+
+export async function deleteManagedFollows(db, raw, now = new Date()) {
+  const result = await db
+    .prepare("DELETE FROM follow_subscribers WHERE id IN (" + liveToken + ")")
+    .bind(await tokenHash(raw), "manage", stamp(now))
     .run();
   return result.meta.changes > 0;
 }
