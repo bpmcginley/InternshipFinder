@@ -15,3 +15,13 @@ export function text(body, field, { required = false } = {}) {
   if (s.length > LIMITS[field]) throw bad(field, `${field} is too long (at most ${LIMITS[field]} characters)`);
   return s;
 }
+
+export const DAYS = 30;              // days each role runs
+export const FIELD_CAP = 5;          // paid roles running at once that share a field tag
+export const MAX_START_DAYS = 90;    // the start day is today up to this many days ahead
+
+// A verified order's roles hold their days this long after its Checkout opened (Checkout expires at 31
+// minutes), so two buyers can't both pay for the last place in a field.
+export const CHECKOUT_HOLD_MS = 35 * 60_000;
+
+export const fieldsOf = (list) => (list.length ? list : ["other"]);

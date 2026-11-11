@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "backend"))
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 # These are topic tags, not majors or employer eligibility requirements.
 FIELDS = (
@@ -405,9 +407,10 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as error:
         print(f"[title-discovery] refused: {error}", file=sys.stderr)
         return 1
-    print(
-        f"[title-discovery] wrote {len(pack['sheets'])} draft sheets to {args.out}; nothing posted"
-    )
+    message = f"[title-discovery] wrote {len(pack['sheets'])} draft sheets"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+        message += f" to {args.out}"
+    console(message + "; nothing posted")
     return 0
 
 
