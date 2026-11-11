@@ -9,6 +9,8 @@ import { heldLine } from "../background/held.js";
 import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, bulkConfirmKeys, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue, setSetupEmail, repairSetupEmail } from "./profile.js";
 
 import { readFile, docBlock } from "./files.js";
+import { SLOTS, FACTS, VOICE_FIELDS, JSON_SECTIONS, GOAL_FIELDS } from "./field-options.js";
+import { interviewSystem } from "./interview-prompt.js";
 
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
@@ -396,12 +398,6 @@ async function fillSpending() {
 }
 
 // ---------- 2. files ----------
-const SLOTS = [
-  ["resume", "Resume", "Required. Used for every application and uploaded where asked."],
-  ["cv", "CV", "Optional longer version with everything."],
-  ["transcript", "Transcript", "Optional. Uploaded when a site asks for one."],
-  ["cover_letter", "Cover letter", "Optional. A past letter you like, used as a style reference and uploaded if asked."],
-];
 function files() {
   const fmt = (f) => f ? `${esc(f.name)} · ${Math.max(1, Math.round(f.size / 1024))} KB` : "No file";
   main.innerHTML = `
@@ -631,33 +627,6 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
 }
 
 // ---------- 3. facts ----------
-const YN = ["", "Yes", "No"];
-const FACTS = [
-  ["Contact", "", [
-    ["first_name", "First name"], ["last_name", "Last name"], ["preferred_name", "Preferred name"], ["pronouns", "Pronouns"],
-    ["email", "Email"], ["phone", "Phone"], ["address", "Street address"], ["city", "City"], ["state", "State"], ["zip", "ZIP"],
-    ["country", "Country"], ["linkedin", "LinkedIn URL"], ["github", "GitHub URL"], ["website", "Website / portfolio"]]],
-  ["Work eligibility", "", [
-    ["work_authorized", "Authorized to work in the US?", YN],
-    ["needs_sponsorship", "Need visa sponsorship now or later?", YN],
-    ["citizenship", "Citizenship", ["", "U.S. citizen", "U.S. permanent resident", "F-1 student visa", "Other"]],
-    ["clearance_eligible", "Eligible for a security clearance?", ["", "Yes", "No", "Not sure"]],
-    ["over_18", "18 or older?", YN], ["background_check", "OK with a background check?", YN],
-    ["drug_test", "OK with a drug test?", YN], ["non_compete", "Bound by a non-compete?", YN]]],
-  ["Availability and defaults", "", [
-    ["available_start", "Internship start date (e.g. May 2027)"], ["available_end", "Internship end date (e.g. August 2027)"],
-    ["earliest_start", "Earliest start date"], ["hours_per_week", "Hours per week"],
-    ["willing_to_relocate", "Willing to relocate for the summer?", YN], ["willing_to_travel", "Willing to travel?", YN],
-    ["salary_expectation", "Pay expectation (blank = \"flexible\")"], ["how_heard", "\"How did you hear about us?\" default"],
-    ["worked_here_before", "\"Worked here before?\" default", YN], ["languages", "Languages you speak"]]],
-  ["Voluntary self-identification", "These questions are optional and can't affect your eligibility. The default is to decline.", [
-    ["gender", "Gender", ["Decline to self-identify", "Male", "Female", "Non-binary"]],
-    ["hispanic", "Hispanic or Latino?", ["Decline to self-identify", "Yes", "No"]],
-    ["race", "Race", ["Decline to self-identify", "American Indian or Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "White", "Two or more races"]],
-    ["veteran", "Veteran status", ["I don't wish to answer", "I am not a protected veteran", "I identify as one or more of the classifications of protected veteran"]],
-    ["disability", "Disability", ["I don't wish to answer", "No, I do not have a disability", "Yes, I have a disability (or previously had one)"]],
-    ["lgbtq", "LGBTQ+?", ["Decline to self-identify", "Yes", "No"]]]],
-];
 function facts() {
   const f = S.profile.facts;
   const ready = confirmedFacts(S);
@@ -725,38 +694,6 @@ function facts() {
 
 // ---------- 4. interview ----------
 const CHAT_KEY = "deepdive_chat";
-const COVERAGE = `1. The project they're proudest of (what they built, their exact role, technical depth, result)
-2. A hard challenge or obstacle they worked through
-3. Leadership or taking initiative
-4. Teamwork and collaboration
-5. A failure or mistake, and what they changed afterward
-6. A disagreement or conflict and how they handled it
-7. Career goals (next 1–2 years and longer term)
-8. Why their field / major
-9. What they want out of an internship, and the kinds of companies/teams that excite them
-10. Strengths, and one honest growth area
-11. Interests and life outside class, and anything that makes them distinct`;
-
-function interviewSystem() {
-  const p = S.profile;
-  const { voice, extra, ...rest } = p;
-  return `You are running the InternScout Deep Dive, a friendly, efficient interview of a college student who is applying to internships. An application agent will later use what you learn to answer essay and short-answer questions truthfully and specifically, in the student's voice.
-
-What we already know (JSON):
-${JSON.stringify(rest)}
-
-Cover these topics:
-${COVERAGE}
-
-How to interview:
-- Ask ONE question at a time, 1–3 sentences, warm and plain. No lists of questions.
-- Dig for specifics with a follow-up or two when an answer is vague: numbers, their exact contribution, tools used, the outcome, what they learned.
-- Build on their resume: reference actual projects and roles by name.
-- Skip or shorten topics that existing stories already cover well${p.stories.length ? " (this is a re-run: focus on gaps and on anything new since last time)" : ""}.
-- Never invent details. Don't write essays for them.
-- When every topic is covered (or the student asks to stop), thank them in one sentence and end your message with [[DONE]].`;
-}
-
 async function interview(epoch) {
   let msgs = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
   if (epoch !== renderEpoch || step !== "interview") return;
@@ -781,7 +718,7 @@ async function interview(epoch) {
     sendBtn.disabled = true;
     busy(stat, "Thinking…");
     try {
-      const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(), messages: msgs });
+      const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(S), messages: msgs });
       msgs.push({ role: "assistant", content: textOf(r) });
       await persist();
       draw();
@@ -857,10 +794,6 @@ Return JSON only:
 }
 
 // ---------- 5. voice ----------
-const VOICE_FIELDS = [
-  ["summary", "In a sentence, how you come across"], ["tone", "Tone"], ["sentence_style", "Sentence style"],
-  ["vocabulary", "Word choice"], ["avoid", "Things to avoid"], ["sample", "A sample answer in your voice"],
-];
 function voice() {
   const v = S.profile.voice;
   const n = S.files.samples.length + (S.files.cover_letter ? 1 : 0);
@@ -891,14 +824,6 @@ function voice() {
 }
 
 // ---------- 6. review ----------
-const JSON_SECTIONS = [
-  ["education", "Education"], ["experience", "Experience"], ["projects", "Projects"],
-  ["skills", "Skills"], ["links", "Links"], ["stories", "Stories"], ["extra", "Answers learned while applying"],
-];
-const GOAL_FIELDS = [
-  ["career", "Career goals"], ["why_field", "Why this field"], ["why_internship", "What you want from an internship"],
-  ["interests", "Interests"], ["strengths", "Strengths"], ["growth_areas", "Growth areas"],
-];
 // The JSON lists sit under "Edit raw data", closed (2026-10-04). was: one open code box per list,
 // which made Review read as something a student had to check line by line before finishing.
 function review() {

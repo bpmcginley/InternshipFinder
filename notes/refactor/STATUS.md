@@ -100,8 +100,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | In review | Fixed offline responses for 42 exact routes and 44 transport, guard and special cases. |
 | 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Start after response characterization. Financial wrapper changes remain paused under Q3. |
 | 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | In review | Page-state and file helpers only. All existing imports and safety tests remain valid. |
-| 5 | WP-5.2 Background agent | Unassigned | - | - | Queued | Separate move-only PR; guard and tests untouched; no version bump. |
-| 5 | WP-5.2 Onboarding | Unassigned | - | - | Queued | Separate PR; preserve UI text and reproducible packaging. |
+| 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | [#257](https://github.com/bpmcginley/InternshipFinder/pull/257) | In review | Extract prompt, snapshot, field options and interview prompt in separate commits. Existing loaders, state, safety tests and version are unchanged. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
 | 6 | WP-2.2 Design tokens | Unassigned | - | - | Queued | After Phase 3; preserve inlined output and distinct values. |
 | 6 | WP-5.1 Core modules | Unassigned | - | - | Question | Browser-support decision Q2 precedes implementation. |
@@ -495,6 +494,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Move the six page-state expressions and five helper functions to `extension/background/page-state.js`. Agent imports and re-exports its four existing public helpers. The facade retains all 35 export names, including the preexisting `domainOf` re-export. Move `toB64`, `readFile` and `docBlock` to `extension/onboarding/files.js`, where Mammoth is still read only when opening a DOCX file.
 - Byte comparison matches both moved blocks apart from two new leaf export keywords and matches all remaining source outside import wiring. All existing extension tests, guard, manifest, background entry point and onboarding loader are byte-identical. This preserves the 14 protected safety tests, MAIN and isolated injection order, and onboarding startup order.
 - Node 22.23.4 passed 348 extension tests, both packaging tests passed, and an offline probe matched PDF, text, DOCX, lazy Mammoth, size and truncation behavior. Both actual ZIP variants reproduced across builds with 53 members each. Compared to main, only the two importing members differ and the two leaf modules are new. Both golden checks passed against 695 expected site files. JavaScript lint reported zero errors or warnings.
+
+## WP-5.2 remaining extension leaves
+
+- Background prompt rules, tool schema, history trimming, request construction, snapshot formatting and progress calculations move into two modules. The agent keeps all 35 public exports and owns tab injection, asynchronous job generations, scheduler interactions and runtime tool execution. Its existing field-failure limit remains shared by snapshot formatting and tool dispatch.
+- Onboarding field options and interview prompt construction move into two modules. The existing prompt call passes the live onboarding store at the same point in the turn. Render, save and restore state, event wiring and the Mammoth loader retain their existing order. The guard, manifest, background entry point, onboarding HTML and every extension test are unchanged.
+- Exact declaration-source and AST comparisons account for 22 background and eight onboarding moves. The new interview function parameter and its call argument are the only expression-level wiring changes. Verified all 35 legacy names and moved public binding identities using native imports.
+- Node 22.23.4 passed 348 extension tests, and both packaging tests passed. Both ZIP variants reproduced across local builds with 57 members. Relative imports resolve in both ZIPs, and compared with #251 the only archive differences are two facade files and four new modules. Golden matched all 695 site files. JavaScript lint reported zero errors and warnings.
 
 ## Orders extraction readiness (read-only)
 
