@@ -8,6 +8,42 @@ const OFFER = Object.freeze({
   currency: "usd",
   units: 25,
 });
+// Historical recovery stays configured when current sales or the Price are inactive.
+export function topupRecoveryConfigured(env) {
+  return (
+    typeof env?.STRIPE_SECRET_KEY === "string" &&
+    !!env.STRIPE_SECRET_KEY &&
+    typeof env.STRIPE_PRICE_TOPUP === "string" &&
+    /^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+  );
+}
+export function historicalTopupOffer(env, version, livemode) {
+  return topupRecoveryConfigured(env) && version === OFFER.version && typeof livemode === "boolean"
+    ? { ...OFFER, priceId: env.STRIPE_PRICE_TOPUP, livemode }
+    : null;
+}
+// At most one bounded GET per association step. No arbitrary path or provider writes.
+export async function readTopupAssociation(env, kind, id, fetchImpl) {
+  const prefix = { charges: "ch", payment_intents: "pi" }[kind];
+  if (
+    !topupRecoveryConfigured(env) ||
+    !prefix ||
+    typeof id !== "string" ||
+    !new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id) ||
+    typeof fetchImpl !== "function"
+  )
+    throw unavailable();
+  return boundedRequest(
+    { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    kind + "/" + encodeURIComponent(id),
+    {},
+    fetchImpl,
+    null,
+    "GET",
+    TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+  );
+}
+
 export function topupConfigured(env) {
   return (
     env?.TOPUPS_ENABLED === "1" &&

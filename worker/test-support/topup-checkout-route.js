@@ -8,7 +8,15 @@ const site = "https://internscout.org";
 const legacy = "https://bpmcginley.github.io";
 const checkoutPath = "/billing/topup/checkout";
 const offerPath = "/billing/topup/offer";
-const settings = { ...stripeEnv, SITE_URL: site };
+const settings = {
+  ...stripeEnv,
+  SITE_URL: site,
+  FUNDED_RUNS_MODE: "create",
+  FUNDED_PURCHASES: "1",
+  FUNDED_RESPONSE_MAX_BYTES: "16384",
+  FUNDED_RESPONSE_EVENT_BYTES: "8192",
+  FUNDED_RESPONSE_DEADLINE_MS: "5000",
+};
 const account = attempt().user_hash;
 const login = (db) =>
   createSession(db, { user: account, tier: "edu", provider: "google" }, new Date(+at - 86400000));
@@ -312,5 +320,112 @@ export async function pauseDuringPriceBlocksOfferAndCheckout(db) {
     await db.prepare("DELETE FROM spend WHERE user_hash='*' AND month=?").bind(day).run();
   }
   assert.equal(priceReads, 2);
+  assert.equal(await attempts(db), 0);
+}
+
+export async function unusableFundedConfigurationClosesEverySalesSurface(db) {
+  const { token } = await login(db);
+  const before = await sessionTimes(db);
+  let providerCalls = 0;
+  const run = (request, patch) =>
+    handle(request, { ...settings, ...patch, DB: db }, null, {
+      now: () => at,
+      fetch: async () => {
+        providerCalls++;
+        throw new Error("Synthetic provider must not be reached");
+      },
+    });
+  for (const patch of [
+    { FUNDED_RUNS_MODE: undefined },
+    { FUNDED_RUNS_MODE: "legacy" },
+    { FUNDED_RUNS_MODE: "drain" },
+    { FUNDED_RUNS_MODE: "unknown" },
+    { FUNDED_PURCHASES: undefined },
+    { FUNDED_PURCHASES: "0" },
+    { FUNDED_PURCHASES: 1 },
+    { FUNDED_RESPONSE_MAX_BYTES: undefined },
+    { FUNDED_RESPONSE_MAX_BYTES: "9007199254740992" },
+    { FUNDED_RESPONSE_EVENT_BYTES: "0" },
+    { FUNDED_RESPONSE_EVENT_BYTES: "16385" },
+    { FUNDED_RESPONSE_DEADLINE_MS: "05" },
+    { FUNDED_RESPONSE_DEADLINE_MS: "2147483648" },
+  ]) {
+    const config = await run(req({ method: "GET", path: "/config" }), patch);
+    assert.equal(config.status, 200);
+    assert.equal(Object.hasOwn(await config.json(), "topups"), false, JSON.stringify(patch));
+    await expect(await run(offerRequest({ token }), patch), 503, { status: "disabled" });
+    await expect(await run(req({ token }), patch), 503, { status: "disabled" });
+  }
+  assert.equal(providerCalls, 0);
+  assert.equal(await attempts(db), 0);
+  assert.deepEqual(await sessionTimes(db), before);
+}
+
+export async function fundedConfigurationClosedDuringPriceRefusesTheOfferAndCheckout(db) {
+  const { token } = await login(db);
+  const before = await sessionTimes(db);
+  const calls = [];
+  for (const patch of [
+    { FUNDED_RUNS_MODE: "legacy" },
+    { FUNDED_RUNS_MODE: "drain" },
+    { FUNDED_PURCHASES: "0" },
+    { FUNDED_RESPONSE_EVENT_BYTES: "16385" },
+  ]) {
+    for (const request of [offerRequest({ token }), req({ token })]) {
+      const env = { ...settings, DB: db };
+      const response = await handle(request, env, null, {
+        now: () => at,
+        fetch: async (url, options) => {
+          calls.push(options.method);
+          assert.match(url, /\/prices\//);
+          Object.assign(env, patch);
+          return reply(price());
+        },
+      });
+      await expect(response, 503, { status: "disabled" });
+    }
+  }
+  assert.deepEqual(calls, Array(8).fill("GET"));
+  assert.equal(await attempts(db), 0);
+  assert.deepEqual(await sessionTimes(db), before);
+}
+
+export async function fundedConfigurationRecheckedAfterAccountReads(db) {
+  const { token } = await login(db);
+  for (const stopAfter of [1, 2]) {
+    const env = { ...settings };
+    let planReads = 0;
+    let priceReads = 0;
+    env.DB = {
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        if (!/\bFROM plans\b/.test(sql)) return statement;
+        return {
+          bind(...values) {
+            const bound = statement.bind(...values);
+            return {
+              async first(...args) {
+                const result = await bound.first(...args);
+                if (++planReads === stopAfter) env.FUNDED_PURCHASES = "0";
+                return result;
+              },
+            };
+          },
+        };
+      },
+    };
+    const response = await handle(req({ token }), env, null, {
+      now: () => at,
+      fetch: async (url, options) => {
+        assert.match(url, /\/prices\//);
+        assert.equal(options.method, "GET");
+        priceReads++;
+        return reply(price());
+      },
+    });
+    await expect(response, 503, { status: "disabled" });
+    assert.equal(planReads, stopAfter);
+    assert.equal(priceReads, stopAfter - 1);
+  }
   assert.equal(await attempts(db), 0);
 }

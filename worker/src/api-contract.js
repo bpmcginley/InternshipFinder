@@ -117,7 +117,7 @@ export const ROUTES = Object.freeze([
     "stripe-signature",
     "Raw signed event body; Stripe-Signature header",
     "JSON {ok: true, repeat?: true}; event-specific effects stay in existing handlers",
-    "payments-or-orders",
+    "payments-or-orders-or-historical-topups",
   ),
   route(
     "POST",
