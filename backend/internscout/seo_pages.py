@@ -34,6 +34,7 @@ from urllib.parse import quote, urlparse
 
 from . import near_metros
 from .console_log import console
+from .site import discovery, llms
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
     MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
@@ -4033,9 +4034,6 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
     )
 
 
-# ---- /llms.txt and /llms-full.txt
-
-
 def llms_files(
     f: dict,
     made: dict[str, tuple[str, int]],
@@ -4045,307 +4043,32 @@ def llms_files(
     new: int,
     updated: str,
 ) -> dict[str, str]:
-    """The two llmstxt.org files: llms.txt, an H1, a one-paragraph summary and lists of links to the
-    pages that matter; llms-full.txt, the longer description an assistant can quote from. made is
-    every page this build wrote (path -> (heading, open roles)), so neither links a page that isn't
-    there. Dated from the data, like everything else a build writes."""
-
-    def link(path: str, label: str | None = None, note: str = "") -> str:
-        return f"- [{label or made[path][0]}]({SITE}{path})" + (f": {note}" if note else "")
-
-    field_pages = [
-        (t, n)
-        for t, n in sorted(f["fields"].items(), key=lambda kv: (-kv[1], kv[0]))
-        if f"/internships/{field_slug(t)}/" in made
-    ]
-    state_pages = sorted(
-        (
-            (p, h, n)
-            for p, (h, n) in made.items()
-            if p.count("/") == 3
-            and p.startswith("/internships/")
-            and h.startswith("Internships in ")
-        ),
-        key=lambda e: (-e[2], e[0]),
+    """Render LLMS text with the current SEO build configuration."""
+    return llms.llms_files(
+        f,
+        made,
+        rep,
+        majors,
+        employers,
+        new,
+        updated,
+        site=SITE,
+        slogan=SLOGAN,
+        compare_as_of=COMPARE_AS_OF,
+        free_words=FREE_WORDS,
+        plan_prices=PLAN_PRICES,
+        numbers_path=NUMBERS_PATH,
+        boards_line=boards_line,
+        coverage_line=coverage_line,
+        field_slug=field_slug,
+        field_title=field_title,
+        join_words=join_words,
+        lower_name=lower_name,
+        money=money,
+        pct=pct,
+        top=top,
+        word_list=word_list,
     )
-    browse = [
-        p
-        for p in (
-            "/internships/new/",
-            "/internships/paid/",
-            "/internships/co-op/",
-            "/internships/research/",
-            "/internships/for-freshmen/",
-            "/internships/for-sophomores/",
-        )
-        if p in made
-    ]
-    plans = ", ".join(f"{name} {price}/month" for name, price in PLAN_PRICES)
-    summary_ = (
-        f"InternScout ({SITE}) is a free internship search for college students of every major in the "
-        f"US and Canada. As of {updated} it lists {coverage_line(f)}, collected several times a day from "
-        f"employers' own job boards. Search is free and needs no account. {SLOGAN}"
-    )
-    facts = [
-        "Key facts:",
-        "",
-        "- Free: searching, ranking and browsing every listing; no account needed.",
-        "- Optional Chrome extension, InternScout Auto-Apply: fills in applications with AI and never submits "
-        f"them (the student reviews and submits). Free for {FREE_WORDS}. "
-        f"Optional paid plans: {plans}.",
-        # was: "... Free with a monthly allowance; a school .edu email doubles it. ..." (2026-10-04)
-        f"- Coverage: {f['open']:,} open roles from {f['employers']:,} employers, in {len(f['fields'])} fields, "
-        f"{len(f['states'])} of the 50 US states and {len(f['provinces'])} Canadian provinces and territories. "
-        f"{boards_line(f)[0].upper()}{boards_line(f)[1:]}.",
-        # was: "Every listing links to ..." (a few link to a job site instead: own_posting). 2026-10-13
-        "- Updated several times a day. Almost every listing links to the employer's own posting.",
-        "- Not affiliated with UMass Amherst, or with any employer it lists.",
-    ]
-    main_pages = [
-        link(
-            "/",
-            "Dashboard",
-            "search every open listing and rank it for your major, class year and states",
-        ),
-        link(
-            "/about/",
-            "About InternScout",
-            "what it is, what is free, where listings come from, in direct answers",
-        ),
-        link(
-            "/pricing/",
-            "Plans and prices",
-            f"free search; the Auto-Apply extension's free allowance and the {plans} plans",
-        ),
-        link(
-            "/compare/",
-            "InternScout vs Simplify vs Jobright",
-            "prices and features compared, with dated sources",
-        ),
-    ]
-    if "/internships/highest-paying/" in made:
-        main_pages.append(
-            link(
-                "/internships/highest-paying/",
-                "Highest-paying internships",
-                "top listed hourly pay by role, field and employer, rebuilt every update",
-            )
-        )
-    if NUMBERS_PATH in made:
-        main_pages.append(
-            link(
-                NUMBERS_PATH,
-                "InternScout by the numbers",
-                "open roles, employers, fields, states, pay and job-board shares, each a dated sentence",
-            )
-        )
-    main_pages.append(
-        link(
-            "/install.html",
-            "Auto-Apply extension install guide",
-            "the free Chrome extension that fills applications and never submits",
-        )
-    )
-    lines = [
-        "# InternScout",
-        "",
-        f"> {summary_}",
-        "",
-        *facts,
-        "",
-        "## Main pages",
-        "",
-        *main_pages,
-        "",
-        "## Browse internships",
-        "",
-        link(
-            "/internships/",
-            "All internships by field, state, employer and major",
-            f"{f['open']:,} open roles",
-        ),
-        link(
-            "/internships/at/",
-            "Internships by employer",
-            f"{employers:,} employers with their own page",
-        ),
-        link("/internships/for/", "Internships by major", f"{majors} majors"),
-        *[link(p, note=f"{made[p][1]:,} open") for p in browse],
-        *[
-            link(
-                f"/internships/{field_slug(t)}/",
-                note=f"{made[f'/internships/{field_slug(t)}/'][1]:,} open",
-            )
-            for t, _ in field_pages[:12]
-        ],
-        *[link(p, note=f"{n:,} open") for p, _, n in state_pages[:8]],
-        "",
-        "## Feeds",
-        "",
-        *(
-            [link("/internships/new/feed.xml", "New internships this week (RSS)")]
-            if "/internships/new/" in made
-            else []
-        ),
-        "- Every field, state, major and employer page has an RSS feed of its newest roles at its own "
-        "address plus feed.xml"
-        + (
-            f", for example {SITE}/internships/{field_slug(field_pages[0][0])}/feed.xml"
-            if field_pages
-            else ""
-        ),
-        "",
-        "## Policies",
-        "",
-        link("/privacy", "Privacy policy"),
-        link("/terms", "Terms of use"),
-        "",
-        "## Optional",
-        "",
-        link(
-            "/llms-full.txt",
-            "Full description",
-            "coverage, top fields and employers, pay, how it works, limits",
-        ),
-        "",
-    ]
-    short = "\n".join(lines)
-
-    top_emp = sorted(
-        (
-            (p, h, n)
-            for p, (h, n) in made.items()
-            if p.startswith("/internships/at/") and p != "/internships/at/"
-        ),
-        key=lambda e: (-e[2], e[0]),
-    )
-    full = [
-        "# InternScout",
-        "",
-        f"> {summary_}",
-        "",
-        f"Data as of {updated}. Every number below is counted from the listings open on that day.",
-        "",
-        "## What InternScout is",
-        "",
-        "InternScout is a website (internscout.org) for finding internships, co-ops, research positions and "
-        "fellowships. It collects open roles from employers' public job boards, sorts them by field, location, "
-        "start term and class year, and ranks them for the major, class year and states a student picks. "
-        "Each listing links to the application on the employer's own site; InternScout takes no applications "
-        "and charges employers nothing.",
-        "",
-        "## Who it is for",
-        "",
-        f"College students of every major, in the US and Canada. Open roles are sorted into {len(f['fields'])} "
-        f"fields (all of them are listed below); the largest are "
-        f"{word_list([lower_name(field_title(t)) for t in top(f['fields'], 5)])}. There are browse pages for "
-        f"{majors} majors.",
-        "",
-        "## How it works",
-        "",
-        f"- Listings come from employers' public job boards: {boards_line(f)}. Each site's robots.txt is respected.",
-        "- Several times a day the listings are refreshed: new roles are added and closed ones removed.",
-        "- The dashboard (https://internscout.org/) filters by field, state, start term, class year, paid "
-        "roles and new roles, and ranks the rest for the student's profile. No account is needed.",
-        "- Every field, state, employer and major with enough open roles has a plain page under "
-        "https://internscout.org/internships/ with its newest open roles and an RSS feed.",
-        "",
-        # was: "- Every field, state, employer and major has a plain page ...": only employers with
-        # MIN_OPEN open roles do (702 of 1,725 on 2026-10-02), so the claim was not true (review).
-        "## What is free and what is paid",
-        "",
-        "- Free: search, ranking, the browse pages, the RSS feeds. No account.",
-        "- Free with a monthly allowance: the InternScout Auto-Apply Chrome extension, which fills in "
-        "applications with AI and never submits them; the student reviews every answer and presses Submit. "
-        f"The allowance is {FREE_WORDS}.",
-        # was: "A school .edu email doubles the allowance." (2026-10-04)
-        f"- Optional paid plans raise the allowance: {plans}.",
-        "",
-        "## Coverage",
-        "",
-        f"- Open roles: {f['open']:,}",
-        f"- Employers: {f['employers']:,} ({employers:,} with their own page)",
-        f"- Fields: {len(f['fields'])}",
-        f"- Places: {len(f['states'])} of the 50 US states, and {len(f['provinces'])} Canadian provinces and "
-        f"territories ({f['canada']:,} roles in Canada)",
-        f"- Found in the last week: {new:,}",
-        f"- List pay or say they are paid: {f['paid']:,} ({pct(f['paid'], f['open'])}); a clear hourly rate: "
-        f"{f['hourly']:,} ({pct(f['hourly'], f['open'])})",
-        "",
-        # Every field, largest first, so "does it have nursing internships?" has an answer here; a
-        # field with a page of its own is a link.
-        "## Fields, by open roles",
-        "",
-        *[
-            link(f"/internships/{field_slug(t)}/", field_title(t), f"{n:,} open")
-            if f"/internships/{field_slug(t)}/" in made
-            else f"- {field_title(t)}: {n:,} open"
-            for t, n in sorted(f["fields"].items(), key=lambda kv: (-kv[1], kv[0]))
-        ],
-        "",
-        "## Employers with the most open roles",
-        "",
-        *[link(p, h.replace("Internships at ", ""), f"{n:,} open") for p, h, n in top_emp[:15]],
-        "",
-    ]
-    if rep:
-        x0, _, hi0 = rep["top"][0]
-        full += [
-            "## Pay",
-            "",
-            f"Among the {len(rep['roles']):,} open roles that list a clear hourly rate, the median is "
-            f"{money(round(rep['median'], 2))} an hour; the highest is {money(hi0)} an hour "
-            f"({x0.get('company_name') or ''}, {x0.get('title') or ''}). Yearly salaries and stipends are "
-            "left out, never converted, and so are roles only in Canada (paid in Canadian dollars); the "
-            "same role posted twice counts once. "
-            # was: "... left out, never converted. ": without the rest, this count (pay_report's)
-            # and the Coverage section's "a clear hourly rate" count read as two answers to one
-            # question (1,732 and 1,775 on 2026-10-02; review).
-            + (
-                f"Highest median by field: {join_words([f'{field_title(t)} ({money(round(m, 2))})' for t, _, m, _ in rep['by_field'][:3]])}. "
-                if rep["by_field"]
-                else ""
-            )
-            + f"Details: {SITE}/internships/highest-paying/",
-            "",
-        ]
-    full += [
-        "## How to use it",
-        "",
-        "1. Open https://internscout.org/ and pick your major, class year and the states you want (or remote).",
-        "2. Filter by start term, paid roles or new this week, and open the postings that fit.",
-        "3. Apply on the employer's own site. The optional Auto-Apply extension can fill in the form; you "
-        "review it and submit.",
-        "4. To follow a field or a state, subscribe to its page's RSS feed in a feed reader, Discord or Slack.",
-        "",
-        "## Compared with Simplify and Jobright",
-        "",
-        f"As of {COMPARE_AS_OF}: Simplify+ is $39.99/month ($19.99/week, $89.99 for 3 months); its autofill "
-        "extension (Copilot), tracker and resume builder are free, AI resume tailoring and cover letters are "
-        "Simplify+, and the user submits (source: help.simplify.jobs/articles/5623502-whats-included-in-simplify-"
-        "features-and-pricing). Jobright publishes no student pricing; Jobscan reported Turbo at $39.99/month "
-        "($17.99/week), its free tier uses daily credits, and its AI Agent can submit applications, supervised "
-        "or fully automatically (source: jobscan.co/blog/jobscan-vs-jobright, July 2026). Both cover every job "
-        "level. InternScout: free search, a free extension allowance, $4 and $8 plans, never submits, every "
-        f"major. Details: {SITE}/compare/",
-        "",
-        "## Limits",
-        "",
-        "- Only roles posted on public job boards InternScout scans are listed; a site whose robots.txt says "
-        "no is not scanned, so some employers are missing.",
-        "- Most postings do not give pay, a start term or the class years they take; pages say so rather than guess.",
-        "- Listings can close between updates. Always check the posting on the employer's site before applying.",
-        "- InternScout does not apply for anyone, and its extension never submits an application.",
-        "",
-        "## Disclaimer",
-        "",
-        "InternScout is a free internship search built by a UMass Amherst student. Not affiliated with UMass "
-        "Amherst, or with any employer it lists. Not affiliated with Simplify or Jobright.",
-        "",
-        SLOGAN,
-        "",
-    ]
-    return {"llms.txt": short, "llms-full.txt": "\n".join(full)}
 
 
 # ---------------------------------------------------------------- <field> internships near <city> (2026-10-18)
@@ -6028,65 +5751,9 @@ def write(site_dir: str, pages: list[dict]) -> None:
     now = GENERATED or datetime.now(timezone.utc)  # was: now = datetime.now(timezone.utc)
     with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(not_found(f"{now:%B} {now.day}, {now.year}"))
-    # The dashboard gets its own content date below (2026-10-23); was: the browse hub's date. Other
-    # static pages still carry no lastmod rather than a made-up one. Revert: remove the '/' override.
-    hub = next((p["lastmod"] for p in pages if p["path"] == "/internships/"), None)
-    # /employers/ (2026-10-13) is hand-written in docs/employers/index.html, like install.html.
-    # was: urls = [("/", hub), ("/install.html", None), ("/privacy", None), ("/terms", None)] + \
-    urls = [
-        ("/", hub),
-        ("/install.html", None),
-        ("/employers/", None),
-        ("/privacy", None),
-        ("/terms", None),
-    ] + [(p["path"], p.get("lastmod")) for p in pages if p.get("index", True)]
-    # A noindex page (index False: /digest/ before its form has an address) stays out of the sitemap.
-    # was: [(p["path"], p.get("lastmod")) for p in pages]
-    with open(os.path.join(site_dir, "sitemap.xml"), "w", encoding="utf-8", newline="\n") as f:
-        f.write(
-            '<?xml version="1.0" encoding="UTF-8"?>\n'
-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        )
-        for u, mod in urls:
-            if u == "/":
-                mod = home_lastmod
-            f.write(
-                f"  <url><loc>{esc(SITE + u)}</loc>"
-                + (f"<lastmod>{mod}</lastmod>" if mod else "")
-                + "</url>\n"
-            )
-        f.write("</urlset>\n")
-    with open(os.path.join(site_dir, "robots.txt"), "w", encoding="utf-8", newline="\n") as f:
-        # No "Disallow: /data/": the dashboard at / (canonical, and in the sitemap) fetches its listings
-        # from ./data/ in the browser, and a crawler barred from them renders it as an empty shell. The
-        # files there are JSON, which search engines do not list as pages anyway.
-        # The comment (2026-10-02) only says out loud what "User-agent: *" already allows: AI search and
-        # answer crawlers read the site like any other. A group of their own would change nothing, and
-        # a crawler that matches a named group ignores the "*" one, so a later edit to one could
-        # silently stop applying to them.
-        # Google and Bing skip the per-page RSS feeds (2026-10-07). Search Console: 687 pages "discovered -
-        # currently not indexed", and most of the 21 "crawled - currently not indexed" were feed.xml files,
-        # one per page and each linked from its page's head, so the two engines spent their visits on
-        # ~1,360 feeds instead of the pages. Feed readers and every other crawler keep the "*" group. The
-        # named group replaces "*" for those two (the warning above), so it says Allow: / again.
-        # was: f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n" after the comment.
-        f.write(
-            "# Every crawler is welcome, AI search and answer engines included: GPTBot, OAI-SearchBot,\n"
-            "# ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Google-Extended, Bingbot and\n"
-            f"# Applebot-Extended. A summary for language models: {SITE}/llms.txt\n"
-            "User-agent: *\nAllow: /\n\n"
-            "# Google and Bing: every page, but not the per-page RSS feeds, which are for feed readers.\n"
-            "User-agent: Googlebot\nUser-agent: Bingbot\nAllow: /\nDisallow: /*feed.xml$\n\n"
-            f"Sitemap: {SITE}/sitemap.xml\n"
-        )
-        # was: f.write(f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")
-        # was: f.write("User-agent: *\nAllow: /\n# Raw listing data; the pages under /internships/ are the readable form.\n"
-        #              f"Disallow: /data/\n\nSitemap: {SITE}/sitemap.xml\n")
-    # llms.txt and llms-full.txt (2026-10-02): not in the sitemap, which lists pages; answer engines
-    # look for them at the root by name, and robots.txt and /about/ point to them.
-    for name, text in TEXTS.items():
-        with open(os.path.join(site_dir, name), "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
+    discovery.write_sitemap(site_dir, pages, home_lastmod, SITE, esc)
+    discovery.write_robots(site_dir, SITE)
+    llms.write(site_dir, TEXTS)
     page_dates.write(site_dir, content_dates)  # 2026-10-23: persist hashes, not page membership.
     # The thin pages this deploy serves (INDEX_COMBO), for the next deploy's held_paths (2026-10-13).
     with open(os.path.join(site_dir, HELD_FILE), "w", encoding="utf-8", newline="\n") as f:
@@ -6112,17 +5779,8 @@ def write(site_dir: str, pages: list[dict]) -> None:
 
 
 def live_paths(sitemap: str) -> dict[str, str]:
-    """path -> lastmod ("" if none) for every page in the sitemap the site was serving before this
-    build; empty if there was none."""
-    try:
-        with open(sitemap, encoding="utf-8") as f:
-            text = f.read()
-    except OSError:
-        return {}
-    return {
-        SITE_PATH.sub("", loc): mod
-        for loc, mod in re.findall(r"<loc>([^<]+)</loc>(?:<lastmod>([^<]*)</lastmod>)?", text)
-    }
+    """Read the prior sitemap using the current site-path matcher."""
+    return discovery.live_paths(sitemap, SITE_PATH)
 
 
 SITE_PATH = re.compile("^" + re.escape(SITE))
