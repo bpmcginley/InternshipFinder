@@ -13,9 +13,10 @@ Run: python scripts/make_og_image.py
 Writes: docs/og-preview.png
 """
 
-from io import BytesIO
 from pathlib import Path
+from struct import pack
 import sys
+import zlib
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -75,23 +76,13 @@ def build() -> Path:
     return OUT
 
 
-def _landing_font(size: int) -> ImageFont.FreeTypeFont:
-    font = ImageFont.load_default(size)
-    if not isinstance(font, ImageFont.FreeTypeFont):
-        raise RuntimeError("Landing previews require Pillow's FreeType font")
-    # Pillow selects RAQM when present. Keep the same layout engine across build platforms.
-    if font.layout_engine != ImageFont.Layout.BASIC:
-        font = font.font_variant(layout_engine=ImageFont.Layout.BASIC)
-    return font
-
-
 def _fit_landing_title(draw: ImageDraw.ImageDraw, heading: str):
     words = heading.split()
     if not words:
         raise ValueError("Landing card title is empty")
     width = W - 168
     for size in range(90, 43, -2):
-        font = _landing_font(size)
+        font = ImageFont.load_default(size)
         lines = [words[0]]
         for word in words[1:]:
             line = f"{lines[-1]} {word}"
@@ -106,6 +97,27 @@ def _fit_landing_title(draw: ImageDraw.ImageDraw, heading: str):
     raise ValueError("Landing card title does not fit")
 
 
+def _png_chunk(kind: bytes, data: bytes) -> bytes:
+    return pack(">I", len(data)) + kind + data + pack(">I", zlib.crc32(kind + data))
+
+
+def _encode_landing_png(card: Image.Image) -> bytes:
+    # The optimized Pillow encoder chooses architecture-dependent compressed bytes.
+    # Use one PNG row filter and the standard library's fixed-Huffman deflate.
+    pixels = card.tobytes()
+    stride = card.width * 3
+    rows = b"".join(b"\x00" + pixels[i : i + stride] for i in range(0, len(pixels), stride))
+    compressor = zlib.compressobj(level=9, strategy=zlib.Z_FIXED)
+    image = compressor.compress(rows) + compressor.flush()
+    header = pack(">IIBBBBB", card.width, card.height, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", header)
+        + _png_chunk(b"IDAT", image)
+        + _png_chunk(b"IEND", b"")
+    )
+
+
 def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> bytes:
     """Render a 1200 by 630 PNG for one generated landing page."""
     card = Image.new("RGB", (W, H), ACCENT)
@@ -116,10 +128,10 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
         icon = source.convert("RGBA").resize((64, 64), Image.Resampling.LANCZOS)
     card.paste(icon, (92, 67), icon)
 
-    draw.text((186, 74), "InternScout", font=_landing_font(48), fill=PAPER)
+    draw.text((186, 74), "InternScout", font=ImageFont.load_default(48), fill=PAPER)
     title, font = _fit_landing_title(draw, heading)
     if term is not None:
-        term_font = _landing_font(41)
+        term_font = ImageFont.load_default(41)
         if (
             not term.strip()
             or term != term.strip()
@@ -129,11 +141,9 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
             raise ValueError("Landing card term does not fit")
         draw.text((84, 177), term, font=term_font, fill=SOFT)
     draw.multiline_text((84, 235 if term else 210), title, font=font, spacing=8, fill=PAPER)
-    draw.text((84, 533), "internscout.org", font=_landing_font(37), fill=ACCENT)
+    draw.text((84, 533), "internscout.org", font=ImageFont.load_default(37), fill=ACCENT)
 
-    output = BytesIO()
-    card.save(output, "PNG", optimize=True)
-    return output.getvalue()
+    return _encode_landing_png(card)
 
 
 if __name__ == "__main__":
