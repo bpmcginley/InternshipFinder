@@ -10,7 +10,7 @@ const onboarding = "extension/onboarding/onboarding.js";
 const baseline = execFileSync("git", ["show", `ac9e9b27:${onboarding}`], { cwd: root });
 const practice = `${origin}/extension/practice/practice.html`;
 
-async function run(browser, phase, width, theme, flow) {
+async function run(browser, phase, width, theme, flow, blocked = false) {
   const context = await browser.newContext({
     viewport: { width, height: 950 },
     colorScheme: theme,
@@ -103,36 +103,39 @@ async function run(browser, phase, width, theme, flow) {
     const finish = page.getByRole("button", {
       name: flow === "review" ? "Finish, turn on Auto-Apply" : "Turn on Auto-Apply now",
     });
-    if (flow === "restore")
+    if (blocked)
       await page.evaluate(() => {
         evidence.data["internscout.restored"] = { at: "2026-11-10T12:00:00Z", shown: true };
       });
+    const originalButton = await finish.elementHandle();
     await finish.press("Enter");
-    await page.getByText("Saved. Auto-Apply is on.", { exact: true }).waitFor();
-    assert.equal(
-      await page.evaluate(() => evidence.data.store.settings.onboarded),
-      flow !== "restore",
-    );
+    const success = page.getByText("Saved. Auto-Apply is on.", { exact: true });
+    if (blocked) {
+      await page.waitForFunction((button) => !button.isConnected, originalButton);
+      assert.equal(await success.count(), 0);
+    } else await success.waitFor();
+    assert.equal(await page.evaluate(() => evidence.data.store.settings.onboarded), !blocked);
     assert.equal(context.pages().length, 1);
-    if (phase === "after" && flow !== "restore") {
+    if (phase === "after" && !blocked) {
       await link.waitFor();
       assert.equal(await link.count(), 1);
       assert.equal(await link.getAttribute("href"), "../practice/practice.html");
       assert.equal(await link.evaluate((el) => el === document.activeElement), true);
     } else assert.equal(await link.count(), 0);
-    if (flow !== "restore") {
+    if (!blocked) {
       await page.evaluate(async () => {
         await document.fonts.ready;
         window.scrollTo({ top: 0, behavior: "instant" });
         await new Promise(requestAnimationFrame);
       });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
-      await page.screenshot({
-        path: path.join(__dirname, `${phase}-${width}-${theme}-${flow}.png`),
-        fullPage: true,
-      });
+      if (!process.env.VERIFY_ONLY)
+        await page.screenshot({
+          path: path.join(__dirname, `${phase}-${width}-${theme}-${flow}.png`),
+          fullPage: true,
+        });
     }
-    if (phase === "after" && flow !== "restore") {
+    if (phase === "after" && !blocked) {
       const [opened] = await Promise.all([context.waitForEvent("page"), link.press("Enter")]);
       await opened.getByRole("heading", { name: "Practice Auto-Apply" }).waitFor();
       assert.equal(opened.url(), practice);
@@ -146,7 +149,7 @@ async function run(browser, phase, width, theme, flow) {
     }
     assert.deepEqual(await page.evaluate(() => evidence.unexpected), []);
     assert.deepEqual(unexpected, []);
-    console.log(JSON.stringify({ phase, width, theme, flow, requests: 0 }));
+    console.log(JSON.stringify({ phase, width, theme, flow, blocked, requests: 0 }));
   } finally {
     await context.close();
   }
@@ -164,7 +167,7 @@ async function run(browser, phase, width, theme, flow) {
       for (const width of [1280, 375])
         for (const theme of ["light", "dark"])
           for (const flow of ["resume", "review"]) await run(browser, phase, width, theme, flow);
-    await run(browser, "after", 375, "light", "restore");
+    for (const flow of ["resume", "review"]) await run(browser, "after", 375, "light", flow, true);
   } finally {
     await browser.close();
   }

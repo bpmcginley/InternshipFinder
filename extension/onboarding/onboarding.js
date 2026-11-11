@@ -599,7 +599,8 @@ function drawQuick(msg = "", offerPractice = false) {
   if ($("#quickgo")) $("#quickgo").addEventListener("click", async () => {
     $("#quickgo").disabled = true;
     const finished = await finishAndRender();
-    drawQuick("Saved. Auto-Apply is on.", finished);
+    if (!finished) return;
+    drawQuick("Saved. Auto-Apply is on.", true);
     $("#practice-link")?.focus();
   });
   if (S.settings.onboarded) drawHeld();
@@ -937,10 +938,11 @@ function review() {
   }));
   $("#finishall").addEventListener("click", async () => {
     const finished = await finishAndRender();
+    if (!finished) return;
     // The weekly email's link under it (2026-10-06), as on the Files step's finish (drawQuick).
     const status = $("#rstat");
     if (!status) return;
-    status.innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}${finished ? practiceLink : ""}`;
+    status.innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}${practiceLink}`;
     $("#practice-link")?.focus();
     drawHeld();
   });
