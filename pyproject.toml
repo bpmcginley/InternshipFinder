@@ -9,7 +9,7 @@ requires-python = ">=3.10"
 dynamic = ["dependencies"]
 
 [tool.setuptools]
-packages = ["internscout", "internscout.sources", "internscout.site", "growth"]
+packages = ["internscout", "internscout.sources", "internscout.site", "internscout.site.render", "growth"]
 include-package-data = false
 
 [tool.setuptools.package-dir]

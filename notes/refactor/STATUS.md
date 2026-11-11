@@ -17,7 +17,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
 - All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. PR #230 removed the four manual source tags after Product released the files and merged as `789e72f0`.
 - The authorized Wave 4 logging, vocabulary inventory, public configuration and orders split are merged. The last logging merge passed Pages and its exact deployment check. Existing provider and credential output covered by Q6 and Q7 remains separate. The Wave 4 checkpoint #248 published through Pages 42940952578 and its exact deployment succeeded.
-- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split #271 is merged and published. The employer-page split #276 is merged and published. The field, place, combination and major page split #277 is merged and published. The pay-family split #282 is merged and published. The Numbers split #285 is merged and published. The Digest and New split #288 is merged and published. The remaining listing split #290 is merged and published. Build orchestration is in review. The dashboard test-only follow-up #263 is also published.
+- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split #271 is merged and published. The employer-page split #276 is merged and published. The field, place, combination and major page split #277 is merged and published. The pay-family split #282 is merged and published. The Numbers split #285 is merged and published. The Digest and New split #288 is merged and published. The remaining listing split #290 is merged and published. Build orchestration #296 is merged and published. Phase 3 consumer and renderer migration is in review. The dashboard test-only follow-up #263 is also published.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Product published the counter disclosure in #225. Counter #175 and the Worker refactors still await operator deployment. Migration adoption, production sending and extension release remain operator actions. Product released the dashboard and SEO source after #217 and #208, respectively. Check open file claims again before each wave.
 
@@ -96,8 +96,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.3 Numbers family | wp21_inventory | `refactor/wp-3.3-numbers` | [#285](https://github.com/bpmcginley/InternshipFinder/pull/285) | Merged | `7e49f4fc`. Pages 42952879978 and 42952886757 and the exact deployment succeeded. |
 | 5 | WP-3.3 Digest family | wp21_inventory | `refactor/wp-3.3-digest` | [#288](https://github.com/bpmcginley/InternshipFinder/pull/288) | Merged | `a7b4e464`. Pages 42953886770 and 42953893223 and the exact deployment succeeded. |
 | 5 | WP-3.3 Listing family | wp21_inventory | `refactor/wp-3.3-listing` | [#290](https://github.com/bpmcginley/InternshipFinder/pull/290) | Merged | `2d6f843d`. Pages 42954835802 and 42954843329 and the exact deployment succeeded. |
-| 5 | WP-3.4 Build orchestration | wp21_inventory | `refactor/wp-3.4-site-build` | - | In review | Explicit selection and page assembly phases with ordered compatibility writes. |
-| 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
+| 5 | WP-3.4 Build orchestration | wp21_inventory | `refactor/wp-3.4-site-build` | [#296](https://github.com/bpmcginley/InternshipFinder/pull/296) | Merged | `d003e287`. Pages 42956228215 and 42956231842 and the exact deployment succeeded. |
+| 5 | WP-3.5 Import consumers | wp21_inventory | `refactor/wp-3.5-site-consumers` | - | In review | Independent site runtime, renderer owners and direct consumer imports. Legacy facade stays until WP-6.2. |
 | 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | Merged | `4ee6308b` records fixed offline responses for 42 exact routes and 44 additional cases. Pages 42942714678 and the exact deployment succeeded. |
 | 5 | WP-4.3 Non-financial route table | wp42_orders | `refactor/wp-4.3-safe-table` | [#259](https://github.com/bpmcginley/InternshipFinder/pull/259) | Merged | `1712e648`. Pages 42943948562 and the exact deployment succeeded. Contract-keyed dispatch covers 13 routes with the original gate and request order. |
 | 5 | WP-4.3 Financial and adjacent route wrappers | Unassigned | - | - | Question Q3 | The existing 29 switch routes preserve billing, paid-placement and AI allowance behavior. |
@@ -297,7 +297,7 @@ Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held 
 
 ## Next update
 
-Complete review and current-head CI on WP-3.4 orchestration. After it merges, reversible local work on Phase 3 dependency and consumer migration may proceed while the Pages runs complete. The next merge waits for green Pages and the exact deployment. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
+Complete review and current-head CI on WP-3.5. Wave 6 merges wait for green Pages and the exact deployment after Phase 3 closes. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
 
 ## Dashboard ranking test clock
 
@@ -483,6 +483,7 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 ## WP-3.3 listing test follow-up
 
+- [#300](https://github.com/bpmcginley/InternshipFinder/pull/300) merged as `cc2c0211`. Pages 42959357666 and the exact deployment succeeded.
 - Move five kind-page and summer-tracker tests into `test_seo_listing.py` after [#290](https://github.com/bpmcginley/InternshipFinder/pull/290) published. Keep all five bodies intact and import the shared listing, site and tracker fixtures from their existing module. Mixed-family cases and physical source checks stay in `test_seo_pages.py`.
 - Backend collection retained all 1,166 tests, with only the five moved node paths changing. All 188 focused tests and Ruff passed.
 
@@ -546,6 +547,14 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - `internscout.site.build` owns named selection and page assembly phases with explicit inputs and results. The 165-line compatibility function sequences those phases and the live facade renderer callbacks, preserving nine live bindings and the existing `LISTINGS` identity. The served, live and earning inputs remain distinct.
 - Hoisted five cycle-free imports with module attribute lookup. The remaining feed, role-index and placement imports retain their late CLI and dependency behavior for WP-3.5. Complete the placement of the remaining orchestration and family renderers in `internscout.site` during Phase 3 closure with WP-3.5, after the shared layout and listing-render dependencies and live configuration access are available.
 - Relevant tests passed 764 cases with two environment skips. Both Golden checks passed against 695 unchanged files. The installed wheel and isolated import checks passed, including no eager placement, feed or role-index import. Ruff passed. The explicit accepted `duplicates` live input type removes two existing Pyright diagnostics and adds none.
+
+## WP-3.5 site consumers and compatibility
+
+- Started from `d003e287` after checking 37 exact Product file lists. #266's apparent overlaps were inherited from its merge base. Both #296 Pages runs, 42956228215 and 42956231842, and the exact deployment succeeded. Normal integration preserved the 111 incoming data files in `5c44b68a` and the published #300 listing-test move.
+- Selection and catalog assembly have independent source owners, and the family and shared layout renderers are packaged under `internscout.site.render`. The ordered build runs in `site.build`. The default entry uses fresh explicit state and returns the same build's employer registry. Growth and backend consumers use the owning source, taxonomy, facts, artifacts and build interfaces.
+- The old facade retains public adapters, the invoking CLI and nine compatibility writes with existing `LISTINGS` identity. Direct builds do not import the facade. The standalone feed fallback still consults canonical `GENERATED` at call time. Placement services load only on placement paths, and pipeline, role index and feeds imports leave them unloaded.
+- CSS and SLOGAN source checks now point at their asset owner with the same assertions. Placement source checks remain on the original literals. No golden input, expected file or manifest changed.
+- Independent repeated-build, CLI and consumer probes matched page order, compatibility timing, all 695 artifacts and the placement report. The editable-install backend and growth suite passed 1,655 checks with three environment skips. Node 22.23.4 passed all 316 site checks, and the installed wheel included all 17 audited owner files. Ruff passed. Targeted Pyright retained ten diagnostics, with two reporting text changes at relocated seams.
 
 ## WP-1.4 remaining growth diagnostics
 

@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import os
+import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+
+
+DIGEST_MIN_NEW = (
+    3  # new roles a field needs in a week to get a section in the email (was: digest.MIN_NEW = 3)
+)
 
 SIGNUP_HEADING = "New internships in your inbox every Monday. Free."
 
@@ -113,3 +120,36 @@ def select_examples(
         ],
         generated,
     )
+
+
+_DIGEST_ACTION = re.compile(r"^\s*digest\s*:\s*\{[^{}\n]*?\bformAction\s*:\s*\"([^\"\n]*)\"", re.M)
+
+
+_BUTTONDOWN_FORM = re.compile(
+    r"^https://buttondown\.(?:com|email)/api/emails/embed-subscribe/([A-Za-z0-9_-]+)/?$"
+)
+
+
+DIGEST_PATH = "/digest/"
+
+
+def digest_form_action(site_dir: str) -> str:
+    """CONFIG.digest.formAction from <site_dir>/index.html, or "" while it is empty, missing, or not an
+    https address (the test js/app.js makes before it shows its own form)."""
+    try:
+        with open(os.path.join(site_dir, "index.html"), encoding="utf-8") as f:
+            m = _DIGEST_ACTION.search(f.read())
+    except OSError:
+        return ""
+    action = m.group(1).strip() if m else ""
+    return action if re.match(r"^https://\S+$", action) else ""
+
+
+def digest_archive(action: str) -> str:
+    """The newsletter's public web archive on Buttondown, worked out from the form's address
+    (https://buttondown.com/api/emails/embed-subscribe/USERNAME -> https://buttondown.com/USERNAME/archive/),
+    or "" when the address is not Buttondown's. js/core.js IS.digestArchive does the same for the
+    dashboard. Buttondown's docs (docs.buttondown.com/email-archives) put the archive at
+    buttondown.com/USERNAME; /archive/ is its list of past emails, newest first."""
+    m = _BUTTONDOWN_FORM.match(action or "")
+    return f"https://buttondown.com/{m.group(1)}/archive/" if m else ""

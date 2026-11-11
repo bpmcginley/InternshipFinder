@@ -1,6 +1,6 @@
 // The design tokens (A2 design spec section 1, 2026-10-14). There is no build step, so the same :root block is
 // copied into four places: the dashboard (docs/index.html, the source), the landing pages (CSS in
-// backend/internscout/seo_pages.py), /employers/ (docs/employers/index.html) and the extension
+// backend/internscout/site/assets.py), /employers/ (docs/employers/index.html) and the extension
 // (extension/lib/theme.css, and the colours in extension/agent/overlay.js). These tests fail when a copy
 // drifts, when a colour pair falls under WCAG AA, or when a size, face or focus rule slips back.
 import { test } from "node:test";
@@ -16,7 +16,7 @@ const SHEETS = {
   dashboard: noComments(styleOf(read("docs/index.html"))),
   landing: noComments(
     (() => {
-      const s = read("backend/internscout/seo_pages.py");
+      const s = read("backend/internscout/site/assets.py");
       const a = s.indexOf('CSS = """') + 9;
       return s.slice(a, s.indexOf('"""', a));
     })(),
@@ -230,7 +230,7 @@ test("the two faces are self-hosted, the same files for the site and the extensi
   }
   // Nothing fetched from Google any more, on the dashboard or the generated pages.
   assert.doesNotMatch(read("docs/index.html"), /fonts\.googleapis\.com|fonts\.gstatic\.com/);
-  assert.doesNotMatch(read("backend/internscout/seo_pages.py"), /fonts\.googleapis\.com/);
+  assert.doesNotMatch(read("backend/internscout/site/assets.py"), /fonts\.googleapis\.com/);
 });
 
 // Every font size in the four sheets and the extension pages is one of the eight steps, and nothing is
