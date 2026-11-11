@@ -1,5 +1,5 @@
 // Dormant transaction composition. No sender, producer, route, cron or progress finalization.
-import { followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
+import { followInstant, followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
 import { readFollowProgress } from "./follow-progress.js";
 import { payloadOf } from "./follow-outbox.js";
 
@@ -25,7 +25,14 @@ const noLiveJob =
   "NOT EXISTS (SELECT 1 FROM follow_digest_outbox busy WHERE busy.subscriber_id=u.id " +
   "AND busy.state IN ('queued','leased','attempting') AND busy.expires_at>?)";
 
-async function advanceEmptyWindow(db, subscriberId, advances, current, at, upperBound) {
+// SQLite evaluates UTC at the mutating statement. The day fence prevents a
+// delayed statement from inheriting yesterday's admission and daily key.
+const databaseNow = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
+const archiveTimeGuard = ` AND ${databaseNow}>=? AND ${databaseNow}<? AND substr(${databaseNow},1,10)=?`;
+const archiveTimeParameters = (admission, upperBound, at) =>
+  admission ? [upperBound, admission.enqueueUntil, at.slice(0, 10)] : [];
+
+async function advanceEmptyWindow(db, subscriberId, advances, current, at, upperBound, admission) {
   // Evaluate the full-set check once, before any of its captured watermarks are updated.
   const [result] = await db.batch([
     db
@@ -36,12 +43,21 @@ async function advanceEmptyWindow(db, subscriberId, advances, current, at, upper
           " AND " +
           noLiveJob +
           " AND NOT EXISTS (SELECT 1 FROM follow_digest_outbox busy " +
-          "WHERE busy.state='attempting' AND busy.subscriber_id=u.id)) " +
+          "WHERE busy.state='attempting' AND busy.subscriber_id=u.id)" +
+          (admission ? archiveTimeGuard : "") +
+          ") " +
           "UPDATE follow_scope_progress SET watermark=? WHERE subscriber_id=(SELECT id FROM ready) " +
           "AND watermark<? AND scope_key IN (SELECT json_extract(a.value,'$.scopeKey') " +
           "FROM captured c,json_each(c.advances) a)",
       )
-      .bind(advances, subscriberId, at, upperBound, upperBound),
+      .bind(
+        advances,
+        subscriberId,
+        at,
+        ...archiveTimeParameters(admission, upperBound, at),
+        upperBound,
+        upperBound,
+      ),
   ]);
   return { status: result.meta.changes ? "advanced" : "conflict" };
 }
@@ -53,10 +69,10 @@ export async function enqueueFollowSnapshot(
   db,
   subscriberId,
   input,
-  { catalog, limits, upperBound, maxProgressBytes, maxPendingBytes },
+  { catalog, limits, upperBound, maxProgressBytes, maxPendingBytes, archiveAdmission },
   now = new Date(),
 ) {
-  const nowMs = now instanceof Date ? +now : NaN;
+  let nowMs = now instanceof Date ? +now : NaN;
   if (
     !(input instanceof Uint8Array) ||
     !positive(limits?.maxBytes) ||
@@ -67,8 +83,32 @@ export async function enqueueFollowSnapshot(
   )
     return invalid("configuration");
   // Own the bytes across asynchronous reads/hash computation; callers cannot swap the snapshot.
-  const snapshot = new Uint8Array(input),
-    at = new Date(nowMs).toISOString();
+  const snapshot = new Uint8Array(input);
+  let at = new Date(nowMs).toISOString();
+  const admission = archiveAdmission && { ...archiveAdmission };
+  const deadline = followInstant(admission?.enqueueUntil);
+  const generated = followInstant(upperBound);
+  if (
+    admission &&
+    (deadline === null || generated === null || typeof admission.clock !== "function")
+  )
+    return invalid("archive_admission");
+  function refreshAdmission() {
+    if (!admission) return true;
+    const current = admission.clock();
+    if (
+      !(current instanceof Date) ||
+      !Number.isFinite(+current) ||
+      +current < nowMs ||
+      +current >= deadline ||
+      +current < generated
+    )
+      return false;
+    nowMs = +current;
+    at = current.toISOString();
+    return true;
+  }
+  if (!refreshAdmission()) return invalid("archive_admission");
   let scopes;
   try {
     scopes = await readFollowProgress(db, subscriberId, catalog, {
@@ -80,6 +120,7 @@ export async function enqueueFollowSnapshot(
     if (error.message === "Invalid follow progress") return invalid("progress");
     throw error;
   }
+  if (!refreshAdmission()) return invalid("archive_admission");
   if (upperBound > at) return invalid("future_snapshot");
   const matched = matchFollowSnapshot(
     snapshot,
@@ -104,8 +145,10 @@ export async function enqueueFollowSnapshot(
   );
   if (bytes(advances) > maxPendingBytes) return invalid("pending_bound");
   const current = currentScopes(scopes.length);
-  if (!matched.refs.length)
-    return advanceEmptyWindow(db, subscriberId, advances, current, at, upperBound);
+  if (!matched.refs.length) {
+    if (!refreshAdmission()) return invalid("archive_admission");
+    return advanceEmptyWindow(db, subscriberId, advances, current, at, upperBound, admission);
+  }
   // Reuse the existing outbox's canonical references and 32-KiB validation.
   let payload;
   try {
@@ -114,6 +157,7 @@ export async function enqueueFollowSnapshot(
     return invalid("pending_bound");
   }
   const digest = await followSnapshotDigest(snapshot);
+  if (!refreshAdmission()) return invalid("archive_admission");
   const id = crypto.randomUUID(),
     day = at.slice(0, 10);
   const result = await db.batch([
@@ -126,6 +170,7 @@ export async function enqueueFollowSnapshot(
           current +
           " AND " +
           noLiveJob +
+          (admission ? archiveTimeGuard : "") +
           " ON CONFLICT(subscriber_id,day) DO NOTHING",
       )
       .bind(
@@ -137,6 +182,7 @@ export async function enqueueFollowSnapshot(
         new Date(nowMs + 2 * 86400_000).toISOString(),
         subscriberId,
         at,
+        ...archiveTimeParameters(admission, upperBound, at),
       ),
     db
       .prepare(

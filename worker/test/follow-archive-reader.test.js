@@ -88,6 +88,7 @@ test("exact #327 Python bytes work for latest and independent older pin without 
     result = await s.reader.latest({ effectiveLower: lower });
   assert.equal(result.status, "ready");
   assert.equal(result.digest, latest.sha256);
+  assert.equal(result.enqueueUntil, latest.enqueue_until);
   const bytes = await s.reader.loadSnapshot(pin(older));
   assert.equal(await followSnapshotDigest(bytes), older.sha256);
   assert.equal(new TextDecoder().decode(bytes), fixture.files[`data/follows/${older.sha256}.json`]);
