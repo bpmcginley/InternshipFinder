@@ -17,7 +17,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
 - All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. PR #230 removed the four manual source tags after Product released the files and merged as `789e72f0`.
 - The authorized Wave 4 logging, vocabulary inventory, public configuration and orders split are merged. The last logging merge passed Pages and its exact deployment check. Existing provider and credential output covered by Q6 and Q7 remains separate. The Wave 4 checkpoint #248 published through Pages 42940952578 and its exact deployment succeeded.
-- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split #271 is merged and published. The employer-page split is in review. The dashboard test-only follow-up #263 is also published.
+- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split #271 is merged and published. The employer-page split #276 is merged and published. The field, place, combination and major page split is in review. The dashboard test-only follow-up #263 is also published.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Product published the counter disclosure in #225. Counter #175 and the Worker refactors still await operator deployment. Migration adoption, production sending and extension release remain operator actions. Product released the dashboard and SEO source after #217 and #208, respectively. Check open file claims again before each wave.
 
@@ -90,8 +90,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.1 Constants/helpers | wp21_inventory | `refactor/wp-3.1-site-helpers` | [#252](https://github.com/bpmcginley/InternshipFinder/pull/252) | Merged | `c00fb90f`. Pages 42942262592 and 42942269472 and both exact deployments succeeded. Pure helpers and immutable thresholds retain legacy re-exports. |
 | 5 | WP-3.2 Sitemap/feeds/llms | wp21_inventory | `refactor/wp-3.2-site-artifacts` | [#264](https://github.com/bpmcginley/InternshipFinder/pull/264) | Merged | `6fa14ba8`. Pages 42946316162 and the exact deployment succeeded. Sitemap, robots, RSS and LLMS retain legacy entry points and exact golden bytes. |
 | 5 | WP-3.3 Near family | wp21_inventory | `refactor/wp-3.3-near` | [#271](https://github.com/bpmcginley/InternshipFinder/pull/271) | Merged | `75c4e013`. Pages 42948316654 and the exact deployment succeeded. All 501 near pages and 695 golden files retained. |
-| 5 | WP-3.3 Employer family | wp21_inventory | `refactor/wp-3.3-employer` | [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) | In review | Select plain employer data before rendering. Preserve eligibility, recruiter CTA, related links and full page items. |
-| 5 | WP-3.3 Field family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
+| 5 | WP-3.3 Employer family | wp21_inventory | `refactor/wp-3.3-employer` | [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) | Merged | `c84cea3b`. Pages 42949557934 and 42949563654 and the exact deployment succeeded. Employer eligibility, recruiter CTA, related links and full page items were preserved. |
+| 5 | WP-3.3 Field family | wp21_inventory | `refactor/wp-3.3-field` | [#277](https://github.com/bpmcginley/InternshipFinder/pull/277) | In review | Structured cohorts and related links for field, place, combination and major pages. |
 | 5 | WP-3.3 Pay family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Numbers family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Digest family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
@@ -297,7 +297,7 @@ Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held 
 
 ## Next update
 
-Complete review and current-head CI on the employer-page split, then verify its Pages run and exact deployment before the field family. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
+Complete review and current-head CI on the field family. After it merges, reversible local work on pay may proceed while the Pages runs complete. The next merge waits for green Pages and the exact deployment. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
 
 ## Dashboard ranking test clock
 
@@ -495,6 +495,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Extracted plain employer data and related-link rankings from the late employer loop, with one-model rendering in the SEO facade while shared helpers are there. Early company registration, aliases, title/location dedup, cohort sidecar, paid placement post-pass and Altera redirect are unchanged. The exact recruiter CTA stays in `employer_offer`. The full selected item list continues to drive dates, feeds and placement.
 - Seven synthetic before/after builds matched page records and emitted files. Covered held creation, held versus live slack, earning bypass, threshold override, cohort details and the existing recruiter link. The module AST outside the late employer loop and its two helpers is exact.
 - Relevant SEO, discovery, dates, feeds, link, role and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks matched 695 unchanged expected files, and the wheel and isolated import check confirmed no SEO facade back-edge. Ruff passed and targeted Pyright retained the same 12 existing diagnostics.
+
+## WP-3.3 field page family
+
+- Started reversible local work from `c84cea3b` while the #276 Pages runs were in progress. Both 42949557934 and 42949563654 and the exact deployment succeeded before this PR was opened. Pages continues to gate merges. Exact Product claim checks found no overlap. #266's apparent overlap is inherited from its merge base.
+- The field, place, combination and major renderers consume plain selected records. The shared rendering dependencies stay in the facade. The early cohort graph, separate live/held/earning gates, field and place collision handling, combination widening and duplicate decisions, major ownership and aliases, add order, and other families stay in their existing code.
+- Independent baseline verification matched complete ordered records and 96 byte hashes across five eligibility scenarios. It covered remote and Canadian views, NYC, widening, collision and duplicate ties, major aliases, related links, feeds, sitemap and dates. AST outside the late page loops and new helper functions is exact.
+- The relevant SEO, feed, date, role, link, discovery and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Golden and its mutation test passed for the unchanged 695-file snapshot. The wheel includes the new leaf, isolated imports have no SEO back-edge, Ruff passed, and targeted Pyright retained the same 12 existing diagnostics.
 
 ## WP-1.4 remaining growth diagnostics
 
