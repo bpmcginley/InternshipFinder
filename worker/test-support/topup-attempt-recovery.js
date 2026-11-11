@@ -175,7 +175,7 @@ export async function recoveryExpiryAndUnknownCreation(db) {
   const f = await setup(db, "creating");
   assert.deepEqual(await f.run(), { status: "pending" });
   assert.equal(f.calls.length, 0);
-  await assert.rejects(deleteUser(db, f.a.user_hash, now), /topup_payment_pending/);
+  await assert.rejects(deleteUser(db, f.a.user_hash, now), { status: 409, code: "topup_payment_pending" });
   f.checkout.status = "expired";
   f.checkout.payment_status = "unpaid";
   f.checkout.payment_intent = null;
