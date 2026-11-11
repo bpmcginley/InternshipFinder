@@ -803,6 +803,11 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - Offline verification: 246 focused tests passed with one existing optional cryptography skip. The real synthetic Reel check ran. Both Golden tests passed with 695 artifact paths. Ruff and diff checks passed.
 - The Instagram and metrics direct CLIs use a temporary checkout import path. Their existing workflow checkouts already contain the shared standard-library logger. No workflow or packaging edit. The diagnostic-only scope is supported by syntax-tree comparisons of the four status modules and actual artifact and stdout comparisons for digest. After integrating main `f98760d2`, the authored sources and tests stayed byte-identical, and the socket-denied focused and golden run passed 233 with two local dependency skips. Ruff passed.
 
+## WP-6.2 screenshot reproduction scripts
+
+- The synthetic P-1.9 employer stress page still uses the pinned `f6e599ef` renderer before and uses the current canonical renderer after. The previous after-mode searched the facade for a function that had become an alias. Both fixture pages match their reference bytes and preserve the hostile-name escaping and employer entry link.
+- P-2.3n and P-4.1 import the shared listing fixture directly. Offline comparisons matched all 128 P-2.3n files and all 762 P-4.1 files, including 636 site files and the five pilot pages. All three scripts ran with sockets blocked. The import-blocked runs used the exact pending fixture-consumer heads from [#434](https://github.com/bpmcginley/InternshipFinder/pull/434) and [#445](https://github.com/bpmcginley/InternshipFinder/pull/445). Both Golden checks passed against all 836 artifacts.
+
 ## WP-1.4 page-build logging
 
 - On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
