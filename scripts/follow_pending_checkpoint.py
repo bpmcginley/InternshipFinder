@@ -209,7 +209,7 @@ def _candidate_source(checkout, candidate, predecessor, identity, bounds):
 
 
 def prepare_pending_follow_checkpoint(
-    checkout, *, candidate, staged, provenance, predecessor, prepared_at, bounds
+    checkout, *, candidate, staged, provenance, predecessor, prepared_at, bounds, _continuity=None
 ) -> bytes:
     """Encode the trusted writer's full lineage after candidate commit and before push."""
     _check_bounds(bounds)
@@ -241,6 +241,8 @@ def prepare_pending_follow_checkpoint(
     open_rows, _ = _check_lineage(provenance.lineage, rows, lower, generated)
     if open_rows != staged._rows:
         raise _reject("full lineage differs from staged open evidence")
+    if _continuity is not None:
+        _continuity(rows, provenance.lineage)
     header = {
         "version": 1,
         "predecessor": asdict(predecessor),
@@ -256,7 +258,7 @@ def prepare_pending_follow_checkpoint(
 
 
 def read_pending_follow_checkpoint(
-    checkout, raw, *, predecessor, now, bounds
+    checkout, raw, *, predecessor, now, bounds, _continuity=None
 ) -> PendingFollowCheckpoint:
     """Decode a live candidate against the caller's independently trusted predecessor."""
     _check_bounds(bounds)
@@ -289,6 +291,8 @@ def read_pending_follow_checkpoint(
     generated, rows = _source_rows(source, identity, bounds)
     _coverage(prepared, lower, generated)
     open_rows, _ = _check_lineage(lineage, rows, lower, generated)
+    if _continuity is not None:
+        _continuity(rows, lineage)
     return PendingFollowCheckpoint(
         sha256(raw).hexdigest(),
         predecessor,
