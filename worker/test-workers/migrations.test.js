@@ -66,7 +66,7 @@ it("the deduplicated migration creates the complete legacy schema, including con
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
   expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(50);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(26);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(27);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(9);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });

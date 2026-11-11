@@ -85,6 +85,54 @@ const interceptBatch = (db, before, after) => ({
   },
 });
 
+export async function activeLookupPlan(db, equal) {
+  const a = await confirm(db, "alpha");
+  // Retained terminal history must not become the active-job lookup's scan range.
+  await db.batch(
+    Array.from({ length: 100 }, (_, n) =>
+      db
+        .prepare(
+          "INSERT INTO follow_digest_outbox (id,subscriber_id,day,payload,created,expires_at,state) VALUES (?,?,?,NULL,?,?,'accepted')",
+        )
+        .bind(
+          crypto.randomUUID(),
+          a.subscriberId,
+          new Date(Date.UTC(2020, 0, n + 1)).toISOString().slice(0, 10),
+          start.toISOString(),
+          start.toISOString(),
+        ),
+    ),
+  );
+  equal((await enqueue(db, a.subscriberId)).status, "queued");
+  const lookup =
+    "SELECT 1 FROM follow_digest_outbox busy WHERE busy.subscriber_id=? " +
+    "AND busy.state IN ('queued','leased','attempting') AND busy.expires_at>?";
+  const plan = (
+    await db
+      .prepare("EXPLAIN QUERY PLAN " + lookup)
+      .bind(a.subscriberId, now.toISOString())
+      .all()
+  ).results;
+  equal(
+    plan.some(
+      (row) =>
+        row.detail.includes("follow_active_expiry") &&
+        row.detail.includes("subscriber_id=? AND expires_at>?"),
+    ),
+    true,
+  );
+  equal((await db.prepare(lookup).bind(a.subscriberId, now.toISOString()).all()).results.length, 1);
+  equal(
+    (
+      await db
+        .prepare(lookup)
+        .bind(a.subscriberId, new Date(+now + 2 * 86400_000).toISOString())
+        .all()
+    ).results,
+    [],
+  );
+}
+
 export async function immutableEnqueue(db, equal, rejects) {
   const a = await confirm(db, "alpha");
   await confirm(db, "beta");

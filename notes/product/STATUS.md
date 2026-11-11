@@ -118,7 +118,7 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 
 ## P-2.1j dormant transactional enqueue
 
-[Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281) composes exact #274 `478da886` with #255 `3d3a5cea` by ordinary merge. Complete confirmed-scope CAS, immutable snapshot digest/date and bounded pending advances are implemented without advancing durable watermarks. Prior active subscriber jobs block cross-day duplicates; cancellation/deletion erase pending metadata and preserve surviving-scope recovery. Migration 0010 and legacy schema are covered by local D1. Local evidence: 407 Node tests, 42 Workers/D1 tests, lint clean; independent review and fresh PR checks pending. [Contract and gates](P-2.1j-follow-enqueue.md). Zero-match/terminal progress finalization, producer, sender and activation remain deferred. Needs-bruce; no merge/deploy.
+[Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281) composes exact #274 `478da886` with #255 `3d3a5cea` by ordinary merge. Complete confirmed-scope CAS, immutable snapshot digest/date and bounded pending advances are implemented without advancing durable watermarks. Prior active subscriber jobs block cross-day duplicates; cancellation/deletion erase pending metadata and preserve surviving-scope recovery. Migration 0010 and legacy schema are covered by local D1. Local evidence: 408 Node tests, 43 Workers/D1 tests, lint clean; independent review and fresh PR checks pending. [Contract and gates](P-2.1j-follow-enqueue.md). Zero-match/terminal progress finalization, producer, sender and activation remain deferred. Needs-bruce; no merge/deploy.
 
 ## Waiting for Bruce
 
