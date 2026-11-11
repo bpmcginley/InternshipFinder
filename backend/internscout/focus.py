@@ -13,8 +13,11 @@ rather than spending money on a vague query.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections import Counter
+
+from .console_log import console
 
 # Google Jobs results are tagged from their titles alone (normalize.py: classify(title)), so a query
 # only helps its field if the titles it brings back classify into that field and read as a student
@@ -164,7 +167,7 @@ def interleave(fields: list[str]) -> list[str]:
 def choose(export_dir: str | None, fallback: list[str]) -> list[str]:
     """The focus queries for this run, from the last export in export_dir (docs/data), or fallback."""
     if not export_dir or not os.path.exists(os.path.join(export_dir, "listings", "index.json")):
-        print("[focus] no previous export; using the configured focus queries")
+        console("[focus] no previous export; using the configured focus queries")
         return fallback
     try:
         from .seo_pages import load
@@ -173,14 +176,16 @@ def choose(export_dir: str | None, fallback: list[str]) -> list[str]:
         d = load(os.path.dirname(os.path.abspath(export_dir)))
         picks = thinnest(d["listings"], d["majors"])
     except Exception as e:  # never let targeting break an ingest
-        print(
-            f"[focus] could not read the last export ({type(e).__name__}); using the configured focus queries"
+        console(
+            f"[focus] could not read the last export ({type(e).__name__}); using the configured focus queries",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
         )
         return fallback
     if not picks:
-        print("[focus] no field is thin; using the configured focus queries")
+        console("[focus] no field is thin; using the configured focus queries")
         return fallback
-    print(
+    console(
         "[focus] thinnest fields for UMass majors: "
         + ", ".join(f"{t} ({n} open nearby, {m} majors)" for t, n, m in picks)
     )
