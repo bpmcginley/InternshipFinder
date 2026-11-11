@@ -702,6 +702,12 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - The helper honors the current stdout or an explicit stream, separator, terminator and flush setting in default mode, regardless of the process's logging suppression or record factory. Set `INTERNSCOUT_LOG_FORMAT=json` to opt in to one JSON object per diagnostic with the level and message. Google Jobs uses it for all ten existing diagnostics. Its broad account and search handlers add exception class names as structured fields, with no exception bodies or tracebacks.
 - Leave machine-readable stdout payloads on their own paths when migrating growth logging: the directory monitor writes JSON, the growth report writes Markdown, the digest schedule writes a GitHub Actions output, and the metrics CLI emits JSON consumed by tests.
 - Source follow-up question for Bruce: may the existing raw provider exception messages in NYC Jobs, Lever, GitHub lists, Greenhouse and USAJOBS be replaced in default console output with safe status or class names? Raw exception text can include request details. These call sites await that decision because safe replacement would change their existing text. Other source diagnostics can be migrated independently.
+
+
+### WP-1.4 Q6 source diagnostic redaction
+
+- NYC Jobs, Lever, GitHub lists, Greenhouse and USAJOBS now use the shared console logger for the five formerly raw failure lines. Plain output reports a fixed source/category and the exception class. JSON adds the class as a structured field. Neither mode prints provider text, URLs, board names or tokens from these diagnostics. Catch types, return values, continuation, counts and source-reporting calls are unchanged.
+- Offline verification: 248 focused logging, fetcher, scan, validation and pipeline tests passed, including all ten source/mode mock cases. Both Golden tests passed with all 695 artifact paths preserved. Scoped Ruff and diff checks passed.
 - Focused validation passed 16 logging and Google Jobs tests plus all nine packaging tests with an editable install. Ruff and targeted Pyright had zero findings. Comparing the Google Jobs syntax trees after removing logging metadata confirms all ten message arguments and the original control flow match main.
 
 ## WP-1.5 asset-version build integration
