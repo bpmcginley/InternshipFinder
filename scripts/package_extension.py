@@ -15,6 +15,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+import profile_bridge
+
 ROOT = Path(__file__).resolve().parent.parent
 EXT = ROOT / "extension"
 DIST = ROOT / "dist"
@@ -49,6 +51,10 @@ def build(webstore: bool = False) -> Path:
     (jmjj...); the store may refuse a manifest that carries one and assigns its own ID. That ID is not
     the unpacked one: the store item was created as hpnbb... on 2026-09-22, so sign-in redirects and
     the Worker's CORS list carry both IDs (worker/wrangler.toml ALLOWED_ORIGINS)."""
+    bridge = profile_bridge.generated_copies(ROOT)
+    profile_bridge.check_copies(bridge)
+    background_entry = profile_bridge.BACKGROUND.relative_to("extension").as_posix()
+    background_payload = bridge[profile_bridge.BACKGROUND][1]
     manifest = json.loads((EXT / "manifest.json").read_text(encoding="utf-8"))
     version = manifest["version"]
     # The dashboard bridge also matches localhost so the dashboard can be developed against the
@@ -73,7 +79,7 @@ def build(webstore: bool = False) -> Path:
                     "utf-8"
                 )
             else:
-                payload = p.read_bytes()
+                payload = background_payload if rel == background_entry else p.read_bytes()
                 if p.suffix.lower() in TEXT_SUFFIXES:
                     # Git's Windows checkout may use CRLF; the release must not depend on that setting.
                     payload = payload.replace(b"\r\n", b"\n")

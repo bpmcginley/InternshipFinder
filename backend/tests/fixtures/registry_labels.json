@@ -1,0 +1,14 @@
+{
+  "greenhouse": {
+    "acluinternships": {
+      "name": "ACLU",
+      "sector": "nonprofit"
+    },
+    "robinhood": {
+      "name": "Robinhood"
+    },
+    "axontalentcommunity": {
+      "name": "Axon"
+    }
+  }
+}
