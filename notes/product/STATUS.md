@@ -325,6 +325,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | P-2.2ai top-up sales readiness | Draft branch `codex/product-p2.2ai-sales-readiness` on frozen #442. Require usable funded-run creation and purchased spending before offering new sales. | Draft needs-bruce |
 | 2026-11-11 | P-2.2ag signed top-up routing | [#442](https://github.com/bpmcginley/InternshipFinder/pull/442), dependent on #430, uses the released #439 billing hook and existing receipt. Independent exact review, CI and coordinated release required. Sales readiness, purchased visibility, recovery/deletion response, provider configuration and retention-history activation gates remain separate. No production operation. | Needs-bruce |
 | 2026-11-11 | Dormant outbound Worker compatibility | [#414](https://github.com/bpmcginley/InternshipFinder/pull/414) repairs the proven native redirect option in archive and top-up readers. Independent review, CI and coordinated integration required. All existing enablement/configuration gates remain. | Draft needs-bruce; no provider call or deployment |
 | 2026-11-11 | Optional employer publication adapter | Draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410), synthetic publication parity and paired screenshots verified; exact review/CI pending. | Owner source publication and coordinated activation remain pending; default off |
