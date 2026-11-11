@@ -126,7 +126,7 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 
 ## P-2.1l dormant empty-window progress
 
-[Draft #295](https://github.com/bpmcginley/InternshipFinder/pull/295) is based on exact #286 `c4e245dd`. A validated complete window with no matching roles advances the unchanged confirmed scopes atomically. The same full-set generation and watermark check used for enqueue protects the write. Live jobs and unresolved send attempts keep their existing progress. A retry after an ambiguous commit can read the already-advanced window. Owner integration and the producer, dispatch and deployment gates remain pending.
+[Draft #295](https://github.com/bpmcginley/InternshipFinder/pull/295) is based on exact #286 `c4e245dd`. A validated complete window with no matching roles advances the unchanged confirmed scopes atomically. The same full-set generation and watermark check used for enqueue protects the write. Live jobs and unresolved send attempts keep their existing progress. Migration `0014` adds a partial subscriber index for the unresolved-attempt check. A retry after an ambiguous commit can read the already-advanced window. Owner integration and the producer, dispatch and deployment gates remain pending.
 
 ## Waiting for Bruce
 

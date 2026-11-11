@@ -493,7 +493,29 @@ export async function emptyWindowRollback(db, equal, rejects) {
   }
   equal(await progress(db), original);
   equal(await jobs(db), []);
-  equal(await enqueue(db, a.subscriberId, emptySnapshot()), { status: "advanced" });
+  let planQuery;
+  const explaining = {
+    batch: (statements) => db.batch(statements),
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.includes("UPDATE follow_scope_progress SET watermark=")) return statement;
+      return {
+        bind(...args) {
+          planQuery = db.prepare("EXPLAIN QUERY PLAN " + sql).bind(...args);
+          return statement.bind(...args);
+        },
+      };
+    },
+  };
+  equal(await enqueue(explaining, a.subscriberId, emptySnapshot()), { status: "advanced" });
+  const plan = (await planQuery.all()).results;
+  equal(
+    plan.some(
+      ({ detail }) =>
+        detail.includes("follow_attempting_subscriber") && detail.includes("subscriber_id=?"),
+    ),
+    true,
+  );
   equal(
     (await progress(db)).map((row) => row.watermark),
     [options.upperBound, options.upperBound],

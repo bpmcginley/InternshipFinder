@@ -889,3 +889,7 @@ BEGIN
     payload=NULL,lease_token=NULL,lease_until=NULL
     WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
 END;
+
+-- Check one subscriber's unresolved attempts without walking global attempt history.
+CREATE INDEX IF NOT EXISTS follow_attempting_subscriber
+  ON follow_digest_outbox (subscriber_id) WHERE state='attempting';
