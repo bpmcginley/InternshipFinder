@@ -107,9 +107,14 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
 
     draw.text((186, 74), "InternScout", font=ImageFont.load_default(48), fill=PAPER)
     title, font = _fit_landing_title(draw, heading)
-    if term:
+    if term is not None:
         term_font = ImageFont.load_default(41)
-        if len(term.splitlines()) != 1 or draw.textlength(term, font=term_font) > W - 168:
+        if (
+            not term.strip()
+            or term != term.strip()
+            or term.splitlines() != [term]
+            or draw.textlength(term, font=term_font) > W - 168
+        ):
             raise ValueError("Landing card term does not fit")
         draw.text((84, 177), term, font=term_font, fill=SOFT)
     draw.multiline_text((84, 235 if term else 210), title, font=font, spacing=8, fill=PAPER)
