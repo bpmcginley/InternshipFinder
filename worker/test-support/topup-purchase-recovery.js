@@ -394,3 +394,237 @@ export async function purchaseRefreshBoundedFailureAndInputs(db) {
     "applied",
   );
 }
+
+// The same appended scenarios run through the registered Node and actual D1 wrappers.
+import { recoverVerifiedTopupReversalEvent as recoverEvent } from "../src/topup-reversal-events.js";
+import { referenceHash } from "../src/topup-ledger.js";
+import { hmacHex, verifyWebhook } from "../src/billing.js";
+const reversalEvent = (type = "refund.updated") => {
+  const kind =
+    type === "charge.refunded"
+      ? "charge"
+      : type.startsWith("charge.dispute.")
+        ? "dispute"
+        : "refund";
+  return {
+    object: "event",
+    id: "evt_fixture",
+    type,
+    livemode: false,
+    data: {
+      object: {
+        object: kind,
+        id: { refund: "re_fixture", charge: "ch_fixture", dispute: "du_fixture" }[kind],
+        payment_intent: "pi_fixture",
+        ...(kind === "refund" ? {} : { livemode: false }),
+        status: "lost",
+        amount_refunded: 999999,
+        refunded: true,
+      },
+    },
+  };
+};
+const eventOptions = (db, f, event = reversalEvent()) => ({
+  db,
+  env,
+  event,
+  fetchImpl: f.fetch,
+  resolveOffer: (version, mode) => {
+    assert.equal(version, offer.version);
+    assert.equal(mode, false);
+    return offer;
+  },
+});
+
+export async function reversalEventContractsAndAuthoritativeRecovery(db) {
+  for (const type of [
+    "refund.created",
+    "refund.updated",
+    "refund.failed",
+    "charge.refund.updated",
+    "charge.refunded",
+    "charge.dispute.created",
+    "charge.dispute.updated",
+    "charge.dispute.closed",
+    "charge.dispute.funds_withdrawn",
+    "charge.dispute.funds_reinstated",
+  ]) {
+    const f = await setup(db),
+      event = reversalEvent(type);
+    const body = JSON.stringify(event),
+      second = Math.floor(now.getTime() / 1000),
+      secret = "synthetic-signature-fixture";
+    const signature = await hmacHex(secret, second + "." + body);
+    const verified = await verifyWebhook(secret, `t=${second},v1=${signature}`, body, now);
+    assert.deepEqual(await recoverEvent(eventOptions(db, f, verified)), { status: "reconciled" });
+    assert.equal(f.calls.length, 9);
+    assert.deepEqual(await balances(db), { available: 25, held: 0, consumed: 0, revoked: 0 });
+  }
+  const f = await setup(db),
+    event = reversalEvent();
+  event.data.object.payment_intent = {
+    object: "payment_intent",
+    id: "pi_fixture",
+    livemode: false,
+  };
+  // Event claims a loss; only the authoritative current full refund determines revocation.
+  f.refunds = [item("refund", "succeeded")];
+  f.charge.amount_refunded = 327;
+  f.charge.refunded = true;
+  assert.deepEqual(await recoverEvent(eventOptions(db, f, event)), { status: "reconciled" });
+  assert.deepEqual(await balances(db), { available: 0, held: 0, consumed: 0, revoked: 25 });
+}
+
+export async function reversalEventMissingAmbiguousAndMode(db) {
+  const f = await setup(db),
+    before = await financial(db);
+  const mutations = [
+    (e) => delete e.data.object.payment_intent,
+    (e) => {
+      e.data.object.payment_intent = null;
+    },
+    (e) => {
+      e.data.object.payment_intent = " pi_fixture";
+    },
+    (e) => {
+      e.data.object.payment_intent = { id: "pi_fixture" };
+    },
+    (e) => {
+      e.data.object.payment_intent = { object: "payment_intent", id: "pi_fixture", livemode: true };
+    },
+    (e) => {
+      e.livemode = "false";
+    },
+    (e) => {
+      e.data.object.livemode = true;
+    },
+    (e) => {
+      e.object = "refund";
+    },
+    (e) => {
+      e.id = "wrong";
+    },
+    (e) => {
+      e.data.object.object = "charge";
+    },
+    (e) => {
+      e.data.object.id = "wrong";
+    },
+    (e) => {
+      e.account = "synthetic-context";
+    },
+    (e) => {
+      e.context = "synthetic-context";
+    },
+  ];
+  for (const mutate of mutations) {
+    const event = reversalEvent();
+    mutate(event);
+    assert.deepEqual(await recoverEvent(eventOptions(db, f, event)), pending);
+  }
+  const missingMode = reversalEvent("charge.dispute.created");
+  delete missingMode.data.object.livemode;
+  assert.deepEqual(await recoverEvent(eventOptions(db, f, missingMode)), pending);
+  const unknown = reversalEvent();
+  unknown.data.object.payment_intent = "pi_unknown";
+  assert.deepEqual(await recoverEvent(eventOptions(db, f, unknown)), { status: "unclassified" });
+  const otherMode = reversalEvent();
+  otherMode.livemode = true;
+  assert.deepEqual(await recoverEvent(eventOptions(db, f, otherMode)), { status: "unclassified" });
+  assert.deepEqual(await recoverEvent(eventOptions(db, f, { type: "charge.updated" })), {
+    status: "unclassified",
+  });
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await financial(db), before);
+  // Same raw provider ID may occur in the other mode: retained live and active test claims stay distinct.
+  await db
+    .prepare("INSERT INTO topup_claims VALUES(?,?,'retired')")
+    .bind(
+      await referenceHash("payment", true, "pi_fixture"),
+      await referenceHash("checkout", true, "cs_fixture"),
+    )
+    .run();
+  assert.deepEqual(await recoverEvent(eventOptions(db, f, otherMode)), { status: "inactive" });
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await recoverEvent(eventOptions(db, f)), { status: "reconciled" });
+}
+
+export async function reversalEventRetainedCollisionAndUnavailable(db) {
+  for (const terminal of ["deleted", "retired"]) {
+    const f = await setup(db);
+    if (terminal === "deleted") await deleteUser(db, f.a.user_hash, now);
+    else
+      await db.batch([
+        db.prepare("UPDATE topup_claims SET state='retired'"),
+        db.prepare("DELETE FROM topup_purchases"),
+      ]);
+    const before = await financial(db);
+    assert.deepEqual(
+      await recoverEvent({
+        ...eventOptions(db, f),
+        resolveOffer: () => assert.fail("no config lookup"),
+        fetchImpl: null,
+      }),
+      { status: "inactive" },
+    );
+    assert.deepEqual(await financial(db), before);
+    assert.equal(f.calls.length, 0);
+  }
+  for (const sql of [
+    "UPDATE topup_purchases SET payment_id='pi_other'",
+    "UPDATE topup_claims SET checkout_hash=lower(hex(zeroblob(32)))",
+    "DELETE FROM topup_purchases",
+  ]) {
+    const f = await setup(db);
+    await db.prepare(sql).run();
+    assert.deepEqual(await recoverEvent(eventOptions(db, f)), pending);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = await setup(db),
+    before = await financial(db);
+  for (const historical of [null, { ...offer, version: "other" }, { ...offer, livemode: true }])
+    assert.deepEqual(
+      await recoverEvent({ ...eventOptions(db, f), resolveOffer: () => historical }),
+      pending,
+    );
+  const real = await db.batch([
+    db.prepare(
+      "SELECT c.state,c.checkout_hash,p.payment_id,p.checkout_id,p.offer_version FROM topup_claims c JOIN topup_purchases p ON p.payment_hash=c.payment_hash",
+    ),
+  ]);
+  for (const result of [
+    [{ success: false, results: [] }],
+    [{ ...real[0], results: [real[0].results[0], real[0].results[0]] }],
+    [],
+  ]) {
+    const wrapped = { prepare: (sql) => db.prepare(sql), batch: async () => result };
+    assert.deepEqual(await recoverEvent(eventOptions(wrapped, f)), pending);
+  }
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await financial(db), before);
+  assert.deepEqual(
+    await recoverEvent({
+      ...eventOptions(db, f),
+      fetchImpl: async () => {
+        throw Error("synthetic detail must not escape");
+      },
+    }),
+    pending,
+  );
+  assert.deepEqual(await financial(db), before);
+}
+
+export async function reversalEventDeletionDuringHistoricalLookup(db) {
+  const f = await setup(db);
+  const options = {
+    ...eventOptions(db, f),
+    resolveOffer: async () => {
+      await deleteUser(db, f.a.user_hash, now);
+      return offer;
+    },
+  };
+  assert.deepEqual(await recoverEvent(options), pending);
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await recoverEvent(options), { status: "inactive" });
+  assert.equal((await rows(db, "topup_purchases")).length, 0);
+}
