@@ -302,14 +302,41 @@ export function stitchChunks(chunks) {
     promptFeedback,
     seen = false;
   for (const c of chunks) {
-    if (!c || typeof c !== "object") continue;
+    if (!c || typeof c !== "object" || Array.isArray(c))
+      throw new Error("Invalid Gemini stream chunk");
+    if (c.error) throw new Error("Gemini stream error");
+    if (c.candidates !== undefined && !Array.isArray(c.candidates))
+      throw new Error("Invalid Gemini candidates");
     if (c.usageMetadata) usageMetadata = c.usageMetadata;
     if (c.promptFeedback) promptFeedback = c.promptFeedback;
     const cand = (c.candidates || [])[0];
-    if (!cand) continue;
+    if (!c.candidates?.length) continue;
+    if (
+      !cand ||
+      typeof cand !== "object" ||
+      Array.isArray(cand) ||
+      (cand.finishReason !== undefined && typeof cand.finishReason !== "string")
+    )
+      throw new Error("Invalid Gemini candidate");
+    if (
+      cand.content !== undefined &&
+      (!cand.content || typeof cand.content !== "object" || Array.isArray(cand.content))
+    )
+      throw new Error("Invalid Gemini content");
+    const candidateParts = cand.content?.parts;
+    if (candidateParts !== undefined && !Array.isArray(candidateParts))
+      throw new Error("Invalid Gemini parts");
     seen = true;
-    if (cand.finishReason) finishReason = cand.finishReason;
-    for (const p of (cand.content && cand.content.parts) || []) {
+    // Later candidate content cannot inherit an earlier terminal marker. Usage-only trailers can.
+    finishReason = cand.finishReason;
+    for (const p of candidateParts || []) {
+      if (
+        !p ||
+        typeof p !== "object" ||
+        Array.isArray(p) ||
+        (p.text != null && typeof p.text !== "string")
+      )
+        throw new Error("Invalid Gemini part");
       if (p.thought) continue;
       const last = parts[parts.length - 1];
       const plain = (x) => x && x.text != null && !x.functionCall;
@@ -329,35 +356,115 @@ export function stitchChunks(chunks) {
   };
 }
 
-// Reads a text/event-stream body to the end and returns the JSON of every "data:" line.
-export async function readSSE(res) {
+// Technical client ceilings, not claims about operator-configured Worker limits.
+export const SSE_LIMITS = Object.freeze({ maxBytes: 4 * 1024 * 1024, maxEventBytes: 1024 * 1024 });
+
+// Decode complete SSE events, never individual data lines or a truncated last event.
+export async function readSSE(
+  res,
+  { signal, maxBytes = SSE_LIMITS.maxBytes, maxEventBytes = SSE_LIMITS.maxEventBytes } = {},
+) {
+  throwIfAborted(signal);
+  if (
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes < 1 ||
+    maxBytes > SSE_LIMITS.maxBytes ||
+    !Number.isSafeInteger(maxEventBytes) ||
+    maxEventBytes < 1 ||
+    maxEventBytes > Math.min(maxBytes, SSE_LIMITS.maxEventBytes)
+  )
+    throw new Error("Invalid SSE limits");
+  if (!res.body?.getReader) throw new Error("Missing SSE reader");
+  const reader = res.body.getReader(),
+    decoder = new TextDecoder("utf-8", { fatal: true }),
+    encoder = new TextEncoder();
   const chunks = [];
-  const take = (line) => {
-    if (!line.startsWith("data:")) return;
-    const t = line.slice(5).trim();
-    if (!t || t === "[DONE]") return;
-    try {
-      chunks.push(JSON.parse(t));
-    } catch (e) {
-      /* a cut-off last line: stitchChunks reports it as incomplete */
+  let buffer = "",
+    lines = [],
+    eventBytes = 0,
+    total = 0,
+    ended = false;
+  const dispatch = () => {
+    const data = lines.join("\n");
+    lines = [];
+    eventBytes = 0;
+    if (!data.trim()) return;
+    if (data.trim() === "[DONE]") {
+      ended = true;
+      return;
+    }
+    if (ended) throw new Error("Data after SSE completion");
+    const value = JSON.parse(data);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Invalid SSE data");
+    chunks.push(value);
+  };
+  const scan = (piece, final = false) => {
+    buffer += piece;
+    let end;
+    while ((end = buffer.search(/[\r\n]/)) !== -1) {
+      if (buffer[end] === "\r" && end + 1 === buffer.length && !final) break;
+      const width = buffer[end] === "\r" && buffer[end + 1] === "\n" ? 2 : 1;
+      const line = buffer.slice(0, end);
+      buffer = buffer.slice(end + width);
+      eventBytes += encoder.encode(line).byteLength + width;
+      if (eventBytes > maxEventBytes) throw new Error("SSE event too large");
+      if (!line) {
+        dispatch();
+        continue;
+      }
+      if (line === "data" || line.startsWith("data:")) lines.push(line.slice(5).replace(/^ /, ""));
+    }
+    if (eventBytes + encoder.encode(buffer).byteLength > maxEventBytes)
+      throw new Error("SSE event too large");
+    if (final) {
+      if (buffer === "data" || buffer.startsWith("data:"))
+        lines.push(buffer.slice(5).replace(/^ /, ""));
+      // Preserve a harmless final DONE trailer; it never supplies Gemini's finish reason.
+      if (lines.length && lines.join("\n").trim() !== "[DONE]")
+        throw new Error("Incomplete SSE event");
     }
   };
-  if (res.body && res.body.getReader) {
-    const reader = res.body.getReader(),
-      dec = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split(/\r?\n/);
-      buf = lines.pop();
-      lines.forEach(take);
-    }
-    buf += dec.decode();
-    if (buf) take(buf);
-  } else (await res.text()).split(/\r?\n/).forEach(take);
-  return chunks;
+  let rejectAbort;
+  const aborted = new Promise((_, reject) => {
+    rejectAbort = reject;
+  });
+  const cancelReader = (reason) => {
+    try {
+      void Promise.resolve(reader.cancel(reason)).catch(() => {});
+    } catch {}
+  };
+  const abort = () => {
+    const reason = signal.reason || new DOMException("The request was canceled.", "AbortError");
+    rejectAbort(reason);
+    cancelReader(reason);
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    throwIfAborted(signal);
+    const read = async () => {
+      for (;;) {
+        const { done, value } = await reader.read();
+        throwIfAborted(signal);
+        if (done) break;
+        if (!(value instanceof Uint8Array)) throw new Error("Invalid SSE bytes");
+        total += value.byteLength;
+        if (total > maxBytes) throw new Error("SSE body too large");
+        scan(decoder.decode(value, { stream: true }));
+      }
+      scan(decoder.decode(), true);
+      throwIfAborted(signal);
+      return chunks;
+    };
+    // One abort race for the operation, not one retained reaction per incoming chunk.
+    return await Promise.race([read(), aborted]);
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    cancelReader();
+    try {
+      reader.releaseLock();
+    } catch {}
+  }
 }
 
 const isSSE = (res) =>
@@ -407,7 +514,7 @@ export async function callWorker({
     if (res.ok && isSSE(res)) {
       let whole;
       try {
-        whole = stitchChunks(await readSSE(res));
+        whole = stitchChunks(await readSSE(res, { signal }));
       } catch (e) {
         if (signal?.aborted || e.name === "AbortError") throw e;
         whole = null;
@@ -415,7 +522,7 @@ export async function callWorker({
       throwIfAborted(signal);
       // A stream that stopped before Gemini said it was finished is a dropped connection, not an
       // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
-      if (!whole || (!whole.complete && !whole.promptFeedback)) {
+      if (!whole || (!whole.complete && (whole.candidates.length || !whole.promptFeedback))) {
         lastErr = workerError(502, { error: "upstream" });
         if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
         continue;
