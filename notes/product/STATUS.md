@@ -153,3 +153,11 @@ The entire PR remains needs-bruce for the exact existing plans-sentence relocati
 Normally merged approved #187 main `2cacbea6`, then published data-only main `686a590d`; retargeted #193 to main. The row HTML/app.js, row-presentation tests and every P-1.3 screenshot/evidence file remain byte-identical to reviewed `9c5d14c1`. Current main data, install/count, backend/refactor/cache code, build harness/workflow and golden inputs are preserved. Both stamped artifacts were rebuilt: all 695 archive hashes match the manifest, and only `index.html` and `js/app.js` differ from main. The later data-only merge did not change any golden build input or artifact; no redundant refresh was performed.
 
 Node 22 serial site suite passed 274/274, seven focused row tests passed, and both golden tests passed. After the final data-only merge, all 40 dashboard/first-screen/placement data-dependent tests and the startup report passed again. Repository-wide pinned JavaScript lint reported zero errors/warnings; startup-budget reporting succeeded. The actual 695-file archive passed the publication allowlist; checker tests passed four cases with the existing Windows symlink skip. Source and browser evidence are unchanged; no new browser measurement is claimed. Final-head CI and independent incremental review remain required before lead merge. No source cache tag edit, deployment, release, provider call or real application occurred. #204/#210/#211/#217 remain frozen until their respective parent integration/publication gates clear.
+
+## P-2.2a dormant ledger claim
+
+| Package | Owner | Branch | PR | State | Constraint |
+|---|---|---|---|---|---|
+| P-2.2a purchase ledger | worker product agent | `codex/product-p2.2a-topup-ledger` | Draft pending | In progress; needs-bruce | Approved design and #226 exact terms; local storage only, stacked on frozen #229 with migration 0004. No live wiring or deployment. |
+
+Waiting for Bruce: P-2.2a implementation merge after independent review and green CI; Stripe setup, publication and deployment remain operator-owned. [Scope and deferred safeguards](P-2.2a-ledger-implementation.md).
