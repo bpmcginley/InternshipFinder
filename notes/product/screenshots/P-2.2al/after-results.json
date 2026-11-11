@@ -1,0 +1,122 @@
+[
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 1280,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 3327.484375,
+      "width": 1280,
+      "height": 1043.703125
+    }
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 1280,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 3327.484375,
+      "width": 1280,
+      "height": 1043.703125
+    }
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 375,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 5460.03125,
+      "width": 375,
+      "height": 1836.53125
+    }
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 375,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 5460.03125,
+      "width": 375,
+      "height": 1836.53125
+    }
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 1280,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 10644.421875,
+      "width": 1280,
+      "height": 750.703125
+    }
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 1280,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 10644.421875,
+      "width": 1280,
+      "height": 750.703125
+    }
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 375,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 20478.484375,
+      "width": 375,
+      "height": 1304.90625
+    }
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 375,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 20478.484375,
+      "width": 375,
+      "height": 1304.90625
+    }
+  }
+]

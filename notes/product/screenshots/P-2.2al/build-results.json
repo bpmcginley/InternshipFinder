@@ -1,0 +1,17 @@
+{
+  "base": "6827576b64790afc2a4a659a316a5a983beb29bb",
+  "files": 836,
+  "changed": [
+    "privacy.html",
+    "terms.html"
+  ],
+  "before": {
+    "privacy.html": "fe4ff4a671efd8c1831811043863125a035d38c623374b62822825d36a5775bd",
+    "terms.html": "3a6456df4f781106e7c531094670fe9a1877f6144155d72f9d23977e3e408413"
+  },
+  "after": {
+    "privacy.html": "4cb24dce268c6c9d013c29f950791e2164cac6ebc9805ff5fe73861fc378b39e",
+    "terms.html": "205bf84a65f92a721eb0f15a3721bf0c744697e4adaae0ef77eb2e17a283785a"
+  },
+  "sharedFixturesChanged": false
+}
