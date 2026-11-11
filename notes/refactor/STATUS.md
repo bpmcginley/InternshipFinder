@@ -17,7 +17,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
 - All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. PR #230 removed the four manual source tags after Product released the files and merged as `789e72f0`.
 - The authorized Wave 4 logging, vocabulary inventory, public configuration and orders split are merged. The last logging merge passed Pages and its exact deployment check. Existing provider and credential output covered by Q6 and Q7 remains separate. The Wave 4 checkpoint #248 published through Pages 42940952578 and its exact deployment succeeded.
-- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split #271 is merged and published. The employer-page split #276 is merged and published. The field, place, combination and major page split #277 is merged and published. The pay-family split #282 is merged and published. The Numbers split is in review. The dashboard test-only follow-up #263 is also published.
+- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split #271 is merged and published. The employer-page split #276 is merged and published. The field, place, combination and major page split #277 is merged and published. The pay-family split #282 is merged and published. The Numbers split #285 is merged and published. The Digest and New split is in review. The dashboard test-only follow-up #263 is also published.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Product published the counter disclosure in #225. Counter #175 and the Worker refactors still await operator deployment. Migration adoption, production sending and extension release remain operator actions. Product released the dashboard and SEO source after #217 and #208, respectively. Check open file claims again before each wave.
 
@@ -93,8 +93,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.3 Employer family | wp21_inventory | `refactor/wp-3.3-employer` | [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) | Merged | `c84cea3b`. Pages 42949557934 and 42949563654 and the exact deployment succeeded. Employer eligibility, recruiter CTA, related links and full page items were preserved. |
 | 5 | WP-3.3 Field family | wp21_inventory | `refactor/wp-3.3-field` | [#277](https://github.com/bpmcginley/InternshipFinder/pull/277) | Merged | `b0ae0740`. Pages 42950725316 and the exact deployment succeeded. The queued duplicate was superseded by the data-refresh run, which also succeeded. |
 | 5 | WP-3.3 Pay family | wp21_inventory | `refactor/wp-3.3-pay` | [#282](https://github.com/bpmcginley/InternshipFinder/pull/282) | Merged | `ec8ea4ae`. Pages 42951877472 and the exact deployment succeeded. |
-| 5 | WP-3.3 Numbers family | wp21_inventory | `refactor/wp-3.3-numbers` | - | In review | Select ordered counts and existing-page links, then render the Numbers page and Dataset. |
-| 5 | WP-3.3 Digest family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
+| 5 | WP-3.3 Numbers family | wp21_inventory | `refactor/wp-3.3-numbers` | [#285](https://github.com/bpmcginley/InternshipFinder/pull/285) | Merged | `7e49f4fc`. Pages 42952879978 and 42952886757 and the exact deployment succeeded. |
+| 5 | WP-3.3 Digest family | wp21_inventory | `refactor/wp-3.3-digest` | - | In review | Separate Digest examples, signup and New page selection from one-model rendering. |
 | 5 | WP-3.3 Listing family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
@@ -297,7 +297,7 @@ Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held 
 
 ## Next update
 
-Complete review and current-head CI on Numbers. After it merges, reversible local work on Digest may proceed while the Pages runs complete. The next merge waits for green Pages and the exact deployment. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
+Complete review and current-head CI on Digest and New. After it merges, reversible local work on the remaining listing family may proceed while the Pages runs complete. The next merge waits for green Pages and the exact deployment. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
 
 ## Dashboard ranking test clock
 
@@ -522,6 +522,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - `internscout.site.numbers` selects raw counts, ordered links to existing pages, optional USD cohort data, and the export date for the one-model renderer. Dataset properties and date fields, sparse sections, raw versus deduplicated pay counts, and fingerprint text retain their behavior. Shared `site_facts`, build eligibility and ordering, and About, LLMS and home consumers are unchanged.
 - Direct parity covered five live ranking cutoffs, duplicate kind records and current Dataset identifiers. The source AST outside the Numbers adapter and renderer is exact. The installed wheel includes the leaf without an SEO facade back-edge.
 - Relevant SEO and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks passed against 695 unchanged expected files. Ruff passed and targeted Pyright retained the same 12 existing diagnostics.
+
+## WP-3.3 Digest and New page family
+
+- Started reversible local work on `7e49f4fc` after checking the exact file lists of 30 open Product PRs. #266's apparent overlap is inherited from its merge base. Both #285 Pages runs, 42952879978 and 42952886757, and the exact deployment succeeded.
+- Plain signup, example, Digest and New models feed the existing facade renderers. The deduplicated Digest cohort and raw New list still drive their respective counts. Existing eligibility, page order, dates, current action and archive handling, field opt-in, fallbacks and feed cap retain their behavior. Shared growth entry points and actual sending paths are unchanged.
+- Relevant SEO and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Forty-six dashboard checks and both unchanged Golden checks for 695 files passed. Existing signatures and docstrings match, unrelated AST is exact, and the installed wheel imports the leaf independently. Ruff passed and targeted Pyright retained 12 existing diagnostics.
 
 ## WP-1.4 remaining growth diagnostics
 

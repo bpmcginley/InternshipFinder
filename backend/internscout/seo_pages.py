@@ -34,6 +34,7 @@ from urllib.parse import quote, urlparse
 
 from . import near_metros
 from .console_log import console
+from .site import digest as _digest
 from .site import discovery as _discovery
 from .site import employer as _employer
 from .site import field as _field
@@ -1912,7 +1913,7 @@ def digest_archive(action: str) -> str:
 def signup_form(
     pitch: str,
     field: str | None = None,
-    heading: str = "New internships in your inbox every Monday. Free.",
+    heading: str = _digest.SIGNUP_HEADING,
     what: bool = True,
     placement: str = "landing",
 ) -> str:
@@ -1925,15 +1926,40 @@ def signup_form(
     `pitch`: the page's own sentence (with its number) ahead of what the email is. `heading`: /digest/
     has its own, since its h1 already says what the email is, and `what` False leaves out the sentence
     saying what the email holds, which /digest/ lists under the form instead."""
+    return _render_signup_form(_select_signup_form(pitch, field, heading, what, placement))
+
+
+def _select_signup_form(
+    pitch: str,
+    field: str | None,
+    heading: str,
+    what: bool,
+    placement: str,
+) -> _digest.Signup | None:
     if not DIGEST_FORM:
+        return None
+    return _digest.Signup(
+        action=DIGEST_FORM,
+        archive=digest_archive(DIGEST_FORM),
+        pitch=pitch,
+        field=field,
+        field_name=lower_name(field_title(field)) if field else "",
+        heading=heading,
+        what=what,
+        placement=placement,
+    )
+
+
+def _render_signup_form(model: _digest.Signup | None) -> str:
+    if model is None:
         return ""
-    archive = digest_archive(DIGEST_FORM)
+    pitch, field, heading = model.pitch, model.field, model.heading
+    what, placement, archive = model.what, model.placement, model.archive
     box = ""
     if field:
-        name = lower_name(field_title(field))
         box = (
             f'<label class="check"><input type="checkbox" name="tag" value="{esc(field)}"/> '
-            f"Save {esc(name)} with my subscription, so the email can be matched to it later</label>"
+            f"Save {esc(model.field_name)} with my subscription, so the email can be matched to it later</label>"
         )
     goes = "Your address and the field you tick go" if field else "Your address goes"
     about = (
@@ -1946,7 +1972,7 @@ def signup_form(
     )
     lead = " ".join(p for p in (pitch, about) if p)
     return (
-        f'<form class="digest" action="{esc(DIGEST_FORM)}" method="post" target="_blank" rel="noopener" '
+        f'<form class="digest" action="{esc(model.action)}" method="post" target="_blank" rel="noopener" '
         f'aria-labelledby="digest-title" data-digest-placement="{esc(placement)}">'
         f'<h2 id="digest-title">{esc(heading)}</h2>'
         + (f"<p>{lead}</p>" if lead else "")
@@ -3902,30 +3928,30 @@ def digest_examples(new: list[dict]) -> str:
     A sample is not a promise that a listing stays open or appears in next Monday's email.
     Filtering here also keeps this safe when called outside build() with untrusted rows.
     """
-    pool = newest_first(
-        [x for x in unique_roles(new) if x.get("status") == "open" and safe_url(x.get("apply_url"))]
+    return _render_digest_examples(_select_digest_examples(new))
+
+
+def _select_digest_examples(new: list[dict]) -> _digest.Examples:
+    return _digest.select_examples(
+        new,
+        GENERATED,
+        sort_newest=newest_first,
+        dedupe=unique_roles,
+        safe_link=safe_url,
+        employer_key=employer_key,
+        place=place,
     )
-    picked, fields, employers = [], set(), set()
-    while pool and len(picked) < 3:
-        best = max(
-            range(len(pool)),
-            key=lambda i: (
-                bool(set(pool[i].get("field_tags") or []) - fields),
-                employer_key(pool[i].get("company_name") or "") not in employers,
-            ),
-        )
-        x = pool.pop(best)
-        picked.append(x)
-        fields.update(x.get("field_tags") or [])
-        employers.add(employer_key(x.get("company_name") or ""))
-    if not picked:
+
+
+def _render_digest_examples(model: _digest.Examples | None) -> str:
+    if model is None or not model.rows:
         return ""
-    dated = f" Snapshot: {GENERATED.strftime('%B %d, %Y')}." if GENERATED else ""
+    dated = f" Snapshot: {model.generated.strftime('%B %d, %Y')}." if model.generated else ""
     rows = "".join(
-        f'<li><a href="{esc(safe_url(x["apply_url"]))}" target="_blank" rel="nofollow noopener">'
-        f'{esc(x.get("title") or "View posting")}</a> at {esc(x.get("company_name") or "Employer")} '
-        f'<span class="meta">({esc(place(x))})</span></li>'
-        for x in picked
+        f'<li><a href="{esc(safe_url(row.url))}" target="_blank" rel="nofollow noopener">'
+        f'{esc(row.title)}</a> at {esc(row.company)} '
+        f'<span class="meta">({esc(row.location)})</span></li>'
+        for row in model.rows
     )
     return (
         '<section class="prose digest-examples" aria-labelledby="digest-examples-title">'
@@ -3940,35 +3966,45 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
     week's new roles as the email counts them (new_roles) and `by_field` the same per field; new_page
     says whether /internships/new/ was made. With no form address yet (DIGEST_FORM empty) the page has
     no form and says sign-ups aren't open, and build() keeps it out of search and the sitemap."""
-    top3 = [
-        t
-        for t, k in sorted(by_field.items(), key=lambda tk: (-tk[1], field_title(tk[0])))
-        if k >= DIGEST_MIN_NEW
-    ][:3]
+    top_fields = _digest.top_fields(by_field, DIGEST_MIN_NEW, field_title)
+    count = len(new) if len(new) >= DIGEST_MIN_NEW else None
+    form = _select_signup_form(
+        "A selection of new roles, with links to explore the rest. Everyone gets the same email for now.",
+        field=None,
+        heading="Get the free weekly email",
+        what=False,
+        placement="digest-page",
+    )
+    model = _digest.Page(
+        count=count,
+        top_fields=[lower_name(field_title(tag)) for tag in top_fields] if count is not None else [],
+        new_page=new_page,
+        form=form,
+        examples=_select_digest_examples(new) if form is not None else None,
+    )
+    return _render_digest_page(model)
+
+
+def _render_digest_page(model: _digest.Page) -> tuple[str, str, str]:
     count = (
-        f"{len(new):,} new internships in the last week"
+        f"{model.count:,} new internships in the last week"
         + (
-            f", the most in {esc(join_words([lower_name(field_title(t)) for t in top3]))}."
-            if top3
+            f", the most in {esc(join_words(model.top_fields))}."
+            if model.top_fields
             else "."
         )
-        if len(new) >= DIGEST_MIN_NEW
+        if model.count is not None
         else ""
     )
     lede = (
         f"<p class=\"lede\">{count + ' ' if count else ''}One free email every Monday with the internships, "
         "co-ops and research roles InternScout found that week.</p>"
     )
-    if DIGEST_FORM:
+    if model.form is not None:
         body = (
             lede
-            + signup_form(
-                "A selection of new roles, with links to explore the rest. Everyone gets the same email for now.",
-                heading="Get the free weekly email",
-                what=False,
-                placement="digest-page",
-            )
-            + digest_examples(new)
+            + _render_signup_form(model.form)
+            + _render_digest_examples(model.examples)
             + "<section class=\"prose\"><h2>What you get</h2><ul class=\"plain\">"
             "<li>One email on Mondays. It lists the fields that gained the most new roles that week, a few "
             "postings from each, Northeast and remote first, and a link to the rest of each field.</li>"
@@ -3983,7 +4019,7 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
         where = (
             "<a href=\"/internships/new/\">New this week</a> lists every role found in the last week, and "
             "its RSS feed can follow it in a feed reader or a Discord or Slack channel."
-            if new_page
+            if model.new_page
             else "<a href=\"/internships/\">Browse open internships</a> by field, state or major."
         )
         body = lede + f"<p>Sign-ups for the email aren't open yet. Until they are, {where}</p>"
@@ -3993,6 +4029,40 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
         "that week. Confirm once, unsubscribe any time.",
         body,
     )
+
+
+def _render_new_page(model: _digest.NewPage) -> dict:
+    new, root, now, updated = model.items, model.root, model.now, model.updated
+    return {
+        "path": "/internships/new/",
+        "title": [f"New Internships This Week – {len(new):,} Found", "New Internships This Week"],
+        "desc": (
+            f"{len(new):,} internships, co-ops and research roles for college students found in the last week, "
+            f"Northeast and remote first. Updated {updated}. Free, no sign-up."
+        ),
+        "h1": "New internships this week",
+        "crumbs": [root, ("/internships/new/", "New this week")],
+        "body": listing_body(
+            new,
+            "found in the last week",
+            "",
+            now,
+            "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
+            f"{model.feed_limit} newest roles found this week, so a Discord or Slack channel can follow "
+            "just this one.</p>"
+            # The soonest summer's employers, newest-opened first (2026-10-07).
+            + (
+                f"<p class=\"more\">Employers rather than roles: <a href=\"{model.tracker[1]}\">"
+                f"{esc(model.tracker[0])} internships, who’s open now</a>, newest first.</p>"
+                if model.tracker
+                else ""
+            ),
+            dash=dash_link(new=True),
+            src="seo-hub",
+            signup=_render_signup_form(model.form),
+        ),
+        "items": new,
+    }
 
 
 def llms_files(
@@ -5165,53 +5235,25 @@ def build(
         )  # 2026-10-23: a hub of noindex pages. was: no thin (indexed)
 
     new = [x for x in listings if fresh(x, now, d["baseline"])]
-    # This page lists every new listing, and the email counts a role posted on two of an employer's
-    # boards once, so when the two numbers differ the form says why its number is the smaller one.
-    k = len(digest_new)
-    new_pitch = (
-        (
-            f"{k:,} new internships in the last week"
-            + (
-                ", each role counted once even when an employer posted it twice."
-                if k != len(new)
-                else "."
-            )
-        )
-        if k >= DIGEST_MIN_NEW
-        else ""
-    )
     if len(new) >= MIN_OPEN:
-        add(
-            "/internships/new/",
-            [f"New Internships This Week – {len(new):,} Found", "New Internships This Week"],
-            f"{len(new):,} internships, co-ops and research roles for college students found in the last week, "
-            f"Northeast and remote first. Updated {updated}. Free, no sign-up.",
-            "New internships this week",
-            [root, ("/internships/new/", "New this week")],
-            listing_body(
-                new,
-                "found in the last week",
-                "",
-                now,
-                "<p class=\"more\">One feed for a whole club: this page's RSS feed carries the "
-                f"{NEW_FEED} newest roles found this week, so a Discord or Slack channel can follow "
-                "just this one.</p>"
-                # The soonest summer's employers, newest-opened first (2026-10-07).
-                + (
-                    f"<p class=\"more\">Employers rather than roles: <a href=\"{TRACKER[1]}\">"
-                    f"{esc(TRACKER[0])} internships, who’s open now</a>, newest first.</p>"
-                    if TRACKER
-                    else ""
-                ),
-                dash=dash_link(new=True),
-                src="seo-hub",
-                signup=signup_form(new_pitch),
+        new_model = _digest.NewPage(
+            items=new,
+            root=root,
+            now=now,
+            updated=updated,
+            feed_limit=NEW_FEED,
+            tracker=TRACKER,
+            form=_select_signup_form(
+                _digest.new_pitch(len(digest_new), len(new), DIGEST_MIN_NEW),
+                field=None,
+                heading=_digest.SIGNUP_HEADING,
+                what=True,
+                placement="landing",
             ),
-            new,
         )
-        # More than the usual newest 25, since this one feed may be a club's only one, but not every
-        # new role: that was 1,800 items and 800 KB, fetched every few hours by every subscriber.
-        pages[-1]["feed_limit"] = NEW_FEED  # was: None (every new role)
+        add(**_render_new_page(new_model))
+        # A single club feed carries more of the week's new listings than a typical feed.
+        pages[-1]["feed_limit"] = new_model.feed_limit
 
     # The highest listed hourly pay (2026-10-02), made before the hubs so the hub can link it. Kept
     # like any other page once live (enough), since its URL is the one a search result points at.
