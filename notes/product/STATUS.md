@@ -128,6 +128,10 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 
 [Draft #295](https://github.com/bpmcginley/InternshipFinder/pull/295) is based on exact #286 `c4e245dd`. A validated complete window with no matching roles advances the unchanged confirmed scopes atomically. The same full-set generation and watermark check used for enqueue protects the write. Live jobs and unresolved send attempts keep their existing progress. Migration `0014` adds a partial subscriber index for the unresolved-attempt check. A retry after an ambiguous commit can read the already-advanced window. Owner integration and the producer, dispatch and deployment gates remain pending.
 
+## P-2.1m dormant pinned digest preparation
+
+[Draft #298](https://github.com/bpmcginley/InternshipFinder/pull/298) is based on exact #295 `a1f3c19c`. Preparation loads only the queued public snapshot pin, verifies exact bytes and matched role references, and rechecks the live lease after loading. The loader receives no address or link. The actual sender still needs a fresh guarded attempt. The producer, transport, owner integration and deployment remain pending.
+
 ## Waiting for Bruce
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
@@ -137,6 +141,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 <<<<<<< HEAD
 | 2026-11-10 | P-2.1k dormant finalization worker merge | [Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286), stacked on #281. Local progress, deletion, rollback, malformed-data and migration tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender or deployment enabled. | - |
 | 2026-11-10 | P-2.1l empty-window progress | [#295](https://github.com/bpmcginley/InternshipFinder/pull/295), stacked on #286. Complete empty snapshots can advance exact current scopes without a digest job. Review, CI, parent integration and owner merge remain pending. | Draft needs-bruce |
+| 2026-11-10 | P-2.1m pinned digest preparation | [#298](https://github.com/bpmcginley/InternshipFinder/pull/298), stacked on #295. Preparation proves the pinned public snapshot and current lease. The sender still needs fresh consent and an owner-approved deployment. | Draft needs-bruce |
 | 2026-11-10 | P-2.1j dormant enqueue worker merge | [Draft #281](https://github.com/bpmcginley/InternshipFinder/pull/281), stacked on #274 with #255 integrated. Local transaction/retention tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender, finalizer or deployment enabled. | - |
 | 2026-11-10 | P-2.1i dormant scope progress worker merge | [Draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274), stacked on #261. Local migration and legacy-schema checks pass; independent review, PR checks, parent integration and owner merge remain pending. No queue, sender or deployment is enabled. | - |
 =======

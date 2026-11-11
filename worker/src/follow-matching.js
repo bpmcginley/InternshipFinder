@@ -21,6 +21,12 @@ const text = (value, maximum) =>
   !/[\u0000-\u001f\u007f\ud800-\udfff]/u.test(value) &&
   bytes(value) <= maximum;
 const invalid = (reason) => ({ status: "invalid", reason });
+
+export async function followSnapshotDigest(input) {
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", input));
+  return [...hash].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+
 const list = (values, allowed) =>
   Array.isArray(values) &&
   values.length <= 64 &&
