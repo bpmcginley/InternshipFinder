@@ -370,6 +370,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - At `f11ff1a9`, the two generated test modules use the canonical site runtime and explicit build settings. The widget helper is the same binding the old facade exported. The isolated distribution build disables near pages and keeps the default-off settings. Fixture values and all assertion ASTs match the prior tests.
 - With the actual root conftest active, all six distribution tests and five phone tests passed while legacy imports and sockets were blocked. All 24 targeted, publisher, widget and Golden tests passed against the unchanged 836-file fixture.
 
+## WP-6.2 structured data tests
+
+- At `df978c48`, the structured-data suite uses canonical runtime constants and builds with fresh explicit state and hooks. The default earnings lookup stays in place, and near pages stay disabled for the fixture. All 18 ordered page records, HTML bytes, input fixture files and assertion ASTs match the legacy path.
+- All 20 tests passed with the actual root conftest active and the legacy facade and sockets blocked. All 33 targeted and Golden tests passed against the unchanged 836-file fixture.
+
 ## WP-6.2 standalone test fixture
 
 - The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
@@ -720,6 +725,16 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Standalone feeds snapshot the canonical site URL and configured build date on first use, as the legacy import did. When no date is available, they use the current UTC time. An already-loaded legacy facade still supplies its current URL and last build date, so direct overrides and callers that omit the date after a legacy build still work. If standalone RSS captured the defaults first, a later canonical facade import initializes from that same snapshot. The legacy CLI continues passing its build date explicitly.
 - A fresh subprocess generated a feed with the legacy facade blocked. The offline legacy CLI comparison matched 815 files, including 75 feeds, and console output. All 161 focused tests passed, including the standalone Pages publisher and Golden build. Product's publisher, renderers and Golden fixtures are outside this slice.
+
+## WP-6.2 central SEO, employer and listing tests
+
+- After the discovery fixture move merged as `fff8c84d`, the three suites use canonical build state, publisher writes and CLI, with explicit near, indexing and placement clock settings. Test order, parametrization and assertions are preserved. The shared pay fixture and placement and tracker donor exports remain available to their existing callers.
+- Offline comparisons matched the bytes, ordered writes and console output for three legacy and canonical placement cases. The retained placement report and console tests continue to cover the legacy CLI. On the merged discovery baseline, all 148 migrated tests and both 836-artifact Golden checks passed with the facade and sockets blocked. The three retained CLI tests passed with sockets blocked.
+
+## WP-6.2 facade removal rehearsal
+
+- A disposable copy of `ca660a4a` composed the reviewed test and screenshot slices with the feed and root-fixture changes and physically removed `seo_pages.py`. The executable-reference audit found no live import or command. All three synthetic screenshot preparations and both 836-artifact Golden checks passed with external network calls denied.
+- The full backend and growth run passed 1,870 tests and 11 subtests with eight skips. Five editable provenance tests initially resolved a different checkout. A real offline editable install of the disposable copy with pinned setuptools 84.2.1 then passed all nine packaging tests, including those five. Across both runs, 1,875 distinct tests passed. The facade remains in the repository pending the prerequisite migrations.
 
 ## WP-5.1 Buy retention before activation
 
