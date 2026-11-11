@@ -4,6 +4,8 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
+- **P-2.2 native browser top-up UI claim:** isolated allowance/dashboard modules, new tests and synthetic evidence on `baf163d8`; detached/default-off pending verified Worker capability and offer. No shared golden/allowlist, classic App/Core or activation changes.
+
 - **Employer Worker runtime live.** [#409](https://github.com/bpmcginley/InternshipFinder/pull/409) deployed as `b64bb927` at 19:01:09 UTC. Exact Pages and backend passed, and all 4,984 App artifact files matched before the next data refresh. The existing API smoke passed and brand video returned 200 for HEAD and 206 for a range request. The first production half-hour invocation initialized the current-day cap, with no unexpected days or expired aggregate rows. Maintenance is enabled and employer intake stays off.
 
 - **P-2.3u employer publication adapter:** draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) on published `45ccddda` adds an explicit default-off publisher option. It captures the selected export once, validates same-release annotations/catalog, and renders from that captured input. Default 830-file golden is unchanged; opted-in synthetic output has 831 files and passes the publication allowlist. Full Python/growth and site Node suites pass; paired visual evidence is unchanged. Independent review/CI remain pending. No writer, workflow, browser activation or Worker configuration change.
