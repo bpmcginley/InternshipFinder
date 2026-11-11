@@ -36,6 +36,7 @@ from . import near_metros
 from .console_log import console
 from .site import discovery as _discovery
 from .site import employer as _employer
+from .site import field as _field
 from .site import llms as _llms
 from .site import near as _near
 from .site.rules import (
@@ -4492,6 +4493,213 @@ def _render_employer_page(model: _employer.Page) -> dict:
     }
 
 
+def _render_field(model: _field.Field) -> dict:
+    t, path, items = model.tag, model.path, model.items
+    root, now, updated = model.context.root, model.context.now, model.context.updated
+    name = field_title(t)
+    related = link_list(
+        f"{name} internships by state",
+        [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in model.states],
+    )
+    related += link_list(
+        f"{name} internships by city",
+        [(f"{path}{state_slug(k)}/", US_STATES[k], n) for k, n in model.cities],
+    )
+    related += link_list(f"Employers hiring in {lower_name(name)}", model.employers)
+    # The employer list stops at RELATED; the rest are a click away.
+    if model.more_employers is not None:
+        total, hiring = model.more_employers
+        related += (
+            f"<p class=\"more\"><a href=\"/internships/at/\">All {total:,} employers hiring "
+            f"now</a>, {hiring:,} of them in {esc(lower_name(name))}.</p>"
+        )
+    qa, co_ops = model.faq, model.co_ops
+    pitch = (
+        f"{model.signup_count:,} new {esc(lower_name(name))} internships in the last week."
+        if model.signup_count is not None
+        else ""
+    )
+    related += widget_follow(t)
+    return {
+        "path": path,
+        "title": listing_title([f"{name} Internships", f"{field_short(t)} Internships"], len(items)),
+        "desc": listing_description(
+            len(items),
+            f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
+            "",
+            items,
+            updated,
+        ),
+        "h1": f"{name} internships",
+        "crumbs": [root, (path, name)],
+        "body": listing_body(
+            items,
+            f"in {lower_name(name)}",
+            "",
+            now,
+            related,
+            dash=dash_link([t]),
+            fits=model.fits,
+            src="seo-field",
+            faq=faq_section(qa),
+            signup=signup_form(pitch, t),
+        ),
+        "items": items,
+        "ld": [faq_ld(qa)],
+        "kind": "field",
+    }
+
+
+def _render_place(model: _field.Place) -> dict:
+    k, path, items = model.key, model.path, model.items
+    root, now, updated = model.context.root, model.context.now, model.context.updated
+    where = US_STATES[k]
+    related = link_list(
+        f"Internships {in_place(k)} by field",
+        [
+            (f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
+            for t, n in model.fields
+        ],
+    )
+    related += link_list(
+        f"Internships {in_place(k)} by city",
+        [(f"/internships/{state_slug(m)}/", m, n) for m, n in model.cities],
+    )
+    crumbs = [root, (path, where)]
+    if model.parent_state is not None:
+        st = model.parent_state
+        crumbs = [root, (f"/internships/{state_slug(st)}/", US_STATES[st]), (path, where)]
+    loc = "remote" if k == "remote" else in_place(k)
+    head = f"Internships {'(Remote)' if k == 'remote' else in_place(k)}"
+    qa, co_ops = model.faq, model.co_ops
+    subjects = (
+        [f"Internships and Co-ops {in_place(k)}"] if model.canadian and co_ops else []
+    ) + [head]
+    return {
+        "path": path,
+        "title": listing_title(subjects, len(items)),
+        "desc": listing_description(
+            len(items),
+            "internships and co-ops" if co_ops else "internships",
+            "that are remote" if k == "remote" else loc,
+            items,
+            updated,
+        ),
+        "h1": f"Internships {'you can do remotely' if k == 'remote' else in_place(k)}",
+        "crumbs": crumbs,
+        "body": listing_body(
+            items,
+            "",
+            f" {loc}",
+            now,
+            related,
+            state=k,
+            dash=dash_link(state=k),
+            src="seo-state",
+            faq=faq_section(qa),
+        ),
+        "items": items,
+        "state": k,
+        "ld": [faq_ld(qa)],
+        "kind": "state",
+        "thin": model.thin,
+    }
+
+
+def _render_combo(model: _field.Combo) -> dict:
+    t, k, path, items = model.tag, model.key, model.path, model.items
+    root, now, updated = model.context.root, model.context.now, model.context.updated
+    name, where = field_title(t), US_STATES[k]
+    related = link_list(
+        f"{name} internships in other states",
+        [
+            (f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
+            for kk, n in model.states
+        ],
+    )
+    related += link_list(
+        f"{name} internships by city",
+        [
+            (f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
+            for kk, n in model.cities
+        ],
+    )
+    loc = "remote" if k == "remote" else in_place(k)
+    at = "(Remote)" if k == "remote" else in_place(k)
+    at_short = PLACE_SHORT.get(k, at)
+    qa, co_ops = model.faq, model.co_ops
+    return {
+        "path": path,
+        "title": listing_title(
+            [
+                f"{name} Internships {at}",
+                f"{field_short(t)} Internships {at}",
+                f"{name} Internships {at_short}",
+                f"{field_short(t)} Internships {at_short}",
+            ],
+            len(items),
+        ),
+        "desc": listing_description(
+            len(items),
+            f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
+            "that are remote" if k == "remote" else loc,
+            items,
+            updated,
+        ),
+        "h1": f"{name} internships {loc}",
+        "crumbs": [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
+        "body": listing_body(
+            items,
+            f"in {lower_name(name)}",
+            f" {loc}",
+            now,
+            related,
+            state=k,
+            dash=dash_link([t], k),
+            src="seo-field",
+            faq=faq_section(qa),
+        ),
+        "items": items,
+        "state": k,
+        "ld": [faq_ld(qa)],
+        "thin": model.thin,
+        "kind": "combo",
+    }
+
+
+def _render_major(model: _field.Major) -> dict:
+    name, tags, path, items = model.name, model.tags, model.path, model.items
+    root, now, updated = model.context.root, model.context.now, model.context.updated
+    related = link_list(
+        f"Related fields for {name} majors",
+        [(f"/internships/{field_slug(t)}/", field_title(t), n) for t, n in model.fields],
+    )
+    return {
+        "path": path,
+        "title": [
+            f"Internships for {name} Majors – {len(items):,} Open",
+            f"Internships for {name} Majors",
+        ],
+        "desc": listing_description(
+            len(items), f"student roles for {name} majors", "", items, updated, audience=False
+        ),
+        "h1": f"Internships for {name} majors",
+        "crumbs": [root, ("/internships/for/", "By major"), (path, name)],
+        "body": listing_body(
+            items,
+            f"that fit {name} majors",
+            "",
+            now,
+            related,
+            dash=dash_link(tags),
+            fits=model.fits,
+            src="seo-hub",
+        ),
+        "items": items,
+        "kind": "major",
+    }
+
+
 # ---------------------------------------------------------------- build
 
 
@@ -4785,241 +4993,62 @@ def build(
     root = ("/internships/", "Internships")
     page_name = {EMPLOYERS[nm]: nm for nm in by_company}  # employer page -> the name it goes by
 
+    field_context = _field.Context(root, now, updated)
     for t, items in sorted(fields.items()):
-        name = field_title(t)
         path = f"/internships/{field_slug(t)}/"
-        top_states = sorted(
-            ((k, len(v)) for (tt, k), v in combos.items() if tt == t),
-            key=lambda kv: (-kv[1], kv[0]),
-        )
-        # was: key=lambda kv: -kv[1]  (and so on below: every count that can tie is broken by name)
-        # The US cities in a list of their own (2026-10-07), so "by state" still lists states.
-        related = link_list(
-            f"{name} internships by state",
-            [
-                (f"{path}{state_slug(k)}/", US_STATES[k], n)
-                for k, n in top_states
-                if k not in US_METRO_PAGES
-            ],
-        )
-        related += link_list(
-            f"{name} internships by city",
-            [
-                (f"{path}{state_slug(k)}/", US_STATES[k], n)
-                for k, n in top_states
-                if k in US_METRO_PAGES
-            ],
-        )
-        # was: emp = join_words(top(Counter(...), 3)), for the description; hiring_words says it now (2026-10-13).
-        # The employers in this field that have a page of their own (2026-10-01), so search engines
-        # reach the employer pages from the field pages as well as from single listing rows.
-        hiring = Counter(
-            EMPLOYERS[x["company_name"]] for x in items if x.get("company_name") in EMPLOYERS
-        )
-        related += link_list(
-            f"Employers hiring in {lower_name(name)}",
-            [
-                (pth, page_name[pth], k)
-                for pth, k in sorted(hiring.items(), key=lambda kv: (-kv[1], kv[0]))[:RELATED]
-            ],
-        )
-        # The list stops at RELATED; the rest are a click away (2026-10-07).
-        if len(hiring) > RELATED:
-            related += (
-                f"<p class=\"more\"><a href=\"/internships/at/\">All {len(by_company):,} employers hiring "
-                f"now</a>, {len(hiring):,} of them in {esc(lower_name(name))}.</p>"
-            )
-        # was: add(path, f"{name} Internships – {len(items):,} Open Now | InternScout", ...
-        n = f"{len(items):,}"
-        # The page's questions, on the page and as a FAQPage block (2026-10-05, listing_faq).
-        qa = listing_faq(items, t, None, updated)
+        top_states = _field.counts_by_place(combos, t)
+        employers, hiring = _field.hiring_links(items, EMPLOYERS, page_name, RELATED)
         fresh_n = digest_by_field[t]
-        pitch = (
-            f"{fresh_n:,} new {esc(lower_name(name))} internships in the last week."
-            if fresh_n >= DIGEST_MIN_NEW
-            else ""
+        model = _field.Field(
+            context=field_context,
+            tag=t,
+            path=path,
+            items=items,
+            states=[entry for entry in top_states if entry[0] not in US_METRO_PAGES],
+            cities=[entry for entry in top_states if entry[0] in US_METRO_PAGES],
+            employers=employers,
+            more_employers=(len(by_company), hiring) if hiring > RELATED else None,
+            fits=fits.get(path),
+            signup_count=fresh_n if fresh_n >= DIGEST_MIN_NEW else None,
+            co_ops=_field.has_co_ops(items),
+            faq=listing_faq(items, t, None, updated),
         )
-        # 2026-10-13: "Software Engineering Internships: 2,000+ Open" (listing_title, a count floor), and a
-        # description that says which term most roles start in and who is hiring (listing_description).
-        # was: [f"{name} Internships – {n} Open Now", f"{name} Internships – {n} Open", f"{name} Internships",
-        #       f"{field_short(t)} Internships – {n} Open", f"{field_short(t)} Internships"], and
-        #      f"{n} open {name} internships and co-ops for college students, updated {updated}. Employers
-        #      include {emp}. Free search, no sign-up."
-        co_ops = any("co_op" in (x.get("stage") or []) for x in items)
-        related += widget_follow(t)
-        add(
-            path,
-            listing_title([f"{name} Internships", f"{field_short(t)} Internships"], len(items)),
-            listing_description(
-                len(items),
-                f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
-                "",
-                items,
-                updated,
-            ),
-            f"{name} internships",
-            [root, (path, name)],
-            listing_body(
-                items,
-                f"in {lower_name(name)}",
-                "",
-                now,
-                related,
-                dash=dash_link([t]),
-                fits=fits.get(path),
-                src="seo-field",
-                faq=faq_section(qa),
-                signup=signup_form(pitch, t),
-            ),
-            items,
-            ld=[faq_ld(qa)],
-            kind="field",
-        )
+        add(**_render_field(model))
 
     for k, items in sorted(states.items()):
-        where = US_STATES[k]
         path = f"/internships/{state_slug(k)}/"
-        top_fields = sorted(
-            ((t, len(v)) for (t, kk), v in combos.items() if kk == k),
-            key=lambda tv: (-tv[1], tv[0]),
-        )
-        related = link_list(
-            f"Internships {in_place(k)} by field",
-            [
-                (f"/internships/{field_slug(t)}/{state_slug(k)}/", field_title(t), n)
-                for t, n in top_fields
-            ],
-        )
-        # A state links its cities, and a city its state (2026-10-07).
-        cities = sorted(
-            ((m, len(states[m])) for m in US_METRO_PAGES if m in states and METRO_STATE[m] == k),
-            key=lambda kv: (-kv[1], kv[0]),
-        )
-        related += link_list(
-            f"Internships {in_place(k)} by city",
-            [(f"/internships/{state_slug(m)}/", m, n) for m, n in cities],
-        )
-        crumbs = [root, (path, where)]
-        if k in US_METRO_PAGES and METRO_STATE[k] in states:
-            st = METRO_STATE[k]
-            crumbs = [root, (f"/internships/{state_slug(st)}/", US_STATES[st]), (path, where)]
-        loc = "remote" if k == "remote" else in_place(k)  # was: f"in {where}" (in_place adds "the")
-        # was: add(path, f"Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
-        head = f"Internships {'(Remote)' if k == 'remote' else in_place(k)}"
-        qa = listing_faq(items, None, k, updated)
-        # 2026-10-13: listing_title and listing_description. A Canadian page names co-ops in its title
-        # when it has some: "co-op" is how students there search (Waterloo above all). was:
-        # [f"{head} – {n} Open", head], and f"{n} open internships, co-ops and research roles {loc},
-        # updated {updated}. Free search for college students, no sign-up."
-        co_ops = any("co_op" in (x.get("stage") or []) for x in items)
-        canadian = k in CANADA_KEYS or k in CA_METRO_PAGES
-        subjects = ([f"Internships and Co-ops {in_place(k)}"] if canadian and co_ops else []) + [
-            head
-        ]
-        add(
-            path,
-            listing_title(subjects, len(items)),
-            listing_description(
-                len(items),
-                "internships and co-ops" if co_ops else "internships",
-                "that are remote" if k == "remote" else loc,
-                items,
-                updated,
-            ),
-            f"Internships {'you can do remotely' if k == 'remote' else in_place(k)}",
-            crumbs,
-            listing_body(
-                items,
-                "",
-                f" {loc}",
-                now,
-                related,
-                state=k,
-                dash=dash_link(state=k),
-                src="seo-state",
-                faq=faq_section(qa),
-            ),
-            items,
-            k,
-            ld=[faq_ld(qa)],
-            kind="state",
+        parent = METRO_STATE[k] if k in US_METRO_PAGES and METRO_STATE[k] in states else None
+        place_model = _field.Place(
+            context=field_context,
+            key=k,
+            path=path,
+            items=items,
+            fields=_field.counts_by_field(combos, k),
+            cities=_field.city_counts(states, k, US_METRO_PAGES, METRO_STATE),
+            parent_state=parent,
+            co_ops=_field.has_co_ops(items),
+            canadian=k in CANADA_KEYS or k in CA_METRO_PAGES,
+            faq=listing_faq(items, None, k, updated),
             thin=path in inside,
-        )  # 2026-10-23, duplicates
+        )
+        add(**_render_place(place_model))
 
     for (t, k), items in sorted(combos.items()):
-        name, where = field_title(t), US_STATES[k]
         path = f"/internships/{field_slug(t)}/{state_slug(k)}/"
-        others = sorted(
-            ((kk, len(v)) for (tt, kk), v in combos.items() if tt == t and kk != k),
-            key=lambda kv: (-kv[1], kv[0]),
+        others = _field.counts_by_place(combos, t, exclude=k)
+        combo_model = _field.Combo(
+            context=field_context,
+            tag=t,
+            key=k,
+            path=path,
+            items=items,
+            states=_field.other_states(others, US_METRO_PAGES, METRO_STATE.get(k))[:RELATED],
+            cities=[entry for entry in others if entry[0] in US_METRO_PAGES][:RELATED],
+            co_ops=_field.has_co_ops(items),
+            faq=listing_faq(items, t, k, updated),
+            thin=not combo_indexed(len(items), path, live, earning) or path in inside,
         )
-        # Cities and states in two lists (2026-10-07), the field in this city's state first. was: one
-        # list of every other place, which only held states.
-        related = link_list(
-            f"{name} internships in other states",
-            [
-                (f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
-                for kk, n in [o for o in others if o[0] == METRO_STATE.get(k)]
-                + [o for o in others if o[0] not in US_METRO_PAGES and o[0] != METRO_STATE.get(k)]
-            ][:RELATED],
-        )
-        related += link_list(
-            f"{name} internships by city",
-            [
-                (f"/internships/{field_slug(t)}/{state_slug(kk)}/", US_STATES[kk], n)
-                for kk, n in others
-                if kk in US_METRO_PAGES
-            ][:RELATED],
-        )
-        loc = "remote" if k == "remote" else in_place(k)  # was: f"in {where}" (in_place adds "the")
-        # was: add(path, f"{name} Internships {'(Remote)' if k == 'remote' else 'in ' + where} – {len(items):,} Open | InternScout", ...
-        at = "(Remote)" if k == "remote" else in_place(k)
-        qa = listing_faq(items, t, k, updated)
-        at_short = PLACE_SHORT.get(k, at)
-        # was: the four forms without at_short (2026-10-07: a place that needs "the" can run long).
-        # 2026-10-13: listing_title and listing_description. was: [f"{name} Internships {at} – {n} Open",
-        # f"{name} Internships {at}", f"{short} Internships {at} – {n} Open", f"{short} Internships {at}",
-        # f"{name} Internships {at_short}", f"{short} Internships {at_short}"], and f"{n} open {name}
-        # internships and co-ops {loc}, updated {updated}. Free search for college students, no sign-up."
-        co_ops = any("co_op" in (x.get("stage") or []) for x in items)
-        add(
-            path,
-            listing_title(
-                [
-                    f"{name} Internships {at}",
-                    f"{field_short(t)} Internships {at}",
-                    f"{name} Internships {at_short}",
-                    f"{field_short(t)} Internships {at_short}",
-                ],
-                len(items),
-            ),
-            listing_description(
-                len(items),
-                f"{lower_name(name)} internships{' and co-ops' if co_ops else ''}",
-                "that are remote" if k == "remote" else loc,
-                items,
-                updated,
-            ),
-            f"{name} internships {loc}",
-            [root, (f"/internships/{field_slug(t)}/", name), (path, where)],
-            listing_body(
-                items,
-                f"in {lower_name(name)}",
-                f" {loc}",
-                now,
-                related,
-                state=k,
-                dash=dash_link([t], k),
-                src="seo-field",
-                faq=faq_section(qa),
-            ),
-            items,
-            k,
-            ld=[faq_ld(qa)],
-            thin=not combo_indexed(len(items), path, live, earning)
-            or path in inside,  # INDEX_COMBO, duplicates
-            kind="combo",
-        )  # was: thin=not combo_indexed(len(items), path, live, earning) (2026-10-13)
+        add(**_render_combo(combo_model))
 
     majors_made = []
     for m, tags, items, path in major_rows:
@@ -5028,41 +5057,16 @@ def build(
         if path != f"/internships/for/{slugify(name)}-majors/":
             continue  # folded into the field or major page with the same listings
         rel_tags = [t for t in (m.get("related") or []) if t in fields]
-        related = link_list(
-            f"Related fields for {name} majors",
-            [
-                (f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                for t in rel_tags[:RELATED]
-            ],
+        major_model = _field.Major(
+            context=field_context,
+            name=name,
+            tags=tags,
+            path=path,
+            items=items,
+            fields=[(t, len(fields[t])) for t in rel_tags[:RELATED]],
+            fits=[n for n in fits[path] if n != name],
         )
-        # was: add(path, f"Internships for {name} Majors – {len(items):,} Open | InternScout", ...
-        add(
-            path,
-            [
-                f"Internships for {name} Majors – {len(items):,} Open",
-                f"Internships for {name} Majors",
-            ],
-            # 2026-10-23: identify who is hiring from this major's actual roles, rather than boilerplate.
-            # was: count/name/date plus "Built for UMass Amherst students; free, no sign-up."
-            # Revert: restore that description template; page selection is unchanged.
-            listing_description(
-                len(items), f"student roles for {name} majors", "", items, updated, audience=False
-            ),
-            f"Internships for {name} majors",
-            [root, ("/internships/for/", "By major"), (path, name)],
-            listing_body(
-                items,
-                f"that fit {name} majors",
-                "",
-                now,
-                related,
-                dash=dash_link(tags),
-                fits=[n for n in fits[path] if n != name],
-                src="seo-hub",
-            ),
-            items,
-            kind="major",
-        )
+        add(**_render_major(major_model))
 
     # Each employer's main fields, for "Similar employers": others that hire in the same fields.
     company_fields = {
