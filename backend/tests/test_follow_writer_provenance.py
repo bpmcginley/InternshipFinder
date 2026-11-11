@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from shutil import copytree
@@ -12,6 +13,7 @@ from internscout import export_static, pipeline
 from internscout.db import Base
 from internscout.follow_writer_provenance import FollowWriterCapture, _fixed_export
 from internscout.models import Listing
+from test_ingest_data_writer import writer
 
 NOW = datetime(2026, 11, 11, 18, tzinfo=timezone.utc)
 BASELINE = NOW - timedelta(hours=1)
@@ -252,3 +254,135 @@ def test_unrelated_public_writer_errors_still_propagate(tmp_path, database, monk
     with pytest.raises(OSError, match="public write failure"):
         export_static.export(str(directory), follow_capture=capture)
     assert capture.result is None
+
+
+@pytest.fixture
+def staged_writer(tmp_path, database):
+    repo = tmp_path / "data-repo"
+    state = tmp_path / "writer-state"
+    state.mkdir()
+    writer.git(tmp_path, "init", str(repo))
+    writer.git(repo, "config", "core.autocrlf", "true")
+    directory = repo / "docs/data"
+    capture = observe_seed(seed(directory, []))
+    pipeline.run(
+        [
+            raw("Fixture MA", "ma"),
+            raw("Fixture NY", "ny") | {"locations": ["Albany, NY"]},
+        ],
+        verbose=False,
+        follow_capture=capture,
+    )
+    export_static.export(str(directory), follow_capture=capture)
+    assert capture.result is not None
+    assert capture.result.identity.shard_sha256.keys() == {"MA", "NY"}
+    return repo, state, capture.result
+
+
+def stage(repo, state):
+    writer.stage_snapshot(repo, state)
+    return writer.git(repo, "write-tree").stdout.decode("ascii").strip()
+
+
+def test_staged_proof_uses_exact_validated_git_bytes(staged_writer):
+    repo, state, proof = staged_writer
+    candidate = stage(repo, state)
+    original = public_bytes(repo / "docs/data")
+    assert writer.validate_tree(repo, candidate) is None
+    checked = writer.validate_staged_follow_provenance(repo, candidate, proof)
+    assert checked.candidate_tree == candidate
+    assert checked.generated_at == proof.generated_at
+    assert checked.covers_after == proof.covers_after
+    assert checked.index_bytes == (repo / "docs/data/listings/index.json").read_bytes()
+    assert checked.shard_sha256 == proof.identity.shard_sha256
+    assert set(checked.shards) == {"listings/MA.json", "listings/NY.json"}
+    assert checked.for_adapter(tuple_evidence, tuple_evidence) == (
+        proof.identity.index_sha256,
+        proof.identity.shard_sha256,
+        {
+            key: (value.raw_first_seen, value.verified_utc, value.observed_by)
+            for key, value in proof.rows.items()
+        },
+    )
+    assert not hasattr(proof, "for_adapter")
+    assert public_bytes(repo / "docs/data") == original
+    # An unstaged working-copy edit cannot replace the immutable candidate bytes.
+    path = repo / "docs/data/listings/MA.json"
+    path.write_bytes(b"unstaged")
+    assert writer.validate_staged_follow_provenance(repo, candidate, proof).shards == checked.shards
+    with pytest.raises(TypeError):
+        checked.shards["listings/MA.json"] = b"substitute"
+
+
+def tuple_evidence(*args):
+    return args
+
+
+@pytest.mark.parametrize(
+    ("name", "reason"),
+    [
+        ("listings/index.json", "staged listing index"),
+        ("listings/MA.json", "staged listing shards"),
+    ],
+)
+def test_valid_but_changed_staged_blob_invalidates_proof(staged_writer, name, reason):
+    repo, state, proof = staged_writer
+    path = repo / "docs/data" / name
+    path.write_bytes(path.read_bytes() + b" ")
+    candidate = stage(repo, state)
+    writer.validate_tree(repo, candidate)
+    with pytest.raises(ValueError, match=reason):
+        writer.validate_staged_follow_provenance(repo, candidate, proof)
+
+
+def test_missing_staged_blob_fails_writer_validation(staged_writer):
+    repo, state, proof = staged_writer
+    (repo / "docs/data/listings/NY.json").unlink()
+    candidate = stage(repo, state)
+    with pytest.raises(ValueError, match="missing or invalid"):
+        writer.validate_staged_follow_provenance(repo, candidate, proof)
+
+
+def test_partial_proof_and_wrong_candidate_fail_closed(staged_writer):
+    repo, state, proof = staged_writer
+    older = stage(repo, state)
+    partial = replace(
+        proof,
+        identity=replace(proof.identity, shard_sha256={"MA": proof.identity.shard_sha256["MA"]}),
+    )
+    with pytest.raises(ValueError, match="staged listing index"):
+        writer.validate_staged_follow_provenance(repo, older, partial)
+    stats = repo / "docs/data/stats.json"
+    stats.write_bytes(stats.read_bytes() + b" ")
+    newer = stage(repo, state)
+    assert newer != older
+    writer.validate_staged_follow_provenance(repo, newer, proof)
+    with pytest.raises(ValueError, match="exact staged candidate"):
+        writer.validate_staged_follow_provenance(repo, older, proof)
+
+
+def test_changed_index_stage_during_validation_cannot_issue_receipt(staged_writer, monkeypatch):
+    repo, state, proof = staged_writer
+    candidate = stage(repo, state)
+    validate = writer.validate_tree
+
+    def restage(checkout, tree, **kwargs):
+        validate(checkout, tree, **kwargs)
+        stats = repo / "docs/data/stats.json"
+        stats.write_bytes(stats.read_bytes() + b" ")
+        assert stage(repo, state) != candidate
+
+    monkeypatch.setattr(writer, "validate_tree", restage)
+    with pytest.raises(ValueError, match="changed during"):
+        writer.validate_staged_follow_provenance(repo, candidate, proof)
+
+
+def test_archive_attributes_cannot_hide_a_staged_slim_shard(staged_writer):
+    repo, state, proof = staged_writer
+    path = "docs/data/listings/VA.json"
+    (repo / path).write_bytes(b"[]")
+    (repo / ".git/info/attributes").write_text(f"{path} export-ignore\n", encoding="utf-8")
+    candidate = stage(repo, state)
+    writer.validate_tree(repo, candidate)
+    with pytest.raises(ValueError, match="paths differ"):
+        writer.validate_staged_follow_provenance(repo, candidate, proof)

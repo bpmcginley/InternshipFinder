@@ -1,7 +1,10 @@
 """Prepare and publish one complete ingest snapshot on the existing data branch."""
 
 import argparse
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
+from hashlib import sha256
 import io
 import json
 import os
@@ -10,6 +13,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from types import MappingProxyType
 
 BRANCH = "refs/heads/data"
 TRACKING = "refs/remotes/origin/data"
@@ -71,7 +75,7 @@ def check_counts(declared, actual):
         raise ValueError("Declared ingest snapshot count does not match the referenced file")
 
 
-def validate_tree(checkout, tree):
+def validate_tree(checkout, tree, *, _listing_bytes=None):
     paths = [PUBLIC]
     if git(checkout, "ls-tree", tree, "--", "backend/data").stdout:
         paths.append("backend/data")
@@ -88,11 +92,23 @@ def validate_tree(checkout, tree):
             if not member.isfile() or name in names or not member.name.endswith(".json"):
                 raise ValueError("Aliased or unexpected file in ingest snapshot")
             names.add(name)
-            with snapshot.extractfile(member) as payload:
-                value = parse_json(payload.read())
-                if member.name in STATE and not isinstance(value, dict):
-                    raise ValueError("Expected an ingest state object")
-                files[member.name.removeprefix(PUBLIC + "/")] = value
+            path = member.name.removeprefix(PUBLIC + "/")
+            if (
+                _listing_bytes is not None
+                and member.name.startswith(f"{PUBLIC}/listings/")
+                and not member.name.endswith(".desc.json")
+            ):
+                # Git archive may apply working-tree conversion to text files.
+                # Validate and retain the exact object bytes for the proof.
+                raw = git(checkout, "cat-file", "blob", f"{tree}:{member.name}").stdout
+                _listing_bytes[path] = raw
+                value = parse_json(raw)
+            else:
+                with snapshot.extractfile(member) as payload:
+                    value = parse_json(payload.read())
+            if member.name in STATE and not isinstance(value, dict):
+                raise ValueError("Expected an ingest state object")
+            files[path] = value
 
     if not REQUIRED <= files.keys():
         raise ValueError("Required public file missing from ingest snapshot")
@@ -216,6 +232,93 @@ def stage_snapshot(checkout, state):
         if target.is_file() or tracked:
             git(checkout, "add", "-A", "--", path)
     ensure_owned_stage(checkout)
+
+
+@dataclass(frozen=True)
+class _StagedFollowProvenance:
+    candidate_tree: str
+    generated_at: datetime
+    covers_after: datetime
+    index_bytes: bytes
+    shards: Mapping[str, bytes]
+    index_sha256: str
+    shard_sha256: Mapping[str, str]
+    _rows: Mapping
+
+    def for_adapter(self, provenance_type, evidence_type):
+        """Construct #334 evidence from the exact validated staged candidate."""
+        return provenance_type(
+            self.index_sha256,
+            self.shard_sha256,
+            {
+                role_id: evidence_type(proof.raw_first_seen, proof.verified_utc, proof.observed_by)
+                for role_id, proof in self._rows.items()
+            },
+        )
+
+
+def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
+    """Verify an opted-in proof against the current, exact writer candidate without publishing."""
+    ensure_owned_stage(checkout)
+    if (
+        provenance is None
+        or git(checkout, "write-tree").stdout.decode("ascii").strip() != candidate_tree
+    ):
+        raise ValueError("Expected follow proof and exact staged candidate")
+
+    listing_bytes = {}
+    validate_tree(checkout, candidate_tree, _listing_bytes=listing_bytes)
+    staged_listing_paths = (
+        git(
+            checkout,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "-z",
+            candidate_tree,
+            "--",
+            f"{PUBLIC}/listings",
+        )
+        .stdout.decode("utf-8")
+        .split("\0")
+    )
+    if {
+        path.removeprefix(PUBLIC + "/")
+        for path in staged_listing_paths
+        if path and not path.endswith(".desc.json")
+    } != listing_bytes.keys():
+        raise ValueError("Staged follow listing paths differ from the validated archive")
+    index_bytes = listing_bytes.pop("listings/index.json")
+    index = parse_json(index_bytes)
+    identity = provenance.identity
+    if (
+        sha256(index_bytes).hexdigest() != identity.index_sha256
+        or datetime.fromisoformat(index["generated_at"]) != provenance.generated_at
+        or not index["files"]
+        or index["files"].keys() != identity.shard_sha256.keys()
+    ):
+        raise ValueError("Follow proof does not match the staged listing index")
+
+    digests = {}
+    for key, entry in index["files"].items():
+        path = entry["file"]
+        digests[key] = sha256(listing_bytes[path]).hexdigest()
+    if digests != identity.shard_sha256:
+        raise ValueError("Follow proof does not match the staged listing shards")
+
+    if git(checkout, "write-tree").stdout.decode("ascii").strip() != candidate_tree:
+        raise ValueError("Staged candidate changed during follow verification")
+
+    return _StagedFollowProvenance(
+        candidate_tree,
+        provenance.generated_at,
+        provenance.covers_after,
+        index_bytes,
+        MappingProxyType(listing_bytes),
+        identity.index_sha256,
+        MappingProxyType(digests),
+        MappingProxyType(dict(provenance.rows)),
+    )
 
 
 def ancestor(checkout, earlier, later):
