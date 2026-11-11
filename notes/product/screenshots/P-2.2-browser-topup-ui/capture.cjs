@@ -38,6 +38,11 @@ async function context(
     releases = [];
   await ctx.addInitScript(
     ({ signedIn }) => {
+      addEventListener("message", (event) => {
+        const d = event.data;
+        if (d?.__internscout === "req")
+          postMessage({ __internscout: "res", id: d.id, result: {} }, location.origin);
+      });
       localStorage.setItem("internscout.setup.skipped.v1", "true");
       localStorage.setItem("internscout.landing.seen.v1", "true");
       if (signedIn)
