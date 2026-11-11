@@ -42,6 +42,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 from internscout import seo_pages as sp  # noqa: E402
 from internscout import placements  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 # was: MIN_NEW = 3. It moved to seo_pages (2026-10-06) with the "new" rule below, so the sign-up
 # forms on the landing pages quote a field's number only when the email would give it a section.
@@ -591,11 +592,17 @@ def main(argv: list[str]) -> int:
         with open(os.path.join(args.out, name), "w", encoding="utf-8", newline="\n") as f:
             f.write(body)
     t = digest["totals"]
-    print(
-        f"[digest] {digest['subject']}: {len(digest['sections'])} of {t['fields']} fields shown, "
-        f"{t['nearby']:,} new roles in the Northeast or remote; wrote digest.html, digest.txt and "
-        f"digest.json to {args.out}"
+    counts = (
+        f"{len(digest['sections'])} of {t['fields']} fields shown, "
+        f"{t['nearby']:,} new roles in the Northeast or remote"
     )
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
+        console(f"[digest] wrote digest preview ({counts})")
+    else:
+        console(
+            f"[digest] {digest['subject']}: {counts}; wrote digest.html, digest.txt and "
+            f"digest.json to {args.out}"
+        )
     return 0
 
 
