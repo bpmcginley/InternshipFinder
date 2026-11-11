@@ -9,6 +9,7 @@ import re
 from datetime import date, datetime, timezone
 
 from . import insights
+from .public_data import public_data_dir
 
 # 2026-10-28: was: static cards only showed title, place, term and pay. Limit this observation
 # cohort to four retained employer pages; no page-selection or indexing rule depends on it.
@@ -275,7 +276,8 @@ def load(site_dir: str, rows: list[dict]) -> dict[str, tuple[tuple[str, str], ..
     # Full-source facts are exported separately so slim dashboard rows and the 1,500-character
     # description limit stay unchanged. A new export replaces this map; carried excerpts cannot
     # recreate or silently refresh its provenance.
-    records = read_records(os.path.join(site_dir, "data", FILE))
+    data = public_data_dir(site_dir)
+    records = read_records(os.path.join(data, FILE))
     for id_, row in list(pending.items()):
         facts = recorded_facts(row, records.get(id_))
         if facts:
@@ -291,7 +293,7 @@ def load(site_dir: str, rows: list[dict]) -> dict[str, tuple[tuple[str, str], ..
     for id_, row in pending.items():
         for key in row.get("keys", ()):
             if isinstance(key, str) and _SHARD.fullmatch(key):
-                path = os.path.join(site_dir, "data", "listings", key + ".desc.json")
+                path = os.path.join(data, "listings", key + ".desc.json")
                 try:
                     size = os.path.getsize(path)
                 except OSError:

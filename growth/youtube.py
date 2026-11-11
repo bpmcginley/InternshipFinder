@@ -47,6 +47,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+# The checkout script also works without an editable install.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+try:
+    from internscout.console_log import console
+finally:
+    sys.path.pop(0)
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API = "https://www.googleapis.com/youtube/v3"
@@ -383,10 +391,10 @@ def main(argv: list[str]) -> int:
         post = json.load(f)
     reel = os.path.join(os.path.dirname(os.path.abspath(path)), "reel.mp4")
     if not post.get("reel"):
-        print("[youtube] not a Reel day (post.json has no reel); no Short")
+        console("[youtube] not a Reel day (post.json has no reel); no Short")
         return 0
     if not os.path.exists(reel):
-        print(
+        console(
             "[youtube] post.json asks for a Reel but reel.mp4 wasn't made (see the Post step); no Short"
         )
         return 0
@@ -398,7 +406,7 @@ def main(argv: list[str]) -> int:
         return 0
     missing = [k for k in SECRETS if not os.environ.get(k)]
     if missing:
-        print(f"[youtube] no {', '.join(missing)}; nothing uploaded (growth/README.md, YouTube)")
+        console(f"[youtube] no {', '.join(missing)}; nothing uploaded (growth/README.md, YouTube)")
         return 0
     try:
         token = access_token(*(os.environ[k] for k in SECRETS))

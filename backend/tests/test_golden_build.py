@@ -53,7 +53,7 @@ def test_full_build_matches_golden(tmp_path):
 def test_one_character_template_change_is_detected(tmp_path):
     work = tmp_path / "mutated"
     prepare(work)
-    template = work / "backend" / "internscout" / "seo_pages.py"
+    template = work / "backend" / "internscout" / "site" / "assets.py"
     source = template.read_text(encoding="utf-8")
     original = 'SLOGAN = "Built by one student, made for all students."'
     assert source.count(original) == 1
