@@ -1,3 +1,4 @@
+import { topupRetentionBalanceSql } from "./topup-retention.js";
 // Dormant purchased-unit storage. The future admission caller must first exhaust monthly
 // and invite units and enforce every service/task limit. Receipts are not AI authorization.
 const identity = (run) =>
@@ -22,7 +23,7 @@ const outcome = (changed, selected) => ({
 export async function allocatePurchasedRun(db, run) {
   const values = identity(run);
   if (!values) return { changed: false, allocation: null };
-  const [inserted, , selected] = await db.batch([
+  const [inserted, , , selected] = await db.batch([
     db
       .prepare(
         "INSERT INTO topup_allocations(user_hash,month,task,run_id,payment_hash,state) " +
@@ -42,6 +43,9 @@ export async function allocatePurchasedRun(db, run) {
           `WHERE payment_hash=(SELECT payment_hash FROM topup_allocations WHERE ${key}) AND changes()=1`,
       )
       .bind(...values),
+    db
+      .prepare(topupRetentionBalanceSql(`SELECT payment_hash FROM topup_allocations WHERE ${key}`))
+      .bind(...values),
     receipt(db, values),
   ]);
   return outcome(inserted, selected);
@@ -58,7 +62,7 @@ const financial =
 export async function restorePurchasedRun(db, run) {
   const values = identity(run);
   if (!values) return { changed: false, allocation: null };
-  const [restored, , selected] = await db.batch([
+  const [restored, , , selected] = await db.batch([
     db
       .prepare(
         "UPDATE topup_allocations SET state=CASE WHEN (SELECT " +
@@ -84,6 +88,9 @@ export async function restorePurchasedRun(db, run) {
           "revoked=revoked+((SELECT destination FROM target)='revoked') " +
           "WHERE payment_hash=(SELECT payment_hash FROM target) AND changes()=1",
       )
+      .bind(...values),
+    db
+      .prepare(topupRetentionBalanceSql(`SELECT payment_hash FROM topup_allocations WHERE ${key}`))
       .bind(...values),
     receipt(db, values),
   ]);

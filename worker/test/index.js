@@ -88,3 +88,5 @@ import "./funded-run-sibling.test.js";
 import "./funded-purchase.test.js";
 import "./funded-provider.test.js";
 import "./ai-lifecycle.test.js";
+
+import "./topup-retention.test.js";

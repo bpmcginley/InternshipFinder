@@ -1,3 +1,4 @@
+import { topupRetentionBalanceSql } from "./topup-retention.js";
 // SQL fragments used only inside the funded-run transaction, never a second allocation call.
 export const purchaseFrom =
   "FROM topup_purchases p JOIN topup_claims c ON c.payment_hash=p.payment_hash LEFT JOIN topup_reconciliations r ON r.payment_hash=p.payment_hash";
@@ -19,6 +20,13 @@ export function allocateGeneration(db, generation, callId) {
     db
       .prepare(
         "UPDATE topup_purchases SET available=available-1,consumed=consumed+1 WHERE payment_hash=(SELECT payment_hash FROM topup_generation_allocations WHERE generation=?) AND changes()=1",
+      )
+      .bind(generation),
+    db
+      .prepare(
+        topupRetentionBalanceSql(
+          "SELECT payment_hash FROM topup_generation_allocations WHERE generation=?",
+        ),
       )
       .bind(generation),
   ];
@@ -57,6 +65,11 @@ export function restoreGeneration(q) {
         "WHERE payment_hash=(SELECT p.payment_hash " +
         selected +
         ") AND changes()=1",
+    ),
+    q(
+      topupRetentionBalanceSql(
+        "SELECT payment_hash FROM topup_generation_allocations WHERE generation=(SELECT generation FROM target WHERE calls=1 AND accepted=0 AND funding='purchase')",
+      ),
     ),
   ];
 }

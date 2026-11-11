@@ -115,9 +115,9 @@ export async function releaseFundedCall(db, identity) {
       ),
       q("DELETE FROM funded_run_calls WHERE call_id=(SELECT call_id FROM target)"),
     ],
-    [8, 9],
+    [9, 10],
     "released",
-    8, // Actual D1 counts the run, metadata and last-call cascade; Node counts only the run.
+    9, // Actual D1 counts the run, metadata and last-call cascade; Node counts only the run.
   );
 }
 

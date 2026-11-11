@@ -54,7 +54,12 @@ const reversal = (status, amount = 327) => ({
   currency: "usd",
 });
 async function count(db, expected) {
-  for (const table of ["topup_claims", "topup_purchases", "topup_reconciliations"])
+  for (const table of [
+    "topup_claims",
+    "topup_purchases",
+    "topup_reconciliations",
+    "topup_retention",
+  ])
     assert.equal((await rows(db, table)).length, expected);
 }
 
@@ -92,6 +97,16 @@ export async function initialDispositions(db) {
     assert.equal(purchase.consumed, 0);
     assert.equal(purchase.granted, 25);
     assert.equal(purchase.amount, 327);
+    const retention = await db
+      .prepare("SELECT * FROM topup_retention WHERE payment_hash=?")
+      .bind(result.paymentHash)
+      .first();
+    const resolved =
+      refunds.every((r) => !["pending", "requires_action"].includes(r.status)) &&
+      disputes.every((d) => ["won", "warning_closed", "prevented", "lost"].includes(d.status));
+    assert.equal(!!retention.resolved_at, resolved);
+    assert.equal(!!retention.resolved_zero_since, resolved && disposition === "revoked");
+
     const state = await db
       .prepare("SELECT * FROM topup_reconciliations WHERE payment_hash=?")
       .bind(result.paymentHash)
@@ -283,6 +298,16 @@ export async function settlementRollback(db) {
   assert.equal((await rows(db, "topup_attempt_revisions"))[0].revision, 1);
   assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "creating");
   await db.prepare("DROP TRIGGER fixture_settlement_abort").run();
+  await db
+    .prepare(
+      "CREATE TRIGGER fixture_retention_abort BEFORE INSERT ON topup_retention BEGIN SELECT RAISE(ABORT,'fixture_retention_rollback'); END",
+    )
+    .run();
+  await assert.rejects(() => apply(db, f), /fixture_retention_rollback/);
+  await count(db, 0);
+  assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "creating");
+  assert.equal((await rows(db, "topup_attempt_revisions"))[0].revision, 1);
+  await db.prepare("DROP TRIGGER fixture_retention_abort").run();
   assert.equal((await apply(db, f)).status, "settled");
 }
 
