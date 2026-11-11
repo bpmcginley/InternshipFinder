@@ -285,8 +285,8 @@ export async function deleteLinkedFollows(db, ownerUserHash) {
   ]);
 }
 
-export async function expireFollows(db, now = new Date()) {
-  await db.batch([
+export function followExpiryStatements(db, now) {
+  return [
     db
       .prepare(
         "DELETE FROM follow_tokens WHERE expires_at<=? OR (purpose='confirm' AND EXISTS " +
@@ -300,5 +300,9 @@ export async function expireFollows(db, now = new Date()) {
     db.prepare(
       "DELETE FROM follow_subscribers WHERE NOT EXISTS (SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id)",
     ),
-  ]);
+  ];
+}
+
+export async function expireFollows(db, now = new Date()) {
+  await db.batch(followExpiryStatements(db, now));
 }

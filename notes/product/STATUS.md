@@ -80,6 +80,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| D | P-2.1ad Follow retention maintenance | Product session | `codex/product-p2.1ad-follow-maintenance` | [#362](https://github.com/bpmcginley/InternshipFinder/pull/362) | Draft needs-bruce | Dormant bulk operation using one D1 UTC sample and the existing expiry and budget statements. No scheduler or sending. |
 | D | P-2.1ac Bounded delivery tick | audit_growth_generated | `codex/product-p2.1ac-delivery-tick` | [#361](https://github.com/bpmcginley/InternshipFinder/pull/361) | Draft; review/CI pending; needs-bruce | Bounded advisory lookup and sequential UTC-fenced delivery; normal npm test 482 / Workers 102 pass. Five candidate reads at 10,000 synthetic jobs. No cleanup/schedule/activation. |
 | D | P-2.1z Archive-qualified subscriber batch | Product lead | `codex/product-p2.1z-archive-batch` | [#354](https://github.com/bpmcginley/InternshipFinder/pull/354) | Draft needs-bruce | Bounded confirmed-subscriber lookup and one verified archive read per page. 466 Node and 85 local Workers tests passed. Independent review, hosted checks, owner integration and activation pending. |
 | D | P-2.1u Archive-qualified follow enqueue | Product session | `codex/product-p2.1u-qualified-enqueue` | [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) | Draft needs-bruce | Dormant single-subscriber composition on #330. Uses verified archive coverage, fresh Worker time and a D1 write-time cutoff. No scheduler or sender. |
@@ -235,6 +236,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | P-2.1ad Follow retention maintenance | [#362](https://github.com/bpmcginley/InternshipFinder/pull/362) composes existing retention in one bulk D1 batch. Independent review, owner integration and operator activation remain pending. | Draft needs-bruce |
 | 2026-11-11 | [P-2.1ac / #361](https://github.com/bpmcginley/InternshipFinder/pull/361) bounded delivery tick | Dormant internal operation; explicit limits, independent review/CI and all owner sender/integration gates remain. No durable cursor or cleanup. | Needs-bruce; no activation |
 | 2026-11-11 | Follow archive subscriber batch | [#354](https://github.com/bpmcginley/InternshipFinder/pull/354) adds an internal confirmed-subscriber batch with explicit bounds and existing queue checks. Scheduling, archive binding, owner integration and deployment remain pending. | Draft needs-bruce |
 | 2026-11-10 | P-2.1o budgeted digest attempt | [#310](https://github.com/bpmcginley/InternshipFinder/pull/310) composes the dormant strict digest claim and shared budget. Parent integration, owner cap and quota, dispatch wiring and deployment remain pending. | Draft needs-bruce, no sending activation |
