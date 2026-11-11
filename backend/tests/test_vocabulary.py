@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 from shutil import copyfile
 
-from internscout import classify, geo, near_metros, vocabulary
-from internscout.site import taxonomy
+from internscout import classify, focus, geo, near_metros, vocabulary
+from internscout.site import source, taxonomy
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -19,6 +19,8 @@ def test_vocabulary_projections_keep_order_and_labels():
     assert dict(vocabulary.US_PLACE_LABELS)["DC"] == "District of Columbia"
     assert taxonomy.US_STATES["DC"] == "Washington, DC"
     assert taxonomy.US_STATES["remote"] == "Remote (US)"
+    assert focus.HOME == source.HOME_STATES == set(vocabulary.HOME_STATE_CODES)
+    assert focus.HOME is not source.HOME_STATES
     assert list(taxonomy.CA_PROVINCES.items()) == list(vocabulary.CANADIAN_PROVINCES)
     assert list(geo.PROVINCES.items()) == sorted(vocabulary.CANADIAN_PROVINCES)
     assert list(near_metros.FIELD_TAGS.items()) == [
