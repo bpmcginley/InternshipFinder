@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from internscout import asset_versions, geo, probe
+from internscout.sources import greenhouse, nyc_jobs, usajobs
 
 
 @pytest.fixture(params=[False, True], ids=["plain", "json"])
@@ -141,3 +142,113 @@ def test_probe_fallback_survives_an_unavailable_json_stream(monkeypatch):
     with contextlib.redirect_stdout(UnavailableStream()):
         assert probe._probe_one(None, "Synthetic Name") == ("second", "synthetic-board")
     assert len(writes) == 1
+
+
+def test_public_feed_statuses_include_only_the_count_or_setting_names(
+    monkeypatch, capsys, json_log
+):
+    calls = []
+
+    def nyc_response(request):
+        calls.append("nyc")
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "job_id": "synthetic-city-posting",
+                    "business_title": "Engineering Intern",
+                    "career_level": "Student",
+                }
+            ],
+        )
+
+    def usa_response(request):
+        calls.append("usa")
+        return httpx.Response(
+            200,
+            json={
+                "SearchResult": {
+                    "SearchResultCountAll": 1,
+                    "SearchResultItems": [
+                        {
+                            "MatchedObjectDescriptor": {
+                                "PositionTitle": "Engineering Student Trainee",
+                                "PositionURI": "https://example.test/synthetic-federal-posting",
+                                "PositionLocation": [
+                                    {"LocationName": "Boston, Massachusetts", "CountryCode": "US"}
+                                ],
+                            }
+                        }
+                    ],
+                }
+            },
+        )
+
+    monkeypatch.setattr(
+        nyc_jobs, "client", lambda: httpx.Client(transport=httpx.MockTransport(nyc_response))
+    )
+    monkeypatch.setattr(
+        usajobs, "client", lambda: httpx.Client(transport=httpx.MockTransport(usa_response))
+    )
+    monkeypatch.delenv("USAJOBS_API_KEY", raising=False)
+    monkeypatch.delenv("USAJOBS_EMAIL", raising=False)
+
+    assert len(nyc_jobs.fetch_nyc_jobs()) == 1
+    assert usajobs.fetch_usajobs() == []
+    assert calls == ["nyc"]
+    assert len(usajobs.fetch_usajobs(api_key="fixture-value", email="fixture@example.test")) == 1
+    assert calls == ["nyc", "usa"]
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    messages = [
+        "[nyc_jobs] 1 student postings",
+        "[usajobs] no USAJOBS_API_KEY/USAJOBS_EMAIL set; skipping",
+        "[usajobs] 1 student postings",
+    ]
+    if json_log:
+        assert [json.loads(line) for line in captured.out.splitlines()] == [
+            {"level": "INFO", "message": message} for message in messages
+        ]
+    else:
+        assert captured.out == "\n".join(messages) + "\n"
+
+
+def test_greenhouse_detail_failure_preserves_list_item_and_scan_completion(capsys, json_log):
+    paths = []
+
+    def respond(request):
+        paths.append(request.url.path)
+        if len(paths) != 1:
+            raise TimeoutError("synthetic provider detail")
+        return httpx.Response(
+            200,
+            json={
+                "jobs": [
+                    {
+                        "id": "synthetic-id",
+                        "title": "Engineering Intern",
+                        "location": {"name": "Boston, MA"},
+                        "absolute_url": "https://example.test/role",
+                        "content": "<p>Keep the list description.</p>",
+                    }
+                ]
+            },
+        )
+
+    board = {"ats_token": "synthetic-board", "name": "Synthetic Employer"}
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        items = greenhouse.fetch_greenhouse_board(client, board)
+    assert len(paths) == 2
+    assert items[0]["description"] == "Keep the list description."
+    assert board["_scan_complete"] is True
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    if json_log:
+        assert json.loads(captured.out) == {
+            "level": "WARNING",
+            "message": "[greenhouse] job detail failed",
+            "exception_type": "TimeoutError",
+        }
+    else:
+        assert captured.out == ""
