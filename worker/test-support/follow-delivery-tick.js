@@ -338,3 +338,43 @@ export async function measureCandidateReads(db) {
   assert.deepEqual(samples, [5, 5, 5, 5, 5, 5]);
   return samples;
 }
+
+export async function persistedUncertainContinues(db) {
+  const f = await fixture(db);
+  let calls = 0;
+  const result = await f.run({
+    transport: async () => {
+      calls++;
+      if (calls === 1) throw new Error("Synthetic uncertain acceptance");
+      assert.equal(
+        (
+          await db
+            .prepare(
+              "SELECT count(*) n FROM follow_digest_outbox WHERE state='uncertain' AND payload IS NULL AND lease_token IS NULL AND accepted_at IS NULL",
+            )
+            .first()
+        ).n,
+        1,
+        "the first uncertainty must be durably terminal before the second transport starts",
+      );
+    },
+  });
+  assert.deepEqual(result, { status: "processed", counts: { uncertain: 1, accepted: 1 } });
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    (
+      await db
+        .prepare("SELECT state,count(*) n FROM follow_digest_outbox GROUP BY state ORDER BY state")
+        .all()
+    ).results,
+    [
+      { state: "accepted", n: 1 },
+      { state: "queued", n: 1 },
+      { state: "uncertain", n: 1 },
+    ],
+  );
+  assert.equal(
+    await db.prepare("SELECT attempts FROM follow_send_budget WHERE slot=1").first("attempts"),
+    2,
+  );
+}
