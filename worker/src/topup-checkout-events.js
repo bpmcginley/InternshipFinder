@@ -1,6 +1,6 @@
 // Dormant handoff for Checkout events returned by the existing signature verifier.
 import { recoverTopupAttempt } from "./topup-attempt-recovery.js";
-import { validTopupCheckoutId } from "./topup-ledger.js";
+import { referenceHash, validTopupCheckoutId } from "./topup-ledger.js";
 
 const recoveryEvents = new Set([
   "checkout.session.completed",
@@ -30,36 +30,48 @@ export async function recoverVerifiedTopupCheckoutEvent({
   const checkout = event.data?.object;
   const marked = checkout?.metadata?.kind === "autofill_topup";
   const checkoutId = checkout?.id;
-  if (!validTopupCheckoutId(checkoutId) || checkoutId !== checkoutId.trim())
-    return marked ? pending() : unclassified();
+  if (!validTopupCheckoutId(checkoutId) || checkoutId !== checkoutId.trim()) return pending();
 
-  const attemptId = marked ? checkout.metadata.attempt_id : null;
-  if (marked && !validAttemptId(attemptId)) return pending();
+  const hint = checkout.metadata?.attempt_id;
+  const attemptId = validAttemptId(hint) ? hint : null;
+  if (marked && !attemptId) return pending();
   const livemode = event.livemode;
-  const matchesEvent =
-    checkout.object === "checkout.session" &&
-    checkout.mode === "payment" &&
-    typeof livemode === "boolean" &&
-    checkout.livemode === livemode;
+  if (
+    checkout.object !== "checkout.session" ||
+    typeof livemode !== "boolean" ||
+    checkout.livemode !== livemode
+  )
+    return pending();
+  const mode = checkout.mode;
   const user = checkout.metadata?.user_hash;
   const version = checkout.metadata?.offer_version;
   const units = checkout.metadata?.units;
   const reference = checkout.client_reference_id;
   try {
-    // Primary-key and unique Checkout lookups can identify distinct rows on a collision.
-    const { success, results } = await db
-      .prepare(
-        "SELECT id,user_hash,offer_version,units,checkout_id,state FROM topup_checkout_attempts " +
-          "WHERE id=? OR checkout_id=? LIMIT 2",
-      )
-      .bind(attemptId, checkoutId)
-      .all();
-    if (success !== true || !Array.isArray(results) || results.length > 1) return pending();
-    const [attempt] = results;
-    if (!attempt) return marked ? { status: "inactive" } : unclassified();
+    // Read the durable attempt and retained Checkout fingerprint in the same D1 batch.
+    const checkoutHash = await referenceHash("checkout", livemode, checkoutId);
+    const lookups = await db.batch([
+      db
+        .prepare(
+          "SELECT id,user_hash,offer_version,units,checkout_id,state FROM topup_checkout_attempts " +
+            "WHERE id=? OR checkout_id=? LIMIT 2",
+        )
+        .bind(attemptId, checkoutId),
+      db.prepare("SELECT 1 AS known FROM topup_claims WHERE checkout_hash=?").bind(checkoutHash),
+    ]);
+    if (
+      lookups.length !== 2 ||
+      lookups.some((result) => result?.success !== true || !Array.isArray(result.results)) ||
+      lookups[0].results.length > 1 ||
+      lookups[1].results.length > 1
+    )
+      return pending();
+    const [attempt] = lookups[0].results;
+    const knownClaim = lookups[1].results.length === 1;
+    if (!attempt) return marked || knownClaim ? { status: "inactive" } : unclassified();
     if (
       !marked ||
-      !matchesEvent ||
+      mode !== "payment" ||
       attempt.id !== attemptId ||
       (attempt.checkout_id !== null && attempt.checkout_id !== checkoutId) ||
       attempt.user_hash !== user ||
@@ -71,7 +83,8 @@ export async function recoverVerifiedTopupCheckoutEvent({
     if (!recoveryEvents.has(type)) return { status: "ignored" };
     if (attempt.state === "settled" || attempt.state === "expired")
       return attempt.checkout_id === checkoutId ? { status: "inactive" } : pending();
-    if (typeof resolveOffer !== "function" || typeof fetchImpl !== "function") return pending();
+    if (knownClaim || typeof resolveOffer !== "function" || typeof fetchImpl !== "function")
+      return pending();
     const offer = await resolveOffer(attempt.offer_version, livemode);
     if (offer?.version !== attempt.offer_version || offer?.livemode !== livemode) return pending();
     const result = await recoverTopupAttempt(db, env, attempt.id, offer, fetchImpl, {

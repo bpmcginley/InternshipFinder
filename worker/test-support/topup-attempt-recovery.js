@@ -334,6 +334,14 @@ export async function verifiedCheckoutRecoversLostCreationExactlyOnce(db) {
   assert.deepEqual(await webhook(db, f, event), { status: "inactive" });
   assert.equal(f.calls.length, calls);
   assert.equal((await rows(db, "topup_purchases")).length, 1);
+
+  await deleteUser(db, f.a.user_hash, now);
+  assert.deepEqual(await rows(db, "topup_checkout_attempts"), []);
+  assert.equal((await rows(db, "topup_claims"))[0].state, "deleted");
+  const markerless = await signedCheckout({ ...f.checkout, metadata: {} });
+  assert.deepEqual(await webhook(db, f, markerless), { status: "inactive" });
+  assert.equal(f.calls.length, calls);
+  assert.deepEqual(await rows(db, "topup_purchases"), []);
 }
 
 export async function verifiedCheckoutKnownOrAmbiguousNeverFallsThrough(db) {
@@ -387,10 +395,32 @@ export async function verifiedCheckoutKnownOrAmbiguousNeverFallsThrough(db) {
     ),
     { status: "unclassified" },
   );
+  assert.deepEqual(
+    await webhook(
+      db,
+      f,
+      await signedCheckout({ ...f.checkout, id: "cs_unknown", metadata: {}, livemode: true }),
+    ),
+    { status: "pending" },
+  );
   assert.deepEqual(await webhook(db, f, await signedCheckout(f.checkout, "charge.refunded")), {
     status: "unclassified",
   });
   assert.equal(f.calls.length, 0);
+  assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
+  await noGrant(db);
+
+  const creating = await setup(db, "creating");
+  const missingMarker = { ...creating.checkout, metadata: { attempt_id: creating.a.id } };
+  assert.deepEqual(await webhook(db, creating, await signedCheckout(missingMarker)), {
+    status: "pending",
+  });
+  for (const id of [undefined, "invalid", "cs_fixture\n"])
+    assert.deepEqual(
+      await webhook(db, creating, await signedCheckout({ ...missingMarker, id, metadata: {} })),
+      { status: "pending" },
+    );
+  assert.equal(creating.calls.length, 0);
   assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
   await noGrant(db);
 }
