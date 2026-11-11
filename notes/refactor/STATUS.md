@@ -112,13 +112,13 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 6 | WP-5.3 Shared pure code | wp21_inventory | `refactor/wp-5.3-profile-bridge` | [#316](https://github.com/bpmcginley/InternshipFinder/pull/316) | Merged | Merge `1aefa457`, Pages 42964005110 and exact deployment succeeded. Canonical eight-key dashboard profile bridge with existing projections and extension trust subset. Listing scorers differ and stable IDs already have one producer. Both 57-entry ZIPs and Golden 695 match exactly. Offline package checks 5, Node site 319 and extension 348 passed. |
 | 6 | WP-6.1.1 DATA_DIR | wp14_logging | `refactor/wp-6.1.1-public-data` | [#306](https://github.com/bpmcginley/InternshipFinder/pull/306) | Merged | Locate public listing exports with `INTERNSCOUT_PUBLIC_DATA`; default remains `docs/data`. Merge `bcedd37c`, Pages 42961911238 and exact deployment succeeded. |
 | 6 | WP-6.1.2 Test fixtures | wp42_orders | `refactor/wp-6.1.2-data-test-fixtures` | [#313](https://github.com/bpmcginley/InternshipFinder/pull/313) | Merged | Merge `f3aa1b0e`, Pages 42963510330 and exact deployment succeeded. Fixed dashboard and placement shards, first-screen preview and registry seed checks. With public data and five ingest state files absent, Node 22 site 319, editable Python 1,661 with three skips, and Golden 695. |
-| 6 | WP-6.1.3 Reader workflows | wp14_logging | `refactor/wp-6.1.3-data-readers` | [#317](https://github.com/bpmcginley/InternshipFinder/pull/317) | In review | Pin one public snapshot for eight readers. Primary checkout fallback only when the data branch is absent. Offline Git and staging checks passed, Golden 695. |
+| 6 | WP-6.1.3 Reader workflows | wp14_logging | `refactor/wp-6.1.3-data-readers` | [#317](https://github.com/bpmcginley/InternshipFinder/pull/317) | Merged | Pin one public snapshot for eight readers, with primary fallback when the data branch is absent. Golden 695. Merge `e19c0c69` passed Pages 42965451981, its exact deployment, backend 42965451948 and Every-major selection/build 42965594463. |
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
 | 7 | WP-6.1.4 Data branch | Unassigned | - | - | Queued | Normal push from current data; branch rules remain Bruce's. |
 | 7 | WP-6.1.5 Ingest writer | Unassigned | - | - | Queued | Write data branch; preserve Pages-following-ingest behavior. |
 | 7 | WP-6.1.6 Remove main data | Unassigned | - | - | Waiting for observation | Requires seven days of clean ingest/Pages after cutover; no history rewrite. |
 | 7 | WP-6.2 Remove shims | Unassigned | - | - | Queued | Only after repository-wide old-import search is clear. |
-| 7 | WP-6.3 Ingest timing | Unassigned | - | - | Queued | Report from logs; no production run triggered for measurement. |
+| 7 | WP-6.3 Ingest timing | wp21_inventory | `refactor/wp-6.3-ingest-timing` | [#323](https://github.com/bpmcginley/InternshipFinder/pull/323) | In review | Two successful existing runs measured. Concurrent board phase took 36m 25s scheduled and 27m 11s on push. Per-source timings unavailable. |
 
 ## Verified findings and plan corrections
 
@@ -581,6 +581,19 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Preserve the bare paths from Cards, Reels and Comparison, the digest schedule's Actions output, the directory monitor and metrics JSON, and the growth report Markdown. Digest preview, metrics status, campaign ffmpeg stderr, and title discovery refusal stay outside this slice. The report's exception notes are part of its Markdown, and the fallback has no separate stdout channel for telemetry.
 - IndexNow and Keep schedule keep their 13 prints. Pages notify and the ingest/social guards each sparse-check out only `growth`. Keep schedule also checks out `.github/actions` and installs neither backend dependencies nor the editable project. Adding the `backend/internscout` checkout path at all four call sites plus a direct-script import from `backend` could make the standard-library helper available without changing triggers, permissions, secrets, schedules or package installation. Preserve IndexNow usage and raw error annotations, and keep the guard's `skip=` file output verbatim.
 - Both generator ASTs match main outside the success diagnostics and imports. After normal main integration `add6dc3d`, focused, generator and golden verification passed 69 tests. Ruff passed.
+
+## WP-6.3 ingest timing from existing runs
+
+Both completed runs succeeded. The ingest and export, coverage, and commit columns are step wall-clock durations from Actions metadata. The board phase is the elapsed-seconds value from the existing `[boards]` summary inside the ingest and export step.
+
+| Existing run | Trigger | Ingest and export | Concurrent board phase | Coverage | Commit |
+| --- | --- | ---: | ---: | ---: | ---: |
+| [42637078377](https://github.com/bpmcginley/InternshipFinder/actions/runs/42637078377) | Schedule | 2,544 s (42m 24s) | 2,185 s (36m 25s) | 1 s | 8 s |
+| [42960240558](https://github.com/bpmcginley/InternshipFinder/actions/runs/42960240558) | Push | 1,900 s (31m 40s) | 1,631 s (27m 11s) | 1 s | 10 s |
+
+The board phase accounted for about 86% of the ingest and export step in both runs. Per-source timings are unavailable in the current logs and metrics. The timer covers concurrent worker pools and the retry pass together, and the source breakdown reports posting and failure counts.
+
+For a later measurement, record monotonic elapsed milliseconds and attempt counts under a fixed set of source categories. Report initial and retry attempts separately and distinguish overlapping worker time from elapsed phase time. Keep the output to numeric aggregates and fixed categories.
 
 ## WP-1.4 growth preview and refusal diagnostics
 
