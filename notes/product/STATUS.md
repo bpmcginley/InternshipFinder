@@ -325,6 +325,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+- [#452](https://github.com/bpmcginley/InternshipFinder/pull/452): 0.6.0 tailoring factual anchors. Draft implementation; independent review, exact CI, post-refactor integration and coordinated extension release qualification remain required. No provider or release action.
+
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
 
 P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
@@ -510,4 +512,4 @@ Normally integrated published dashboard main `2a8176db`, preserving reviewed pri
 
 ## Chrome 0.6.0 tailoring factual anchors
 
-Draft claim by audit_site on `codex/product-extension-tailor-anchors`: new `extension/lib/tailor_claims.js`, existing `lib/tailoring.js`, `lib/resume_doc.js`, `lib/docx.js`, `background/tailor.js` cache version lines, new focused test and existing tailoring flow tests, own package note/status. High-confidence numeric/unit and distinct technical identifier checks only. Existing human review, automatic choice, guard, permissions, provider and release stay unchanged. Needs Bruce integration/release; no deployment or provider calls.
+Draft needs-bruce [#452](https://github.com/bpmcginley/InternshipFinder/pull/452) adds conservative numeric/unit and distinct technical-identifier checks across profile/PDF/Word rewrites and versions both real tailoring cache keys. Mapped-source fallback, valid paraphrases/aliases, format/reorder/drop behavior and existing review choices are preserved. All 365 extension tests, scoped lint and startup reporting pass. General semantic claims remain unverified, including unsupported responsibility claims; no extra AI call, provider, guard, manifest, version, storage or release change. Independent review, exact CI and post-refactor release qualification remain required. [Package evidence](P-0.6.0-tailor-anchors.md).

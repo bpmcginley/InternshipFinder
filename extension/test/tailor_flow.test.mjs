@@ -329,3 +329,93 @@ test("urisIn reads link addresses and nothing else", () => {
   assert.equal(sameLink("https://www.LinkedIn.com/in/jane/", "linkedin.com/in/jane"), true);
   assert.equal(sameLink("https://a.com/x", "https://a.com/y"), false);
 });
+
+// Reconstruct the previous public key contract from the current real hash inputs. Only synthetic
+// fixtures are used. This checks the actual path keys, rather than a separate test-only version.
+test("all three paths ignore old-version cache entries and reuse newly checked results", async () => {
+  const { tailorKey } = await import("../lib/tailor_cache.js");
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  const decodeKey = (raw) => {
+    const values = [];
+    let at = 0;
+    for (let n = 0; n < 3; n++) {
+      const end = raw.indexOf(":", at),
+        size = Number(raw.slice(at, end));
+      values.push(raw.slice(end + 1, end + 1 + size));
+      at = end + 1 + size;
+    }
+    return values;
+  };
+  for (const original of [null, await docx("Garamond"), pdf()]) {
+    reset();
+    let keyInput;
+    crypto.subtle.digest = async (algorithm, bytes) => {
+      const text = new TextDecoder().decode(bytes);
+      if (text.includes("\nfacts-3")) keyInput = text;
+      return digest(algorithm, bytes);
+    };
+    try {
+      // Default fake replies leave the original unchanged but still exercise file construction/cache.
+      if (original?.type === "application/pdf") replies.layout = layout();
+      const store = storeOf(original);
+      const fresh = await tailorResume(store, JOB);
+      assert.ok(keyInput, "real cache key includes the validation version");
+      assert.ok(!fresh.reused);
+      const count = calls.length;
+      const warm = await tailorResume(store, JOB);
+      assert.equal(warm.reused, true);
+      assert.equal(calls.length, count);
+      const [model, system, prompt] = decodeKey(keyInput);
+      const priorPrompt = original
+        ? prompt.replace("\nfacts-3\n", "\nformat-2\n")
+        : prompt.replace(/\nfacts-3$/, "");
+      const oldKey = await tailorKey(model, system, priorPrompt);
+      data.tailor_cache = {
+        [oldKey]: { at: Date.now(), value: { file: { name: "unchecked-old" }, diff: [] } },
+      };
+      const rebuilt = await tailorResume(store, JOB);
+      assert.notEqual(rebuilt.file.name, "unchecked-old");
+      assert.ok(!rebuilt.reused);
+      assert.equal(calls.length, count + 1);
+      const again = await tailorResume(store, JOB);
+      assert.equal(again.reused, true);
+      assert.equal(calls.length, count + 1);
+      // A different posting still cannot reuse the prior posting's checked cache entry.
+      await tailorResume(store, {
+        ...JOB,
+        description: JOB.description + " Different synthetic role.",
+      });
+      assert.equal(calls.length, count + 2);
+    } finally {
+      crypto.subtle.digest = digest;
+    }
+  }
+});
+
+test("posting requirements cannot become resume facts through any model response path", async () => {
+  for (const original of [null, await docx("Garamond"), pdf()]) {
+    reset();
+    replies.layout = layout();
+    const bullets = [
+      { from: 0, text: "Improved scores 40%" },
+      { from: 1, text: "Used Kubernetes" },
+      {
+        from: 2,
+        text: original?.name?.endsWith(".docx")
+          ? "Ordered supplies for the team"
+          : "Ordered supplies",
+      },
+    ];
+    replies.template = { summary: "Kubernetes expert", experience: [{ i: 0, bullets }] };
+    replies.doc = { entries: [{ s: 1, e: 0, bullets }] };
+    replies.docx = { groups: [{ g: 0, bullets }] };
+    const result = await tailorResume(storeOf(original), {
+      ...JOB,
+      description:
+        "Kubernetes expertise and improving scores 40% are desired for this synthetic job.",
+    });
+    assert.deepEqual(result.diff, []);
+    assert.equal(result.summary, "");
+    assert.equal(calls.length, original?.type === "application/pdf" ? 2 : 1);
+  }
+});

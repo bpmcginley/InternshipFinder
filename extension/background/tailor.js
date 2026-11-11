@@ -131,7 +131,7 @@ const isAccountError = (e) => NEEDS_YOU_CODES.has(e && e.code);
 // null when nothing usable came back.
 // BUILD names the code that turns a reply into a file. It is part of the cache key, so a file built
 // by an older, faultier version of lib/docx.js or lib/pdf_layout.js is not handed out again.
-const BUILD = "format-2";
+const BUILD = "facts-3";
 // was: tailorWith(store, job, system, prompt, build, extra) and tailorKey(model, system, prompt).
 // The key was made of words only. Two Word files with the same bullets but a different font, or the
 // same PDF re-read into a different layout, shared one key, and the student who uploaded a new file
@@ -327,7 +327,7 @@ async function tailorPdf(store, job, orig) {
 async function tailorFromProfile(store, job) {
   const model = modelFor(store, "tailor");
   const prompt = `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}\n\nPROFILE (JSON)\n${JSON.stringify(tailorInput(store))}`;
-  const key = await tailorKey(model, SYSTEM, prompt);
+  const key = await tailorKey(model, SYSTEM, `${prompt}\n${BUILD}`);
   const hit = await readTailored(key);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
 
