@@ -12,6 +12,6 @@ test("send budget migration is mirrored and budget remains unwired", () => {
   const read = (path) =>
     readFileSync(new URL(path, import.meta.url), "utf8").replaceAll("\r\n", "\n");
   assert.ok(read("../schema.sql").includes(read("../migrations/0016_follow_send_budget.sql")));
-  for (const file of ["index", "mail", "follow-outbox"])
+  for (const file of ["index", "mail"])
     assert.doesNotMatch(read(`../src/${file}.js`), /follow-send-budget/);
 });

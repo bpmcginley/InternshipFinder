@@ -45,4 +45,5 @@ import "./follow-request-deletion.test.js";
 import "./follow-progress.test.js";
 import "./follow-enqueue.test.js";
 import "./follow-send-budget.test.js";
+import "./follow-budgeted-attempt.test.js";
 import "./follow-finalization.test.js";
