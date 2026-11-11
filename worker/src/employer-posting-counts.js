@@ -1,5 +1,8 @@
 // Dormant core: no production caller, URL, migration or shared limiter.
-import { createEmployerCatalogCache } from "./employer-catalog-cache.js";
+import {
+  createEmployerCatalogCache,
+  createRequestSafeEmployerCatalogCache,
+} from "./employer-catalog-cache.js";
 
 export const EMPLOYER_POSTING_EVENT = "employer_posting_open";
 export const employerPostingCountsEnabled = (env) => env?.EMPLOYER_POSTING_COUNTS_ENABLED === "1";
@@ -29,45 +32,97 @@ function parseCatalog(text) {
   return catalog(JSON.parse(text));
 }
 
-export function createEmployerMinuteBudget(schedule = setTimeout, cancel = clearTimeout) {
-  let timer;
-  let minute = null;
-  let addresses = new Map();
-  return (address, now) => {
-    if (!instant(now) || typeof address !== "string" || !/^[0-9a-f:.]{1,64}$/i.test(address))
+// Async because Web Crypto stays in the requesting invocation. Shared state contains no
+// raw address, timer or promise. Codes expire lazily on the next valid newer-minute check.
+export function createEmployerMinuteBudget(crypto = globalThis.crypto) {
+  let key = null,
+    minute = null,
+    codes = new Map();
+  return async (address, now) => {
+    try {
+      if (!instant(now) || typeof address !== "string" || !/^[0-9a-f:.]{1,64}$/i.test(address))
+        return false;
+      const current = Math.floor(now.getTime() / 60_000);
+      if (minute !== null && current < minute) return false;
+      if (current !== minute) {
+        minute = current;
+        codes = new Map();
+      }
+      if (!key) {
+        // Concurrent first calls own their own promises; only the first completed key is
+        // retained. All callers then sign with that same non-extractable isolate key.
+        const generated = await crypto.subtle.generateKey(
+          { name: "HMAC", hash: "SHA-256", length: 256 },
+          false,
+          ["sign"],
+        );
+        if (generated?.extractable !== false || generated?.type !== "secret") return false;
+        key ||= generated;
+      }
+      const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(`${current}:${address}`));
+      if (current !== minute || !(digest instanceof ArrayBuffer) || digest.byteLength !== 32)
+        return false;
+      const code = Array.from(new Uint8Array(digest), (value) =>
+        value.toString(16).padStart(2, "0"),
+      ).join("");
+      const n = codes.get(code) || 0;
+      if ((!n && codes.size >= 2_000) || n >= 30) return false;
+      codes.set(code, n + 1);
+      return true;
+    } catch {
       return false;
-    const current = Math.floor(now.getTime() / 60_000);
-    if (current !== minute) {
-      minute = current;
-      addresses = new Map();
-      cancel(timer);
-      timer = schedule(
-        () => {
-          addresses.clear();
-          minute = null;
-        },
-        60_000 - (now.getTime() % 60_000),
-      );
-      timer?.unref?.(); // Node tests must not wait for the otherwise-idle expiry timer.
     }
-    const n = addresses.get(address) || 0;
-    if ((!n && addresses.size >= 2_000) || n >= 30) return false;
-    addresses.set(address, n + 1);
-    return true;
   };
 }
 
 // Shared by counter instances in this isolate, including after snapshot replacement.
 const employerMinuteBudget = createEmployerMinuteBudget();
 const permanentMatch = () => true;
+const validBody = (body) =>
+  body &&
+  typeof body === "object" &&
+  !Array.isArray(body) &&
+  Object.keys(body).length === 2 &&
+  Object.hasOwn(body, "e") &&
+  Object.hasOwn(body, "c") &&
+  body.e === EMPLOYER_POSTING_EVENT &&
+  isEmployerPostingKey(body.c);
 
-export function createEmployerPostingCounter({ db, keys, now = () => new Date() }) {
-  const known = catalog(keys);
-  const match = known && ((key) => (known(key) ? permanentMatch : null));
-  return employerPostingCounter(db, match, now);
+// A server-only, single-use receipt: no IP, request, binding or persistent identifier.
+const admissions = new WeakMap();
+export async function admitEmployerPosting(body, address, at) {
+  if (!validBody(body)) return null;
+  const company = body.c;
+  let admittedAt;
+  try {
+    admittedAt = instant(at) ? at.getTime() : NaN;
+  } catch {
+    return null;
+  }
+  if (!(await employerMinuteBudget(address, new Date(admittedAt)))) return null;
+  const receipt = Object.freeze({});
+  admissions.set(receipt, { company, at: admittedAt });
+  return receipt;
 }
 
-export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = () => new Date() }) {
+export function createEmployerPostingCounter({
+  db,
+  keys,
+  now = () => new Date(),
+  budget = employerMinuteBudget,
+}) {
+  const known = catalog(keys);
+  const match = known && ((key) => (known(key) ? permanentMatch : null));
+  return employerPostingCounter(db, match, now, budget);
+}
+
+export function createCachedEmployerPostingCounter({
+  db,
+  load,
+  maxBytes,
+  now = () => new Date(),
+  budget = employerMinuteBudget,
+}) {
   const cache = createEmployerCatalogCache({
     load,
     parse: parseCatalog,
@@ -75,11 +130,26 @@ export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = (
     now: () => now().getTime(),
     loadTimeoutMs: 5_000,
   });
-  return employerPostingCounter(db, cache.match, now);
+  return employerPostingCounter(db, cache.match, now, budget);
+}
+
+// Only this parsed catalog may be shared across requests. No loader or D1 binding is retained.
+export function createRequestSafeEmployerPostingCatalog({ maxBytes, now = Date.now }) {
+  return createRequestSafeEmployerCatalogCache({ parse: parseCatalog, maxBytes, now });
+}
+
+// Construct inside the owning request; the caller still owns retention/health sequencing.
+export function createRequestScopedEmployerPostingCounter({
+  db,
+  cache,
+  load,
+  now = () => new Date(),
+}) {
+  return employerPostingCounter(db, (key) => cache.match(key, load), now);
 }
 
 // Cleanup has to succeed for the current UTC day before accepting counts.
-function employerPostingCounter(db, match, now) {
+function employerPostingCounter(db, match, now, budget = employerMinuteBudget) {
   let readyDay = null;
   let cleanupVersion = 0;
   return {
@@ -124,64 +194,74 @@ function employerPostingCounter(db, match, now) {
     },
     async count(body, address) {
       const at = now();
-      if (!match || !instant(at)) return false;
-      const day = at.toISOString().slice(0, 10);
-      const version = cleanupVersion;
-      if (readyDay !== day || !employerMinuteBudget(address, at)) return false;
       if (
-        !body ||
-        typeof body !== "object" ||
-        Array.isArray(body) ||
-        Object.keys(body).length !== 2 ||
-        !Object.hasOwn(body, "e") ||
-        !Object.hasOwn(body, "c") ||
-        body.e !== EMPLOYER_POSTING_EVENT ||
-        !isEmployerPostingKey(body.c)
+        !match ||
+        !instant(at) ||
+        readyDay !== at.toISOString().slice(0, 10) ||
+        !(await budget(address, at)) ||
+        !validBody(body)
       )
         return false;
-      const company = body.c;
-      const isCurrent = await match(company);
-      if (!isCurrent) return false;
-      const checked = now();
-      const checkedTime = instant(checked) ? checked.getTime() : NaN;
+      return countKnown(body.c, at);
+    },
+    async countAdmitted(admission) {
+      const value = admissions.get(admission);
+      admissions.delete(admission); // Consume before any await or caller-controlled operation.
+      if (!value) return false;
+      const fresh = now();
       if (
-        !isCurrent(checkedTime) ||
-        !Number.isFinite(checkedTime) ||
-        checkedTime < at.getTime() ||
-        checked.toISOString().slice(0, 10) !== day ||
-        readyDay !== day ||
-        cleanupVersion !== version
+        !value ||
+        !instant(fresh) ||
+        fresh.getTime() < value.at ||
+        fresh.toISOString().slice(0, 10) !== new Date(value.at).toISOString().slice(0, 10)
       )
         return false;
-      // D1 batch is one transaction. The second write follows only a successful company
-      // increment; failure rolls both back. No full-day scan, IP, or historical rollup.
-      try {
-        const results = await db.batch([
-          db
-            .prepare(
-              `
+      return countKnown(value.company, new Date(value.at));
+    },
+  };
+  async function countKnown(company, at) {
+    const day = at.toISOString().slice(0, 10),
+      version = cleanupVersion;
+    if (!match || readyDay !== day) return false;
+    const isCurrent = await match(company);
+    if (!isCurrent) return false;
+    const checked = now();
+    const checkedTime = instant(checked) ? checked.getTime() : NaN;
+    if (
+      !isCurrent(checkedTime) ||
+      !Number.isFinite(checkedTime) ||
+      checkedTime < at.getTime() ||
+      checked.toISOString().slice(0, 10) !== day ||
+      readyDay !== day ||
+      cleanupVersion !== version
+    )
+      return false;
+    // D1 batch is one transaction. The second write follows only a successful company
+    // increment; failure rolls both back. No full-day scan, IP, or historical rollup.
+    try {
+      const results = await db.batch([
+        db
+          .prepare(
+            `
           INSERT INTO employer_posting_counts(day, company, n)
           SELECT ?, ?, 1
           WHERE (SELECT n FROM employer_posting_day_caps WHERE day = ?) < 50000
           ON CONFLICT(day, company) DO UPDATE SET n = n + 1 WHERE n < 1000
         `,
-            )
-            .bind(day, company, day),
-          db
-            .prepare(
-              "UPDATE employer_posting_day_caps SET n = n + 1 WHERE day = ? AND changes() = 1",
-            )
-            .bind(day),
-        ]);
-        if (!results.every((result) => result.success)) {
-          readyDay = null;
-          return false;
-        }
-        return results.every((result) => result.meta.changes === 1);
-      } catch {
+          )
+          .bind(day, company, day),
+        db
+          .prepare("UPDATE employer_posting_day_caps SET n = n + 1 WHERE day = ? AND changes() = 1")
+          .bind(day),
+      ]);
+      if (!results.every((result) => result.success)) {
         readyDay = null;
         return false;
       }
-    },
-  };
+      return results.every((result) => result.meta.changes === 1);
+    } catch {
+      readyDay = null;
+      return false;
+    }
+  }
 }

@@ -19,6 +19,7 @@ const eq = (actual, expected, label) => {
 const event = (c = "acme") => ({ e: EMPLOYER_POSTING_EVENT, c });
 
 export async function employerCachedCounterScenario(db) {
+  const budget = createEmployerMinuteBudget();
   await db.prepare(EMPLOYER_COUNT_SCHEMA).run();
   await db.prepare(EMPLOYER_DAY_CAP_SCHEMA).run();
   const start = Date.parse("2026-12-15T12:00:00Z");
@@ -29,6 +30,7 @@ export async function employerCachedCounterScenario(db) {
     crossingExpiry = false,
     expiryReads = 0;
   const count = createCachedEmployerPostingCounter({
+    budget,
     db,
     maxBytes: 64,
     now: () => new Date(crossingExpiry && ++expiryReads === 5 ? time + 1 : time),
@@ -72,6 +74,9 @@ export async function employerCachedCounterScenario(db) {
 
   time = Date.parse("2026-12-15T23:59:59Z");
   const previousDay = count.count(event("newco"), address);
+  for (let i = 0; !finishLoad && i < 1000; i++)
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  eq(typeof finishLoad, "function", "crypto admission reaches delayed catalog");
   time += 1_000;
   eq(await count.cleanup(), true, "UTC rollover reestablishes retention");
   finishLoad(new Response('["newco"]'));
@@ -79,7 +84,11 @@ export async function employerCachedCounterScenario(db) {
   eq(await count.count(event("newco"), address), true, "current UTC day accepts a new click");
 
   time += 300_000;
+  finishLoad = null;
   const previousCleanup = count.count(event("newco"), address);
+  for (let i = 0; !finishLoad && i < 1000; i++)
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  eq(typeof finishLoad, "function", "second crypto admission reaches delayed catalog");
   eq(await count.cleanup(), true, "a new cleanup generation can succeed on the same day");
   finishLoad(new Response('["newco"]'));
   eq(await previousCleanup, false, "same-day obsolete admission is discarded");
@@ -101,11 +110,12 @@ export async function employerCachedCounterScenario(db) {
 }
 
 export async function employerCounterScenario(db) {
+  const budget = createEmployerMinuteBudget();
   await db.prepare(EMPLOYER_COUNT_SCHEMA).run();
   await db.prepare(EMPLOYER_DAY_CAP_SCHEMA).run();
   let time = new Date("2026-11-10T23:59:59Z");
   const keys = ["acme", "a & b", "é".repeat(100)];
-  const core = createEmployerPostingCounter({ db, keys, now: () => time });
+  const core = createEmployerPostingCounter({ budget, db, keys, now: () => time });
   keys.push("mutated");
   const rows = async () =>
     (await db.prepare("SELECT * FROM employer_posting_counts ORDER BY company").all()).results;
@@ -147,11 +157,12 @@ export async function employerCounterScenario(db) {
     ["\u0000"],
     Array(10001).fill("a"),
   ]) {
-    const bad = createEmployerPostingCounter({ db, keys: snapshot, now: () => time });
+    const bad = createEmployerPostingCounter({ budget, db, keys: snapshot, now: () => time });
     eq(await bad.cleanup(), false, "invalid snapshot fails closed");
     eq(await bad.count(event(), "192.0.2.3"), false, "invalid snapshot never writes");
   }
   const maximum = createEmployerPostingCounter({
+    budget,
     db,
     keys: Array.from({ length: 10000 }, (_, i) => `k${i}`),
     now: () => time,
@@ -197,7 +208,7 @@ export async function employerCounterScenario(db) {
   // Separate counter instances share the DB cap and this isolate's minute budget.
   const instances = many
     .slice(50)
-    .map(() => createEmployerPostingCounter({ db, keys: many, now: () => time }));
+    .map(() => createEmployerPostingCounter({ budget, db, keys: many, now: () => time }));
   await Promise.all(instances.map((c) => c.cleanup()));
   const globalRace = await Promise.all(
     instances.map((c, i) => c.count(event(many[50 + i]), "192.0.2.1")),
@@ -235,7 +246,12 @@ export async function employerCounterScenario(db) {
       return db.prepare(sql);
     },
   };
-  const recovery = createEmployerPostingCounter({ db: flaky, keys: ["acme"], now: () => time });
+  const recovery = createEmployerPostingCounter({
+    budget,
+    db: flaky,
+    keys: ["acme"],
+    now: () => time,
+  });
   eq(await recovery.cleanup(), true, "recovery baseline");
   fail = true;
   eq(await recovery.cleanup(), false, "cleanup failure");
@@ -253,14 +269,19 @@ export async function employerCounterScenario(db) {
       return db.batch(statements);
     },
   };
-  const pending = createEmployerPostingCounter({ db: delayed, keys: ["acme"], now: () => time });
+  const pending = createEmployerPostingCounter({
+    budget,
+    db: delayed,
+    keys: ["acme"],
+    now: () => time,
+  });
   const oldCleanup = pending.cleanup();
   time = new Date("2026-11-12T00:00:00Z");
   release({ success: true });
   eq(await oldCleanup, false, "old cleanup cannot enable a new UTC day");
   eq(await pending.count(event(), "192.0.2.1"), false, "stale cleanup stays disabled");
   const swapped = Array.from({ length: 31 }, () =>
-    createEmployerPostingCounter({ db, keys: ["acme"], now: () => time }),
+    createEmployerPostingCounter({ budget, db, keys: ["acme"], now: () => time }),
   );
   await Promise.all(swapped.map((c) => c.cleanup()));
   const refreshed = await Promise.all(swapped.map((c) => c.count(event(), "192.0.2.99")));
@@ -269,11 +290,12 @@ export async function employerCounterScenario(db) {
 }
 
 export async function employerDayCapScenario(db) {
+  const budget = createEmployerMinuteBudget();
   await db.prepare(EMPLOYER_COUNT_SCHEMA).run();
   await db.prepare(EMPLOYER_DAY_CAP_SCHEMA).run();
   let time = new Date("2026-11-15T12:00:00Z");
   const make = (database = db) =>
-    createEmployerPostingCounter({ db: database, keys: ["acme"], now: () => time });
+    createEmployerPostingCounter({ budget, db: database, keys: ["acme"], now: () => time });
   const total = () =>
     db
       .prepare("SELECT n FROM employer_posting_day_caps WHERE day = ?")
@@ -364,6 +386,7 @@ export async function employerDayCapScenario(db) {
   );
   // A delayed previous-day cleanup must not recreate a purged cap after the new day exists.
   const stale = createEmployerPostingCounter({
+    budget,
     db,
     keys: ["acme"],
     now: () => new Date("2026-11-16T23:59:59Z"),
@@ -381,6 +404,7 @@ export async function employerDayCapScenario(db) {
 
 // Actual local D1 metadata, not elapsed-time or production-traffic estimates.
 export async function employerDayCapReads(db) {
+  const budget = createEmployerMinuteBudget();
   await db.prepare("DROP TABLE IF EXISTS employer_posting_counts").run();
   await db.prepare("DROP TABLE IF EXISTS employer_posting_day_caps").run();
   await db.prepare(EMPLOYER_COUNT_SCHEMA).run();
@@ -415,6 +439,7 @@ export async function employerDayCapReads(db) {
       },
     };
     const core = createEmployerPostingCounter({
+      budget,
       db: observed,
       keys: Array.from({ length: size }, (_, i) => `k${i}`),
       now: () => new Date("2026-11-20T12:00:00Z"),
@@ -462,32 +487,24 @@ export async function employerDayCapReads(db) {
   return measurements;
 }
 
-export function employerBudgetScenario() {
-  let expire, delay;
-  const expiring = createEmployerMinuteBudget(
-    (fn, ms) => {
-      expire = fn;
-      delay = ms;
-    },
-    () => {},
-  );
-  const instant = new Date("2026-11-10T23:59:59Z");
-  for (let i = 0; i < 30; i++) eq(expiring("192.0.2.1", instant), true, "expiry setup");
-  eq(delay, 1000, "expiry scheduled at UTC minute boundary");
-  expire();
-  eq(expiring("192.0.2.1", instant), true, "timer removes idle address entries");
+export async function employerBudgetScenario() {
   const allow = createEmployerMinuteBudget(),
     other = createEmployerMinuteBudget();
   const now = new Date("2026-11-10T23:59:59Z");
-  for (let i = 0; i < 30; i++) eq(allow("192.0.2.1", now), true, "address allowance");
-  eq(allow("192.0.2.1", now), false, "address cap");
-  eq(other("192.0.2.1", now), true, "independent instance");
+  for (let i = 0; i < 30; i++) eq(await allow("192.0.2.1", now), true, "address allowance");
+  eq(await allow("192.0.2.1", now), false, "address cap");
+  eq(await other("192.0.2.1", now), true, "independent instance");
   for (let i = 1; i < 2000; i++)
-    eq(allow(`2001:db8:${i.toString(16)}::1`, now), true, "bounded map accepts capacity");
-  eq(allow("192.0.2.2", now), false, "full map rejects new addresses");
-  eq(allow("2001:db8:1::1", now), true, "existing entry retains allowance");
+    eq(await allow(`2001:db8:${i.toString(16)}::1`, now), true, "bounded map accepts capacity");
+  eq(await allow("192.0.2.2", now), false, "full map rejects new addresses");
+  eq(await allow("2001:db8:1::1", now), true, "existing entry retains allowance");
   for (const address of ["", null, "x".repeat(100), "company.example"])
-    eq(allow(address, now), false, "missing/invalid address");
-  eq(allow("192.0.2.2", new Date(NaN)), false, "invalid clock");
-  eq(allow("192.0.2.2", new Date("2026-11-11T00:00:00Z")), true, "UTC minute resets capacity");
+    eq(await allow(address, now), false, "missing/invalid address");
+  eq(await allow("192.0.2.2", new Date(NaN)), false, "invalid clock");
+  eq(
+    await allow("192.0.2.2", new Date("2026-11-11T00:00:00Z")),
+    true,
+    "UTC minute resets capacity",
+  );
+  eq(await allow("192.0.2.3", now), false, "older minute cannot reopen previous budget");
 }
