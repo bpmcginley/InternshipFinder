@@ -1,0 +1,41 @@
+{
+  "base": "e05a994eee818458876faf564ee77b373b34716e",
+  "before": 836,
+  "after": 836,
+  "added": [
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/allowance.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/controls.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/dashboard.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/entry.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/extension.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/index.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/navigation.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/presentation.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/rows.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/setup.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/tracker.mjs"
+  ],
+  "removed": [
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/allowance.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/controls.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/dashboard.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/entry.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/extension.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/index.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/navigation.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/presentation.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/rows.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/setup.mjs",
+    "js/app-modules/71dab95464152e41530504981461420a883d3188d092093138d4d1232648ae54/tracker.mjs"
+  ],
+  "changed": [
+    "index.html",
+    "js/app/rows.mjs"
+  ],
+  "opted_in_before": 837,
+  "opted_in_after": 837,
+  "opted_in_delta_identical": true,
+  "other_archive_bytes_unchanged": true,
+  "all_836_archive_hashes_match_manifest": true,
+  "reviewed_16_pngs_unchanged": true
+}
