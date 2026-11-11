@@ -56,3 +56,5 @@ import "./topup-attempt-recovery.test.js";
 import "./topup-payment-bounds.test.js";
 import "./topup-purchase-recovery.test.js";
 import "./topup-checkout-bounds.test.js";
+import "./session-copy-fence.test.js";
+import "./topup-session-copy-integration.test.js";

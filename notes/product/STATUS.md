@@ -130,6 +130,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | Session copy and checkout integration | [#342](https://github.com/bpmcginley/InternshipFinder/pull/342) combines exact reviewed session-copy fence files from #297 with bounded checkout on #337. Local SQLite and D1 exercise a valid copy, deletion during copying and revocation during checkout. | Owner integration and deployment pending |
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
 | 2026-11-10 | P-0.2 worker deployment and disclosure | [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175) merged. Approve/publish disclosure before deployment; no deployment by this product session. | - |
 | 2026-11-10 | P-1.2 plan-text relocation and merge | Approved by Bruce; [#187](https://github.com/bpmcginley/InternshipFinder/pull/187) merged as `2cacbea6`. Remaining children integrate sequentially after accepted parent publication and fresh checks; no deployment or release authorization is implied. | Resolved |
