@@ -17,7 +17,7 @@ internscout = "backend/internscout"
 growth = "growth"
 
 [tool.setuptools.package-data]
-internscout = ["top_degree_fields.json", "us_top50_metros.json"]
+internscout = ["top_degree_fields.json", "us_top50_metros.json", "vocabulary.json"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["backend/requirements.txt"]}
