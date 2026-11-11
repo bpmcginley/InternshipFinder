@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from ..console_log import console
 from ..pay import placeholder_pay
 from ..public_data import public_data_dir
+from ..vocabulary import HOME_STATE_CODES
 from .taxonomy import CA_METRO_PAGES, us_metro
 from .text import safe_url
 
@@ -32,7 +33,7 @@ CANADA_SINCE = "2026-09-30"
 NEW_DAYS = 7
 
 
-HOME_STATES = {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "remote"}
+HOME_STATES = set(HOME_STATE_CODES)
 
 
 PER_PAGE = 40  # listings shown on one page; the dashboard has the rest
