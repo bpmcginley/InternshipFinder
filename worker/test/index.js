@@ -49,3 +49,4 @@ import "./follow-budgeted-attempt.test.js";
 import "./follow-finalization.test.js";
 import "./follow-archive-reader.test.js";
 import "./follow-archive-enqueue.test.js";
+import "./follow-digest-delivery.test.js";
