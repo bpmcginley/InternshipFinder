@@ -27,6 +27,7 @@ import { trySend, sendMail } from "./mail.js";
 import { queueOrderMail, retryOrderMail, dropRetainedOrders } from "./order-mail.js";
 import { LIMITS, LISTING_ID, bad, conflict, text } from "./orders/shared.js";
 import { readShard, shardOf } from "./orders/roles.js";
+import { WORKER_URL } from "./public-config.js";
 
 export { listOrders } from "./orders/admin.js";
 export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
@@ -65,7 +66,7 @@ export const PER_ADDRESS_PER_DAY = 5;
 export const ALL_PER_DAY = 100;
 const ALL = "order:*";
 // Where Bruce's review links point. The Worker's own address; API_URL overrides it (wrangler dev).
-const DEFAULT_API = "https://internscout-api.bpmcginley.workers.dev";
+const DEFAULT_API = WORKER_URL;
 
 // The site build drops a placement for these reasons when its role has gone (placement_runs.reason).
 export const CLOSE_REASONS = ["listing_gone", "closed", "url_changed", "deadline"];
