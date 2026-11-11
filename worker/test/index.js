@@ -42,3 +42,4 @@ import "./follow-outbox.test.js";
 import "./follow-unsubscribe.test.js";
 import "./follow-mail.test.js";
 import "./follow-request-deletion.test.js";
+import "./follow-progress.test.js";
