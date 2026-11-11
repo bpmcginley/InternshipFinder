@@ -43,8 +43,12 @@ def git(checkout, *args, check=True, env=None, no_replace=False):
     return result
 
 
-def revision(checkout, ref):
-    return git(checkout, "rev-parse", "--verify", ref).stdout.decode("ascii").strip()
+def revision(checkout, ref, *, no_replace=False):
+    return (
+        git(checkout, "rev-parse", "--verify", ref, no_replace=no_replace)
+        .stdout.decode("ascii")
+        .strip()
+    )
 
 
 def owned(path):
@@ -336,13 +340,35 @@ def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
     )
 
 
-def ancestor(checkout, earlier, later):
-    return git(checkout, "merge-base", "--is-ancestor", earlier, later, check=False).returncode == 0
-
-
-def same_snapshot(checkout, earlier, later):
+def ancestor(checkout, earlier, later, *, no_replace=False):
     return (
-        git(checkout, "diff", "--quiet", earlier, later, "--", *OWNED, check=False).returncode == 0
+        git(
+            checkout,
+            "merge-base",
+            "--is-ancestor",
+            earlier,
+            later,
+            check=False,
+            no_replace=no_replace,
+        ).returncode
+        == 0
+    )
+
+
+def same_snapshot(checkout, earlier, later, *, no_replace=False):
+    return (
+        git(
+            checkout,
+            "diff",
+            "--quiet",
+            earlier,
+            later,
+            "--",
+            *OWNED,
+            check=False,
+            no_replace=no_replace,
+        ).returncode
+        == 0
     )
 
 
@@ -393,12 +419,12 @@ def _bind_published_follow(checkout, candidate, accepted, staged):
     if staged is None:
         return None
     try:
-        if not ancestor(checkout, candidate, accepted) or not same_snapshot(
-            checkout, staged.candidate_tree, accepted
+        if not ancestor(checkout, candidate, accepted, no_replace=True) or not same_snapshot(
+            checkout, staged.candidate_tree, accepted, no_replace=True
         ):
             return None
-        public_tree = revision(checkout, f"{accepted}:{PUBLIC}")
-        if public_tree != revision(checkout, f"{staged.candidate_tree}:{PUBLIC}"):
+        public_tree = revision(checkout, f"{accepted}:{PUBLIC}", no_replace=True)
+        if public_tree != revision(checkout, f"{staged.candidate_tree}:{PUBLIC}", no_replace=True):
             return None
         return _PublishedFollowProvenance(accepted, public_tree, staged)
     except (ValueError, OSError, tarfile.TarError):
@@ -445,7 +471,7 @@ def _publish(checkout, state, message, follow_provenance):
         attempted = None
         if staged is not None:
             try:
-                attempted = revision(checkout, "HEAD")
+                attempted = revision(checkout, "HEAD", no_replace=True)
             except (ValueError, OSError):
                 staged = None
         if push_existing(checkout, expected):

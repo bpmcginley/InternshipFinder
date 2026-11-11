@@ -480,10 +480,10 @@ class IngestWriterTests(unittest.TestCase):
         self.update_snapshot()
         revision = writer.revision
 
-        def unavailable(checkout, ref):
+        def unavailable(checkout, ref, **kwargs):
             if ref.endswith(f":{writer.PUBLIC}"):
                 raise OSError("synthetic immutable public tree lookup failure")
-            return revision(checkout, ref)
+            return revision(checkout, ref, **kwargs)
 
         with patch.object(writer, "revision", side_effect=unavailable):
             result, receipt = writer.publish_with_follow_provenance(
@@ -493,6 +493,79 @@ class IngestWriterTests(unittest.TestCase):
         self.assertEqual(
             result, ("Published validated data snapshot.", revision(self.remote, writer.BRANCH))
         )
+
+    def test_follow_receipt_ignores_replacement_commit_after_accepted_push(self):
+        writer.prepare(self.data, self.primary, self.state)
+        self.update_snapshot()
+        real_push = writer.push_existing
+
+        def push_and_replace(checkout, expected):
+            self.assertTrue(real_push(checkout, expected))
+            accepted = writer.revision(checkout, "HEAD")
+            path = checkout / NEW_SHARD
+            path.write_bytes(path.read_bytes() + b" ")
+            self.git(checkout, "add", "--", NEW_SHARD)
+            other_tree = self.git(checkout, "write-tree").decode("ascii").strip()
+            self.git(checkout, "restore", "--staged", "--worktree", "--", NEW_SHARD)
+            replacement = (
+                self.git(
+                    checkout, "commit-tree", other_tree, "-p", accepted, "-m", "Replacement view"
+                )
+                .decode("ascii")
+                .strip()
+            )
+            self.git(checkout, "replace", accepted, replacement)
+            self.assertNotEqual(
+                writer.revision(checkout, f"{accepted}:{writer.PUBLIC}"),
+                writer.revision(self.remote, f"{accepted}:{writer.PUBLIC}"),
+            )
+            return True
+
+        with patch.object(writer, "push_existing", side_effect=push_and_replace):
+            result, receipt = writer.publish_with_follow_provenance(
+                self.data, self.state, "Publish", self.follow_proof()
+            )
+        self.assert_follow_receipt(result, receipt, "Published validated data snapshot.")
+
+    def test_replacement_cannot_mask_true_owned_change_in_reconciled_commit(self):
+        writer.prepare(self.data, self.primary, self.state)
+        self.update_snapshot()
+        real_push = writer.push_existing
+
+        def lost_ack(checkout, expected):
+            self.assertTrue(real_push(checkout, expected))
+            candidate = writer.revision(checkout, "HEAD")
+            other = self.other()
+            shard = other / NEW_SHARD
+            shard.write_bytes(shard.read_bytes() + b" ")
+            changed = self.commit(other, NEW_SHARD)
+            self.git(other, "push", "origin", f"HEAD:{writer.BRANCH}")
+            self.assertEqual(writer.remote_tip(checkout), changed)
+            original_tree = writer.revision(checkout, f"{candidate}^{{tree}}")
+            replacement = (
+                self.git(
+                    checkout, "commit-tree", original_tree, "-p", candidate, "-m", "Masked view"
+                )
+                .decode("ascii")
+                .strip()
+            )
+            self.git(checkout, "replace", changed, replacement)
+            self.assertTrue(writer.same_snapshot(checkout, candidate, changed))
+            self.assertFalse(writer.same_snapshot(checkout, candidate, changed, no_replace=True))
+            return False
+
+        with patch.object(writer, "push_existing", side_effect=lost_ack):
+            result, receipt = writer.publish_with_follow_provenance(
+                self.data, self.state, "Publish", self.follow_proof()
+            )
+        self.assertEqual(
+            result,
+            (
+                "Validated data snapshot already published.",
+                writer.revision(self.remote, writer.BRANCH),
+            ),
+        )
+        self.assertIsNone(receipt)
 
     def test_unconfirmed_push_never_binds_a_follow_receipt(self):
         writer.prepare(self.data, self.primary, self.state)
