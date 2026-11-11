@@ -41,7 +41,8 @@ export function categoryOf(tags = []) {
 
 // Open US Greenhouse / Lever / Ashby internships from the site's own data (docs/data/listings).
 export function listingCandidates(root) {
-  const dir = join(root, "docs/data/listings");
+  const data = process.env.INTERNSCOUT_PUBLIC_DATA || join(root, "docs/data");
+  const dir = join(data, "listings");
   const byId = new Map(), desc = {};
   for (const f of readdirSync(dir)) {
     const path = join(dir, f);
