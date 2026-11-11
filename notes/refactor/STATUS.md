@@ -17,7 +17,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
 - All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. PR #230 removed the four manual source tags after Product released the files and merged as `789e72f0`.
 - The authorized Wave 4 logging, vocabulary inventory, public configuration and orders split are merged. The last logging merge passed Pages and its exact deployment check. Existing provider and credential output covered by Q6 and Q7 remains separate. The Wave 4 checkpoint #248 published through Pages 42940952578 and its exact deployment succeeded.
-- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is in independent review. The dashboard test-only follow-up #263 is also published.
+- Wave 5 is active. SEO helpers #252, extension extractions #251 and #257, and Worker route packages #253 and #259 are merged and published. SEO artifacts #264 is merged and published. The near-page family split is in review. The dashboard test-only follow-up #263 is also published.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Product published the counter disclosure in #225. Counter #175 and the Worker refactors still await operator deployment. Migration adoption, production sending and extension release remain operator actions. Product released the dashboard and SEO source after #217 and #208, respectively. Check open file claims again before each wave.
 
@@ -88,8 +88,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | [#231](https://github.com/bpmcginley/InternshipFinder/pull/231) | Merged | `fef33968`. Pages 42936798140 and backend verified. Field-capacity file move with exact SQL and all 39 facade exports preserved. |
 | 4 | WP-4.2 Orders split, remaining seams and tests | wp42_orders | `refactor/wp-4.2-orders-delivery` | [#239](https://github.com/bpmcginley/InternshipFinder/pull/239) | Merged | `4c78a8a2`. Pages 42937600170 and backend verified. Preserved all 39 facade exports and the registration order and assertions of all 43 order test cases. |
 | 5 | WP-3.1 Constants/helpers | wp21_inventory | `refactor/wp-3.1-site-helpers` | [#252](https://github.com/bpmcginley/InternshipFinder/pull/252) | Merged | `c00fb90f`. Pages 42942262592 and 42942269472 and both exact deployments succeeded. Pure helpers and immutable thresholds retain legacy re-exports. |
-| 5 | WP-3.2 Sitemap/feeds/llms | wp21_inventory | `refactor/wp-3.2-site-artifacts` | [#264](https://github.com/bpmcginley/InternshipFinder/pull/264) | In review | Move sitemap, robots, RSS and LLMS rendering and writes with legacy entry points and exact golden bytes. |
-| 5 | WP-3.3 Near family | Unassigned | - | - | Queued | Serial family PR; data/render split without output changes. |
+| 5 | WP-3.2 Sitemap/feeds/llms | wp21_inventory | `refactor/wp-3.2-site-artifacts` | [#264](https://github.com/bpmcginley/InternshipFinder/pull/264) | Merged | `6fa14ba8`. Pages 42946316162 and the exact deployment succeeded. Sitemap, robots, RSS and LLMS retain legacy entry points and exact golden bytes. |
+| 5 | WP-3.3 Near family | wp21_inventory | `refactor/wp-3.3-near` | - | In review | Near data selection and single-model rendering. All 501 near pages and 695 golden files retained. |
 | 5 | WP-3.3 Employer family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Field family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Pay family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
@@ -295,7 +295,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-Complete independent review and current-head CI on WP-3.2 #264, then verify its Pages run and exact deployment before WP-3.3 implementation. Recheck Product file claims before the near-page extraction. Q3 still covers financial routing changes beyond file moves.
+Complete review and current-head CI on the near-page split, then verify its Pages run and exact deployment before the employer family. Recheck Product file claims before the next extraction. Q3 still covers financial routing changes beyond file moves.
 
 ## Dashboard ranking test clock
 
@@ -473,6 +473,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Audited open Product PRs and the growth CLI and workflow call sites at `aa9070c4`. The Flyer, Glass Flyer and campaign prose diagnostics preserve their exact default text and streams. Opt-in JSON omits output paths, Glass Flyer URLs and spot labels, and campaign titles and matched lint text.
 - Cards and Reels keep their bare artifact-path stdout. The raw local ffmpeg diagnostic in campaign is unchanged, as are rendering, artifact content, exit codes, workflows and provider/publishing paths. Flyer scripts use a temporary checkout import path so direct invocation still works without installing the project.
 - Focused campaign/card/Reel tests passed 42 with one local ffmpeg skip. An offline comparison matched complete default streams, both reproducible Flyer PDFs byte for byte, and all four mocked Glass Flyer render calls and HTML. A campaign run with deterministic render stubs matched default streams and all nine artifact bytes. JSON omits the expected paths and data. Both golden checks and Ruff passed. After integrating main `789e72f0`, the authored code and tests stayed byte-identical and the combined focused and golden run passed 44 with the same ffmpeg skip.
+
+## WP-3.3 near page family
+
+- Began from `6fa14ba8` after the #264 Pages run and exact deployment succeeded. No open Product change owned the near source, tests or package files. #266's changed-file list included inherited main history because it targets a Product branch. Its exact head differed from its merge base in none of these paths. The separate WP-3.2 test split retains ownership of its `test_seo_pages.py` blocks.
+- `internscout.site.near` prepares plain page records, local and remote display data, dashboard selections, and related-link groups in the existing order. One-model facade renderers keep current shared helpers and the legacy near entry points, signatures, and documentation. Related groups stay as data until rendered. The build, live flags, indexing decisions, mutable state, and existing tests are unchanged.
+- Compared every page record and the hub to the original module in seven default and opt-in variants. Checked threshold, live slack, earning bypass, rival suppression, remote ID exclusion and zero remote cap. A full opt-in local build matched all 547 input/output files, including 501 near pages, sitemap, held paths, date records and feeds.
+- Relevant SEO, dates, feed, link, role and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks passed against 695 unchanged expected files. The wheel includes the new module, which imports without an SEO facade back-edge. Unrelated SEO AST, including `build`, is exact. Ruff passed and targeted Pyright retained the same 12 existing diagnostics.
 
 ## WP-1.4 remaining growth diagnostics
 

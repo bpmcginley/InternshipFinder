@@ -36,6 +36,7 @@ from . import near_metros
 from .console_log import console
 from .site import discovery as _discovery
 from .site import llms as _llms
+from .site import near as _near
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
     MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
@@ -4216,25 +4217,43 @@ def near_body(
     indexed: bool,
     related: str,
 ) -> str:
-    label, lname = near_metros.metro_label(m), lower_name(f["name"])
-    key = "near:" + m["cbsa"]  # no region is filed under this, so place() leads with regions[0]
-    items = [near_view(x, regs) for x, regs in local]
-    tags = list(near_metros.FIELD_TAGS[f["slug"]])
-    # The dashboard reads at most six fields (docs/js/core.js filtersFromUrl): the six with the most roles here.
-    by_tag = Counter(t for x, _ in local for t in x.get("field_tags") or [] if t in tags)
-    dash_tags = sorted(tags, key=lambda t: (-by_tag[t], tags.index(t)))[:6]
-    # The dashboard filters by state, not by town, so the link says so.
-    states = near_metros.metro_states(m["cbsa"])
-    dash = dash_link(dash_tags, ",".join(states))
+    model = _select_near_body(f, m, local, remote, now, path, indexed)
+    return _render_near_body(model) + related + _near_footer()
+
+
+def _select_near_body(
+    f: dict,
+    m: dict,
+    local: list[_near.LocalRow],
+    remote: list[dict],
+    now: datetime,
+    path: str,
+    indexed: bool,
+) -> _near.NearBody:
+    return _near.select_body(
+        f,
+        m,
+        local,
+        remote,
+        now,
+        path,
+        indexed,
+        view=near_view,
+        town=near_town,
+        remote_limit=NEAR_REMOTE_SHOWN,
+    )
+
+
+def _render_near_body(model: _near.NearBody) -> str:
+    label, lname = near_metros.metro_label(model.metro), lower_name(model.field["name"])
+    key = "near:" + model.metro["cbsa"]  # no region is filed under this, so place() leads with regions[0]
+    items = model.items
+    dash = dash_link(model.dashboard_tags, ",".join(model.states))
     out = []
     if items:
-        towns = Counter(
-            n for _, regs in local for n in {near_town(g, m["cbsa"]) for g in regs} if n
-        )
-        where = sorted(towns.items(), key=lambda kv: (-kv[1], kv[0]))
         lead = summary(items, f"in {lname}", f" near {label}", tail="")
-        if len(where) > 1:
-            lead += " " + esc(f"By town: {counted(where, 3)}.")
+        if len(model.towns) > 1:
+            lead += " " + esc(f"By town: {counted(model.towns, 3)}.")
         out.append(f"<p class=\"lede\">{lead}</p>")
     else:
         out.append(
@@ -4242,12 +4261,13 @@ def near_body(
             "Listings are collected from public job boards several times a day, so this page changes as "
             "employers post.</p>"
         )
-    out.append(f"<p class=\"fits\">{esc(near_how(m, f))}</p>")
-    cta = f"Search {lname} roles in {join_words([US_STATES[k] for k in states])} on the dashboard"
+    out.append(f"<p class=\"fits\">{esc(near_how(model.metro, model.field))}</p>")
+    cta = f"Search {lname} roles in {join_words([US_STATES[k] for k in model.states])} on the dashboard"
     out.append(f"<a class=\"cta\" href=\"{dash}\">{esc(cta)}</a>")
     if items:
         out.append(autoapply_card(items, "seo-near", key))
-        out.append(f"<ul class=\"jobs\">{listing_rows(items, now, key, path, 'seo-near')}</ul>")
+        rows = listing_rows(items, model.now, key, model.path, "seo-near")
+        out.append(f"<ul class=\"jobs\">{rows}</ul>")
         if len(items) > PER_PAGE:
             out.append(
                 f"<p class=\"more\">Showing the {PER_PAGE} newest of {len(items):,}. "
@@ -4255,35 +4275,37 @@ def near_body(
             )
         out.append(chart_figure(items, key))
     # Remote roles, apart and labelled: open to a student in this city, but not in it.
-    if remote:
+    if model.remote_count:
         words = (
-            f"{plural(len(remote), 'remote ' + lname + ' role')} {'is' if len(remote) == 1 else 'are'} open "
-            "to students anywhere in the US. They are not counted above."
+            f"{plural(model.remote_count, 'remote ' + lname + ' role')} "
+            f"{'is' if model.remote_count == 1 else 'are'} open to students anywhere in the US. "
+            "They are not counted above."
         )
     else:
         words = f"No remote {lname} roles are open right now."
     section = (
         f"<section class=\"rel\"><h2>{esc('Remote ' + lname + ' roles')}</h2><p class=\"more\">{esc(words)}"
         + (
-            f" <a href=\"{dash_link(dash_tags, 'remote')}\">See them on the dashboard</a>."
-            if remote
+            f" <a href=\"{dash_link(model.dashboard_tags, 'remote')}\">See them on the dashboard</a>."
+            if model.remote_count
             else ""
         )
         + "</p>"
     )
-    if remote and not indexed:
-        section += f"<ul class=\"jobs\">{listing_rows(remote[:NEAR_REMOTE_SHOWN], now, 'remote', path, 'seo-near')}</ul>"
+    if model.shown_remote is not None:
+        rows = listing_rows(model.shown_remote, model.now, "remote", model.path, "seo-near")
+        section += f"<ul class=\"jobs\">{rows}</ul>"
     out.append(section + "</section>")
     if items:
         out.append(
             "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
             "<a href=\"feed.xml\">RSS feed</a></p>"
         )
-    out.append(
-        related
-        + f"<p class=\"more\"><a href=\"{NEAR_ROOT}\">Every field near all 50 cities</a></p>"
-    )
     return "".join(out)
+
+
+def _near_footer() -> str:
+    return f"<p class=\"more\"><a href=\"{NEAR_ROOT}\">Every field near all 50 cities</a></p>"
 
 
 def near_pages(
@@ -4295,95 +4317,53 @@ def near_pages(
     rivals: list[frozenset],
 ) -> tuple[list[dict], dict]:
     """The 500 pages as add() arguments, and (path, field, local roles) per (CBSA, field slug) for the hub."""
-    local_by_metro = near_local(listings)
-    remote_all = newest_first([x for x in listings if near_metros.us_remote(x)])
+    selected, hub = _near.select_pages(
+        listings,
+        now,
+        updated,
+        live,
+        earning,
+        rivals,
+        group_local=near_local,
+        sort_newest=newest_first,
+        path_for=near_path,
+        view=near_view,
+        should_index=near_indexed,
+        body_for=_select_near_body,
+    )
+    return [_render_near_page(model) for model in selected], hub
 
-    def tagged(slug: str, x: dict) -> bool:
-        return bool(set(near_metros.FIELD_TAGS[slug]) & set(x.get("field_tags") or []))
 
-    grid = {
-        (m["cbsa"], f["slug"]): [
-            (x, regs) for x, regs in local_by_metro.get(m["cbsa"], []) if tagged(f["slug"], x)
-        ]
-        for m in near_metros.METROS
-        for f in near_metros.FIELDS
+def _render_near_page(model: _near.NearPage) -> dict:
+    body = model.body
+    f, m = body.field, body.metro
+    path, items = body.path, model.items
+    related = "".join(link_list(label, links) for label, links in model.related)
+    return {
+        "path": path,
+        "title": near_title(f, m, items),
+        "desc": near_description(f, m, items, body.remote_count, model.updated),
+        "h1": f"{f['name']} internships near {model.label}",
+        "crumbs": [
+            ("/internships/", "Internships"),
+            (NEAR_ROOT, "Near 50 US cities"),
+            (path, f"{f['name']} near {m['city']}"),
+        ],
+        "body": _render_near_body(body) + related + _near_footer(),
+        "items": items or None,
+        "state": "near:" + m["cbsa"],
+        "thin": not model.indexed,
+        "kind": "near",
     }
-    remote_by_field = {
-        f["slug"]: [x for x in remote_all if tagged(f["slug"], x)] for f in near_metros.FIELDS
-    }
-    hub = {
-        (m["cbsa"], f["slug"]): (
-            near_path(m, f["slug"]),
-            f["name"],
-            len(grid[(m["cbsa"], f["slug"])]),
-        )
-        for m in near_metros.METROS
-        for f in near_metros.FIELDS
-    }
-    specs = []
-    for m in near_metros.METROS:
-        label = near_metros.metro_label(m)
-        for f in near_metros.FIELDS:
-            local = grid[(m["cbsa"], f["slug"])]
-            path = near_path(m, f["slug"])
-            ids = {x["id"] for x, _ in local}
-            remote = [x for x in remote_by_field[f["slug"]] if x["id"] not in ids]
-            items = [near_view(x, regs) for x, regs in local]
-            indexed = near_indexed(items, path, live, earning, rivals)
-            # The city's other fields and the field's other cities, most roles first (then by name).
-            fields_here = sorted(
-                (
-                    hub[(m["cbsa"], ff["slug"])]
-                    for ff in near_metros.FIELDS
-                    if ff["slug"] != f["slug"]
-                ),
-                key=lambda e: (-e[2], e[1]),
-            )
-            cities = sorted(
-                (
-                    (
-                        hub[(mm["cbsa"], f["slug"])][0],
-                        near_metros.metro_label(mm),
-                        hub[(mm["cbsa"], f["slug"])][2],
-                    )
-                    for mm in near_metros.METROS
-                    if mm["cbsa"] != m["cbsa"]
-                ),
-                key=lambda e: (-e[2], e[1]),
-            )
-            related = link_list(f"Other fields near {m['city']}", fields_here) + link_list(
-                f"{f['name']} internships near other cities", cities
-            )
-            specs.append(
-                {
-                    "path": path,
-                    "title": near_title(f, m, items),
-                    "desc": near_description(f, m, items, len(remote), updated),
-                    "h1": f"{f['name']} internships near {label}",
-                    "crumbs": [
-                        ("/internships/", "Internships"),
-                        (NEAR_ROOT, "Near 50 US cities"),
-                        (path, f"{f['name']} near {m['city']}"),
-                    ],
-                    "body": near_body(f, m, local, remote, now, path, indexed, related),
-                    "items": items or None,
-                    "state": "near:" + m["cbsa"],
-                    "thin": not indexed,
-                    "kind": "near",
-                }
-            )
-    return specs, hub
 
 
 def near_hub(hub: dict) -> tuple[list[str], str, str]:
     """(title forms, description, body) of /internships/near/: every one of the 500 pages, by city."""
-    sections = [
-        link_list(
-            f"Near {near_metros.metro_label(m)}",
-            [hub[(m["cbsa"], f["slug"])] for f in near_metros.FIELDS],
-        )
-        for m in near_metros.METROS
-    ]
+    return _render_near_hub(_near.select_hub(hub))
+
+
+def _render_near_hub(groups: list[_near.LinkGroup]) -> tuple[list[str], str, str]:
+    sections = [link_list(title, links) for title, links in groups]
     body = (
         "<p class=\"lede\">Internships in ten of the largest college degree fields, near each of the 50 largest "
         "US metro areas. The fields are the ten largest by bachelor's degrees awarded in 2021-22 (NCES Digest "
