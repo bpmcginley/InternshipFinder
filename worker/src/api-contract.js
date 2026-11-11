@@ -13,6 +13,14 @@ const route = (method, path, auth, request, response, gate = "none") =>
 
 export const ROUTES = Object.freeze([
   route(
+    "POST",
+    "/follows/unsubscribe",
+    "follow-unsubscribe-token",
+    "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes; no login, cookies or Origin required",
+    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation",
+    "none; deletion remains available when signup or sending is off",
+  ),
+  route(
     "GET",
     "/config",
     "public",
@@ -321,6 +329,8 @@ export const SPECIAL_ROUTES = Object.freeze([
 ]);
 
 export const AUTH = Object.freeze({
+  "follow-unsubscribe-token":
+    "Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.",
   public: "No sign-in required; route-specific validation still applies.",
   user: "Provider ID token or live session bearer token, through the existing authenticateUser path.",
   "provider-id": "Fresh verified provider ID token only; session tokens cannot create sessions.",

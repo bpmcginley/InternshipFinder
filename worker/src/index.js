@@ -11,6 +11,7 @@ import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, month
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
+import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { employerMetrics } from "./employer-metrics.js";
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
@@ -132,6 +133,9 @@ const withAdmin = (handler) => async (context) => {
 
 /** @type {Record<string, SafeRouteHandler>} */
 const safeRouteHandlers = {
+  // Token deletion stays available independently of future signup/sending switches.
+  "POST /follows/unsubscribe": async ({ request, db, now }) => followUnsubscribeEndpoint(request, db, now),
+
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
   "POST /session": async ({ request, env, db, now, ctx, d }) => {
