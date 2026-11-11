@@ -1,3 +1,4 @@
+import { restoreGeneration } from "./funded-purchase.js";
 // Dormant callbacks. Stored call facts, never saved client flags, control accounting.
 const uuid = (value) =>
   typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
@@ -22,7 +23,7 @@ function statements(db, identity, state) {
     "FROM funded_run_calls c JOIN funded_runs f ON f.generation=c.generation " +
     "JOIN runs r USING(user_hash,month,task,run_id) " +
     "WHERE f.user_hash=? AND f.month=? AND f.task=? AND f.run_id=? AND f.generation=? AND c.call_id=? AND c.state=? " +
-    "AND r.calls>0 AND f.funding IN ('monthly','invite') AND NOT EXISTS(SELECT 1 FROM forget WHERE user_hash=f.user_hash)) ";
+    "AND r.calls>0 AND f.funding IN ('monthly','invite','purchase') AND NOT EXISTS(SELECT 1 FROM forget WHERE user_hash=f.user_hash)) ";
   return (sql, ...args) =>
     db.prepare(target + sql).bind(userHash, month, task, runId, generation, callId, state, ...args);
 }
@@ -96,6 +97,7 @@ export async function releaseFundedCall(db, identity) {
       account("(SELECT user_hash FROM target)", "(SELECT month FROM target)", "account_metered=1"),
       account("'*'", "(SELECT free_day FROM target)", "free_day IS NOT NULL"),
       account("'*'", "(SELECT month FROM target)", "free_month=1"),
+      ...restoreGeneration(q),
       q(
         "UPDATE usage SET units=MAX(0,units-1) WHERE (user_hash,month,task) IN " +
           "(SELECT user_hash,month,task FROM target WHERE calls=1 AND accepted=0)",
@@ -113,9 +115,9 @@ export async function releaseFundedCall(db, identity) {
       ),
       q("DELETE FROM funded_run_calls WHERE call_id=(SELECT call_id FROM target)"),
     ],
-    [6, 7],
+    [8, 9],
     "released",
-    6, // Actual D1 counts the run, metadata and last-call cascade; Node counts only the run.
+    8, // Actual D1 counts the run, metadata and last-call cascade; Node counts only the run.
   );
 }
 

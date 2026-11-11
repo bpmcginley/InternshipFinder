@@ -1,5 +1,6 @@
+import { purchaseFrom, purchaseSpendable, allocateGeneration } from "./funded-purchase.js";
 // Dormant first-generation storage, NOT AI authorization. Trusted callers must separately
-// enforce existing auth/task/rate gates; siblings, callbacks and purchased funding are absent.
+// enforce existing auth/task/rate gates. New purchased funding requires explicit opt-in.
 const nonnegative = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
 const pending = () => ({ status: "pending" });
 export async function reserveFirstFundedRun(db, input, now = new Date()) {
@@ -14,6 +15,7 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
     monthBudget,
     dayBudget,
     freeTier,
+    allowPurchased = false,
   } = input || {};
   if (
     typeof userHash !== "string" ||
@@ -29,6 +31,7 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
     !(accountCeiling === null || nonnegative(accountCeiling)) ||
     !nonnegative(monthBudget) ||
     typeof freeTier !== "boolean" ||
+    typeof allowPurchased !== "boolean" ||
     (freeTier && !nonnegative(dayBudget)) ||
     !(now instanceof Date) ||
     !Number.isFinite(now.getTime())
@@ -61,7 +64,11 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
           "date('now')=? AND NOT EXISTS(SELECT 1 FROM forget WHERE user_hash=?) AND " +
           "(? IS NULL OR ?>0) AND (? IS NULL OR " +
           used +
-          "<? OR EXISTS(SELECT 1 FROM bonus WHERE user_hash=? AND task=? AND used<granted)) AND " +
+          "<? OR EXISTS(SELECT 1 FROM bonus WHERE user_hash=? AND task=? AND used<granted) OR (?=1 AND ?='autofill' AND EXISTS(SELECT 1 " +
+          purchaseFrom +
+          " WHERE p.user_hash=? AND " +
+          purchaseSpendable +
+          "))) AND " +
           "?>0 AND (?=0 OR COALESCE((SELECT cents FROM spend WHERE user_hash='*' AND month=?),0)<?) AND " +
           "(? IS NULL OR (?>0 AND COALESCE((SELECT cents FROM spend WHERE user_hash=? AND month=?),0)<?)) AND " +
           "(?=0 OR (?>0 AND COALESCE((SELECT cents FROM spend WHERE user_hash='*' AND month=?),0)<?)) " +
@@ -78,6 +85,9 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
         allowance,
         userHash,
         task,
+        Number(allowPurchased),
+        task,
+        userHash,
         monthBudget,
         Number(freeTier),
         month,
@@ -96,7 +106,7 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
         "INSERT INTO funded_runs(user_hash,month,task,run_id,generation,funding,first_autofill_day,first_autofill_due) " +
           "SELECT ?,?,?,?,?,CASE WHEN ? IS NULL OR " +
           used +
-          "<? THEN 'monthly' ELSE 'invite' END, " +
+          "<? THEN 'monthly' WHEN EXISTS(SELECT 1 FROM bonus WHERE user_hash=? AND task=? AND used<granted) THEN 'invite' ELSE 'purchase' END, " +
           "CASE WHEN ?='autofill' AND " +
           used +
           "=0 THEN ? ELSE NULL END, " +
@@ -110,6 +120,8 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
         month,
         task,
         allowance,
+        userHash,
+        task,
         task,
         userHash,
         month,
@@ -130,6 +142,7 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
         freeTier ? day : null,
         Number(freeTier),
       ),
+      ...allocateGeneration(db, generation, callId),
       prepare(
         "UPDATE bonus SET used=used+1 WHERE user_hash=? AND task=? AND " +
           funded +
@@ -168,6 +181,8 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
       1,
       1,
       null,
+      null,
+      null,
       1,
       Number(accountCeiling !== null),
       Number(freeTier),
@@ -175,7 +190,9 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
       1,
     ];
     if (
-      results.length !== 9 ||
+      results.length !== changes.length ||
+      results[3]?.meta?.changes !== results[4]?.meta?.changes ||
+      results[3]?.meta?.changes + results[5]?.meta?.changes > 1 ||
       results.some(
         (r, i) =>
           r?.success !== true ||

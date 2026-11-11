@@ -4,11 +4,23 @@ import { applyD1Migrations } from "cloudflare:test";
 import { beforeEach, expect, it } from "vitest";
 
 const baselineName = "0001_baseline.sql";
-const migrationNames = [baselineName, "0002_follow_lifecycle.sql", "0003_follow_digest_outbox.sql", "0004_topup_ledger.sql", "0005_topup_reconciliation.sql", "0006_topup_allocations.sql", "0008_topup_checkout_attempts.sql", "0013_topup_attempt_revisions.sql", "0015_topup_account_deletion.sql", "0017_funded_run_admission.sql"];
+const migrationNames = [
+  baselineName,
+  "0002_follow_lifecycle.sql",
+  "0003_follow_digest_outbox.sql",
+  "0004_topup_ledger.sql",
+  "0005_topup_reconciliation.sql",
+  "0006_topup_allocations.sql",
+  "0008_topup_checkout_attempts.sql",
+  "0013_topup_attempt_revisions.sql",
+  "0015_topup_account_deletion.sql",
+  "0017_funded_run_admission.sql",
+  "0018_purchased_run_generations.sql",
+];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
 const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
-  const match = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)\s*\(/);
+  const match = sql.match(/CREATE TABLE IF NOT EXISTS "?(\w+)"?\s*\(/);
   return match ? [match[1]] : [];
 });
 const run = (db, queries) => db.batch(queries.map((sql) => db.prepare(sql)));
@@ -56,8 +68,8 @@ it("the deduplicated migration creates the complete legacy schema, including con
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(55);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(30);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(56);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(31);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(8);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });

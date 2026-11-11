@@ -1,3 +1,4 @@
+import { purchaseContinuation } from "./funded-purchase.js";
 // Dormant new-call admission into a previously funded generation. No unit debit or
 // provider authorization: trusted callers preserve current auth/task/rate gates.
 const nonnegative = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
@@ -60,7 +61,9 @@ export async function reserveFundedSibling(db, input, now = new Date()) {
       q(
         "UPDATE runs SET calls=calls+1 WHERE user_hash=? AND month=? AND task=? AND run_id=? AND calls>0 AND calls<? " +
           "AND date('now')=? AND NOT EXISTS(SELECT 1 FROM forget WHERE user_hash=?) " +
-          "AND EXISTS(SELECT 1 FROM funded_runs f WHERE f.user_hash=runs.user_hash AND f.month=runs.month AND f.task=runs.task AND f.run_id=runs.run_id AND f.generation=? AND f.funding IN ('monthly','invite')) " +
+          "AND EXISTS(SELECT 1 FROM funded_runs f WHERE f.user_hash=runs.user_hash AND f.month=runs.month AND f.task=runs.task AND f.run_id=runs.run_id AND f.generation=? AND (f.funding IN ('monthly','invite') OR (f.funding='purchase' AND " +
+          purchaseContinuation +
+          "))) " +
           "AND ?>0 AND (?=0 OR COALESCE((SELECT cents FROM spend WHERE user_hash='*' AND month=?),0)<?) " +
           "AND (? IS NULL OR (?>0 AND COALESCE((SELECT cents FROM spend WHERE user_hash=? AND month=?),0)<?)) " +
           "AND (?=0 OR (?>0 AND COALESCE((SELECT cents FROM spend WHERE user_hash='*' AND month=?),0)<?))",

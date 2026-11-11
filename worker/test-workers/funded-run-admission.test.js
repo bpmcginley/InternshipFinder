@@ -12,7 +12,7 @@ it("0017 preserves preexisting committed runs without backfilling refundable fun
   const db = env.MIGRATION_DB;
   await applyD1Migrations(
     db,
-    env.TEST_MIGRATIONS.filter((m) => m.name !== "0017_funded_run_admission.sql"),
+    env.TEST_MIGRATIONS.filter((m) => !/^001[78]_/.test(m.name)),
   );
   await db
     .prepare("INSERT INTO runs VALUES('legacy-fixture','2026-10','autofill','legacy',2)")
