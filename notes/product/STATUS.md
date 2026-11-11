@@ -4,7 +4,7 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
-- **P-2.2 native browser top-up UI claim:** isolated allowance/dashboard modules, new tests and synthetic evidence on `baf163d8`; detached/default-off pending verified Worker capability and offer. No shared golden/allowlist, classic App/Core or activation changes.
+- **P-2.2 native browser top-up UI:** draft [#429](https://github.com/bpmcginley/InternshipFinder/pull/429) on `baf163d8` adds an exhausted-session-only verified offer and explicit checkout action, with 11 focused tests and eight paired browser screenshots. Detached/default-off pending the separate Worker capability/offer, independent review and owner enablement. [Evidence](P-2.2-browser-topup-ui.md). Shared golden refresh remains held by #419; expected native App graph mismatch is recorded. No classic App/Core or activation changes.
 
 - **Employer Worker runtime live.** [#409](https://github.com/bpmcginley/InternshipFinder/pull/409) deployed as `b64bb927` at 19:01:09 UTC. Exact Pages and backend passed, and all 4,984 App artifact files matched before the next data refresh. The existing API smoke passed and brand video returned 200 for HEAD and 206 for a range request. The first production half-hour invocation initialized the current-day cap, with no unexpected days or expired aggregate rows. Maintenance is enabled and employer intake stays off.
 
