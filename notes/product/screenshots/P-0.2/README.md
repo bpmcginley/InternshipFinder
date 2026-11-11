@@ -33,3 +33,7 @@ The date becomes **Last updated November 10, 2026**. The following paragraph is 
 Both stamped artifacts are regenerated. Exactly `privacy.html` changes; all other 694 files and all page-content-date records remain byte-identical. No input fixture, source generator, JavaScript, schema, worker or paid-policy wording changes. Removing the inserted paragraph and reverting only the visible date restores the previous privacy source exactly. Archive SHA-256: `4c7a031a2f6760285cd63896241c30f00a4a9f5c382ab78303c3711a3f831655`.
 
 Baseline counter tests: 46 passed. Full Node 22 site suite, serial: 267 passed. Golden tests: two passed. Publication checker: 695 files, zero problems. Startup-budget estimate, capture-script syntax and diff checks pass. No application startup code changed; the local policy loads successfully in every capture.
+
+## Final dashboard integration
+
+Normal main merge includes published #217 at `2a8176db`. Privacy source, capture script, all measurements and all 16 PNGs remain unchanged from reviewed `14696ba9`; the rebuilt privacy artifact is also byte-identical to that reviewed capture. Both stamped artifacts were rebuilt to retain all intervening dashboard output. Exactly privacy.html differs from main; all other 694 paths and page-content-date records are identical. Final archive SHA-256: `815c4581105fff2b13efcd39413e7b493a55675f6a5a92a057c50d951549c104`. Final serial Node 22 site suite: 316 passed; golden tests: two passed; publication checker: 695 files, zero problems. No new browser measurement is claimed.

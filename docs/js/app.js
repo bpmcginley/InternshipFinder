@@ -1,7 +1,7 @@
 // InternScout dashboard UI. Plain JS with React.createElement (no build step, no Babel).
 (function () {
   "use strict";
-  const { useState, useEffect, useMemo, useRef, useCallback, useId } = React;
+  const { useState, useEffect, useMemo, useRef, useCallback, useId, useLayoutEffect = useEffect } = React;
   const h = React.createElement, F = React.Fragment;
   const IS = window.IS, C = IS.C;
   const ADMIN = new URLSearchParams(location.search).get("admin") === "1";
@@ -12,8 +12,145 @@
   const EXT_NOTICE_KEY = "internscout.extnotice.v1";
   // The one-time notice that paid listings have started (S8, 2026-10-14): hidden for good in this browser.
   const PLACE_NOTICE_KEY = "internscout.placements.notice.v1";
+  const ARRIVAL_KEY = "internscout.allowance.return.v1", ARRIVAL_TTL = 10 * 60 * 1000;
+  // Only a one-use intent flag and expiry cross sign-in, never a URL, plan or account value.
+  function arrivalFlag(action, storage, now = Date.now()) {
+    try {
+      storage = storage || window.sessionStorage;
+      if (action === "save") { storage.setItem(ARRIVAL_KEY, JSON.stringify({ show: true, expiresAt: now + ARRIVAL_TTL })); return; }
+      const raw = storage.getItem(ARRIVAL_KEY); storage.removeItem(ARRIVAL_KEY);
+      const v = raw && JSON.parse(raw);
+      return action === "take" && !!(v && v.show === true && Number.isFinite(v.expiresAt) && v.expiresAt > now && v.expiresAt <= now + ARRIVAL_TTL);
+    } catch (e) { return false; }
+  }
+  function configuredPlans(cfg) {
+    return cfg && cfg.payments && cfg.payments.enabled && Array.isArray(cfg.payments.plans) ? cfg.payments.plans.filter(p => p && typeof p.plan === "string" && p.plan && Number.isFinite(p.multiplier) && p.multiplier > 1) : [];
+  }
+  function allowanceArrival(search, cfg) {
+    const q = new URLSearchParams(search), plan = q.get("upgrade");
+    return { plan: configuredPlans(cfg).some(p => p.plan === plan) ? plan : "", generic: q.get("out_of_runs") === "1" };
+  }
+  function clearArrivalKeys(keys) {
+    const url = new URL(location.href); keys.forEach(k => url.searchParams.delete(k));
+    history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+  }
+  function runAllowance(me, cfg) {
+    const a = me && me.allowance && me.allowance.autofill;
+    if (!a || !Number.isFinite(a.used) || a.used < 0 || (a.limit !== null && (!Number.isFinite(a.limit) || a.limit < 0))) return null;
+    const unlimited = a.limit === null, left = unlimited ? null : Math.max(0, a.limit - a.used);
+    // /me.limit is a compatibility value including prior usage and bonus. Only these
+    // /config tables describe this account exactly; paid general tables are not supplied.
+    const table = cfg && cfg.allowance, tier = me.plan === "free" ? me.tier : me.tier === "edu" ? me.plan : null;
+    const disabled = a.limit === 0 || !!(tier && table && table[tier] && table[tier].autofill === 0);
+    const summary = `${a.used.toLocaleString()} Auto-Apply runs used this month; ` + (unlimited ? "no monthly run limit." : `${left.toLocaleString()} runs left in your allowance.`);
+    return { summary, left, unlimited, disabled, exhausted: !disabled && !me.paused && a.limit > 0 && left === 0, bonus: Number.isFinite(a.bonus) && a.bonus > 0 ? a.bonus : 0 };
+  }
+  const bounded = promise => new Promise(resolve => {
+    const timer = setTimeout(() => resolve(null), 8000);
+    Promise.resolve(promise).then(v => { clearTimeout(timer); resolve(v); }, () => { clearTimeout(timer); resolve(null); });
+  });
+  const bonusWords = bonus => Object.entries(bonus || {}).filter(([k, n]) => IS.ALLOWANCE_LABELS[k] && Number.isFinite(n) && n > 0)
+    .map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k])}`).join(" and ");
+  function countArrivalOnce(seen, event) { if (!seen.has(event)) { seen.add(event); IS.count(event); } }
+  function focusArrival(panel) {
+    const active = document.activeElement;
+    if (!panel || (active && active !== document.body && active !== document.documentElement)) return false;
+    panel.focus(); panel.scrollIntoView({ block: "start" }); return true;
+  }
+  function visibleFocusAnchor() {
+    const node = document.activeElement;
+    if (!node || node === document.body || node === document.documentElement) return null;
+    const box = node.getBoundingClientRect();
+    return box.bottom > 0 && box.top < innerHeight ? { node, top: box.top } : null;
+  }
+  function restoreArrivalAnchor(anchor) {
+    if (!anchor || !anchor.node.isConnected || document.activeElement !== anchor.node) return;
+    const shift = anchor.node.getBoundingClientRect().top - anchor.top;
+    if (shift) window.scrollBy({ top: shift, behavior: "instant" });
+  }
+  function validInvite(r) {
+    try { return !!(r && ["https:", "http:"].includes(new URL(r.link).protocol) && Number.isInteger(r.max) && r.max >= 0 && Number.isInteger(r.rewarded) && r.rewarded >= 0 && bonusWords(r.bonus)); }
+    catch (e) { return false; }
+  }
+  function InviteBlock({ invite, status, note, onLoad, onCopy }) {
+    const words = invite && bonusWords(invite.bonus), capped = invite && invite.rewarded >= invite.max;
+    return h("section", { className: "invite", "aria-label": "Invite a classmate" },
+      h("h3", null, invite && invite.bonus.autofill > 0 && !capped ? "Invite a classmate: share extra runs" : "Invite a classmate"),
+      h("p", null, invite ? (capped ? `Your invite reward limit is reached. Eligible new classmates can still get ${words}; you will not receive more invite rewards.` : `You each get ${words}.`)
+        : "New classmates who join through your link with a verified .edu email in their first week can get extra AI use. Load your link to check your reward eligibility."),
+      invite && h("p", { className: "muted" }, `For classmates with a verified .edu email, in their first week. Your rewarded invites: ${invite.rewarded} of ${invite.max}.`),
+      h("div", { className: "invite-row" },
+        invite && h("input", { id: "invite-link", type: "text", readOnly: true, value: invite.link, "aria-label": "Your invite link", onFocus: e => e.target.select() }),
+        invite ? h("button", { type: "button", className: "btn", onClick: onCopy }, "Copy link")
+          : h("button", { type: "button", className: "btn", disabled: status === "loading", onClick: onLoad }, status === "loading" ? "Loading invite link…" : status === "error" ? "Retry invite link" : "Get my invite link")),
+      h("p", { className: "muted", role: "status" }, status === "error" ? "Couldn't load your invite link. Try again." : note));
+  }
+  function AllowancePanel({ signedIn, me, status, cfgStatus, allowance, resetDay, plans, busy, signIn, inviteBlock, onRetry, onConfigRetry, onCheckout, onClose }) {
+    return h("section", { id: "allowance-panel", className: "notice allowance-panel", "aria-labelledby": "allowance-title", tabIndex: -1 },
+      h("h2", { id: "allowance-title" }, allowance && allowance.exhausted ? "No Auto-Apply runs left in your allowance" : "Your Auto-Apply allowance"),
+      h("p", { id: "allowance-status", role: "status", "aria-live": "polite", "aria-atomic": true }, !signedIn ? ""
+        : allowance ? (status === "loading" ? "Refreshing your allowance… " : "") + allowance.summary
+        : status === "loading" ? "Loading your allowance…" : "Couldn't load your allowance."),
+      !signedIn ? h(F, null, h("p", null, "Sign in to see your allowance, invite link and available plans. Searching stays free without sign-in."), cfgStatus === "loading" && h("p", { role: "status" }, "Loading sign-in options…"), signIn)
+        : !allowance ? status !== "loading" && h("button", { type: "button", className: "btn", onClick: onRetry }, "Retry allowance")
+        : h(F, null,
+          allowance.exhausted && h("p", null, `Monthly allowance resets on ${resetDay} (UTC).`),
+          allowance.bonus > 0 && h("p", null, `Includes ${allowance.bonus.toLocaleString()} extra runs. Extra runs do not expire.`),
+          h("p", { className: "muted" }, me.paused ? "AI use is temporarily paused. Search still works." : allowance.disabled ? "Auto-Apply is currently unavailable for this account." : "Per-run and other service limits can still apply."),
+          !allowance.disabled && !me.paused && inviteBlock),
+      cfgStatus === "error" && h(F, null, h("p", { role: "status" }, "Couldn't load account options."), h("button", { type: "button", className: "btn", onClick: onConfigRetry }, "Retry account options")),
+      signedIn && allowance && h("div", { className: "allowance-plans" }, h("h3", null, "Available plans"),
+        plans.length ? plans.map(pl => h("button", { key: pl.plan, type: "button", className: "btn", disabled: !!busy || status !== "ready", onClick: () => onCheckout(pl.plan) }, `${pl.label || IS.PLAN_LABELS[pl.plan] || pl.plan}${pl.price ? ` · ${pl.price}` : ""}`))
+          : h("p", null, cfgStatus === "loading" ? "Loading plan options…" : cfgStatus === "error" ? "Plan options could not be loaded." : "No plan upgrade is available for this account."),
+        plans.length > 0 && h("p", { className: "muted" }, "Optional monthly plans. Checkout opens only when you choose a plan. Cancel any time.")),
+      h("button", { type: "button", className: "btn quiet", onClick: onClose }, "Not now"));
+  }
   const LS_KEY = "internscout.appstate.v1", SAVED_KEY = "internscout.saved.v1", LANDING_KEY = "internscout.landing.seen.v1", SKIP_KEY = "internscout.setup.skipped.v1", MORE_KEY = "internscout.filters.more.v1";
   const APP_STATES = ["none", "interested", "applied", "interviewing", "rejected", "offer"];
+  const MYLIST_KEY = "internscout.mylist.v1", VISIT_KEY = "internscout.visit.v1";
+  // Saved SEARCHES keep SAVED_KEY. Membership is independent of application history in LS_KEY.
+  const publicRole = r => ({ company: typeof r.company_name === "string" ? r.company_name.slice(0, 200) : "",
+    title: typeof r.title === "string" ? r.title.slice(0, 300) : "",
+    url: typeof r.apply_url === "string" && r.apply_url.length <= 2000 && /^https?:\/\//i.test(r.apply_url) ? r.apply_url : "",
+    shards: [...IS.shardKeys(r)].filter(k => /^(?:[A-Z]{2}|remote|Canada)$/.test(k)) });
+  function readMyList(raw, states) {
+    if (!raw || raw.version !== 1 || !raw.roles || typeof raw.roles !== "object" || Array.isArray(raw.roles)) {
+      return { version: 1, roles: Object.fromEntries(Object.entries(states).filter(([, s]) => s !== "none" && APP_STATES.includes(s)).map(([id]) => [id, { saved: true }])) };
+    }
+    return { version: 1, roles: Object.fromEntries(Object.entries(raw.roles).filter(([, r]) => r && typeof r.saved === "boolean").map(([id, r]) => [id, {
+      saved: r.saved, ...publicRole({ company_name: r.company, title: r.title, apply_url: r.url }),
+      shards: Array.isArray(r.shards) ? r.shards.filter(k => typeof k === "string" && /^(?:[A-Z]{2}|remote|Canada)$/.test(k)) : [],
+    }])) };
+  }
+  function writeLocal(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; } }
+  function savedRoleRows(rows, roles) {
+    const current = new Map(rows.map(r => [String(r.id), r]));
+    return Object.entries(roles).filter(([, r]) => r.saved).map(([id, r]) => current.get(id) || {
+      id, company_name: r.company || "Saved role " + id, title: r.title || "Listing details unavailable", apply_url: r.url || "", _savedMissing: true,
+    });
+  }
+  function sinceVisit(row, previous, now) {
+    // Exported SQL timestamps omit an offset but are UTC; do not interpret them as local wall time.
+    const value = row.first_seen, seen = Date.parse(typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value) ? value + "Z" : value);
+    return row.status === "open" && Number.isFinite(previous) && previous > 0 && previous <= now && Number.isFinite(seen) && seen > previous && seen <= now;
+  }
+  // Current rows first, then one location hint per unresolved role, then the remaining public shards.
+  // Await even an in-flight key: loadedKeys() includes promises that have not settled yet.
+  async function resolveSavedRoles(store, index, roles, paint, live) {
+    const ids = Object.keys(roles).filter(id => roles[id].saved), failed = new Set();
+    const missing = () => { const known = new Set(store.all().map(r => String(r.id))); return ids.filter(id => !known.has(id)); };
+    if (!missing().length || !index || !index.files) return [];
+    const valid = new Set(Object.keys(index.files));
+    const hints = [...new Set(missing().map(id => (roles[id].shards || []).find(k => valid.has(k))).filter(Boolean))];
+    for (const phase of [hints, [...valid].filter(k => !hints.includes(k))]) {
+      for (let i = 0; i < phase.length && live() && missing().length; i += 4) {
+        const bad = await store.ensure(phase.slice(i, i + 4));
+        if (!live()) return null;
+        bad.forEach(k => failed.add(k)); paint();
+      }
+    }
+    return missing().length ? [...failed] : [];
+  }
   const STATE_LABEL = { none: "Not started", interested: "Interested", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
   const JOB_LABEL = { queued: "Queued", working: "Agent working", needs_you: "Needs you", ready_to_submit: "Ready to submit", submitted: "Submitted", failed: "Failed" };
   const ATS = { greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", workday: "Workday", smartrecruiters: "SmartRecruiters", icims: "iCIMS", icims_site: "iCIMS", oracle: "Oracle", bamboohr: "BambooHR", workable: "Workable", taleo: "Taleo" };
@@ -35,10 +172,19 @@
   // calls these for every row it draws. Same text (toLocaleDateString(undefined, o) is
   // new Intl.DateTimeFormat(undefined, o).format).
   const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
-  const SHORT_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
   const fmtDay = d => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? "Invalid Date" : DAY_FMT.format(t); };
   const daysUntil = d => Math.ceil((new Date(d + "T23:59:59").getTime() - Date.now()) / DAY);
-  const shortDate = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : SHORT_FMT.format(d); };
+  function postedTime(value, today = new Date()) {
+    if (!value) return null;
+    // A date-only posting is a calendar date, not midnight UTC on the previous local day.
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value), d = new Date(dateOnly ? value + "T12:00:00" : value);
+    if (isNaN(d) || (dateOnly && (d.getFullYear() !== +value.slice(0, 4) || d.getMonth() + 1 !== +value.slice(5, 7) || d.getDate() !== +value.slice(8)))) return null;
+    const full = DAY_FMT.format(d), day = x => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+    const age = Math.round((day(today) - day(d)) / DAY);
+    return h("time", { dateTime: value, title: full },
+      h("span", { "aria-hidden": true }, "Posted " + (age < 0 ? full : ago(age))),
+      h("span", { className: "sr" }, "Posted " + full));
+  }
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const cx = (...a) => a.filter(Boolean).join(" ");
   const prevent = fn => e => { e.preventDefault(); fn(e); };
@@ -220,6 +366,33 @@
     h("select", { "aria-label": label, value, onChange: e => onChange(e.target.value) }, children));
   const opt = (v, l) => h("option", { key: v, value: v }, l);
 
+  const graphemes = typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+  const companyHue = name => { let hash = 0; for (const c of name.toLowerCase()) hash = (hash * 31 + c.codePointAt(0)) >>> 0; return hash % 360; };
+  function CompanyTile({ name }) {
+    const label = String(name || "").trim().normalize("NFC");
+    const initial = label ? (graphemes ? graphemes.segment(label)[Symbol.iterator]().next().value.segment : Array.from(label)[0]) : "?";
+    return h("span", { className: "company-tile", "aria-hidden": true, style: { "--company-hue": companyHue(label) } }, initial.toUpperCase());
+  }
+
+  function compactLocation(g, raw) {
+    if (!g) return raw;
+    const names = g.kind === "canada" ? IS.CA_PROVINCES : IS.US_STATES;
+    const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f.\s]/g, "").toLowerCase();
+    const country = g.kind === "canada" ? ["canada"] : ["us", "usa", "unitedstates", "unitedstatesofamerica"];
+    let text = raw;
+    if (g.kind !== "remote" && names[g.state]) {
+      const parts = raw.split(",").map(s => s.trim()).filter(Boolean);
+      const suffix = s => { const n = norm(s.replace(/\s*\(remote\)$/i, "")); return n === norm(g.state) || n === norm(names[g.state]) || country.includes(n); };
+      // Keep the first token: New York and Washington can be city names as well as states.
+      while (parts.length > 1 && suffix(parts[parts.length - 1])) parts.pop();
+      text = parts.join(", ");
+      if (!parts.some(s => norm(s) === norm(g.state))) text += ", " + g.state;
+    }
+    if (g.kind === "canada" && !/\bcanada\b/i.test(text)) text += ", Canada";
+    if ((g.kind === "remote" || g.remote || /\(remote\)/i.test(raw)) && !/\bremote\b/i.test(text)) text += " (remote)";
+    return text;
+  }
+
   // The listing's place, inline, for the row's facts line (D9, 2026-10-14): "Boston, MA +2". was: two
   // stacked lines in a Location column (the place, then its state or "Remote" under it).
   function Loc({ r, keys }) {
@@ -227,13 +400,9 @@
     // was: || "—". A muted word says what is missing; a bare dash only says something is.
     const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || null);
     if (!first) return h("span", { className: "muted" }, "Location not listed");
-    // was: remote, else the state when the first line lacks it. A Canadian place also says the country.
-    const sub = g && g.kind === "remote" ? (/remote/i.test(first) ? null : "Remote")
-      : g && g.kind === "canada" ? (/canada/i.test(first) ? (g.remote || /remote/i.test(first) ? "Remote" : null) : `${g.state && !first.includes(g.state) ? g.state + ", " : ""}Canada`)
-      : g && g.state && !first.includes(g.state) ? g.state : null;
     const more = Math.max(0, all.length - 1);
-    return h("span", { title: all.map(x => x.loc).join("; ") }, first, sub ? (sub === "Remote" ? " (remote)" : ", " + sub) : "",
-      more > 0 && h("span", { className: "muted" }, " +" + more));
+    return h("span", { title: all.map(x => x.loc).join("; ") || first }, compactLocation(g, first),
+      more > 0 && h("span", { className: "muted" }, " +" + more + " more"));
   }
 
   // The Why panel (A2 component 6, D13): a region that takes focus when it opens, closes on Escape and hands
@@ -267,7 +436,8 @@
     // was: has ? (has[s.name] ? "✓ " : "✗ ") : "", s.name
     const icon = (name, said) => h(F, null, h("span", { className: "i i-" + name, "aria-hidden": true }), h("span", { className: "sr" }, said));
     const chip = s => h("span", { key: s.name, className: cx("tag", has && (has[s.name] ? "ok" : "miss")), title: has ? (has[s.name] ? "Found on your profile" : "Not on your profile") : "" }, has ? (has[s.name] ? icon("check", "Have: ") : icon("cross", "Missing: ")) : "", s.name);
-    const dates = h("div", { className: "meta" }, posted != null ? `Posted ${ago(posted)}` : "Posting date not listed", seen != null ? ` · first seen ${ago(seen)}` : "", r.sector ? ` · ${IS.sectorLabel(r.sector)} sector` : "");
+    const boardCode = String(r.ats || "").trim(), board = boardCode && !/^other$/i.test(boardCode) ? ATS[boardCode.toLowerCase()] || boardCode : null;
+    const dates = h("div", { className: "meta" }, postedTime(r.posted_at) || "Posting date not listed", seen != null ? ` · first seen ${ago(seen)}` : "", r.sector ? ` · ${IS.sectorLabel(r.sector)} sector` : "", board ? ` · Job board: ${board}` : "");
     // was: h("div", { className: "whyg" }, ...) with h4 headings
     return h("div", { className: "whyg", ref: box, tabIndex: -1, role: "region", "aria-label": `Why: ${r.company_name}, ${r.title}`,
       onKeyDown: e => { if (e.key === "Escape") { e.preventDefault(); onClose && onClose(); } } },
@@ -300,7 +470,7 @@
     // Two field tags fit on the line; the rest are a count.
     const fieldText = tags.slice(0, 2).map(IS.fieldLabel).join(", ") + (tags.length > 2 ? ` +${tags.length - 2}` : "");
     const term = [IS.termText(r.term), r.duration].filter(Boolean).join(", ");
-    const pay = IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : "Pay not listed";
+    const pay = IS.realSalary(r) ? h("span", { className: "num pay-badge" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? h("span", { className: "pay-badge" }, "Stipend") : IS.payOf(r) === "unpaid" ? h("span", { className: "closed pay-badge" }, "Unpaid") : "Pay not listed";
     const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
     return h("div", { className: "meta facts" },
       tags.length ? h("span", { title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, fieldText) : h("span", { className: "muted" }, "Not tagged"),
@@ -346,23 +516,24 @@
   // `needsAccess` (U11): with the extension installed, a row whose application is not on a site Auto-Apply
   // already has access to (SUPPORTED_ATS) says, quietly, that it will ask for that site first.
   // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns }) {
-  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer }) {
+  const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer, saved, onSave, myList, fresh, missingText }) {
     const [aaOpen, setAaOpen] = useState(false);
     const whyBtn = useRef(), statusSel = useRef();
     const asking = !!ask && (state === "none" || state === "interested") && !job;
-    const needsAccess = canAuto && !!r.apply_url && !SUPPORTED_ATS.has(r.ats);
+    const needsAccess = canAuto && !r._savedMissing && !!r.apply_url && !SUPPORTED_ATS.has(r.ats);
     // Who the row is, for the names of its repeated controls (U12): "Open posting, Acme, Data Intern".
     const who = `${r.company_name}, ${r.title}`;
     // The line goes once answered; focus moves to the row's status, which now shows the answer, rather
     // than falling back to the top of the page.
-    const answer = applied => { onAnswer(r.id, applied); setTimeout(() => { if (statusSel.current && statusSel.current.focus) statusSel.current.focus(); }, 0); };
-    const tryAuto = !canAuto && canTry && r.apply_url && SUPPORTED_ATS.has(r.ats);
+    const focusProgress = () => setTimeout(() => { const target = statusSel.current || document.getElementById("listings"); if (target && target.focus) target.focus(); }, 0);
+    const answer = applied => { onAnswer(r.id, applied); focusProgress(); };
+    const tryAuto = !canAuto && canTry && !r._savedMissing && r.apply_url && SUPPORTED_ATS.has(r.ats);
     const scored = !!ctx.p;
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
     const stages = (r.stage || []).filter(s => s !== "internship").map(s => IS.STAGE_LABEL[s] || s);
-    const dates = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, ...stages, r.sector && IS.sectorLabel(r.sector),
-      r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
+    const posted = postedTime(r.posted_at);
+    const dates = [dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, ...stages, r.sector && IS.sectorLabel(r.sector), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
     const bl = elig ? blockers(r, elig).filter(t => !/^For /.test(t)) : [];
     const cols = canAuto ? 5 : 4;
     const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
@@ -372,20 +543,20 @@
       h("tr", { id: "listing-" + r.id, tabIndex: -1, className: cx(checked && "sel", open && "opened", sc.mismatch && "dim") },
         // was: "aria-label": "Select " + r.company_name, the same name on every row from one employer.
         canAuto && h("td", { className: "c-chk" }, h("input", { type: "checkbox", "aria-label": `Select ${r.company_name}, ${r.title}`, checked,
-          disabled: !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
+          disabled: r._savedMissing || !r.apply_url || active || (job && job.status === "submitted"), onChange: e => onCheck(r.id, e.target.checked) })),
         h("td", { className: "c-co" },
           // A badge that says New has to mean new and still open: is_new alone is only the scan window, and
           // the export keeps closed rows too.
-          h("div", { className: "li-head" }, h("span", { className: "co" }, r.company_name), r.is_new && r.status === "open" && h("span", { className: "new" }, "New"),
+          h("div", { className: "li-head" }, h(CompanyTile, { name: r.company_name }), h("span", { className: "co" }, r.company_name), fresh && h("span", { className: "new" }, "New since your last visit"),
             h("span", { className: "sr" }, ", "), dot, h("span", { className: "role" }, r.title)),
           // was: the facts line built here; factsLine (above) since 2026-10-14, shared with the paid box.
-          factsLine(r, keys),
-          (dates || r.status === "closed") && h("div", { className: "meta" }, dates, r.status === "closed" && h("span", { className: "closed" }, (dates ? " · " : "") + "Closed")),
+          r._savedMissing ? h("div", { className: "meta" }, missingText) : factsLine(r, keys),
+          (posted || dates || r.status === "closed") && h("div", { className: "meta" }, posted, posted && dates ? " · " : "", dates, r.status === "closed" && h("span", { className: "closed" }, (posted || dates ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
         // was: the score button (or Rank for my major and Details) built here; matchControl (above) since
         // 2026-10-14, shared with the paid box so both show the one score from the same scoreOf.
-        h("td", { className: "c-match" }, matchControl({ r, sc, scored, open, onToggle: () => onWhy(r.id), onRank, btnRef: whyBtn, onKeyDown: whyKey, panelId: "why-" + r.id })),
+        h("td", { className: "c-match" }, !r._savedMissing && matchControl({ r, sc, scored, open, onToggle: () => onWhy(r.id), onRank, btnRef: whyBtn, onKeyDown: whyKey, panelId: "why-" + r.id })),
         h("td", { className: "c-links" },
           // data-aa (2026-10-13): an application Auto-Apply fills, so js/offer.js may offer the extension
           // when this is opened. The same rule as the row's "Auto-Apply" explainer (SUPPORTED_ATS).
@@ -394,15 +565,17 @@
           // onOpen (U9): remembered so the page can ask "Did you apply?" when the student comes back.
           r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined, onClick: () => onOpen(r) },
             "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, `, ${who} (opens in a new tab)`)) : h("span", { className: "muted" }, "No link"),
-          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
+          !job && canAuto && !r._savedMissing && r.apply_url && h("button", { type: "button", className: "rowbtn", title: "Fills from your resume. You review and submit.", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
             "Auto-Apply", h("span", { className: "sr" }, ": " + who)),
           !job && needsAccess && h("span", { className: "aa-note", id: "acc-" + r.id, title: "This application is on the employer's own site. The first time, Auto-Apply asks you to allow that one site." }, "asks for site access"),
-          tryAuto && h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply", h("span", { className: "sr" }, ": " + who))),
+          tryAuto && h("button", { type: "button", className: "rowbtn try", title: "Fills from your resume. You review and submit.", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply", h("span", { className: "sr" }, ": " + who))),
           // was: h("div", null, h("a", { className: "report", ... }, "Report")): in the Why panel only now (D11).
         h("td", { className: "c-mine" },
           // was: "aria-label": "Your status" on all 150 selects, then "Your status for " + r.title (two employers'
           // "Software Engineering Intern" rows read the same).
-          h("select", { className: "mine", ref: statusSel, "aria-label": `Your status for ${r.title} at ${r.company_name}`, value: state, onChange: e => onState(r.id, e.target.value) }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
+          h("button", { type: "button", className: cx("btn small save-role", saved && "on"), ref: !myList ? statusSel : undefined,
+            "aria-pressed": !!saved, "aria-label": `Save ${r.title} at ${r.company_name}`, onClick: () => onSave(r) }, saved ? "Saved" : "Save"),
+          myList && h("select", { className: "mine", ref: statusSel, "aria-label": `Your status for ${r.title} at ${r.company_name}`, value: state, onChange: e => { onState(r.id, e.target.value); focusProgress(); } }, APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
           job && h("div", null, h("span", { className: "st " + job.status, title: job.reason || job.question || job.summary || "" }, JOB_LABEL[job.status] || job.status)))),
       // "Did you apply?" (U9): its own full-width row under the listing, like the Why panel.
       asking && h("tr", { className: "ask", id: "ask-" + r.id }, h("td", { colSpan: cols },
@@ -500,6 +673,58 @@
       return () => { if (mq.removeEventListener) mq.removeEventListener("change", f); else if (mq.removeListener) mq.removeListener(f); };
     }, [mq]);
     return on;
+  }
+
+  // Native disclosure also works in the static header without JavaScript.
+  function SiteNav({ children }) {
+    const root = useRef(null), lastFocus = useRef(null);
+    useEffect(() => {
+      const box = root.current, details = box.querySelector("details"), summary = box.querySelector("summary");
+      const mq = window.matchMedia("(max-width: 760px)");
+      const resize = () => {
+        const active = document.activeElement === document.body ? lastFocus.current : document.activeElement;
+        if (!mq.matches) {
+          details.open = false;
+          if (active === summary) box.querySelector("nav a").focus();
+        } else if (!details.open && box.querySelector("nav").contains(active)) summary.focus();
+      };
+      const outside = event => {
+        if (!box.contains(event.target)) lastFocus.current = null;
+        if (!details.open || box.contains(event.target)) return;
+        if (box.contains(document.activeElement)) summary.focus({ preventScroll: true });
+        details.open = false;
+      };
+      mq.addEventListener("change", resize);
+      document.addEventListener("pointerdown", outside);
+      return () => { mq.removeEventListener("change", resize); document.removeEventListener("pointerdown", outside); };
+    }, []);
+    return h("div", { className: "site-navigation", ref: root,
+      onFocus: event => { lastFocus.current = event.target; },
+      onKeyDown: event => {
+        const details = root.current.querySelector("details");
+        if (event.key === "Escape" && details.open) {
+          details.open = false; root.current.querySelector("summary").focus(); event.stopPropagation();
+        }
+      },
+      onBlur: event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          // A breakpoint can hide the focused control before its change event fires.
+          if (event.relatedTarget || event.target.getClientRects().length) lastFocus.current = null;
+          root.current.querySelector("details").open = false;
+        }
+      },
+      onClick: event => {
+        const link = event.target.closest("nav a");
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === "_blank") return;
+        root.current.querySelector("details").open = false;
+        // Same-page links keep their destination focus instead of returning to Menu.
+        const url = new URL(link.href);
+        if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search && url.hash) {
+          const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
+          if (target) target.focus();
+        }
+      }
+    }, h("details", null, h("summary", { "aria-controls": "site-links" }, "Menu")), children);
   }
 
   // ---------- landing ----------
@@ -883,13 +1108,27 @@
     const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...link }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
     const [saved, setSaved] = useState(() => IS.ls.get(SAVED_KEY, []) || []);
+    const [myList, setMyList] = useState(false), [myProgress, setMyProgress] = useState("");
+    const [myLimit, setMyLimit] = useState(PAGE), [myRetry, setMyRetry] = useState(0);
+    const [myLoad, setMyLoad] = useState({ checking: false, failed: [] });
+    const [roleBook, setRoleBook] = useState(() => readMyList(IS.ls.get(MYLIST_KEY, null), appStates));
+    const roleBookRef = useRef(roleBook); roleBookRef.current = roleBook;
+    const [trackerStored, setTrackerStored] = useState(true);
+    const [visitStart] = useState(() => Date.now());
+    const [previousVisit, setPreviousVisit] = useState(() => IS.ls.get(VISIT_KEY, null));
+    const keepRoleBook = useCallback(next => { roleBookRef.current = next; setRoleBook(next); if (!writeLocal(MYLIST_KEY, next)) setTrackerStored(false); }, []);
+    useEffect(() => { keepRoleBook(roleBookRef.current); if (!writeLocal(VISIT_KEY, visitStart)) setTrackerStored(false); }, []);
+    const savedIds = Object.keys(roleBook.roles).filter(id => roleBook.roles[id].saved), savedIdsKey = JSON.stringify(savedIds);
     const [openId, setOpenId] = useState(null);
-    const [limit, setLimit] = useState(PAGE);
-    const [sel, setSel] = useState(() => new Set());
+    const [browseLimit, setLimit] = useState(PAGE);
+    const [browseSel, setBrowseSel] = useState(() => new Set()), [mySel, setMySel] = useState(() => new Set());
+    const sel = myList ? mySel : browseSel, setSel = myList ? setMySel : setBrowseSel;
+    const selectionSetter = useRef(setSel); selectionSetter.current = setSel;
     const [note, setNote] = useState("");
     // A classmate's invite code waiting for sign-in, and the student's own invite panel (worker/src/referral.js).
     const [invited, setInvited] = useState(() => IS.ls.get(IS.INVITE_KEY, null));
-    const [invite, setInvite] = useState(null);
+    const [inviteState, setInviteState] = useState(null);
+    const inviteRequest = useRef(0);
     const [inviteNote, setInviteNote] = useState("");
     // The one-time invite nudge (added 2026-10-02; core.js inviteNudgeDue): on for the rest of this page
     // load once a first Auto-Apply or first profile triggers it, until Not now or the panel opens.
@@ -901,16 +1140,35 @@
       ? IS.createDigestNudge() : { claim: () => false, shown() {}, finish() {} };
     const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
+    const billingRequest = useRef(0);
     const [ghToken, setGhToken] = useState(() => { try { return localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
     // auth.token is the bearer sent to the Worker (a session code or an ID token); auth.who is
     // IS.authInfo() of the sign-in it came from ({ email, sub, exp, signin, session }), because a
     // session code can't be decoded the way an ID token could.
-    const [auth, setAuth] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
+    const [auth, setAuthState] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
+    const authRef = useRef(auth);
+    const setAuth = useCallback(update => { const next = typeof update === "function" ? update(authRef.current) : update; authRef.current = next; setAuthState(next); }, []);
+    const invite = inviteState && inviteState.token === auth.token ? inviteState.data : null;
+    const inviteStatus = inviteState && inviteState.token === auth.token ? inviteState.status : "idle";
+    const [cfgStatus, setCfgStatus] = useState("loading");
+    const configRequest = useRef(0);
+    const loadConfig = useCallback(async () => {
+      const seq = ++configRequest.current; setCfgStatus("loading");
+      const cfg = await bounded(IS.fetchWorkerConfig());
+      if (seq !== configRequest.current) return;
+      setAuth(a => ({ ...a, cfg })); setCfgStatus(cfg ? "ready" : "error");
+    }, []);
     const signedIn = (x, source) => { const who = IS.authInfo(x); return who ? { token: who.token, who, source } : { token: null, who: null }; };
     // was (twice): IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.tokenOk(r.token)) setAuth(a => ({ ...a, token: r.token, source: "extension" })); });
     // The extension answers { token, email, account, expires } for a session and { token } for an ID token.
-    const askExtension = () => IS.ext.call({ type: "auth:token" }, 1500).then(r => { if (r && r.token && IS.authOk(r)) setAuth(a => ({ ...a, ...signedIn(r, "extension") })); });
+    const askExtension = () => {
+      const before = authRef.current;
+      return IS.ext.call({ type: "auth:token" }, 1500).then(r => {
+        if (authRef.current.token !== before.token || authRef.current.source !== before.source) return;
+        if (r && r.token && IS.authOk(r)) setAuth(a => ({ ...a, ...signedIn(r, "extension") }));
+      });
+    };
     const { info, queue, profile: extProfile } = useExtension();
 
     useEffect(() => { IS.ls.set(LANDING_KEY, true); }, []);
@@ -1002,6 +1260,14 @@
       return () => { live = false; clearTimeout(timer); cancelAnimationFrame(frame); };
     }, [ready, planKey, retry]);
 
+    useEffect(() => {
+      if (!myList || !ready) return;
+      let live = true; setMyLoad({ checking: true, failed: [] });
+      resolveSavedRoles(store.current, index, roleBookRef.current.roles, () => setVer(store.current.version()), () => live)
+        .then(failed => { if (live) setMyLoad({ checking: false, failed: failed || [] }); });
+      return () => { live = false; };
+    }, [myList, ready, savedIdsKey, myRetry]);
+
     // Descriptions come in a sidecar per state; fetch them the first time the search box is used.
     // Each description file is about the size of its listing file (MA: 0.9 MB), so they are fetched only
     // for a real search (2+ letters), and only on their own while the chosen states stay under
@@ -1025,7 +1291,7 @@
         if (r && r.token) setAuth(a => ({ ...a, ...signedIn(r.session || r.token, "page") }));
         if (r && r.error) setNote("Sign-in didn't work: " + r.error);
       });
-      IS.fetchWorkerConfig().then(cfg => setAuth(a => ({ ...a, cfg })));
+      loadConfig();
     }, []);
     useEffect(() => {
       if (!info.installed || auth.token) return;
@@ -1045,22 +1311,34 @@
     useEffect(() => { if (auth.token && p) IS.postDemand(auth.token, p); }, [auth.token, p]);
     // was: const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
     const who = auth.token ? auth.who : null;
-    const [me, setMe] = useState(null);
+    const [meResult, setMeResult] = useState(null), meRequest = useRef(0);
+    const me = meResult && meResult.token === auth.token ? meResult.data : null;
+    const meStatus = meResult && meResult.token === auth.token ? meResult.status : "loading";
     // An ID token lasts about an hour, a session until sign-out or a year unused. When either runs out
     // (or the Worker refuses it), stop showing "Signed in": take a fresh one from the extension if it
     // has one, otherwise show the sign-in buttons again.
     const dropToken = useCallback(() => {
       // was: IS.signOut(); setAuth(a => ({ ...a, token: null }));
-      IS.signOut(); setAuth(a => ({ ...a, token: null, who: null }));
+      arrivalFlag("clear"); IS.signOut(); setAuth(a => ({ ...a, token: null, who: null }));
       if (info.installed) askExtension();
     }, [info.installed]);
+    const loadMe = useCallback(async (token = authRef.current.token) => {
+      if (!token || token !== authRef.current.token) return null;
+      const seq = ++meRequest.current;
+      setMeResult(previous => ({ token, data: previous && previous.token === token ? previous.data : null, status: "loading" }));
+      const data = await bounded(IS.fetchMe(token));
+      if (token !== authRef.current.token || seq !== meRequest.current) return null;
+      setMeResult({ token, data, status: runAllowance(data) ? "ready" : "error" });
+      if (!data && !IS.authOk(authRef.current.who)) dropToken();
+      return data;
+    }, [dropToken]);
     useEffect(() => {
-      setMe(null);
+      setMeResult(null); setInviteState(null); setInviteNote(""); inviteRequest.current++;
       if (!auth.token) return;
-      let live = true, last = Date.now();
+      let last = Date.now();
       // was: ... else if (!IS.tokenOk(auth.token)) dropToken(); });
       // authOk is also false once the Worker has answered 401 for this token (a session it ended).
-      const load = () => IS.fetchMe(auth.token).then(m => { if (!live) return; if (m) setMe(m); else if (!IS.authOk(auth.who)) dropToken(); });
+      const load = () => loadMe(auth.token);
       load();
       // was: const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
       // was: const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
@@ -1073,13 +1351,20 @@
       // Coming back to the tab after an Auto-Apply run: the "left this month" text should be current.
       const onVis = () => { if (document.visibilityState === "visible" && Date.now() - last > 60000) { last = Date.now(); load(); } };
       document.addEventListener("visibilitychange", onVis);
-      return () => { live = false; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); };
-    }, [auth.token, dropToken]);
+      return () => { meRequest.current++; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); };
+    }, [auth.token, loadMe]);
 
     // The extension's Upgrade button (a job paused on a used-up allowance) opens /?upgrade=<plan>.
     // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
     // gives, then presses checkout here themselves.
-    const [upgradeAsk, setUpgradeAsk] = useState(() => new URLSearchParams(location.search).get("upgrade") || "");
+    const [arrival] = useState(() => ({ search: location.search, returned: arrivalFlag("take") }));
+    const [arrivalDismissed, setArrivalDismissed] = useState(false);
+    const arrivalEvents = useRef(new Set());
+    const countArrival = event => countArrivalOnce(arrivalEvents.current, event);
+    const arrivalRoute = allowanceArrival(arrival.search, auth.cfg);
+    const upgradeAsk = !arrivalDismissed && (arrivalRoute.plan || arrivalRoute.generic || arrival.returned);
+    const [checkoutReturn] = useState(() => new URLSearchParams(location.search).get("upgraded") === "1");
+    const dismissArrival = () => { arrivalFlag("clear"); setArrivalDismissed(true); document.getElementById("listings")?.focus(); };
     // The header's sign-in is one quiet button until pressed (2026-10-05); this is whether it has been.
     const [signInOpen, setSignInOpen] = useState(false);
     // was: the plans announcement (2026-10-04), shown above the list until dismissed (plansSeen, hidePlans).
@@ -1095,22 +1380,29 @@
     // the queue holds a filled application.
     const [reviewHidden, setReviewHidden] = useState(() => { try { return localStorage.getItem(IS.REVIEW_LINE_KEY) === "hidden"; } catch (e) { return false; } });
     const hideReview = () => { try { localStorage.setItem(IS.REVIEW_LINE_KEY, "hidden"); } catch (e) { } setReviewHidden(true); };
-    useEffect(() => { if (upgradeAsk) history.replaceState(null, "", location.pathname); }, []);
+    useEffect(() => {
+      const keys = [...(arrivalRoute.plan ? ["upgrade"] : []), ...(arrivalRoute.generic ? ["out_of_runs"] : [])];
+      if (keys.length) clearArrivalKeys(keys);
+    }, [arrivalRoute.plan, arrivalRoute.generic]);
 
     // Stripe sends the student back to /?upgraded=1. The webhook that records the plan can land a
     // moment later, so check once now and once shortly after before saying anything.
     useEffect(() => {
-      if (!new URLSearchParams(location.search).has("upgraded")) return;
-      history.replaceState(null, "", location.pathname);
-      setNote("Thanks for supporting InternScout. Your larger allowance is being switched on…");
-      const check = n => IS.fetchMe(auth.token).then(m => {
-        if (m) setMe(m);
-        if (m && m.plan && m.plan !== "free") setNote(`You're on the ${IS.PLAN_LABELS[m.plan] || m.plan} plan. Your AI allowance is now larger.`);
-        else if (n > 0) setTimeout(() => check(n - 1), 3000);
-        else setNote("Payment received. If the larger allowance hasn't appeared in a minute, reload the page.");
-      });
-      if (auth.token) check(4);
-    }, [auth.token]);
+      if (!checkoutReturn) return;
+      clearArrivalKeys(["upgraded"]);
+      if (!auth.token) return;
+      const token = auth.token; let live = true, timer;
+      setNote("Checking your updated plan…");
+      const check = async n => {
+        const m = await loadMe(token);
+        if (!live || token !== authRef.current.token) return;
+        if (m && m.plan && m.plan !== "free") setNote(`You're on the ${IS.PLAN_LABELS[m.plan] || m.plan} plan.`);
+        else if (n > 0) timer = setTimeout(() => check(n - 1), 3000);
+        else setNote("Your plan has not updated yet. Retry your allowance in a minute.");
+      };
+      check(4);
+      return () => { live = false; clearTimeout(timer); };
+    }, [auth.token, checkoutReturn, loadMe]);
 
     // The filters in the address (U10, 2026-10-14; IS.filterSearch in core.js): only what differs from the
     // defaults, so with nothing set the address is plain. replaceState, not pushState: changing a filter
@@ -1132,7 +1424,7 @@
     // a later .edu sign-in. Anything else (unreachable, 5xx, 429, a 401 while Google rotates its
     // keys, an error this page doesn't know) keeps it and tries once more per sign-in or session.
     const INVITE_FINAL = ["bad_invite", "own_invite", "not_new", "already_claimed"];
-    const inviteOffer = auth.cfg && auth.cfg.invite;
+    const inviteOffer = auth.cfg && auth.cfg.invite && bonusWords(auth.cfg.invite.bonus) ? auth.cfg.invite : null;
     const inviteWords = inviteOffer ? Object.entries(inviteOffer.bonus || {}).map(([k, n]) => `${n} extra ${IS.midSentence(IS.ALLOWANCE_LABELS[k] || k)}`).join(" and ") : "";
     useEffect(() => {
       if (!auth.token || !invited || !inviteOffer) return;
@@ -1149,7 +1441,9 @@
       // was: const attempt = `${sub}|${claims.iat || ""}|${invited}`;
       const attempt = `${sub}|${claims.signin || ""}|${invited}`;
       if (IS.ss.get(IS.INVITE_TRIED_KEY) === attempt) return;
-      IS.claimInvite(auth.token, invited).then(r => {
+      const token = auth.token;
+      IS.claimInvite(token, invited).then(r => {
+        if (token !== authRef.current.token) return;
         // was: if (!r) return;
         // was: if (r.error === "edu_only") { setNote(r.message); return; }
         // The code is kept for a later school-account sign-in, so the same personal account was asked
@@ -1163,25 +1457,25 @@
         IS.ss.del(IS.INVITE_TRIED_KEY); IS.ls.del(IS.INVITE_KEY); setInvited(null);
         if (r.ok) {
           setNote(`Invite accepted: you ${r.inviter_rewarded ? "and your classmate each got" : "got"} ${inviteWords}. They're used after your monthly allowance and don't expire.`);
-          IS.fetchMe(auth.token).then(m => { if (m) setMe(m); });
+          loadMe(token);
         } else if (r.error && r.error !== "already_claimed" && r.message) setNote(r.message);
       });
     }, [auth.token, invited, !!inviteOffer]);
-    async function openInvite() {
-      if (invite) { setInvite(null); return; }
-      setInviteNote("");
-      const r = await IS.fetchInvite(auth.token);
-      // was: if (r) setInvite(r); else setNote("Couldn't load your invite link. Try again in a minute.");
-      // An opened panel (from the nudge or the Account menu) retires the nudge for good, and counts as the
-      // "invite_open" step (worker/src/visits.js EVENTS), once per page load like every step.
-      if (r) { setInvite(r); setNudge(false); IS.markInviteNudge("opened"); IS.count("invite_open"); }
-      else setNote("Couldn't load your invite link. Try again in a minute.");
+    async function openInvite(retry = false) {
+      if (inviteStatus !== "idle" && retry !== true) { inviteRequest.current++; setInviteState(null); return; }
+      const token = authRef.current.token; if (!token || !inviteOffer) return;
+      const seq = ++inviteRequest.current; setInviteNote(""); setInviteState({ token, data: null, status: "loading" });
+      const r = await bounded(IS.fetchInvite(token));
+      if (token !== authRef.current.token || seq !== inviteRequest.current) return;
+      if (validInvite(r)) {
+        setInviteState({ token, data: r, status: "ready" }); setNudge(false); IS.markInviteNudge("opened"); IS.count("invite_open");
+      } else setInviteState({ token, data: null, status: "error" });
     }
     // A good moment just happened (first Auto-Apply queued, first profile saved): offer the invite
     // once, if it can be offered at all. Marked as shown straight away, so a reload never repeats it.
     function offerNudge() {
       if (nudge) return true;
-      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: !!invite, seen: IS.inviteNudgeSeen() })) return false;
+      if (!IS.inviteNudgeDue({ signedIn: !!auth.token, offer: inviteOffer, panelOpen: inviteStatus !== "idle" || !!showAllowance, seen: IS.inviteNudgeSeen() })) return false;
       IS.markInviteNudge(); setNudge(true); return true;
     }
     function offerDigestNudge(action) {
@@ -1190,27 +1484,32 @@
     function finishDigestNudge(how) {
       digestPrompt.current.finish(how); setDigestNudge(false);
     }
-    async function shareInvite() {
-      // was: const text = `InternScout finds internships for your major. Sign in through my link with your school Google account and we both get ${inviteWords}.`;
-      // The Worker gives the .edu tier to any verified school email (Google, or a school Microsoft
-      // account whose domain is verified), so eligibility is worded by email, not provider. Google is
-      // still the recommended button: many school Microsoft tenants block unverified publishers.
-      const text = `InternScout finds internships for your major. Sign in through my link with your school (.edu) email and we both get ${inviteWords}.`;
-      if (navigator.share) {
-        try { await navigator.share({ title: "InternScout", text, url: invite.link }); setInviteNote("Sent"); return; }
-        catch (e) { if (e && e.name === "AbortError") return; }
+    async function copyInvite() {
+      if (!invite || inviteState.token !== authRef.current.token) return;
+      const token = authRef.current.token, link = invite.link;
+      try {
+        await navigator.clipboard.writeText(link);
+        if (token === authRef.current.token) setInviteNote("Link copied");
+      } catch (e) {
+        if (token !== authRef.current.token) return;
+        const input = document.getElementById("invite-link"); if (input) { input.focus(); input.select(); }
+        setInviteNote("Select the link and copy it. Clipboard access is unavailable.");
       }
-      try { await navigator.clipboard.writeText(invite.link); setInviteNote("Link copied"); }
-      catch (e) { setInviteNote("Select the link above and copy it"); }
     }
 
-    async function billing(kind, plan) {
+    async function billing(kind, plan, fromArrival = false) {
+      const token = authRef.current.token;
+      if (!token || !meResult || meResult.token !== token || (kind === "checkout" && (meStatus !== "ready" || !upgrades.some(p => p.plan === plan)))) return;
+      const seq = ++billingRequest.current;
+      if (fromArrival && kind === "checkout") countArrival("out_of_runs_plan");
       if (kind === "checkout") IS.count("checkout");
       setBusy(kind === "checkout" ? "Opening Stripe…" : "Opening your billing page…");
-      const r = await IS.billingUrl(auth.token, kind, plan);
+      const r = await bounded(IS.billingUrl(token, kind, plan));
+      if (seq !== billingRequest.current) return;
       setBusy("");
-      if (r.url) location.assign(r.url);
-      else setNote(r.error);
+      if (token !== authRef.current.token) return;
+      if (r && r.url) location.assign(r.url);
+      else setNote((r && r.error) || "Couldn't open billing. Try again.");
     }
 
     // profile sync with the extension
@@ -1271,6 +1570,14 @@
         if (el) el.focus();
       }, 0);
     }
+    function clearTracker() {
+      appStatesRef.current = {}; setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
+      const empty = { version: 1, roles: {} }; roleBookRef.current = empty; setRoleBook(empty); IS.ls.del(MYLIST_KEY); IS.ls.del(VISIT_KEY); setPreviousVisit(null);
+    }
+    function deleteTracker() {
+      if (!window.confirm("Delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? This cannot be undone.")) return;
+      clearTracker(); setTimeout(() => { const heading = document.getElementById("listings"); if (heading) heading.focus(); }, 0);
+    }
     async function deleteData() {
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
@@ -1280,12 +1587,12 @@
       if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
       setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
-      if ((Object.keys(appStates).length || saved.length || ghToken) && window.confirm("Also delete your applied/saved statuses and saved searches from this browser? Cancel keeps them.")) {
-        setAppStates({}); IS.ls.del(LS_KEY); keepSaved([]); IS.ls.del(SAVED_KEY);
+      if ((Object.keys(appStates).length || saved.length || ghToken || Object.keys(roleBook.roles).length || previousVisit || visitStart) && window.confirm("Also delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? Cancel keeps them.")) {
+        clearTracker();
         try { localStorage.removeItem("internscout.gh_token"); } catch (e) { } setGhToken("");
       }
       // was: setP(null); setAuth(a => ({ ...a, token: null })); setSetupOpen(false); IS.ls.del(SKIP_KEY);
-      profileRef.current = null; quickFirstSave.current = false; setP(null); setQuickMessage(""); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); setQuickOpen(true); IS.ls.del(SKIP_KEY);
+      arrivalFlag("clear"); profileRef.current = null; quickFirstSave.current = false; setP(null); setQuickMessage(""); setAuth(a => ({ ...a, token: null, who: null })); setSetupOpen(false); setQuickOpen(true); IS.ls.del(SKIP_KEY);
       setF(x => ({ ...x, states: [], ...initF(null) }));
       setNote(r.server === false ? "Deleted from this browser. The server delete failed; sign in again and retry, or open a GitHub issue." : (r.server ? "Your data was deleted from this browser and our server." : "Your profile was deleted from this browser.")
         + (info.installed ? " The extension keeps its own copy of your profile and files: removing it at chrome://extensions deletes that copy." : ""));
@@ -1293,7 +1600,18 @@
 
     // The statuses as of the last render, for listeners added once (the "Did you apply?" check below).
     const appStatesRef = useRef(appStates); appStatesRef.current = appStates;
-    const setAppState = useCallback((id, v) => setAppStates(m => { const n = { ...m, [id]: v }; if (v === "none") delete n[id]; IS.ls.set(LS_KEY, n); return n; }), []);
+    const setAppState = useCallback((id, v) => {
+      // Compose queue, prompt and Save callbacks before React renders the batch. Save must never
+      // initialize Interested over a newer Applied/Interviewing/Offer update in that same batch.
+      const n = { ...appStatesRef.current, [id]: v }; if (v === "none") delete n[id];
+      appStatesRef.current = n; setAppStates(n); IS.ls.set(LS_KEY, n);
+      // Queue and return-prompt updates preserve an explicit unsave, while new history joins My list.
+      const book = roleBookRef.current;
+      if (v !== "none" && !Object.hasOwn(book.roles, String(id))) {
+        const row = store.current.all().find(r => String(r.id) === String(id));
+        keepRoleBook({ ...book, roles: { ...book.roles, [id]: { saved: true, ...(row ? publicRole(row) : {}) } } });
+      }
+    }, [keepRoleBook]);
     // Queue updates and batch Auto-Apply also set statuses; only the student's own status control
     // can offer this invitation. Never perform prompt side effects inside a React state updater.
     // Stable, like the rows' other handlers: rows are memoized, and a new function here each render
@@ -1305,6 +1623,15 @@
       setAppState(id, v);
     }, [setAppState]);
     const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
+    const myListRef = useRef(myList); myListRef.current = myList;
+    const toggleSaved = useCallback(r => {
+      const book = roleBookRef.current, before = book.roles[String(r.id)], on = !(before && before.saved);
+      keepRoleBook({ ...book, roles: { ...book.roles, [r.id]: { ...(before || {}), ...(!r._savedMissing ? publicRole(r) : {}), saved: on } } });
+      if (on) { IS.count("save_role"); if (!appStatesRef.current[r.id] || appStatesRef.current[r.id] === "none") setManualAppState(r.id, "interested"); }
+      if (!on) setMySel(previous => new Set([...previous].filter(id => String(id) !== String(r.id))));
+      if (!on && myListRef.current) setTimeout(() => { const heading = document.getElementById("listings"); if (heading) heading.focus(); }, 0);
+    }, [keepRoleBook, setManualAppState]);
+    const showMyList = on => { if (on && !myList) { IS.count("mylist_open"); setMyLoad({ checking: true, failed: [] }); } setMyList(on); };
     // "More filters" remembers whether it was open; the count is how many of the controls inside it
     // are set to something other than their default, so a hidden filter is never a silent one.
     const [moreOpen, setMoreOpenRaw] = useState(() => !!IS.ls.get(MORE_KEY, false));
@@ -1332,6 +1659,15 @@
     useEffect(() => { Object.entries(jobs).forEach(([id, j]) => { if (j.status === "submitted" && (appStates[id] || "none") === "none") setAppState(id, "applied"); }); }, [jobs]);
 
     const all = useMemo(() => store.current.all(), [ver]);
+    useEffect(() => {
+      const book = roleBookRef.current; let next = book;
+      for (const row of all) {
+        const old = book.roles[String(row.id)]; if (!old || !old.saved) continue;
+        const entry = { ...publicRole(row), saved: true };
+        if (JSON.stringify(entry) !== JSON.stringify(old)) { if (next === book) next = { ...book, roles: { ...book.roles } }; next.roles[row.id] = entry; }
+      }
+      if (next !== book) keepRoleBook(next);
+    }, [all, savedIdsKey, keepRoleBook]);
     // anywhere: no states on the profile (or no profile), so no place scores above another.
     const ctx = useMemo(() => { const { direct, related } = IS.profileFields(p, majors); return { p, direct, related, keys: new Set(IS.profileKeys(p)), anywhere: !(p && p.states && p.states.length) }; }, [p, majors]);
     // Which of a listing's places the row shows first: one in the scope, or the place searched for.
@@ -1339,8 +1675,8 @@
     // was: rows in `keys` only. With every state in scope it is every row loaded (less remote-only rows
     // for a profile that turned remote off).
     const inView = useMemo(() => !viewSet
-      ? (scope.noRemote ? all.filter(x => [...IS.shardKeys(x)].some(k => k !== "remote" && k !== "US")) : all)
-      : all.filter(x => { for (const k of IS.shardKeys(x)) if (viewSet.has(k)) return true; return false; }), [all, viewSet, scope.noRemote]);
+      ? all.filter(x => [...IS.shardKeys(x)].some(k => (!scope.noRemote || (k !== "remote" && k !== "US")) && (everything || legacy || keys.includes(k))))
+      : all.filter(x => { for (const k of IS.shardKeys(x)) if (viewSet.has(k)) return true; return false; }), [all, viewSet, scope.noRemote, everything, legacy, keysKey]);
     // was: a Map of every row in view, rebuilt whenever a file landed. Kept per row now, so the 56 files
     // of a nationwide search each score only their own rows.
     const scoreOf = useMemo(() => { const m = new WeakMap(); return x => { let v = m.get(x); if (!v) { v = IS.score(x, ctx); m.set(x, v); } return v; }; }, [ctx]);
@@ -1390,7 +1726,8 @@
     // sort, and hands back each row's relevance too. was: the same code inline here, as one useMemo returning
     // rows, with `ranked` worked out just above it. It moved so tests can prove what may and may not change it.
     const listed = useMemo(() => IS.listRows(inView, f, { cq, scoreOf, p, elig, blockers, appStates, jobs }), [inView, cq, f, appStates, jobs, elig, scoreOf, p]);
-    const rows = listed.rows, ranked = listed.ranked;
+    const myRows = useMemo(() => savedRoleRows(all, roleBook.roles), [all, roleBook]);
+    const rows = myList ? myRows.filter(r => !myProgress || (appStates[r.id] || "none") === myProgress) : listed.rows, ranked = !myList && listed.ranked;
 
     // Paid listings (2026-10-14, B2 plan section 5; js/placements.js). Everything above (the list, its order,
     // every score and count) is finished before this runs, and nothing here writes to it: ISPlace.pick only
@@ -1415,14 +1752,15 @@
       || (p && p.terms && p.terms.length && IS.termFit(x, p.terms) < .8)), [scoreOf, p, placeElig]);
     // The last pick, kept while it still fits, so the box doesn't swap as files land or filters change.
     const placedRef = useRef(null);
-    const placed = useMemo(() => PL ? PL.pick({ placements, rows, rel: listed.rel, ranked, fieldsSet: f.fields.length > 0, appState: f.app_state,
+    const placed = useMemo(() => PL && !myList ? PL.pick({ placements, rows, rel: listed.rel, ranked, fieldsSet: f.fields.length > 0, appState: f.app_state,
       loading, day: new Date().toISOString().slice(0, 10), exclude, hidden: placeHidden, prev: placedRef.current, rand: Math.random }) : null,
-    [placements, listed, loading, placeHidden, exclude, f.fields.length, f.app_state]);
+    [placements, listed, loading, placeHidden, exclude, f.fields.length, f.app_state, myList]);
     if (placed) placedRef.current = placed;
 
     const [expandedRuns, setExpandedRuns] = useState(() => new Set());
+    const limit = myList ? myLimit : browseLimit;
     const pageRows = rows.slice(0, limit);
-    const { shown, moreAfter } = companyRuns(pageRows, f, expandedRuns);
+    const { shown, moreAfter } = companyRuns(pageRows, myList ? { sort: "company", q: "" } : f, expandedRuns);
     // Every file loaded: the list itself is the whole country.
     const allLoaded = everything && !loading;
     // was: stats.open, else the sum of index.files[].open, which counts a role filed in two states twice
@@ -1457,13 +1795,15 @@
     const check = useCallback((id, on) => {
       const n = new Set(selectionRef.current);
       if (on && !n.has(id) && n.size >= IS.SELECT_MAX) { flashSelNote(`Select up to ${IS.SELECT_MAX} applications at a time. Queue these first, then select more.`); return; }
-      on ? n.add(id) : n.delete(id); selectionRef.current = n; setSel(n);
+      on ? n.add(id) : n.delete(id); selectionRef.current = n; selectionSetter.current(n);
     }, []);
     const onWhy = useCallback(id => setOpenId(o => o === id ? null : id), []);
     // was: rows with no job of their own. A row whose apply link a job already holds is skipped by the
     // extension too, so the header checkbox no longer picks it.
     const held = useMemo(() => IS.heldUrls(queue), [queue]);
-    const selectable = shown.filter(r => r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url));
+    const selectable = shown.filter(r => !r._savedMissing && r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url));
+    const selectedRows = all.filter(r => sel.has(r.id) && r.apply_url && (!jobs[String(r.id)] || jobs[String(r.id)].status === "failed") && !held.has(r.apply_url)
+      && (!myList || (roleBook.roles[String(r.id)] && roleBook.roles[String(r.id)].saved)));
     // was: selectable.slice(0, 100).every(r => sel.has(r.id)), which could stay unchecked for good (IS.headerChecked).
     const allChecked = IS.headerChecked(selectable, sel);
     const selectShown = on => {
@@ -1505,7 +1845,8 @@
       // was: the listing ids of the added and skipped jobs alone, so a listing skipped for sharing its
       // apply link with another listing's job stayed selected for good.
       const handledIds = new Set([...addedIds, ...IS.handledListingIds(batch, res, current && current.queue)]);
-      setSel(s => new Set([...s].filter(id => !handledIds.has(String(id)))));
+      const unhandled = s => new Set([...s].filter(id => !handledIds.has(String(id))));
+      setBrowseSel(unhandled); setMySel(unhandled);
       // was: if (added) IS.count("autoapply");
       if (added) { IS.count("autoapply"); offerNudge(); }
       setNote(`Queued ${plural(added, "application")}${skipped ? ` (${skipped} already queued)` : ""}.${remaining.length ? ` ${remaining.length} more remain selected; queue them in the next batch.` : ""} Each one is filled in and left for you to submit.`);
@@ -1562,7 +1903,7 @@
     const digestFields = [...ctx.direct].filter(t => t !== "other" && /^[a-z_]{2,32}$/.test(t));
     // Optional paid plans. The Worker only advertises the tiers whose Stripe price it actually has,
     // so a tier that isn't set up yet never appears as a button the student can press.
-    const payPlans = auth.cfg && auth.cfg.payments && auth.cfg.payments.enabled ? auth.cfg.payments.plans || [] : [];
+    const payPlans = configuredPlans(auth.cfg);
     // Only what is actually a step up from the plan they are on: a Supporter sees Pro, not Supporter.
     const myMult = (payPlans.find(pl => pl.plan === (me && me.plan)) || {}).multiplier || 1;
     const upgrades = me && me.can_upgrade ? payPlans.filter(pl => pl.multiplier > myMult) : [];
@@ -1571,31 +1912,41 @@
     // Out of Auto-Apply runs: say when they come back and how to get more now. Only for a real
     // allowance (limit > 0): a limit of 0 is Auto-Apply switched off, and limits.js won't spend
     // invite runs on a switched-off task, so "used up" and "invite a classmate" would both be wrong.
-    const autoAllow = me && me.allowance && me.allowance.autofill;
+    const allowance = runAllowance(me, auth.cfg);
     // was: ... && !me.paused && inviteOffer && autoAllow && ...: the notice only showed while invites were on,
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
-    const outOfRuns = !!(auth.token && me && !me.paused && autoAllow && autoAllow.limit > 0 && IS.leftOf(me, "autofill") === 0);
+    const outOfRuns = !!(auth.token && allowance && allowance.exhausted);
+    const showAllowance = !arrivalDismissed && (upgradeAsk || outOfRuns);
+    const arrivalFocused = useRef(false);
+    const arrivalInserted = useRef(false), arrivalAnchor = useRef(null);
+    if (showAllowance && !arrivalInserted.current) arrivalAnchor.current = visibleFocusAnchor();
+    useLayoutEffect(() => {
+      if (!showAllowance || arrivalInserted.current) return;
+      arrivalInserted.current = true; restoreArrivalAnchor(arrivalAnchor.current); arrivalAnchor.current = null;
+    }, [showAllowance]);
+    useEffect(() => {
+      if (!showAllowance || !upgradeAsk || arrivalFocused.current) return;
+      const panel = document.getElementById("allowance-panel");
+      if (panel) { arrivalFocused.current = true; focusArrival(panel); }
+    }, [showAllowance, upgradeAsk]);
+    useEffect(() => {
+      if (!showAllowance) return;
+      const panel = document.getElementById("allowance-panel"); if (!panel) return;
+      if (!window.IntersectionObserver) {
+        const box = panel.getBoundingClientRect(); if (box.bottom > 0 && box.top < innerHeight) countArrival("out_of_runs_view");
+        return;
+      }
+      const observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) { countArrival("out_of_runs_view"); observer.disconnect(); }
+      });
+      observer.observe(panel); return () => observer.disconnect();
+    }, [showAllowance]);
     // Kept as shown only once it is actually on screen, so a higher-priority notice (or setup) that
     // covers it until a reload doesn't use it up unseen. was: kept as shown when offered (review of #123).
     const digestVisible = !!(digestNudge && digestOn && !setupOpen && !nudge && !invite && !outOfRuns && !upgradeAsk);
     useEffect(() => { if (digestVisible && digestPrompt.current.shown) digestPrompt.current.shown(); }, [digestVisible]);
     // The review line (see reviewHidden above). It waits behind any other notice rather than stacking.
     const reviewLine = !reviewHidden && !note && !nudge && !digestNudge && !outOfRuns && !info.stale && IS.reviewLineDue(info, queue);
-    // The next plan up and how many Auto-Apply runs it gives THIS student (the Worker's /me
-    // upgrade_offer, at their tier; a Worker from before 2026-09-30 sends none, so no run count).
-    const offerPl = upgrades.find(pl => me && me.upgrade_offer && pl.plan === me.upgrade_offer.plan) || upgrades[0] || null;
-    const offerRuns = offerPl && me && me.upgrade_offer && me.upgrade_offer.plan === offerPl.plan && me.upgrade_offer.allowance
-      ? me.upgrade_offer.allowance.autofill : null;
-    // was: const offerBtn = (label) => offerPl && h("button", { ... offerPl ... });
-    // `pl` lets the ?upgrade= notice offer the plan /pricing/ named rather than always the next one up.
-    const offerBtn = (label, pl = offerPl) => pl && h("button", { type: "button", className: "btn primary", disabled: !!busy, title: upgradeTitle(pl),
-      onClick: () => billing("checkout", pl.plan) }, label || `Get ${pl.label}${pl.price ? ` · ${pl.price}` : ""}`);
-    // /pricing/ links here as /?upgrade=supporter or /?upgrade=pro (2026-10-05). The named plan, when it
-    // is one this student can move up to; otherwise the next one up, as before.
-    const askedPl = upgrades.find(pl => pl.plan === upgradeAsk) || offerPl;
-    const askedRuns = askedPl && me && me.upgrade_offer && me.upgrade_offer.plan === askedPl.plan && me.upgrade_offer.allowance
-      ? me.upgrade_offer.allowance.autofill : null;
-    const offerWords = offerPl && (offerRuns ? `${offerPl.label} gives you ${offerRuns} a month. ` : `${offerPl.label} gives you ${offerPl.multiplier}× the allowance. `);
     // me.month is the Worker's UTC month ("2026-09"); the allowance resets on the 1st of the next one.
     const monthMatch = /^(\d{4})-(\d{2})$/.exec((me && me.month) || "");
     const resetDay = monthMatch
@@ -1613,7 +1964,7 @@
       // was: h("button", { ... }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}${pr.id === "google" ? " (UMass email)" : ""}`));
       // The " (UMass email)" suffix was wrong twice over: no account has to be UMass, and nothing has
       // to be .edu at all. A .edu only doubles the allowance, which the tooltip now says.
-      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => IS.startSignIn(auth.cfg, pr.id), title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
+      h("button", { key: pr.id, type: "button", className: "btn", onClick: () => { if (showAllowance) arrivalFlag("save"); IS.startSignIn(auth.cfg, pr.id); }, title: signInTitle }, `Sign in with ${IS.PROVIDER_LABELS[pr.id] || pr.id}`));
     // In the header, one quiet button until it is pressed (2026-10-05 audit): two full-weight sign-in
     // buttons were the most prominent thing on a page whose point is that search needs no account, and
     // "optional" lived in a tooltip. The note says it in visible words once the choice opens.
@@ -1720,7 +2071,13 @@
     // The live region (2026-10-14): the count or the empty message, said once the list has settled for
     // a moment after the student changes something, not on every key or file. was: role=status on the
     // count itself, which changed with each file landing and each pause in typing.
-    const liveText = loading || counting ? "" : rows.length ? `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${asked ? " " + asked : ""} in ${whereWords}.` : emptyText;
+    const myChecking = !ready || myLoad.checking;
+    const missingText = err || myLoad.failed.length ? "Couldn't check current listing data. Saved information is shown."
+      : myChecking ? "Checking current listing data. Saved information is shown."
+        : "Not in the current listing data. Current posting status unknown.";
+    const myListCount = `${shown.length} of ${rows.length} saved role${rows.length === 1 ? "" : "s"} shown${myProgress ? ` (${savedIds.length} total)` : ""}`;
+    const liveText = myList ? `${myListCount}.${myChecking ? " Checking current listing data." : ""}`
+      : loading || counting ? "" : rows.length ? `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}${asked ? " " + asked : ""} in ${whereWords}.` : emptyText;
     const [spoken, setSpoken] = useState("");
     const expandRun = run => {
       setExpandedRuns(previous => new Set([...previous, run.key]));
@@ -1732,7 +2089,7 @@
     const firstF = useRef(f), touched = useRef(false);
     if (f !== firstF.current) touched.current = true;
     useEffect(() => {
-      if (!touched.current || !liveText) return;
+      if ((!touched.current && !myList) || !liveText) return;
       const t = setTimeout(() => setSpoken(liveText), 900);
       return () => clearTimeout(t);
     }, [liveText]);
@@ -1854,7 +2211,7 @@
         // under them the page's h1 with the pain line and the free search as the first action.
         h("div", { className: "brand" },
           h("a", { className: "mark", href: "/" }, "InternScout"),
-          h("nav", { className: "sitenav", "aria-label": "Site" },
+          h(SiteNav, null, h("nav", { id: "site-links", className: "sitenav", "aria-label": "Site" },
             h("a", { href: "internships/" }, "Browse"),
             // Always shown, like the static nav before the app loads (no flash): /digest/ itself says
             // whether sign-ups are open. was: digestOn && h("a", ...) (review of #123).
@@ -1864,7 +2221,7 @@
             h("a", { href: "compare/" }, "Compare"),
             h("a", { href: "about/" }, "About"),
             // 2026-10-23: was: employers could only find the footer link. Revert: omit this anchor.
-            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns"))),
+            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns")))),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
         // header keeps the everyday actions and the account details live in the Account menu.
@@ -1887,14 +2244,14 @@
             spendText: info.spend && info.spend.calls > 0 ? `Estimated AI cost: $${info.spend.month_usd.toFixed(2)}${info.spend.budget ? ` of $${info.spend.budget}` : ""}` : null,
             items: [
               auth.token && inviteOffer && { key: "invite", group: "share", label: invite ? "Hide your invite link" : "Invite classmates", onClick: openInvite,
-                desc: `You and each classmate who joins with a .edu email get ${inviteWords}.` },
+                desc: "New .edu classmates can earn extra AI use. Check your reward eligibility." },
               ...(auth.token ? upgrades.map(pl => ({ key: pl.plan, group: "plan", label: `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`, onClick: () => billing("checkout", pl.plan),
                 disabled: !!busy, title: upgradeTitle(pl), desc: `${pl.multiplier}× your monthly AI allowance. Cancel any time.` })) : []),
               auth.token && me && me.can_manage && { key: "manage", group: "plan", label: "Manage plan", onClick: () => billing("portal"), disabled: !!busy,
                 desc: "Change your card or cancel, on Stripe's own page." },
               // was: onClick: () => { IS.signOut(); setAuth(a => ({ ...a, token: null })); }
               // signOut(true) also ends the session on the Worker, so the code can't be used again.
-              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } },
+              auth.token && auth.source === "page" && { key: "out", group: "session", label: "Sign out", onClick: () => { arrivalFlag("clear"); IS.signOut(true); setAuth(a => ({ ...a, token: null, who: null })); } },
             ].filter(Boolean),
             admin: ADMIN ? [
               { key: "rescan", label: "Rescan", desc: "Run the scanner on GitHub now", onClick: rescan, disabled: !!busy },
@@ -1933,6 +2290,11 @@
               : h("a", { className: "btn", href: installUrl("hero"), target: "_blank", rel: "noopener" }, "Add Auto-Apply to Chrome · free"))))),
 
       h("main", { id: "main" },
+      h("div", { id: "allowance-announcement", className: "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, showAllowance ? "Auto-Apply allowance options are open." : ""),
+      showAllowance && h(AllowancePanel, { signedIn: !!auth.token, me, status: meStatus, cfgStatus, allowance, resetDay,
+        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy, signIn: signInProviders,
+        inviteBlock: inviteOffer && h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => { countArrival("out_of_runs_invite"); openInvite(true); }, onCopy: () => { countArrival("out_of_runs_invite"); copyInvite(); } }),
+        onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: dismissArrival }),
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
       // counters or any statement of what is here. Now the figures come first while the setup card is
       // open with no profile saved; once there is a profile the card is an edit form and the old order
@@ -1952,7 +2314,7 @@
         h("button", { type: "button", "aria-label": "Close this message", onClick: () => { clearTimeout(selTimer.current); setSelNote(""); } }, h("span", { className: "i i-cross", "aria-hidden": true })))),
       // The one-time invite nudge (2026-10-02), right under the "Queued" or "Profile saved" note it follows.
       // It steps aside for the out-of-runs notice, which already offers the invite, and for the panel itself.
-      nudge && auth.token && inviteOffer && !invite && !outOfRuns && h("div", { className: "notice", role: "status" },
+      nudge && auth.token && inviteOffer && inviteStatus === "idle" && !showAllowance && h("div", { className: "notice", role: "status" },
         h("b", null, inviteOffer.bonus && inviteOffer.bonus.autofill ? "Nice work. Want more free Auto-Apply runs? " : "Nice work. Want more free AI use? "),
         // The same terms as the invite panel: the reward lands when a new classmate ("joins": first week,
         // worker/src/referral.js) signs in through the link with a .edu email, for up to REFERRAL.maxRewards.
@@ -1964,38 +2326,22 @@
       invited && !auth.token && inviteOffer && h("div", { className: "notice" }, h("b", null, "A classmate invited you. "),
         // was: `Sign in with Google using your school email and you'll both get ${inviteWords}. Searching needs no account.`),
         `Sign in with your school (.edu) email (Google works for most schools) and you'll both get ${inviteWords}. Searching needs no account.`),
-      // The invite link hides while the invite panel below is already open; the plan buttons are in the header.
-      // was: the invite came first and the plans were "above", which since the Account menu (2026-09-26)
-      // they no longer are. The plan now has its own button here, and the invite follows when on.
-      outOfRuns && h("div", { className: "notice" }, h("b", null, "This month's Auto-Apply runs are used up. "),
-        `They come back on ${resetDay}. `,
-        offerPl && h(F, null, offerWords, offerBtn(), " "),
-        inviteOffer && (invite ? `${offerPl ? "Or share" : "Share"} your invite link below.` : h(F, null,
-          h("a", { href: "#", onClick: prevent(openInvite) }, offerPl ? "Or invite a classmate" : "Invite a classmate"),
-          // An inviter is rewarded for their first REFERRAL.maxRewards classmates only (worker/src/referral.js).
-          `: they get ${inviteWords}, and so do you, for up to ${inviteOffer.max} classmates.`))),
-      // Arrived from the extension's Upgrade button, with runs still left or before /me has loaded.
-      !outOfRuns && upgradeAsk && h("div", { className: "notice" },
-        !auth.token ? "Sign in (top right) to pick a plan. A plan raises how many Auto-Apply runs you get each month. "
-          : !me ? "Loading your plan… "
-          // was: offerPl ? ... offerRuns ... offerBtn("Continue to checkout") (always the next plan up)
-          : askedPl ? h(F, null, h("b", null, `${askedPl.label}${askedPl.price ? ` · ${askedPl.price}` : ""}. `),
-            askedRuns ? `${askedRuns} Auto-Apply runs a month. Cancel any time. ` : `${askedPl.multiplier}× the monthly AI allowance. Cancel any time. `,
-            offerBtn("Continue to checkout", askedPl), " ")
-          : `You're on the ${IS.PLAN_LABELS[me.plan] || me.plan} plan${me.plan === "free" ? "" : " already"}. `,
-        h("a", { href: "#", onClick: prevent(() => setUpgradeAsk("")) }, "Not now")),
-      auth.token && invite && h("div", { className: "notice invite" },
-        h("b", null, "Invite classmates. "),
-        // was: `Each classmate who signs in through your link with a school Google account in their first week gets ${inviteWords}, and so do you`
-        `Each classmate who signs in through your link with a school (.edu) email in their first week gets ${inviteWords}, and so do you`
-          + ` (for up to ${invite.max} classmates; ${invite.rewarded} so far).`,
-        h("div", { className: "invite-row" },
-          h("input", { id: "invite-link", type: "text", readOnly: true, value: invite.link, "aria-label": "Your invite link", onFocus: e => e.target.select() }),
-          h("button", { type: "button", className: "btn primary", onClick: shareInvite }, navigator.share ? "Share link" : "Copy link"),
-          inviteNote && h("span", { className: "muted", role: "status" }, inviteNote))),
+      !showAllowance && auth.token && inviteStatus !== "idle" && h("div", { className: "notice" },
+        h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => openInvite(true), onCopy: copyInvite })),
+      !showAllowance && !arrivalDismissed && new URLSearchParams(arrival.search).get("upgrade") && cfgStatus === "error" && h("div", { className: "notice", role: "status" }, "Couldn't load account options. ",
+        h("button", { type: "button", className: "btn", onClick: loadConfig }, "Retry account options")),
 
       h("section", { id: "results", "aria-labelledby": "listings" },
-      h("h2", { id: "listings", className: "sr", tabIndex: -1 }, "Listings"),
+      h("h2", { id: "listings", className: "sr", tabIndex: -1 }, myList ? "My list" : "Listings"),
+      h("div", { className: "list-views", role: "group", "aria-label": "Listing views" },
+        h("button", { type: "button", className: cx("btn", !myList && "on"), "aria-pressed": !myList, onClick: () => showMyList(false) }, "Browse roles"),
+        h("button", { type: "button", className: cx("btn", myList && "on"), "aria-pressed": myList, onClick: () => showMyList(true) }, `My list (${savedIds.length})`)),
+      !trackerStored && h("p", { className: "notice", role: "status" }, "Browser storage is unavailable. Changes to My list last only in this tab."),
+      myList && h("div", { className: "filters" },
+        h(Sel, { label: "My list progress", value: myProgress, onChange: v => { setMyProgress(v); setMyLimit(PAGE); } }, opt("", "Any progress"), APP_STATES.map(s => opt(s, STATE_LABEL[s]))),
+        h("span", { className: "muted" }, "Saved roles stay in this browser."),
+        h("button", { type: "button", className: "btn quiet", onClick: deleteTracker }, "Delete browser tracker"),
+        canAuto && h("button", { type: "button", className: "btn primary", disabled: !selectedRows.length || queuing, onClick: () => autoApply(selectedRows) }, queuing ? "Adding applications…" : "Auto-Apply", selectedRows.length ? ` ${selectedRows.length} selected` : "")),
       digestVisible && h("div", { className: "notice quietnote", role: "note", "aria-label": "Weekly internship email" },
         "Want new internships in your inbox every Monday? ",
         h("a", { href: "/digest/?from=dashboard-contextual", "data-digest-placement": "contextual", onClick: () => finishDigestNudge("opened") }, "Get the free weekly email"),
@@ -2004,7 +2350,7 @@
       // Two tiers. The first row is what nearly every visit touches: search, field, state, sort,
       // and the Auto-Apply button. The other nine controls sit behind "More filters", which shows
       // how many of them are set so nothing is hidden by surprise.
-      h("div", { className: "filters", role: "search" },
+      !myList && h("div", { className: "filters", role: "search" },
         h("div", { className: "field search" }, h(SearchBox, { value: f.q, onChange: v => upd("q", v) })),
         f.company.length > 0 && h("button", { type: "button", className: "btn", title: "Show every employer", onClick: () => upd("company", []) },
           "Employer: " + f.company[0], h("span", { className: "i i-cross", "aria-hidden": true })),
@@ -2019,8 +2365,8 @@
         h("button", { type: "button", className: cx("btn morebtn", (moreOpen || moreCount > 0) && "on"), "aria-expanded": moreOpen, onClick: () => setMoreOpen(o => !o) },
           moreOpen ? "Fewer filters" : "More filters", moreCount > 0 ? ` · ${moreCount}` : ""),
         h("span", { className: "spacer" }),
-        canAuto && h("button", { type: "button", className: "btn primary", disabled: !sel.size || queuing, onClick: () => autoApply(all.filter(r => sel.has(r.id))) }, queuing ? "Adding applications…" : "Auto-Apply", sel.size ? ` ${sel.size} selected` : "")),
-      moreOpen && h("div", { className: "filters extra" },
+        canAuto && h("button", { type: "button", className: "btn primary", disabled: !selectedRows.length || queuing, onClick: () => autoApply(selectedRows) }, queuing ? "Adding applications…" : "Auto-Apply", selectedRows.length ? ` ${selectedRows.length} selected` : "")),
+      !myList && moreOpen && h("div", { className: "filters extra" },
         h(Sel, { label: "Stage", value: f.stage, onChange: v => upd("stage", v) }, opt("", "Any stage"), IS.STAGES.map(([k, l]) => opt(k, (IS.STAGE_LABEL[k] || l)))),
         h(Sel, { label: "Eligible year", value: f.year, onChange: v => upd("year", v) }, opt("", "Any year"), IS.YEARS.map(([k, l]) => opt(k, "Open to " + l.toLowerCase().replace("master's", "master's").replace("phd", "PhD")))),
         opts.sectors.length > 0 && h(Sel, { label: "Sector", value: f.sector, onChange: v => upd("sector", v) }, opt("", "Any sector"), opts.sectors.map(([k, n]) => opt(k, `${IS.sectorLabel(k)} (${n})`))),
@@ -2043,7 +2389,9 @@
       // 5 so far"). The clear button names what it clears. The description search is offered here, in the line,
       // instead of in a notice of its own above the list (D16).
       // was: "N listings match · loading more states (x of y)…", then "Clear filters" whenever anything was set.
-      h("div", { className: "filterbar-foot" },
+      myList ? h("div", { className: "filterbar-foot" },
+        h("span", null, myListCount, myChecking ? " · Checking current listing data…" : ""),
+        (myLoad.failed.length > 0 || err) && h("button", { type: "button", className: "btn quiet", onClick: () => { if (err) reload(false); else setMyRetry(n => n + 1); } }, "Retry saved role details")) : h("div", { className: "filterbar-foot" },
         // was: role=status on this span; the live region below says the count once it settles.
         h("span", { className: "countline" }, counting ? "Loading…" : h(F, null,
           loading ? `At least ${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""} so far` : `${rows.length.toLocaleString()} listing${rows.length === 1 ? "" : "s"}${anyFilter ? " match" : ""}`,
@@ -2060,29 +2408,30 @@
       // was: a notice above the list: "Searching titles, companies, fields and places in every state. [Search
       // descriptions too] (a larger download)". One line under the count now (D16), and the empty list offers
       // the same button as its main one (D18).
-      descOffer && rows.length > 0 && h("div", { className: "descline" }, "Searching titles, companies, fields and places. ",
+      !myList && descOffer && rows.length > 0 && h("div", { className: "descline" }, "Searching titles, companies, fields and places. ",
         h("button", { type: "button", className: "linkbtn", onClick: () => setDescAll(true) }, "Search descriptions too"), " (a larger download)."),
-      wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
-      wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
+      !myList && wantDesc && descLoading && h("div", { className: "notice quietnote", role: "status" }, "Searching titles and fields while descriptions download…"),
+      !myList && wantDesc && descFailed.length > 0 && h("div", { className: "notice", role: "alert" }, `Some descriptions couldn't load (${descFailed.join(", ")}). Search results may be incomplete. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setDescRetry(n => n + 1) }, "Retry descriptions")),
-      failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
+      !myList && failedKeys.length > 0 && h("div", { className: "notice", role: "alert" }, `Couldn't load listings for ${failedKeys.join(", ")}. Check your connection. `,
         h("button", { type: "button", className: "btn quiet", onClick: () => setRetry(n => n + 1) }, "Try again")),
-      err ? h("div", { className: "sheet empty", role: "alert" }, "Couldn't load listings. Check your connection and try again. ",
+      !myList && err ? h("div", { className: "sheet empty", role: "alert" }, "Couldn't load listings. Check your connection and try again. ",
         h("button", { type: "button", className: "btn", onClick: () => reload(false) }, "Retry listings"))
-        : loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
+        : !myList && loading && !all.length ? h("div", { className: "sheet empty" }, "Loading listings…")
           // was: h("div", { className: "sheet empty" }, inView.length ? "Nothing matches these filters." : "No listings in these states yet. Try more states or remote.")
-          : rows.length === 0 ? emptyEl
+          : rows.length === 0 ? (myList ? h("div", { className: "sheet empty" }, savedIds.length ? "No saved roles have this status." : "No saved roles yet. Save a role to keep it here and track your progress.") : emptyEl)
             // was: the skip link, the table, "End of the N listings shown" and "Show N more" inline here (ListTable now).
-            : h(ListTable, { shown, rows, moreAfter, onExpand: expandRun, pageCount: pageRows.length, phone: narrow, box: placeBox, onMore: () => setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
-              inlineSignup: digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
+            : h(ListTable, { shown, rows, moreAfter, onExpand: expandRun, pageCount: pageRows.length, phone: narrow, box: placeBox, onMore: () => myList ? setMyLimit(l => l + PAGE) : setLimit(l => l + PAGE), columns: canAuto ? 5 : 4,
+              inlineSignup: !myList && digestOn && h(Digest, { cfg: C.digest, fields: digestFields, hasProfile: !!p, onSetup: openSetup, placement: "results-inline", compact: true }),
               head: h("thead", null, h("tr", null,
                 canAuto && h("th", null, h("input", { type: "checkbox", "aria-label": "Select up to 100 shown applications", checked: allChecked, disabled: !selectable.length,
                   onChange: e => selectShown(e.target.checked) })),
                 // was: Company and role, Field, Location and term, Pay, Match, Your status, Links. Field, place, term
                 // and pay are one line under the title now (D9); "Sort: pay listed" stays in the Sort picker.
-                sortTh("company", "Company and role"), sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, "Your status"))),
-              renderRow: r => h(Row, { key: r.id, r, sc: scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
-                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: openId === r.id, onWhy, onRank: openSetup, elig, patterns: stats && stats.skill_patterns,
+                myList ? h("th", { scope: "col" }, "Company and role") : sortTh("company", "Company and role"), myList ? h("th", { scope: "col" }, "Match") : sortTh("score", "Match"), h("th", { scope: "col" }, h("span", { className: "sr" }, "Links")), h("th", { scope: "col" }, myList ? "Your status" : "Save"))),
+              renderRow: r => h(Row, { key: r.id, r, sc: r._savedMissing ? { score: 0, parts: {} } : scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
+                saved: !!(roleBook.roles[String(r.id)] && roleBook.roles[String(r.id)].saved), onSave: toggleSaved, myList, fresh: sinceVisit(r, previousVisit, visitStart), missingText,
+                checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: !r._savedMissing && openId === r.id, onWhy, onRank: openSetup, elig: r._savedMissing ? null : elig, patterns: stats && stats.skill_patterns,
                 ask: askId === r.id, onOpen, onAnswer }) })),
 
       // was: narrow && promoEls
@@ -2116,6 +2465,8 @@
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
           // was: h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
           h("a", { href: installUrl("dashboard-footer"), target: "_blank", rel: "noopener" }, "Install extension"),
+          h("a", { href: "https://github.com/bpmcginley/internships-every-major", "data-distribution": "list" }, "Internships for every major on GitHub"),
+          h("a", { href: "widget/builder.html", "data-distribution": "widget" }, "Put live internships on your club or department site"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
           C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs")),
