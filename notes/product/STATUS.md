@@ -113,7 +113,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## P-2.1i dormant scope progress
 
-P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is built on exact #261 `e29eb17cf736b8e16f233781fe6c93c0eab4b4e7`: stable confirmed-scope identity, persisted matching watermark and bounded single-subscriber read only. Migration 0009 and the rerunnable legacy schema are both exercised in actual local D1. Local validation: 394 Node tests, 30 D1 tests, zero JavaScript lint errors/warnings. [Contract and evidence](P-2.1i-scope-progress.md). Independent review and PR CI are pending. No queue transaction, sender, producer, activation or retention change; #266 is excluded and #255 integration remains separate. Needs-bruce; parent integration and owner merge/deployment gates remain.
+P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is built on exact #261 `e29eb17cf736b8e16f233781fe6c93c0eab4b4e7`: stable confirmed-scope identity, persisted matching watermark and bounded single-subscriber read only. Migration 0009 and the rerunnable legacy schema are both exercised in actual local D1. Local validation: 395 Node tests, 31 D1 tests, zero JavaScript lint errors/warnings. [Contract and evidence](P-2.1i-scope-progress.md). Independent review and PR CI are pending. No queue transaction, sender, producer, activation or retention change; #266 is excluded and #255 integration remains separate. Needs-bruce; parent integration and owner merge/deployment gates remain.
 
 ## Waiting for Bruce
 

@@ -6,6 +6,7 @@ import {
   cleanupProgress,
   rollbackProgress,
   invalidProgress,
+  boundedPayload,
   read,
   now,
 } from "../test-support/follow-progress.js";
@@ -17,7 +18,13 @@ beforeEach(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
   await env.DB.prepare("DELETE FROM follow_subscribers").run();
 });
-for (const scenario of [scopeLifetime, cleanupProgress, rollbackProgress, invalidProgress]) {
+for (const scenario of [
+  scopeLifetime,
+  cleanupProgress,
+  rollbackProgress,
+  invalidProgress,
+  boundedPayload,
+]) {
   it(`local D1 follow progress: ${scenario.name}`, async () => {
     await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
     await scenario(env.DB, equal, rejects);

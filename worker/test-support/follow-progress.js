@@ -164,3 +164,58 @@ export async function invalidProgress(db, equal, rejects) {
     .run();
   await rejects(() => read(db, first.subscriberId));
 }
+
+export async function boundedPayload(db, equal, rejects) {
+  const id = crypto.randomUUID();
+  await db
+    .prepare("INSERT INTO follow_subscribers (id,email,created) VALUES (?,?,?)")
+    .bind(id, "bounded@example.test", now.toISOString())
+    .run();
+  const keys = ["alpha", "é".repeat(1100), "ø".repeat(1100)].map((company) =>
+    JSON.stringify({ kind: "company", company }),
+  );
+  const encoder = new TextEncoder();
+  equal(
+    keys.every((key) => encoder.encode(key).length < options.maxBytes),
+    true,
+  );
+  equal(keys.reduce((sum, key) => sum + encoder.encode(key).length, 0) > options.maxBytes, true);
+  for (const key of keys) {
+    await db
+      .prepare(
+        "INSERT INTO follow_subscriptions (subscriber_id,scope_key,created,confirmed_at) VALUES (?,?,?,?)",
+      )
+      .bind(id, key, now.toISOString(), now.toISOString())
+      .run();
+    await db
+      .prepare("INSERT INTO follow_scope_progress VALUES (?,?,?,?)")
+      .bind(id, key, crypto.randomUUID(), now.toISOString())
+      .run();
+  }
+  let returned;
+  const observed = {
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        all: async () => {
+          const result = await db
+            .prepare(sql)
+            .bind(...args)
+            .all();
+          returned = result.results;
+          return result;
+        },
+      }),
+    }),
+  };
+  await rejects(() => read(observed, id));
+  equal(
+    returned,
+    keys.map(() => ({
+      scope_key: null,
+      confirmed_at: null,
+      scope_generation: null,
+      watermark: null,
+    })),
+  );
+  equal(encoder.encode(JSON.stringify(returned)).length < 400, true);
+}

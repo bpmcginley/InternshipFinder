@@ -34,16 +34,20 @@ export async function readFollowProgress(
     invalid();
   const { results } = await db
     .prepare(
-      // Do not materialize oversized legacy strings in JS. A NULL sentinel fails validation.
-      "SELECT CASE WHEN length(CAST(s.scope_key AS BLOB))<=? THEN s.scope_key END AS scope_key, " +
-        "CASE WHEN length(s.confirmed_at)=24 THEN s.confirmed_at END AS confirmed_at, " +
-        "CASE WHEN length(p.scope_generation)=36 THEN p.scope_generation END AS scope_generation, " +
-        "CASE WHEN length(p.watermark)=24 THEN p.watermark END AS watermark " +
+      // Bound rows before summing UTF-8 bytes. Over-budget data leaves SQL as NULL sentinels,
+      // never as several individually permitted large strings or a plausible valid prefix.
+      "WITH bounded AS (SELECT s.scope_key,s.confirmed_at,p.scope_generation,p.watermark " +
         "FROM follow_subscriptions s LEFT JOIN follow_scope_progress p " +
         "ON p.subscriber_id=s.subscriber_id AND p.scope_key=s.scope_key " +
-        "WHERE s.subscriber_id=? AND s.confirmed_at IS NOT NULL ORDER BY s.scope_key LIMIT ?",
+        "WHERE s.subscriber_id=? AND s.confirmed_at IS NOT NULL ORDER BY s.scope_key LIMIT ?), " +
+        "budget AS (SELECT SUM(length(CAST(scope_key AS BLOB)))<=? AS fits FROM bounded) " +
+        "SELECT CASE WHEN budget.fits THEN scope_key END AS scope_key, " +
+        "CASE WHEN budget.fits AND length(confirmed_at)=24 THEN confirmed_at END AS confirmed_at, " +
+        "CASE WHEN budget.fits AND length(scope_generation)=36 THEN scope_generation END AS scope_generation, " +
+        "CASE WHEN budget.fits AND length(watermark)=24 THEN watermark END AS watermark " +
+        "FROM bounded CROSS JOIN budget ORDER BY bounded.scope_key",
     )
-    .bind(maxBytes, subscriberId, maxScopes + 1)
+    .bind(subscriberId, maxScopes + 1, maxBytes)
     .all();
   if (results.length > maxScopes || encoder.encode(JSON.stringify(results)).length > maxBytes)
     invalid();

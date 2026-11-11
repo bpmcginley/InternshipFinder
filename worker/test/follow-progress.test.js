@@ -8,11 +8,18 @@ import {
   cleanupProgress,
   rollbackProgress,
   invalidProgress,
+  boundedPayload,
   catalog,
   options,
 } from "../test-support/follow-progress.js";
 
-for (const scenario of [scopeLifetime, cleanupProgress, rollbackProgress, invalidProgress]) {
+for (const scenario of [
+  scopeLifetime,
+  cleanupProgress,
+  rollbackProgress,
+  invalidProgress,
+  boundedPayload,
+]) {
   test(`follow progress: ${scenario.name}`, () =>
     scenario(fakeD1(), assert.deepEqual, assert.rejects));
 }
