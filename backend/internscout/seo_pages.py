@@ -40,11 +40,22 @@ from .site import digest as _digest
 from .site import discovery as _discovery
 from .site import employer as _employer
 from .site import field as _field
+from .site import layout as _layout
 from .site import listing as _listing
 from .site import llms as _llms
 from .site import near as _near
 from .site import numbers as _numbers
 from .site import pay as _pay
+from .site.layout import (
+    faq_ld as faq_ld,
+    faq_section as faq_section,
+    fits_line as fits_line,
+    ld_script as ld_script,
+    link_list as link_list,
+    short_day as short_day,
+    table as table,
+    tablewrap as tablewrap,
+)
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
     MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
@@ -1463,10 +1474,6 @@ def opened_rows(items: list[dict], year: int, baseline: str | None) -> list[tupl
     )
 
 
-def short_day(day) -> str:
-    return f"{day:%b} {day.day}, {day.year}"
-
-
 def tracker_page(
     term: str, rows: list[tuple], roles: int, now: datetime, updated: str, term_path: str
 ) -> tuple[str, str, str, str]:
@@ -1562,64 +1569,35 @@ def listing_rows(
 ) -> str:
     """src: where the page sits (seo-employer, seo-state, ...), carried into the install page's ?from=
     by each row's "Auto-Apply this" link, so its store link's utm_source says which pages install."""
-    rows = []
-    for x in shown(items, state):
-        # was: ordered = newest_first(items) if state else near_home_first(items)
-        #      for x in ordered[:PER_PAGE]:
-        new = fresh(x, now, BASELINE)
-        new_tag = ' <span class="new">New</span>' if new else ""
-        href = esc(safe_url(x["apply_url"]))
-        # On a site Auto-Apply fills, a quiet second link to the install page (2026-10-04). Internal,
-        # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
-        # It names the listing (listing=<id>, 2026-10-14, D21), so the install flow can carry this posting
-        # through. was: href="/install.html?from={src}-row", the same for every row.
-        aa = (
-            f' <a class="aa" href="/install.html?from={esc(src)}-row&amp;listing={esc(quote(str(x["id"]), safe=""))}">'
-            'Auto-Apply this</a>'
-            if autofills(x) and x.get("id") is not None
-            else ""
-        )
-        # 2026-10-28: was: title/place/term/pay only. Four employer pages get concise source-backed
-        # mentions; details is empty everywhere else. Revert: omit this optional block.
-        detail = (details or {}).get(str(x.get("id"))) or ()
-        detail_html = (
-            (
-                '<div class="meta posting-details">'
-                + '<br/>'.join(f'{esc(label)}: {esc(value)}.' for label, value in detail)
-                + '</div>'
-            )
-            if detail
-            else ""
-        )
-        # data-aa (2026-10-13): js/offer.js may offer the extension when this posting is opened.
-        rows.append(
-            '<li class="job">'
-            f'<div class="co">{company_link(x.get("company_name") or "", here)}{new_tag}</div>'
-            f'<div class="role">{esc(x.get("title") or "")}</div>'
-            f'<div class="meta">{row_meta(x, state)}</div>' + detail_html +
-            # The two actions sit on one line in .acts (2026-10-14, D21): "Open posting" a secondary button,
-            # "Auto-Apply this" a quiet link after it, as on the dashboard's rows.
-            # was: f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
-            f'<div class="acts"><a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}</div>'
-            "</li>"
-        )
-    return "\n".join(rows)
+    return _listing.listing_rows(
+        items,
+        now,
+        state,
+        here,
+        src,
+        details,
+        baseline=BASELINE,
+        shown=shown,
+        fresh=fresh,
+        company_link=company_link,
+        row_meta=row_meta,
+        autofills=autofills,
+        go_aa=go_aa,
+        safe_url=safe_url,
+        esc=esc,
+    )
 
 
 def row_meta(x: dict, state: str | None = None) -> str:
     """A row's grey line, HTML: place, term, stage and pay. The same for a listing row and a paid
     listing's box (placement_box), so the two can never describe one role differently."""
-    stage = ", ".join(s.replace("_", "-") for s in (x.get("stage") or []) if s != "internship")
-    meta = [esc(place(x, state))]
-    if x.get("term"):
-        meta.append(esc(str(x["term"])))
-    if stage:
-        meta.append(esc(stage))
-    pay = esc(
-        pay_text(x)
-    )  # was: esc(str(x["salary"])) if x.get("salary") else ("Paid" if is_paid(x) else "")
-    pay_tag = f' · <span class="pay">{pay}</span>' if pay else ""
-    return " · ".join(meta) + pay_tag
+    return _listing.row_meta(
+        x,
+        state,
+        place=place,
+        pay_text=pay_text,
+        esc=esc,
+    )
 
 
 def autofills(x: dict) -> bool:
@@ -1641,7 +1619,10 @@ OFFER_MARK = '<a class="go" data-aa '
 
 def go_aa(x: dict) -> str:
     """ ' data-aa' for a posting link whose application Auto-Apply fills (autofills), else ''."""
-    return " data-aa" if autofills(x) else ""
+    return _listing.go_aa(
+        x,
+        autofills=autofills,
+    )
 
 
 def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str:
@@ -1650,38 +1631,26 @@ def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str
     them is on a site it fills. Two buttons, one shown: on a computer straight to the store (count.js
     counts it as install_click), on a phone or tablet, which can't add extensions, to the install page,
     which says to send the link to a laptop. The same media query as install.html's, so no script."""
-    rows = shown(items, state)
-    on = Counter(x["ats"] for x in rows if autofills(x))
-    # was: ... if x.get("ats") in SUPPORTED_ATS (counted SuccessFactors boards on employers' own domains)
-    n, m = sum(on.values()), len(rows)
-    if not n:
-        return ""
-    # Workday first when the page has it (the one students know by name), then by count.
-    named = [ATS_NAMES.get(k, k) for k in sorted(on, key=lambda k: (k != "workday", -on[k], k))]
-    if len(named) == 1:
-        where = f"{named[0]}, a site"
-    elif len(named) == 2:
-        where = f"{named[0]} or {named[1]}, sites"
-    else:
-        where = f"{named[0]}, {named[1]} or another site"
-    who = (
-        ("This application is" if m == 1 else f"All {m} of these applications are")
-        if n == m
-        else f"{n} of these {m} applications {'is' if n == 1 else 'are'}"
-    )
-    label = "Add Auto-Apply to Chrome, free"
-    return (
-        f"<div class=\"aa-card\"><p>{who} on {esc(where)} the free Auto-Apply extension can fill in from "
-        f"your resume. It stops at Submit: you review {'it' if n == 1 else 'each one'} and send it yourself.</p>"
-        f"<a class=\"cta secondary ext-desk\" href=\"{STORE_URL}?utm_source={esc(src)}\">{label}</a>"
-        f"<a class=\"cta secondary ext-touch\" href=\"/install.html?from={esc(src)}\">{label}</a></div>"
+    return _listing.autoapply_card(
+        items,
+        src,
+        state,
+        shown=shown,
+        autofills=autofills,
+        ats_names=ATS_NAMES,
+        store_url=STORE_URL,
+        esc=esc,
     )
 
 
 def company_link(name: str, here: str | None = None) -> str:
     """The company's name, linked to its employer page when it has one (here: this page's path)."""
-    path = EMPLOYERS.get(name)
-    return f'<a href="{esc(path)}">{esc(name)}</a>' if path and path != here else esc(name)
+    return _listing.company_link(
+        name,
+        here,
+        employers=EMPLOYERS,
+        esc=esc,
+    )
 
 
 EMPLOYER_PLACES = 6  # field-in-a-place pages an employer page links (2026-10-07)
@@ -1702,16 +1671,6 @@ def in_place(k: str) -> str:
 def combo_label(t: str, k: str) -> str:
     """A field-in-a-place page as a link names it: "Software Engineering in Boston"."""
     return f"{field_title(t)} (Remote)" if k == "remote" else f"{field_title(t)} {in_place(k)}"
-
-
-def link_list(title: str, links: list[tuple[str, str, int]]) -> str:
-    if not links:
-        return ""
-    lis = "".join(
-        f"<li><a href=\"{esc(href)}\">{esc(label)}</a> <span class=\"n\">{n:,}</span></li>"
-        for href, label, n in links
-    )
-    return f"<section class=\"rel\"><h2>{esc(title)}</h2><ul>{lis}</ul></section>"
 
 
 # The dashboard's tokens (docs/index.html), since 2026-10-14 the whole block: colours, the eight type sizes,
@@ -2015,24 +1974,6 @@ HOME = ""
 HOME_LIVE_DATE = None
 
 
-def ld_script(obj) -> str:
-    """One JSON-LD block, safe to put in a page whatever its strings hold.
-
-    "</" inside a script block would end it early, and so can "<!--" followed by "<script": an
-    employer named "<!--<script>" puts the parser in a state where the real </script> no longer
-    closes the block, and the page after it becomes script. So no "<", ">" or "&" appears in the
-    block at all: JSON reads <, > and & as the same characters, and they only ever
-    occur inside strings (they are not JSON punctuation), so replacing them is always safe."""
-    ld_json = (
-        json.dumps(obj, ensure_ascii=False)
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-        .replace("&", "\\u0026")
-    )
-    # was: ld_json = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
-    return f'<script type="application/ld+json">{ld_json}</script>'
-
-
 def widget_follow(field: str) -> str:
     """Link a field's canonical tag to the existing snippet builder, not its page slug."""
     return (
@@ -2067,104 +2008,23 @@ def page(
     FAQPage blocks of the hub and /about/), each in its own block after the breadcrumb trail.
     thin (2026-10-13, INDEX_COMBO): a real page kept out of search. It keeps its canonical link to
     itself and says "noindex, follow", so a crawler still follows its links to the indexed pages."""
-    robots = (
-        f'<link rel="canonical" href="{esc(SITE + path)}"/>\n<meta name="robots" content="noindex, follow"/>'
-        if thin
-        else f'<link rel="canonical" href="{esc(SITE + path)}"/>'
-        if index
-        else '<meta name="robots" content="noindex"/>'
+    return _layout.page(
+        path,
+        title,
+        description,
+        h1,
+        crumbs,
+        body,
+        updated,
+        index,
+        feed,
+        ld,
+        thin,
+        shell=_layout.Shell(SITE, ORG_ID, ORGANIZATION, CSS, SLOGAN, BEACON, DIGEST_FORM, OFFER_TAG, OFFER_MARK),
+        footer_browse=footer_browse,
+        ld_script=ld_script,
+        esc=esc,
     )
-    # was, in the head: the canonical link if index, else the noindex meta (no thin pages)
-    url = SITE + path
-    # One crumb is not a trail: no line at all, rather than a lone "› Internships" (2026-10-14, D24).
-    # was: the line on every page, " › Internships" on the hub.
-    crumb_html = (
-        (
-            "<p class=\"crumbs\">"
-            + " › ".join(f"<a href=\"{esc(h)}\">{esc(t)}</a>" for h, t in crumbs[:-1])
-            + f" › {esc(crumbs[-1][1])}</p>\n"
-        )
-        if len(crumbs) > 1
-        else ""
-    )
-    trail = {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-            {"@type": "ListItem", "position": i + 1, "name": t, "item": SITE + h}
-            for i, (h, t) in enumerate(crumbs)
-        ],
-    }
-    # A breadcrumb trail of one is not a trail (Google reports it as invalid), so the hub has none.
-    # (The escaping that was here is ld_script's, since 2026-10-02.)
-    # Every page carries the Organization since 2026-10-05 (the audit: 2 of 297 did), once: a page
-    # that passes it in `ld` (the hub, /about/, /pricing/) is not given a second copy.
-    # was: ld_tag = "\n".join(([ld_script(trail)] if len(crumbs) > 1 else []) + [ld_script(o) for o in ld])
-    objs = list(ld) + ([] if any(o.get("@id") == ORG_ID for o in ld) else [ORGANIZATION])
-    ld_tag = "\n".join(
-        ([ld_script(trail)] if len(crumbs) > 1 else []) + [ld_script(o) for o in objs]
-    )
-    # was: ld_tag = f'<script type="application/ld+json">{ld_json}</script>' if len(crumbs) > 1 else ""
-    # The footer links /about/ and /compare/ from every page (2026-10-02), so crawlers and answer
-    # engines reach the pages that say what InternScout is. was: only Privacy and Terms.
-    # The header names what the install page offers and that it costs nothing (2026-10-04).
-    # was: <a href="/install.html">Extension</a>
-    # Pricing, Compare and About are in the nav since 2026-10-05 (the audit: the comparison page, the
-    # site's best price story, was reachable only from the footer, and the prices had no page at all).
-    # was: <nav><a href="/">Dashboard</a><a href="/internships/">Browse</a><a href="/install.html">Auto-Apply (free)</a></nav>
-    # A landing visitor can find the optional digest before scrolling through the listings.
-    # Reuse the existing nav link counter; the lower form keeps its landing placement.
-    digest_nav = (
-        '<a class="nav-extra" href="/digest/" data-digest-placement="nav">Free Monday email</a>'
-        if DIGEST_FORM and path.startswith("/internships/")
-        else ""
-    )
-    digest_footer = (
-        '<span class="mobile-digest"> · <a href="/digest/" '
-        'data-digest-placement="footer">Free Monday email</a></span>'
-        if digest_nav
-        else ""
-    )
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>{esc(title)}</title>
-<meta name="description" content="{esc(description)}"/>
-{robots}
-<meta property="og:title" content="{esc(title)}"/>
-<meta property="og:description" content="{esc(description)}"/>
-<meta property="og:type" content="website"/>
-<meta property="og:url" content="{esc(url)}"/>
-<meta property="og:image" content="{SITE}/og-preview.png"/>
-<meta name="twitter:card" content="summary_large_image"/>
-{f'<link rel="alternate" type="application/rss+xml" title="{esc(h1)} | InternScout" href="feed.xml"/>' if feed else ""}
-<link rel="icon" type="image/png" sizes="48x48" href="/icon48.png"/>
-<link rel="apple-touch-icon" href="/icon128.png"/>
-<link rel="preload" href="/fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin/>
-<link rel="preload" href="/fonts/source-serif-4-latin.woff2" as="font" type="font/woff2" crossorigin/>
-<style>{CSS}</style>
-{ld_tag}
-</head>
-<body>
-<div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav aria-label="Primary"><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a class="nav-extra" href="/pricing/">Pricing</a><a class="nav-extra" href="/compare/">Compare</a><a class="nav-extra" href="/about/">About</a><a class="nav-extra" href="/employers/" data-employer-entry="nav">Hire interns</a></nav></header>
-<main>
-{crumb_html}<h1>{esc(h1)}</h1>
-{body}
-<p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
-</main>
-<footer><nav class="distribution-links" aria-label="More ways to use InternScout">
-<a href="https://github.com/bpmcginley/internships-every-major" data-distribution="list">Internships for every major on GitHub</a>
-<a href="/widget/builder.html" data-distribution="widget">Put live internships on your club or department site</a>
-</nav><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>{digest_footer}</footer>
-</div>
-{BEACON}
-{OFFER_TAG if OFFER_MARK in body else ""}
-</body>
-</html>
-"""
 
 
 def _dash_state(state: str) -> str:
@@ -2201,17 +2061,6 @@ def dash_link(
     if paid:
         q.append("paid=1")
     return "/?" + "&amp;".join(q)
-
-
-def fits_line(majors: list[str]) -> str:
-    return (
-        (
-            f"<p class=\"fits\">The page for {esc(join_words(sorted(majors)))} "
-            f"{'majors' if len(majors) > 1 else 'majors too'}.</p>"
-        )
-        if majors
-        else ""
-    )
 
 
 # ---- the page's own data as a chart (2026-10-05)
@@ -2320,53 +2169,31 @@ def listing_body(
     signup: str = "",
     details: dict | None = None,
 ) -> str:
-    more = len(items) - PER_PAGE
-    order = "newest" if state else "newest, Northeast and remote first,"
-    # `extra`: the employer pages' "at a glance" list, under the opening paragraph (2026-10-01).
-    # `src`: which kind of page this is, for the install links' ?from= and the store's utm_source
-    # (2026-10-04; see autoapply_card).
-    # `faq`: the field, state and field-in-state pages' questions section (faq_section, 2026-10-05),
-    # after the chart and before the follow lines; the employer pages carry theirs in `related`.
-    # 2026-10-28: was: no per-role source detail. The note only appears where a cohort card has facts.
-    # Revert: omit detail_note and details from listing_rows; index decisions are independent.
-    detail_count = sum(bool((details or {}).get(str(x["id"]))) for x in shown(items, state))
-    detail_note = (
-        f'<p class="more">Brief posting details are shown for {detail_count} of '
-        f'{len(shown(items, state))} roles below. These are not a complete eligibility check. '
-        'Open the employer\'s posting for full requirements. Unverified details are omitted.</p>'
-        if detail_count
-        else ""
-    )
-    return (
-        f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>"
-        + fits_line(fits or [])
-        + extra
-        + f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"
-        + autoapply_card(items, src, state)
-        + detail_note
-        + f"<ul class=\"jobs\">{listing_rows(items, now, state, here, src, details)}</ul>"
-        + (
-            f"<p class=\"more\">Showing the {PER_PAGE} {order} of {len(items):,}. "
-            f"<a href=\"{dash}\">See every one on the dashboard</a>, ranked for your profile.</p>"
-            if more > 0
-            else ""
-        )
-        # `signup`: the weekly email's form (signup_form, 2026-10-06), on the field pages and
-        # /internships/new/, straight after the list, where a reader has just seen what it would bring.
-        + signup
-        # The page's own numbers as a chart, under the list it summarises (2026-10-05, g_multimodal).
-        + chart_figure(items, state)
-        + faq
-        + "<p class=\"follow\">Get new ones in a Discord or Slack channel, or a feed reader: "
-        "<a href=\"feed.xml\">RSS feed</a></p>"
-        # The extension has been in the Chrome Web Store since 2026-09-22. This links the install
-        # page rather than the store: it's ours, so the link stays inside the site, and it tells a
-        # phone reader to send it to a laptop instead of dropping them on a store page that can't
-        # install anything. ?from= becomes the store link's utm_source there (install.html's
-        # canonical link keeps it one page to search engines). Since 2026-10-04 the tag says which
-        # kind of page (src). was: ?from=landing-page on every page.
-        + f"<p class=\"follow\">Applying to a few? The free <a href=\"/install.html?from={esc(src)}\">Auto-Apply extension</a> "
-        "fills in the application for you and stops at the submit button.</p>" + related
+    return _listing.listing_body(
+        items,
+        what,
+        where,
+        now,
+        related,
+        state,
+        dash,
+        fits,
+        here,
+        tail,
+        about,
+        extra,
+        src,
+        faq,
+        signup,
+        details,
+        per_page=PER_PAGE,
+        shown=shown,
+        summary=summary,
+        fits_line=fits_line,
+        autoapply_card=autoapply_card,
+        listing_rows=listing_rows,
+        chart_figure=chart_figure,
+        esc=esc,
     )
 
 
@@ -2788,30 +2615,6 @@ FAQ_ANSWER_MAX = (
 FAQ_NAMES = 5  # employers or places named in an answer, before shortening
 
 
-def faq_ld(qa: list[tuple[str, str]]) -> dict:
-    """The FAQPage block for (question, answer) pairs; the answers are plain text, as on the page."""
-    return {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        "mainEntity": [
-            {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}}
-            for q, a in qa
-        ],
-    }
-
-
-def faq_section(qa: list[tuple[str, str]]) -> str:
-    return (
-        (
-            "<section class=\"faq\">"
-            + "".join(f"<h2>{esc(q)}</h2><p>{esc(a)}</p>" for q, a in qa)
-            + "</section>"
-        )
-        if qa
-        else ""
-    )
-
-
 def faq_topic(field: str | None, state: str | None, what: str = "internships") -> str:
     """The page's subject as a phrase: "software engineering internships in Massachusetts",
     "internships in Canada", "remote software engineering interns" (what="interns")."""
@@ -3183,44 +2986,6 @@ def pay_rows(top_roles: list[tuple], now: datetime) -> str:
             "</li>"
         )
     return "\n".join(rows)
-
-
-def tablewrap(label: str) -> str:
-    """The opening of the box a wide table scrolls sideways in. A keyboard can reach and scroll it, and a
-    screen reader names it (2026-10-14, D24; was: a bare <div class="tablewrap">)."""
-    return f"<div class=\"tablewrap\" tabindex=\"0\" role=\"region\" aria-label=\"{esc(label)}\">"
-
-
-def table(
-    head: list[str],
-    rows: list[list[str]],
-    num_from: int = 1,
-    cls: str = "data",
-    label: str = "Table",
-) -> str:
-    """An HTML table; cells are HTML already. Columns from num_from on hold figures and don't wrap.
-    label: what the table is, for the scrolling box's name (tablewrap)."""
-    # Explicit roles retain table relationships when narrow-screen CSS stacks the rows.
-    # Repeated visible labels are decorative; the real column headers stay in the accessibility tree.
-    th = "".join(f'<th scope="col" role="columnheader">{h}</th>' for h in head)
-    body = "".join(
-        '<tr role="row">'
-        + "".join(
-            f'<th scope="row" role="rowheader">{c}</th>'
-            if i == 0 and i < num_from
-            else f'<td class="{"num" if i >= num_from else ""}" role="cell">'
-            f'<span class="cell-label" aria-hidden="true">{head[i] if i < len(head) else ""}</span>'
-            f'<span class="cell-value">{c}</span></td>'
-            for i, c in enumerate(r)
-        )
-        + "</tr>"
-        for r in rows
-    )
-    return (
-        f'{tablewrap(label)}<table class="{cls}" role="table">'
-        f'<thead role="rowgroup"><tr role="row">{th}</tr></thead>'
-        f'<tbody role="rowgroup">{body}</tbody></table></div>'
-    )
 
 
 def pay_page(
