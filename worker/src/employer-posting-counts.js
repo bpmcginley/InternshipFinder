@@ -2,6 +2,7 @@
 import { createEmployerCatalogCache } from "./employer-catalog-cache.js";
 
 export const EMPLOYER_POSTING_EVENT = "employer_posting_open";
+export const employerPostingCountsEnabled = (env) => env?.EMPLOYER_POSTING_COUNTS_ENABLED === "1";
 const DAY = 86_400_000;
 const encoder = new TextEncoder();
 const validKey = (key) =>

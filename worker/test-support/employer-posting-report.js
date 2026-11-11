@@ -1,9 +1,15 @@
 import { readEmployerPostingReport } from "../src/employer-posting-report.js";
 import { EMPLOYER_COUNT_SCHEMA, EMPLOYER_DAY_CAP_SCHEMA } from "./employer-posting-counts.js";
 
-export async function employerPostingReportScenario(db, equal, rejects) {
+export async function employerPostingReportScenario(
+  db,
+  equal,
+  rejects,
+  { createTables = true } = {},
+) {
   const now = new Date("2026-11-11T23:59:59Z");
-  await db.batch([EMPLOYER_COUNT_SCHEMA, EMPLOYER_DAY_CAP_SCHEMA].map((sql) => db.prepare(sql)));
+  if (createTables)
+    await db.batch([EMPLOYER_COUNT_SCHEMA, EMPLOYER_DAY_CAP_SCHEMA].map((sql) => db.prepare(sql)));
   const fixtures = [
     ["2026-08-12", "expired", 1],
     ["2026-08-13", "acme", 2],
