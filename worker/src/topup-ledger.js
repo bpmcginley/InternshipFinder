@@ -6,6 +6,10 @@ const fail = (message) => {
   throw new Error(message);
 };
 const positive = (n) => Number.isSafeInteger(n) && n > 0;
+export const validTopupOfferVersion = (value) =>
+  typeof value === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(value);
+export const validTopupCheckoutId = (value) =>
+  typeof value === "string" && /^cs_[A-Za-z0-9_]{1,250}$/.test(value);
 
 async function referenceHash(kind, live, id) {
   const bytes = await crypto.subtle.digest(
@@ -25,10 +29,10 @@ export async function recordVerifiedTopup(db, input, now = new Date()) {
       (key) => typeof input[key] === "string",
     ) ||
     !/^pi_[A-Za-z0-9_]{1,250}$/.test(input.paymentId) ||
-    !/^cs_[A-Za-z0-9_]{1,250}$/.test(input.checkoutId || "") ||
+    !validTopupCheckoutId(input.checkoutId) ||
     !HEX.test(input.userHash || "") ||
     typeof input.livemode !== "boolean" ||
-    !/^[a-zA-Z0-9_-]{1,64}$/.test(input.offerVersion || "") ||
+    !validTopupOfferVersion(input.offerVersion) ||
     !/^[a-z]{3}$/.test(input.currency || "") ||
     !positive(input.amount) ||
     !positive(input.units) ||

@@ -201,6 +201,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.2e checkout reservation worker merge | [PR #267](https://github.com/bpmcginley/InternshipFinder/pull/267), stacked on frozen #254. Approved storage boundary; owner merge after review/CI. Mocked adapter only; private offer setup, terminal recovery/settlement/deletion and production activation remain pending. | - |
 | 2026-11-10 | P-2.2d purchased-run allocation/restoration merge | [PR #254](https://github.com/bpmcginley/InternshipFinder/pull/254), stacked on frozen #249. Approved policy, owner merge after review/CI. Dormant local storage only; admission attempt fence, priority/caps, provider/deletion/retention integration and deployment remain pending. | - |
 | 2026-11-10 | P-2.2c existing-purchase reconciliation merge | [PR #249](https://github.com/bpmcginley/InternshipFinder/pull/249), stacked on frozen #241. Approved policy/storage, owner merge after review/CI. Provider integration, refund-before-grant, restore/deletion/retention wiring, publication and deployment remain pending. | - |
 | 2026-11-10 | P-2.2b decision helper merge | [PR #241](https://github.com/bpmcginley/InternshipFinder/pull/241), stacked on frozen #237. Exact #226 policy is approved; implementation merge remains with Bruce after independent review/green CI. No provider setup, ledger commit, publication or deployment is enabled. | - |
