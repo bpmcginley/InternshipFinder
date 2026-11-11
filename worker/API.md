@@ -10,6 +10,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 
 | Method and path | Authentication | Feature gate | Request shape | Response shape |
 |---|---|---|---|---|
+| `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation |
 | `GET /config` | public | none | none | JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean} |
 | `GET /me` | user | none | none | JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, tier, paused, allowance: {task: {used, limit, bonus?}}} |
 | `POST /session` | provider-id | none | Authorization: Bearer provider ID token; no body | JSON {session, account, email, provider, tier, expires} |
@@ -59,6 +60,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 
 ### Authentication keys
 
+- **follow-unsubscribe-token:** Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.
 - **public:** No sign-in required; route-specific validation still applies.
 - **user:** Provider ID token or live session bearer token, through the existing authenticateUser path.
 - **provider-id:** Fresh verified provider ID token only; session tokens cannot create sessions.
@@ -89,6 +91,20 @@ dashboard (`docs/index.html`). Update the route data and these notes together, t
   <!-- was: Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`. -->
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
   A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
+
+## One-click follow unsubscribe
+
+`POST /follows/unsubscribe` uses one HTTPS query parameter named `token`, with a deletion-only
+follow token and a 256-character query limit. Send exactly the text form field
+`List-Unsubscribe=One-Click` as URL-encoded or multipart form data. The body has a 4,096-byte limit
+and a single five-second read deadline. The token is the sole credential. The request can omit
+login, cookies, an authorization header and an Origin header.
+
+Deletion, replay, unknown tokens and other well-formed tokens with a different purpose all return
+an empty 204 with `Cache-Control: no-store`. Malformed input returns an empty 400. Body timeout,
+capacity or unavailable storage returns an empty 503 with `Retry-After: 60`. Up to four operations
+can be in flight per Worker isolate. GET and HEAD use the standard 404 fallback. Deletion is
+available independently of signup and sending switches.
 
 ## Public brand videos
 

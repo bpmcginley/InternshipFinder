@@ -98,7 +98,7 @@ test("exact #327 Python bytes work for latest and independent older pin without 
   );
   for (const call of s.calls) {
     assert.equal(call.method, "GET");
-    assert.equal(call.redirect, "error");
+    assert.equal(call.redirect, "manual");
     assert.equal(new URL(call.url).origin, new URL(indexUrl).origin);
     assert(call.signal instanceof AbortSignal);
   }

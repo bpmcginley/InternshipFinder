@@ -100,7 +100,7 @@ export async function readTopupReversalEvidence(
       async (url, options) => {
         const response = await fetchImpl(url, {
           ...options,
-          redirect: "error",
+          redirect: "manual",
           signal: controller.signal,
         });
         if (stopped) {

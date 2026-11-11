@@ -103,7 +103,7 @@ async function boundedRequest(config, path, form, fetchImpl, key, method, timeou
       async (url, options) => {
         const response = await fetchImpl(url, {
           ...options,
-          redirect: "error",
+          redirect: "manual",
           signal: controller.signal,
         });
         if (stopped || performance.now() >= deadline || response.ok !== true) {

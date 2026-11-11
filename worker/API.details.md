@@ -14,6 +14,20 @@ dashboard (`docs/index.html`). Update the route data and these notes together, t
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
   A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
 
+## One-click follow unsubscribe
+
+`POST /follows/unsubscribe` uses one HTTPS query parameter named `token`, with a deletion-only
+follow token and a 256-character query limit. Send exactly the text form field
+`List-Unsubscribe=One-Click` as URL-encoded or multipart form data. The body has a 4,096-byte limit
+and a single five-second read deadline. The token is the sole credential. The request can omit
+login, cookies, an authorization header and an Origin header.
+
+Deletion, replay, unknown tokens and other well-formed tokens with a different purpose all return
+an empty 204 with `Cache-Control: no-store`. Malformed input returns an empty 400. Body timeout,
+capacity or unavailable storage returns an empty 503 with `Retry-After: 60`. Up to four operations
+can be in flight per Worker isolate. GET and HEAD use the standard 404 fallback. Deletion is
+available independently of signup and sending switches.
+
 ## Public brand videos
 
 `GET` or `HEAD /social-video/YYYY-MM-DD-field.mp4` serves a generated brand Reel from the fixed

@@ -1,5 +1,10 @@
 // Dormant existing-purchase storage only; no provider, grant, admission or deletion caller.
 import { decideTopup } from "./topup-decisions.js";
+import {
+  topupFinanciallyResolved,
+  topupRetentionStatement,
+  invalidateTopupRetention,
+} from "./topup-retention.js";
 
 // Capture BEFORE authoritative provider reads. A conflict requires a fresh capture AND
 // provider read, never replaying an old snapshot under a new revision. No row is created here.
@@ -46,8 +51,11 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
   // Ignore any caller-supplied previous state. Governing causes remain meaningful even
   // when held units are zero; a future failed-run return must still observe the hold.
   const decision = decideTopup({ ...snapshot, previous: stored.previous });
-  if (decision.disposition === "retry") return { status: "retry" };
-  const [state, balance] = await db.batch([
+  if (decision.disposition === "retry") {
+    await invalidateTopupRetention(db, paymentHash, revision);
+    return { status: "retry" };
+  }
+  const [state, balance, retention] = await db.batch([
     db
       .prepare(
         "INSERT INTO topup_reconciliations(payment_hash, revision, loss, full_refund, hold_ids) " +
@@ -83,8 +91,9 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
           "WHERE payment_hash=? AND changes()=1",
       )
       .bind(decision.disposition, decision.disposition, decision.disposition, paymentHash),
+    topupRetentionStatement(db, paymentHash, topupFinanciallyResolved(snapshot, stored.previous)),
   ]);
-  return state.meta.changes === 1 && balance.meta.changes === 1
+  return state.meta.changes === 1 && balance.meta.changes === 1 && retention.meta.changes === 1
     ? { status: "applied", revision: revision + 1, decision }
     : { status: "stale" };
 }

@@ -182,6 +182,7 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
       1,
       null,
       null,
+      null, // optional retention row after exact purchase debit
       null,
       1,
       Number(accountCeiling !== null),
@@ -192,7 +193,8 @@ export async function reserveFirstFundedRun(db, input, now = new Date()) {
     if (
       results.length !== changes.length ||
       results[3]?.meta?.changes !== results[4]?.meta?.changes ||
-      results[3]?.meta?.changes + results[5]?.meta?.changes > 1 ||
+      results[3]?.meta?.changes + results[6]?.meta?.changes > 1 ||
+      results[5]?.meta?.changes > results[4]?.meta?.changes ||
       results.some(
         (r, i) =>
           r?.success !== true ||
