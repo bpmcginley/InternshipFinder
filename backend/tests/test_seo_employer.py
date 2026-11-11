@@ -5,7 +5,8 @@ import os
 import pytest
 
 from internscout import seo_pages
-from test_seo_pages import COMBO, _DASHES, _built, _head, _paths, _row, _site
+from tests.seo_fixture_data import _row, _site
+from test_seo_pages import COMBO, _DASHES, _built, _head, _paths
 
 
 def test_spellings_of_one_employer_share_a_page_and_a_role_counts_once(tmp_path):

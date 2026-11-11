@@ -3,7 +3,8 @@
 import json
 
 from internscout import seo_pages
-from tests.test_seo_pages import _pl, _row, _site
+from tests.seo_fixture_data import _row, _site
+from tests.test_seo_pages import _pl
 
 
 def test_json_page_build_keeps_annotations_and_omits_the_output_path(tmp_path, monkeypatch, capsys):
