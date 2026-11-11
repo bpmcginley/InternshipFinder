@@ -59,6 +59,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | D | P-2.2 Top-up build | Unassigned | - | - | Waiting for design | No build before approved price, note, terms and secret setup. |
 | D | P-3.1 Limit card | Unassigned | - | - | Waiting for WP-5.2 | Preserve cap markers through the refactor before implementation; no worker contract approved. Extension merge/release remains needs-bruce. |
 | D | P-3.2 Review ask | mylist_review | `codex/product-p3.2-review-ask` | [#212](https://github.com/bpmcginley/InternshipFinder/pull/212) | Reviewed; ready; needs-bruce | Final cd20fa36: all nine CI checks, independent review, 348 Node22 tests, 16 focused cases, two packaging checks and 40 synthetic screenshots pass. Prior decisions retained; no protected-source/permission/version change or release. |
+| D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
 | E | P-2.4 Cross-device list | Unassigned | - | - | Waiting for observation | P-1.4 live for two weeks, approved design/privacy, then build. |
 | E | P-3.3 Resume first | Unassigned | - | - | Waiting for refactor | After WP-5.2; needs-bruce. |
 | E | P-3.4 Practice form | Unassigned | - | - | Verification | Stop if a new host permission is needed; needs-bruce for extension. |
@@ -67,7 +68,6 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | E | P-4.3 Share cards | Unassigned | - | - | Queued | Matching pages, build-time images, build cost check. |
 | E | P-4.4 Advisor edition | Unassigned | - | - | Queued | Subscription/email work needs Bruce; no outreach. |
 
-| D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
 
 ## Verified findings
 
