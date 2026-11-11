@@ -753,6 +753,52 @@ BEGIN
     WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
 END;
 
+-- Dormant P-2.2a: immutable purchase identity and isolated grant, not payment authorization.
+-- Claims retain only opaque provider-reference fingerprints and state after future deletion.
+CREATE TABLE IF NOT EXISTS topup_claims (
+  payment_hash TEXT PRIMARY KEY NOT NULL CHECK(length(payment_hash) = 64),
+  checkout_hash TEXT NOT NULL UNIQUE CHECK(length(checkout_hash) = 64),
+  state TEXT NOT NULL CHECK(state IN ('granted', 'deleted', 'retired'))
+);
+CREATE TABLE IF NOT EXISTS topup_purchases (
+  payment_hash TEXT PRIMARY KEY NOT NULL REFERENCES topup_claims(payment_hash),
+  payment_id TEXT NOT NULL,
+  checkout_id TEXT NOT NULL,
+  user_hash TEXT NOT NULL CHECK(length(user_hash) = 64),
+  offer_version TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount > 0),
+  currency TEXT NOT NULL CHECK(length(currency) = 3),
+  granted INTEGER NOT NULL CHECK(typeof(granted) = 'integer' AND granted > 0),
+  available INTEGER NOT NULL CHECK(typeof(available) = 'integer' AND available >= 0),
+  held INTEGER NOT NULL DEFAULT 0 CHECK(typeof(held) = 'integer' AND held >= 0),
+  consumed INTEGER NOT NULL DEFAULT 0 CHECK(typeof(consumed) = 'integer' AND consumed >= 0),
+  revoked INTEGER NOT NULL DEFAULT 0 CHECK(typeof(revoked) = 'integer' AND revoked >= 0),
+  created TEXT NOT NULL,
+  CHECK(available + held + consumed + revoked = granted)
+);
+CREATE INDEX IF NOT EXISTS topup_purchases_user ON topup_purchases(user_hash, created, payment_hash);
+
+-- Dormant existing-purchase reconciliation; no new identity or provider snapshot fields.
+CREATE TABLE IF NOT EXISTS topup_reconciliations (
+  payment_hash TEXT PRIMARY KEY NOT NULL REFERENCES topup_purchases(payment_hash) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK(typeof(revision) = 'integer' AND revision > 0 AND revision <= 9007199254740991),
+  loss INTEGER NOT NULL CHECK(loss IN (0, 1)),
+  full_refund INTEGER NOT NULL CHECK(full_refund IN (0, 1)),
+  hold_ids TEXT NOT NULL CHECK(json_valid(hold_ids) AND json_type(hold_ids) = 'array')
+);
+
+-- One purchased unit per existing run identity; retain receipts independently of runs cleanup.
+CREATE TABLE IF NOT EXISTS topup_allocations (
+  user_hash TEXT NOT NULL CHECK(length(user_hash)=64),
+  month TEXT NOT NULL CHECK(length(month)=7),
+  task TEXT NOT NULL CHECK(task='autofill'),
+  run_id TEXT NOT NULL CHECK(length(run_id) BETWEEN 1 AND 64),
+  payment_hash TEXT NOT NULL REFERENCES topup_purchases(payment_hash) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK(state IN ('allocated','restored','revoked')),
+  PRIMARY KEY(user_hash,month,task,run_id)
+);
+CREATE INDEX IF NOT EXISTS topup_allocations_purchase ON topup_allocations(payment_hash);
+
 -- Dormant capability for deleting one pending confirmation request.
 CREATE TABLE IF NOT EXISTS follow_request_deletions (
   token_hash TEXT PRIMARY KEY NOT NULL CHECK (length(token_hash) = 64),
@@ -767,6 +813,22 @@ BEGIN
   UPDATE follow_digest_outbox SET state='cancelled', payload=NULL, lease_token=NULL, lease_until=NULL
     WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
 END;
+
+-- Dormant top-up checkout reservation; unresolved attempts never expire by local timer.
+CREATE TABLE IF NOT EXISTS topup_checkout_attempts (
+  id TEXT PRIMARY KEY NOT NULL CHECK(length(id)=36),
+  user_hash TEXT NOT NULL CHECK(length(user_hash)=64),
+  offer_version TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount>0),
+  currency TEXT NOT NULL CHECK(length(currency)=3),
+  units INTEGER NOT NULL CHECK(typeof(units)='integer' AND units>0),
+  created TEXT NOT NULL,
+  checkout_id TEXT UNIQUE,
+  state TEXT NOT NULL CHECK(state IN ('creating','open','expired','settled')),
+  CHECK(state!='open' OR checkout_id IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS topup_checkout_one_active ON topup_checkout_attempts(user_hash)
+  WHERE state IN ('creating','open');
 
 -- Dormant matching prerequisites. Progress belongs to exactly one confirmed scope lifetime.
 CREATE TABLE IF NOT EXISTS follow_scope_progress (
@@ -890,9 +952,34 @@ BEGIN
     WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
 END;
 
+-- Dormant pre-provider fence. Consumed on settlement; removed with an erased attempt.
+CREATE TABLE IF NOT EXISTS topup_attempt_revisions (
+  attempt_id TEXT PRIMARY KEY NOT NULL REFERENCES topup_checkout_attempts(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK(typeof(revision) = 'integer' AND revision > 0 AND revision <= 9007199254740991)
+);
+
 -- Check one subscriber's unresolved attempts without walking global attempt history.
 CREATE INDEX IF NOT EXISTS follow_attempting_subscriber
   ON follow_digest_outbox (subscriber_id) WHERE state='attempting';
+
+-- Account deletion is the sole INSERT/UPSERT writer of forget. Monthly cleanup only DELETEs.
+-- RAISE aborts deleteUser's whole D1 batch; no new identity or retention is introduced.
+CREATE INDEX IF NOT EXISTS topup_checkout_resolved_user ON topup_checkout_attempts(user_hash)
+  WHERE state IN ('expired', 'settled');
+CREATE TRIGGER IF NOT EXISTS topup_account_deletion BEFORE INSERT ON forget
+BEGIN
+  SELECT RAISE(ABORT, 'topup_payment_pending') WHERE EXISTS (
+    SELECT 1 FROM topup_checkout_attempts
+    WHERE user_hash = NEW.user_hash AND state IN ('creating', 'open')
+  );
+  UPDATE topup_claims SET state = 'deleted'
+    WHERE state = 'granted' AND payment_hash IN (
+      SELECT payment_hash FROM topup_purchases WHERE user_hash = NEW.user_hash
+    );
+  DELETE FROM topup_purchases WHERE user_hash = NEW.user_hash;
+  DELETE FROM topup_checkout_attempts
+    WHERE user_hash = NEW.user_hash AND state IN ('expired', 'settled');
+END;
 
 -- One global follow-send attempt count for the UTC day of the latest observed time.
 CREATE TABLE IF NOT EXISTS follow_send_budget (

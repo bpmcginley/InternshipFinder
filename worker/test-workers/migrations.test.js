@@ -8,11 +8,17 @@ const migrationNames = [
   baselineName,
   "0002_follow_lifecycle.sql",
   "0003_follow_digest_outbox.sql",
+  "0004_topup_ledger.sql",
+  "0005_topup_reconciliation.sql",
+  "0006_topup_allocations.sql",
   "0007_follow_request_deletion.sql",
+  "0008_topup_checkout_attempts.sql",
   "0009_follow_scope_progress.sql",
   "0010_follow_pending_progress.sql",
   "0012_follow_attempt_progress.sql",
+  "0013_topup_attempt_revisions.sql",
   "0014_follow_attempt_lookup.sql",
+  "0015_topup_account_deletion.sql",
   "0016_follow_send_budget.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
@@ -68,9 +74,9 @@ it("the deduplicated migration creates the complete legacy schema, including con
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(51);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(28);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(10);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(57);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(32);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(11);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
