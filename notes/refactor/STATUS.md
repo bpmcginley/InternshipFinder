@@ -1,4 +1,4 @@
-Wave 7 active. The data seed is published and the first writer run is in progress.
+Wave 7 active. The first writer and matching Pages follower succeeded. G3 observation is underway.
 
 **Authorization update, 2026-11-10:** Bruce explicitly authorized processing now, finishing and merging retained PRs #165, #175, #177 and #178, and notifying the Product/Growth Refactor session to continue. This supersedes the 16:00 earliest-start and empty-queue holds below. Reviews, green CI, Pages verification, protected guard code/tests, and production deployment restrictions remain in force. Product has been notified; formatting is merged and published, and coordinated product work has resumed. Design-note merges do not resolve unspecified pricing, privacy, retention or operator choices, nor enable payment/email implementation. Historical notice and inventories below record the earlier gate.
 
@@ -115,8 +115,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 6 | WP-6.1.3 Reader workflows | wp14_logging | `refactor/wp-6.1.3-data-readers` | [#317](https://github.com/bpmcginley/InternshipFinder/pull/317) | Merged | Pin one public snapshot for eight readers, with primary fallback when the data branch is absent. Golden 695. Merge `e19c0c69` passed Pages 42965451981, its exact deployment, backend 42965451948 and Every-major selection/build 42965594463. |
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
 | 7 | WP-6.1.4 Data branch | Lead | `data` | - | Seed published | Normal initial push of `2e3f1c5b` from `cde2646f` after strict validation. Pages 42969039657 selected and deployed that exact seed. |
-| 7 | WP-6.1.5 Ingest writer | wp42_orders | `refactor/wp-6.1.5-data-writer` | [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) | Merged | `997cfd6d` merged after independent review and nine green checks. Seed Pages 42969039657 passed. Automatic ingest 42969039608 is in progress. |
-| 7 | WP-6.1.6 Remove main data | Unassigned | - | - | Waiting for observation | Requires seven days of clean ingest/Pages after cutover; no history rewrite. |
+| 7 | WP-6.1.5 Ingest writer | wp42_orders | `refactor/wp-6.1.5-data-writer` | [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) | Merged | `997cfd6d` merged after independent review and nine green checks. Seed Pages 42969039657 passed. Automatic ingest 42969039608 published `e66294c5` at 2026-11-11 06:30:58 UTC. Its exact Pages follower 42972977656 completed at 06:33:03 UTC. |
+| 7 | WP-6.1.6 Remove main data | wp42_orders | `refactor/wp-6.1.6-retire-main-data` | [#329](https://github.com/bpmcginley/InternshipFinder/pull/329) | Reviewed draft / G3 hold | Exact head `3075421b` independently reviewed with nine green checks. A Windows fetch with `core.autocrlf=true` installed all 141 public files byte-for-byte from Git. Merge waits for seven verified clean days and lead release. |
 | 7 | WP-6.2 Remove shims | Unassigned | - | - | Queued | Only after repository-wide old-import search is clear. |
 | 7 | WP-6.3 Ingest timing | wp21_inventory | `refactor/wp-6.3-ingest-timing` | [#323](https://github.com/bpmcginley/InternshipFinder/pull/323) | Merged | `29a86129` passed Pages 42967561585 and backend 42967561649. Concurrent board phase took 36m 25s scheduled and 27m 11s on push. Per-source timings unavailable. |
 
@@ -258,7 +258,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 | Q7 | WP-1.4 existing growth provider and credential output | Which existing human growth provider/error diagnostics should use a redacted default, and what secure channel should the interactive credential setup use? | Preserve existing provider/credential flows until decided. Machine payloads, Actions annotations and bare artifact paths retain their formats by design. |
 | G1 | WP-4.1 adoption | Bruce verifies actual production schema and marks the baseline migration applied; deployment-script change follows only afterward. | Prepare and test locally; no production commands. |
 | G2 | WP-0.3 formatting | Original 16:00 Eastern and empty-queue restrictions superseded by Bruce's explicit 2026-11-10 instruction to finish queued PRs and proceed now. | Continue file ownership, separate worktrees, independent review, green CI and Pages gates. |
-| G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | Seed publication succeeded. The first matching writer and Pages follower must both succeed before starting the observation clock. |
+| G3 | WP-6.1.6 | Seven days of clean ingest and Pages after data-writer cutover. | Started 2026-11-11 06:33:03 UTC after the first exact writer and Pages pair succeeded. Earliest threshold is 2026-11-18 06:33:03 UTC if the observation stays continuously clean. |
 
 Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held pending GitGuardian classification of an inherited historical generic alert. All 75 parsed description records match between the historical and current shards after accounting for byte order. Scanner disposition and published data are untouched.
 
@@ -300,7 +300,7 @@ Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held 
 
 ## Next update
 
-Verify automatic ingest 42969039608 and its exact Pages follower using the public commit, tree and upstream run markers. Start G3 only after that pair succeeds. The browser decision Q2 still gates the site module conversion, and Q3 still covers financial routing changes beyond file moves.
+Track ingest and Pages through the G3 observation using the public commit, tree and upstream run markers. Keep #329 in draft until seven clean days are verified and the lead releases it. The browser decision Q2 still gates the site module conversion, and Q3 still covers financial routing changes beyond file moves.
 
 ## Dashboard ranking test clock
 
@@ -586,7 +586,8 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - The prior main-targeting ingest finished at `cde2646f`. The seed commit `2e3f1c5b` removes one redundant identical line from the listing index. Parsed values and ordering and all other bytes match the prior snapshot. The strict validator passed before the initial normal push.
 - [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) merged as `997cfd6d` from reviewed head `99a5d5e1` with all nine checks green. The [seed Pages run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039657) selected source `data` at seed `2e3f1c5b` and public tree `161e4b72`. Build, deploy, notify, the exact Pages deployment and backend 42969039593 succeeded. The public index returned HTTP 200 with byte-identical seed content, a duplicate-free parse and 68 shards.
-- The merge started [automatic ingest 42969039608](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039608). The guard, data checkout and prepare steps passed. Ingest and export remain in progress. The seed publication was a push-triggered Pages run. G3 starts after the first successful ingest and its matching successful Pages follower, then requires seven clean days before removing data from main.
+- The merge started [automatic ingest 42969039608](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039608). The writer succeeded at 2026-11-11 06:30:58 UTC and logged data commit `e66294c5` and public tree `9b54c5ea`. The [Pages follower 42972977656](https://github.com/bpmcginley/InternshipFinder/actions/runs/42972977656) matched that commit and tree with source `data` and upstream run 42969039608. Build, deploy, notify and the exact Pages deployment succeeded.
+- The listing index, first preview, stats, majors and remote shard returned HTTP 200, parsed without duplicate keys and matched `e66294c5` byte-for-byte. G3 began at the follower's full completion on 2026-11-11 06:33:03 UTC. The earliest seven-day threshold is 2026-11-18 06:33:03 UTC if every intervening observation stays clean.
 
 ## WP-6.3 ingest timing from existing runs
 
