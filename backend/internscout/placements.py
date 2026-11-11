@@ -34,6 +34,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
+from .console_log import console
+
 # Paid boxes on one page or in one view. The D1 column page_cap is held at 1 by a CHECK as well.
 MAX_PER_PAGE = 1
 
@@ -350,7 +352,7 @@ def main(argv: list[str]) -> int:
             + _why(e).replace(token, "[token]").replace("\n", " ")
         )
         return 0
-    print(f"[placements] recorded today's runs for {n} placement(s)")
+    console(f"[placements] recorded today's runs for {n} placement(s)")
     return 0
 
 

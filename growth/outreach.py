@@ -22,6 +22,7 @@ else:
     import audience  # noqa: E402
     import digest  # noqa: E402
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 MIN_NEW = 3
 MAX_AGE = timedelta(days=2)
@@ -160,7 +161,11 @@ def main() -> None:
     (out / "drafts.json").write_text(
         json.dumps(kit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    print(f"[outreach] {len(kit['majors'])} drafts; status={kit['status']}; wrote {out}")
+    message = f"[outreach] {len(kit['majors'])} drafts; status={kit['status']}; wrote"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
+        console(f"{message} drafts")
+    else:
+        console(f"{message} {out}")
 
 
 if __name__ == "__main__":
