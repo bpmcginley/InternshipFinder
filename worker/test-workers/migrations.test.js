@@ -4,7 +4,7 @@ import { applyD1Migrations } from "cloudflare:test";
 import { beforeEach, expect, it } from "vitest";
 
 const baselineName = "0001_baseline.sql";
-const migrationNames = [baselineName, "0002_follow_lifecycle.sql", "0003_follow_digest_outbox.sql"];
+const migrationNames = [baselineName, "0002_follow_lifecycle.sql", "0003_follow_digest_outbox.sql", "0004_topup_ledger.sql"];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
 const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
@@ -56,8 +56,8 @@ it("the deduplicated migration creates the complete legacy schema, including con
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(47);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(25);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(49);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(26);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(7);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });

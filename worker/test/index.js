@@ -39,3 +39,5 @@ import "./api-contract.test.js";
 import "./follows.test.js";
 import "./follow-management.test.js";
 import "./follow-outbox.test.js";
+
+import "./topup-ledger.test.js";
