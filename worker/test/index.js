@@ -37,3 +37,4 @@ import "./settlement-race.test.js";
 import "./api-contract.test.js";
 
 import "./follows.test.js";
+import "./follow-management.test.js";
