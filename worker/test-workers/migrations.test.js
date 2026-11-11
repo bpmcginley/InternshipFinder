@@ -4,6 +4,17 @@ import { applyD1Migrations } from "cloudflare:test";
 import { beforeEach, expect, it } from "vitest";
 
 const baselineName = "0001_baseline.sql";
+const migrationNames = [
+  baselineName,
+  "0002_follow_lifecycle.sql",
+  "0003_follow_digest_outbox.sql",
+  "0007_follow_request_deletion.sql",
+  "0009_follow_scope_progress.sql",
+  "0010_follow_pending_progress.sql",
+  "0012_follow_attempt_progress.sql",
+  "0014_follow_attempt_lookup.sql",
+  "0016_follow_send_budget.sql",
+];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
 const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
@@ -20,7 +31,7 @@ beforeEach(async () => {
   for (const db of databases) {
     await run(
       db,
-      [...tableNames, "d1_migrations"].map((name) => `DROP TABLE IF EXISTS "${name}"`),
+      [...tableNames.toReversed(), "d1_migrations"].map((name) => `DROP TABLE IF EXISTS "${name}"`),
     );
   }
 });
@@ -33,12 +44,14 @@ async function initialize() {
 async function schema(db) {
   const objects = (
     await rows(db, "SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name")
-  ).filter(
-    (row) =>
-      !row.name.startsWith("sqlite_") &&
-      !row.name.startsWith("_cf_") &&
-      row.name !== "d1_migrations",
-  );
+  )
+    .filter(
+      (row) =>
+        !row.name.startsWith("sqlite_") &&
+        !row.name.startsWith("_cf_") &&
+        row.name !== "d1_migrations",
+    )
+    .map((row) => ({ ...row, sql: row.sql?.replaceAll("\r\n", "\n") }));
   const tables = {};
   for (const name of tableNames) {
     tables[name] = {
@@ -51,14 +64,15 @@ async function schema(db) {
 }
 
 it("the deduplicated migration creates the complete legacy schema, including constraints and triggers", async () => {
-  expect(env.TEST_MIGRATIONS.map((migration) => migration.name)).toEqual([baselineName]);
+  expect(env.TEST_MIGRATIONS.map((migration) => migration.name)).toEqual(migrationNames);
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(42);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(22);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(6);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(51);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(28);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(10);
+  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 
 async function historicalRows(db) {
@@ -109,7 +123,7 @@ it("historical account and inviter backfills match the legacy path and fixed-dat
   expect(await backfillRows(env.MIGRATION_DB)).toEqual(expected);
   await initialize();
   for (const db of databases) expect(await backfillRows(db)).toEqual(expected);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 
 async function triggerOutcomes(db) {
@@ -189,5 +203,5 @@ it("migration bookkeeping skips an applied baseline and rolls back a failed migr
       "SELECT name FROM sqlite_schema WHERE name='migration_failure_probe'",
     ),
   ).toEqual([]);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });

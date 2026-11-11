@@ -54,12 +54,35 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 - **Follow capture and writer ownership:** Refactor WP-6.1.5 [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) merged as `997cfd6d`. [Pages 42969039657](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039657) and its matching deployment succeeded. The data ref pointed to strict-clean seed `2e3f1c5b`, and the refactor lead confirmed the live index matched it. The first automatic writer [42969039608](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039608) was still running at this checkpoint. The seven-day clean-run observation gate remains. Follow publication and sending stay dormant.
 - The shared digest budget and atomic top-up deletion hook each passed nine checks and independent review. The next digest attempt and active-checkout recovery slices are under implementation in separate dormant branches. [#302](https://github.com/bpmcginley/InternshipFinder/pull/302), [#303](https://github.com/bpmcginley/InternshipFinder/pull/303), [#310](https://github.com/bpmcginley/InternshipFinder/pull/310), [#311](https://github.com/bpmcginley/InternshipFinder/pull/311)
 
+## P-2.1k dormant attempt finalization
+
+[Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286) is based on exact #281 `e5191571`. Guarded snapshot attempts require valid current pending progress before taking a daily marker; accepted/uncertain durable attempts finalize only exact surviving generations before pending erasure. Pre-attempt cancellation advances nothing; post-attempt partial deletion becomes uncertain for snapshot jobs, while full deletion cascades and standalone compatibility is retained. Migration 0012/legacy parity, 417 Node tests, 51 actual local Workers/D1 tests and lint pass; final focused deletion/rollback checks also pass. [Contract and limits](P-2.1k-follow-finalization.md). Invalid data never authorizes guessed progress or extended retention. Independent review/fresh CI and owner integration remain pending; needs-bruce, no send/producer/cron/deploy.
+
+## P-2.1l dormant empty-window progress
+
+[Draft #295](https://github.com/bpmcginley/InternshipFinder/pull/295) is based on exact #286 `c4e245dd`. A validated complete window with no matching roles advances the unchanged confirmed scopes atomically. The same full-set generation and watermark check used for enqueue protects the write. Live jobs and unresolved send attempts keep their existing progress. Migration `0014` adds a partial subscriber index for the unresolved-attempt check. A retry after an ambiguous commit can read the already-advanced window. Owner integration and the producer, dispatch and deployment gates remain pending.
+
+## P-2.1m dormant pinned digest preparation
+
+[Draft #298](https://github.com/bpmcginley/InternshipFinder/pull/298) is based on exact #295 `a1f3c19c`. Preparation loads only the queued public snapshot pin, verifies exact bytes and matched role references, and rechecks the live lease after loading. The loader receives no address or link. The actual sender still needs a fresh guarded attempt. The producer, transport, owner integration and deployment remain pending.
+
+## P-2.1n dormant shared follow send budget
+
+[Draft #302](https://github.com/bpmcginley/InternshipFinder/pull/302) is based on exact #298 `e9a5a857`. Migration 0016 and equivalent legacy schema add one shared UTC-day attempt count with an explicit cap and monotonic clock fence. Local 424 Node and 60 D1 tests pass. Independent review, fresh CI, owner cap/quota, parent integration and deployment remain pending. [Contract](P-2.1n-follow-send-budget.md). No sender or outbox binding.
+
+## P-2.1o dormant budgeted digest attempt
+
+[Draft #310](https://github.com/bpmcginley/InternshipFinder/pull/310) is based on exact #302 `4456afbc`. One D1 batch binds exact snapshot consent and lease, existing daily marker, durable attempt and shared cap. Cap denial preserves a reclaimable pre-attempt lease without debit or marker. Independent review and fresh CI remain pending. [Contract](P-2.1o-budgeted-attempt.md). No transport, route or deployment.
+
 ## Package tracker
 
 Queued means not started, not approved for release. A dash means no branch or PR has been created. Split parts of a package get separate rows and PRs when ownership or approval differs.
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| D | P-2.1z Archive-qualified subscriber batch | Product lead | `codex/product-p2.1z-archive-batch` | [#354](https://github.com/bpmcginley/InternshipFinder/pull/354) | Draft needs-bruce | Bounded confirmed-subscriber lookup and one verified archive read per page. 466 Node and 85 local Workers tests passed. Independent review, hosted checks, owner integration and activation pending. |
+| D | P-2.1u Archive-qualified follow enqueue | Product session | `codex/product-p2.1u-qualified-enqueue` | [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) | Draft needs-bruce | Dormant single-subscriber composition on #330. Uses verified archive coverage, fresh Worker time and a D1 write-time cutoff. No scheduler or sender. |
+| D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
 | 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged; Pages green | Independent review and all CI passed; Pages 42865303436. |
 | 0 | P-0.2 Counter names | Refactor lead (integration) | `codex/product-p0.2-counters` | [#175](https://github.com/bpmcginley/InternshipFinder/pull/175) | Merged; disclosure published; owner deploy pending | Approved disclosure [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) published as `ab86541e`; Pages 42933686331 and exact backend succeeded. Worker deployment remains an owner action; none performed by this session. |
 | 0 | P-0.2 Counter disclosure | audit_growth_generated | `codex/product-p0.2-disclosure` | [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) | Merged; published | Merge `ab86541e`; independent review/all nine checks passed. Pages 42933686331 passed build/deploy/notify and exact-commit backend succeeded. Approved conditional disclosure is live; worker deployment remains owner-controlled. |
@@ -203,10 +226,24 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
+
+P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
+
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | Follow archive subscriber batch | [#354](https://github.com/bpmcginley/InternshipFinder/pull/354) adds an internal confirmed-subscriber batch with explicit bounds and existing queue checks. Scheduling, archive binding, owner integration and deployment remain pending. | Draft needs-bruce |
+| 2026-11-10 | P-2.1o budgeted digest attempt | [#310](https://github.com/bpmcginley/InternshipFinder/pull/310) composes the dormant strict digest claim and shared budget. Parent integration, owner cap and quota, dispatch wiring and deployment remain pending. | Draft needs-bruce, no sending activation |
+| 2026-11-10 | P-2.1n shared follow send budget | [#302](https://github.com/bpmcginley/InternshipFinder/pull/302) adds a dormant UTC-day attempt budget with no configured default. Owner quota verification, cap and existing order-mail reserve, parent integration and deployment remain pending. | Draft needs-bruce, no sending activation |
+| 2026-11-10 | P-2.1m pinned digest preparation | [#298](https://github.com/bpmcginley/InternshipFinder/pull/298), stacked on #295. Preparation proves the pinned public snapshot and current lease. The sender still needs fresh consent and an owner-approved deployment. | Draft needs-bruce |
+| 2026-11-10 | P-2.1l empty-window progress | [#295](https://github.com/bpmcginley/InternshipFinder/pull/295), stacked on #286. Complete empty snapshots can advance exact current scopes without a digest job. Review, CI, parent integration and owner merge remain pending. | Draft needs-bruce |
+| 2026-11-10 | P-2.1k dormant finalization worker merge | [Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286), stacked on #281. Local progress, deletion, rollback, malformed-data and migration tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender or deployment enabled. | - |
+| 2026-11-10 | P-2.1f dormant matching merge | [#255](https://github.com/bpmcginley/InternshipFinder/pull/255), stacked on #243. Pure matching only; review/CI and owner merge needed. Draft public snapshot contract is unpublished; production limits/producer, consent/watermark/queue integration and sending/deployment gates remain pending. | - |
+| 2026-11-10 | P-2.1g scoped follow deletion worker merge | [#261](https://github.com/bpmcginley/InternshipFinder/pull/261) preserves reviewed dormant scoped deletion on requalified #256. Fresh checks and Bruce merge approval remain pending. Routing, disclosure and deployment remain separate. | Open needs-bruce |
+| 2026-11-10 | P-2.1e follow mail envelope worker merge | [#256](https://github.com/bpmcginley/InternshipFinder/pull/256) preserves the reviewed dormant renderer on requalified #243. Fresh checks and Bruce merge approval remain pending. Actual sender, postal address, DKIM, quota and deployment remain operator gates. | Open needs-bruce |
+| 2026-11-10 | P-2.1d one-click unsubscribe worker merge | [#243](https://github.com/bpmcginley/InternshipFinder/pull/243) is a dormant handler stacked on #229. Parent integration preserves the reviewed handler. Fresh checks and Bruce merge approval remain pending. | Open needs-bruce |
 | 2026-11-11 | Employer posting-key mapping | [#336](https://github.com/bpmcginley/InternshipFinder/pull/336) `4e2d3eff` passed independent review and nine checks. The proposed mapping includes direct organic links for closed dashboard listings that retain a posting link, with a 256 KiB uncompressed catalog limit. The exact design awaits approval. | Mapping decision pending |
 | 2026-11-11 | Follow queue integration | [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) `f5dc2f90` passed exact review and all nine checks. Queue integration still requires an approved archive binding and operator release. The one-click unsubscribe security review hold [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) remains. | Owner integration pending |
 | 2026-11-11 | Checkout session and URL fences | [#342](https://github.com/bpmcginley/InternshipFinder/pull/342) `a5e67e58` is ready with exact review and all nine checks. [#345](https://github.com/bpmcginley/InternshipFinder/pull/345) `f66812e9` passed independent integration review and combined local suites. The purchased-run lifecycle proposal [#294](https://github.com/bpmcginley/InternshipFinder/pull/294) `1a954039` is mergeable with byte-identical wording and awaits exact approval. | Owner policy and integration pending |

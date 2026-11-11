@@ -688,3 +688,217 @@ CREATE TABLE IF NOT EXISTS employer_campaign_reports (
 CREATE INDEX IF NOT EXISTS employer_campaign_reports_order ON employer_campaign_reports (order_id);
 CREATE INDEX IF NOT EXISTS employer_campaign_reports_due
   ON employer_campaign_reports (state, next_attempt_at, sending_until);
+
+-- Dormant P-2.1a storage: no route, cron or sending path uses these tables yet.
+CREATE TABLE IF NOT EXISTS follow_subscribers (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  created TEXT NOT NULL,
+  confirmed_at TEXT,
+  last_sent_at TEXT
+);
+CREATE TABLE IF NOT EXISTS follow_subscriptions (
+  subscriber_id TEXT NOT NULL REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  scope_key TEXT NOT NULL,
+  created TEXT NOT NULL,
+  confirmed_at TEXT,
+  owner_user_hash TEXT,
+  PRIMARY KEY (subscriber_id, scope_key)
+);
+CREATE INDEX IF NOT EXISTS follow_subscriptions_owner ON follow_subscriptions (owner_user_hash);
+CREATE TABLE IF NOT EXISTS follow_tokens (
+  token_hash TEXT PRIMARY KEY,
+  subscriber_id TEXT NOT NULL REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  -- Management is reserved for the approved next slice; no management helper exists yet.
+  purpose TEXT NOT NULL CHECK (purpose IN ('confirm', 'manage', 'unsubscribe')),
+  scope_key TEXT NOT NULL,
+  generation TEXT NOT NULL,
+  expires_at TEXT,
+  owner_user_hash TEXT,
+  CHECK ((purpose = 'confirm' AND scope_key != '') OR (purpose != 'confirm' AND scope_key = '')),
+  CHECK ((purpose = 'unsubscribe' AND expires_at IS NULL) OR (purpose != 'unsubscribe' AND expires_at IS NOT NULL)),
+  CHECK (purpose = 'confirm' OR owner_user_hash IS NULL)
+);
+CREATE INDEX IF NOT EXISTS follow_tokens_subscriber ON follow_tokens (subscriber_id, purpose, scope_key);
+
+-- Dormant digest-only queue; no transport, router or cron consumes it yet.
+CREATE TABLE IF NOT EXISTS follow_digest_days (
+  marker TEXT PRIMARY KEY CHECK (length(marker) = 64),
+  expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS follow_digest_outbox (
+  id TEXT PRIMARY KEY,
+  subscriber_id TEXT NOT NULL REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,
+  payload TEXT,
+  created TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('queued','leased','attempting','accepted','uncertain','cancelled')),
+  lease_token TEXT,
+  lease_until TEXT,
+  attempted_at TEXT,
+  accepted_at TEXT,
+  UNIQUE (subscriber_id, day),
+  CHECK ((state IN ('queued','leased','attempting') AND payload IS NOT NULL) OR
+    (state IN ('accepted','uncertain','cancelled') AND payload IS NULL)),
+  CHECK ((state IN ('leased','attempting') AND lease_token IS NOT NULL AND lease_until IS NOT NULL) OR
+    (state NOT IN ('leased','attempting') AND lease_token IS NULL AND lease_until IS NULL))
+);
+CREATE INDEX IF NOT EXISTS follow_digest_outbox_due ON follow_digest_outbox (state, lease_until);
+-- Cancelling every outstanding aggregate is conservative: no removed-scope roles can be sent.
+-- Already accepted mail cannot be recalled. The independent daily marker has no subscriber FK.
+CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
+BEGIN
+  UPDATE follow_digest_outbox SET state='cancelled', payload=NULL, lease_token=NULL, lease_until=NULL
+    WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
+END;
+
+-- Dormant capability for deleting one pending confirmation request.
+CREATE TABLE IF NOT EXISTS follow_request_deletions (
+  token_hash TEXT PRIMARY KEY NOT NULL CHECK (length(token_hash) = 64),
+  confirm_hash TEXT NOT NULL UNIQUE REFERENCES follow_tokens(token_hash) ON DELETE CASCADE
+);
+
+-- Only confirmed scopes can be referenced by an outstanding digest.
+DROP TRIGGER IF EXISTS follow_scope_cancel_digest;
+CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
+WHEN OLD.confirmed_at IS NOT NULL
+BEGIN
+  UPDATE follow_digest_outbox SET state='cancelled', payload=NULL, lease_token=NULL, lease_until=NULL
+    WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
+END;
+
+-- Dormant matching prerequisites. Progress belongs to exactly one confirmed scope lifetime.
+CREATE TABLE IF NOT EXISTS follow_scope_progress (
+  subscriber_id TEXT NOT NULL,
+  scope_key TEXT NOT NULL,
+  scope_generation TEXT NOT NULL UNIQUE,
+  watermark TEXT NOT NULL,
+  PRIMARY KEY (subscriber_id, scope_key),
+  FOREIGN KEY (subscriber_id, scope_key)
+    REFERENCES follow_subscriptions(subscriber_id, scope_key) ON DELETE CASCADE
+);
+
+-- Legacy confirmed scopes have no surviving first-confirmation token. Give each a new opaque
+-- server identity once; preserve the original confirmation instant, including invalid legacy
+-- values that the bounded reader must reject rather than silently repairing or advancing.
+INSERT INTO follow_scope_progress (subscriber_id,scope_key,scope_generation,watermark)
+SELECT s.subscriber_id,s.scope_key,
+  lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' ||
+  lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))),
+  s.confirmed_at
+FROM follow_subscriptions s
+WHERE s.confirmed_at IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM follow_scope_progress p
+  WHERE p.subscriber_id=s.subscriber_id AND p.scope_key=s.scope_key
+);
+
+-- Dormant enqueue metadata; no email, rendered facts or permanent watermark advancement.
+CREATE INDEX IF NOT EXISTS follow_confirmed_scopes
+  ON follow_subscriptions (subscriber_id, scope_key) WHERE confirmed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS follow_active_expiry
+  ON follow_digest_outbox (subscriber_id, expires_at)
+  WHERE state IN ('queued','leased','attempting');
+CREATE TABLE IF NOT EXISTS follow_pending_progress (
+  job_id TEXT PRIMARY KEY NOT NULL REFERENCES follow_digest_outbox(id) ON DELETE CASCADE,
+  snapshot_digest TEXT NOT NULL CHECK (length(snapshot_digest)=64 AND snapshot_digest NOT GLOB '*[^0-9a-f]*'),
+  snapshot_at TEXT NOT NULL CHECK (length(snapshot_at)=24),
+  advances TEXT NOT NULL CHECK (json_valid(advances) AND json_type(advances)='array'
+    AND json_array_length(advances)>0 AND length(CAST(advances AS BLOB))<=32768)
+);
+CREATE TRIGGER IF NOT EXISTS follow_pending_immutable BEFORE UPDATE ON follow_pending_progress
+BEGIN
+  SELECT RAISE(ABORT, 'follow_pending_immutable');
+END;
+-- Existing cancellation, uncertainty, acceptance and expiry paths already erase the payload.
+-- Erase its pending metadata in the same statement; scope watermarks remain recoverable.
+CREATE TRIGGER IF NOT EXISTS follow_pending_terminal AFTER UPDATE OF state ON follow_digest_outbox
+WHEN NEW.state IN ('accepted','uncertain','cancelled')
+BEGIN
+  DELETE FROM follow_pending_progress WHERE job_id=NEW.id;
+END;
+
+-- A bounded validation view, not new retained data. Invalid pending data is never guessed.
+CREATE VIEW IF NOT EXISTS follow_valid_pending AS
+SELECT p.job_id,p.snapshot_at,p.advances
+FROM follow_pending_progress p JOIN follow_digest_outbox o ON o.id=p.job_id
+WHERE length(p.snapshot_digest)=64 AND p.snapshot_digest NOT GLOB '*[^0-9a-f]*'
+  AND length(p.snapshot_at)=24
+  AND strftime('%Y-%m-%dT%H:%M:%fZ',p.snapshot_at,'+0 days')=p.snapshot_at
+  AND length(o.created)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',o.created,'+0 days')=o.created
+  AND p.snapshot_at<=o.created AND length(CAST(p.advances AS BLOB))<=32768
+  AND json_type(p.advances)='array' AND json_array_length(p.advances)>0
+  AND NOT EXISTS (
+    SELECT 1 FROM json_each(p.advances) a
+    WHERE CASE WHEN a.type!='object' THEN 1 ELSE NOT COALESCE(
+      (SELECT COUNT(*) FROM json_each(a.value))=5
+      AND NOT EXISTS (SELECT 1 FROM json_each(a.value) k
+        WHERE k.key NOT IN ('scopeKey','generation','confirmedAt','from','to'))
+      AND json_type(a.value,'$.scopeKey')='text' AND length(json_extract(a.value,'$.scopeKey'))>0
+      AND json_type(a.value,'$.generation')='text'
+      AND length(json_extract(a.value,'$.generation'))=36
+      AND substr(json_extract(a.value,'$.generation'),9,1)='-'
+      AND substr(json_extract(a.value,'$.generation'),14,1)='-'
+      AND substr(json_extract(a.value,'$.generation'),19,1)='-'
+      AND substr(json_extract(a.value,'$.generation'),24,1)='-'
+      AND length(replace(json_extract(a.value,'$.generation'),'-',''))=32
+      AND replace(json_extract(a.value,'$.generation'),'-','') NOT GLOB '*[^0-9a-f]*'
+      AND json_type(a.value,'$.confirmedAt')='text' AND length(json_extract(a.value,'$.confirmedAt'))=24
+      AND strftime('%Y-%m-%dT%H:%M:%fZ',json_extract(a.value,'$.confirmedAt'),'+0 days')=json_extract(a.value,'$.confirmedAt')
+      AND json_type(a.value,'$.from')='text' AND length(json_extract(a.value,'$.from'))=24
+      AND strftime('%Y-%m-%dT%H:%M:%fZ',json_extract(a.value,'$.from'),'+0 days')=json_extract(a.value,'$.from')
+      AND json_type(a.value,'$.to')='text' AND json_extract(a.value,'$.to')=p.snapshot_at
+      AND json_extract(a.value,'$.confirmedAt')<=json_extract(a.value,'$.from')
+      AND json_extract(a.value,'$.from')<=json_extract(a.value,'$.to'),0) END
+  )
+  AND (SELECT COUNT(DISTINCT json_extract(CASE WHEN a.type='object' THEN a.value ELSE '{}' END,'$.scopeKey'))
+    FROM json_each(p.advances) a)=json_array_length(p.advances);
+
+-- Runs before the existing AFTER-state trigger erases pending data. Only durable attempts
+-- can consume a window. Removed/recreated or independently changed lifetimes are untouched.
+CREATE TRIGGER IF NOT EXISTS follow_finalize_attempt BEFORE UPDATE OF state ON follow_digest_outbox
+WHEN OLD.state='attempting' AND NEW.state IN ('accepted','uncertain')
+  AND length(OLD.attempted_at)=24
+  AND strftime('%Y-%m-%dT%H:%M:%fZ',OLD.attempted_at,'+0 days')=OLD.attempted_at
+BEGIN
+  UPDATE follow_scope_progress SET watermark=(
+    SELECT json_extract(a.value,'$.to') FROM follow_valid_pending v,json_each(v.advances) a
+    WHERE v.job_id=OLD.id AND json_extract(a.value,'$.scopeKey')=follow_scope_progress.scope_key
+  ) WHERE (subscriber_id,scope_key) IN (
+    SELECT OLD.subscriber_id,json_extract(a.value,'$.scopeKey')
+    FROM follow_valid_pending v,json_each(v.advances) a WHERE v.job_id=OLD.id
+  ) AND EXISTS (
+    SELECT 1 FROM follow_valid_pending v,json_each(v.advances) a
+    JOIN follow_subscriptions s ON s.subscriber_id=OLD.subscriber_id
+      AND s.scope_key=json_extract(a.value,'$.scopeKey')
+    WHERE v.job_id=OLD.id AND v.snapshot_at<=OLD.attempted_at
+      AND s.scope_key=follow_scope_progress.scope_key
+      AND s.confirmed_at=json_extract(a.value,'$.confirmedAt')
+      AND follow_scope_progress.scope_generation=json_extract(a.value,'$.generation')
+      AND follow_scope_progress.watermark=json_extract(a.value,'$.from')
+  );
+END;
+
+-- No advancement before an attempt. Once claimed, cancellation is uncertain for survivors:
+-- a late provider response cannot be recalled and must not make their window eligible again.
+DROP TRIGGER IF EXISTS follow_scope_cancel_digest;
+CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
+WHEN OLD.confirmed_at IS NOT NULL
+BEGIN
+  UPDATE follow_digest_outbox SET state=CASE WHEN state='attempting' AND EXISTS (SELECT 1 FROM follow_pending_progress WHERE job_id=follow_digest_outbox.id) THEN 'uncertain' ELSE 'cancelled' END,
+    payload=NULL,lease_token=NULL,lease_until=NULL
+    WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
+END;
+
+-- Check one subscriber's unresolved attempts without walking global attempt history.
+CREATE INDEX IF NOT EXISTS follow_attempting_subscriber
+  ON follow_digest_outbox (subscriber_id) WHERE state='attempting';
+
+-- One global follow-send attempt count for the UTC day of the latest observed time.
+CREATE TABLE IF NOT EXISTS follow_send_budget (
+  slot INTEGER PRIMARY KEY CHECK(slot=1),
+  observed_at TEXT NOT NULL CHECK(length(observed_at)=24
+    AND strftime('%Y-%m-%dT%H:%M:%fZ',observed_at,'+0 days') IS observed_at),
+  attempts INTEGER NOT NULL CHECK(typeof(attempts)='integer'
+    AND attempts BETWEEN 0 AND 9007199254740991)
+);

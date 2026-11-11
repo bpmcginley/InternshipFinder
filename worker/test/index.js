@@ -35,3 +35,17 @@ import "./employer-revenue-cron.test.js";
 import "./settlement-race.test.js";
 // Route documentation and client completeness are checked without changing runtime routing.
 import "./api-contract.test.js";
+
+import "./follows.test.js";
+import "./follow-management.test.js";
+import "./follow-outbox.test.js";
+import "./follow-unsubscribe.test.js";
+import "./follow-mail.test.js";
+import "./follow-request-deletion.test.js";
+import "./follow-progress.test.js";
+import "./follow-enqueue.test.js";
+import "./follow-send-budget.test.js";
+import "./follow-budgeted-attempt.test.js";
+import "./follow-finalization.test.js";
+import "./follow-archive-reader.test.js";
+import "./follow-archive-enqueue.test.js";

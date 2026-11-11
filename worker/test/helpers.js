@@ -22,6 +22,11 @@ export function fakeD1() {
     },
     all: async () => ({ success: true, meta: {}, results: sql.prepare(query).all(...params).map((r) => ({ ...r })) }),
     run: async () => {
+      // D1 batch() returns SELECT rows from the same transaction as preceding writes.
+      // Keep the existing write path/changes semantics below unchanged.
+      if (/^\s*SELECT\b/i.test(query)) {
+        return { success: true, meta: { changes: 0 }, results: sql.prepare(query).all(...params).map((r) => ({ ...r })) };
+      }
       const r = sql.prepare(query).run(...params);
       return { success: true, meta: { changes: Number(r.changes) } };
     },
