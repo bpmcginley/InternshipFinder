@@ -105,7 +105,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | Merged | `1754f0c6`. Pages 42942005718 and the exact deployment succeeded. Page-state and file helpers retain imports and safety tests. |
 | 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | [#257](https://github.com/bpmcginley/InternshipFinder/pull/257) | Merged | `86627ff8`. Pages 42943168312 and the exact deployment succeeded. The loaders, state, safety tests and version are unchanged. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
-| 6 | WP-2.2 Design tokens | Unassigned | - | - | Queued | After Phase 3; preserve inlined output and distinct values. |
+| 6 | WP-2.2 Design tokens | wp42_orders | `refactor/wp-2.2-design-tokens` | [#305](https://github.com/bpmcginley/InternshipFinder/pull/305) | In review | Canonical `tokens.css` with five byte-identical generated blocks and CI drift detection. Validates every target before writing and preserves value whitespace. Node 22 site 319 and extension 348, packaging 2, Golden 695. |
 | 6 | WP-5.1 Core modules | Unassigned | - | - | Question | Browser-support decision Q2 precedes implementation. |
 | 6 | WP-5.1 App modules | Unassigned | - | - | Question | After core and Q2; preserve window.IS consumers. |
 | 6 | WP-5.1 Buy modules | Unassigned | - | - | Question | Last, alone; checkout boundary Q3 and unchanged checkout tests. |
