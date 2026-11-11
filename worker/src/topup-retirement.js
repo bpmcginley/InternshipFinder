@@ -74,7 +74,10 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence) {
   if (
     evidence?.status !== "reversal_evidence" ||
     typeof evidence.livemode !== "boolean" ||
-    !/^ch_[A-Za-z0-9_]{1,250}$/.test(evidence.chargeId || "") ||
+    typeof evidence.paymentId !== "string" ||
+    typeof evidence.checkoutId !== "string" ||
+    typeof evidence.currency !== "string" ||
+    !Number.isSafeInteger(evidence.capturedAmount) ||
     evidence.paymentId !== p.payment_id ||
     evidence.checkoutId !== p.checkout_id ||
     evidence.capturedAmount !== p.amount ||
@@ -96,7 +99,11 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence) {
   previous.held = previous.heldDisputeIds.length > 0;
   const decision = decideTopup({ ...evidence, previous });
   if (payment !== paymentHash || checkout !== p.checkout_hash) return { status: "pending" };
-  if (!digest) {
+  if (
+    typeof evidence.chargeId !== "string" ||
+    !/^ch_[A-Za-z0-9_]{1,250}$/.test(evidence.chargeId) ||
+    !digest
+  ) {
     await invalidateTopupRetention(db, paymentHash, p.revision);
     return { status: "pending" };
   }

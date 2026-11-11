@@ -63,6 +63,7 @@ export async function financialEvidenceDigest(snapshot) {
     if (
       value?.status !== "reversal_evidence" ||
       typeof value.livemode !== "boolean" ||
+      ![value.paymentId, value.checkoutId, value.chargeId].every((id) => typeof id === "string") ||
       !/^pi_[A-Za-z0-9_]{1,250}$/.test(value.paymentId || "") ||
       !/^cs_[A-Za-z0-9_]{1,250}$/.test(value.checkoutId || "") ||
       !/^ch_[A-Za-z0-9_]{1,250}$/.test(value.chargeId || "") ||

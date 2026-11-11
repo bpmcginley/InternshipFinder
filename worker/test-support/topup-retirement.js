@@ -550,9 +550,71 @@ export async function retirementStrictJsonFacts(db) {
   assert.equal((await row(db, "topup_retention", initial.key)).history_proven, 0);
   assert.equal((await row(db, "topup_retention", initial.key)).evidence_digest, null);
   const updated = await ready(db);
-  await refresh(db, updated, { created: custom });
-  assert.equal((await row(db, "topup_retention", updated.key)).history_proven, 0);
-  assert.equal((await row(db, "topup_retention", updated.key)).evidence_digest, null);
+  const prior = await row(db, "topup_retention", updated.key);
+  assert.equal((await refresh(db, updated, { created: custom })).status, "retry");
+  assert.deepEqual(await row(db, "topup_retention", updated.key), {
+    ...prior,
+    resolved_at: null,
+    resolved_zero_since: null,
+  });
   const sparse = { ...f.r, history: [, 1] };
   assert.equal(await financialEvidenceDigest(sparse), null);
+}
+
+export async function retirementPrimitiveProviderIds(db) {
+  const f = await ready(db);
+  for (const field of ["paymentId", "checkoutId", "chargeId"])
+    assert.equal(await financialEvidenceDigest({ ...f.r, [field]: [f.r[field]] }), null);
+  const scalarDigest = await financialEvidenceDigest(f.r);
+  assert.match(scalarDigest, /^[a-f0-9]{64}$/);
+  for (const patch of [
+    { chargeId: [f.r.chargeId] },
+    { chargeId: 123 },
+    { chargeId: "bad-charge" },
+    { nested: { created: new Date() } },
+    { nested: { unsupported: () => 1 } },
+  ]) {
+    await age(db, f.key);
+    const previous = await row(db, "topup_retention", f.key),
+      revision = (await readTopupRevision(db, f.key)).revision;
+    assert.equal((await refresh(db, f, patch)).status, "retry");
+    assert.deepEqual(await row(db, "topup_retention", f.key), {
+      ...previous,
+      resolved_at: null,
+      resolved_zero_since: null,
+    });
+    assert.equal((await readTopupRevision(db, f.key)).revision, revision);
+    assert.equal((await retire(db, f, async () => ({ ...f.r, ...patch }))).status, "pending");
+    await refresh(db, f);
+    await age(db, f.key);
+    assert.equal((await retire(db, f, async () => ({ ...f.r, ...patch }))).status, "pending");
+    assert.equal((await row(db, "topup_retention", f.key)).resolved_zero_since, null);
+    assert.equal((await row(db, "topup_claims", f.key)).state, "granted");
+    await refresh(db, f);
+  }
+  await age(db, f.key);
+  const before = await row(db, "topup_retention", f.key);
+  for (const patch of [
+    { paymentId: [f.r.paymentId] },
+    { checkoutId: [f.r.checkoutId] },
+    { livemode: true, chargeId: [f.r.chargeId] },
+  ]) {
+    assert.equal((await refresh(db, f, patch)).status, "retry");
+    assert.equal((await retire(db, f, async () => ({ ...f.r, ...patch }))).status, "pending");
+    assert.deepEqual(await row(db, "topup_retention", f.key), before); // association not established
+  }
+  assert.equal((await retire(db, f)).status, "retired");
+  const unknown = await ready(db);
+  await db
+    .prepare(
+      "UPDATE topup_retention SET history_proven=0,evidence_digest=NULL WHERE payment_hash=?",
+    )
+    .bind(unknown.key)
+    .run();
+  assert.equal((await refresh(db, unknown, { chargeId: [unknown.r.chargeId] })).status, "retry");
+  const unproven = await row(db, "topup_retention", unknown.key);
+  assert.equal(unproven.history_proven, 0);
+  assert.equal(unproven.evidence_digest, null);
+  assert.equal(unproven.resolved_zero_since, null);
+  assert.equal((await retire(db, unknown)).status, "pending");
 }

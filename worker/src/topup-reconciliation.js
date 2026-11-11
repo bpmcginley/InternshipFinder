@@ -1,4 +1,5 @@
 // Dormant existing-purchase storage only; no provider, grant, admission or deletion caller.
+import { referenceHash } from "./topup-ledger.js";
 import { decideTopup } from "./topup-decisions.js";
 import {
   topupFinanciallyResolved,
@@ -43,7 +44,20 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
   try {
     snapshot = structuredClone(snapshot);
   } catch {
-    return { status: "retry" };
+    // Preserve only safe association fields when a nested non-JSON fact cannot clone.
+    const source = snapshot;
+    snapshot = {};
+    for (const key of [
+      "status",
+      "livemode",
+      "paymentId",
+      "checkoutId",
+      "capturedAmount",
+      "currency",
+    ]) {
+      const descriptor = source && Object.getOwnPropertyDescriptor(source, key);
+      if (descriptor && "value" in descriptor) snapshot[key] = descriptor.value;
+    }
   }
   if (!Number.isSafeInteger(revision) || revision < 0 || revision >= Number.MAX_SAFE_INTEGER)
     return { status: "stale" };
@@ -57,6 +71,21 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
     snapshot?.currency !== stored.currency
   )
     return { status: "retry" };
+  const digest = await hashing;
+  // A declared provider observation must never establish resolution from coercible IDs
+  // or non-JSON facts. Only the exact primitive, mode-bound association can clear old age.
+  if (snapshot.status === "reversal_evidence" && !digest) {
+    if (
+      typeof snapshot.livemode === "boolean" &&
+      typeof snapshot.paymentId === "string" &&
+      typeof snapshot.checkoutId === "string" &&
+      typeof snapshot.currency === "string" &&
+      Number.isSafeInteger(snapshot.capturedAmount) &&
+      (await referenceHash("payment", snapshot.livemode, snapshot.paymentId)) === paymentHash
+    )
+      await invalidateTopupRetention(db, paymentHash, revision);
+    return { status: "retry" };
+  }
   // Ignore any caller-supplied previous state. Governing causes remain meaningful even
   // when held units are zero; a future failed-run return must still observe the hold.
   const decision = decideTopup({ ...snapshot, previous: stored.previous });
@@ -105,7 +134,7 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
       paymentHash,
       topupFinanciallyResolved(snapshot, stored.previous),
       topupHistoryProven(snapshot, stored.previous, decision),
-      await hashing,
+      digest,
     ),
   ]);
   return state.meta.changes === 1 && balance.meta.changes === 1 && retention.meta.changes === 1
