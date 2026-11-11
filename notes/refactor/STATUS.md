@@ -71,6 +71,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Page-build logging | wp14_pages_logging | `refactor/wp-1.4-logging-page-build` | [#220](https://github.com/bpmcginley/InternshipFinder/pull/220) | Merged | Merged as `f358eefa`. Pages 42922011172, 42922021386 and backend verified. Plain console output and GitHub annotations preserved. JSON omits the output path. |
 | 4 | WP-1.4 Backend auxiliary logging | wp21_inventory | `refactor/wp-1.4-logging-backend-tools` | [#235](https://github.com/bpmcginley/InternshipFinder/pull/235) | In review | Focus diagnostics and placement success count. Raw JSON, coverage Markdown, CLI usage and GitHub annotations stay unchanged. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
+| 4 | WP-1.4 Growth logging, operator reports | wp42_orders | `refactor/wp-1.4-logging-growth-safe` | [#222](https://github.com/bpmcginley/InternshipFinder/pull/222) | In review | Audience and outreach summaries preserve default output. JSON omits the local outreach path. |
 | 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | In review | Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
 | 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | In review | Every Major and title discovery success summaries only. |
 | 4 | WP-1.4 Growth preview status logging | wp14_logging | `refactor/wp-1.4-logging-growth-status` | [#240](https://github.com/bpmcginley/InternshipFinder/pull/240) | In review | Eight preflight or local-render summaries. Provider and payload paths remain separate. |
@@ -369,6 +370,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Recovery Pages run 42890454209 passed all jobs. JavaScript formatting #189 merged as `da5bc492` after independent final review and all nine checks passed; its Pages run must pass before this retry merges. Integrated its exact source and all tracker evidence by normal merge.
 
+
+## WP-1.4 growth operator diagnostics
+
+- Audited 126 direct print calls in growth production modules at main `14143d37`. Moved the four audience display call sites and the single outreach summary to the shared console helper. The weekly report consumes `audience.tiers()` directly, and the outreach workflow uploads the two draft files from its output directory. Neither reads the operator console lines.
+- Plain output preserves the report's tier order, blank lines, summary and stdout. JSON mode formats the same audience counts and published major labels, and removes the local outreach destination. Draft file content and filenames stay the same. Both commands reuse their existing imports for direct script and package entry points.
+- Deferred workflow payloads include the report Markdown, directory monitor JSON, digest schedule GitHub output and metrics JSON. Product owns digest and every-major changes, and WP-2.4 owns the social and Instagram config edits. Credential flow, raw provider error messages and remaining publish/draft diagnostics need separate review before migration.
+- Focused mocked console and existing outreach/report checks passed 28 tests. After normal integration with main `cb0f5f98`, the same checks and public config checks passed 30 tests. Golden matched all 695 files. Ruff correctness and committed-file format checks and Git diff checks passed.
 
 ## WP-1.1 unused local server and review archive
 
