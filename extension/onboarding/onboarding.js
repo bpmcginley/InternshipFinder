@@ -36,6 +36,7 @@ let restoredNote = "";                  // shown above the current step until th
 // dashOffer: the dashboard has offered its own sign-in and the Worker has said it is live (U8).
 let signedIn = null, dashOffer = false;
 let queuedResume = null;
+let signingIn = false;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (sel) => main.querySelector(sel);
 
@@ -326,14 +327,20 @@ function signInRow() {
 // `done(error)` runs after the attempt, with "" when it worked.
 function wireSignIn(box, done) {
   box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
+    if (signingIn) return;
+    signingIn = true;
     box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
     const dash = b.dataset.signin === "dashboard";
     busy(box.querySelector(".signin-msg"), dash ? "Checking that sign-in…" : "Waiting for the sign-in window…");
     const r = await chrome.runtime.sendMessage(dash ? { type: "auth:accept_offer" } : { type: "auth:signin", provider: b.dataset.signin }).catch((e) => ({ error: e.message }));
+    signingIn = false;
     if (dash) dashOffer = false;   // used once, whichever way it went
     if (r && !r.error && r.signedIn) signedIn = true;
     drawSteps();
     done(r && r.error ? r.error : "");
+    // Setup's reply can arrive after the student has already returned to Resume.
+    if (step === "files" && box.id !== "files-signin") drawFilesSignIn();
+    if ($("#extract")) $("#extract").disabled = !canReadResume();
   }));
 }
 
@@ -357,7 +364,6 @@ async function refreshSignIn() {
   if (step === "setup" && $("#acct")) fillAccount();
   drawFilesSignIn();
   if ($("#extract")) $("#extract").disabled = !canReadResume();
-  readQueuedResume();
 }
 
 // The dashboard's offer usually arrives just after this page opens (the install opens this page and
@@ -379,9 +385,9 @@ function drawFilesSignIn(msg = "") {
   box.innerHTML = `<p class="small" style="margin:12px 0 8px"><b>Sign in to read your resume.</b> Any Google account or personal Microsoft account works.</p>${signInRow()}`
     + (msg ? `<p class="small err" style="margin:8px 0 0">${esc(msg)}</p>` : "");
   wireSignIn(box, (err) => {
+    if (step !== "files") return;
     if (err || !signedIn) { drawFilesSignIn(err || ""); return; }
     drawFilesSignIn();
-    if ($("#extract")) $("#extract").disabled = !canReadResume();
     if (readAfterSignIn(S, { extracting, pending: !!pendingResumeImport })) extract($("#extract"), $("#exout")).catch((e) => { const f = $("#ferr"); if (f) f.textContent = e.message || String(e); });
   });
 }
@@ -406,7 +412,7 @@ async function fillSpending() {
 
 // ---------- 2. files ----------
 const canReadResume = () =>
-  !!S.files.resume && !extracting && hasKey(S) && (!isWorker(S.ai) || signedIn === true);
+  !!S.files.resume && !extracting && !signingIn && hasKey(S) && (!isWorker(S.ai) || signedIn === true);
 
 function readQueuedResume() {
   if (!queuedResume || queuedResume !== S.files.resume || !$("#extract") || !canReadResume()) return;
@@ -646,9 +652,12 @@ async function extract(btn, out) {
   if (out) busy(out, "Reading your resume… (about 30 seconds)");
   // The file this read is about. A different resume chosen while it runs is read straight after (below),
   // and "Last read" names the file that was read, not whichever one is chosen when the answer comes back.
-  const file = S.files.resume;
+  const currentStore = S, revision = seenRestore, file = S.files.resume;
+  const stillCurrent = async () => (await restoredAt()) === revision && S === currentStore &&
+    S.files.resume?.b64 === file.b64 && S.files.resume?.name === file.name;
   try {
     await save(true);
+    if (!(await stillCurrent())) return;
     const content = [docBlock(file, "Resume"), docBlock(S.files.cv, "CV")].filter(Boolean);
     if (!content.length) throw new Error("Couldn't read the resume file. Try a PDF.");
     content.push({ type: "text", text: `Extract this applicant's details as JSON only, no commentary. Use "" or [] when unknown; never guess.
@@ -661,7 +670,7 @@ async function extract(btn, out) {
 Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.` });
     const r = await ai({ model: M().deep, max_tokens: 12000, thinking: { type: "adaptive" }, messages: [{ role: "user", content }] });
     const x = jsonOf(r);
-    if (S.files.resume?.b64 !== file.b64 || S.files.resume?.name !== file.name) return;
+    if (!(await stillCurrent())) return;
     const p = S.profile, plan = planResumeImport(p, x, { legacyResume: !!S.settings.extracted_from });
     if (plan.some((e) => e.conflict)) {
       pendingResumeImport = { file, plan };

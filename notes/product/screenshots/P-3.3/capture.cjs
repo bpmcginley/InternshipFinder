@@ -60,7 +60,9 @@ async function capture(browser, width, colorScheme) {
           if (type === "auth:offer_status") return { waiting: false };
           if (type === "held:get") return { jobs: [] };
           if (type === "auth:signin") {
+            const finish = new Promise((resolve) => { window.evidence.releaseSignIn = resolve; });
             await set({ "internscout.session": { token: "iss_fixture", expires: "2099-01-01T00:00:00Z" } });
+            await finish;
             return { signedIn: true };
           }
           unexpected.push(type);
@@ -77,6 +79,10 @@ async function capture(browser, width, colorScheme) {
       if (payload.task !== "deep_dive" || !options.body.includes(fixture))
         throw new Error("Unexpected resume request");
       calls.push(payload.task);
+      if (window.evidence.holdNextRead) {
+        window.evidence.holdNextRead = false;
+        await new Promise((resolve) => { window.evidence.releaseRead = resolve; });
+      }
       const text = JSON.stringify({
         facts: { first_name: "Avery", last_name: "Example", email: "avery@example.invalid" },
         education: [{ school: "Sample University", major: "Computer Science" }],
@@ -95,7 +101,11 @@ async function capture(browser, width, colorScheme) {
   const url = "http://127.0.0.1:8765/extension/onboarding/onboarding.html";
   await page.goto(url);
   const shot = async (scenario) => {
-    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      window.scrollTo({ top: 0, behavior: "instant" });
+      await new Promise(requestAnimationFrame);
+    });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: path.join(__dirname, `${phase}-${width}-${colorScheme}-${scenario}.png`), fullPage: true });
   };
@@ -112,6 +122,11 @@ async function capture(browser, width, colorScheme) {
   assert.deepEqual(await page.evaluate(() => evidence.calls), []);
   if (!before) assert.equal(await page.locator("#extract").isEnabled(), false);
   await signIn.press("Enter");
+  await page.waitForFunction(() => typeof evidence.releaseSignIn === "function");
+  if (!before) await signIn.waitFor({ state: "hidden" });
+  assert.deepEqual(await page.evaluate(() => evidence.calls), []);
+  if (!before) assert.equal(await page.locator("#extract").isEnabled(), false);
+  await page.evaluate(() => evidence.releaseSignIn());
   await page.getByRole("button", { name: "Turn on Auto-Apply now" }).waitFor();
   assert.deepEqual(await page.evaluate(() => evidence.calls), ["deep_dive"]);
   if (!before) await page.getByRole("heading", { name: "Review your resume details" }).waitFor();
@@ -131,6 +146,41 @@ async function capture(browser, width, colorScheme) {
     }));
     await page.goto(url);
     await page.getByRole("heading", { name: "Review", exact: true }).waitFor();
+    if (width === 375 && colorScheme === "dark") {
+      await page.locator('[data-step="files"]').click();
+      await page.evaluate(() => { evidence.holdNextRead = true; });
+      await page.locator("#extract").click();
+      await page.waitForFunction(() => typeof evidence.releaseRead === "function");
+      await page.evaluate(async () => {
+        const store = structuredClone(evidence.data.store);
+        store.profile.facts.first_name = "Restored";
+        store.settings.resume_details_ready = true;
+        store.settings.resume_import = null;
+        await evidence.set({
+          store,
+          "internscout.restored": { at: "2026-11-11T02:00:00Z", updated: "2026-11-11T01:59:00Z", shown: false },
+        });
+      });
+      await page.getByRole("heading", { name: "Review", exact: true }).waitFor();
+      await page.evaluate(() => evidence.releaseRead());
+      await page.waitForTimeout(100);
+      const restored = await page.evaluate(() => evidence.data.store);
+      assert.equal(restored.profile.facts.first_name, "Restored");
+      assert.equal(restored.settings.resume_import, null);
+      assert.equal(restored.settings.resume_details_ready, true);
+      await page.evaluate(async () => {
+        delete evidence.releaseSignIn;
+        await evidence.set({ "internscout.session": undefined });
+      });
+      await page.locator('[data-step="setup"]').click();
+      await page.locator('#acct [data-signin="google"]').press("Enter");
+      await page.waitForFunction(() => typeof evidence.releaseSignIn === "function");
+      await page.locator('[data-step="files"]').click();
+      assert.equal(await page.locator("#extract").isEnabled(), false);
+      await page.evaluate(() => evidence.releaseSignIn());
+      await page.waitForFunction(() => !document.querySelector("#extract").disabled);
+      assert.deepEqual(await page.evaluate(() => evidence.calls), ["deep_dive"]);
+    }
   }
   assert.deepEqual(await page.evaluate(() => evidence.unexpected), []);
   assert.deepEqual(unexpected, []);
