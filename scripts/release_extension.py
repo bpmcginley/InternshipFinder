@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import package_extension
+import profile_bridge
 
 
 def write_record(paths: list[Path], source_commit: str, output: Path) -> dict:
@@ -34,11 +35,15 @@ def main() -> None:
         raise SystemExit(
             "Refusing a release record from modified tracked source; commit the candidate first."
         )
+    bridge_inputs = [profile_bridge.SOURCE.as_posix(), profile_bridge.GENERATOR.as_posix()]
     tracked = set(
         subprocess.check_output(
-            ["git", "ls-files", "-z", "--", "extension"], cwd=root, text=True
+            ["git", "ls-files", "-z", "--", "extension", *bridge_inputs], cwd=root, text=True
         ).split("\0")
     )
+    for path in bridge_inputs:
+        if path not in tracked:
+            raise SystemExit(f"Refusing untracked package input: {path}")
     for path in package_extension.EXT.rglob("*"):
         if path.is_file() and package_extension.included(path.relative_to(package_extension.EXT)):
             if path.relative_to(root).as_posix() not in tracked:
