@@ -75,10 +75,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Merged as `9ea5bc0a` after review and CI. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | - | Prepared locally | File move based on Worker config #223. Open after #223 merges. |
-| 4 | WP-4.2 Orders split, mail templates | wp42_orders | `refactor/wp-4.2-orders-templates` | - | Prepared locally | Plain-text file move based on field capacity. Open after the capacity PR merges. |
-| 4 | WP-4.2 Orders split, review HTML and records | wp42_orders | `refactor/wp-4.2-orders-review-records` | - | Prepared locally | Move the review HTML helpers and record readers after the mail-template PR merges. |
-| 4 | WP-4.2 Orders split, paid settlement | wp42_orders | `refactor/wp-4.2-orders-settlement` | - | Prepared locally | Move the paid block after review HTML and record readers merge. |
-| 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
+| 4 | WP-4.2 Orders split, remaining seams and tests | wp42_orders | `refactor/wp-4.2-orders-delivery` | - | Prepared locally | Combined file moves for mail templates, review helpers, readers, settlement, checkout, review, refunds and cron. Open after field capacity merges. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
 | 5 | WP-3.3 Near family | Unassigned | - | - | Queued | Serial family PR; data/render split without output changes. |
@@ -491,3 +488,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Move the complete paid block to `orders/settlement.js`. Its Stripe helper is read at call time and `billing.js` still calls `listingEvent` through `orders.js`. The legacy module exports the same 39 names and keeps the physical terms literals.
 - Byte comparison against `c23bce4e` matched the entire paid block and all other orders.js bytes outside import and export wiring. Existing SQL, call order, idempotency keys, notifications, cron callbacks and handler behavior are preserved.
 - Node 22.23.4 passed all 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
+
+## WP-4.2 remaining order modules and test split
+
+- Combined the prepared mail templates, review HTML and records, and settlement moves with isolated commits for shared access, checkout, review decisions, credits/refunds and cron. The facade keeps its original 39 exports, physical terms literals, configuration and gate entry points. Checkout reads the terms bindings only when called. Billing imports remain lazy through the existing live bindings.
+- Compared all 104 declarations from the pre-capacity `orders.js` at `05dd42cf` with their current locations. Every original declaration body matched byte-for-byte. All module references resolve, and the checkout, settlement, review, refund and cron SQL, mail, provider and idempotency order remains in the original function bodies.
+- The original Node test entry point imports four consecutive case files in their old registration order, with the original shared fixtures. All 43 test bodies match after accounting for one relative dynamic import path, which still resolves to the same Worker entry point. The shared Node/D1 settlement race is unchanged.
+- Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics. Worker deployment remains with Bruce.
