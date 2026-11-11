@@ -60,6 +60,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | D | P-3.1 Limit card | Unassigned | - | - | Waiting for WP-5.2 | Preserve cap markers through the refactor before implementation; no worker contract approved. Extension merge/release remains needs-bruce. |
 | D | P-3.2 Review ask | mylist_review | `codex/product-p3.2-review-ask` | [#212](https://github.com/bpmcginley/InternshipFinder/pull/212) | Reviewed; ready; needs-bruce | Final cd20fa36: all nine CI checks, independent review, 348 Node22 tests, 16 focused cases, two packaging checks and 40 synthetic screenshots pass. Prior decisions retained; no protected-source/permission/version change or release. |
 | D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
+| D | P-2.1u Archive-qualified follow enqueue | Product session | `codex/product-p2.1u-qualified-enqueue` | [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) | Draft needs-bruce | Dormant single-subscriber composition on #330. Uses verified archive coverage, fresh Worker time and a D1 write-time cutoff. No scheduler or sender. |
 | E | P-2.4 Cross-device list | Unassigned | - | - | Waiting for observation | P-1.4 live for two weeks, approved design/privacy, then build. |
 | E | P-3.3 Resume first | Unassigned | - | - | Waiting for refactor | After WP-5.2; needs-bruce. |
 | E | P-3.4 Practice form | Unassigned | - | - | Verification | Stop if a new host permission is needed; needs-bruce for extension. |
@@ -145,6 +146,8 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 ## Waiting for Bruce
 
 P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
+
+P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
 

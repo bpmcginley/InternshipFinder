@@ -297,7 +297,13 @@ export function createFollowArchiveReader({
           if (now() >= followInstant(entry.enqueue_until)) fail();
           if (effectiveLower > entry.generated_at) return unavailable();
           if (effectiveLower < snapshot.covers_after) return { status: "gap" };
-          return { status: "ready", at: entry.generated_at, digest: entry.sha256, bytes };
+          return {
+            status: "ready",
+            at: entry.generated_at,
+            enqueueUntil: entry.enqueue_until,
+            digest: entry.sha256,
+            bytes,
+          };
         })) ?? unavailable()
       );
     },
