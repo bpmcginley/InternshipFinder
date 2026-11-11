@@ -582,6 +582,58 @@
     return on;
   }
 
+  // Native disclosure also works in the static header without JavaScript.
+  function SiteNav({ children }) {
+    const root = useRef(null), lastFocus = useRef(null);
+    useEffect(() => {
+      const box = root.current, details = box.querySelector("details"), summary = box.querySelector("summary");
+      const mq = window.matchMedia("(max-width: 760px)");
+      const resize = () => {
+        const active = document.activeElement === document.body ? lastFocus.current : document.activeElement;
+        if (!mq.matches) {
+          details.open = false;
+          if (active === summary) box.querySelector("nav a").focus();
+        } else if (!details.open && box.querySelector("nav").contains(active)) summary.focus();
+      };
+      const outside = event => {
+        if (!box.contains(event.target)) lastFocus.current = null;
+        if (!details.open || box.contains(event.target)) return;
+        if (box.contains(document.activeElement)) summary.focus({ preventScroll: true });
+        details.open = false;
+      };
+      mq.addEventListener("change", resize);
+      document.addEventListener("pointerdown", outside);
+      return () => { mq.removeEventListener("change", resize); document.removeEventListener("pointerdown", outside); };
+    }, []);
+    return h("div", { className: "site-navigation", ref: root,
+      onFocus: event => { lastFocus.current = event.target; },
+      onKeyDown: event => {
+        const details = root.current.querySelector("details");
+        if (event.key === "Escape" && details.open) {
+          details.open = false; root.current.querySelector("summary").focus(); event.stopPropagation();
+        }
+      },
+      onBlur: event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          // A breakpoint can hide the focused control before its change event fires.
+          if (event.relatedTarget || event.target.getClientRects().length) lastFocus.current = null;
+          root.current.querySelector("details").open = false;
+        }
+      },
+      onClick: event => {
+        const link = event.target.closest("nav a");
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === "_blank") return;
+        root.current.querySelector("details").open = false;
+        // Same-page links keep their destination focus instead of returning to Menu.
+        const url = new URL(link.href);
+        if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search && url.hash) {
+          const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
+          if (target) target.focus();
+        }
+      }
+    }, h("details", null, h("summary", { "aria-controls": "site-links" }, "Menu")), children);
+  }
+
   // ---------- landing ----------
   // was: function Landing({ open, setOpen, onSetup, hasProfile, nationwide }) {
   // `plans` is the Worker's /config payments.plans, so the prices shown here are the ones Stripe is
@@ -2003,7 +2055,7 @@
         // under them the page's h1 with the pain line and the free search as the first action.
         h("div", { className: "brand" },
           h("a", { className: "mark", href: "/" }, "InternScout"),
-          h("nav", { className: "sitenav", "aria-label": "Site" },
+          h(SiteNav, null, h("nav", { id: "site-links", className: "sitenav", "aria-label": "Site" },
             h("a", { href: "internships/" }, "Browse"),
             // Always shown, like the static nav before the app loads (no flash): /digest/ itself says
             // whether sign-ups are open. was: digestOn && h("a", ...) (review of #123).
@@ -2013,7 +2065,7 @@
             h("a", { href: "compare/" }, "Compare"),
             h("a", { href: "about/" }, "About"),
             // 2026-10-23: was: employers could only find the footer link. Revert: omit this anchor.
-            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns"))),
+            h("a", { href: "employers/", "data-employer-entry": "nav" }, "Hire interns")))),
         // was: one flex row of every control (AI cost, Rescan, profile, sign-in state, allowance, invite,
         // each paid plan, Manage plan, Deep Dive, Queue), which wrapped into a long second line. Now the
         // header keeps the everyday actions and the account details live in the Account menu.
