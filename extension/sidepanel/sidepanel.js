@@ -140,6 +140,9 @@ async function renderQueue(version) {
     } else if (act === "upgrade") {
       const j = jobs.find((x) => x.id === id);
       if (j && j.upgrade) chrome.tabs.create({ url: "https://internscout.org/?upgrade=" + encodeURIComponent(j.upgrade.plan) });
+    } else if (act === "invite") {
+      const j = jobs.find((x) => x.id === id);
+      if (j && j.allowanceLimited) chrome.tabs.create({ url: "https://internscout.org/?out_of_runs=1" });
     } else if (act === "answer") {
       const v = (drafts[id] || "").trim();
       if (!v) return;
