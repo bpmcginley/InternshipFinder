@@ -440,6 +440,38 @@ test("a Worker backoff only waits when another request can follow", async (t) =>
   }
 });
 
+test("cancellation while the final incomplete stream ends preserves the abort reason", async () => {
+  const controller = new AbortController();
+  const reason = new DOMException("User canceled", "AbortError");
+  let calls = 0;
+  const waits = [];
+  await assert.rejects(callWorker({
+    url: "u",
+    token: "t",
+    task: "autofill",
+    signal: controller.signal,
+    fetchImpl: async () => {
+      const response = sse([chunk([{ text: "Incomplete" }])]);
+      if (++calls < 4) return response;
+      const reader = response.body.getReader();
+      return {
+        ...response,
+        body: { getReader: () => ({
+          async read() {
+            const result = await reader.read();
+            if (result.done) controller.abort(reason);
+            return result;
+          },
+        }) },
+      };
+    },
+    sleepImpl: async (ms) => waits.push(ms),
+    ...opts,
+  }), (error) => error === reason);
+  assert.equal(calls, 4);
+  assert.deepEqual(waits, [1500, 3000, 6000]);
+});
+
 test("MAX_TOKENS and a blocked prompt come through a stream unchanged", async () => {
   const long = await callWorker({ url: "u", token: "t", task: "deep_dive", fetchImpl: async () => sse([chunk([{ text: "a" }], { finishReason: "MAX_TOKENS" })]), ...opts });
   assert.equal(long.stop_reason, "max_tokens");

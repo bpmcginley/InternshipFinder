@@ -412,6 +412,7 @@ export async function callWorker({
         if (signal?.aborted || e.name === "AbortError") throw e;
         whole = null;
       }
+      throwIfAborted(signal);
       // A stream that stopped before Gemini said it was finished is a dropped connection, not an
       // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
       if (!whole || (!whole.complete && !whole.promptFeedback)) {
@@ -419,7 +420,6 @@ export async function callWorker({
         if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
         continue;
       }
-      throwIfAborted(signal);
       return fromResponse(whole);
     }
     const data = await res.json().catch((e) => {
