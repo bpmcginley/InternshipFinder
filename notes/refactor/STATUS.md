@@ -98,6 +98,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
 | 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Characterize responses first; financial wrapper changes paused under Q3. |
+| 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | In review | Page-state and file helpers only. All existing imports and safety tests remain valid. |
 | 5 | WP-5.2 Background agent | Unassigned | - | - | Queued | Separate move-only PR; guard and tests untouched; no version bump. |
 | 5 | WP-5.2 Onboarding | Unassigned | - | - | Queued | Separate PR; preserve UI text and reproducible packaging. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
@@ -479,6 +480,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
 - An offline comparison against the original generator matched complete default stdout and stderr after normalizing only the fixture directory. The JSON regression exercises both annotation paths, stderr and path redaction.
 - Focused SEO, placements, distribution, employer entry and golden tests passed (245 total). All 695 golden files matched, including the existing date assertions, and the golden mutation check passed. Ruff passed. Targeted Pyright matched all 12 existing SEO diagnostics by severity, rule and message.
+
+## WP-5.2 first extension leaf moves
+
+- Started from main `067a0337` after Wave 4 checkpoint Pages run 42940952578 and its deployment backend succeeded. Rechecked open Product claims. Product #212 is already merged, and its review behavior stays in the existing extension files.
+- Move the six page-state expressions and five helper functions to `extension/background/page-state.js`. Agent imports and re-exports its four existing public helpers. The facade retains all 35 export names, including the preexisting `domainOf` re-export. Move `toB64`, `readFile` and `docBlock` to `extension/onboarding/files.js`, where Mammoth is still read only when opening a DOCX file.
+- Byte comparison matches both moved blocks apart from two new leaf export keywords and matches all remaining source outside import wiring. All existing extension tests, guard, manifest, background entry point and onboarding loader are byte-identical. This preserves the 14 protected safety tests, MAIN and isolated injection order, and onboarding startup order.
+- Node 22.23.4 passed 348 extension tests, both packaging tests passed, and an offline probe matched PDF, text, DOCX, lazy Mammoth, size and truncation behavior. Both actual ZIP variants reproduced across builds with 53 members each. Compared to main, only the two importing members differ and the two leaf modules are new. Both golden checks passed against 695 expected site files. JavaScript lint reported zero errors or warnings.
 
 ## Orders extraction readiness (read-only)
 
