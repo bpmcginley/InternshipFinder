@@ -15,6 +15,7 @@ Writes: docs/og-preview.png
 
 from io import BytesIO
 from pathlib import Path
+import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -126,6 +127,11 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
 
 
 if __name__ == "__main__":
-    p = build()
-    im = Image.open(p)
-    print(f"{p}  {p.stat().st_size / 1024:.1f} KB  {im.size}")
+    if sys.argv[1:2] == ["--site"]:
+        from internscout.seo_pages import main
+
+        main([sys.argv[0], *sys.argv[2:]], card_renderer=landing_card)
+    else:
+        p = build()
+        with Image.open(p) as im:
+            print(f"{p}  {p.stat().st_size / 1024:.1f} KB  {im.size}")

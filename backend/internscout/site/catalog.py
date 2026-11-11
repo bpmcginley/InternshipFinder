@@ -204,7 +204,10 @@ def emit_kind_and_tracker_pages(
             related_kinds=listing.related_kinds(kind_made, path),
             tracker=tracker,
         )
-        add(**render_kind_page(model))
+        page = render_kind_page(model)
+        if term is not None:
+            page["share_card"] = ("Internships", term)
+        add(**page)
 
     # The trackers themselves (tracker_page), each under its term page in the breadcrumb trail.
     for t in trackers:
@@ -215,7 +218,8 @@ def emit_kind_and_tracker_pages(
         # The roles of the employers listed, one per role (was: len(unique_roles(items)), which also
         # counted rows whose employer name is not a name, real_company).
         t_, d_, h_, b_ = tracker_page(t, rows, sum(r[4] for r in rows), now, updated, term_path)
-        add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_, dated=items)
+        add(path, t_, d_, h_, [root, (term_path, t), (path, "Who’s open now")], b_,
+            dated=items, share_card=("Who is open now", t))
 
 
 def emit_near_and_new_pages(

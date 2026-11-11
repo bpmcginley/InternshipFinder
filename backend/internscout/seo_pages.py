@@ -30,6 +30,7 @@ import sys
 from collections import Counter
 from statistics import median
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import quote, urlparse
 
 from . import feeds, near_metros, page_dates, role_index, seo_role_details, widget_data
@@ -49,6 +50,7 @@ from .site import near as _near
 from .site import numbers as _numbers
 from .site import paid as _paid
 from .site import pay as _pay
+from .site import share_cards as _share_cards
 from .site import source as _source
 from .site import taxonomy as _taxonomy
 from .site.render import digest as _render_digest_module
@@ -1376,12 +1378,13 @@ def today_utc() -> str:
 
 
 
-def write(site_dir: str, pages: list[dict]) -> None:
+def write(site_dir: str, pages: list[dict], *, share_views: str = "") -> None:
+    home_body = HOME + share_views
     # 2026-10-23: date real visible changes, including corrections and closures, after all page
     # decisions. was: only max(first_seen, live lastmod); see page_dates for the one-line revert.
     now = GENERATED or datetime.now(timezone.utc)
     content_dates, home_lastmod = page_dates.refresh(
-        site_dir, pages, now, HOME, HOME_START, HOME_END, LISTINGS, home_floor=HOME_LIVE_DATE
+        site_dir, pages, now, home_body, HOME_START, HOME_END, LISTINGS, home_floor=HOME_LIVE_DATE
     )
     for p in pages:
         folder = os.path.join(site_dir, p["path"].strip("/").replace("/", os.sep))
@@ -1430,7 +1433,7 @@ def write(site_dir: str, pages: list[dict]) -> None:
             text = f.read()
         start, end = text.find(HOME_START), text.find(HOME_END)
         if 0 <= start < end:
-            text = text[: start + len(HOME_START)] + HOME + text[end:]
+            text = text[: start + len(HOME_START)] + home_body + text[end:]
             with open(home, "w", encoding="utf-8", newline="") as f:
                 f.write(text)
 
@@ -1455,7 +1458,7 @@ def held_paths(listing: str) -> frozenset[str]:
 
 
 
-def main(argv: list[str]) -> None:
+def main(argv: list[str], *, card_renderer: _share_cards.Renderer | None = None) -> None:
     """python -m internscout.seo_pages SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
     [--placements-report PATH]
 
@@ -1508,7 +1511,11 @@ def main(argv: list[str]) -> None:
                 print("::warning::placements report not written")
         pages = add_paid_boxes(pages, kept, today)
         console(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
-    write(site_dir, pages)
+    if card_renderer is None:
+        write(site_dir, pages)
+    else:
+        pages = _share_cards.publish(Path(site_dir), pages, SITE, card_renderer)
+        write(site_dir, pages, share_views=_share_cards.dashboard_views(pages))
     # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
     # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.
     shards = role_index.write(site_dir, LISTINGS, GENERATED or datetime.now(timezone.utc), today)

@@ -27,4 +27,5 @@ data/roles/(index|[a-z0-9_])\.json
 404\.html
 (sitemap\.xml|robots\.txt|llms(-full)?\.txt|noindex-pages\.txt)
 internships/([a-z0-9-]+/)*(index\.html|feed\.xml)
+internships/[a-z0-9-]+/([a-z0-9-]+/)?share\.png
 (about|compare|digest|numbers|pricing)/index\.html

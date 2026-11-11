@@ -21,16 +21,26 @@
     let states = scope.keys;
     if (scope.all) {
       if (!allLoaded) states = first;
-      else if (scope.noRemote) states = indexKeys.filter(key => !remoteKeys.has(key));
+      else if (scope.noRemote) states = indexKeys.filter((key) => !remoteKeys.has(key));
       else states = ["all"];
     }
     if (!states.length) return null;
 
     const field = filters.fields.length <= 1 ? filters.fields[0] || "" : null;
-    if (states.length === 1 && field !== null &&
-        !filters.q.trim() && !filters.company.length &&
-        !filters.new_only && !filters.stage && !filters.year && !filters.sector &&
-        !filters.where && !filters.paid && !filters.hide_citizen && filters.status === "open") {
+    if (
+      states.length === 1 &&
+      field !== null &&
+      !filters.q.trim() &&
+      !filters.company.length &&
+      !filters.new_only &&
+      !filters.stage &&
+      !filters.year &&
+      !filters.sector &&
+      !filters.where &&
+      !filters.paid &&
+      !filters.hide_citizen &&
+      filters.status === "open"
+    ) {
       const path = views[field + "/" + states[0]];
       if (typeof path === "string" && landingPath.test(path)) return new URL(path, origin).href;
     }

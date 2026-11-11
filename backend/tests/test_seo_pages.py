@@ -2482,7 +2482,10 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
         encoding="utf-8",
     ).read()
     assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
-    assert "python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt" in wf
+    assert (
+        "python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt"
+        in wf
+    )
 
 
 # PR #97 follow-up: a page with no state covers every state, so its dashboard link says so; otherwise

@@ -48,6 +48,7 @@ def test_invalid_card_titles_fail_before_publication(heading):
         landing_card(ICON, heading)
 
 
-def test_multiline_term_fails_before_publication():
+@pytest.mark.parametrize("term", ["", " ", " Summer 2027", "Summer 2027\n", "Summer\u20282027"])
+def test_invalid_term_fails_before_publication(term):
     with pytest.raises(ValueError, match="term"):
-        landing_card(ICON, "Finance internships", term="Summer 2027\nFall 2027")
+        landing_card(ICON, "Finance internships", term=term)

@@ -7,7 +7,10 @@ const origin = "https://internscout.org";
 const browser = { window: { addEventListener() {} }, URL, URLSearchParams };
 vm.createContext(browser);
 for (const file of ["core", "share"]) {
-  vm.runInContext(readFileSync(new URL(`../../docs/js/${file}.js`, import.meta.url), "utf8"), browser);
+  vm.runInContext(
+    readFileSync(new URL(`../../docs/js/${file}.js`, import.meta.url), "utf8"),
+    browser,
+  );
 }
 const { landingViews, searchLink } = browser.window.ISShare;
 const { filterParams, filtersFromUrl } = browser.window.IS;
@@ -28,13 +31,22 @@ test("uses only an emitted match for the public field and location", () => {
   assert.equal(link({ fields: ["swe"] }), origin + "/internships/software-engineering/");
   const ma = { all: false, keys: ["MA"], noRemote: false };
   assert.equal(link({}, ma), origin + "/internships/massachusetts/");
-  assert.equal(link({ fields: ["swe"] }, ma), origin + "/internships/software-engineering/massachusetts/");
+  assert.equal(
+    link({ fields: ["swe"] }, ma),
+    origin + "/internships/software-engineering/massachusetts/",
+  );
   assert.equal(new URL(link({ fields: ["finance"] }, ma)).pathname, "/");
 });
 
 test("shares the actual first-state scope and profile-limited regions", () => {
-  assert.equal(new URL(link({}, national, { ...available, allLoaded: false })).searchParams.get("state"), "MA,NY");
-  assert.equal(new URL(link({}, { ...national, noRemote: true })).searchParams.get("state"), "MA,NY");
+  assert.equal(
+    new URL(link({}, national, { ...available, allLoaded: false })).searchParams.get("state"),
+    "MA,NY",
+  );
+  assert.equal(
+    new URL(link({}, { ...national, noRemote: true })).searchParams.get("state"),
+    "MA,NY",
+  );
   assert.equal(link({}, national, { ...available, allLoaded: false, first: [] }), null);
 });
 
