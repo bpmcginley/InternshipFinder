@@ -209,7 +209,7 @@ def _held_paths(listing: str) -> frozenset[str]:
 
 def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) -> None:
     """python -m internscout.site.publish SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
-    [--placements-report PATH] [--employer-postings]
+    [--placements-report PATH] [--employer-postings] [--employer-posting-capture]
 
     --placements PATH (2026-10-14): the Worker's GET /placements answer, which the pages workflow
     fetches only when the repo variable INTERNSCOUT_PLACEMENTS_URL is set and otherwise writes as
@@ -223,8 +223,15 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
 
     --employer-postings explicitly stages the already-selected export and its matching catalog
     before rendering organic annotations from that same captured data. Off by default; it does
-    not enable browser capture or Worker collection. Use a fresh staged export for each build."""
+    not enable browser capture or Worker collection. Use a fresh staged export for each build.
+    --employer-posting-capture additionally marks supported count scripts, only with that staging.
+    It does not configure Worker intake or change any production workflow."""
     argv = list(argv)
+    capture = "--employer-posting-capture" in argv
+    if capture:
+        if argv.count("--employer-posting-capture") != 1 or argv.count("--employer-postings") != 1:
+            raise ValueError("Capture requires exactly one employer publication option")
+        argv.remove("--employer-posting-capture")
     employer_postings = "--employer-postings" in argv
     if employer_postings:
         if argv.count("--employer-postings") != 1:
@@ -304,6 +311,10 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     )
     # The embedded widget needs real per-field coverage, not the dashboard's 60-row preview.
     widget_data.write(site_dir, state.listings, state.generated, _today_utc())
+    if capture:
+        from .employer_capture import stamp
+
+        stamp(Path(site_dir), pages)
     message = f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt"
     if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
         message += f" into {site_dir}"
