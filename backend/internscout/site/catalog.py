@@ -161,6 +161,7 @@ def emit_employer_pages(
             live,
             earning,
             cohort_details if path in cohort_paths() else None,
+            export_stamp=context.export_stamp,
         )
         add(**render_employer_page(model))
 

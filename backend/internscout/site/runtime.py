@@ -1570,6 +1570,7 @@ def listing_body(
     faq: str = "",
     signup: str = "",
     details: dict | None = None,
+    export_stamp: datetime | None = None,
 ) -> str:
     return _render_listing_module.listing_body(
         items,
@@ -1588,6 +1589,7 @@ def listing_body(
         faq,
         signup,
         details,
+        export_stamp=export_stamp,
         per_page=_state().per_page,
         shown=shown,
         summary=summary,
@@ -3113,6 +3115,7 @@ def _select_employer_page(
     live,
     earning: frozenset,
     details: dict[str, tuple[tuple[str, str], ...]] | None,
+    export_stamp: datetime | None = None,
 ) -> _employer.Page:
     main = directory.company_fields[name]
     links = _employer.select_links(
@@ -3148,6 +3151,7 @@ def _select_employer_page(
         own_links=all(own_posting(x) for x in items),
         thin=not employer_indexed(len(items), path, live, earning),
         details=details,
+        export_stamp=export_stamp,
     )
 
 
@@ -3649,7 +3653,10 @@ def build_result(
     _state().baseline = data["baseline"]
     listings = data["listings"]
     _state().listings[:] = listings  # main resolves placements against this existing list object
-    now = _when(data["generated_at"]) or datetime.now(timezone.utc)
+    # The fact line must never turn the build-clock fallback into source evidence.
+    raw_stamp = data["generated_at"]
+    export_stamp = _when(raw_stamp) if isinstance(raw_stamp, str) else None
+    now = _when(raw_stamp) or datetime.now(timezone.utc)
     _state().generated = now
     digest_new, digest_by_field, updated = _build.digest_summary(data, now, _hooks().new_roles, SKIP_FIELDS)
 
@@ -3685,7 +3692,7 @@ def build_result(
         data,
         live,
         earning,
-        _field.Context(("/internships/", "Internships"), now, updated),
+        _field.Context(("/internships/", "Internships"), now, updated, export_stamp),
         digest_new,
         digest_by_field,
         enough,

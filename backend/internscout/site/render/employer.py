@@ -79,6 +79,7 @@ def render_employer_page(
             extra=facts,
             src="seo-employer",
             details=model.details,
+            export_stamp=model.export_stamp,
         ),
         "items": items,
         "kind": "employer",
