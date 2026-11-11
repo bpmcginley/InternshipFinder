@@ -355,6 +355,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
 - All 65 marked tests passed with the root fixtures active, strict marker checking, and the facade and sockets blocked. The full offline backend and growth suite on `b3b3d049` passed 1,865 tests and 11 subtests with eight local or optional skips. After feed defaults [#411](https://github.com/bpmcginley/InternshipFinder/pull/411), the 65 standalone cases, both lazy cases, and 35 combined feed, widget, near-page and Golden checks passed. The Node 22 Worker suite passed all 726 tests.
 
+## WP-6.2 page-date tests
+
+- Page-date tests read the live sitemap before each publishing build and write using that build's canonical state and hooks. Comparison dates and the near-page exception use the existing state settings. The pricing-copy correction uses the existing pricing hook. The numeric page path resolves to the same constant.
+- Offline legacy and canonical runs matched all 39 assertions, all 1,412 ordered page records across 42 builds, 40 sitemap reads and publication snapshots, 811 ordered writes and 428 final fixture files. Each snapshot contained identical sitemap and date-manifest bytes. All 31 cases passed with real root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 134 focused cases included both Golden checks against all 836 artifacts.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
