@@ -70,7 +70,7 @@ export function session(a = attempt()) {
     url: "https://checkout.stripe.com/c/pay/cs_fixture#ephemeral-fixture",
   };
 }
-export const reply = (value) => ({ ok: true, text: async () => JSON.stringify(value) });
+export const reply = (value) => new Response(JSON.stringify(value));
 export async function stripeReservationRoundTrip(db) {
   let posts = 0,
     reads = 0,
