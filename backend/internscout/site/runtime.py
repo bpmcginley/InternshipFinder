@@ -47,6 +47,7 @@ from . import facts as _facts
 from . import field as _field
 from .render import layout as _layout
 from . import listing as _listing
+from . import launch as _launch
 from . import llms as _llms
 from . import near as _near
 from . import numbers as _numbers
@@ -58,6 +59,7 @@ from .render import digest as _render_digest_module
 from .render import employer as _render_employer_module
 from .render import field as _render_field_module
 from .render import listing as _render_listing_module
+from .render import launch as _render_launch_module
 from .render import near as _render_near_module
 from .render import numbers as _render_numbers_module
 from .render import pay as _render_pay_module
@@ -3387,6 +3389,25 @@ def _emit_report_pages(
     )
 
 
+def _emit_launch_pages(add, pages, context, listings, live, earning, employers_in, fold_at):
+    models = _launch.select(
+        listings, pages, live, earning, employers_in=employers_in,
+        indexed=combo_indexed, near_same=near_same, fold_at=fold_at, places=PLACES,
+    )
+    links = []
+    for model in models:
+        rendered = _render_launch_module.render(
+            model, context, field_title=field_title, field_slug=field_slug,
+            state_slug=state_slug, metro_state=METRO_STATE, place_names=US_STATES,
+            dash_link=dash_link, listing_rows=_hooks().listing_rows,
+            autoapply_card=autoapply_card, per_page=_state().per_page,
+            existing_paths={page["path"] for page in pages},
+        )
+        add(**rendered)
+        links.append((model.path, rendered["h1"], len(model.items)))
+    return links
+
+
 def _emit_hubs(
     add: _build.AddPage,
     context: _field.Context,
@@ -3400,6 +3421,7 @@ def _emit_hubs(
     pay_path: str,
     rep: dict | None,
     numbers: bool,
+    launch_links=(),
 ) -> None:
     return _catalog.emit_hubs(
         add,
@@ -3414,6 +3436,7 @@ def _emit_hubs(
         pay_path,
         rep,
         numbers,
+        launch_links=launch_links,
         canada_keys=CANADA_KEYS,
         ca_metro_pages=CA_METRO_PAGES,
         ca_provinces=CA_PROVINCES,
@@ -3655,6 +3678,7 @@ def build_result(
         hubs=_emit_hubs,
         information=_emit_information_pages,
         finish=_finish_build,
+        launch_pages=_emit_launch_pages,
     )
     return _build.assemble(
         site_dir,
