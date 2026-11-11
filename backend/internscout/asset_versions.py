@@ -123,12 +123,12 @@ class _AssetTags(HTMLParser):
 
     def __init__(
         self, root: Path, path: Path, source: str, hashes: dict[Path, str], names: set[str],
-        core_entry: str | None,
+        module_entries: dict[core_graph.Graph, str | None],
     ):
         super().__init__(convert_charrefs=False)
         self.root, self.path, self.source, self.hashes = root, path, source, hashes
         self.names = names
-        self.core_entry = core_entry
+        self.module_entries = module_entries
         self.lines = [0] + [match.end() for match in re.finditer("\n", source)]
         self.edits: list[tuple[int, int, str]] = []
         self.references, self.plaintext = 0, False
@@ -196,14 +196,14 @@ class _AssetTags(HTMLParser):
         if not asset.is_file() or asset.suffix.lower() in {".html", ".htm"}:
             raise AssetVersionError("Local asset must be a non-HTML file")
         logical_name = logical.relative_to(self.root).as_posix()
-        if logical_name == f"{core_graph.SOURCE}/{core_graph.ENTRY}" or core_graph.ENTRY_PATH.fullmatch(
-            logical_name
-        ):
+        graph = next((item for item in self.module_entries if item.is_entry(logical_name)), None)
+        if graph is not None:
+            entry = self.module_entries[graph]
             if tag != "script" or (values.get("type") or "").lower() != "module":
-                raise AssetVersionError("Core entry must be loaded as a module")
-            if "?" in url or "#" in url or self.core_entry is None:
-                raise AssetVersionError("Core entry requires an unqualified graph URL")
-            versioned = self.core_entry
+                raise AssetVersionError(f"{graph.name} entry must be loaded as a module")
+            if "?" in url or "#" in url or entry is None:
+                raise AssetVersionError(f"{graph.name} entry requires an unqualified graph URL")
+            versioned = entry
         else:
             if asset not in self.hashes:
                 self.hashes[asset] = hashlib.sha256(asset.read_bytes()).hexdigest()[:12]
@@ -240,13 +240,20 @@ def version_assets(
         raise AssetVersionError("Select one source of retained Core modules")
     files, names = _site_files(root)
     try:
-        core_entry, modules = core_graph.plan(root, retain_core_from, retain_core_git)
+        history = core_graph.pin_history(retain_core_git) if retain_core_git is not None else None
+        module_entries: dict[core_graph.Graph, str | None] = {}
+        modules: dict[str, bytes] = {}
+        for graph in core_graph.GRAPHS:
+            previous = retain_core_from if graph == core_graph.CORE else None
+            entry, graph_files = core_graph.plan(root, previous, history, graph)
+            module_entries[graph] = entry
+            modules.update(graph_files)
     except core_graph.CoreGraphError as error:
         raise AssetVersionError(str(error)) from None
     hashes, planned, references = {}, [], 0
     for path in files:
         source = path.read_bytes().decode("utf-8")
-        parser = _AssetTags(root, path, source, hashes, names, core_entry)
+        parser = _AssetTags(root, path, source, hashes, names, module_entries)
         parser.feed(source)
         parser.close()
         rewritten = parser.rewritten()
@@ -268,7 +275,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("site_dir", type=Path)
     retention = parser.add_mutually_exclusive_group()
     retention.add_argument("--retain-core-from", type=Path, metavar="DIRECTORY")
-    retention.add_argument("--retain-core-git", type=Path, metavar="REPOSITORY")
+    retention.add_argument(
+        "--retain-core-git", type=Path, metavar="REPOSITORY",
+        help="Retain immutable dashboard graphs from the checked-out Git history",
+    )
     args = parser.parse_args(argv)
     try:
         report = version_assets(args.site_dir, retain_core_from=args.retain_core_from, retain_core_git=args.retain_core_git)
