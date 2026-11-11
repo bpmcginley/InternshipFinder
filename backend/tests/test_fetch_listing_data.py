@@ -162,6 +162,53 @@ class FetchTests(unittest.TestCase):
                 self.assertEqual(marker.read_bytes(), stored)
         self.assertEqual(fetch.install(self.local), latest)
 
+    def test_keyboard_interrupt_after_each_directory_rename_restores_old_snapshot(self):
+        fetch.install(self.local)
+        before = fetch.fingerprint(self.target)
+        marker = self.local / ".git/internscout-public-snapshot.json"
+        stored = marker.read_bytes()
+        latest = self.advance()
+
+        for phase in ("backup", "install"):
+            with self.subTest(phase=phase):
+
+                def interrupt_after_rename(src, dest):
+                    os.replace(src, dest)
+                    if (phase == "backup" and dest.name == "previous") or (
+                        phase == "install" and src.name == "incoming"
+                    ):
+                        raise KeyboardInterrupt
+
+                with self.assertRaises(KeyboardInterrupt):
+                    fetch.install(self.local, replace=interrupt_after_rename)
+                self.assertEqual(fetch.fingerprint(self.target), before)
+                self.assertEqual(marker.read_bytes(), stored)
+                self.assertFalse(marker.with_suffix(".lock").exists())
+        self.assertEqual(fetch.install(self.local), latest)
+
+    def test_marker_cleanup_failure_does_not_strand_install_lock(self):
+        fetch.install(self.local)
+        self.advance()
+        marker = self.local / ".git/internscout-public-snapshot.json"
+        before = marker.read_bytes()
+        real_unlink = Path.unlink
+
+        def fail_marker_replace(src, dest):
+            if dest == marker:
+                raise OSError("Simulated marker rename failure")
+            os.replace(src, dest)
+
+        def fail_marker_cleanup(path, *args, **kwargs):
+            if path.name.startswith("internscout-marker-"):
+                raise OSError("Simulated marker cleanup failure")
+            return real_unlink(path, *args, **kwargs)
+
+        with patch.object(Path, "unlink", fail_marker_cleanup), self.assertRaises(OSError):
+            fetch.install(self.local, replace=fail_marker_replace)
+        self.assertFalse(marker.with_suffix(".lock").exists())
+        self.assertEqual(marker.read_bytes(), before)
+        self.assertEqual((self.target / "index.json").read_bytes(), b"first snapshot")
+
     def test_missing_branch_refuses_without_writes(self):
         self.git(self.bare, "update-ref", "-d", "refs/heads/data")
         with self.assertRaisesRegex(ValueError, "fetch"):

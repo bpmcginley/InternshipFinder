@@ -162,38 +162,50 @@ def install(root, *, replace=os.replace):
             if current != prior:
                 raise ValueError("Existing public data was not installed unchanged by this helper")
         changed = current != desired
-        if changed and exists:
-            replace(target, backup)
-        installed = False
+        metadata = json.dumps({"commit": pin, "digest": desired}) + "\n"
+        # Preserve the old tree until the new directory and its marker are both committed.
+        safe_cleanup = False
         try:
-            if changed and exists and fingerprint(backup) != current:
-                raise ValueError("Local public files changed while preparing the install.")
+            if changed and exists:
+                replace(target, backup)
+                if fingerprint(backup) != current:
+                    raise ValueError("Local public files changed while preparing the install.")
             if changed:
                 replace(incoming, target)
-                installed = True
             fd, name = tempfile.mkstemp(prefix="internscout-marker-", dir=marker.parent)
             pending_marker = Path(name)
             with os.fdopen(fd, "w", encoding="utf8") as output:
-                output.write(json.dumps({"commit": pin, "digest": desired}) + "\n")
+                output.write(metadata)
             replace(pending_marker, marker)
-        except (OSError, ValueError):
-            safe_cleanup = False
+            safe_cleanup = True
+        except (OSError, ValueError, KeyboardInterrupt):
             try:
-                if installed:
-                    replace(target, incoming)
-                if backup.exists():
-                    replace(backup, target)
-            except OSError:
+                if pending_marker is not None and not pending_marker.exists():
+                    # The interruption may have arrived immediately after the marker rename.
+                    if (
+                        marker.read_text(encoding="utf8") != metadata
+                        or fingerprint(target) != desired
+                    ):
+                        raise ValueError("Could not establish whether the snapshot was installed.")
+                else:
+                    # Check the actual directories, even when a rename completed before raising.
+                    if changed and not incoming.exists():
+                        replace(target, incoming)
+                    if backup.exists():
+                        replace(backup, target)
+                safe_cleanup = True
+            except (OSError, ValueError, KeyboardInterrupt):
                 raise ValueError(
                     f"Could not restore the previous snapshot. Recovery directory: {stage}"
                 ) from None
-            safe_cleanup = True
             raise
         return pin
     finally:
-        if pending_marker is not None:
-            pending_marker.unlink(missing_ok=True)
-        lock.unlink(missing_ok=True)
+        try:
+            if pending_marker is not None:
+                pending_marker.unlink(missing_ok=True)
+        finally:
+            lock.unlink(missing_ok=True)
         if stage is not None and safe_cleanup and stage.parent == docs and stage.resolve() == stage:
             shutil.rmtree(stage)
 
