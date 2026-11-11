@@ -16,6 +16,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from email.utils import format_datetime
+from functools import cache
 from html import escape
 
 from .site import assets
@@ -30,9 +31,19 @@ ITEMS = 25  # newest roles per feed; readers and bots only look at what is new s
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
 
-def _legacy_settings():
-    # Preserve direct overrides on the compatibility facade when a caller already loaded it.
-    return sys.modules.get(f"{__package__}.seo_pages")
+@cache
+def _standalone_settings() -> tuple[str, datetime | None]:
+    # The old first feed lookup imported the facade and copied these defaults once.
+    from .site import runtime
+
+    return assets.SITE, runtime.GENERATED
+
+
+def _settings() -> tuple[str, datetime | None]:
+    legacy = sys.modules.get(f"{__package__}.seo_pages")
+    if legacy is not None:
+        return legacy.SITE, legacy.GENERATED
+    return _standalone_settings()
 
 
 def _x(text) -> str:
@@ -58,7 +69,7 @@ def rss(
         now,
         state,
         limit,
-        site=getattr(_legacy_settings(), "SITE", assets.SITE),
+        site=_settings()[0],
         place=source.place,
         pay_text=source.pay_text,
         safe_url=safe_url,
@@ -70,7 +81,7 @@ def rss(
 def write_all(site_dir: str, pages: list[dict], now: datetime | None = None) -> int:
     """feed.xml beside every landing page that lists roles (the hubs have none).
 
-    Prefer the supplied snapshot date, then the last legacy build's date. A standalone call
-    with neither uses the current UTC time."""
-    now = now or getattr(_legacy_settings(), "GENERATED", None) or datetime.now(timezone.utc)
+    Prefer the supplied snapshot date, then the configured build date. Use the current UTC
+    time when neither is available."""
+    now = now or _settings()[1] or datetime.now(timezone.utc)
     return _site_rss.write_all(site_dir, pages, now, rss, ITEMS)

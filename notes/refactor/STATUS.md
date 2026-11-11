@@ -661,8 +661,8 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 ## WP-6.2 standalone feed defaults
 
-- Standalone feeds use the canonical site URL and the current UTC time when no snapshot date is available. An already-loaded legacy facade still supplies its current URL and last build date, so direct overrides and callers that omit the date after a legacy build still work. The legacy CLI continues passing its build date explicitly.
-- A fresh subprocess generated a feed with the legacy facade blocked. The offline legacy CLI comparison matched 815 files, including 75 feeds, and console output. All 158 focused tests passed, including the standalone Pages publisher and Golden build. Product's publisher, renderers and Golden fixtures are outside this slice.
+- Standalone feeds snapshot the canonical site URL and configured build date on first use, as the legacy import did. When no date is available, they use the current UTC time. An already-loaded legacy facade still supplies its current URL and last build date, so direct overrides and callers that omit the date after a legacy build still work. The legacy CLI continues passing its build date explicitly.
+- A fresh subprocess generated a feed with the legacy facade blocked. The offline legacy CLI comparison matched 815 files, including 75 feeds, and console output. All 160 focused tests passed, including the standalone Pages publisher and Golden build. Product's publisher, renderers and Golden fixtures are outside this slice.
 
 ## WP-6.3 ingest timing from existing runs
 
