@@ -88,6 +88,17 @@ def test_app_graph_changes_independently_and_git_rollback_keeps_both_app_generat
         assert {folder.name for folder in (stage / "js/app-modules").iterdir()} == expected_app.keys()
         assert version_assets(stage, retain_core_git=repo).changed_files == 0
 
+    invalid_leaf = b"export { missing }\nfrom './missing.mjs';\n"
+    _app_site(source, invalid_leaf)
+    git("add", "docs")
+    git("commit", "--quiet", "-m", "Unpublishable App generation")
+    invalid_stage = tmp_path / "invalid-stage"
+    _core_site(invalid_stage, core)
+    _app_site(invalid_stage, invalid_leaf)
+    with pytest.raises(AssetVersionError, match="App modules must use declaration exports"):
+        version_assets(invalid_stage, retain_core_git=repo)
+    assert not (invalid_stage / "js/modules").exists() and not (invalid_stage / "js/app-modules").exists()
+
     git("rm", "--quiet", "-r", "docs/js/app")
     git("commit", "--quiet", "-m", "Restore classic App")
     rollback = tmp_path / "rollback"
