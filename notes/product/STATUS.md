@@ -48,6 +48,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| C | P-2.3l Request-time retention invariant | audit_growth_generated | `codex/product-p2.3l-retention-invariant` | Draft claim | Implementing; needs-bruce | Current database-state gate only; historical failure-latch semantics remain an integration consideration. No activation. |
 | 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged; Pages green | Independent review and all CI passed; Pages 42865303436. |
 | 0 | P-0.2 Counter names | Refactor lead (integration) | `codex/product-p0.2-counters` | [#175](https://github.com/bpmcginley/InternshipFinder/pull/175) | Merged; disclosure published; owner deploy pending | Approved disclosure [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) published as `ab86541e`; Pages 42933686331 and exact backend succeeded. Worker deployment remains an owner action; none performed by this session. |
 | 0 | P-0.2 Counter disclosure | audit_growth_generated | `codex/product-p0.2-disclosure` | [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) | Merged; published | Merge `ab86541e`; independent review/all nine checks passed. Pages 42933686331 passed build/deploy/notify and exact-commit backend succeeded. Approved conditional disclosure is live; worker deployment remains owner-controlled. |
@@ -195,6 +196,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | P-2.3l retention invariant | Dormant request-local admitted counting on #292. Review/CI, policy interpretation, parent and owner integration remain pending. | Needs-bruce; no deployment |
 | 2026-11-10 | P-2.3 employer posting-click design and privacy | [#209](https://github.com/bpmcginley/InternshipFinder/pull/209) design is approved/published; Bruce also explicitly approved the extra UTC-day-only cap total and five-minute fail-closed cache. Actual catalog/wiring, updated aggregate disclosure, retention health and deployment remain gated. | Both additional decisions approved; implementation/operator gates remain |
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
 | 2026-11-10 | P-0.2 worker deployment and disclosure | #175 merged; approved disclosure [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) published as `ab86541e`, with Pages 42933686331 and exact backend success. Only owner worker deployment remains; no deployment by this session. | Disclosure published; owner deployment pending |
