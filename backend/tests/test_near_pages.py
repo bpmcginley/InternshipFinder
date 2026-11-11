@@ -6,9 +6,15 @@ import json
 import os
 import re
 
-from internscout import classify, near_metros as nm, seo_pages
+import pytest
 
-NEAR = seo_pages.NEAR_ROOT
+from internscout import classify, near_metros as nm
+from internscout.site import publish, runtime
+
+
+pytestmark = pytest.mark.without_seo_facade
+
+NEAR = runtime.NEAR_ROOT
 
 
 def _row(i, loc="Denver, CO", state="CO", tags=("finance",), kind="us", company=None, **over):
@@ -52,8 +58,17 @@ def _site(tmp_path, rows):
     return str(tmp_path)
 
 
-def _built(site, live=()):
-    return {p["path"]: p for p in seo_pages.build(site, set(live), frozenset(), frozenset())}
+def _snapshot(site, live=(), *, near_index=runtime.NEAR_INDEX):
+    state = runtime.BuildState(near_index=near_index)
+    hooks = runtime.BuildHooks()
+    pages = runtime.invoke(
+        state, hooks, runtime.build, site, set(live), frozenset(), frozenset()
+    )
+    return {p["path"]: p for p in pages}, state, hooks
+
+
+def _built(site, live=(), *, near_index=runtime.NEAR_INDEX):
+    return _snapshot(site, live, near_index=near_index)[0]
 
 
 def _metro(city):
@@ -61,7 +76,7 @@ def _metro(city):
 
 
 def _path(city, slug):
-    return seo_pages.near_path(_metro(city), slug)
+    return runtime.near_path(_metro(city), slug)
 
 
 def _in(loc, state, kind="us"):
@@ -110,7 +125,7 @@ def test_the_field_mapping_uses_only_tags_classify_gives_and_matches_the_json():
 def test_exactly_the_500_pages_and_a_hub_are_built_even_with_no_listings_near_any(tmp_path):
     built = _built(_site(tmp_path, [_row(i, loc="Boise, ID", state="ID") for i in range(6)]))
     near = {p for p in built if p.startswith(NEAR)}
-    want = {seo_pages.near_path(m, f["slug"]) for m in nm.METROS for f in nm.FIELDS}
+    want = {runtime.near_path(m, f["slug"]) for m in nm.METROS for f in nm.FIELDS}
     assert len(want) == 500 and near == want | {NEAR}
     assert len({nm.metro_slug(m) for m in nm.METROS}) == 50
     assert _path("Washington", "business") == "/internships/near/washington-dc/business/"
@@ -306,7 +321,7 @@ def test_the_page_links_the_dashboard_the_citys_other_fields_and_the_fields_othe
             assert f'href="{_path("Denver", f["slug"])}"' in html
     for m in nm.METROS:
         if m["city"] != "Denver":
-            assert f'href="{seo_pages.near_path(m, "business")}"' in html
+            assert f'href="{runtime.near_path(m, "business")}"' in html
     assert f'href="{NEAR}"' in html
     assert 'href="feed.xml"' in html
 
@@ -330,40 +345,38 @@ def test_an_empty_page_says_so_truthfully_and_is_kept_out_of_search(tmp_path):
 
 
 def test_no_near_page_or_their_hub_is_indexed_while_near_index_is_off(tmp_path):
-    assert seo_pages.NEAR_INDEX is False  # 2026-10-23
+    assert runtime.NEAR_INDEX is False  # 2026-10-23
     site = _denver_site(tmp_path, 20)
     built = _built(site)
     near = {p: v for p, v in built.items() if p.startswith(NEAR)}
     assert near and all(
         v["thin"] and not v["index"] and "noindex, follow" in v["html"] for v in near.values()
     )
-    assert not _built(site, live={_path("Denver", "business"), NEAR})[_path("Denver", "business")][
-        "index"
-    ]
-    seo_pages.write(site, list(built.values()))
+    live_built, state, hooks = _snapshot(site, live={_path("Denver", "business"), NEAR})
+    assert not live_built[_path("Denver", "business")]["index"]
+    # The original write used the last build's state with the first build's page records.
+    publish._write_site(site, list(built.values()), state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
-    held = open(os.path.join(site, seo_pages.HELD_FILE), encoding="utf-8").read().splitlines()
+    held = open(os.path.join(site, runtime.HELD_FILE), encoding="utf-8").read().splitlines()
     assert "/internships/near/" not in sitemap and set(near) <= set(held)
 
 
-def test_below_the_threshold_a_page_is_noindex_and_out_of_the_sitemap_but_still_built(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setattr(seo_pages, "NEAR_INDEX", True)  # NEAR_INDEX_MIN decides only while it is on
-    need = seo_pages.NEAR_INDEX_MIN
+def test_below_the_threshold_a_page_is_noindex_and_out_of_the_sitemap_but_still_built(tmp_path):
+    # NEAR_INDEX_MIN decides only while near indexing is on.
+    need = runtime.NEAR_INDEX_MIN
     assert need == 5
     path = _path("Denver", "business")
-    small = _built(_denver_site(tmp_path / "small", need - 1))[path]
+    small = _built(_denver_site(tmp_path / "small", need - 1), near_index=True)[path]
     assert small["thin"] and "noindex, follow" in small["html"] and len(small["items"]) == need - 1
     # Under the bar the page lists remote roles too, apart; an indexed page gives only their count.
     assert small["html"].count('<ul class="jobs">') == 2
     site = _denver_site(tmp_path / "enough", need)
-    built = _built(site)
+    built, state, hooks = _snapshot(site, near_index=True)
     assert built[path]["index"] and not built[path]["thin"] and "noindex" not in built[path]["html"]
     assert built[path]["html"].count('<ul class="jobs">') == 1
-    seo_pages.write(site, list(built.values()))
+    publish._write_site(site, list(built.values()), state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
-    held = open(os.path.join(site, seo_pages.HELD_FILE), encoding="utf-8").read()
+    held = open(os.path.join(site, runtime.HELD_FILE), encoding="utf-8").read()
     assert f"<loc>https://internscout.org{path}</loc>" in sitemap and path not in held
     assert f"<loc>https://internscout.org{NEAR}</loc>" in sitemap
     fresno = _path("Fresno", "education")
@@ -374,7 +387,7 @@ def test_below_the_threshold_a_page_is_noindex_and_out_of_the_sitemap_but_still_
         os.path.join(site, "internships", "near", "fresno", "education", "index.html")
     )
     # One role closing does not drop a page that is already in the live sitemap.
-    assert _built(_denver_site(tmp_path / "live", need - 1), live={path})[path]["index"]
+    assert _built(_denver_site(tmp_path / "live", need - 1), live={path}, near_index=True)[path]["index"]
 
 
 def test_one_employers_roles_or_a_list_the_site_already_has_are_not_indexed(tmp_path):
@@ -404,7 +417,7 @@ def test_titles_and_descriptions_come_from_the_pages_own_data(tmp_path):
     )
     assert "Hiring now: Northwind" in desc
     # A long field name gives way to its short one before the count does.
-    long_ = seo_pages.near_title(
+    long_ = runtime.near_title(
         nm.field_of("computer-and-information-sciences"),
         _metro("San Francisco"),
         [_row(i) for i in range(120)],
@@ -415,8 +428,8 @@ def test_titles_and_descriptions_come_from_the_pages_own_data(tmp_path):
             t = re.search(r"<title>(.*?)</title>", p["html"]).group(1)
             d = re.search(r'<meta name="description" content="(.*?)"/>', p["html"]).group(1)
             assert (
-                30 <= len(t) <= seo_pages.TITLE_MAX
-                and seo_pages.DESC_MIN <= len(d) <= seo_pages.DESC_MAX
+                30 <= len(t) <= runtime.TITLE_MAX
+                and runtime.DESC_MIN <= len(d) <= runtime.DESC_MAX
             ), p["path"]
 
 

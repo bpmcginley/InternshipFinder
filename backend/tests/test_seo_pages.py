@@ -9,7 +9,7 @@ import re
 import pytest
 
 from internscout import seo_pages
-from tests.seo_fixture_data import _row, _site
+from tests.seo_fixture_data import _pay_site, _row, _site
 
 
 def _paths(pages):
@@ -601,23 +601,6 @@ def test_place_names_read_the_way_people_write_them():
 
 
 # ---- for AI assistants and answer engines (added 2026-10-02)
-
-
-def _pay_site(tmp_path):
-    """30 roles at $20-$49 an hour across six employers, and pay that must never be ranked as hourly:
-    yearly salaries, salaries in thousands, and a role only in Canada (Canadian dollars)."""
-    rows = [_row(i, company_name=f"Pay Co {i % 6}", salary=f"${20 + i}/hr") for i in range(30)]
-    rows += [_row(100 + i, company_name="Salary Co", salary="$150,000 a year") for i in range(5)]
-    rows += [_row(200 + i, company_name="Thousands Co", salary="$120k") for i in range(5)]
-    canada = [
-        _row(
-            300,
-            company_name="Maple Co",
-            salary="$95/hr",
-            regions=[{"loc": "Toronto, ON", "kind": "canada", "state": "ON"}],
-        )
-    ]
-    return _site(tmp_path, {"MA": rows, "ON": canada})
 
 
 def _ld_blocks(html):
