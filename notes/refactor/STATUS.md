@@ -90,7 +90,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.1 Constants/helpers | wp21_inventory | `refactor/wp-3.1-site-helpers` | [#252](https://github.com/bpmcginley/InternshipFinder/pull/252) | Merged | `c00fb90f`. Pages 42942262592 and 42942269472 and both exact deployments succeeded. Pure helpers and immutable thresholds retain legacy re-exports. |
 | 5 | WP-3.2 Sitemap/feeds/llms | wp21_inventory | `refactor/wp-3.2-site-artifacts` | [#264](https://github.com/bpmcginley/InternshipFinder/pull/264) | Merged | `6fa14ba8`. Pages 42946316162 and the exact deployment succeeded. Sitemap, robots, RSS and LLMS retain legacy entry points and exact golden bytes. |
 | 5 | WP-3.3 Near family | wp21_inventory | `refactor/wp-3.3-near` | [#271](https://github.com/bpmcginley/InternshipFinder/pull/271) | Merged | `75c4e013`. Pages 42948316654 and the exact deployment succeeded. All 501 near pages and 695 golden files retained. |
-| 5 | WP-3.3 Employer family | wp21_inventory | `refactor/wp-3.3-employer` | - | In review | Select plain employer data before rendering. Preserve eligibility, recruiter CTA, related links and full page items. |
+| 5 | WP-3.3 Employer family | wp21_inventory | `refactor/wp-3.3-employer` | [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) | In review | Select plain employer data before rendering. Preserve eligibility, recruiter CTA, related links and full page items. |
 | 5 | WP-3.3 Field family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Pay family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Numbers family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
@@ -491,7 +491,7 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 ## WP-3.3 employer page family
 
-- Started on `9d0f5a65`, including Product's docs-only #270, after #271 Pages 42948316654 and exact deployment succeeded. Rechecked 23 open Product PRs. #266's apparent overlap is inherited main history; there are no employer paths changed relative to its merge base.
+- Started on `9d0f5a65`, including Product's docs-only #270, after #271 Pages 42948316654 and exact deployment succeeded. Rechecked 24 open Product PRs. #266's apparent overlap is inherited main history; there are no employer paths changed relative to its merge base.
 - Extracted plain employer data and related-link rankings from the late employer loop, with one-model rendering in the SEO facade while shared helpers are there. Early company registration, aliases, title/location dedup, cohort sidecar, paid placement post-pass and Altera redirect are unchanged. The exact recruiter CTA stays in `employer_offer`. The full selected item list continues to drive dates, feeds and placement.
 - Seven synthetic before/after builds matched page records and emitted files. Covered held creation, held versus live slack, earning bypass, threshold override, cohort details and the existing recruiter link. The module AST outside the late employer loop and its two helpers is exact.
 - Relevant SEO, discovery, dates, feeds, link, role and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks matched 695 unchanged expected files, and the wheel and isolated import check confirmed no SEO facade back-edge. Ruff passed and targeted Pyright retained the same 12 existing diagnostics.
