@@ -96,7 +96,7 @@ const allowanceTable = (config, fn) =>
   Object.fromEntries(Object.entries(config.TASKS).map(([task, c]) => [task, fn(task, c)]));
 
 /**
- * @typedef {object} RouteContext
+ * @typedef {object} SafeRouteContext
  * @property {Request} request
  * @property {Parameters<typeof route>[1]} env
  * @property {Parameters<typeof route>[1]["DB"]} db
@@ -108,33 +108,33 @@ const allowanceTable = (config, fn) =>
  * @property {() => string} tier
  * @property {() => Promise<string>} signIn
  */
-/** @typedef {(context: RouteContext) => Promise<Response>} RouteHandler */
+/** @typedef {(context: SafeRouteContext) => Promise<Response>} SafeRouteHandler */
 
 // These wrappers preserve each selected route's gate, authentication and parsing order.
 /**
- * @param {(context: RouteContext, user: string) => Promise<Response>} handler
- * @returns {RouteHandler}
+ * @param {(context: SafeRouteContext, user: string) => Promise<Response>} handler
+ * @returns {SafeRouteHandler}
  */
 const withUser = (handler) => async (context) => handler(context, await context.signIn());
 /**
- * @param {(context: RouteContext, user: string) => Promise<Response>} handler
- * @returns {RouteHandler}
+ * @param {(context: SafeRouteContext, user: string) => Promise<Response>} handler
+ * @returns {SafeRouteHandler}
  */
 const withSyncUser = (handler) => async (context) => {
   requireSync(context.env);
   return handler(context, await context.signIn());
 };
 /**
- * @param {RouteHandler} handler
- * @returns {RouteHandler}
+ * @param {SafeRouteHandler} handler
+ * @returns {SafeRouteHandler}
  */
 const withAdmin = (handler) => async (context) => {
   await requireAdmin(context.request, context.env);
   return handler(context);
 };
 
-/** @type {Record<string, RouteHandler>} */
-const routeHandlers = {
+/** @type {Record<string, SafeRouteHandler>} */
+const safeRouteHandlers = {
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
   "POST /session": async ({ request, env, db, now, ctx, d }) => {
@@ -472,7 +472,7 @@ const routeHandlers = {
   },
 };
 
-/** @param {RouteContext} context */
+/** @param {SafeRouteContext} context */
 async function changeAdminPlacement({ request, db, env, now, ctx, d, path }) {
   await requireAdmin(request, env);
   const { body } = await readJson(request, MAX_ADMIN_BYTES);
@@ -499,7 +499,7 @@ async function changeAdminPlacement({ request, db, env, now, ctx, d, path }) {
 // The API contract supplies the dispatch keys. Descriptive auth and gate text stays documentation.
 const exactRoutes = new Map(ROUTES.map(({ method, path }) => {
   const key = `${method} ${path}`;
-  return [key, routeHandlers[key]];
+  return [key, safeRouteHandlers[key]];
 }));
 
 async function route(request, env, ctx, d) {

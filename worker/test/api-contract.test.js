@@ -23,7 +23,7 @@ test("the contract contains every exact table route, with auth and descriptive s
   walk(
     parse(read("worker/src/index.js"), { ecmaVersion: "latest", sourceType: "module" }),
     (node) => {
-      if (node.type === "VariableDeclarator" && name(node.id) === "routeHandlers") {
+      if (node.type === "VariableDeclarator" && name(node.id) === "safeRouteHandlers") {
         tables += 1;
         assert.equal(node.init.type, "ObjectExpression");
         for (const handler of node.init.properties) {
