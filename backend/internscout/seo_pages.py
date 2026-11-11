@@ -171,7 +171,7 @@ PLACE_SHORT = _runtime.PLACE_SHORT
 BEACON = _runtime.BEACON
 DIGEST_FORM = _runtime.DIGEST_FORM
 BASELINE = _runtime.BASELINE
-GENERATED = _runtime.GENERATED
+GENERATED: datetime | None
 TEXTS = {}
 TRACKER = _runtime.TRACKER
 HOME = _runtime.HOME
@@ -1531,6 +1531,13 @@ def main(argv: list[str], *, card_renderer: _share_cards.Renderer | None = None)
         message += f" into {site_dir}"
     console(message)
 
+
+
+if __name__ == f"{__package__}.seo_pages":
+    # Publish the generated date only after the site URL and the facade are initialized.
+    SITE, GENERATED = feeds._standalone_settings()
+else:
+    GENERATED = _runtime.GENERATED
 
 
 if __name__ == "__main__":

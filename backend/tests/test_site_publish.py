@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import sys
 
+import pytest
+
 from tests.seo_fixture_data import _row, _site
 
 
@@ -43,6 +45,7 @@ assert not attempts and not forbidden.intersection(sys.modules)
 """
 
 
+@pytest.mark.without_seo_facade
 def test_site_adapter_publishes_without_legacy_or_placement_services(tmp_path):
     site = tmp_path / "site"
     _site(site, {"MA": [_row(i) for i in range(30)]})

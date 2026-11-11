@@ -1,0 +1,178 @@
+[
+  {
+    "phase": "before",
+    "view": "browse",
+    "width": 1280,
+    "colorScheme": "light",
+    "rows": 150,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "view": "my-list",
+    "width": 1280,
+    "colorScheme": "light",
+    "rows": 3,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "before",
+    "view": "browse",
+    "width": 1280,
+    "colorScheme": "dark",
+    "rows": 150,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "view": "my-list",
+    "width": 1280,
+    "colorScheme": "dark",
+    "rows": 3,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "before",
+    "view": "browse",
+    "width": 375,
+    "colorScheme": "light",
+    "rows": 150,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "view": "my-list",
+    "width": 375,
+    "colorScheme": "light",
+    "rows": 3,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "before",
+    "view": "browse",
+    "width": 375,
+    "colorScheme": "dark",
+    "rows": 150,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "view": "my-list",
+    "width": 375,
+    "colorScheme": "dark",
+    "rows": 3,
+    "annotated": 0,
+    "unchangedLayoutAndLinks": false,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "after",
+    "view": "browse",
+    "width": 1280,
+    "colorScheme": "light",
+    "rows": 150,
+    "annotated": 150,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "view": "my-list",
+    "width": 1280,
+    "colorScheme": "light",
+    "rows": 3,
+    "annotated": 2,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "after",
+    "view": "browse",
+    "width": 1280,
+    "colorScheme": "dark",
+    "rows": 150,
+    "annotated": 150,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "view": "my-list",
+    "width": 1280,
+    "colorScheme": "dark",
+    "rows": 3,
+    "annotated": 2,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "after",
+    "view": "browse",
+    "width": 375,
+    "colorScheme": "light",
+    "rows": 150,
+    "annotated": 150,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "view": "my-list",
+    "width": 375,
+    "colorScheme": "light",
+    "rows": 3,
+    "annotated": 2,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  },
+  {
+    "phase": "after",
+    "view": "browse",
+    "width": 375,
+    "colorScheme": "dark",
+    "rows": 150,
+    "annotated": 150,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "view": "my-list",
+    "width": 375,
+    "colorScheme": "dark",
+    "rows": 3,
+    "annotated": 2,
+    "unchangedLayoutAndLinks": true,
+    "externalPageRequestsAllowed": 0,
+    "keyboardOpenAndUnsave": true,
+    "paidAndInstallExclusionsExercised": true
+  }
+]

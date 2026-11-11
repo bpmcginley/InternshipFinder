@@ -20,6 +20,8 @@ js/core/[a-z][a-z0-9-]*\.mjs
 js/modules/[0-9a-f]{64}/[a-z][a-z0-9-]*\.mjs
 js/app/[a-z][a-z0-9-]*\.mjs
 js/app-modules/[0-9a-f]{64}/[a-z][a-z0-9-]*\.mjs
+js/buy/(entry|landing|order-form)\.mjs
+js/buy-modules/[0-9a-f]{64}/(entry|landing|order-form)\.mjs
 fonts/(ibm-plex-sans-latin|source-serif-4-latin)\.woff2
 fonts/OFL-(IBM-Plex-Sans|Source-Serif-4)\.txt
 # Exported listing data and generated build data.

@@ -94,6 +94,14 @@ export const ROUTES = Object.freeze([
     "JSON {url: string}",
     "payments",
   ),
+  route(
+    "POST",
+    "/billing/topup/checkout",
+    "session + site-origin",
+    "First-party dashboard Origin and current session bearer. The server owns the offer and return URLs.",
+    "No-store JSON {status: open, url} 200, {status: pending} 202, auth 401, disallowed Origin 403, disabled or unavailable 503",
+    "TOPUPS_ENABLED and existing payment configuration",
+  ),
   route("POST", "/billing/portal", "user", "none", "JSON {url: string}", "payments"),
   route(
     "POST",
