@@ -228,7 +228,6 @@ def encode_accepted_follow_checkpoint(receipt, provenance, *, accepted_at, bound
     if naive_open != staged._rows:
         raise _reject("full lineage differs from accepted open evidence")
 
-    tuples = []
     header = {
         "version": 1,
         "accepted_commit": source.commit,
@@ -237,17 +236,21 @@ def encode_accepted_follow_checkpoint(receipt, provenance, *, accepted_at, bound
         "covers_after": _wire(lower),
         "index_sha256": identity.index_sha256,
         "shard_sha256": dict(identity.shard_sha256),
-        "rows": tuples,
     }
+    return _encode_lineage(header, provenance.lineage, bounds.max_bytes)
+
+
+def _encode_lineage(header, lineage, max_bytes):
+    tuples = header["rows"] = []
     size = len(_json(header))
-    for (role_id, raw), proof in sorted(provenance.lineage.items()):
+    for (role_id, raw), proof in sorted(lineage.items()):
         kind = "observed_by" if proof.observed_by is not None else "verified_utc"
         record = [role_id, raw, kind, _wire(getattr(proof, kind))]
         size += len(_json(record)) + bool(tuples)
-        if size > bounds.max_bytes:
+        if size > max_bytes:
             raise _reject("checkpoint byte bound")
         tuples.append(record)
-    if size > bounds.max_bytes:
+    if size > max_bytes:
         raise _reject("checkpoint byte bound")
     return _json(header)
 
@@ -285,9 +288,17 @@ def decode_accepted_follow_checkpoint(raw, source, *, now, bounds) -> FollowChec
     generated, rows = _source_rows(source, identity, bounds)
     _coverage(accepted, lower, generated)
 
+    lineage = _decode_lineage(record["rows"])
+    _, associations = _check_lineage(lineage, rows, lower, generated)
+    return FollowCheckpoint(
+        accepted, lower, identity, MappingProxyType(lineage), MappingProxyType(associations)
+    )
+
+
+def _decode_lineage(tuples):
     lineage = {}
     previous = ""
-    for item in record["rows"]:
+    for item in tuples:
         if not isinstance(item, list) or len(item) != 4:
             raise _reject("malformed evidence tuple")
         role_id, stamp, kind, at = item
@@ -301,7 +312,4 @@ def decode_accepted_follow_checkpoint(raw, source, *, now, bounds) -> FollowChec
             raise _reject("invalid or duplicate evidence tuple")
         previous = role_id
         lineage[(role_id, stamp)] = FirstSeenLineage(stamp, **{kind: _instant(at)})
-    _, associations = _check_lineage(lineage, rows, lower, generated)
-    return FollowCheckpoint(
-        accepted, lower, identity, MappingProxyType(lineage), MappingProxyType(associations)
-    )
+    return lineage
