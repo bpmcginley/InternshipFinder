@@ -3,6 +3,7 @@
 // against stubbed Chrome APIs, a stubbed page (window.ISDom) and a stubbed AI (fetch), offline.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { withReviewDocument } from "./fixtures/review-document.mjs";
 
 const data = {};
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
@@ -557,6 +558,13 @@ test("verified final review skips only the redundant Worker call", async (t) => 
   const execute = chrome.scripting.executeScript, fetch = globalThis.fetch;
   const ai = data.store.ai, sessionKey = "internscout.session";
   const url = "https://boards.greenhouse.io/acme/jobs/1";
+  const warnings = {
+    "unmarked required answer": "Required work authorization answer missing.",
+    "unmarked required field": "Required field: work authorization.",
+    "unanswered required questions": "You have unanswered required questions.",
+    "unmarked required assertion": "Work authorization is required.",
+  };
+  const digestWarning = "This field is required.";
   const cases = [
     ["qualified review", 1, "ready_to_submit"],
     ["ambiguous document evidence", 2, "ready_to_submit"],
@@ -565,7 +573,8 @@ test("verified final review skips only the redundant Worker call", async (t) => 
     ["changed document", 2, "ready_to_submit"],
     ["field error on the preceding fill", 2, "ready_to_submit"],
     ["late editable field", 2, "needs_you"],
-    ["unmarked required answer", 2, "needs_you"],
+    ...Object.keys(warnings).map((name) => [name, 2, "needs_you"]),
+    ["warning during final digest", 2, "needs_you"],
     ["takeover during the proof", 1, "needs_you"],
   ];
   try {
@@ -585,7 +594,7 @@ test("verified final review skips only the redundant Worker call", async (t) => 
             ? [{ ref: "b2", text: "I agree", blocked: true, consent: true }]
             : [{ ref: "b2", text: "Submit Application", blocked: true },
               ...(name === "alternate control" ? [{ ref: "b3", text: "Continue" }] : [])],
-          text: review && name === "unmarked required answer" ? "Required work authorization answer missing." : "",
+          text: phase === "late warning" ? digestWarning : review ? warnings[name] || "" : "",
           filledFields: review ? 1 : 0, busy: false, frozen: false,
         };
       };
@@ -606,8 +615,18 @@ test("verified final review skips only the redundant Worker call", async (t) => 
         if (options.target.documentIds && options.world === "ISOLATED") {
           proofReads++;
           if (name === "takeover during the proof") await takeBack(id, TOOK_OVER);
-          const unproved = ["ambiguous document evidence", "unmarked required answer"].includes(name);
-          const result = unproved || phase === "late" ? null : Array(32).fill(1);
+          let result;
+          if (warnings[name] || name === "warning during final digest") {
+            result = await withReviewDocument(options.func, {
+              bodyText: warnings[name] || "All required answers are complete. No errors found.",
+              duringDigest: name === "warning during final digest" && proofReads === 2 ? (body) => {
+                body.innerText = digestWarning;
+                phase = "late warning";
+              } : undefined,
+            });
+          } else {
+            result = name === "ambiguous document evidence" || phase === "late" ? null : Array(32).fill(1);
+          }
           return [{ frameId: 0, documentId: "original", result }];
         }
         const documentId = name === "changed document" && phase !== "fill" ? "replacement" : "original";
@@ -622,12 +641,12 @@ test("verified final review skips only the redundant Worker call", async (t) => 
         if (requests.length === 2 && name === "late editable field") {
           assert.match(JSON.stringify(body), /New required answer/);
         }
-        if (requests.length === 2 && name === "unmarked required answer") {
-          assert.match(JSON.stringify(body), /Required work authorization answer missing/);
+        if (requests.length === 2 && (warnings[name] || name === "warning during final digest")) {
+          assert.ok(JSON.stringify(body).includes(warnings[name] || digestWarning));
         }
         const parts = requests.length === 1
           ? [tool("fill", { ref: "0:e1", text: "Sample" }), tool("click", { ref: "0:b1" })]
-          : ["late editable field", "consent control", "unmarked required answer"].includes(name)
+          : warnings[name] || ["late editable field", "consent control", "warning during final digest"].includes(name)
             ? [tool("pause_for_user", { reason: "Check the new prompt." })]
             : [tool("ready_to_submit", { summary: "Human review" })];
         const event = JSON.stringify({ candidates: [{ content: { parts }, finishReason: "STOP" }] });
@@ -645,6 +664,10 @@ test("verified final review skips only the redundant Worker call", async (t) => 
         assert.equal(job.summary, "Check every answer before you submit.");
         assert.equal(job.pending.results.length, 2);
         assert.equal((await loadMsgs(id)).length, 2);
+      }
+      if (name === "warning during final digest") {
+        assert.equal(proofReads, 2);
+        assert.equal(highlighted, 1);
       }
       if (name === "takeover during the proof") {
         assert.equal(job.reason, TOOK_OVER.reason);
