@@ -52,6 +52,7 @@ from internscout.site import source as site_source  # noqa: E402
 from internscout.site import taxonomy as site_taxonomy  # noqa: E402
 from internscout.site import text as site_text  # noqa: E402
 from internscout.console_log import console  # noqa: E402
+from internscout.public_data import public_data_dir  # noqa: E402
 import digest  # noqa: E402
 if __package__:
     from .public_config import WORKER_URL
@@ -470,7 +471,8 @@ def save_drafts(data: dict, token: str, card_path: str | None = None) -> None:
 def stale(site_dir: str, now: datetime | None = None) -> str | None:
     """Why the export is too old to post from, or None. An export with no readable time counts as
     stale: candidates would fall back to the clock, and the post would claim a week it can't see."""
-    with open(os.path.join(site_dir, "data", "listings", "index.json"), encoding="utf-8") as f:
+    index_path = os.path.join(public_data_dir(site_dir), "listings", "index.json")
+    with open(index_path, encoding="utf-8") as f:
         stamp = json.load(f).get("generated_at")
     made = site_source._when(stamp)
     now = now or datetime.now(timezone.utc)
