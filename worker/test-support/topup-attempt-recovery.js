@@ -1,5 +1,7 @@
 // Real composition and real storage; every provider response below is synthetic.
 import assert from "node:assert/strict";
+import { hmacHex, verifyWebhook } from "../src/billing.js";
+import { recoverVerifiedTopupCheckoutEvent } from "../src/topup-checkout-events.js";
 import { recoverTopupAttempt as recover } from "../src/topup-attempt-recovery.js";
 import { captureTopupSettlement } from "../src/topup-first-settlement.js";
 import { deleteUser } from "../src/limits.js";
@@ -294,4 +296,134 @@ export async function recoveryRollbackAndDeletion(db) {
   assert.deepEqual(await f.run(), { status: "inactive" });
   assert.deepEqual(await rows(db, "topup_claims"), claims);
   assert.deepEqual(await rows(db, "topup_purchases"), []);
+}
+
+async function signedCheckout(checkout, type = "checkout.session.completed") {
+  const secret = crypto.randomUUID();
+  const timestamp = Math.floor(+now / 1000);
+  const body = JSON.stringify({ type, livemode: false, data: { object: checkout } });
+  const hmac = await hmacHex(secret, `${timestamp}.${body}`);
+  return verifyWebhook(secret, `t=${timestamp},v1=${hmac}`, body, now);
+}
+
+function webhook(db, f, event, overrides = {}) {
+  return recoverVerifiedTopupCheckoutEvent({
+    db,
+    env,
+    event,
+    resolveOffer(version, livemode) {
+      assert.equal(version, offer.version);
+      assert.equal(livemode, offer.livemode);
+      return offer;
+    },
+    fetchImpl: f.fetch,
+    clock,
+    ...overrides,
+  });
+}
+
+export async function verifiedCheckoutRecoversLostCreationExactlyOnce(db) {
+  const f = await setup(db, "creating");
+  // Signed but older session facts never determine price, payment state or entitlement.
+  const event = await signedCheckout({ ...f.checkout, payment_status: "unpaid", amount_total: 1 });
+  assert.deepEqual(await webhook(db, f, event), { status: "settled" });
+  const calls = f.calls.length;
+  assert.equal(calls, 9);
+  assert.equal((await rows(db, "topup_purchases"))[0].amount, 327);
+  assert.equal((await rows(db, "topup_checkout_attempts"))[0].checkout_id, "cs_fixture");
+  assert.deepEqual(await webhook(db, f, event), { status: "inactive" });
+  assert.equal(f.calls.length, calls);
+  assert.equal((await rows(db, "topup_purchases")).length, 1);
+}
+
+export async function verifiedCheckoutKnownOrAmbiguousNeverFallsThrough(db) {
+  const f = await setup(db);
+  const invalid = [
+    { ...f.checkout, metadata: {} },
+    { ...f.checkout, mode: "subscription" },
+    { ...f.checkout, client_reference_id: "b".repeat(64) },
+    { ...f.checkout, metadata: { ...f.checkout.metadata, units: "99" } },
+    { ...f.checkout, metadata: { ...f.checkout.metadata, offer_version: "topup-other" } },
+    { ...f.checkout, id: "cs_different" },
+  ];
+  for (const checkout of invalid)
+    assert.deepEqual(await webhook(db, f, await signedCheckout(checkout)), { status: "pending" });
+  const other = crypto.randomUUID();
+  await db
+    .prepare("INSERT INTO topup_checkout_attempts VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(
+      other,
+      "b".repeat(64),
+      offer.version,
+      300,
+      "usd",
+      25,
+      now.toISOString(),
+      "cs_other",
+      "open",
+    )
+    .run();
+  assert.deepEqual(await webhook(db, f, await signedCheckout({ ...f.checkout, id: "cs_other" })), {
+    status: "pending",
+  });
+  assert.deepEqual(
+    await webhook(
+      db,
+      f,
+      await signedCheckout({ ...f.checkout, id: "cs_listing", metadata: { kind: "listing" } }),
+    ),
+    { status: "unclassified" },
+  );
+  assert.deepEqual(
+    await webhook(
+      db,
+      f,
+      await signedCheckout({
+        ...f.checkout,
+        id: "cs_subscription",
+        mode: "subscription",
+        metadata: {},
+      }),
+    ),
+    { status: "unclassified" },
+  );
+  assert.deepEqual(await webhook(db, f, await signedCheckout(f.checkout, "charge.refunded")), {
+    status: "unclassified",
+  });
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
+  await noGrant(db);
+}
+
+export async function verifiedCheckoutExpiryUsesAuthoritativePaymentState(db) {
+  const f = await setup(db, "creating");
+  const event = await signedCheckout(f.checkout, "checkout.session.expired");
+  f.checkout.status = "open";
+  f.checkout.payment_status = "unpaid";
+  assert.deepEqual(await webhook(db, f, event), { status: "pending" });
+  assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "creating");
+  f.checkout.status = "expired";
+  f.checkout.payment_intent = null;
+  assert.deepEqual(await webhook(db, f, event), { status: "expired" });
+  assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "expired");
+  await noGrant(db);
+}
+
+export async function verifiedCheckoutRefreshesOnlyConfiguredModeAndCurrentAttempt(db) {
+  const f = await setup(db);
+  const event = await signedCheckout(f.checkout, "checkout.session.async_payment_succeeded");
+  assert.deepEqual(
+    await webhook(db, f, event, { resolveOffer: () => ({ ...offer, livemode: true }) }),
+    {
+      status: "pending",
+    },
+  );
+  assert.equal(f.calls.length, 0);
+  f.before = async () => {
+    f.before = async () => {};
+    await captureTopupSettlement(db, f.a.id);
+  };
+  assert.deepEqual(await webhook(db, f, event), { status: "pending" });
+  await noGrant(db);
+  assert.deepEqual(await webhook(db, f, event), { status: "settled" });
 }
