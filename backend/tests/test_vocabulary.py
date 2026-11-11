@@ -31,11 +31,9 @@ def test_browser_vocabulary_is_current():
         [sys.executable, str(ROOT / "scripts" / "generate_vocabulary.py"), "--check"],
         check=True,
     )
- 
+
 
 def test_browser_generator_only_replaces_the_owned_ranges(tmp_path):
-    from shutil import copyfile
-
     paths = (
         "scripts/generate_vocabulary.py",
         "backend/internscout/vocabulary.json",
@@ -52,6 +50,8 @@ def test_browser_generator_only_replaces_the_owned_ranges(tmp_path):
     original = source.read_bytes()
     source.write_bytes(original.replace(b'"Software"', b'"Software; QA"'))
     targets = [tmp_path / name for name in paths[2:]]
+    core = targets[0].read_bytes().replace(b"\r\n", b"\n")
+    targets[0].write_bytes(core.replace(b"\n", b"\r\n"))
     before = [target.read_bytes() for target in targets]
     assert subprocess.run([*command, "--check"], capture_output=True).returncode == 1
     assert [target.read_bytes() for target in targets] == before
@@ -65,6 +65,11 @@ def test_browser_generator_only_replaces_the_owned_ranges(tmp_path):
     targets[1].write_bytes(malformed)
     assert subprocess.run(command, capture_output=True).returncode == 1
     assert [target.read_bytes() for target in targets] == [before[0], malformed]
+
+    duplicate = before[1] + b'\n  var FIELD_NAMES = {};\n'
+    targets[1].write_bytes(duplicate)
+    assert subprocess.run(command, capture_output=True).returncode == 1
+    assert [target.read_bytes() for target in targets] == [before[0], duplicate]
 
     targets[1].write_bytes(before[1])
     subprocess.run(command, check=True)
