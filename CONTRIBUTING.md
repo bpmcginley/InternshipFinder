@@ -37,6 +37,8 @@ python -m internscout.run_ingest --export ../docs/data     # full run, several m
 #   --workers N parallel board fetches
 ```
 
+To preview the published snapshot, run `python scripts/fetch_listing_data.py` from the repository root before starting the server.
+
 Log long runs to a file. Then serve the repo root and open the dashboard:
 
 ```bash
