@@ -25,6 +25,7 @@ fonts/OFL-(IBM-Plex-Sans|Source-Serif-4)\.txt
 # Exported listing data and generated build data.
 data/(first|majors|seo-posting-details|stats|placements|widget|page-content-dates)\.json
 data/listings/index\.json
+data/employer-posting-keys\.json
 data/listings/(AB|AK|AL|AR|AZ|BC|CA|CO|CT|Canada|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MB|MD|ME|MI|MN|MO|MS|MT|NB|NC|ND|NE|NH|NJ|NL|NM|NS|NT|NU|NV|NY|OH|OK|ON|OR|PA|PE|PR|QC|RI|SC|SD|SK|TN|TX|US|UT|VA|VT|WA|WI|WV|WY|YT|remote)(\.desc)?\.json
 data/roles/(index|[a-z0-9_])\.json
 # Generated pages and feeds: slug directories never admit notes or arbitrary files.
