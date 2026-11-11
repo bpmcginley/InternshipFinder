@@ -45,3 +45,4 @@ import "./topup-decisions.test.js";
 import "./topup-reconciliation.test.js";
 import "./topup-allocation.test.js";
 import "./topup-checkout.test.js";
+import "./topup-stripe.test.js";

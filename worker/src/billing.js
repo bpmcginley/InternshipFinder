@@ -101,7 +101,7 @@ async function savePlan(db, user, { plan, status, customer, subscription, period
   return r.meta.changes > 0;
 }
 
-const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
+export const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
 // was: const siteUrl = (env) => ... (exported 2026-10-19 for orders.js)
 export const siteUrl = (env) => (env.SITE_URL || "https://internscout.org").replace(/\/+$/, "");
 
