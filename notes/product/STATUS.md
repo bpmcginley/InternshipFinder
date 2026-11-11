@@ -352,6 +352,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | 2026-11-11 | Session-copy deletion fence | [#297](https://github.com/bpmcginley/InternshipFinder/pull/297) `e09a8744` passed exact review and nine checks on refreshed main. | Owner merge and Worker deployment pending |
 | 2026-11-11 | Advisor signup and consent wording | [#328](https://github.com/bpmcginley/InternshipFinder/pull/328) `096991ae` is independently reviewed, nine-green and ready. Approve exact form and privacy copy before implementation. Confirm Buttondown Tags and absence of advisor tag automation before activating signup. Static advisor pages are in #324. | Exact wording and provider settings pending |
 | 2026-11-11 | Employer catalog projection | [#331](https://github.com/bpmcginley/InternshipFinder/pull/331) is the dormant conversion claim for complete, already-public employer input and an explicit byte budget. Live source selection, mapping and publication are separate. | Draft needs-bruce |
+| 2026-11-11 | Employer posting-key mapping | P-2.3k design proposes one pinned public catalog, annotations on organic direct posting links, coverage of closed dashboard listings that retain a posting link, and a 256 KiB response bound. Offline validation used the first automatic published export and the exact Worker parser. | Mapping approval pending |
 
 ## Measurement follow-up
 
