@@ -9150,6 +9150,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "shopline": {
+   "name": "SHOPLINE",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "simisinc": {
    "name": "SimIS",
    "quant": false,
@@ -13809,8 +13815,9 @@
   "beigene|wd5|beigene": {
    "name": "BeOne",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-11"
   },
   "belk|wd1|careers": {
    "name": "Belk",
@@ -13941,9 +13948,8 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-11"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
