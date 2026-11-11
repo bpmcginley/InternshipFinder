@@ -1,5 +1,5 @@
 // Dashboard state, effects and React controller.
-import { createAskExtension, createLoadMe, openInviteAction, copyInviteAction, billingAction } from "./allowance.mjs";
+import { createAskExtension, createLoadMe, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions } from "./allowance.mjs";
 import { saveProfileAction, saveQuickProfileAction, finishQuickProfileAction } from "./setup.mjs";
 import { clearTrackerAction, createSetAppState, createToggleSaved, useManualAppState, showMyListAction } from "./tracker.mjs";
 import { useDigestPrompt } from "./navigation.mjs";
@@ -84,15 +84,15 @@ export function createDashboard(browser, {
     const digestPrompt = useDigestPrompt({ useRef, IS });
     const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
-    const billingRequest = useRef(0);
+    const billingRequest = useRef(0), checkoutLock = useRef(null);
     const [ghToken, setGhToken] = useState(() => { try { return browser.localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
     // auth.token is the bearer sent to the Worker (a session code or an ID token); auth.who is
     // IS.authInfo() of the sign-in it came from ({ email, sub, exp, signin, session }), because a
     // session code can't be decoded the way an ID token could.
     const [auth, setAuthState] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
-    const authRef = useRef(auth);
-    const setAuth = useCallback(update => { const next = typeof update === "function" ? update(authRef.current) : update; authRef.current = next; setAuthState(next); }, []);
+    const authRef = useRef(auth), authGeneration = useRef(0);
+    const setAuth = useCallback(update => { const next = typeof update === "function" ? update(authRef.current) : update; if (next.token !== authRef.current.token || next.source !== authRef.current.source) authGeneration.current++; authRef.current = next; setAuthState(next); }, []);
     const invite = inviteState && inviteState.token === auth.token ? inviteState.data : null;
     const inviteStatus = inviteState && inviteState.token === auth.token ? inviteState.status : "idle";
     const [cfgStatus, setCfgStatus] = useState("loading");
@@ -422,11 +422,13 @@ export function createDashboard(browser, {
       });
     }
 
-    function billing(kind, plan, fromArrival = false) {
-      return billingAction({
+    async function billing(kind, plan, fromArrival = false) {
+      if (checkoutLock.current?.kind === "topup") return;
+      const ticket = { kind: "billing" }; checkoutLock.current = ticket;
+      try { return await billingAction({
         authRef, meResult, meStatus, upgrades, billingRequest, countArrival, IS, setBusy,
         bounded, browser, setNote,
-      }, kind, plan, fromArrival);
+      }, kind, plan, fromArrival); } finally { if (checkoutLock.current === ticket) checkoutLock.current = null; }
     }
 
     // profile sync with the extension
@@ -810,6 +812,21 @@ export function createDashboard(browser, {
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
     const outOfRuns = !!(auth.token && allowance && allowance.exhausted);
     const showAllowance = !arrivalDismissed && (upgradeAsk || outOfRuns);
+    const eligibleTopup = topupEligible({ open: showAllowance, auth, cfgStatus, meStatus, allowance });
+    const [topupState, setTopupState] = useState(null);
+    const topupContext = useRef(null);
+    topupContext.current = { eligible: eligibleTopup, workerUrl: C.workerUrl };
+    const topupActions = useRef(null);
+    if (!topupActions.current) topupActions.current = createTopupActions(browser, {
+      context: () => ({ ...topupContext.current, token: authRef.current.token, generation: authGeneration.current }),
+      update: setTopupState, lock: checkoutLock, onPurchase: () => countArrival("out_of_runs_topup"),
+    });
+    useEffect(() => {
+      topupActions.current.cancel(); setTopupState(null);
+      if (eligibleTopup) void topupActions.current.load();
+      return () => topupActions.current.cancel();
+    }, [eligibleTopup, auth.token, authGeneration.current]);
+    const topup = eligibleTopup && topupState ? { ...topupState, buy: topupActions.current.buy, retry: topupActions.current.load } : null;
     const arrivalFocused = useRef(false);
     const arrivalInserted = useRef(false), arrivalAnchor = useRef(null);
     if (showAllowance && !arrivalInserted.current) arrivalAnchor.current = visibleFocusAnchor();
@@ -1185,9 +1202,9 @@ export function createDashboard(browser, {
       h("main", { id: "main" },
       h("div", { id: "allowance-announcement", className: "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, showAllowance ? "Auto-Apply allowance options are open." : ""),
       showAllowance && h(AllowancePanel, { signedIn: !!auth.token, me, status: meStatus, cfgStatus, allowance, resetDay,
-        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy, signIn: signInProviders,
+        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy: busy || (topup?.status === "opening"), topup, signIn: signInProviders,
         inviteBlock: inviteOffer && h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => { countArrival("out_of_runs_invite"); openInvite(true); }, onCopy: () => { countArrival("out_of_runs_invite"); copyInvite(); } }),
-        onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: dismissArrival }),
+        onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: () => { topupActions.current.cancel(); dismissArrival(); } }),
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
       // counters or any statement of what is here. Now the figures come first while the setup card is
       // open with no profile saved; once there is a profile the card is an edit form and the old order

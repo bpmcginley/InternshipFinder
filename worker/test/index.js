@@ -96,3 +96,4 @@ import "./topup-retention.test.js";
 import "./topup-retirement.test.js";
 
 import "./topup-webhook.test.js";
+import "./purchased-allowance.test.js";

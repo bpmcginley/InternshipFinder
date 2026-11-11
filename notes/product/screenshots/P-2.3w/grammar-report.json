@@ -1,0 +1,93 @@
+[
+  {
+    "name": "unquoted-url-0",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "unquoted-url-1",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "unquoted-url-2",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "unquoted-url-3",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "overlapping-quoted-source",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "short-comment",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "dash-comment",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "end-tag-extra",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "end-tag-slash",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "default-short-comment",
+    "syntheticExecutions": 1,
+    "rejected": true,
+    "actualPublisherEntry": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "default-dash-comment",
+    "syntheticExecutions": 1,
+    "rejected": true,
+    "actualPublisherEntry": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "default-retained-page",
+    "syntheticExecutions": 1,
+    "rejected": true,
+    "actualPublisherEntry": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "annotation-retained-page",
+    "syntheticExecutions": 1,
+    "rejected": true,
+    "actualPublisherEntry": true,
+    "externalRequestsAllowed": 0
+  }
+]
