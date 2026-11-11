@@ -39,6 +39,7 @@ from .site import employer as _employer
 from .site import field as _field
 from .site import llms as _llms
 from .site import near as _near
+from .site import pay as _pay
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
     MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
@@ -3120,76 +3121,24 @@ def pay_report(listings: list[dict], fields: dict[str, list]) -> dict:
     yearly salary or stipend is left out, never converted. The same role on two of one employer's
     boards counts once (as dedupe_roles, but across every employer at once). Roles only in Canada are
     left out: their pay is in Canadian dollars, and a ranking in two currencies ranks neither."""
-    seen, roles = set(), []
-    for x in newest_first(listings):
-        r = hourly_rate(x)
-        if not r or canada_only(x):
-            continue
-        # The same title, place and rate is the same role, even under two spellings of the employer
-        # ("Cadence" and "Cadence Design Systems" both posted Software Intern, San Jose, $31.63-$58.75).
-        key = (re.sub(r"\W+", " ", (x.get("title") or "").lower()).strip(), place(x), r)
-        if key not in seen:
-            seen.add(key)
-            roles.append((x, r[0], r[1]))
-    mid = lambda lo, hi: (lo + hi) / 2  # noqa: E731  a range counts as its midpoint in a median
-    # Ranked by the top of the range, then its bottom; ties go to the name, title and id, so every
-    # build of the same data lists them in the same order.
-    ranked = sorted(
-        roles,
-        key=lambda r: (
-            -r[2],
-            -r[1],
-            str(r[0].get("company_name") or ""),
-            str(r[0].get("title") or ""),
-            r[0]["id"],
+    return _pay.select_report(
+        listings,
+        fields,
+        limits=_pay.Limits(
+            per_employer=PAY_PER_EMPLOYER,
+            top=PAY_TOP,
+            field=MIN_PAY_FIELD,
+            employer=MIN_PAY_EMPLOYER,
+            employer_rows=PAY_EMPLOYERS,
         ),
+        newest_first=newest_first,
+        hourly_rate=hourly_rate,
+        canada_only=canada_only,
+        place=place,
+        employer_key=employer_key,
+        field_title=field_title,
+        real_salary=real_salary,
     )
-    per: Counter = Counter()
-    top_roles = []
-    for r in ranked:
-        k = employer_key(r[0].get("company_name") or "")
-        if per[k] < PAY_PER_EMPLOYER and len(top_roles) < PAY_TOP:
-            per[k] += 1
-            top_roles.append(r)
-    by_field = []
-    for t in sorted(fields):
-        rates = [(lo, hi) for x, lo, hi in roles if t in (x.get("field_tags") or [])]
-        if len(rates) >= MIN_PAY_FIELD:
-            by_field.append(
-                (t, len(rates), median(mid(lo, hi) for lo, hi in rates), max(hi for _, hi in rates))
-            )
-    by_field.sort(key=lambda r: (-r[2], -r[3], field_title(r[0])))
-    groups: dict[str, list] = {}
-    for x, lo, hi in roles:
-        if x.get("company_name"):
-            groups.setdefault(employer_key(x["company_name"]), []).append((x, lo, hi))
-    by_employer = []
-    for _, rs in sorted(groups.items()):
-        if len(rs) < MIN_PAY_EMPLOYER:
-            continue
-        names = Counter(x["company_name"] for x, _, _ in rs)
-        name = min(names, key=lambda n: (-names[n], len(n), n))  # the spelling build() picks
-        by_employer.append(
-            (
-                name,
-                len(rs),
-                median(mid(lo, hi) for _, lo, hi in rs),
-                min(lo for _, lo, _ in rs),
-                max(hi for _, _, hi in rs),
-            )
-        )
-    by_employer.sort(key=lambda r: (-r[2], -r[4], r[0]))
-    return {
-        "roles": roles,
-        "top": top_roles,
-        "by_field": by_field,
-        "by_employer": by_employer[:PAY_EMPLOYERS],
-        "employers_listing": sum(1 for rs in groups.values() if len(rs) >= MIN_PAY_EMPLOYER),
-        "median": median(mid(lo, hi) for _, lo, hi in roles) if roles else None,
-        # Roles whose pay is given some other way: a yearly salary, monthly pay, a stipend.
-        "other_pay": sum(1 for x in listings if real_salary(x) and not hourly_rate(x)),
-        "canada": sum(1 for x in listings if hourly_rate(x) and canada_only(x)),
-    }
 
 
 def pay_rows(top_roles: list[tuple], now: datetime) -> str:
@@ -3251,9 +3200,27 @@ def pay_page(
     rep: dict, f: dict, now: datetime, fields: dict[str, list], paid_page: bool
 ) -> tuple[str, str, str]:
     """(title, description, body) of /internships/highest-paying/."""
+    model = _pay.Page(
+        report=rep,
+        open_roles=f["open"],
+        hourly=f["hourly"],
+        paid=f["paid"],
+        now=now,
+        field_totals={t: len(fields[t]) for t, _, _, _ in rep["by_field"]},
+        graduate=sum(1 for x, _, _ in rep["top"] if _GRADUATE.search(x.get("title") or "")),
+        paid_page=paid_page,
+        per_employer=PAY_PER_EMPLOYER,
+        min_field=MIN_PAY_FIELD,
+        min_employer=MIN_PAY_EMPLOYER,
+    )
+    return _render_pay_page(model)
+
+
+def _render_pay_page(model: _pay.Page) -> tuple[str, str, str]:
+    rep, now = model.report, model.now
     x0, _, hi0 = rep["top"][0]
-    n, k = f["open"], f["hourly"]
-    grad = sum(1 for x, _, _ in rep["top"] if _GRADUATE.search(x.get("title") or ""))
+    n, k = model.open_roles, model.hourly
+    grad = model.graduate
     lede = (
         f"The highest hourly pay listed on an open internship, co-op or research role is "
         f"{esc(money(hi0))} an hour, at {company_link(x0.get('company_name') or '')} "
@@ -3265,7 +3232,7 @@ def pay_page(
         f"<a class=\"cta\" href=\"{dash_link(paid=True)}\">See every paid role on the dashboard</a>",
         "<section class=\"prose\"><h2>Top internships by listed hourly pay</h2>",
         f"<p class=\"more\">The {len(rep['top'])} open roles with the highest listed rate, at most "
-        f"{PAY_PER_EMPLOYER} from one employer."
+        f"{model.per_employer} from one employer."
         + (
             f" {grad} of them {'is' if grad == 1 else 'are'} for graduate students (the title says PhD, "
             "MBA, master’s or graduate)."
@@ -3279,7 +3246,7 @@ def pay_page(
         rows = [
             [
                 f"<a href=\"/internships/{field_slug(t)}/\">{esc(field_title(t))}</a>",
-                f"{c:,} of {len(fields[t]):,}",
+                f"{c:,} of {model.field_totals[t]:,}",
                 esc(money(round(m, 2))),
                 esc(money(h)),
             ]
@@ -3287,7 +3254,7 @@ def pay_page(
         ]
         body.append(
             "<section class=\"prose\"><h2>Listed pay by field</h2>"
-            f"<p>The {len(rep['by_field'])} fields where at least {MIN_PAY_FIELD} open roles list an "
+            f"<p>The {len(rep['by_field'])} fields where at least {model.min_field} open roles list an "
             "hourly rate, by median rate. The count is of roles that list a rate, out of the field’s "
             "open roles; most postings in every field give no rate.</p>"
             + table(
@@ -3309,7 +3276,7 @@ def pay_page(
         ]
         body.append(
             "<section class=\"prose\"><h2>Top-paying employers</h2>"
-            f"<p>Employers with at least {MIN_PAY_EMPLOYER} open roles that list an hourly rate, by "
+            f"<p>Employers with at least {model.min_employer} open roles that list an hourly rate, by "
             f"median rate: the top {len(rows)} of {rep['employers_listing']:,}.</p>"
             + table(
                 ["Employer", "Roles listing a rate", "Median", "Range"],
@@ -3320,7 +3287,7 @@ def pay_page(
         )
     body.append(
         "<section class=\"prose\"><h2>How this is counted</h2>"
-        f"<p>{f['paid']:,} of the {n:,} open roles ({pct(f['paid'], n)}) list pay or say they are paid, and "
+        f"<p>{model.paid:,} of the {n:,} open roles ({pct(model.paid, n)}) list pay or say they are paid, and "
         f"{k:,} ({pct(k, n)}) give a clear hourly rate. A rate counts when the posting gives it per hour, or "
         "as amounts under $200 with no unit, which is how student pay is usually written. Yearly salaries, "
         "monthly or weekly pay and stipends are left out, never converted to an hourly figure "
@@ -3339,7 +3306,7 @@ def pay_page(
         + (
             "<p>Every role that lists pay or says it is paid, hourly or not: "
             "<a href=\"/internships/paid/\">paid internships</a>.</p>"
-            if paid_page
+            if model.paid_page
             else ""
         )
         + "</section>"
