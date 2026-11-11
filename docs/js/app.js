@@ -35,10 +35,19 @@
   // calls these for every row it draws. Same text (toLocaleDateString(undefined, o) is
   // new Intl.DateTimeFormat(undefined, o).format).
   const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
-  const SHORT_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
   const fmtDay = d => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? "Invalid Date" : DAY_FMT.format(t); };
   const daysUntil = d => Math.ceil((new Date(d + "T23:59:59").getTime() - Date.now()) / DAY);
-  const shortDate = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : SHORT_FMT.format(d); };
+  function postedTime(value, today = new Date()) {
+    if (!value) return null;
+    // A date-only posting is a calendar date, not midnight UTC on the previous local day.
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value), d = new Date(dateOnly ? value + "T12:00:00" : value);
+    if (isNaN(d) || (dateOnly && (d.getFullYear() !== +value.slice(0, 4) || d.getMonth() + 1 !== +value.slice(5, 7) || d.getDate() !== +value.slice(8)))) return null;
+    const full = DAY_FMT.format(d), day = x => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+    const age = Math.round((day(today) - day(d)) / DAY);
+    return h("time", { dateTime: value, title: full },
+      h("span", { "aria-hidden": true }, "Posted " + (age < 0 ? full : ago(age))),
+      h("span", { className: "sr" }, "Posted " + full));
+  }
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const cx = (...a) => a.filter(Boolean).join(" ");
   const prevent = fn => e => { e.preventDefault(); fn(e); };
@@ -220,6 +229,33 @@
     h("select", { "aria-label": label, value, onChange: e => onChange(e.target.value) }, children));
   const opt = (v, l) => h("option", { key: v, value: v }, l);
 
+  const graphemes = typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+  const companyHue = name => { let hash = 0; for (const c of name.toLowerCase()) hash = (hash * 31 + c.codePointAt(0)) >>> 0; return hash % 360; };
+  function CompanyTile({ name }) {
+    const label = String(name || "").trim().normalize("NFC");
+    const initial = label ? (graphemes ? graphemes.segment(label)[Symbol.iterator]().next().value.segment : Array.from(label)[0]) : "?";
+    return h("span", { className: "company-tile", "aria-hidden": true, style: { "--company-hue": companyHue(label) } }, initial.toUpperCase());
+  }
+
+  function compactLocation(g, raw) {
+    if (!g) return raw;
+    const names = g.kind === "canada" ? IS.CA_PROVINCES : IS.US_STATES;
+    const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f.\s]/g, "").toLowerCase();
+    const country = g.kind === "canada" ? ["canada"] : ["us", "usa", "unitedstates", "unitedstatesofamerica"];
+    let text = raw;
+    if (g.kind !== "remote" && names[g.state]) {
+      const parts = raw.split(",").map(s => s.trim()).filter(Boolean);
+      const suffix = s => { const n = norm(s.replace(/\s*\(remote\)$/i, "")); return n === norm(g.state) || n === norm(names[g.state]) || country.includes(n); };
+      // Keep the first token: New York and Washington can be city names as well as states.
+      while (parts.length > 1 && suffix(parts[parts.length - 1])) parts.pop();
+      text = parts.join(", ");
+      if (!parts.some(s => norm(s) === norm(g.state))) text += ", " + g.state;
+    }
+    if (g.kind === "canada" && !/\bcanada\b/i.test(text)) text += ", Canada";
+    if ((g.kind === "remote" || g.remote || /\(remote\)/i.test(raw)) && !/\bremote\b/i.test(text)) text += " (remote)";
+    return text;
+  }
+
   // The listing's place, inline, for the row's facts line (D9, 2026-10-14): "Boston, MA +2". was: two
   // stacked lines in a Location column (the place, then its state or "Remote" under it).
   function Loc({ r, keys }) {
@@ -227,13 +263,9 @@
     // was: || "—". A muted word says what is missing; a bare dash only says something is.
     const first = g ? g.loc : ((r.location_raw || "").split(";")[0].trim() || null);
     if (!first) return h("span", { className: "muted" }, "Location not listed");
-    // was: remote, else the state when the first line lacks it. A Canadian place also says the country.
-    const sub = g && g.kind === "remote" ? (/remote/i.test(first) ? null : "Remote")
-      : g && g.kind === "canada" ? (/canada/i.test(first) ? (g.remote || /remote/i.test(first) ? "Remote" : null) : `${g.state && !first.includes(g.state) ? g.state + ", " : ""}Canada`)
-      : g && g.state && !first.includes(g.state) ? g.state : null;
     const more = Math.max(0, all.length - 1);
-    return h("span", { title: all.map(x => x.loc).join("; ") }, first, sub ? (sub === "Remote" ? " (remote)" : ", " + sub) : "",
-      more > 0 && h("span", { className: "muted" }, " +" + more));
+    return h("span", { title: all.map(x => x.loc).join("; ") || first }, compactLocation(g, first),
+      more > 0 && h("span", { className: "muted" }, " +" + more + " more"));
   }
 
   // The Why panel (A2 component 6, D13): a region that takes focus when it opens, closes on Escape and hands
@@ -267,7 +299,8 @@
     // was: has ? (has[s.name] ? "✓ " : "✗ ") : "", s.name
     const icon = (name, said) => h(F, null, h("span", { className: "i i-" + name, "aria-hidden": true }), h("span", { className: "sr" }, said));
     const chip = s => h("span", { key: s.name, className: cx("tag", has && (has[s.name] ? "ok" : "miss")), title: has ? (has[s.name] ? "Found on your profile" : "Not on your profile") : "" }, has ? (has[s.name] ? icon("check", "Have: ") : icon("cross", "Missing: ")) : "", s.name);
-    const dates = h("div", { className: "meta" }, posted != null ? `Posted ${ago(posted)}` : "Posting date not listed", seen != null ? ` · first seen ${ago(seen)}` : "", r.sector ? ` · ${IS.sectorLabel(r.sector)} sector` : "");
+    const boardCode = String(r.ats || "").trim(), board = boardCode && !/^other$/i.test(boardCode) ? ATS[boardCode.toLowerCase()] || boardCode : null;
+    const dates = h("div", { className: "meta" }, postedTime(r.posted_at) || "Posting date not listed", seen != null ? ` · first seen ${ago(seen)}` : "", r.sector ? ` · ${IS.sectorLabel(r.sector)} sector` : "", board ? ` · Job board: ${board}` : "");
     // was: h("div", { className: "whyg" }, ...) with h4 headings
     return h("div", { className: "whyg", ref: box, tabIndex: -1, role: "region", "aria-label": `Why: ${r.company_name}, ${r.title}`,
       onKeyDown: e => { if (e.key === "Escape") { e.preventDefault(); onClose && onClose(); } } },
@@ -300,7 +333,7 @@
     // Two field tags fit on the line; the rest are a count.
     const fieldText = tags.slice(0, 2).map(IS.fieldLabel).join(", ") + (tags.length > 2 ? ` +${tags.length - 2}` : "");
     const term = [IS.termText(r.term), r.duration].filter(Boolean).join(", ");
-    const pay = IS.realSalary(r) ? h("span", { className: "num" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? "Stipend" : IS.payOf(r) === "unpaid" ? h("span", { className: "closed" }, "Unpaid") : "Pay not listed";
+    const pay = IS.realSalary(r) ? h("span", { className: "num pay-badge" }, IS.realSalary(r)) : IS.payOf(r) === "stipend" ? h("span", { className: "pay-badge" }, "Stipend") : IS.payOf(r) === "unpaid" ? h("span", { className: "closed pay-badge" }, "Unpaid") : "Pay not listed";
     const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
     return h("div", { className: "meta facts" },
       tags.length ? h("span", { title: tags.length > 2 ? tags.map(IS.fieldLabel).join(", ") : undefined }, fieldText) : h("span", { className: "muted" }, "Not tagged"),
@@ -361,8 +394,8 @@
     const active = job && ACTIVE.includes(job.status);
     const dl = r.insights && r.insights.deadline;
     const stages = (r.stage || []).filter(s => s !== "internship").map(s => IS.STAGE_LABEL[s] || s);
-    const dates = [shortDate(r.posted_at) && `Posted ${shortDate(r.posted_at)}`, dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, ...stages, r.sector && IS.sectorLabel(r.sector),
-      r.ats && r.ats !== "other" && (ATS[r.ats] || r.ats), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
+    const posted = postedTime(r.posted_at);
+    const dates = [dl && daysUntil(dl) >= 0 && `Apply by ${fmtDay(dl)}`, ...stages, r.sector && IS.sectorLabel(r.sector), r.carried && "Not re-checked this scan"].filter(Boolean).join(" · ");
     const bl = elig ? blockers(r, elig).filter(t => !/^For /.test(t)) : [];
     const cols = canAuto ? 5 : 4;
     const dot = h("span", { className: "dot-sep", "aria-hidden": true }, " · ");
@@ -376,11 +409,11 @@
         h("td", { className: "c-co" },
           // A badge that says New has to mean new and still open: is_new alone is only the scan window, and
           // the export keeps closed rows too.
-          h("div", { className: "li-head" }, h("span", { className: "co" }, r.company_name), r.is_new && r.status === "open" && h("span", { className: "new" }, "New"),
+          h("div", { className: "li-head" }, h(CompanyTile, { name: r.company_name }), h("span", { className: "co" }, r.company_name), r.is_new && r.status === "open" && h("span", { className: "new" }, "New"),
             h("span", { className: "sr" }, ", "), dot, h("span", { className: "role" }, r.title)),
           // was: the facts line built here; factsLine (above) since 2026-10-14, shared with the paid box.
           factsLine(r, keys),
-          (dates || r.status === "closed") && h("div", { className: "meta" }, dates, r.status === "closed" && h("span", { className: "closed" }, (dates ? " · " : "") + "Closed")),
+          (posted || dates || r.status === "closed") && h("div", { className: "meta" }, posted, posted && dates ? " · " : "", dates, r.status === "closed" && h("span", { className: "closed" }, (posted || dates ? " · " : "") + "Closed")),
           sc.mismatch && h("div", { className: "meta" }, h("span", { className: "closed" }, `Not for your year: for ${IS.yearsText(r.years)}`)),
           bl.length > 0 && h("div", { className: "meta" }, h("span", { className: "closed", title: bl.join("; ") }, "May not be eligible: " + bl[0]))),
         // was: the score button (or Rank for my major and Details) built here; matchControl (above) since
@@ -394,10 +427,10 @@
           // onOpen (U9): remembered so the page can ask "Did you apply?" when the student comes back.
           r.apply_url ? h("a", { className: "open-link", href: r.apply_url, target: "_blank", rel: "noopener", "data-aa": SUPPORTED_ATS.has(r.ats) ? "" : undefined, onClick: () => onOpen(r) },
             "Open posting", h("span", { className: "i i-external", "aria-hidden": true }), h("span", { className: "sr" }, `, ${who} (opens in a new tab)`)) : h("span", { className: "muted" }, "No link"),
-          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
+          !job && canAuto && r.apply_url && h("button", { type: "button", className: "rowbtn", title: "Fills from your resume. You review and submit.", disabled: queueBusy, onClick: () => onAuto([r]), "aria-describedby": needsAccess ? "acc-" + r.id : undefined },
             "Auto-Apply", h("span", { className: "sr" }, ": " + who)),
           !job && needsAccess && h("span", { className: "aa-note", id: "acc-" + r.id, title: "This application is on the employer's own site. The first time, Auto-Apply asks you to allow that one site." }, "asks for site access"),
-          tryAuto && h("button", { type: "button", className: "rowbtn try", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply", h("span", { className: "sr" }, ": " + who))),
+          tryAuto && h("button", { type: "button", className: "rowbtn try", title: "Fills from your resume. You review and submit.", "aria-expanded": aaOpen, "aria-controls": "aa-" + r.id, onClick: () => setAaOpen(o => !o) }, "Auto-Apply", h("span", { className: "sr" }, ": " + who))),
           // was: h("div", null, h("a", { className: "report", ... }, "Report")): in the Why panel only now (D11).
         h("td", { className: "c-mine" },
           // was: "aria-label": "Your status" on all 150 selects, then "Your status for " + r.title (two employers'
