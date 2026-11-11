@@ -585,8 +585,8 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 ## WP-6.1.4 and WP-6.1.5 data cutover
 
 - The prior main-targeting ingest finished at `cde2646f`. The seed commit `2e3f1c5b` removes one redundant identical line from the listing index. Parsed values and ordering and all other bytes match the prior snapshot. The strict validator passed before the initial normal push.
-- [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) merged as `997cfd6d` from reviewed head `99a5d5e1` with all nine checks green. The [seed Pages run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039657) selected source `data` and the exact seed commit and public tree. Build, deploy, notify and the exact Pages deployment succeeded.
-- The merge started [automatic ingest 42969039608](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039608). The seed publication was a push-triggered Pages run. G3 starts after the first successful ingest and its matching successful Pages follower, then requires seven clean days before removing data from main.
+- [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) merged as `997cfd6d` from reviewed head `99a5d5e1` with all nine checks green. The [seed Pages run](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039657) selected source `data` at seed `2e3f1c5b` and public tree `161e4b72`. Build, deploy, notify, the exact Pages deployment and backend 42969039593 succeeded. The public index returned HTTP 200 with byte-identical seed content, a duplicate-free parse and 68 shards.
+- The merge started [automatic ingest 42969039608](https://github.com/bpmcginley/InternshipFinder/actions/runs/42969039608). The guard, data checkout and prepare steps passed. Ingest and export remain in progress. The seed publication was a push-triggered Pages run. G3 starts after the first successful ingest and its matching successful Pages follower, then requires seven clean days before removing data from main.
 
 ## WP-6.3 ingest timing from existing runs
 
