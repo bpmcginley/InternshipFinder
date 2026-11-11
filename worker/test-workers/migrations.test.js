@@ -4,6 +4,7 @@ import { applyD1Migrations } from "cloudflare:test";
 import { beforeEach, expect, it } from "vitest";
 
 const baselineName = "0001_baseline.sql";
+const migrationNames = [baselineName, "0002_follow_lifecycle.sql"];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
 const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
@@ -20,7 +21,7 @@ beforeEach(async () => {
   for (const db of databases) {
     await run(
       db,
-      [...tableNames, "d1_migrations"].map((name) => `DROP TABLE IF EXISTS "${name}"`),
+      [...tableNames.toReversed(), "d1_migrations"].map((name) => `DROP TABLE IF EXISTS "${name}"`),
     );
   }
 });
@@ -51,14 +52,14 @@ async function schema(db) {
 }
 
 it("the deduplicated migration creates the complete legacy schema, including constraints and triggers", async () => {
-  expect(env.TEST_MIGRATIONS.map((migration) => migration.name)).toEqual([baselineName]);
+  expect(env.TEST_MIGRATIONS.map((migration) => migration.name)).toEqual(migrationNames);
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(42);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(22);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(45);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(24);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(6);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 
 async function historicalRows(db) {
@@ -109,7 +110,7 @@ it("historical account and inviter backfills match the legacy path and fixed-dat
   expect(await backfillRows(env.MIGRATION_DB)).toEqual(expected);
   await initialize();
   for (const db of databases) expect(await backfillRows(db)).toEqual(expected);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 
 async function triggerOutcomes(db) {
@@ -189,5 +190,5 @@ it("migration bookkeeping skips an applied baseline and rolls back a failed migr
       "SELECT name FROM sqlite_schema WHERE name='migration_failure_probe'",
     ),
   ).toEqual([]);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
