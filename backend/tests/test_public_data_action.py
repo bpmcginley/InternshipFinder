@@ -68,7 +68,16 @@ def test_present_ref_requires_exact_complete_snapshot(tmp_path, selector):
     original = json.loads(index.read_text(encoding="utf-8"))
     duplicate = {"file": "listings/MA.desc.json", "desc": "listings/MA.desc.json"}
     backslash = {"file": r"listings/MA\child.json", "desc": r"listings/MA\child.desc.json"}
-    for files in ({"MA": duplicate}, {r"MA\child": backslash}):
+    (shards / "index.desc.json").write_text("{}", encoding="utf-8")
+    index_alias = {"file": "listings/index.json", "desc": "listings/index.desc.json"}
+    (shards / "MA.desc.desc.json").write_text("{}", encoding="utf-8")
+    shard_alias = {"file": "listings/MA.desc.json", "desc": "listings/MA.desc.desc.json"}
+    for files in (
+        {"MA": duplicate},
+        {r"MA\child": backslash},
+        {"index": index_alias},
+        {**original["files"], "MA.desc": shard_alias},
+    ):
         index.write_text(json.dumps({**original, "files": files}), encoding="utf-8")
         with pytest.raises(SystemExit, match="complete listing export"):
             actions.select(tmp_path, SHA)

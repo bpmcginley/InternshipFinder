@@ -56,13 +56,15 @@ def check_snapshot(directory: Path) -> None:
         manifest = json.loads(index.read_text(encoding="utf-8"))
         if manifest["first"]["file"] != "first.json":
             raise ValueError
+        paths = {"listings/index.json"}
         for shard, metadata in manifest["files"].items():
             if not shard or any(separator in shard for separator in ("/", "\\", ":")):
                 raise ValueError
             for field, suffix in (("file", ".json"), ("desc", ".desc.json")):
                 name = f"listings/{shard}{suffix}"
-                if metadata[field] != name or not (directory / name).is_file():
+                if name in paths or metadata[field] != name or not (directory / name).is_file():
                     raise ValueError
+                paths.add(name)
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         raise SystemExit("The public data branch does not contain a complete listing export.") from None
 
