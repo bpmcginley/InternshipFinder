@@ -177,3 +177,8 @@ After #210 merged, a conflict-free normal integration of actual main `aa9070c4` 
 The lead released the existing worktree after the original writer finished. It was clean at exact reviewed `ccdd93e4` before integration. Normally merged #211 frozen `c538196b`, then its metadata-only main-integration head `1faff4d4`; #217 retains base #211 until that parent merges. The two-link app source, HTML and all P-1.7f screenshot/evidence files remain byte-identical to `ccdd93e4`. Parent tests and current data/install/count/backend/cache/harness/workflow are preserved, including the four upstream distribution tests absent from the old branch.
 
 Node 22 serial site suite passed 316/316 and both golden tests passed. Both stamped artifacts were rebuilt: all 695 archive hashes match the manifest; only js/app.js and index.html differ from the parent. The index difference is exactly the generated app asset hash; no HTML wording or date-record changes occur. Repository-wide pinned JavaScript lint reported zero errors/warnings, startup reporting succeeded, and the actual695-file archive passed the publication allowlist. Checker tests passed four cases with the existing Windows symlink skip. Original browser evidence applies to byte-identical source; no new measurement is claimed. No source cache tag was edited. Final CI/review, parent merge/publication and retarget checks remain required; no deployment, release, mail, provider call or real application occurred.
+
+## P-2.3b daily-cap claim
+
+P-2.3b is claimed by audit_growth_generated on `codex/product-p2.3b-day-cap`, stacked on frozen #227. Draft PR pending; needs-bruce. Scope and approved extra aggregate: [P-2.3b-day-cap.md](P-2.3b-day-cap.md). No production wiring or activation.
+
