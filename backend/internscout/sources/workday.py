@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from ..console_log import console_exception
 from .common import (
     RobotsDisallowed,
     ScanCounts,
@@ -259,8 +260,8 @@ def fetch_workday_board(c, co: dict) -> list[dict]:
                 if d.status_code == 200:
                     dl, desc = parse_workday_detail(d.json())
                     locs = board_locations(tenant, dl) or locs
-            except Exception:
-                pass
+            except Exception as e:
+                console_exception("[workday] job detail failed", type(e).__name__)
         out.append(
             board_item(
                 co,
