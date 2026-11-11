@@ -1,7 +1,6 @@
 // Asking for a Chrome Web Store review (added 2026-10-07). Reviews are how other students find the
 // extension, and a student is likeliest to write one right after it has done something for them, so
-// the side panel shows one small card at that moment: after their 2nd filled application, and once
-// more after their 10th. Never on the first, never while an application is being filled, and never
+// the side panel shows one small card at that moment: after their 3rd filled application, once. Never on the first, never while an application is being filled, and never
 // again after "Leave a review" or "Don't ask again". The same quiet "Leave a review" link is always
 // in the popup and the side panel for anyone who wants it without being asked.
 //
@@ -21,13 +20,13 @@ export const STORE_REVIEWS_URL =
 // and Chrome's uninstall page (background/index.js).
 export const FEEDBACK_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform";
-// Filled applications after which the card appears. Two asks at most, ever.
-export const MILESTONES = [2, 10];
+// One proactive ask on this device, after the third successful fill.
+export const MILESTONES = [3];
 const MAX_IDS = 500; // job ids already counted, so "Check the form again" or a retry doesn't count a job twice
 
-// Statuses that mean the agent finished filling: ready_to_submit is the success moment, and a job
-// marked submitted got there too.
-export const FILLED = new Set(["ready_to_submit", "submitted"]);
+// Ready is evidence of filling. Submitted can be a manual status, so a queue without stored
+// review history cannot safely count it. Existing stored counts are preserved by migration.
+export const FILLED = new Set(["ready_to_submit"]);
 
 // The next milestone above `filled`, as an index into MILESTONES (MILESTONES.length when none is left).
 const nextAfter = (filled) => {
@@ -41,7 +40,7 @@ const nextAfter = (filled) => {
 export function emptyState(ids = []) {
   const uniq = [...new Set(ids)].slice(-MAX_IDS);
   return {
-    v: 1,
+    v: 2,
     filled: uniq.length,
     ids: uniq,
     next: nextAfter(uniq.length),
@@ -51,16 +50,30 @@ export function emptyState(ids = []) {
   };
 }
 
+// Keep the existing key, history and permanent decisions. A prior ask/open card consumes the
+// single opportunity; an update never asks late about a milestone already passed.
+export function migrateReview(state) {
+  if (!state) return null;
+  if (state.v === 2) return state;
+  const consumed = !!(state.done || state.open || state.asks > 0 || state.filled >= 3);
+  return { ...state, v: 2, open: false, next: consumed ? MILESTONES.length : 0 };
+}
+
+// Submitted can be a manual status, so only reaching Ready is a new successful fill.
+// Missing review history seeds only Ready jobs, never inferred manual submissions.
+export const fillTransition = (previous, status) =>
+  !!previous && previous !== status && status === "ready_to_submit";
+
 // One application filled. Returns a new state; the same one when this job was already counted.
 export function recordFill(state, id) {
-  const s = state || emptyState();
+  const s = migrateReview(state) || emptyState();
   if (!id || s.ids.includes(id)) return s;
   const out = { ...s, filled: s.filled + 1, ids: [...s.ids, id].slice(-MAX_IDS) };
   if (
     !out.done &&
     out.next < MILESTONES.length &&
     out.filled >= MILESTONES[out.next] &&
-    out.filled >= 2
+    out.filled >= 3
   ) {
     if (!out.open) out.asks = out.asks + 1; // a card still showing from the last milestone stays one card
     out.open = true;
@@ -71,24 +84,24 @@ export function recordFill(state, id) {
 
 // Whether the card shows now. `jobs` is the queue's jobs: while any is being filled, it waits.
 export function shouldShow(state, jobs = []) {
-  if (!state || !state.open || state.done || state.filled < 2) return false;
+  state = migrateReview(state);
+  if (!state || !state.open || state.done || state.filled < 3) return false;
   return !jobs.some((j) => j && j.status === "working");
 }
 
 // The student's answer. "review": they went to the store (from the card or the always-there link);
-// "never": Don't ask again; "later": Not now, so the next milestone may ask once more.
+// "never": Don't ask again; "later": Not now. Neither allows a second proactive ask.
 export function answer(state, action) {
-  const s = state || emptyState();
+  const s = migrateReview(state) || emptyState();
   if (action === "review") return { ...s, open: false, done: "reviewed" };
   if (action === "never") return { ...s, open: false, done: "never" };
-  if (action === "later") return { ...s, open: false };
+  if (action === "later") return { ...s, open: false, next: MILESTONES.length };
   return s;
 }
 
-// Whether the dashboard may show its own one-line review suggestion: the student has filled a couple
-// of applications and has not reviewed or said "Don't ask again" here. Handed to the dashboard in the
-// ping reply (background/index.js), inside this browser only.
-export const webLineOk = (state) => !!(state && !state.done && state.filled >= 2);
+// The side panel is the sole proactive surface. Existing passive review links remain available;
+// returning false also prevents an independent dashboard suggestion after a card was dismissed.
+export const webLineOk = () => false;
 
 // The card's words. `n` is this device's count of filled applications.
 export function cardCopy(n) {
@@ -110,7 +123,7 @@ function withLock(fn) {
   return p;
 }
 export async function loadReview() {
-  return (await chrome.storage.local.get(KEY))[KEY] || null;
+  return migrateReview((await chrome.storage.local.get(KEY))[KEY] || null);
 }
 
 // A job reached a filled status. `jobs` (the whole queue's jobs) seeds the count the first time.

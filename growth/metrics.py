@@ -37,7 +37,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
+# Keep direct checkout invocation working without an editable install.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+try:
+    from internscout.console_log import console
+finally:
+    sys.path.pop(0)
 
 ACCOUNT = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "d4a5640a67faee275d9df91204c4ec59")
 SITE_TAG = os.environ.get("CLOUDFLARE_SITE_TAG", "54f99780d57f4ae2a55182b44b082e0a")
@@ -1420,7 +1428,7 @@ def main(argv: list[str]) -> int:
     if not write:
         return 0
     if not token:
-        print("[metrics] nothing written: no CLOUDFLARE_API_TOKEN")
+        console("[metrics] nothing written: no CLOUDFLARE_API_TOKEN")
         return 1
     try:
         for row in days:
@@ -1455,9 +1463,9 @@ def main(argv: list[str]) -> int:
             else str(e)
         )
         print(f"[metrics] write failed: {detail}")
-        print("[metrics] The Cloudflare token needs D1: Edit as well as Account Analytics: Read.")
+        console("[metrics] The Cloudflare token needs D1: Edit as well as Account Analytics: Read.")
         return 1
-    print(f"[metrics] wrote {len(days)} days and a snapshot")
+    console(f"[metrics] wrote {len(days)} days and a snapshot")
     return 0
 
 

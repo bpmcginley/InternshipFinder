@@ -164,7 +164,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          sparse-checkout: growth
+          sparse-checkout: |
+            growth
+            backend/internscout
       - uses: actions/download-artifact@v8
         with:
           name: sitemaps
