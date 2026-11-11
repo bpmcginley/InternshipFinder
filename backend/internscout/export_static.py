@@ -806,6 +806,8 @@ def export(out_dir: str, completed_boards=None, observed_urls=None, *, follow_ca
             .order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
         fixed = follow_capture.predecessor(out_dir) if follow_capture is not None else None
+        if fixed is None:
+            follow_capture = None
         listings = []
         for row in rows:
             item = _listing_dict(row)

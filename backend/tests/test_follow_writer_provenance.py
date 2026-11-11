@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from shutil import copytree
@@ -175,17 +174,81 @@ def test_failed_sqlite_commit_does_not_release_new_row_origin(tmp_path, database
     assert capture.result is None
 
 
-def test_predecessor_digest_and_seed_bound_fail_before_any_export_write(tmp_path, database):
-    directory = tmp_path / "public"
-    identity = seed(directory, [])
+def test_seed_bound_requires_prior_observation(tmp_path):
+    identity = seed(tmp_path / "public", [])
     with pytest.raises(ValueError, match="coverage start"):
         FollowWriterCapture(
             covers_after=BASELINE,
             prior_identity=identity,
             seed_observed_by=BASELINE + timedelta(microseconds=1),
         )
-    before = public_bytes(directory)
-    capture = observe_seed(replace(identity, index_sha256="0" * 64))
-    with pytest.raises(ValueError, match="differ"):
+
+
+@pytest.mark.parametrize("failure", ["digest", "missing", "malformed"])
+def test_invalid_predecessor_falls_back_to_normal_public_export(tmp_path, database, failure):
+    sessions, _ = database
+    healthy, enabled, disabled = (tmp_path / name for name in ("healthy", "enabled", "disabled"))
+    rows = [raw("Fixture Prior", "prior"), raw("Fixture Fresh", "fresh")]
+    pipeline.run(rows[:1], verbose=False)
+    with sessions() as db:
+        prior = export_static._listing_dict(db.scalar(select(Listing)))
+    identity = seed(healthy, [prior | {"first_seen": "2026-11-01T10:00:00"}])
+    copytree(healthy, enabled)
+    capture = observe_seed(identity)
+    pipeline.run(rows, verbose=False, follow_capture=capture)
+    export_static.export(str(healthy), follow_capture=capture)
+    assert capture.result is not None
+
+    index = enabled / "listings/index.json"
+    if failure == "digest":
+        index.write_bytes(index.read_bytes() + b" ")
+    elif failure == "missing":
+        index.unlink()
+    else:
+        index.write_bytes(b"{invalid")
+    copytree(enabled, disabled)
+    assert export_static.export(str(enabled), follow_capture=capture) == export_static.export(
+        str(disabled)
+    )
+    assert capture.result is None
+    assert public_bytes(enabled) == public_bytes(disabled)
+    assert public_bytes(enabled) == public_bytes(healthy)
+
+
+def test_failed_seal_preserves_completed_public_export(tmp_path, database, monkeypatch):
+    from internscout import follow_writer_provenance
+
+    enabled, disabled = tmp_path / "enabled", tmp_path / "disabled"
+    capture = observe_seed(seed(enabled, []))
+    copytree(enabled, disabled)
+    pipeline.run([raw("Fixture Fresh", "fresh")], verbose=False, follow_capture=capture)
+    original = follow_writer_provenance._fixed_export
+    calls = 0
+
+    def fail_at_seal(directory):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("synthetic evidence read failure")
+        return original(directory)
+
+    monkeypatch.setattr(follow_writer_provenance, "_fixed_export", fail_at_seal)
+    assert export_static.export(str(enabled), follow_capture=capture) == export_static.export(
+        str(disabled)
+    )
+    assert calls == 2
+    assert capture.result is None
+    assert public_bytes(enabled) == public_bytes(disabled)
+
+
+def test_unrelated_public_writer_errors_still_propagate(tmp_path, database, monkeypatch):
+    directory = tmp_path / "public"
+    capture = observe_seed(seed(directory, []))
+
+    def fail_write(*_args):
+        raise OSError("synthetic public write failure")
+
+    monkeypatch.setattr(export_static, "write_shards", fail_write)
+    with pytest.raises(OSError, match="public write failure"):
         export_static.export(str(directory), follow_capture=capture)
-    assert public_bytes(directory) == before
+    assert capture.result is None

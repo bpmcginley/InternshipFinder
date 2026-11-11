@@ -52,20 +52,31 @@ class WriterProvenance:
         )
 
 
+class _EvidenceUnavailable(ValueError):
+    pass
+
+
 def _unique_object(pairs):
     result = dict(pairs)
     if len(result) != len(pairs):
-        raise ValueError("Duplicate follow capture JSON key")
+        raise _EvidenceUnavailable("Duplicate follow capture JSON key")
     return result
+
+
+def _json(raw):
+    try:
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object)
+    except (ValueError, RecursionError) as error:
+        raise _EvidenceUnavailable("Invalid follow capture JSON") from error
 
 
 def _fixed_export(out_dir):
     directory = Path(out_dir) / "listings"
     index_bytes = (directory / "index.json").read_bytes()
-    index = json.loads(index_bytes, object_pairs_hook=_unique_object)
+    index = _json(index_bytes)
     files = index.get("files") if isinstance(index, dict) else None
     if not isinstance(files, dict) or any(not _SHARD.fullmatch(k) for k in files):
-        raise ValueError("Invalid follow capture manifest")
+        raise _EvidenceUnavailable("Invalid follow capture manifest")
     expected = {f"{k}.json" for k in files}
     actual = {
         p.name
@@ -73,12 +84,12 @@ def _fixed_export(out_dir):
         if p.name != "index.json" and not p.name.endswith(".desc.json")
     }
     if actual != expected:
-        raise ValueError("Incomplete follow capture manifest")
+        raise _EvidenceUnavailable("Incomplete follow capture manifest")
     shards, digests, rows, signatures = {}, {}, {}, {}
     for key, entry in files.items():
         name = f"{key}.json"
         raw = (directory / name).read_bytes()
-        parts = json.loads(raw, object_pairs_hook=_unique_object)
+        parts = _json(raw)
         if (
             not isinstance(parts, list)
             or not isinstance(entry, dict)
@@ -87,26 +98,30 @@ def _fixed_export(out_dir):
             or type(entry.get("open")) is not int
             or entry["count"] != len(parts)
         ):
-            raise ValueError("Invalid follow capture shard")
+            raise _EvidenceUnavailable("Invalid follow capture shard")
         ids = set()
         open_count = 0
         for row in parts:
             role_id = row.get("id") if isinstance(row, dict) else None
-            signature = json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            try:
+                signature = json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            except (ValueError, RecursionError) as error:
+                raise _EvidenceUnavailable("Invalid follow capture row") from error
             if (
                 not isinstance(role_id, str)
                 or not _ID.fullmatch(role_id)
                 or row.get("status") not in ("open", "closed")
+                or (row.get("apply_url") is not None and not isinstance(row["apply_url"], str))
                 or role_id in ids
                 or (role_id in signatures and signatures[role_id] != signature)
             ):
-                raise ValueError("Ambiguous follow capture row")
+                raise _EvidenceUnavailable("Ambiguous follow capture row")
             ids.add(role_id)
             rows[role_id] = row
             signatures[role_id] = signature
             open_count += row["status"] == "open"
         if entry["open"] != open_count:
-            raise ValueError("Invalid follow capture open count")
+            raise _EvidenceUnavailable("Invalid follow capture open count")
         shards[name] = raw
         digests[key] = sha256(raw).hexdigest()
     return (
@@ -164,16 +179,20 @@ class FollowWriterCapture:
     def committed(self, origins: Mapping[str, datetime]) -> None:
         self._origins.update(origins)
 
-    def predecessor(self, out_dir) -> Mapping[str, bytes]:
+    def predecessor(self, out_dir) -> Mapping[str, bytes] | None:
+        """Return fixed predecessor bytes, or leave the caller on the normal export path."""
         self.result = None
         self._selected.clear()
-        identity, shards, rows, index = _fixed_export(out_dir)
+        try:
+            identity, shards, rows, index = _fixed_export(out_dir)
+        except (_EvidenceUnavailable, OSError):
+            return None
         if identity != self._prior_identity:
-            raise ValueError("Follow predecessor bytes differ from attested export")
+            return None
         if self._seed is not None:
             generation = _parse(index.get("generated_at"))
             if not _aware(generation) or generation > self._seed:
-                raise ValueError("Follow seed observation predates export")
+                return None
         self._previous_ids = set(rows)
         self._previous_urls = {r["apply_url"] for r in rows.values() if r.get("apply_url")}
         return shards
@@ -193,11 +212,11 @@ class FollowWriterCapture:
 
     def carried(self, row: dict, predecessor: dict) -> None:
         raw = row.get("first_seen")
+        stamp = _parse(raw)
+        if stamp is None or raw != predecessor.get("first_seen"):
+            return
         key = (row["id"], raw)
         self._selected.pop(key, None)
-        stamp = _parse(raw)
-        if raw != predecessor.get("first_seen") or stamp is None:
-            return
         proof = self._prior.get((predecessor["id"], raw))
         if self._seed is not None:
             proof = FirstSeenLineage(raw, observed_by=self._seed)
@@ -216,14 +235,17 @@ class FollowWriterCapture:
 
     def seal(self, out_dir, generated_at: str) -> None:
         self.result = None
-        identity, shards, rows, index = _fixed_export(out_dir)
+        try:
+            identity, shards, rows, index = _fixed_export(out_dir)
+        except (_EvidenceUnavailable, OSError):
+            return
         end = _parse(generated_at)
         if (
-            index["generated_at"] != generated_at
+            index.get("generated_at") != generated_at
             or not _aware(end)
             or end.replace(microsecond=end.microsecond // 1000 * 1000) <= self.covers_after
         ):
-            raise ValueError("Follow output generation changed before capture")
+            return
         if not shards:
             return
         evidence, lineage = {}, {}
