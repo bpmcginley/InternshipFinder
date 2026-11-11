@@ -47,10 +47,14 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import facts as site_facts  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
 from internscout.console_log import console  # noqa: E402
 
-SITE = sp.SITE
+SITE = site_assets.SITE
 SIZES = {"feed": (1080, 1350), "tall": (1080, 1920)}
 # Clear of the app's own buttons and caption: Reels and TikTok draw over the top 220 and bottom 420
 # pixels of a tall frame (growth/reels.py); a feed carousel only needs a margin.
@@ -264,7 +268,7 @@ def tagged(path: str, channel: str, campaign: str, content: str = "post") -> str
 
 
 def place_words(k: str) -> str:
-    return "remote (US)" if k == "remote" else sp.in_place(k).removeprefix("in ")
+    return "remote (US)" if k == "remote" else site_taxonomy.in_place(k).removeprefix("in ")
 
 
 def search_pick(listings: list[dict], now: datetime) -> dict | None:
@@ -272,7 +276,7 @@ def search_pick(listings: list[dict], now: datetime) -> dict | None:
     field's best place, then a different field each ISO week, so the feed covers every major in turn."""
     count: Counter = Counter()
     for x in listings:
-        for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS:
+        for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS:
             for k in x["keys"] & set(SEARCH_PLACES):
                 count[(t, k)] += 1
     best: dict[str, tuple[str, int]] = {}
@@ -293,13 +297,13 @@ def search_pick(listings: list[dict], now: datetime) -> dict | None:
 def search_slides(pick: dict, now: datetime, baseline: str | None) -> list[tuple[str, str]]:
     """(kicker, text) slides for a search pick. Each says only what the listings show."""
     items, t, k = pick["items"], pick["field"], pick["place"]
-    name = sp.lower_name(sp.field_title(t))
+    name = site_text.lower_name(site_taxonomy.field_title(t))
     where = place_words(k)
-    new = [x for x in items if sp.fresh(x, now, baseline)]
+    new = [x for x in items if site_source.fresh(x, now, baseline)]
     out = [
         (
             "A real search, this week",
-            f"{sp.field_title(t)} internships {('that are ' if k == 'remote' else 'in ')}{where}",
+            f"{site_taxonomy.field_title(t)} internships {('that are ' if k == 'remote' else 'in ')}{where}",
         ),
         (
             "Open right now",
@@ -317,14 +321,14 @@ def search_slides(pick: dict, now: datetime, baseline: str | None) -> list[tuple
                 ", ".join(employers[:4]) + (" and more." if len(employers) > 4 else "."),
             )
         )
-    pay = sp.hourly_range(items)
+    pay = site_facts.hourly_range(items)
     if pay:
         lo, hi, n = pay
         out.append(
             (
                 "Listed pay",
                 f"an hour, on the {n} of {len(items)} postings that state an hourly rate.",
-                sp.money(lo) if lo == hi else f"{sp.money(lo)}-{sp.money(hi)}",
+                site_text.money(lo) if lo == hi else f"{site_text.money(lo)}-{site_text.money(hi)}",
             )
         )
     early = [x for x in items if {"first_year", "sophomore"} & set(x.get("years") or [])]
@@ -352,7 +356,7 @@ def tip_pick(now: datetime) -> dict:
 def search_path(pick: dict) -> str:
     """The dashboard opened on this search (docs/js/app.js reads ?field= and ?state=)."""
     k = pick["place"]
-    return f"/?field={quote(pick['field'])}&state={quote(sp._dash_state(k), safe=',')}"
+    return f"/?field={quote(pick['field'])}&state={quote(site_taxonomy._dash_state(k), safe=',')}"
 
 
 def captions(
@@ -512,8 +516,8 @@ Captions for each channel are in captions.json, each link tagged for its channel
 def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict | None:
     """Write the week's pack into out_dir and return its manifest; None when there's nothing to show or
     lint refused something (printed)."""
-    d = sp.load(site_dir)
-    export = sp._when(d["generated_at"]) or datetime.now(timezone.utc)
+    d = site_source.load(site_dir)
+    export = site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
     now = now or datetime.now(timezone.utc)
     pick = search_pick(d["listings"], export)
     if not pick:
