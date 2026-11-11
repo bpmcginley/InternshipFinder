@@ -45,8 +45,8 @@ import "./follow-outbox.test.js";
 import "./follow-unsubscribe.test.js";
 import "./follow-mail.test.js";
 import "./follow-request-deletion.test.js";
-import "./follow-progress.test.js";
 import "./follow-matching.test.js";
+import "./follow-progress.test.js";
 import "./follow-enqueue.test.js";
 import "./follow-send-budget.test.js";
 import "./follow-budgeted-attempt.test.js";
@@ -54,6 +54,7 @@ import "./follow-finalization.test.js";
 import "./follow-archive-reader.test.js";
 import "./follow-archive-enqueue.test.js";
 import "./follow-digest-delivery.test.js";
+import "./follow-delivery-tick.test.js";
 
 import "./topup-ledger.test.js";
 import "./topup-decisions.test.js";
