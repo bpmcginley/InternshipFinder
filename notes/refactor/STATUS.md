@@ -15,7 +15,7 @@ Updated: 2026-11-10. Lead: Codex lead session. Instructions: [HANDOFF.md](HANDOF
 - Both hand-offs were read in full before the initial audit; original clean-main baseline is `57202cae` and all six suites passed. The original dirty checkout and MuseWork.md remain untouched.
 - Waves 0-2 are complete. JavaScript #189 and Python retry #192 have green Pages/backend verification. Python #190 was ordinarily reverted by #191 after a deployment timeout, then retried without source changes.
 - The four retained PRs #165, #175, #177 and #178 are merged with green CI, independent reviews and green Pages. Bruce lifted the earlier notice-time/empty-queue hold; claimed-file ownership and production restrictions remain in force.
-- All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. The four manual source tag removals remain deferred under product ownership. Wave 4 work has started.
+- All seven Wave 3 PRs are merged and their Pages runs and deployment statuses are green. Asset versioning #205 is active after Pages run 42914104660. PR #230 removed the four manual source tags after Product released the files and merged as `789e72f0`. Wave 4 work has started.
 - Product #188 was ordinarily reverted by #197 after a Pages backend sequencing failure; its reviewed retry #200 published successfully. Main merges are serialized with the product lead. Check both Actions and exact-commit Pages backend state, including automatic-data follow-up runs, before the next merge.
 - Counter #175 still awaits approved/published disclosure and operator deployment. Migration adoption and unspecified email/payment design choices remain operator decisions. Product claims #187/#193 app/index and #194/generated follow-ups; no refactor writes overlap those claims.
 
@@ -60,19 +60,23 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 3 | WP-1.1 Leftovers | read_backend | `refactor/wp-1.1-leftovers` | [#196](https://github.com/bpmcginley/InternshipFinder/pull/196) | Merged | Independent review, green CI, Pages 42897982856 and backend verified. |
 | 3 | WP-1.2 Python packaging | read_site_extension | `refactor/wp-1.2-packaging` | [#199](https://github.com/bpmcginley/InternshipFinder/pull/199) | Merged | Independent review, green CI, Pages 42902346112 and backend verified; 19 test moves and external import proof. |
 | 3 | WP-1.3 Docs index | Lead | `refactor/wp-1.3-docs-index` | [#195](https://github.com/bpmcginley/InternshipFinder/pull/195) | Merged | Independent review, green CI, Pages 42906475447 and backend verified. Model notes preserved pending Q1. |
-| 3 | WP-1.5 Cache versions | wp15_cache | `refactor/wp-1.5-asset-versions` | [#205](https://github.com/bpmcginley/InternshipFinder/pull/205) | Build integration merged; source cleanup deferred | Independent review, green CI, Pages 42914104660 and backend verified at merge `53008e6c`. Four manual source tags remain product-owned. |
+| 3 | WP-1.5 Cache versions | wp15_cache | `refactor/wp-1.5-asset-versions` | [#205](https://github.com/bpmcginley/InternshipFinder/pull/205) | Build integration merged | Independent review, green CI, Pages 42914104660 and backend verified at merge `53008e6c`. Follow-up source cleanup below. |
+| 3 | WP-1.5 Manual source tags | wp14_logging | `refactor/wp-1.5-source-versions` | [#230](https://github.com/bpmcginley/InternshipFinder/pull/230) | Merged | Merged as `789e72f0`. Pages 42934571282 pending. Four manual versions removed after Product released the dashboard. Built output remains identical. |
 | 3 | WP-2.3 Worker contract | wp23_contract | `refactor/wp-2.3-api-contract` | [#207](https://github.com/bpmcginley/InternshipFinder/pull/207) | Merged | Independent review, green CI, Pages 42911710045 and backend verified. The runtime router is unchanged. |
 | 3 | WP-4.1 Migrations | read_worker | `refactor/wp-4.1-local-migrations` | [#198](https://github.com/bpmcginley/InternshipFinder/pull/198) | Merged | Independent review, green CI, Pages 42900208315 plus data-follow run 42900434412/backend verified. Operator adoption remains gated. |
 | 3 | WP-4.4 Runner documentation | wp44_runners | `refactor/wp-4.4-worker-tests` | [#203](https://github.com/bpmcginley/InternshipFinder/pull/203) | Merged | Independent review, green CI, Pages 42903653178 and backend verified. |
-| 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary in review | Default text and streams preserved. Remaining sources follow the canary review. |
-| 4 | WP-1.4 Pipeline/export logging | Unassigned | - | - | Queued | Coordinate shared helper ownership and stdout assertions. |
-| 4 | WP-1.4 Page-build logging | Unassigned | - | - | Queued | Preserve default output; avoid concurrent seo_pages edits. |
+| 4 | WP-1.4 Logging foundation/sources | wp14_logging | `refactor/wp-1.4-logging-sources` | [#214](https://github.com/bpmcginley/InternshipFinder/pull/214) | Google Jobs canary merged | Independent review and green CI. Merged as `14143d37`. Pages 42920918176 and backend verified. |
+| 4 | WP-1.4 Pipeline/export logging | wp21_inventory | `refactor/wp-1.4-logging-pipeline` | [#221](https://github.com/bpmcginley/InternshipFinder/pull/221) | In review | Existing default console output preserved. JSON omits provider labels, employer/location examples and the output directory. |
+| 4 | WP-1.4 Page-build logging | wp14_pages_logging | `refactor/wp-1.4-logging-page-build` | [#220](https://github.com/bpmcginley/InternshipFinder/pull/220) | Merged | Merged as `f358eefa`. Pages 42922011172, 42922021386 and backend verified. Plain console output and GitHub annotations preserved. JSON omits the output path. |
 | 4 | WP-1.4 Growth logging, operator reports | wp42_orders | `refactor/wp-1.4-logging-growth-safe` | [#222](https://github.com/bpmcginley/InternshipFinder/pull/222) | In review | Audience and outreach summaries preserve default output. JSON omits the local outreach path. |
 | 4 | WP-1.4 Growth logging, remaining scopes | Unassigned | - | - | Queued / scoped holds | Preserve workflow payloads. Coordinate claimed modules and review raw provider errors and credentials separately. |
+| 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | Merged | Merged as `add6dc3d`. Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
-| 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | In review | One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
-| 4 | WP-2.4 Config: site and Worker | Unassigned | - | - | Queued | Nine production consumers were verified. This PR covers the three extension and growth files. Dashboard, counter, buy, employer page, orders, and placement CLI remain. Coordinate the site files with Product and preserve the Worker environment overrides. |
-| 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Extracts three role-index helpers and retains the orders.js exports. Review and CI passed. |
+| 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
+| 4 | WP-2.4 Config: Worker | Lead | `refactor/wp-2.4-worker-config` | [#223](https://github.com/bpmcginley/InternshipFinder/pull/223) | Merged | Merged as `e3822e4f`. Pages 42934103714 and backend verified. The generated Worker module supplies orders and the placement CLI. Both environment overrides remain evaluated at call time. |
+| 4 | WP-2.4 Config: site | Lead | `refactor/wp-2.4-site-config` | [#232](https://github.com/bpmcginley/InternshipFinder/pull/232) | In review | The generator projects five inline endpoint values into four site files. The current values already match. The contract scanner checks the configured origin, and Product has released the dashboard source. |
+| 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Merged as `9ea5bc0a` after review and CI. Worker deployment remains with Bruce. |
+| 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
@@ -244,6 +248,12 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Waiting for deploy
 
+- [PR #223](https://github.com/bpmcginley/InternshipFinder/pull/223), merged as `e3822e4f`: the Worker config extraction awaits Bruce's deployment.
+
+- [PR #219](https://github.com/bpmcginley/InternshipFinder/pull/219), merged as `c2eb44e6`, moves the admin and pilot code handlers. Worker deployment remains with Bruce.
+
+- [PR #216](https://github.com/bpmcginley/InternshipFinder/pull/216), merged as `9ea5bc0a`: the Worker role-index extraction awaits Bruce's deployment.
+
 - [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175), merged as `f4504cb1`: counter allowlist expansion remains undeployed. Approved and published disclosure plus explicit operator deployment are still required. No worker/database deployment or extension release was performed.
 
 ## Merge and publication ledger
@@ -268,7 +278,7 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 ## Next update
 
-Continue Wave 4 with the vocabulary inventory, logging, public config and orders split. Serialize merges with the product lead and verify Pages after publishing merges. Revisit the four deferred source tag removals once product ownership clears.
+Continue Wave 4 with the vocabulary inventory, logging, public config and orders split. Serialize merges with the product lead and verify Pages after publishing merges.
 
 ## WP-0.6 validation and coordination
 
@@ -403,6 +413,18 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Deferred-import count is not a cycle count: the measured direct back-edge pairs are seo_pages/feeds and seo_pages/role_index. External static importers measured four backend and eight growth modules; additional mentions include comments. Verify each actual caller rather than relying on the hand-off's broader counts.
 - When introducing site/render subpackages, update PR #199's explicit setuptools declarations and inspect built wheel members; editable imports alone can hide omitted packages. Golden fixtures must remain unchanged for these refactor extractions.
 
+## WP-1.4 growth asset logging
+
+- Audited open Product PRs and the growth CLI and workflow call sites at `aa9070c4`. The Flyer, Glass Flyer and campaign prose diagnostics preserve their exact default text and streams. Opt-in JSON omits output paths, Glass Flyer URLs and spot labels, and campaign titles and matched lint text.
+- Cards and Reels keep their bare artifact-path stdout. The raw local ffmpeg diagnostic in campaign is unchanged, as are rendering, artifact content, exit codes, workflows and provider/publishing paths. Flyer scripts use a temporary checkout import path so direct invocation still works without installing the project.
+- Focused campaign/card/Reel tests passed 42 with one local ffmpeg skip. An offline comparison matched complete default streams, both reproducible Flyer PDFs byte for byte, and all four mocked Glass Flyer render calls and HTML. A campaign run with deterministic render stubs matched default streams and all nine artifact bytes. JSON omits the expected paths and data. Both golden checks and Ruff passed. After integrating main `789e72f0`, the authored code and tests stayed byte-identical and the combined focused and golden run passed 44 with the same ffmpeg skip.
+
+## WP-1.4 page-build logging
+
+- On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
+- An offline comparison against the original generator matched complete default stdout and stderr after normalizing only the fixture directory. The JSON regression exercises both annotation paths, stderr and path redaction.
+- Focused SEO, placements, distribution, employer entry and golden tests passed (245 total). All 695 golden files matched, including the existing date assertions, and the golden mutation check passed. Ruff passed. Targeted Pyright matched all 12 existing SEO diagnostics by severity, rule and message.
+
 ## Orders extraction readiness (read-only)
 
 - Audit at main `7728e02b` verified 39 exports. Keep literal TERMS_VERSION/TERMS_BOX assignments in legacy orders.js: unchanged buy tests read them directly. Preserve the billing/orders live-binding cycle and listing settlement before student handling; introduce no eager imported-value reads or configuration snapshots.
@@ -440,12 +462,29 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - The helper stamps real relative/root-relative local script and stylesheet URL values with 12-character SHA-256 versions using HTMLParser source offsets. Assets and non-URL HTML bytes are preserved; query/fragment, raw-text, escaping, path/case and filesystem boundaries have focused tests. Independent review's self-closing raw/RCDATA case is rejected before any write.
 - Controlled output refresh changes exactly 564 of 695 files: 501 near pages, 49 other internship pages and 14 other HTML pages. Every changed key in the manifest diff is explained by local asset version parameters only; independent raw-tag-offset normalization compared every changed HTML file. The other 131 files are byte-identical. All 565 semantic fingerprints and all 555 emitted date records are unchanged; pricing retains 2026-11-01 and About 2026-11-10. No golden INPUT, date code, existing golden assertion, SEO generator, source HTML or public JS/CSS was edited.
 - Definitive combined backend/growth suite: 1,540 passed, three skips (two existing optional-dependency skips plus Windows ordinary-symlink permission). Focused helper/workflow guards: 56 passed, one skip; real Windows junction passed. Two consecutive golden CLI builds matched all 695 hashes, and the combined suite passed the one-character mutation test. Ruff correctness/format and targeted Pyright are clean. The earlier pre-refresh candidate run's sole mismatch was the expected old output manifest, not a main regression.
-- Source cleanup remains DEFERRED: the three manual tags in docs/index.html (core.js, app.js, count.js) and one in docs/employers/buy/index.html (buy.js) remain unchanged because source ownership was not released. Post-build stamping supersedes their old values. This completes the approved build portion, not the deferred source cleanup. Other product fixture writers stay frozen until the lead accepts this reviewed output pair and returns ownership. No deployment, remote database action, manual publishing workflow, history rewrite, force push, release, outreach or paid provider call was performed.
+- Source cleanup was deferred at this merge: the three manual tags in docs/index.html (core.js, app.js, count.js) and one in docs/employers/buy/index.html (buy.js) remain unchanged because source ownership was not released. Post-build stamping supersedes their old values. This completes the approved build portion, not the deferred source cleanup. Other product fixture writers stay frozen until the lead accepts this reviewed output pair and returns ownership. No deployment, remote database action, manual publishing workflow, history rewrite, force push, release, outreach or paid provider call was performed.
+
+## WP-1.5 manual source version cleanup
+
+- After Product released the dashboard file following #217, checked both HTML files against open product claims on main `2a8176db`. Removed only the manual `v` parameters on core.js, app.js, count.js and buy.js. The buy source assertion now requires the unversioned script tag. All checkout behavior tests, other HTML bytes, and golden fixture bytes are preserved.
+- The existing Pages stamp still produces the same asset versions. Both golden tests passed with all 695 expected files, including the deliberate mutation check. Node 22.23.4 passed all 316 site tests. JavaScript lint reported zero errors or warnings.
 
 ## WP-4.2 role-index extraction
 
 - The first file move puts `shardOf`, `cleanRole`, and `readShard` in `worker/src/orders/roles.js`. Role-only patterns move with them, and the shared listing-ID/control patterns and bad-request factory have one home in `worker/src/orders/shared.js`. `orders.js` explicitly re-exports the existing public names.
 - Compared all moved bodies and declarations to the original bytes, and checked that the rest of `orders.js` differs only by imports and re-exports. The shard reader still fetches per call through the injected fetch and reads the billing URL at call time. The Node suite passed all 342 tests under Node 22.23.4, and all 15 local Workers tests passed in six files. Golden matched all 695 files. JavaScript lint reported zero errors or warnings. The Worker type report retained 914 existing errors.
+
+## WP-4.2 admin and pilot extraction
+
+- Move the recent-order query and its row limit to `orders/admin.js`. Move the pilot code handler, alphabet and limit to `orders/pilot.js`. Shared text validation and conflict construction move to `orders/shared.js`. The legacy orders module retains all 39 exports.
+- Byte-compared eight moved declarations and every remaining statement outside import/export wiring. The pilot insert retains its single-statement cap and the original follow-up count. The existing terms literals and SQL bodies are exact.
+- Node 22.23.4 Worker suite passed all 342 tests. Local Workers runtime passed 15 tests in six files, checkout passed 40 tests, and Golden matched all 695 files. JavaScript lint reported zero errors or warnings. The Worker type report retained 914 existing errors. Integrated main `9ea5bc0a` by normal merge. Worker source and test blobs match the locally verified extraction. The unchanged checkout suite passed again. Independent review and CI are pending. Worker deployment remains with Bruce.
+
+## WP-1.4 pipeline and export logging
+
+- Verified 13 existing stdout diagnostics across pipeline (3), export (5) and ingest (5). Ten calls keep the same arguments, including the probe line's flush, and offline tests compare the other three in plain mode. The board summary keeps the same elapsed-time calculation and uses adapter names, counts and failure categories. The failure categories come from HTTP status codes or exception classes. Existing metrics and export files keep their formats.
+- Opt-in JSON mode substitutes aggregate counts for the pipeline's source labels because community records can supply those labels. It omits employer and location examples from the export's unplaced count and omits the operator's output path from the write summary. The one broad board-future catch retains its result and adds a best-effort JSON warning containing static text and the exception class. Tests cover both a broken pipe and a stream runtime error, preserving both board results and executor shutdown.
+- Focused ingest, pipeline, export, logging and golden checks passed 137 tests. Golden matched all 695 files. Ruff passed. Targeted Pyright found one existing optional-member diagnostic in pipeline, reproduced on the foundation commit.
 
 ## WP-1.4 growth operator diagnostics
 
