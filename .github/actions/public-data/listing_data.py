@@ -99,10 +99,11 @@ def select(workspace: Path, sha: str) -> Path:
     return directory
 
 
-def selection_marker(directory: Path) -> str:
+def selection_marker(directory: Path, *, from_data: bool) -> str:
     checkout = directory.parents[1]
     commit, tree = (git_object(checkout, ref) for ref in ("HEAD", f"HEAD:{EXPORT.as_posix()}"))
-    marker = f"[listing-data] commit={commit} tree={tree}"
+    source = "data" if from_data else "main-fallback"
+    marker = f"[listing-data] source={source} commit={commit} tree={tree}"
     if os.environ.get("GITHUB_EVENT_NAME") == "workflow_run":
         event_path = os.environ.get("GITHUB_EVENT_PATH")
         if event_path:
@@ -134,9 +135,10 @@ def main() -> None:
     if sys.argv[1] == "resolve":
         output = f"sha={resolve(workspace)}"
     else:
-        directory = select(workspace, os.environ["DATA_SHA"])
+        sha = os.environ["DATA_SHA"]
+        directory = select(workspace, sha)
         output = f"directory={directory}"
-        print(selection_marker(directory))
+        print(selection_marker(directory, from_data=bool(sha)))
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as target:
         target.write(output + "\n")
 

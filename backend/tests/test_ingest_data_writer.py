@@ -304,20 +304,29 @@ class IngestWriterTests(unittest.TestCase):
         )
 
         event_file = self.root / "event.json"
-        fixed = f"[listing-data] commit={commit} tree={tree}"
+        fixed = f"[listing-data] source=data commit={commit} tree={tree}"
         directory = self.data / writer.PUBLIC
         with patch.dict(
             os.environ, {"GITHUB_EVENT_NAME": "workflow_run", "GITHUB_EVENT_PATH": str(event_file)}
         ):
             write(self.root, event_file.name, {"workflow_run": {"id": 723, "other": "not logged"}})
-            self.assertEqual(reader.selection_marker(directory), fixed + " upstream_run=723")
+            self.assertEqual(
+                reader.selection_marker(directory, from_data=True), fixed + " upstream_run=723"
+            )
             for invalid in (True, -1, "123"):
                 write(self.root, event_file.name, {"workflow_run": {"id": invalid}})
-                self.assertEqual(reader.selection_marker(directory), fixed)
+                self.assertEqual(reader.selection_marker(directory, from_data=True), fixed)
         with patch.dict(
             os.environ, {"GITHUB_EVENT_NAME": "push", "GITHUB_EVENT_PATH": str(event_file)}
         ):
-            self.assertEqual(reader.selection_marker(directory), fixed)
+            self.assertEqual(reader.selection_marker(directory, from_data=True), fixed)
+            fallback = self.primary / writer.PUBLIC
+            main = writer.revision(self.primary, "HEAD")
+            main_tree = writer.revision(self.primary, f"{main}:{writer.PUBLIC}")
+            self.assertEqual(
+                reader.selection_marker(fallback, from_data=False),
+                f"[listing-data] source=main-fallback commit={main} tree={main_tree}",
+            )
 
     def test_noop_and_valid_empty_export(self):
         writer.prepare(self.data, self.primary, self.state)
