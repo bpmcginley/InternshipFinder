@@ -58,6 +58,9 @@ const snapshot = (at = now.toISOString()) =>
       })),
     }),
   );
+const encodeSnapshot = (value) => new TextEncoder().encode(JSON.stringify(value));
+const emptySnapshot = (at = now.toISOString()) =>
+  encodeSnapshot({ ...JSON.parse(new TextDecoder().decode(snapshot(at))), roles: [] });
 const request = (db, company) =>
   requestFollow(db, "fixture@example.test", { kind: "company", company }, catalog, start);
 async function confirm(db, company) {
@@ -378,12 +381,11 @@ export async function rejectionBoundaries(db, equal) {
     status: "invalid",
     reason: "pending_bound",
   });
-  const empty = JSON.parse(new TextDecoder().decode(snapshot()));
-  empty.roles = [];
-  equal(await enqueue(db, a.subscriberId, new TextEncoder().encode(JSON.stringify(empty))), {
-    status: "empty",
+  equal(await enqueue(db, a.subscriberId, emptySnapshot(), { maxPendingBytes: 1 }), {
+    status: "invalid",
+    reason: "pending_bound",
   });
-  const invalid = { ...empty, complete: false };
+  const invalid = { ...JSON.parse(new TextDecoder().decode(emptySnapshot())), complete: false };
   equal(
     (await enqueue(db, a.subscriberId, new TextEncoder().encode(JSON.stringify(invalid)))).status,
     "invalid",
@@ -400,4 +402,122 @@ export async function rejectionBoundaries(db, equal) {
   );
   equal(await enqueue(db, a.subscriberId), { status: "conflict" });
   equal(await pending(db), []);
+}
+
+export async function emptyWindowAdvance(db, equal, rejects) {
+  const a = await confirm(db, "alpha");
+  await confirm(db, "beta");
+  const original = await progress(db);
+  const lostResponse = interceptBatch(db, null, () => {
+    throw new Error("synthetic lost empty-window response");
+  });
+  await rejects(() => enqueue(lostResponse, a.subscriberId, emptySnapshot()));
+  equal(
+    await progress(db),
+    original.map((row) => ({ ...row, watermark: options.upperBound })),
+  );
+  equal(await enqueue(db, a.subscriberId, emptySnapshot()), { status: "empty" });
+  equal(await jobs(db), []);
+  equal(await pending(db), []);
+  equal(await rows(db, "follow_digest_days"), []);
+
+  // A later producer window no longer covers the old confirmation instant.
+  const tomorrow = new Date(+now + 86400_000);
+  const data = JSON.parse(new TextDecoder().decode(snapshot(tomorrow.toISOString())));
+  data.covers_after = "2026-11-11T00:00:00.000Z";
+  for (const role of data.roles) role.first_seen = "2026-11-12T00:00:00.000Z";
+  const next = await enqueue(
+    db,
+    a.subscriberId,
+    encodeSnapshot(data),
+    { upperBound: tomorrow.toISOString() },
+    tomorrow,
+  );
+  equal(next.status, "queued");
+  equal(JSON.parse((await jobs(db))[0].payload).length, 2);
+}
+
+export async function emptyWindowFences(db, equal) {
+  const a = await confirm(db, "alpha");
+  const unrelated = JSON.parse(new TextDecoder().decode(snapshot()));
+  unrelated.roles = unrelated.roles.filter((role) => role.company_key === "beta");
+  const stale = interceptBatch(db, () => confirm(db, "beta"));
+  equal(await enqueue(stale, a.subscriberId, encodeSnapshot(unrelated)), { status: "conflict" });
+  const original = await progress(db);
+  equal(
+    original.map((row) => row.watermark),
+    [start.toISOString(), start.toISOString()],
+  );
+
+  const first = await enqueue(db, a.subscriberId);
+  equal(await enqueue(db, a.subscriberId, emptySnapshot()), { status: "conflict" });
+  const lease = await leaseFollowDigest(db, first.id, now);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new Uint8Array(32).fill(7),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  equal(await beginFollowDigestAttempt(db, key, first.id, lease, () => now), true);
+  const later = new Date(+now + 2 * 86400_000 + 1);
+  const data = emptySnapshot(later.toISOString());
+  const overrides = { upperBound: later.toISOString() };
+  equal(await enqueue(db, a.subscriberId, data, overrides, later), { status: "conflict" });
+  equal(await progress(db), original);
+
+  await expireFollowOutbox(db, later);
+  equal((await jobs(db))[0].state, "uncertain");
+  equal(await enqueue(db, a.subscriberId, data, overrides, later), { status: "advanced" });
+  equal(
+    (await progress(db)).map((row) => row.watermark),
+    [later.toISOString(), later.toISOString()],
+  );
+  equal(await pending(db), []);
+}
+
+export async function emptyWindowRollback(db, equal, rejects) {
+  const a = await confirm(db, "alpha");
+  await confirm(db, "beta");
+  const original = await progress(db);
+  await db
+    .prepare(
+      "CREATE TRIGGER synthetic_empty_window_failure BEFORE UPDATE OF watermark ON follow_scope_progress " +
+        "WHEN OLD.scope_key LIKE '%beta%' BEGIN SELECT RAISE(ABORT,'synthetic_failure'); END",
+    )
+    .run();
+  try {
+    await rejects(() => enqueue(db, a.subscriberId, emptySnapshot()));
+  } finally {
+    await db.prepare("DROP TRIGGER synthetic_empty_window_failure").run();
+  }
+  equal(await progress(db), original);
+  equal(await jobs(db), []);
+  let planQuery;
+  const explaining = {
+    batch: (statements) => db.batch(statements),
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.includes("UPDATE follow_scope_progress SET watermark=")) return statement;
+      return {
+        bind(...args) {
+          planQuery = db.prepare("EXPLAIN QUERY PLAN " + sql).bind(...args);
+          return statement.bind(...args);
+        },
+      };
+    },
+  };
+  equal(await enqueue(explaining, a.subscriberId, emptySnapshot()), { status: "advanced" });
+  const plan = (await planQuery.all()).results;
+  equal(
+    plan.some(
+      ({ detail }) =>
+        detail.includes("follow_attempting_subscriber") && detail.includes("subscriber_id=?"),
+    ),
+    true,
+  );
+  equal(
+    (await progress(db)).map((row) => row.watermark),
+    [options.upperBound, options.upperBound],
+  );
 }
