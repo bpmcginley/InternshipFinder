@@ -8,13 +8,13 @@ import { copySession, createSession, dropExpiredSessions, endSession, isSessionT
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
 import { allowanceFor, cleanup, upgradeOffer, deleteUser, globalRpm, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
-import { admitAiLifecycle, respondFundedAi } from "./ai-lifecycle.js";
+import { admitAiLifecycle, fundedPurchaseCreationReady, respondFundedAi } from "./ai-lifecycle.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
-import { prepareTopupStripe, topupConfigured } from "./topup-stripe.js";
+import { prepareTopupStripe, topupConfigured, topupRecoveryConfigured } from "./topup-stripe.js";
 import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
 const employerPostingRuntime = createEmployerPostingRuntime();
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
@@ -73,12 +73,14 @@ const topupOriginAllowed = (request, env) =>
   !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
 
 const dashboardTopupConfigured = (env) =>
-  topupConfigured(env) && DASHBOARD_ORIGINS.includes(siteUrl(env));
+  topupConfigured(env) &&
+  DASHBOARD_ORIGINS.includes(siteUrl(env)) &&
+  fundedPurchaseCreationReady(env);
 
 function prepareDashboardTopup({ db, env, d }) {
+  const salesReady = () => dashboardTopupConfigured(env) && globalRpm(env, d.config) > 0;
   return async (identity, fresh) => {
-    if (!dashboardTopupConfigured(env) || !(globalRpm(env, d.config) > 0))
-      return { enabled: false };
+    if (!salesReady()) return { enabled: false };
     const canUseAutoApply = async () => {
       const { plan } = await planOf(db, identity.user);
       const at = fresh();
@@ -87,11 +89,12 @@ function prepareDashboardTopup({ db, env, d }) {
         !(await isPaused(db, env, d.config, at, plan))
       );
     };
-    if (!(await canUseAutoApply()) || !(Date.parse(identity.expires) > +fresh()))
+    if (!(await canUseAutoApply()) || !(Date.parse(identity.expires) > +fresh()) || !salesReady())
       return { enabled: false };
     const root = siteUrl(env) + "/";
     const adapter = await prepareTopupStripe(env, { success: root, cancel: root }, d.fetch);
-    return adapter.enabled && (await canUseAutoApply()) ? adapter : { enabled: false };
+    if (!adapter.enabled || !salesReady()) return { enabled: false };
+    return (await canUseAutoApply()) && salesReady() ? adapter : { enabled: false };
   };
 }
 
@@ -375,7 +378,7 @@ const safeRouteHandlers = {
   // Since 2026-10-19 the same endpoint also takes the paid listing orders' payments (orders.js), which
   // can be on while the student plans are off.
   "POST /billing/webhook": async ({ request, db, env, now, d }) => {
-    if ((!paymentsOn(env, d.config) && !ordersOn(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
+    if ((!paymentsOn(env, d.config) && !ordersOn(env) && !topupRecoveryConfigured(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
     const body = await request.text();
     if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
     const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
