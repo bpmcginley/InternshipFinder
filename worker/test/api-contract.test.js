@@ -117,7 +117,11 @@ const called = (node) =>
 const property = (node, key) => node?.properties?.find((p) => name(p.key) === key)?.value;
 const BASE = "https://worker-contract.test";
 const UNKNOWN = "<computed>";
-const configuredTarget = (value, origin) => value === origin || value.startsWith(`${origin}/`);
+const configuredTarget = (value, origin) => {
+  if (!value.startsWith(origin)) return false;
+  const suffix = value.slice(origin.length);
+  return suffix === "" || /^[/?#]/.test(suffix) || suffix.startsWith(UNKNOWN);
+};
 const workerTarget = (value, origin) =>
   value.startsWith(BASE) ||
   configuredTarget(value, origin) ||
@@ -391,6 +395,18 @@ test("AST inventory handles nested literals and rejects unknown routes or comput
   );
   assert.throws(
     () => workerCalls(parseClient("new.js", "fetch(`${WORKER_URL}${arbitrary}`)"), []),
+    /unresolved Worker target/,
+  );
+  assert.throws(
+    () =>
+      workerCalls(
+        parseClient(
+          "new.js",
+          'const API="https://worker.example.test"; fetch(API + arbitrary);',
+          "https://worker.example.test",
+        ),
+        [],
+      ),
     /unresolved Worker target/,
   );
   assert.throws(
