@@ -294,3 +294,33 @@ export async function expireFollowOutbox(db, now = new Date()) {
     db.prepare("DELETE FROM follow_digest_days WHERE expires_at<=?").bind(at),
   ]);
 }
+
+// Dormant final transport fence. No caller may await other work after true before handoff.
+// Snapshot consent is the same exact generation/progress check used by the budgeted claim.
+export async function authorizeFollowSnapshotTransport(db, id, lease, subscriberId, email, clock) {
+  try {
+    const at = budgetClock(clock).toISOString();
+    const results = await db.batch([
+      db
+        .prepare(
+          "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at FROM follow_digest_outbox " +
+            "JOIN follow_subscribers u ON u.id=follow_digest_outbox.subscriber_id " +
+            "WHERE follow_digest_outbox.id=? AND state='attempting' AND lease_token=? " +
+            "AND subscriber_id=? AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
+            `AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND ${snapshotConsent}`,
+        )
+        .bind(id, lease, subscriberId, email, at, at.slice(0, 10), at),
+    ]);
+    const checked = budgetClock(clock).toISOString();
+    return (
+      checked >= at &&
+      checked.slice(0, 10) === at.slice(0, 10) &&
+      results.length === 1 &&
+      results[0].success === true &&
+      results[0].results.length === 1 &&
+      liveDeadlines(results[0].results[0], checked)
+    );
+  } catch {
+    return false;
+  }
+}
