@@ -346,6 +346,8 @@ def page_writer(
         dated=None,
         thin=False,
         kind=None,
+        share_view=None,
+        share_card=None,
     ):
         # lastmod is the day the page's newest listing was found: it moves when the page gains a
         # listing, not on every deploy, which is the only lastmod a search engine keeps trusting.
@@ -407,6 +409,10 @@ def page_writer(
         # 2026-10-23: retain the real live date separately from first_seen for monotonic migration.
         # was: both collapsed into lastmod; revert: remove this metadata with page_dates.
         pages[-1]["lastmod_floor"] = live.get(path) if isinstance(live, dict) else None
+        if share_view is not None:
+            pages[-1]["share_view"] = share_view
+        if share_card is not None:
+            pages[-1]["share_card"] = share_card
 
     return add
 
@@ -465,6 +471,7 @@ class Stages:
     hubs: Callable[..., None]
     information: Callable[..., None]
     finish: Callable[..., None]
+    launch_pages: Callable[..., list] | None = None
 
 
 def assemble(
@@ -507,6 +514,10 @@ def assemble(
     facts, pay_path, rep, numbers = stages.reports(
         add, context, listings, cohorts, kind_made, len(new), enough
     )
+    launch_links = (
+        stages.launch_pages(add, pages, context, listings, live, earning, employers_in, fold_at)
+        if stages.launch_pages else []
+    )
     stages.hubs(
         add,
         context,
@@ -520,6 +531,7 @@ def assemble(
         pay_path,
         rep,
         numbers,
+        launch_links=launch_links,
     )
     stages.information(
         add,

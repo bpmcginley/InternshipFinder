@@ -1070,6 +1070,33 @@
   }
 
   // ---------- app ----------
+  function ShareSearch({ url }) {
+    const [result, setResult] = useState(null);
+    const current = result?.url === url ? result : null;
+    async function share() {
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ url });
+          return;
+        } catch (error) {
+          if (error?.name === "AbortError") return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        setResult({ url, message: "Link copied." });
+      } catch {
+        setResult({ url, manual: true });
+      }
+    }
+    return h(F, null,
+      h("button", { type: "button", className: "btn quiet", onClick: share }, "Share search"),
+      h("span", { className: current?.message ? "muted" : "sr", role: "status" }, current?.message || ""),
+      current?.manual && h("label", { className: "field" }, "Copy this link",
+        h("input", { type: "url", readOnly: true, value: url, autoFocus: true,
+          onFocus: event => event.currentTarget.select() })));
+  }
+
   function App() {
     const store = useRef(null); if (!store.current) store.current = IS.createStore();
     const [p, setP] = useState(IS.loadProfile);
@@ -1223,6 +1250,9 @@
     useEffect(() => { if (scope.all && wantsAll && !allAsked) setAllAsked(true); }, [scope.all, wantsAll]);
     const everything = scope.all && (allAsked || wantsAll);
     const plan = useMemo(() => IS.loadPlan(scope, indexKeys, qKeys, everything), [scope, indexKeys, qKeysKey, everything]);
+    const shareViews = useMemo(() => window.ISShare?.landingViews(document.getElementById("landing-share-views")), []);
+    const shareUrl = !myList && window.ISShare?.searchLink(
+      f, scope, { allLoaded: everything, first: plan.first, indexKeys }, shareViews, location.origin, IS.filterParams);
     const planKey = plan.first.join(",") + "|" + plan.rest.join(",");
     // The files the list is drawn from: the scope's own, and any place in the search.
     const keys = useMemo(() => [...plan.first, ...plan.rest], [planKey]);
@@ -2400,6 +2430,7 @@
           loading ? ` · loading ${pr.done} of ${pr.total} files` : "",
           !everything && h(F, null, " · ", h("button", { type: "button", className: "linkbtn", onClick: searchAll }, "Show every state")))),
         ranked && rows.length > 1 && h("span", { className: "muted" }, "Closest matches to your search first"),
+        shareUrl && h(ShareSearch, { url: shareUrl }),
         onlySearch ? h("button", { type: "button", className: "btn quiet", onClick: () => upd("q", "") }, "Clear search")
           : anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
       h("div", { className: "sr", role: "status", "aria-live": "polite", "aria-atomic": "true" }, spoken),

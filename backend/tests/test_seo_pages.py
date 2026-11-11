@@ -1195,7 +1195,7 @@ def test_the_field_pages_opening_sentences_are_short(tmp_path):
         .split("</p>")[0]
     )
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", lede) if s]
-    assert sentences[0] == "41 open student roles in mechanical engineering." and sentences[
+    assert sentences[0] == "As of September 23, 2026, InternScout lists 41 open student roles in mechanical engineering." and sentences[
         1
     ].startswith("They range from")
     assert max(len(s.split()) for s in sentences) <= 25
@@ -2482,7 +2482,10 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
         encoding="utf-8",
     ).read()
     assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
-    assert "python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt" in wf
+    assert (
+        "python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt"
+        in wf
+    )
 
 
 # PR #97 follow-up: a page with no state covers every state, so its dashboard link says so; otherwise
