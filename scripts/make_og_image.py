@@ -148,7 +148,7 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
 
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--site"]:
-        from internscout.seo_pages import main
+        from internscout.site.publish import main
 
         main([sys.argv[0], *sys.argv[2:]], card_renderer=landing_card)
     else:
