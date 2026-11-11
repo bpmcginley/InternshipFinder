@@ -2,7 +2,7 @@
 
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import stat
 import subprocess
@@ -56,15 +56,12 @@ def check_snapshot(directory: Path) -> None:
         manifest = json.loads(index.read_text(encoding="utf-8"))
         if manifest["first"]["file"] != "first.json":
             raise ValueError
-        for metadata in manifest["files"].values():
-            for key in ("file", "desc"):
-                name = PurePosixPath(metadata[key])
-                if (
-                    len(name.parts) != 2
-                    or name.parts[0] != "listings"
-                    or name.suffix != ".json"
-                    or not (directory / name).is_file()
-                ):
+        for shard, metadata in manifest["files"].items():
+            if not shard or any(separator in shard for separator in ("/", "\\", ":")):
+                raise ValueError
+            for field, suffix in (("file", ".json"), ("desc", ".desc.json")):
+                name = f"listings/{shard}{suffix}"
+                if metadata[field] != name or not (directory / name).is_file():
                     raise ValueError
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         raise SystemExit("The public data branch does not contain a complete listing export.") from None
