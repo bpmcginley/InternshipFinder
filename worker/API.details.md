@@ -634,6 +634,24 @@ Deletes orders never confirmed after 7 days (always, even while orders are off).
 email that failed, reminds Bruce once about an order waiting more than a day, ends closed roles and makes
 the offer above, sends an offer email that failed, and refunds offers unanswered after 30 days.
 
+## One-time Auto-Apply checkout
+
+`POST /billing/topup/checkout` defaults off. It requires the exact `TOPUPS_ENABLED` and
+`PAYMENTS_ENABLED` opt-ins and the existing private Stripe configuration. It accepts the
+two existing HTTPS dashboard Origins, `https://internscout.org` and
+`https://bpmcginley.github.io`, only when permitted by the configured CORS list.
+
+An existing session bearer authorizes the request without sliding its expiry. The server
+validates the configured offer before reserving a checkout. The configured first-party
+dashboard root is the return destination for both completion and cancellation. The handler
+ignores request body and query fields. The existing reservation permits one active checkout
+attempt per account.
+
+Responses use `Cache-Control: no-store`. A verified open checkout returns 200 with
+`{status: "open", url}`. An unresolved attempt returns 202 with `{status: "pending"}`.
+Missing or invalid sessions return 401, disallowed Origins return 403, and disabled or
+unavailable checkout returns 503. Checkout does not itself grant purchased runs.
+
 ## Paid plans (optional, off by default)
 
 Every route below returns `404 not_found` unless `PAYMENTS_ENABLED` is `"1"` **and** `STRIPE_SECRET_KEY`
