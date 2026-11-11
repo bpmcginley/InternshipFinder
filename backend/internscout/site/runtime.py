@@ -43,6 +43,7 @@ from . import catalog as _catalog
 from . import digest as _digest
 from . import sitemap as _discovery
 from . import employer as _employer
+from .employer_posting_links import PostingLinks
 from . import facts as _facts
 from . import field as _field
 from .render import layout as _layout
@@ -1169,6 +1170,7 @@ def listing_rows(
         go_aa=go_aa,
         safe_url=safe_url,
         esc=esc,
+        posting_links=getattr(_state(), "posting_links", None),
     )
 
 
@@ -2308,6 +2310,8 @@ def pay_report(listings: list[dict], fields: dict[str, list]) -> dict:
 def pay_rows(top_roles: list[tuple], now: datetime) -> str:
     rows = []
     for x, lo, hi in top_roles:
+        links = getattr(_state(), "posting_links", None)
+        employer = links.attribute(x) if links is not None else ""
         meta = [esc(place(x))] + ([esc(str(x["term"]))] if x.get("term") else [])
         new_tag = ' <span class="new">New</span>' if fresh(x, now, _state().baseline) else ""
         rows.append(
@@ -2315,7 +2319,7 @@ def pay_rows(top_roles: list[tuple], now: datetime) -> str:
             f'<div class="co">{company_link(x.get("company_name") or "")}{new_tag}</div>'
             f'<div class="role">{esc(x.get("title") or "")}</div>'
             f'<div class="meta">{" · ".join(meta)} · <span class="pay">{esc(rate_words(lo, hi))}</span></div>'
-            f'<div class="acts"><a class="go"{go_aa(x)} href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" '
+            f'<div class="acts"><a class="go"{go_aa(x)}{employer} href="{esc(safe_url(x["apply_url"]))}" rel="nofollow noopener" '
             'target="_blank">Open posting</a></div>'
             "</li>"
         )
@@ -3874,6 +3878,7 @@ class BuildState:
     """Per-build render settings and values populated in build order."""
 
     beacon: str = BEACON
+    posting_links: PostingLinks | None = None
     baseline: str | None = BASELINE
     generated: datetime | None = GENERATED
     digest_form: str = DIGEST_FORM
