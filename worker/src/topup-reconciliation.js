@@ -1,7 +1,10 @@
 // Dormant existing-purchase storage only; no provider, grant, admission or deletion caller.
+import { referenceHash } from "./topup-ledger.js";
 import { decideTopup } from "./topup-decisions.js";
 import {
   topupFinanciallyResolved,
+  topupHistoryProven,
+  financialEvidenceDigest,
   topupRetentionStatement,
   invalidateTopupRetention,
 } from "./topup-retention.js";
@@ -14,10 +17,10 @@ export async function readTopupRevision(db, paymentHash) {
     .prepare(
       "SELECT p.payment_hash, p.payment_id, p.checkout_id, p.user_hash, p.amount, p.currency, p.held AS held_units, " +
         "COALESCE(r.revision, 0) AS revision, COALESCE(r.loss, 0) AS loss, " +
-        "COALESCE(r.full_refund, 0) AS full_refund, COALESCE(r.hold_ids, '[]') AS hold_ids " +
+        "COALESCE(r.full_refund, 0) AS full_refund, COALESCE(r.hold_ids, '[]') AS hold_ids, COALESCE(t.history_proven,0) AS history_proven " +
         "FROM topup_purchases p JOIN topup_claims c ON c.payment_hash=p.payment_hash " +
         "LEFT JOIN topup_reconciliations r ON r.payment_hash=p.payment_hash " +
-        "WHERE p.payment_hash=? AND c.state='granted'",
+        "LEFT JOIN topup_retention t ON t.payment_hash=p.payment_hash WHERE p.payment_hash=? AND c.state='granted'",
     )
     .bind(paymentHash)
     .first();
@@ -27,6 +30,7 @@ export async function readTopupRevision(db, paymentHash) {
     ...row,
     previous: {
       deleted: false,
+      historyProven: row.history_proven === 1,
       fullRefund: row.full_refund === 1,
       loss: row.loss === 1,
       held: heldDisputeIds.length > 0 || row.held_units > 0,
@@ -36,6 +40,25 @@ export async function readTopupRevision(db, paymentHash) {
 }
 
 export async function reconcileExistingTopup(db, paymentHash, revision, snapshot) {
+  const hashing = financialEvidenceDigest(snapshot);
+  try {
+    snapshot = structuredClone(snapshot);
+  } catch {
+    // Preserve only safe association fields when a nested non-JSON fact cannot clone.
+    const source = snapshot;
+    snapshot = {};
+    for (const key of [
+      "status",
+      "livemode",
+      "paymentId",
+      "checkoutId",
+      "capturedAmount",
+      "currency",
+    ]) {
+      const descriptor = source && Object.getOwnPropertyDescriptor(source, key);
+      if (descriptor && "value" in descriptor) snapshot[key] = descriptor.value;
+    }
+  }
   if (!Number.isSafeInteger(revision) || revision < 0 || revision >= Number.MAX_SAFE_INTEGER)
     return { status: "stale" };
   const stored = await readTopupRevision(db, paymentHash);
@@ -48,6 +71,21 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
     snapshot?.currency !== stored.currency
   )
     return { status: "retry" };
+  const digest = await hashing;
+  // A declared provider observation must never establish resolution from coercible IDs
+  // or non-JSON facts. Only the exact primitive, mode-bound association can clear old age.
+  if (snapshot.status === "reversal_evidence" && !digest) {
+    if (
+      typeof snapshot.livemode === "boolean" &&
+      typeof snapshot.paymentId === "string" &&
+      typeof snapshot.checkoutId === "string" &&
+      typeof snapshot.currency === "string" &&
+      Number.isSafeInteger(snapshot.capturedAmount) &&
+      (await referenceHash("payment", snapshot.livemode, snapshot.paymentId)) === paymentHash
+    )
+      await invalidateTopupRetention(db, paymentHash, revision);
+    return { status: "retry" };
+  }
   // Ignore any caller-supplied previous state. Governing causes remain meaningful even
   // when held units are zero; a future failed-run return must still observe the hold.
   const decision = decideTopup({ ...snapshot, previous: stored.previous });
@@ -91,7 +129,13 @@ export async function reconcileExistingTopup(db, paymentHash, revision, snapshot
           "WHERE payment_hash=? AND changes()=1",
       )
       .bind(decision.disposition, decision.disposition, decision.disposition, paymentHash),
-    topupRetentionStatement(db, paymentHash, topupFinanciallyResolved(snapshot, stored.previous)),
+    topupRetentionStatement(
+      db,
+      paymentHash,
+      topupFinanciallyResolved(snapshot, stored.previous),
+      topupHistoryProven(snapshot, stored.previous, decision),
+      digest,
+    ),
   ]);
   return state.meta.changes === 1 && balance.meta.changes === 1 && retention.meta.changes === 1
     ? { status: "applied", revision: revision + 1, decision }
