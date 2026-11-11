@@ -59,9 +59,16 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
         run: python growth/digest_schedule.py "$SCHEDULE" >> "$GITHUB_OUTPUT"
 
+      - name: Select public listing data
+        id: public-data
+        if: steps.eastern-slot.outputs.run == 'true'
+        uses: ./.github/actions/public-data
+
       - name: Write the digest
         if: steps.eastern-slot.outputs.run == 'true'
         # digest.py and seo_pages use only the standard library, so nothing is installed.
+        env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
         run: python growth/digest.py docs --out digest-preview
 
       - uses: actions/upload-artifact@v7
@@ -95,6 +102,7 @@ jobs:
         # subscriber and carries nothing about any of them.
         if: steps.eastern-slot.outputs.run == 'true' && vars.DIGEST_ENABLED == '1' && !inputs.check_key
         env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
           BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
           DIGEST_POSTAL_ADDRESS: ${{ secrets.DIGEST_POSTAL_ADDRESS }}
           DIGEST_TEST_TO: ${{ vars.DIGEST_TEST_TO }}
