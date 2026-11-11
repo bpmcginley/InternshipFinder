@@ -152,8 +152,20 @@ def test_raw_candidate_parent_and_owned_tree_survive_local_view_overrides(pendin
     w.git(repo, "add", "unrelated.txt")
     w.git(repo, "commit", "--amend", "--no-edit")
     monkeypatch.setenv("GIT_LITERAL_PATHSPECS", "1")
-    with pytest.raises(ValueError, match="diff-tree"):
+    with pytest.raises(ValueError, match="outside the owned snapshot"):
         read(original | {"candidate_commit": w.revision(repo, "HEAD")})
+    w.git(repo, "rm", "unrelated.txt")
+    state_dir = repo / "backend/data/ats_registry.json"
+    state_dir.mkdir(parents=True)
+    (state_dir / "nested.json").write_text("{}", encoding="ascii")
+    w.git(repo, "add", "--all")
+    w.git(repo, "commit", "--amend", "--no-edit")
+    nested = w.revision(repo, "HEAD")
+    with pytest.raises(ValueError, match="outside the owned snapshot"):
+        read(
+            original
+            | {"candidate_commit": nested, "candidate_tree": w.revision(repo, "HEAD^{tree}")}
+        )
     for corrupted in (
         original | {"public_tree": "f" * 40},
         original | {"rows": original["rows"] + original["rows"][:1]},
@@ -161,3 +173,39 @@ def test_raw_candidate_parent_and_owned_tree_survive_local_view_overrides(pendin
     ):
         with pytest.raises(ValueError):
             read(corrupted)
+
+
+def test_pending_git_reads_cannot_be_redirected_to_another_checkout(pending, tmp_path, monkeypatch):
+    repo, w, codec, _, previous, payload, bounds = pending
+    empty = tmp_path / "empty"
+    w.git(tmp_path, "init", str(empty))
+    objects = str(repo / ".git/objects")
+    overrides = {
+        "GIT_DIR": str(repo / ".git"),
+        "GIT_COMMON_DIR": str(repo / ".git"),
+        "GIT_WORK_TREE": str(repo),
+        "GIT_OBJECT_DIRECTORY": objects,
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects,
+    }
+
+    def read(checkout):
+        return codec.read_pending_follow_checkpoint(
+            checkout, payload, predecessor=previous, now=NOW, bounds=bounds
+        )
+
+    for key, value in overrides.items():
+        with monkeypatch.context() as isolated:
+            isolated.setenv(key, value)
+            with pytest.raises(ValueError):
+                read(empty)
+    for key, value in overrides.items():
+        monkeypatch.setenv(key, value)
+    with pytest.raises(ValueError):
+        read(empty)
+    with pytest.raises(ValueError, match="explicit Git checkout"):
+        read(repo / "docs")
+    nested = repo / "nested-invalid"
+    (nested / ".git").mkdir(parents=True)
+    with pytest.raises(ValueError):
+        read(nested)
+    assert read(repo).generation == sha256(payload).hexdigest()

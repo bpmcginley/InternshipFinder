@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
 import os
+from pathlib import Path
 from types import MappingProxyType
 
 from internscout.follow_snapshot_source import _DIGEST, _SHARD, _read, _utc
@@ -25,7 +26,7 @@ from scripts.follow_lineage_checkpoint import (
     _source_rows,
     _wire,
 )
-from scripts.ingest_data_writer import OWNED, PUBLIC, _StagedFollowProvenance, git
+from scripts.ingest_data_writer import PUBLIC, _StagedFollowProvenance, git, owned
 
 _FIELDS = {
     "version",
@@ -83,9 +84,14 @@ def _check_predecessor(predecessor):
 
 
 def _raw_git(checkout, *args):
-    env = os.environ | {"GIT_NO_LAZY_FETCH": "1"}
-    for name in ("LITERAL", "GLOB", "NOGLOB", "ICASE"):
-        env.pop(f"GIT_{name}_PATHSPECS", None)
+    env = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    env.update(
+        GIT_ALLOW_PROTOCOL="",
+        GIT_CEILING_DIRECTORIES=str(Path(checkout).resolve().parent),
+        GIT_CONFIG_GLOBAL=os.devnull,
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_NO_LAZY_FETCH="1",
+    )
     return git(checkout, *args, no_replace=True, env=env).stdout
 
 
@@ -98,6 +104,8 @@ def _object_size(checkout, ref):
 
 
 def _candidate_source(checkout, candidate, predecessor, identity, bounds):
+    if not (Path(checkout) / ".git").exists():
+        raise _reject("candidate requires an explicit Git checkout")
     if (
         not _git_id(candidate)
         or len(candidate) != len(predecessor.commit)
@@ -132,11 +140,13 @@ def _candidate_source(checkout, candidate, predecessor, identity, bounds):
         or prior_public != predecessor.public_tree
     ):
         raise _reject("candidate tree, no-op or predecessor public tree")
-    _raw_git(
+    changed = _raw_git(
         checkout,
         "diff-tree",
-        "--quiet",
         "-r",
+        "--no-commit-id",
+        "--name-only",
+        "-z",
         "--ignore-submodules=none",
         "--no-ext-diff",
         "--no-renames",
@@ -145,8 +155,9 @@ def _candidate_source(checkout, candidate, predecessor, identity, bounds):
         predecessor.commit,
         candidate,
         "--",
-        *(f":(top,exclude,literal){path}" for path in OWNED),
     )
+    if any(not owned(path.decode("utf-8")) for path in changed.split(b"\0")[:-1]):
+        raise _reject("candidate changed a path outside the owned snapshot")
 
     public_tree = _revision(checkout, f"{candidate}:{PUBLIC}")
     listing_tree = _revision(checkout, f"{candidate}:{PUBLIC}/listings")
