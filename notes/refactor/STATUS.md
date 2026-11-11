@@ -472,6 +472,7 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 ## WP-3.2 discovery test follow-up
 
+- [#268](https://github.com/bpmcginley/InternshipFinder/pull/268) merged as `7f43306a`. Both Pages runs, 42947403919 and 42947404877, and the exact deployments succeeded.
 - Move four sitemap, robots, feed discovery and LLMS tests into `test_site_discovery.py` and keep their shared site and listing fixtures in `test_seo_pages.py`. The four test bodies and the private robots parser match their original source. Backend collection retained all 1,166 tests, with only the four moved module paths changing. All 164 focused tests and Ruff passed.
 
 ## WP-1.4 growth asset logging
@@ -484,6 +485,7 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Began from `6fa14ba8` after the #264 Pages run and exact deployment succeeded. No open Product change owned the near source, tests or package files. #266's changed-file list included inherited main history because it targets a Product branch. Its exact head differed from its merge base in none of these paths. The separate WP-3.2 test split retains ownership of its `test_seo_pages.py` blocks.
 - `internscout.site.near` prepares plain page records, local and remote display data, dashboard selections, and related-link groups in the existing order. One-model facade renderers keep current shared helpers and the legacy near entry points, signatures, and documentation. Related groups stay as data until rendered. The build, live flags, indexing decisions, mutable state, and existing tests are unchanged.
+- The one-model renderers stay in the SEO facade for the current shared rendering dependencies. Relocate them to the near module during the orchestration or consumer migration once those dependencies are available.
 - Compared every page record and the hub to the original module in seven default and opt-in variants. Checked threshold, live slack, earning bypass, rival suppression, remote ID exclusion and zero remote cap. A full opt-in local build matched all 547 input/output files, including 501 near pages, sitemap, held paths, date records and feeds.
 - Relevant SEO, dates, feed, link, role and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks passed against 695 unchanged expected files. The wheel includes the new module, which imports without an SEO facade back-edge. Unrelated SEO AST, including `build`, is exact. Ruff passed and targeted Pyright retained the same 12 existing diagnostics.
 
