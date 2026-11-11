@@ -11,6 +11,9 @@ import {
 
 it("local D1 commits confirmation once and cascades all follow data on unsubscribe", async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  const shape = await env.DB.batch([env.DB.prepare("SELECT 42 AS sample")]);
+  expect(shape[0].results).toEqual([{ sample: 42 }]);
+  expect(shape[0].meta.changes).toBe(0);
   const now = new Date("2026-11-10T12:00:00Z");
   const catalog = { companies: new Set(["example-labs"]) };
   const r = await requestFollow(
@@ -33,7 +36,7 @@ it("local D1 commits confirmation once and cascades all follow data on unsubscri
     ).sort(),
   ).toEqual([false, true]);
   expect(
-    await env.DB.prepare("SELECT owner_user_hash FROM follow_subscribers WHERE id=?")
+    await env.DB.prepare("SELECT owner_user_hash FROM follow_subscriptions WHERE subscriber_id=?")
       .bind(r.subscriberId)
       .first("owner_user_hash"),
   ).toBe("a".repeat(64));

@@ -54,7 +54,7 @@ export async function requestFollow(db, email, input, catalog, now = new Date())
     invalid();
   const scopeKey = canonicalFollow(input, catalog),
     id = crypto.randomUUID();
-  await db.batch([
+  const result = await db.batch([
     db
       .prepare(
         "INSERT INTO follow_subscribers (id,email,created) VALUES (?,?,?) ON CONFLICT(email) DO NOTHING",
@@ -62,16 +62,22 @@ export async function requestFollow(db, email, input, catalog, now = new Date())
       .bind(id, email, stamp(now)),
     db
       .prepare(
-        "INSERT INTO follow_subscriptions (subscriber_id,scope_key,created) SELECT id,?,? FROM follow_subscribers WHERE email=? " +
-          "ON CONFLICT(subscriber_id,scope_key) DO NOTHING",
+        "DELETE FROM follow_tokens WHERE purpose='confirm' AND scope_key=? AND subscriber_id IN " +
+          "(SELECT s.subscriber_id FROM follow_subscriptions s JOIN follow_subscribers u ON u.id=s.subscriber_id " +
+          "WHERE u.email=? AND s.scope_key=? AND s.confirmed_at IS NULL AND s.created<=?)",
       )
-      .bind(scopeKey, stamp(now), email),
+      .bind(scopeKey, email, scopeKey, cutoff(now)),
+    db
+      .prepare(
+        "INSERT INTO follow_subscriptions (subscriber_id,scope_key,created) SELECT id,?,? FROM follow_subscribers WHERE email=? " +
+          "ON CONFLICT(subscriber_id,scope_key) DO UPDATE SET created=excluded.created " +
+          "WHERE confirmed_at IS NULL AND created<=?",
+      )
+      .bind(scopeKey, stamp(now), email, cutoff(now)),
+    db.prepare("SELECT id FROM follow_subscribers WHERE email=?").bind(email),
   ]);
   return {
-    subscriberId: await db
-      .prepare("SELECT id FROM follow_subscribers WHERE email=?")
-      .bind(email)
-      .first("id"),
+    subscriberId: result.at(-1).results[0].id,
     scopeKey,
   };
 }
@@ -153,25 +159,25 @@ export async function confirmFollow(db, raw, now = new Date()) {
     at = stamp(now);
   const eligible =
     "SELECT t.subscriber_id FROM follow_tokens t JOIN follow_subscriptions s ON s.subscriber_id=t.subscriber_id AND s.scope_key=t.scope_key " +
-    "JOIN follow_subscribers u ON u.id=t.subscriber_id WHERE t.token_hash=? AND t.purpose='confirm' AND t.expires_at>? " +
-    "AND (s.confirmed_at IS NOT NULL OR s.created>?) AND (u.owner_user_hash IS NULL OR t.owner_user_hash IS NULL OR u.owner_user_hash=t.owner_user_hash)";
+    "WHERE t.token_hash=? AND t.purpose='confirm' AND t.expires_at>? " +
+    "AND (s.confirmed_at IS NOT NULL OR s.created>?) AND (s.owner_user_hash IS NULL OR t.owner_user_hash IS NULL OR s.owner_user_hash=t.owner_user_hash)";
   const result = await db.batch([
     db
       .prepare(
-        "UPDATE follow_subscribers SET confirmed_at=COALESCE(confirmed_at,?), owner_user_hash=COALESCE(owner_user_hash," +
-          "(SELECT owner_user_hash FROM follow_tokens WHERE token_hash=?)) WHERE id IN (" +
+        "UPDATE follow_subscribers SET confirmed_at=COALESCE(confirmed_at,?) WHERE id IN (" +
           eligible +
           ")",
       )
-      .bind(at, digest, digest, at, cutoff(now)),
+      .bind(at, digest, at, cutoff(now)),
     db
       .prepare(
-        "UPDATE follow_subscriptions SET confirmed_at=COALESCE(confirmed_at,?) WHERE subscriber_id IN (" +
+        "UPDATE follow_subscriptions SET confirmed_at=COALESCE(confirmed_at,?), owner_user_hash=COALESCE(owner_user_hash," +
+          "(SELECT owner_user_hash FROM follow_tokens WHERE token_hash=?)) WHERE subscriber_id IN (" +
           eligible +
           ") " +
           "AND scope_key=(SELECT scope_key FROM follow_tokens WHERE token_hash=?)",
       )
-      .bind(at, digest, at, cutoff(now), digest),
+      .bind(at, digest, digest, at, cutoff(now), digest),
     db.prepare("DELETE FROM follow_tokens WHERE token_hash=? AND purpose='confirm'").bind(digest),
   ]);
   return result[1].meta.changes > 0;
@@ -191,10 +197,18 @@ export async function unsubscribeFollows(db, raw, now = new Date()) {
 // the separately keyed daily send marker must survive deletion until UTC midnight.
 export async function deleteLinkedFollows(db, ownerUserHash) {
   if (!ownerUserHash || !owner(ownerUserHash)) invalid();
-  return db
-    .prepare("DELETE FROM follow_subscribers WHERE owner_user_hash=?")
-    .bind(ownerUserHash)
-    .run();
+  return db.batch([
+    db
+      .prepare(
+        "DELETE FROM follow_tokens WHERE owner_user_hash=? OR (purpose='confirm' AND EXISTS " +
+          "(SELECT 1 FROM follow_subscriptions s WHERE s.subscriber_id=follow_tokens.subscriber_id AND s.scope_key=follow_tokens.scope_key AND s.owner_user_hash=?))",
+      )
+      .bind(ownerUserHash, ownerUserHash),
+    db.prepare("DELETE FROM follow_subscriptions WHERE owner_user_hash=?").bind(ownerUserHash),
+    db.prepare(
+      "DELETE FROM follow_subscribers WHERE NOT EXISTS (SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id)",
+    ),
+  ]);
 }
 
 export async function expireFollows(db, now = new Date()) {
