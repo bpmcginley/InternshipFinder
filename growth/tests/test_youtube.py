@@ -314,7 +314,7 @@ def test_last_weeks_short_with_the_same_title_is_no_reason_to_skip(monkeypatch):
     assert q["playlistId"] == ["UU123"]  # the channel's own uploads
 
 
-def test_a_dropped_upload_resumes_from_where_youtube_got_to(monkeypatch):
+def test_a_dropped_upload_resumes_from_where_youtube_got_to(monkeypatch, capsys):
     data = b"0123456789" * 10
     fake = FakeGoogle(
         ("PUT", SESSION, http_error(503, b'{"error": {"code": 503, "message": "Backend Error"}}')),
@@ -323,6 +323,8 @@ def test_a_dropped_upload_resumes_from_where_youtube_got_to(monkeypatch):
     )
     monkeypatch.setattr(yt.urllib.request, "urlopen", fake)
     assert yt.send_file(SESSION, "ACCESS-TOKEN", data, sleep=lambda s: None)["id"] == "VID9"
+    out = capsys.readouterr().out
+    assert "resuming, try 2 of" in out and "Backend Error" not in out
     status_query, rest = fake.requests[1], fake.requests[2]
     assert status_query.get_header("Content-range") == "bytes */100" and status_query.data == b""
     assert rest.get_header("Content-range") == "bytes 40-99/100" and rest.data == data[40:]
@@ -375,7 +377,7 @@ def test_a_day_without_a_reel_uploads_nothing(run, tmp_path, capsys):
 # ---- failures ------------------------------------------------------------------------------------
 
 
-def test_a_revoked_token_fails_with_googles_message_and_never_the_secrets(run, capsys):
+def test_a_revoked_token_fails_with_safe_advice_and_no_provider_detail(run, capsys):
     install, post = run
     install(
         (
@@ -390,13 +392,21 @@ def test_a_revoked_token_fails_with_googles_message_and_never_the_secrets(run, c
     )
     assert yt.main(["youtube.py", post, "--send"]) == 1
     out = capsys.readouterr().out
-    assert "invalid_grant: Token has been expired or revoked." in out
+    assert "[youtube] failed: YouTubeError" in out
+    assert "Token has been expired or revoked." not in out
     assert "run growth/youtube_auth.py again" in out
     for secret in [*SECRETS.values(), "ACCESS-TOKEN"]:
         assert secret not in out
 
 
-def test_an_upload_error_fails_the_step_without_leaking_the_access_token(run, capsys):
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_an_upload_error_fails_the_step_without_leaking_the_access_token(
+    run, capsys, monkeypatch, json_mode
+):
+    if json_mode:
+        monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
+    else:
+        monkeypatch.delenv("INTERNSCOUT_LOG_FORMAT", raising=False)
     install, post = run
     quota = (
         b'{"error": {"code": 403, "message": "The request cannot be completed because you have exceeded your quota.", '
@@ -405,7 +415,16 @@ def test_an_upload_error_fails_the_step_without_leaking_the_access_token(run, ca
     install(token_ok(), *channel(), ("POST", yt.UPLOAD_URL, http_error(403, quota)))
     assert yt.main(["youtube.py", post, "--send"]) == 1
     out = capsys.readouterr().out
-    assert "403 quotaExceeded: The request cannot be completed" in out and "next Thursday" in out
+    assert "The request cannot be completed" not in out and "next Thursday" in out
+    warning = next(line for line in out.splitlines() if "[youtube] failed:" in line)
+    if json_mode:
+        assert json.loads(warning) == {
+            "level": "WARNING",
+            "message": "[youtube] failed: YouTubeError",
+            "exception_type": "YouTubeError",
+        }
+    else:
+        assert warning == "[youtube] failed: YouTubeError"
     for secret in [*SECRETS.values(), "ACCESS-TOKEN", "Bearer"]:
         assert secret not in out
 
@@ -431,6 +450,7 @@ def test_a_channel_check_that_fails_still_uploads(run, capsys):
     assert yt.main(["youtube.py", post, "--send"]) == 0
     out = capsys.readouterr().out
     assert "couldn't check" in out and "VID123" in out
+    assert "Insufficient Permission" not in out
 
 
 def test_an_unreadable_error_body_becomes_its_status_code():
