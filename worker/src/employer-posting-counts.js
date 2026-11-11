@@ -2,11 +2,13 @@
 import { createEmployerCatalogCache } from "./employer-catalog-cache.js";
 
 export const EMPLOYER_POSTING_EVENT = "employer_posting_open";
+export const employerPostingCountsEnabled = (env) => env?.EMPLOYER_POSTING_COUNTS_ENABLED === "1";
 const DAY = 86_400_000;
 const encoder = new TextEncoder();
-const validKey = (key) =>
+export const isEmployerPostingKey = (key) =>
   typeof key === "string" &&
   key.length > 0 &&
+  key.length <= 200 &&
   key === key.trim() &&
   !/[\u0000-\u001f\u007f\ud800-\udfff]/u.test(key) &&
   encoder.encode(key).length <= 200;
@@ -17,7 +19,7 @@ function catalog(keys) {
   if (!Array.isArray(keys) || !keys.length || keys.length > 10_000) return null;
   const members = new Set();
   for (const key of keys) {
-    if (!validKey(key) || members.has(key)) return null;
+    if (!isEmployerPostingKey(key) || members.has(key)) return null;
     members.add(key);
   }
   return (key) => members.has(key);
@@ -134,7 +136,7 @@ function employerPostingCounter(db, match, now) {
         !Object.hasOwn(body, "e") ||
         !Object.hasOwn(body, "c") ||
         body.e !== EMPLOYER_POSTING_EVENT ||
-        !validKey(body.c)
+        !isEmployerPostingKey(body.c)
       )
         return false;
       const company = body.c;
