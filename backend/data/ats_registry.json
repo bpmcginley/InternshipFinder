@@ -3087,6 +3087,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "addepar1": {
+   "name": "Addepar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
+  },
   "advancedspace": {
    "name": "Advanced Space",
    "quant": false,
@@ -16463,6 +16469,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "investquebec|wd10|ext": {
+   "name": "Investissement Québec",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "iqvia|wd1|IQVIA": {
    "name": "IQVIA",
