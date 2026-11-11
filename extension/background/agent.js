@@ -357,17 +357,17 @@ async function loop(id, run) {
   // resumed, can run after the resume was replaced. Nothing is filled with a profile that isn't ready.
   // was: checked only when jobs were added.
   if (!autoApplyReady(store)) {
-    await own({ status: "needs_you", activity: "", question: "", reason: notReadyHelp(store) });
+    await own({ status: "needs_you", activity: "", question: "", allowanceLimited: false, reason: notReadyHelp(store) });
     return;
   }
   if (!hasKey(store)) {
-    await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
+    await own({ status: "needs_you", allowanceLimited: false, reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
     return;
   }
   if (isWorker(store.ai) && !(await ensureToken())) {
     // needs_auth gives the card a "Sign in & resume" button. A plain Resume only re-ran this check, and an
     // expired sign-in (they last an hour) that could not refresh silently stayed stuck here.
-    await own({ status: "needs_you", needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
+    await own({ status: "needs_you", allowanceLimited: false, needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
     return;
   }
   // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
@@ -377,7 +377,7 @@ async function loop(id, run) {
   if (!(await hasHostAccess(job.apply_url))) {
     // Flags outlive the pause that set them, and the side panel checks needs_auth before needs_host,
     // so clear the other one here or a sign-in that expired earlier hides the Allow button.
-    await own({ status: "needs_you", needs_host: job.apply_url, needs_auth: false, activity: "",
+    await own({ status: "needs_you", allowanceLimited: false, needs_host: job.apply_url, needs_auth: false, activity: "",
       reason: `InternScout needs your permission to work on ${hostOf(job.apply_url)}. Allow it below, then Resume.` });
     return;
   }
@@ -396,7 +396,7 @@ async function loop(id, run) {
   let tabId = await ensureTab(job);
   // was: { tabId, status: "working", ... } written whatever had happened meanwhile, which undid a
   // Pause pressed while the resume was being tailored or the tab was opening.
-  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null };
+  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null, allowanceLimited: false };
   job = await updateJob(id, (j) => (owns(j, gen) ? { tabId, ...fresh } : { tabId }));
   if (!owns(job, gen)) return;
   const msgs = await loadMsgs(id);
@@ -617,7 +617,8 @@ async function loop(id, run) {
       // was: await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
       // `upgrade` (a used-up allowance with a bigger plan on offer) puts an Upgrade button on the job card.
       await own({ status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth",
-        upgrade: e.code === "cap" && e.offer ? e.offer : null });
+        upgrade: e.code === "cap" && e.offer ? e.offer : null,
+        allowanceLimited: e.code === "cap" && e.allowanceLimited === true });
       await saveMsgs(id, msgs);
       return;
     }
