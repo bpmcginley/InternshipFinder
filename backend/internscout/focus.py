@@ -18,6 +18,7 @@ import os
 from collections import Counter
 
 from .console_log import console
+from .public_data import public_data_dir
 
 # Google Jobs results are tagged from their titles alone (normalize.py: classify(title)), so a query
 # only helps its field if the titles it brings back classify into that field and read as a student
@@ -172,8 +173,15 @@ def choose(export_dir: str | None, fallback: list[str]) -> list[str]:
     try:
         from .site.source import load
 
-        # load() reads <site>/data; the export directory is that data folder.
-        d = load(os.path.dirname(os.path.abspath(export_dir)))
+        export_path = os.path.abspath(export_dir)
+        site_dir = os.path.dirname(export_path)
+        # Keep the sibling data fallback for explicit exports outside the configured directory.
+        configured = os.path.normcase(os.path.abspath(public_data_dir(site_dir)))
+        sibling = os.path.join(site_dir, "data")
+        if configured in {os.path.normcase(export_path), os.path.normcase(sibling)}:
+            d = load(site_dir)
+        else:
+            d = load(site_dir, data_dir=sibling)
         picks = thinnest(d["listings"], d["majors"])
     except Exception as e:  # never let targeting break an ingest
         console(

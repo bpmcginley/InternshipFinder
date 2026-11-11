@@ -44,6 +44,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 try:
     from internscout.console_log import console
+    from internscout.public_data import public_data_dir
 finally:
     sys.path.pop(0)
 
@@ -1267,7 +1268,7 @@ def listings(site_dir: str) -> dict:
     backend/internscout (the Dashboard metrics workflow checks out both); where either is missing, it
     falls back to stats.json's own "new", which counts before deduplication and runs a little higher.
     new_7d_basis says which one a snapshot holds."""
-    with open(os.path.join(site_dir, "data", "stats.json"), encoding="utf-8") as f:
+    with open(os.path.join(public_data_dir(site_dir), "stats.json"), encoding="utf-8") as f:
         s = json.load(f)
     # was: return {"open": s.get("open"), "new_7d": s.get("new"), "generated_at": s.get("generated_at")}
     out = {
