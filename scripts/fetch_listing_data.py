@@ -17,7 +17,9 @@ TRACKING = "refs/remotes/origin/data"
 
 
 def git(root, *args, data=None):
-    r = subprocess.run(["git", *args], cwd=root, input=data, capture_output=True)
+    r = subprocess.run(
+        ["git", "--no-replace-objects", *args], cwd=root, input=data, capture_output=True
+    )
     if r.returncode:
         raise ValueError(f"Git {args[0]} failed")
     return r.stdout

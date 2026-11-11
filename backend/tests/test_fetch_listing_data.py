@@ -3,6 +3,7 @@
 import importlib.util
 import io
 import os
+import subprocess
 import tarfile
 from pathlib import Path
 import tempfile
@@ -258,6 +259,25 @@ class FetchTests(unittest.TestCase):
             self.assertNotEqual(encoded, blob)
             self.assertEqual(encoded.replace(b"\r\n", b"\n"), blob)
             self.assertNotIn("docs/data/listings/old.json", archive.getnames())
+
+    def test_local_replace_ref_cannot_substitute_pinned_blob_bytes(self):
+        pin = fetch.pin_data(self.local)
+        original = self.git(self.local, "rev-parse", f"{pin}:docs/data/index.json").strip()
+        substitute = fetch.git(
+            self.local, "hash-object", "-w", "--stdin", data=b"replacement bytes"
+        ).strip()
+        self.git(
+            self.local,
+            "update-ref",
+            f"refs/replace/{original.decode('ascii')}",
+            substitute.decode("ascii"),
+        )
+        replaced = subprocess.check_output(
+            ["git", "cat-file", "blob", original.decode("ascii")], cwd=self.local
+        )
+        self.assertEqual(replaced, b"replacement bytes")
+        self.assertEqual(fetch.install(self.local), pin)
+        self.assertEqual((self.target / "index.json").read_bytes(), b"first snapshot")
 
     def test_rejects_case_aliased_parent_paths_and_symlink_blobs(self):
         oid = (
