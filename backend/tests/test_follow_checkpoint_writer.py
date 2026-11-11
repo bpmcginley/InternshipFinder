@@ -324,6 +324,8 @@ def test_stage_ack_fails_after_utc_expiry_or_rollback_without_retry(successor):
 
 
 def test_missing_retained_closed_evidence_is_refused_on_stage_and_cold_load(successor):
+    from scripts import ingest_data_writer as git
+    from scripts.follow_checkpoint_promotion import BoundFollowAcceptance
     from scripts.follow_checkpoint_writer import FollowWriterCheckpointError, _continuity_check
     from scripts.follow_pending_checkpoint import prepare_pending_follow_checkpoint
 
@@ -369,8 +371,24 @@ def test_missing_retained_closed_evidence_is_refused_on_stage_and_cold_load(succ
 
     good = writer.load(source, observe())
     writer.stage(good, candidate=candidate, staged=staged, provenance=provenance)
-    loaded = session(store).load(source, observe())
+    publication = replace(
+        observe(), commit=candidate, public_tree=git.revision(repo, f"{candidate}:docs/data")
+    )
+    recovery = session(store)
+    loaded = recovery.load(source, publication)
     assert closed_key in loaded.pending.provenance.lineage
+
+    def bind(exact, observation):
+        receipt = git._bind_published_follow(
+            repo, exact.candidate_commit, observation.commit, staged
+        )
+        return BoundFollowAcceptance(exact.candidate_commit, receipt)
+
+    assert recovery.recover(loaded, bind_accepted=bind) == "promoted"
+    next_source = codec.AcceptedFollowSource(
+        candidate, publication.public_tree, staged.index_bytes, staged.shards
+    )
+    assert closed_key in session(store).load(next_source, publication).accepted.lineage
 
     check = _continuity_check(source, old, bounds)
     _, rows = codec._source_rows(source, old.identity, bounds)
@@ -381,3 +399,148 @@ def test_missing_retained_closed_evidence_is_refused_on_stage_and_cold_load(succ
     with pytest.raises(FollowWriterCheckpointError, match="retained listing"):
         check(aliased, {})
     check(aliased, {(alias, raw_time): old.lineage[closed_key]})
+
+
+def test_fractional_accepted_and_pending_ack_follow_exclusive_worker_cutoffs(
+    successor, accepted, monkeypatch
+):
+    from scripts import follow_checkpoint_writer as module
+    from scripts.follow_checkpoint_client import FollowCheckpointLoad
+
+    _, codec, source, bounds, _, candidate, staged, provenance, utc, session, observe, new_store = (
+        successor
+    )
+    _, receipt, original_proof, *_ = accepted
+    fractional = timedelta(microseconds=500)
+    encoded_accepted = codec.encode_accepted_follow_checkpoint(
+        receipt, original_proof, accepted_at=NOW + fractional, bounds=bounds
+    )
+    accepted_cutoff = NOW + timedelta(days=7)
+    utc[0] = accepted_cutoff - timedelta(milliseconds=1)
+    store = Store(FollowCheckpointLoad("active", encoded_accepted, None))
+    writer = session(store)
+    verified = writer.load(source, observe())
+    store.after_stage = lambda: utc.__setitem__(0, accepted_cutoff)
+    with pytest.raises(module.FollowWriterCheckpointError, match="accepted checkpoint expired"):
+        writer.stage(verified, candidate=candidate, staged=staged, provenance=provenance)
+    assert store.calls == ["load", "stage"]
+    with pytest.raises(module.FollowWriterCheckpointError, match="accepted checkpoint expired"):
+        session(store).load(source, observe())
+
+    prepared = NOW + timedelta(hours=2)
+    utc[0] = prepared + fractional
+    pending_cutoff = prepared + timedelta(hours=24)
+    store = new_store()
+    writer = session(store)
+    verified = writer.load(source, observe())
+    prepare = module.prepare_pending_follow_checkpoint
+
+    def after_prepare(*args, **kwargs):
+        result = prepare(*args, **kwargs)
+        utc[0] = prepared + timedelta(milliseconds=1)
+        return result
+
+    monkeypatch.setattr(module, "prepare_pending_follow_checkpoint", after_prepare)
+    store.after_stage = lambda: utc.__setitem__(0, pending_cutoff)
+    with pytest.raises(module.FollowWriterCheckpointError, match="stage deadline"):
+        writer.stage(verified, candidate=candidate, staged=staged, provenance=provenance)
+    assert store.calls == ["load", "stage"]
+    assert codec._instant(json.loads(store.state.pending)["prepared_at"]) == prepared + fractional
+    with pytest.raises(module.FollowWriterCheckpointError, match="pending checkpoint expired"):
+        session(store).load(source, observe())
+
+    utc[0] = pending_cutoff - timedelta(milliseconds=1)
+    recovery = session(store)
+    observation = replace(
+        observe(), commit=candidate, public_tree=json.loads(store.state.pending)["public_tree"]
+    )
+    verified = recovery.load(source, observation)
+    utc[0] = pending_cutoff
+    with pytest.raises(module.FollowWriterCheckpointError, match="pending checkpoint expired"):
+        recovery.recover(verified, bind_accepted=lambda *_: pytest.fail("expired Git proof"))
+    assert "cas" not in store.calls
+
+
+def test_real_git_changed_retained_closed_stamp_is_refused_on_stage_and_cold_load(successor):
+    from scripts import ingest_data_writer as git
+    from scripts.follow_checkpoint_writer import FollowWriterCheckpointError
+    from scripts.follow_pending_checkpoint import prepare_pending_follow_checkpoint
+
+    (
+        repo,
+        codec,
+        source,
+        bounds,
+        old,
+        candidate,
+        staged,
+        provenance,
+        utc,
+        session,
+        observe,
+        new_store,
+    ) = successor
+    closed = next(key for key in old.lineage if key[0] not in provenance.rows)
+    git.git(repo, "checkout", "--detach", source.commit)
+    git.git(repo, "read-tree", "--reset", "-u", candidate)
+    directory = repo / "docs/data"
+    altered = 0
+    for path in staged.shards:
+        shard = directory / path
+        rows = json.loads(shard.read_bytes())
+        for row in rows:
+            if row["id"] == closed[0]:
+                assert row["status"] == "closed" and row["first_seen"] == closed[1]
+                row["first_seen"] = (NOW + timedelta(hours=1)).replace(tzinfo=None).isoformat()
+                altered += 1
+        shard.write_bytes(codec._json(rows))
+    assert altered
+    git.git(repo, "add", "--all")
+    tree = git.git(repo, "write-tree").stdout.decode().strip()
+
+    def blob(path):
+        return git.git(repo, "cat-file", "blob", f"{tree}:docs/data/{path}").stdout
+
+    index = blob("listings/index.json")
+    identity = replace(
+        provenance.identity,
+        index_sha256=sha256(index).hexdigest(),
+        shard_sha256={
+            key: sha256(blob(entry["file"])).hexdigest()
+            for key, entry in json.loads(index)["files"].items()
+        },
+    )
+    changed = replace(
+        provenance,
+        identity=identity,
+        lineage={key: proof for key, proof in provenance.lineage.items() if key != closed},
+    )
+    staged = git.validate_staged_follow_provenance(repo, tree, changed)
+    git.git(repo, "commit", "-m", "Synthetic changed retained closed timestamp")
+    changed_candidate = git.revision(repo, "HEAD")
+
+    store = new_store()
+    writer = session(store)
+    verified = writer.load(source, observe())
+    with pytest.raises(FollowWriterCheckpointError, match="retained listing"):
+        writer.stage(verified, candidate=changed_candidate, staged=staged, provenance=changed)
+    assert store.calls == ["load"] and store.state.pending is None
+
+    raw_pending = prepare_pending_follow_checkpoint(
+        repo,
+        candidate=changed_candidate,
+        staged=staged,
+        provenance=changed,
+        predecessor=verified.predecessor,
+        prepared_at=utc[0],
+        bounds=bounds,
+    )
+    cold = new_store(raw_pending)
+    accepted = replace(
+        observe(),
+        commit=changed_candidate,
+        public_tree=git.revision(repo, f"{changed_candidate}:docs/data"),
+    )
+    with pytest.raises(FollowWriterCheckpointError, match="retained listing"):
+        session(cold).load(source, accepted)
+    assert cold.calls == ["load"]

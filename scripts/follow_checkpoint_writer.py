@@ -71,14 +71,22 @@ def _continuity_check(source, accepted, bounds):
     def check(rows, lineage):
         for role_id, row in rows.items():
             prior = by_id.get(role_id) or by_url.get(row["apply_url"])
-            stamp = row["first_seen"]
-            if prior is None or stamp != prior[1]:
+            if prior is None:
                 continue
             proof = accepted.lineage.get(prior)
-            if proof is not None and lineage.get((role_id, stamp)) != proof:
-                raise FollowWriterCheckpointError("retained listing lost predecessor lineage")
+            stamp = row["first_seen"]
+            if proof is not None and (stamp != prior[1] or lineage.get((role_id, stamp)) != proof):
+                raise FollowWriterCheckpointError("retained listing changed predecessor lineage")
 
     return check
+
+
+def _store_live(now, started, lifetime):
+    # The Worker clock is integer UTC milliseconds. It ceils admission and floors expiry.
+    remainder = timedelta(microseconds=started.microsecond % 1000)
+    elapsed = now - (started - remainder)
+    starts = timedelta(milliseconds=1) if remainder else timedelta(0)
+    return starts <= elapsed < lifetime
 
 
 class FollowCheckpointWriter:
@@ -208,12 +216,12 @@ class FollowCheckpointWriter:
         now = self._now()
         if now < verified.covers_after:
             raise FollowWriterCheckpointError("checkpoint clock predates coverage")
-        if verified.accepted and not (
-            timedelta(0) <= now - verified.accepted.accepted_at < _ACCEPTED_LIFETIME
+        if verified.accepted and not _store_live(
+            now, verified.accepted.accepted_at, _ACCEPTED_LIFETIME
         ):
             raise FollowWriterCheckpointError("accepted checkpoint expired")
-        if verified.pending and not (
-            timedelta(0) <= now - verified.pending.prepared_at < _PENDING_LIFETIME
+        if verified.pending and not _store_live(
+            now, verified.pending.prepared_at, _PENDING_LIFETIME
         ):
             raise FollowWriterCheckpointError("pending checkpoint expired")
         return now
@@ -256,16 +264,18 @@ class FollowCheckpointWriter:
         return generation
 
     def _ensure_stage_live(self, verified, prepared):
-        if not timedelta(0) <= self._ensure_live(verified) - prepared < _PENDING_LIFETIME:
+        if not _store_live(self._ensure_live(verified), prepared, _PENDING_LIFETIME):
             raise FollowWriterCheckpointError("checkpoint stage deadline passed")
 
     def recover(self, verified: VerifiedWriterCheckpoint, *, bind_accepted) -> PromotionStatus:
         """Promote a verified accepted descendant once. Reload before using new lineage."""
         raw, observation, _ = self._take(verified)
+        self._ensure_live(verified)
         if raw is None or observation.commit == verified.predecessor.commit:
             return "no_publication"
 
         def bind(exact, accepted):
+            self._ensure_live(verified)
             return self._call(bind_accepted, exact, accepted)
 
         def compare_and_set(change):
