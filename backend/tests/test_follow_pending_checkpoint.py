@@ -24,7 +24,7 @@ def pending(tmp_path, database, monkeypatch):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Fixture")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "fixture@example.invalid")
     monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "")
-    repo = tmp_path / "candidate"
+    repo = tmp_path / "candidate;checkout"
     w.git(tmp_path, "init", str(repo))
     directory = repo / "docs/data"
     capture = observe_seed(seed(directory, []))
@@ -179,6 +179,8 @@ def test_pending_git_reads_cannot_be_redirected_to_another_checkout(pending, tmp
     repo, w, codec, _, previous, payload, bounds = pending
     empty = tmp_path / "empty"
     w.git(tmp_path, "init", str(empty))
+    linked = tmp_path / "linked"
+    w.git(repo, "worktree", "add", "--detach", str(linked), "HEAD")
     objects = str(repo / ".git/objects")
     overrides = {
         "GIT_DIR": str(repo / ".git"),
@@ -209,3 +211,4 @@ def test_pending_git_reads_cannot_be_redirected_to_another_checkout(pending, tmp
     with pytest.raises(ValueError):
         read(nested)
     assert read(repo).generation == sha256(payload).hexdigest()
+    assert read(linked).generation == sha256(payload).hexdigest()
