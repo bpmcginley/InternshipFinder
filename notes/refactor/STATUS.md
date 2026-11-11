@@ -74,7 +74,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-2.4 Config: site | Unassigned | - | - | Queued | Dashboard, counter, buy, and employer page remain. Preserve their independent load order and coordinate claimed files with Product. |
 | 4 | WP-4.2 Orders split, role index | wp42_orders | `refactor/wp-4.2-orders-roles` | [#216](https://github.com/bpmcginley/InternshipFinder/pull/216) | Merged | Merged as `9ea5bc0a` after review and CI. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
-| 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | - | In review | Field-capacity file move with exact SQL and all 39 facade exports preserved. |
+| 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | [#231](https://github.com/bpmcginley/InternshipFinder/pull/231) | In review | Field-capacity file move with exact SQL and all 39 facade exports preserved. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
