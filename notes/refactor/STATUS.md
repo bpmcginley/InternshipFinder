@@ -380,6 +380,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
 - All 65 marked tests passed with the root fixtures active, strict marker checking, and the facade and sockets blocked. The full offline backend and growth suite on `b3b3d049` passed 1,865 tests and 11 subtests with eight local or optional skips. After feed defaults [#411](https://github.com/bpmcginley/InternshipFinder/pull/411), the 65 standalone cases, both lazy cases, and 35 combined feed, widget, near-page and Golden checks passed. The Node 22 Worker suite passed all 726 tests.
 
+## WP-6.2 page-date tests
+
+- Page-date tests read the live sitemap before each publishing build and write using that build's canonical state and hooks. Comparison dates and the near-page exception use the existing state settings. The pricing-copy correction uses the existing pricing hook. The numeric page path resolves to the same constant.
+- Offline legacy and canonical runs matched all 39 assertions, all 1,412 ordered page records across 42 builds, 40 sitemap reads and publication snapshots, 811 ordered writes and 428 final fixture files. Each snapshot contained identical sitemap and date-manifest bytes. All 31 cases passed with real root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 134 focused cases included both Golden checks against all 836 artifacts.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
@@ -486,6 +491,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Final integration: normally merged recovered main `e009644f`, including automated data refresh `79e85` and the product recovery ledger. Approved deletions, dependency removals, archive moves and six path repairs are unchanged. Current data and product files match recovered main exactly. Product #197 recovery Pages run 42896131695 and its exact-commit backend check are verified green. Fresh final-head CI/review remain required before lead merge.
 
+## WP-6.2 role-index tests
+
+- The role-index suite uses the canonical location formatter, standalone build and publisher CLI. Its integration test scopes the original near-page setting and fixed October 19 UTC day to the same three builds and two publisher runs. The role fixtures, build-alone check, date and shard assertions stay intact.
+- The offline comparison matched all 26 assertions, 21 ordered page records, 65 ordered writes, all 62 fixture files and console output. All three build phases wrote no files, and both publisher runs passed identical role-index and widget inputs with the fixed day. All 11 cases passed with the real root fixtures, strict markers, and the facade and sockets blocked. The 26 focused tests included both Golden checks against all 836 artifacts.
+
 ## WP-4.1 local migration preparation
 
 - Added `worker/migrations/0001_baseline.sql` as an exact copy of the existing 690-line schema, preserving all SQL/comments: 42 tables, 22 explicit indexes, six triggers, and both account/inviter backfills. The two standalone mail/report schemas are already included; no duplicate `0002`/`0003` migrations were created. Legacy schema files, runtime code, package/deploy scripts and Wrangler configuration remain unchanged.
@@ -575,6 +585,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - [#279](https://github.com/bpmcginley/InternshipFinder/pull/279) merged as `a8d79ecc`. Pages 42951163633 and the exact deployment succeeded.
 - [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) merged at `c84cea3b`. Pages runs 42949557934 and 42949563654 and the exact deployment succeeded.
 - Move 15 employer-specific test functions and their private fixture into `test_seo_employer.py`, keeping shared helpers at their existing imports. All assertions and decorators match the original source. Cross-family tests remain in `test_seo_pages.py`. Backend collection retained all 1,166 tests, with only the 20 moved case paths changing. All 219 focused tests and Ruff passed.
+
+## WP-6.2 employer links, role details and widget tests
+
+- Employer entry and posting-link tests use the shared fixtures and canonical rendering. The paid box still uses the sponsored link without organic posting annotations. Role-detail builds preserve sitemap and publication order. The widget case runs the canonical publisher with the same fixed date and complete listing input while page and feed writers are stubbed.
+- The offline comparison matched all 109 assertions, 1,106 ordered page records across eight builds, three publication snapshots, 127 ordered writes, all 61 final fixture files, paid markup, console output and widget inputs. All 52 cases passed with root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 92 focused tests included both Golden checks against all 836 artifacts.
+- The generated distribution and phone migration at `df978c48` and the dated opening-count migration at `5ec2bbba` passed their exact Pages runs. Each 4,996-file publication matched the [#419 artifact](https://github.com/bpmcginley/InternshipFinder/pull/419) byte-for-byte, and all 141 listing files matched data commit `fa207ade`. [#428 Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43092791350) · [#431 Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43093185735).
 
 ## WP-3.3 listing test follow-up
 
@@ -787,6 +803,11 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - Offline verification: 246 focused tests passed with one existing optional cryptography skip. The real synthetic Reel check ran. Both Golden tests passed with 695 artifact paths. Ruff and diff checks passed.
 - The Instagram and metrics direct CLIs use a temporary checkout import path. Their existing workflow checkouts already contain the shared standard-library logger. No workflow or packaging edit. The diagnostic-only scope is supported by syntax-tree comparisons of the four status modules and actual artifact and stdout comparisons for digest. After integrating main `f98760d2`, the authored sources and tests stayed byte-identical, and the socket-denied focused and golden run passed 233 with two local dependency skips. Ruff passed.
 
+## WP-6.2 screenshot reproduction scripts
+
+- The synthetic P-1.9 employer stress page still uses the pinned `f6e599ef` renderer before and uses the current canonical renderer after. The previous after-mode searched the facade for a function that had become an alias. Both fixture pages match their reference bytes and preserve the hostile-name escaping and employer entry link.
+- P-2.3n and P-4.1 import the shared listing fixture directly. Offline comparisons matched all 128 P-2.3n files and all 762 P-4.1 files, including 636 site files and the five pilot pages. All three scripts ran with sockets blocked. The import-blocked runs used the exact pending fixture-consumer heads from [#434](https://github.com/bpmcginley/InternshipFinder/pull/434) and [#445](https://github.com/bpmcginley/InternshipFinder/pull/445). Both Golden checks passed against all 836 artifacts.
+
 ## WP-1.4 page-build logging
 
 - On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
@@ -843,6 +864,11 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 - JSON mode reports source, operation and exception class from 13 previously silent broad catches: 11 ATS detail reads, the HouseAI detail read, and the shared robots lookup. Default mode leaves those catches silent. The shared console_exception helper preserves fallbacks even if the opt-in write raises BrokenPipeError or RuntimeError.
 - This PR preserved the five raw-error source adapters byte-for-byte. Q6 tracks decisions about their existing exception output.
 - The focused mocked source and adapter suites passed 144 tests. Golden snapshot and mutation checks both passed. Ruff is clean, and targeted Pyright exactly matches the nine existing diagnostics. Syntax trees match the previous revision after stripping logging-only changes from all 14 touched source modules. After merging main `acf2d347`, all 146 focused and golden tests passed, and source, test and shared-helper bytes matched their reviewed versions.
+
+## WP-6.2 placement report and console tests
+
+- The placement report and console tests use the canonical publisher with their original fixed UTC day and near-page setting. The qualified placement fixtures, recorder subprocess and workflow assertions are preserved. The cases still cover report placement, report failure and noninterference, and exact JSON diagnostics and workflow annotations.
+- The offline comparison matched all 53 assertions, 245 ordered page records across six publisher runs, six publication snapshots, 527 ordered writes and all 525 final fixture files. Stdout and stderr matched after replacing the scratch-directory prefix. All 18 focused cases passed with strict root fixtures, canonical donor identity, and facade, unqualified donor and sockets blocked. Both Golden checks matched all 836 artifacts.
 
 ## WP-1.4 backend logging closure
 

@@ -15,11 +15,12 @@ import { canUpgrade } from "./billing.js";
 import { countEvent } from "./visits.js";
 import { reserveFirstFundedRun } from "./funded-run-admission.js";
 import { reserveFundedSibling } from "./funded-run-sibling.js";
-import { purchaseFrom, purchaseSpendable } from "./funded-purchase.js";
+import { purchasedRunsFor } from "./funded-purchase.js";
 import { fundedProviderResponse } from "./funded-provider.js";
 import { releaseFundedCall } from "./funded-run-callbacks.js";
 import { costCents, geminiUrl } from "./gemini.js";
 const busy = () => new HttpError(503, "busy", "AI admission is temporarily unavailable");
+const purchasedUnitsEnabled = (env) => env.FUNDED_PURCHASES === "1";
 export function lifecycleMode(env) {
   const mode = env.FUNDED_RUNS_MODE || "legacy";
   if (!["legacy", "create", "drain"].includes(mode)) throw busy();
@@ -40,6 +41,16 @@ function responseLimits(env) {
   )
     throw busy();
   return { maxBytes, maxEventBytes, deadlineMs };
+}
+// Sales require the same funded configuration that admits a new purchased Auto-Apply run.
+export function fundedPurchaseCreationReady(env) {
+  try {
+    if (lifecycleMode(env) !== "create" || !purchasedUnitsEnabled(env)) return false;
+    responseLimits(env);
+    return true;
+  } catch {
+    return false;
+  }
 }
 export async function admitAiLifecycle(
   db,
@@ -65,7 +76,7 @@ export async function admitAiLifecycle(
     key = [user, month, task, runId];
   let row, used, bonus, purchased;
   const limit = allowanceFor(config, env, task, tier, plan, now);
-  const allowPurchased = env.FUNDED_PURCHASES === "1" && task === "autofill";
+  const allowPurchased = purchasedUnitsEnabled(env) && task === "autofill";
   try {
     if (await db.prepare("SELECT 1 FROM forget WHERE user_hash=?").bind(user).first()) throw busy();
     row = await db
@@ -90,19 +101,7 @@ export async function admitAiLifecycle(
           .first()
       )?.n || 0,
     );
-    purchased = allowPurchased
-      ? (
-          await db
-            .prepare(
-              "SELECT COALESCE(SUM(p.available),0) AS n " +
-                purchaseFrom +
-                " WHERE p.user_hash=? AND " +
-                purchaseSpendable,
-            )
-            .bind(user)
-            .first()
-        ).n
-      : 0;
+    purchased = allowPurchased ? await purchasedRunsFor(db, user) : 0;
   } catch {
     throw busy();
   }
