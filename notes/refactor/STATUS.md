@@ -116,7 +116,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
 | 7 | WP-6.1.4 Data branch | Lead | `data` | - | Seed published | Normal initial push of `2e3f1c5b` from `cde2646f` after strict validation. Pages 42969039657 selected and deployed that exact seed. |
 | 7 | WP-6.1.5 Ingest writer | wp42_orders | `refactor/wp-6.1.5-data-writer` | [#322](https://github.com/bpmcginley/InternshipFinder/pull/322) | Merged | `997cfd6d` merged after independent review and nine green checks. Seed Pages 42969039657 passed. Automatic ingest 42969039608 is in progress. |
-| 7 | WP-6.1.6 Remove main data | Unassigned | - | - | Waiting for observation | Requires seven days of clean ingest/Pages after cutover; no history rewrite. |
+| 7 | WP-6.1.6 Remove main data | wp42_orders | `refactor/wp-6.1.6-retire-main-data` | - | Draft / G3 hold | Prepare tracked-data removal and the local public fetch helper for review. No merge before seven verified clean days and lead release. |
 | 7 | WP-6.2 Remove shims | Unassigned | - | - | Queued | Only after repository-wide old-import search is clear. |
 | 7 | WP-6.3 Ingest timing | wp21_inventory | `refactor/wp-6.3-ingest-timing` | [#323](https://github.com/bpmcginley/InternshipFinder/pull/323) | Merged | `29a86129` passed Pages 42967561585 and backend 42967561649. Concurrent board phase took 36m 25s scheduled and 27m 11s on push. Per-source timings unavailable. |
 
