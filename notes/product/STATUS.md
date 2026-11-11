@@ -506,3 +506,8 @@ Node 22 serial site suite passed 316/316 and both golden tests passed. Both stam
 ## P-0.2 final disclosure integration
 
 Normally integrated published dashboard main `2a8176db`, preserving reviewed privacy source and all 16 screenshots from `14696ba9`. Both stamped artifacts were regenerated; 695 hashes match and only privacy.html differs from main. Every other public path and page-content-date record is identical, including dashboard/storage/allowance/distribution output. The privacy artifact itself is byte-identical to the original reviewed after capture. 316 serial Node 22 site tests and two golden tests passed; the publication checker found zero problems. Final CI and independent incremental review remain required. Disclosure wording is approved; publish it before owner worker deployment. No deployment, release, mail or provider action occurred.
+
+
+## Chrome 0.6.0 tailoring factual anchors
+
+Draft claim by audit_site on `codex/product-extension-tailor-anchors`: new `extension/lib/tailor_claims.js`, existing `lib/tailoring.js`, `lib/resume_doc.js`, `lib/docx.js`, `background/tailor.js` cache version lines, new focused test and existing tailoring flow tests, own package note/status. High-confidence numeric/unit and distinct technical identifier checks only. Existing human review, automatic choice, guard, permissions, provider and release stay unchanged. Needs Bruce integration/release; no deployment or provider calls.
