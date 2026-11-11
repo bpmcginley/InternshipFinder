@@ -565,6 +565,7 @@ test("verified final review skips only the redundant Worker call", async (t) => 
     ["changed document", 2, "ready_to_submit"],
     ["field error on the preceding fill", 2, "ready_to_submit"],
     ["late editable field", 2, "needs_you"],
+    ["unmarked required answer", 2, "needs_you"],
     ["takeover during the proof", 1, "needs_you"],
   ];
   try {
@@ -584,7 +585,8 @@ test("verified final review skips only the redundant Worker call", async (t) => 
             ? [{ ref: "b2", text: "I agree", blocked: true, consent: true }]
             : [{ ref: "b2", text: "Submit Application", blocked: true },
               ...(name === "alternate control" ? [{ ref: "b3", text: "Continue" }] : [])],
-          text: "", filledFields: review ? 1 : 0, busy: false, frozen: false,
+          text: review && name === "unmarked required answer" ? "Required work authorization answer missing." : "",
+          filledFields: review ? 1 : 0, busy: false, frozen: false,
         };
       };
       window.ISDom.mark = () => phase;
@@ -604,7 +606,8 @@ test("verified final review skips only the redundant Worker call", async (t) => 
         if (options.target.documentIds && options.world === "ISOLATED") {
           proofReads++;
           if (name === "takeover during the proof") await takeBack(id, TOOK_OVER);
-          const result = name === "ambiguous document evidence" || phase === "late" ? null : Array(32).fill(1);
+          const unproved = ["ambiguous document evidence", "unmarked required answer"].includes(name);
+          const result = unproved || phase === "late" ? null : Array(32).fill(1);
           return [{ frameId: 0, documentId: "original", result }];
         }
         const documentId = name === "changed document" && phase !== "fill" ? "replacement" : "original";
@@ -619,9 +622,12 @@ test("verified final review skips only the redundant Worker call", async (t) => 
         if (requests.length === 2 && name === "late editable field") {
           assert.match(JSON.stringify(body), /New required answer/);
         }
+        if (requests.length === 2 && name === "unmarked required answer") {
+          assert.match(JSON.stringify(body), /Required work authorization answer missing/);
+        }
         const parts = requests.length === 1
           ? [tool("fill", { ref: "0:e1", text: "Sample" }), tool("click", { ref: "0:b1" })]
-          : name === "late editable field" || name === "consent control"
+          : ["late editable field", "consent control", "unmarked required answer"].includes(name)
             ? [tool("pause_for_user", { reason: "Check the new prompt." })]
             : [tool("ready_to_submit", { summary: "Human review" })];
         const event = JSON.stringify({ candidates: [{ content: { parts }, finishReason: "STOP" }] });

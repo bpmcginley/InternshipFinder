@@ -87,6 +87,15 @@ export async function inspectReviewDocument() {
     )
   )
     return null;
+  const warningText = text(bodyText);
+  const unmet = [
+    /\b(?:answer|field|question)s? (?:(?:is|are) )?(?:missing|unanswered|incomplete|blank|not (?:yet )?(?:answered|provided|complete|completed))\b/,
+    /\b(?:this|a) (?:answer|field|question) is required\b/,
+    /\b(?:please )?(?:answer|complete|fill in|fill out|provide|select) (?:all |the |your )?required (?:answers?|fields?|questions?)\b/,
+    /\b(?:validation (?:failed|error)|(?:fix|correct|resolve) (?:the |these |following )?(?:errors?|issues?))\b/,
+    /\b(?:your application has|there (?:is|are)) (?:[1-9][0-9]*|an?|one or more) (?:validation )?errors?\b/,
+  ];
+  if (unmet.some((pattern) => pattern.test(warningText))) return null;
   // Keep application contents in the document. Only an ephemeral equality proof leaves it.
   const signature = await crypto.subtle.digest(
     "SHA-256",
