@@ -185,11 +185,12 @@ export function createRetentionCheckedEmployerPostingCounter({
             SELECT ?,?,1 WHERE ?=date('now')
               AND (SELECT n FROM employer_posting_day_caps WHERE day=?)<50000
               AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day<date(?,'-90 days'))
+              AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day>?)
               AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day<?)
               AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day>?)
             ON CONFLICT(day,company) DO UPDATE SET n=n+1 WHERE n<1000`,
             )
-            .bind(day, value.company, day, day, day, day, day),
+            .bind(day, value.company, day, day, day, day, day, day),
           db
             .prepare("UPDATE employer_posting_day_caps SET n=n+1 WHERE day=? AND changes()=1")
             .bind(day),

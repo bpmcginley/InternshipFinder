@@ -137,6 +137,11 @@ export async function routeAndOwnerGates(db) {
   assert.equal((await read()).organic_posting_readiness.retention, "blocked");
   await f.seed();
   assert.equal((await read()).organic_posting_readiness.retention, "ready");
+  const future = new Date(f.now().getTime() + 86400000).toISOString().slice(0, 10);
+  await db.prepare("INSERT INTO employer_posting_counts VALUES(?,'future',1)").bind(future).run();
+  assert.equal((await read()).organic_posting_readiness.retention, "blocked");
+  await db.prepare("DELETE FROM employer_posting_counts WHERE day=?").bind(future).run();
+  assert.equal((await read()).organic_posting_readiness.retention, "ready");
   const off = await read({ ADMIN_TOKEN: f.env.ADMIN_TOKEN });
   assert.equal(Object.hasOwn(off, "organic_posting_readiness"), false);
   assert.equal(Object.hasOwn(off, "organic_posting_counts"), false);

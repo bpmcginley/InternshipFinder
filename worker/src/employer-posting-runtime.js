@@ -153,9 +153,10 @@ export async function employerPostingReport(context) {
           `SELECT ?=date('now')
         AND EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day=?)
         AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day<date(?,'-90 days'))
+        AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day>?)
         AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day!=?) AS ready`,
         )
-        .bind(day, day, day, day)
+        .bind(day, day, day, day, day)
         .first();
       retention = row?.ready === 1 ? "ready" : "blocked";
     } catch {
