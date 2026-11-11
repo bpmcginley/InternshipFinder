@@ -491,6 +491,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Final integration: normally merged recovered main `e009644f`, including automated data refresh `79e85` and the product recovery ledger. Approved deletions, dependency removals, archive moves and six path repairs are unchanged. Current data and product files match recovered main exactly. Product #197 recovery Pages run 42896131695 and its exact-commit backend check are verified green. Fresh final-head CI/review remain required before lead merge.
 
+## WP-6.2 role-index tests
+
+- The role-index suite uses the canonical location formatter, standalone build and publisher CLI. Its integration test scopes the original near-page setting and fixed October 19 UTC day to the same three builds and two publisher runs. The role fixtures, build-alone check, date and shard assertions stay intact.
+- The offline comparison matched all 26 assertions, 21 ordered page records, 65 ordered writes, all 62 fixture files and console output. All three build phases wrote no files, and both publisher runs passed identical role-index and widget inputs with the fixed day. All 11 cases passed with the real root fixtures, strict markers, and the facade and sockets blocked. The 26 focused tests included both Golden checks against all 836 artifacts.
+
 ## WP-4.1 local migration preparation
 
 - Added `worker/migrations/0001_baseline.sql` as an exact copy of the existing 690-line schema, preserving all SQL/comments: 42 tables, 22 explicit indexes, six triggers, and both account/inviter backfills. The two standalone mail/report schemas are already included; no duplicate `0002`/`0003` migrations were created. Legacy schema files, runtime code, package/deploy scripts and Wrangler configuration remain unchanged.
