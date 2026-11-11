@@ -65,8 +65,14 @@ def test_missing_duplicate_or_preconfigured_script_changes_no_target(tmp_path, t
     assert tree(tmp_path) == before
 
 
-def test_parser_ignores_script_examples_and_leaves_unrelated_pages(tmp_path):
-    text = f'<!-- {TAG} --><script>const example = {TAG!r};</script>\n{TAG}\n'
+def test_raw_guard_rejects_even_inert_counter_examples():
+    for text in [f'<!-- {TAG} -->{TAG}', f'<script>const example = {TAG!r};</script>{TAG}']:
+        with pytest.raises(ValueError, match="raw canonical"):
+            employer_capture._mark(text)
+
+
+def test_leaves_unrelated_pages_unchanged(tmp_path):
+    text = f'<p>Unchanged page text</p>\n{TAG}\n'
     (tmp_path / "index.html").write_text(text, encoding="utf-8")
     for path in ["widget", "digest", "employers"]:
         (tmp_path / path).mkdir()
@@ -111,18 +117,37 @@ def test_potential_counter_filename_cannot_hide_duplicate(src):
         employer_capture._mark(TAG + f'<script defer src="{src}"></script>')
 
 
+@pytest.mark.parametrize(
+    "html",
+    [
+        TAG + "<!-->" + TAG + "<!-- -->",
+        TAG + "<!--->" + TAG + "<!-- -->",
+        TAG.replace("</script>", "</script extra>") + TAG,
+        TAG.replace("</script>", "</script/>") + TAG,
+        TAG + '<!--><script defer src="/js/co&#117;nt.js?v=old"></script><!-- -->',
+        TAG + '<!-->src="' + TAG + '<!-- -->',
+    ],
+)
+def test_raw_counter_guard_is_independent_of_html_comment_and_end_tag_parsing(html):
+    with pytest.raises(ValueError, match="raw canonical"):
+        employer_capture._mark(html)
+
+
 @pytest.mark.parametrize("flags", [[], ["--employer-postings"]])
+@pytest.mark.parametrize("opening", ["", "<!-->", "<!--->"])
 @pytest.mark.parametrize(
     "retained", ["index.html", "internships/stale-outside-current-build/index.html"]
 )
 def test_reused_default_and_annotation_targets_fail_before_any_publication(
-    tmp_path, monkeypatch, flags, retained
+    tmp_path, monkeypatch, flags, retained, opening
 ):
     export(tmp_path)  # A fresh valid export does not authorize a retained marked HTML page.
     (tmp_path / "index.html").write_text(TAG, encoding="utf-8")
     path = tmp_path / retained
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(employer_capture._mark(TAG), encoding="utf-8")
+    path.write_text(
+        opening + employer_capture._mark(TAG) + ("<!-- -->" if opening else ""), encoding="utf-8"
+    )
     before = tree(tmp_path)
     monkeypatch.setattr(employer_publication, "prepare", lambda _: pytest.fail("must not stage"))
     with pytest.raises(ValueError, match="fresh unmarked publication target"):

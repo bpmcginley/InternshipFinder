@@ -1,10 +1,28 @@
 """Explicit build-time capture opt-in, after successful same-export publication."""
 
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
+import re
 from urllib.parse import unquote
 
 ATTRIBUTE = ' data-employer-posting-counts="1"'
+MARKER = "data-employer-posting-counts"
+# Look ahead at every offset: a quoted example must not consume and hide an overlapping
+# browser-active src reference. This scan intentionally knows nothing about HTML comments.
+RAW_SOURCE = re.compile(
+    r'''(?=(\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))))''', re.IGNORECASE
+)
+
+
+def _potential_counter(value):
+    if not isinstance(value, str):
+        return False
+    # No authority or HTML grammar inference: aliases and references in malformed markup
+    # are rejected conservatively. Percent/character references cannot disguise the filename.
+    value = unquote(unescape(value)).replace("\\", "/")
+    value = value.replace("\t", "").replace("\r", "").replace("\n", "").strip()
+    return "count.js" in value.lower()
 
 
 class _Scripts(HTMLParser):
@@ -15,22 +33,12 @@ class _Scripts(HTMLParser):
         self.matches = []
         self.pending = None
 
-    def _counter(self, value):
-        if not isinstance(value, str):
-            return False
-        # Deliberately lexical and conservative, not a Python approximation of browser URL
-        # authority parsing. Any potential counter filename must use the one exact tag,
-        # including foreign hosts, slash-heavy/encoded hosts and cache-versioned aliases.
-        value = unquote(value).replace("\\", "/")
-        value = value.replace("\t", "").replace("\r", "").replace("\n", "").strip()
-        return "count.js" in value.lower()
-
     def handle_starttag(self, tag, attrs):
         if tag != "script":
             return
         if any(name == "data-employer-posting-counts" for name, _ in attrs):
             raise ValueError("Capture requires a fresh unmarked page")
-        if not any(name == "src" and self._counter(value) for name, value in attrs):
+        if not any(name == "src" and _potential_counter(value) for name, value in attrs):
             return
         # These are publisher-owned tags, before the ordinary asset-stamping pass.
         if self.get_starttag_text() != '<script defer src="/js/count.js">':
@@ -45,10 +53,19 @@ class _Scripts(HTMLParser):
 
 
 def _mark(text):
+    if MARKER in text.lower():
+        raise ValueError("Capture requires a fresh unmarked page")
+    raw = [
+        match
+        for match in RAW_SOURCE.finditer(text)
+        if _potential_counter(next(value for value in match.groups()[1:] if value is not None))
+    ]
+    if len(raw) != 1 or raw[0].group(1) != 'src="/js/count.js"':
+        raise ValueError("Capture requires exactly one raw canonical counter script source")
     parser = _Scripts(text)
     parser.feed(text)
     parser.close()
-    if parser.pending is not None or len(parser.matches) != 1:
+    if parser.pending is not None or len(parser.matches) != 1 or raw[0].end(1) != parser.matches[0]:
         raise ValueError("Capture requires exactly one canonical counter script")
     at = parser.matches[0]
     return text[:at] + ATTRIBUTE + text[at:]
@@ -71,15 +88,10 @@ def require_unmarked(root: Path) -> None:
             continue
         if target.is_symlink() or target.is_junction() or not target.is_file():
             raise ValueError("Capture preflight requires regular published pages")
-        parser = HTMLParser(convert_charrefs=True)
-
-        def check(tag, attrs):
-            if tag == "script" and any(name == "data-employer-posting-counts" for name, _ in attrs):
-                raise ValueError("Capture requires a fresh unmarked publication target")
-
-        parser.handle_starttag = check
-        parser.feed(target.read_bytes().decode("utf-8"))
-        parser.close()
+        # Intentionally independent of HTMLParser: browser-active malformed comments/end tags
+        # can hide a script from that parser. Even a marker in inert text fails closed here.
+        if MARKER in target.read_bytes().decode("utf-8").lower():
+            raise ValueError("Capture requires a fresh unmarked publication target")
 
 
 def stamp(root: Path, pages: list[dict]) -> None:
