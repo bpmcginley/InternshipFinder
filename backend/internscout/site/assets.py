@@ -1,6 +1,7 @@
 """Public site origin and the exact generated-page stylesheet."""
 
 SITE = "https://internscout.org"
+SLOGAN = "Built by one student, made for all students."
 
 
 CSS = """

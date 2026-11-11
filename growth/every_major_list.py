@@ -38,7 +38,10 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import entry as site_entry  # noqa: E402
+from internscout.site import rules as site_rules  # noqa: E402
+from internscout.site import sitemap  # noqa: E402
 from internscout.site import source as site_source  # noqa: E402
 from internscout.site import taxonomy as site_taxonomy  # noqa: E402
 from internscout.site import text as site_text  # noqa: E402
@@ -50,7 +53,7 @@ REPO = "bpmcginley/internships-every-major"  # where the workflow publishes the 
 SOURCE = "https://github.com/bpmcginley/InternshipFinder/blob/main/growth/every_major_list.py"
 SLOGAN = "Built by one student, made for all students."
 
-MIN_FIELD = sp.MIN_OPEN  # Summer 2027 roles a field needs for a section of its own
+MIN_FIELD = site_rules.MIN_OPEN  # Summer 2027 roles a field needs for a section of its own
 README_ROWS = (40, 30, 25, 20, 15, 10, 5)  # rows per field in the README: the first that fits
 README_BUDGET = 450_000  # bytes; GitHub stops rendering a file at about 512 KB
 FILE_ROWS = 200  # rows in each fields/<slug>.md
@@ -128,7 +131,7 @@ def summer_role(x: dict) -> bool:
 def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
     """Everything the list says, from the site's data. live: the sitemap the site serves now
     (seo_pages.live_paths), so the field pages linked are exactly the ones deployed."""
-    snapshot = sp.build_result(site_dir, live or {})
+    snapshot = site_entry.build_snapshot(site_dir, live or {})
     pages = snapshot.pages
     by_path = {p["path"]: p for p in pages}
     d = site_source.load(site_dir)
@@ -154,9 +157,9 @@ def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
         # The field's landing page and the count in its title; the dashboard filtered to the field
         # when the site has no page for it (a field page needs MIN_OPEN open roles, of any term).
         links[t] = (
-            (sp.SITE + page["path"], len(page["items"]))
+            (site_assets.SITE + page["path"], len(page["items"]))
             if page
-            else (f"{sp.SITE}/?field={quote(t)}", open_by_field[t])
+            else (f"{site_assets.SITE}/?field={quote(t)}", open_by_field[t])
         )
     new = [x for x in roles if site_source.fresh(x, now, d["baseline"])]
     return {
@@ -195,7 +198,7 @@ def row(x: dict, ctx: dict) -> str | None:
     company = md(name, COMPANY_MAX)
     page = ctx["employers"].get(name)
     if page and company:
-        company = f"[{company}]({sp.SITE}{page})"  # the employer's page on InternScout
+        company = f"[{company}]({site_assets.SITE}{page})"  # the employer's page on InternScout
     cells = [
         company,
         md(x.get("title"), TITLE_MAX),
@@ -284,7 +287,7 @@ def render(ctx: dict, per_field: int, repo: str = REPO) -> str:
     out.append("## New this week\n")
     new = ctx["new"]
     more = (
-        f" [Every role found this week, of any start term]({sp.SITE}/internships/new/)."
+        f" [Every role found this week, of any start term]({site_assets.SITE}/internships/new/)."
         if ctx["new_page"]
         else ""
     )
@@ -377,7 +380,7 @@ def main(argv: list[str]) -> None:
         "--repo", default=REPO, help="owner/name of the list's repository, for the issues link"
     )
     args = ap.parse_args(argv[1:])
-    live = sp.live_paths(args.live_sitemap) if args.live_sitemap else {}
+    live = sitemap.live_paths(args.live_sitemap, sitemap.SITE_PATH) if args.live_sitemap else {}
     files = build(args.site, live, args.repo)
     write(args.out, files)
     size = len(files["README.md"].encode("utf-8"))

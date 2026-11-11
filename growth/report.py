@@ -27,7 +27,8 @@ from datetime import datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
-from internscout import focus, seo_pages  # noqa: E402
+from internscout import focus  # noqa: E402
+from internscout.site import entry as site_entry  # noqa: E402
 from internscout.site import source as site_source  # noqa: E402
 from internscout.site import text as site_text  # noqa: E402
 import audience  # noqa: E402
@@ -289,7 +290,7 @@ def targeting_section(site_dir: str) -> list[str]:
 
 
 def pages_section(site_dir: str) -> list[str]:
-    pages = seo_pages.build(site_dir)
+    pages = site_entry.build_snapshot(site_dir).pages
     kinds = {"field or state": 0, "field in a state": 0, "major": 0, "employer": 0}
     for p in pages:
         parts = p["path"].strip("/").split("/")

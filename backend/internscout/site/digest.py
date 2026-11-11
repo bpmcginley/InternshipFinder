@@ -10,6 +10,10 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
+DIGEST_MIN_NEW = (
+    3  # new roles a field needs in a week to get a section in the email (was: digest.MIN_NEW = 3)
+)
+
 SIGNUP_HEADING = "New internships in your inbox every Monday. Free."
 
 

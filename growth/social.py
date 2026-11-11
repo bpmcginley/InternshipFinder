@@ -45,7 +45,8 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import rules as site_rules  # noqa: E402
 from internscout.site import digest as digest_model  # noqa: E402
 from internscout.site import source as site_source  # noqa: E402
 from internscout.site import taxonomy as site_taxonomy  # noqa: E402
@@ -72,7 +73,7 @@ fresh = site_source.fresh  # found this week, and not an old posting a scan only
 # a form), so the line can't go out before people can sign up. Each channel's link names the channel
 # in utm_source, as the Worker spells them (worker/src/visits.js UTM_SOCIAL), with utm_medium=social,
 # the way growth/digest.py tags its own links (this file's links carried no tag before).
-DIGEST_URL = sp.SITE + digest_model.DIGEST_PATH
+DIGEST_URL = site_assets.SITE + digest_model.DIGEST_PATH
 SIGNUP = "Every Monday by email:"
 
 
@@ -117,15 +118,15 @@ def link(field: str, open_count: int) -> str:
     a slug that isn't a state's), else the dashboard filtered to the field. A post's link can't be
     changed once it's out, so it must never point at a page that isn't there."""
     if digest.has_page(field, open_count):
-        return f"{sp.SITE}/internships/{site_taxonomy.field_slug(field)}/"
-    return f"{sp.SITE}/?field={quote(field)}"
+        return f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(field)}/"
+    return f"{site_assets.SITE}/?field={quote(field)}"
 
 
 def compose(field: str, items: list[dict], open_count: int, signup: str = "") -> tuple[str, str]:
     """(text, url). The text ends with the url, and fits in LIMIT. With `signup` (signup_line, once the
     weekly email is live) that line follows the url, and employers' names are dropped first to make
     room for it; only a post too long even with none goes out without it."""
-    # was: url = f"{sp.SITE}/internships/{site_taxonomy.field_slug(field)}/", which 404s for a field with no page.
+    # was: url = f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(field)}/", which 404s for a field with no page.
     url = link(field, open_count)
     name = site_text.lower_name(site_taxonomy.field_title(field))
     head = f"{len(items)} new {name} internships in the Northeast and remote this week"

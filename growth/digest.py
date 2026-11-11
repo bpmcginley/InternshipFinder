@@ -40,7 +40,9 @@ from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import digest as site_digest  # noqa: E402
+from internscout.site import rules as site_rules  # noqa: E402
 from internscout.site import source as site_source  # noqa: E402
 from internscout.site import taxonomy as site_taxonomy  # noqa: E402
 from internscout.site import text as site_text  # noqa: E402
@@ -49,13 +51,13 @@ from internscout.console_log import console  # noqa: E402
 
 # was: MIN_NEW = 3. It moved to seo_pages (2026-10-06) with the "new" rule below, so the sign-up
 # forms on the landing pages quote a field's number only when the email would give it a section.
-MIN_NEW = sp.DIGEST_MIN_NEW  # new roles a field needs this week to get a section
+MIN_NEW = site_digest.DIGEST_MIN_NEW  # new roles a field needs this week to get a section
 MAX_SECTIONS = 8  # eight fields of five roles is already a long email
 PER_SECTION = 5  # roles shown per field; the field's page has the rest
 PER_EMPLOYER = 2  # ...and at most this many from one employer, so one big poster can't fill a field
 
 UTM = "utm_source=digest&utm_medium=email"
-HOME_URL = f"{sp.SITE}/?{UTM}"
+HOME_URL = f"{site_assets.SITE}/?{UTM}"
 EVERY_MAJOR_URL = "https://github.com/bpmcginley/internships-every-major"
 EVERY_MAJOR_LABEL = "Internships for every major on GitHub"
 SLOGAN = "Built by one student, made for all students."
@@ -102,17 +104,17 @@ new_roles = site_source.new_roles
 def has_page(tag: str, open_count: int) -> bool:
     """Whether seo_pages.build makes a landing page for this field: it needs MIN_OPEN open roles, and a
     field whose slug names a state gets none (the state's page has that path)."""
-    return open_count >= sp.MIN_OPEN and site_taxonomy.field_slug(tag) not in STATE_SLUGS
+    return open_count >= site_rules.MIN_OPEN and site_taxonomy.field_slug(tag) not in STATE_SLUGS
 
 
 def field_url(tag: str, open_count: int) -> str:
     """The field's landing page. When the field has no page, the dashboard filtered to that field
     instead. A page needs MIN_OPEN open roles, and a field whose slug names a state gets none."""
-    # was: slug = site_taxonomy.field_slug(tag); if open_count >= sp.MIN_OPEN and slug not in STATE_SLUGS:
+    # was: slug = site_taxonomy.field_slug(tag); if open_count >= site_rules.MIN_OPEN and slug not in STATE_SLUGS:
     # The test moved into has_page so growth/social.py links only to pages that exist by the same rule.
     if has_page(tag, open_count):
-        return f"{sp.SITE}/internships/{site_taxonomy.field_slug(tag)}/?{UTM}"
-    return f"{sp.SITE}/?field={quote(tag)}&{UTM}"
+        return f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(tag)}/?{UTM}"
+    return f"{site_assets.SITE}/?field={quote(tag)}&{UTM}"
 
 
 def role(x: dict) -> dict:
@@ -189,9 +191,9 @@ def build(site_dir: str, now: datetime | None = None, placements_path: str | Non
         "week_ending": f"{now:%B} {now.day}, {now.year}",
         "generated_at": now.isoformat(),
         # /internships/new/ is built only when it has MIN_OPEN roles; below that, the dashboard's new filter.
-        "new_url": f"{sp.SITE}/internships/new/?{UTM}"
-        if len(new) >= sp.MIN_OPEN
-        else f"{sp.SITE}/?new=1&{UTM}",
+        "new_url": f"{site_assets.SITE}/internships/new/?{UTM}"
+        if len(new) >= site_rules.MIN_OPEN
+        else f"{site_assets.SITE}/?new=1&{UTM}",
         "totals": {
             "open": len(listings),
             "new": len(new),

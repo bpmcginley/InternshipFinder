@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from html import escape
 
-from .site import rss as _site_rss
+from .site import feeds as _site_rss
 from .site import source
 from .site.text import safe_url
 
