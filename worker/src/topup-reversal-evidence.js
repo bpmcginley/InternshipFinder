@@ -220,9 +220,11 @@ export async function readTopupReversalEvidence(
       described = 0;
     for (const refund of second.refunds) {
       if (refund.status === "succeeded") succeeded += refund.amount;
-      described += Math.min(e.capturedAmount - described, refund.amount);
+      if (refund.status !== "failed" && refund.status !== "canceled")
+        described += Math.min(e.capturedAmount - described, refund.amount);
     }
-    // No assumption that pending/failed refunds contribute to Stripe's aggregate.
+    // Only successful or in-flight refunds may explain the aggregate; failed/canceled cannot.
+    // Do not assume whether pending/requires_action already contribute to Stripe's aggregate.
     if (
       succeeded > after.refundedAmount ||
       after.refundedAmount > described ||

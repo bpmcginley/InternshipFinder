@@ -248,6 +248,22 @@ test("Charge aggregates must be compatible with complete observed lists", async 
     ),
     { status: "pending" },
   );
+  for (const status of ["pending", "requires_action"]) {
+    const inFlight = { ...item("refunds", 1, status), amount: 327 };
+    assert.equal(
+      (
+        await run(
+          provider([inFlight], [], (value, kind) => {
+            if (kind === "charges") {
+              value.amount_refunded = 327;
+              value.refunded = true;
+            }
+          }),
+        )
+      ).status,
+      "reversal_evidence",
+    );
+  }
   // Pending may or may not contribute to the aggregate; neither variant is counted as successful.
   for (const aggregate of [0, 1])
     assert.equal(
@@ -261,6 +277,18 @@ test("Charge aggregates must be compatible with complete observed lists", async 
       "reversal_evidence",
     );
 });
+for (const status of ["failed", "canceled"]) {
+  test(`a ${status} refund cannot explain a fully refunded Charge`, async () => {
+    const refund = { ...item("refunds", 1, status), amount: 327 };
+    const p = provider([refund], [], (value, kind) => {
+      if (kind === "charges") {
+        value.amount_refunded = 327;
+        value.refunded = true;
+      }
+    });
+    assert.deepEqual(await run(p), { status: "pending" });
+  });
+}
 test("streamed byte limits and UTF-8 are enforced before JSON normalization", async () => {
   const padded = (length, every = false) => {
     const p = provider(),
