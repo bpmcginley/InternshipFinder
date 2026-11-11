@@ -72,6 +72,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | In review | Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
 | 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | In review | Every Major and title discovery success summaries only. |
+| 4 | WP-1.4 Growth preview status logging | wp14_logging | `refactor/wp-1.4-logging-growth-status` | [#240](https://github.com/bpmcginley/InternshipFinder/pull/240) | In review | Eight preflight or local-render summaries. Provider and payload paths remain separate. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
 | 4 | WP-2.4 Config: Worker | Lead | `refactor/wp-2.4-worker-config` | [#223](https://github.com/bpmcginley/InternshipFinder/pull/223) | Merged | Merged as `e3822e4f`. Pages 42934103714 and backend verified. The generated Worker module supplies orders and the placement CLI. Both environment overrides remain evaluated at call time. |
@@ -430,6 +431,20 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Preserve the bare paths from Cards, Reels and Comparison, the digest schedule's Actions output, the directory monitor and metrics JSON, and the growth report Markdown. Digest preview, metrics status, campaign ffmpeg stderr, and title discovery refusal stay outside this slice. The report's exception notes are part of its Markdown, and the fallback has no separate stdout channel for telemetry.
 - IndexNow and Keep schedule keep their 13 prints. Pages notify and the ingest/social guards each sparse-check out only `growth`. Keep schedule also checks out `.github/actions` and installs neither backend dependencies nor the editable project. Adding the `backend/internscout` checkout path at all four call sites plus a direct-script import from `backend` could make the standard-library helper available without changing triggers, permissions, secrets, schedules or package installation. Preserve IndexNow usage and raw error annotations, and keep the guard's `skip=` file output verbatim.
 - Both generator ASTs match main outside the success diagnostics and imports. After normal main integration `add6dc3d`, focused, generator and golden verification passed 69 tests. Ruff passed.
+
+## WP-1.4 growth preview and refusal diagnostics
+
+- At `add6dc3d`, checked open Product paths and separated human diagnostics from payloads, annotations and credentials. This slice converts three digest preflight refusals, two social local-render statuses, and three YouTube pre-upload statuses. Plain console output stays exact. JSON drops the social output directory and carries only fixed messages or setting names. Existing preview payloads remain raw.
+
+| Module | Human diagnostics | Outputs and decisions kept separate |
+|---|---|---|
+| `growth/digest_send.py` | Three fixed preflight refusals migrate. Read-only check success and duplicate-free status could follow with mocks. | Keep the dry-run body, envelope and request plan raw. Leave recipient and postal details, provider IDs and subjects, and the raw errors and unknown-send recovery text in their existing paths. |
+| `growth/social.py` | No selection and local render success migrate. Existing class-only channel failure and aggregate outcome lines could follow with mocks. | Keep raw post/tagged-copy previews, raw renderer errors, dynamic stale-export reasons and provider return values. Preserve status, cleanup and send order. |
+| `growth/instagram.py` | Fixed skip outcomes exist, but token refresh and posting branches stay outside this slice. | Keep the raw Actions warning/error annotations, preview captions, media paths and status artifact protocol. Leave provider IDs and raw fallback/error messages separate. |
+| `growth/youtube.py` | Two fixed no-Reel skips and the missing-setting names migrate. | Keep raw title/description and media-path previews, provider links and values, retry detail and advice. |
+| `growth/youtube_auth.py` | Interactive authorization instructions stay together. | Existing credential output requires a separate secure-channel decision. Authorization URL, channel selection, credential output and raw failures stay outside this logger. |
+
+- All three syntax trees match main after removing the eight diagnostic changes and their imports. Tests exercise default and JSON modes without provider access. Existing provider flow tests use fake requests, and a socket audit hook rejects any accidental network call. After normal main integration `d709af9a`, all 129 focused and golden tests passed with one existing OAuth loopback test deselected because it requires a local socket. Ruff passed.
 
 ## WP-1.4 page-build logging
 
