@@ -206,7 +206,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | 2026-11-10 | Follow attempt finalization | [#286](https://github.com/bpmcginley/InternshipFinder/pull/286) `c4e245dd` passed [review 5853536994](https://github.com/bpmcginley/InternshipFinder/pull/286#pullrequestreview-5853536994) and all nine checks. On #281. Local 417 Node and 51 D1 tests passed. Finalization stays dormant pending integration, owner merge and dispatch/sending gates. | Ready/open needs-bruce |
 | 2026-11-10 | Private employer metrics response | [#287](https://github.com/bpmcginley/InternshipFinder/pull/287) `bda23b59` passed [review 5853528142](https://github.com/bpmcginley/InternshipFinder/pull/287#pullrequestreview-5853528142) and all nine checks. On #284. Cursors reuse the employer-key grammar. Local 363 Node and 24 D1 tests passed. Owner route binding and deployment remain pending. | Ready/open needs-bruce |
 | 2026-11-10 | Atomic first settlement | [#289](https://github.com/bpmcginley/InternshipFinder/pull/289) `ca137619` is a draft claim. On corrected #283 `c0e67a90`. Migration 0013 and atomic first settlement are claimed. Implementation and exact-head review are pending. | In progress; needs-bruce |
-
+| 2026-11-10 | P-2.2k run lifecycle design | [Proposal](P-2.2k-run-lifecycle.md) on `codex/product-p2.2k-run-lifecycle`. Synthetic evidence covers duplicate/delayed release and unfunded overlap. Owner decisions cover ephemeral call fencing, purchase receipt generations, late callbacks and purchase holds. | Draft needs-bruce; design only |
 
 ## Measurement follow-up
 
