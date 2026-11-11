@@ -1,4 +1,12 @@
 // Dormant digest storage only. No transport or production caller imports this module.
+import {
+  debitFollowSendBudget,
+  followBudgetStamp,
+  followSendBudgetAvailable,
+  observeFollowSendBudget,
+  validFollowSendCap,
+} from "./follow-send-budget.js";
+
 const DAY = 86400_000,
   LEASE = 5 * 60_000;
 const encoder = new TextEncoder();
@@ -114,12 +122,37 @@ export function beginFollowDigestAttempt(db, key, id, lease, clock = () => new D
   return beginAttempt(db, key, id, lease, clock, false);
 }
 
-// Any future snapshot dispatcher must use this entry: absent metadata cannot use legacy fallback.
+// Strict snapshot claim for existing callers. Missing pending metadata cannot use legacy fallback.
 export function beginFollowSnapshotAttempt(db, key, id, lease, clock = () => new Date()) {
   return beginAttempt(db, key, id, lease, clock, true);
 }
 
-async function beginAttempt(db, key, id, lease, clock, requirePending) {
+// A future snapshot sender must use this budgeted boundary. A paused result leaves the
+// pre-attempt lease reclaimable and should stop that scheduler pass without immediate retries.
+export async function beginBudgetedFollowSnapshotAttempt(
+  db,
+  key,
+  id,
+  lease,
+  cap,
+  clock = () => new Date(),
+) {
+  if (!validFollowSendCap(cap)) return "unavailable";
+  try {
+    return (await beginAttempt(db, key, id, lease, clock, true, cap)) || "unavailable";
+  } catch {
+    // A lost batch response may have committed. Never authorize transport or retry here.
+    return "unavailable";
+  }
+}
+
+function budgetClock(clock) {
+  const stamp = followBudgetStamp(clock());
+  if (!stamp) invalid();
+  return new Date(stamp);
+}
+
+async function beginAttempt(db, key, id, lease, clock, requirePending, cap = null) {
   if (typeof clock !== "function") invalid();
   const email = await db
     .prepare(
@@ -128,49 +161,96 @@ async function beginAttempt(db, key, id, lease, clock, requirePending) {
     .bind(id)
     .first("email");
   if (!email) return false;
-  const preparedAt = clock();
+  const preparedAt = cap === null ? clock() : budgetClock(clock);
   const marker = await dailyMarker(key, email, preparedAt);
-  const now = clock();
+  const now = cap === null ? clock() : budgetClock(clock);
   // No stale preparation can claim yesterday's budget. Caller may prepare again without sending.
   if (dayOf(now) !== dayOf(preparedAt) || +now < +preparedAt) return false;
   const at = iso(now);
-  const midnight = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
-  ).toISOString();
+  const midnight =
+    cap === null
+      ? new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+        ).toISOString()
+      : plus(new Date(at.slice(0, 10) + "T00:00:00.000Z"), DAY);
+  if (cap !== null && midnight.length !== 24) return false;
   const valid = "id=? AND state='leased' AND lease_token=? AND lease_until>? AND expires_at>?";
   const progress = requirePending
     ? snapshotConsent
     : "(NOT EXISTS (SELECT 1 FROM follow_pending_progress WHERE job_id=follow_digest_outbox.id) OR " +
       snapshotConsent +
       ")";
-  const result = await db.batch([
+  const budgetGuard = cap === null ? "" : " AND " + followSendBudgetAvailable;
+  const budgetArgs = cap === null ? [] : [at, cap];
+  const markerInsert = db
+    .prepare(
+      "INSERT INTO follow_digest_days (marker,expires_at) SELECT ?,? FROM follow_digest_outbox WHERE " +
+        valid +
+        ` AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND EXISTS ` +
+        "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) AND " +
+        progress +
+        budgetGuard +
+        " ON CONFLICT(marker) DO NOTHING",
+    )
+    .bind(marker, midnight, id, lease, at, at, email, at, ...budgetArgs);
+  // changes() is the preceding marker INSERT in this atomic D1 batch. Existing markers cannot
+  // authorize a second attempt, even after unsubscribe/resubscribe or across enqueue days.
+  const claim = db
+    .prepare(
+      "UPDATE follow_digest_outbox SET state='attempting',attempted_at=?,lease_until=MIN(?,expires_at,?) WHERE " +
+        valid +
+        " AND changes()=1",
+    )
+    .bind(at, plus(now, LEASE), midnight, id, lease, at, at);
+  const cancel = db
+    .prepare(
+      "UPDATE follow_digest_outbox SET state='cancelled',payload=NULL,lease_token=NULL,lease_until=NULL " +
+        "WHERE id=? AND state='leased' AND lease_token=?" +
+        budgetGuard,
+    )
+    .bind(id, lease, ...budgetArgs);
+  if (cap === null) return (await db.batch([markerInsert, claim, cancel]))[1].meta.changes > 0;
+
+  const results = await db.batch([
+    // The attempt may extend lease_until. Keep the exact pre-claim deadlines from this
+    // same transaction so a delayed response cannot authorize work under an expired lease.
+    db
+      .prepare("SELECT lease_until,expires_at FROM follow_digest_outbox WHERE " + valid)
+      .bind(id, lease, at, at),
+    observeFollowSendBudget(db, at),
+    markerInsert,
+    claim,
+    debitFollowSendBudget(db, at, cap, true),
+    cancel,
     db
       .prepare(
-        "INSERT INTO follow_digest_days (marker,expires_at) SELECT ?,? FROM follow_digest_outbox WHERE " +
-          valid +
-          ` AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND EXISTS ` +
-          "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) AND " +
-          progress +
-          " ON CONFLICT(marker) DO NOTHING",
+        "SELECT o.state,o.lease_until,o.expires_at,b.attempts FROM follow_digest_outbox o " +
+          "JOIN follow_send_budget b ON b.slot=1 AND b.observed_at=? " +
+          "WHERE o.id=? AND o.lease_token=?",
       )
-      .bind(marker, midnight, id, lease, at, at, email, at),
-    // changes() is the preceding marker INSERT in this atomic D1 batch. Existing markers cannot
-    // authorize a second attempt, even after unsubscribe/resubscribe or across enqueue days.
-    db
-      .prepare(
-        "UPDATE follow_digest_outbox SET state='attempting',attempted_at=?,lease_until=MIN(?,expires_at,?) WHERE " +
-          valid +
-          " AND changes()=1",
-      )
-      .bind(at, plus(now, LEASE), midnight, id, lease, at, at),
-    db
-      .prepare(
-        "UPDATE follow_digest_outbox SET state='cancelled',payload=NULL,lease_token=NULL,lease_until=NULL " +
-          "WHERE id=? AND state='leased' AND lease_token=?",
-      )
-      .bind(id, lease),
+      .bind(at, id, lease),
   ]);
-  return result[1].meta.changes > 0;
+  const checked = budgetClock(clock).toISOString();
+  if (checked < at || checked >= midnight || !results.every(({ success }) => success)) return false;
+  const [original, , , claimed, debited, , current] = results;
+  const row = current.results[0];
+  if (!liveDeadlines(original.results[0], checked) || !liveDeadlines(row, checked)) return false;
+  if (claimed.meta.changes === 1 && debited.meta.changes === 1 && row.state === "attempting")
+    return "claimed";
+  if (row.state === "leased" && row.attempts >= cap) return "paused";
+  return false;
+}
+
+function liveDeadlines(row, checked) {
+  return (
+    row &&
+    [row.lease_until, row.expires_at].every(
+      (value) =>
+        typeof value === "string" &&
+        followBudgetStamp(new Date(value)) === value &&
+        checked < value,
+    )
+  );
 }
 
 // Caller reports a known acceptance or uncertainty; there is deliberately no retry transition.

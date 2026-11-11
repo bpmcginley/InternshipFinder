@@ -63,6 +63,10 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 [Draft #302](https://github.com/bpmcginley/InternshipFinder/pull/302) is based on exact #298 `e9a5a857`. Migration 0016 and equivalent legacy schema add one shared UTC-day attempt count with an explicit cap and monotonic clock fence. Local 424 Node and 60 D1 tests pass. Independent review, fresh CI, owner cap/quota, parent integration and deployment remain pending. [Contract](P-2.1n-follow-send-budget.md). No sender or outbox binding.
 
+## P-2.1o dormant budgeted digest attempt
+
+[Draft #310](https://github.com/bpmcginley/InternshipFinder/pull/310) is based on exact #302 `4456afbc`. One D1 batch binds exact snapshot consent and lease, existing daily marker, durable attempt and shared cap. Cap denial preserves a reclaimable pre-attempt lease without debit or marker. Independent review and fresh CI remain pending. [Contract](P-2.1o-budgeted-attempt.md). No transport, route or deployment.
+
 ## Package tracker
 
 Queued means not started, not approved for release. A dash means no branch or PR has been created. Split parts of a package get separate rows and PRs when ownership or approval differs.
@@ -216,6 +220,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.1o budgeted digest attempt | [#310](https://github.com/bpmcginley/InternshipFinder/pull/310) composes the dormant strict digest claim and shared budget. Parent integration, owner cap and quota, dispatch wiring and deployment remain pending. | Draft needs-bruce, no sending activation |
 | 2026-11-10 | P-2.1n shared follow send budget | [#302](https://github.com/bpmcginley/InternshipFinder/pull/302) adds a dormant UTC-day attempt budget with no configured default. Owner quota verification, cap and existing order-mail reserve, parent integration and deployment remain pending. | Draft needs-bruce, no sending activation |
 | 2026-11-10 | P-2.1m pinned digest preparation | [#298](https://github.com/bpmcginley/InternshipFinder/pull/298), stacked on #295. Preparation proves the pinned public snapshot and current lease. The sender still needs fresh consent and an owner-approved deployment. | Draft needs-bruce |
 | 2026-11-10 | P-2.1l empty-window progress | [#295](https://github.com/bpmcginley/InternshipFinder/pull/295), stacked on #286. Complete empty snapshots can advance exact current scopes without a digest job. Review, CI, parent integration and owner merge remain pending. | Draft needs-bruce |
