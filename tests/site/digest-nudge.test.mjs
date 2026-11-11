@@ -1,9 +1,9 @@
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
-const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
 const APP = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
 const memory = () => {
   const map = new Map();
@@ -30,7 +30,7 @@ function load(local = memory()) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return { IS: ctx.IS, local, ctx };
 }
 const eligible = { enabled: true, manual: true };
