@@ -7,6 +7,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+
+
 Link = tuple[str, str, int]
 KindSelection = tuple[str, dict, list[dict]]
 

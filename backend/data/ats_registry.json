@@ -12092,8 +12092,9 @@
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-11"
   },
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",

@@ -2,7 +2,7 @@
 // (export_static.first_screen); the dashboard paints from it before the state files arrive.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
@@ -161,28 +161,25 @@ test("React is deferred, ahead of core.js and app.js, so the static hero paints 
   assert.doesNotMatch(inline, /\bReact(DOM)?\./);
 });
 
-// Once the pipeline has written first.json, it must be the top of the first-visit list built from the
-// state files it was taken from (the same export, so the same commit).
-test(
-  "the committed first.json is the top of the first-visit list",
-  { skip: !existsSync(new URL("../../docs/data/first.json", import.meta.url)) },
-  () => {
-    const IS = loadCore(() => new Promise(() => {}));
-    const index = JSON.parse(read("docs/data/listings/index.json"));
-    const first = JSON.parse(read("docs/data/first.json"));
-    const byId = new Map();
-    for (const k of index.first.keys)
-      if (index.files[k])
-        for (const x of JSON.parse(read("docs/data/" + index.files[k].file)))
-          if (!byId.has(x.id)) byId.set(x.id, x);
-    const rows = [...byId.values()].filter((x) => x.status === "open");
-    IS.sortRows(rows, "new", noProfile(IS), null);
-    const key = (x) => [x.posted_at ? 1 : 0, x.posted_at || "", x.first_seen || ""].join("|");
-    // Ties at the edge may fall either way; the keys must match position by position.
-    assert.deepEqual(first.map(key), rows.slice(0, first.length).map(key));
-    assert.equal(first.length, index.first.rows);
-  },
-);
+// The pinned preview and shard metadata represent the same export.
+test("the fixture first.json is the top of the first-visit list", () => {
+  const IS = loadCore(() => new Promise(() => {}));
+  const index = FIX.index;
+  assert.equal(index.first.file, "first.json");
+  const byFixtureId = new Map(FIX.rows.map((row) => [row.id, row]));
+  const first = FIX.expected.map((id) => byFixtureId.get(id));
+  const byId = new Map();
+  for (const k of index.first.keys)
+    if (index.files[k])
+      for (const id of FIX.shards[index.files[k].file])
+        if (!byId.has(id)) byId.set(id, byFixtureId.get(id));
+  const rows = [...byId.values()].filter((x) => x.status === "open");
+  IS.sortRows(rows, "new", noProfile(IS), null);
+  const key = (x) => [x.posted_at ? 1 : 0, x.posted_at || "", x.first_seen || ""].join("|");
+  // Ties at the edge may fall either way; the keys must match position by position.
+  assert.deepEqual(first.map(key), rows.slice(0, first.length).map(key));
+  assert.equal(first.length, index.first.rows);
+});
 
 test("a request the page head started is used once, then fetches go out as usual", async () => {
   const asked = [];

@@ -7,6 +7,8 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
+
+
 Count = tuple[str, int]
 Link = tuple[str, str, int]
 Questions = list[tuple[str, str]]
