@@ -212,6 +212,11 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
   if (cap === null) return (await db.batch([markerInsert, claim, cancel]))[1].meta.changes > 0;
 
   const results = await db.batch([
+    // The attempt may extend lease_until. Keep the exact pre-claim deadlines from this
+    // same transaction so a delayed response cannot authorize work under an expired lease.
+    db
+      .prepare("SELECT lease_until,expires_at FROM follow_digest_outbox WHERE " + valid)
+      .bind(id, lease, at, at),
     observeFollowSendBudget(db, at),
     markerInsert,
     claim,
@@ -227,18 +232,24 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
   ]);
   const checked = budgetClock(clock).toISOString();
   if (checked < at || checked >= midnight || !results.every(({ success }) => success)) return false;
-  const row = results[5].results[0];
-  if (!row || !liveDeadline(row.lease_until, checked) || !liveDeadline(row.expires_at, checked))
-    return false;
-  if (results[2].meta.changes === 1 && results[3].meta.changes === 1 && row.state === "attempting")
+  const [original, , , claimed, debited, , current] = results;
+  const row = current.results[0];
+  if (!liveDeadlines(original.results[0], checked) || !liveDeadlines(row, checked)) return false;
+  if (claimed.meta.changes === 1 && debited.meta.changes === 1 && row.state === "attempting")
     return "claimed";
   if (row.state === "leased" && row.attempts >= cap) return "paused";
   return false;
 }
 
-function liveDeadline(value, checked) {
+function liveDeadlines(row, checked) {
   return (
-    typeof value === "string" && followBudgetStamp(new Date(value)) === value && checked < value
+    row &&
+    [row.lease_until, row.expires_at].every(
+      (value) =>
+        typeof value === "string" &&
+        followBudgetStamp(new Date(value)) === value &&
+        checked < value,
+    )
   );
 }
 

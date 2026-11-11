@@ -227,6 +227,25 @@ export async function budgetedStoredTimeAndDeadline(db) {
   assert.equal((await job(db, f.id)).state, "uncertain");
 }
 
+export async function budgetedOriginalLeaseDeadline(db) {
+  const f = await fixture(db);
+  const original = Date.parse((await job(db, f.id)).lease_until);
+  let time = new Date(original - 1_000);
+  const delayed = intercept(db, {
+    after: () => {
+      time = new Date(original + 1_000);
+    },
+  });
+  assert.equal(await claim(delayed, f, 1, () => time), "unavailable");
+  const attempted = await job(db, f.id);
+  assert.equal(attempted.state, "attempting");
+  assert.ok(Date.parse(attempted.lease_until) > +time);
+  assert.equal((await budget(db)).attempts, 1);
+  assert.equal((await rows(db, "follow_digest_days")).length, 1);
+  assert.equal(await claim(db, f, 2, () => time), "unavailable");
+  assert.equal((await budget(db)).attempts, 1);
+}
+
 export async function budgetedRollbackAndAmbiguity(db) {
   const f = await fixture(db);
   await db
