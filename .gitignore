@@ -33,5 +33,10 @@ scripts/eval/bench-*.md
 scripts/eval/node_modules/
 !scripts/eval/package.json
 !scripts/eval/package-lock.json
-# The ingest report is a run artifact, never part of the published site (2026-10-19).
-docs/data/ingest-report.json
+# Public listings and mutable ingest state are stored on the data branch.
+/docs/data/
+/backend/data/ats_registry.json
+/backend/data/dropped_boards.json
+/backend/data/geocache.json
+/backend/data/google_jobs_day.json
+/backend/data/probe_cache.json
