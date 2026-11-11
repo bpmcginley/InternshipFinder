@@ -367,7 +367,40 @@ def publication_marker(checkout, commit):
     return f"[ingest-data] commit={commit} tree={tree}"
 
 
+@dataclass(frozen=True)
+class _PublishedFollowProvenance:
+    commit: str
+    public_tree: str
+    staged: _StagedFollowProvenance
+
+
+def _bind_published_follow(checkout, candidate, accepted, staged):
+    if staged is None:
+        return None
+    try:
+        if not ancestor(checkout, candidate, accepted) or not same_snapshot(
+            checkout, staged.candidate_tree, accepted
+        ):
+            return None
+        public_tree = revision(checkout, f"{accepted}:{PUBLIC}")
+        if public_tree != revision(checkout, f"{staged.candidate_tree}:{PUBLIC}"):
+            return None
+        return _PublishedFollowProvenance(accepted, public_tree, staged)
+    except (ValueError, OSError, tarfile.TarError):
+        return None
+
+
 def publish(checkout, state, message):
+    result, _ = _publish(checkout, state, message, follow_provenance=None)
+    return result
+
+
+def publish_with_follow_provenance(checkout, state, message, follow_provenance):
+    """Return the ordinary publication result and an optional immutable follow receipt."""
+    return _publish(checkout, state, message, follow_provenance)
+
+
+def _publish(checkout, state, message, follow_provenance):
     base = data_base(checkout)
     git(checkout, "ls-remote", "--exit-code", "--heads", "origin", BRANCH)
     if not state.is_dir() or state.is_symlink():
@@ -379,19 +412,38 @@ def publish(checkout, state, message):
         remote = remote_tip(checkout)
         if not same_snapshot(checkout, base, remote):
             raise ValueError("Concurrent update changed ingest-owned data; refusing no-op")
-        return "No changes.", remote
+        return ("No changes.", remote), None
+
+    staged = None
+    if follow_provenance is not None:
+        try:
+            staged = validate_staged_follow_provenance(checkout, tree, follow_provenance)
+        except (ValueError, OSError, tarfile.TarError):
+            # The independently validated public snapshot can still publish.
+            pass
     git(checkout, "commit", "-m", message)
     if revision(checkout, "HEAD^{tree}") != tree:
         raise ValueError("Committed tree differs from the validated snapshot")
     candidate = revision(checkout, "HEAD")
     expected = base
     for attempt in range(3):
+        attempted = None
+        if staged is not None:
+            try:
+                attempted = revision(checkout, "HEAD")
+            except (ValueError, OSError):
+                staged = None
         if push_existing(checkout, expected):
-            return "Published validated data snapshot.", revision(checkout, "HEAD")
+            accepted = revision(checkout, "HEAD")
+            receipt = _bind_published_follow(
+                checkout, candidate, accepted, staged if accepted == attempted else None
+            )
+            return ("Published validated data snapshot.", accepted), receipt
         remote = remote_tip(checkout)
         if ancestor(checkout, candidate, remote):
             if same_snapshot(checkout, candidate, remote):
-                return "Validated data snapshot already published.", remote
+                receipt = _bind_published_follow(checkout, candidate, remote, staged)
+                return ("Validated data snapshot already published.", remote), receipt
             raise ValueError("Data snapshot changed after publication")
         if (
             not ancestor(checkout, base, remote)
