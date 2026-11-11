@@ -45,6 +45,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 import digest  # noqa: E402
 if __package__:
     from .public_config import WORKER_URL
@@ -486,7 +487,7 @@ def main(argv: list[str]) -> int:
         return 0
     pick_ = chosen(site_dir)
     if not pick_:
-        print("[social] no field gained enough new nearby listings this week; nothing to post")
+        console("[social] no field gained enough new nearby listings this week; nothing to post")
         return 0
     text, url = compose(*pick_)
     print(text)
@@ -508,7 +509,10 @@ def main(argv: list[str]) -> int:
         try:
             data = write_out(site_dir, out_dir)
             if data:
-                print(f"[social] card and captions written to {out_dir}")
+                message = "[social] card and captions written"
+                if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+                    message += f" to {out_dir}"
+                console(message)
         except Exception as e:
             print(f"[social] card failed: {type(e).__name__}: {e}")
             failed.append("card")
