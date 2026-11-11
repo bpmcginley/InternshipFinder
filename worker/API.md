@@ -22,6 +22,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `DELETE /profile` | user | sync | none | JSON {ok: true} |
 | `DELETE /me` | user | none | none | JSON {ok: true}; 409 subscribed while billing blocks deletion |
 | `POST /billing/checkout` | user | payments | Optional JSON {plan?: string} | JSON {url: string} |
+| `POST /billing/topup/checkout` | session + site-origin | TOPUPS_ENABLED and existing payment configuration | First-party dashboard Origin and current session bearer. The server owns the offer and return URLs. | No-store JSON {status: open, url} 200, {status: pending} 202, auth 401, disallowed Origin 403, disabled or unavailable 503 |
 | `POST /billing/portal` | user | payments | none | JSON {url: string} |
 | `POST /billing/webhook` | stripe-signature | payments-or-orders | Raw signed event body; Stripe-Signature header | JSON {ok: true, repeat?: true}; event-specific effects stay in existing handlers |
 | `POST /ai` | user | none | JSON {task, run_id?, request: GeminiRequest}; optional query stream=1 | Gemini JSON or SSE passthrough; X-InternScout-Model and X-InternScout-Remaining headers |
@@ -711,6 +712,24 @@ token. Not tied to `EMPLOYER_CHECKOUT`, so pilot codes can be made before buying
 Deletes orders never confirmed after 7 days (always, even while orders are off). While on: sends a review
 email that failed, reminds Bruce once about an order waiting more than a day, ends closed roles and makes
 the offer above, sends an offer email that failed, and refunds offers unanswered after 30 days.
+
+## One-time Auto-Apply checkout
+
+`POST /billing/topup/checkout` defaults off. It requires the exact `TOPUPS_ENABLED` and
+`PAYMENTS_ENABLED` opt-ins and the existing private Stripe configuration. It accepts the
+two existing HTTPS dashboard Origins, `https://internscout.org` and
+`https://bpmcginley.github.io`, only when permitted by the configured CORS list.
+
+An existing session bearer authorizes the request without sliding its expiry. The server
+validates the configured offer before reserving a checkout. The configured first-party
+dashboard root is the return destination for both completion and cancellation. The handler
+ignores request body and query fields. The existing reservation permits one active checkout
+attempt per account.
+
+Responses use `Cache-Control: no-store`. A verified open checkout returns 200 with
+`{status: "open", url}`. An unresolved attempt returns 202 with `{status: "pending"}`.
+Missing or invalid sessions return 401, disallowed Origins return 403, and disabled or
+unavailable checkout returns 503. Checkout does not itself grant purchased runs.
 
 ## Paid plans (optional, off by default)
 

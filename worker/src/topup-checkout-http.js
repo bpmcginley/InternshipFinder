@@ -1,4 +1,4 @@
-// Dormant outer boundary. The future router owns origin/CORS and server-owned dependencies.
+// Checkout HTTP boundary. The router owns Origin policy and server-owned dependencies.
 import { bearerOf } from "./auth.js";
 import { HttpError, json } from "./http.js";
 import { isSessionToken, sessionUser } from "./session.js";
@@ -15,6 +15,7 @@ export async function topupCheckoutResponse({
   request,
   db,
   adapter = {},
+  prepareAdapter,
   clock = () => new Date(),
   authenticate = authenticateSession,
   checkout = getSessionTopupCheckout,
@@ -34,13 +35,13 @@ export async function topupCheckoutResponse({
       return new Date(latest);
     };
     const identity = await authenticate(request, { DB: db }, { now: +fresh() });
-    if (
-      !identity ||
-      !/^[a-f0-9]{64}$/.test(identity.user || "") ||
-      !(Date.parse(identity.expires) > +fresh())
-    )
+    const expires = Date.parse(identity?.expires);
+    if (!identity || !/^[a-f0-9]{64}$/.test(identity.user || "") || !(expires > +fresh()))
       return response("auth", 401);
-    const result = await checkout(db, identity.user, token, adapter, fresh);
+    const verifiedAdapter = prepareAdapter ? await prepareAdapter() : adapter;
+    // Preparing the verified price can outlast the original session expiry.
+    if (prepareAdapter && !(expires > +fresh())) return response("auth", 401);
+    const result = await checkout(db, identity.user, token, verifiedAdapter, fresh);
     if (result?.status === "open") {
       // Only the verified service may authorize this URL; this is defensive output validation.
       if (
