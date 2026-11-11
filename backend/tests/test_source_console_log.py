@@ -3,7 +3,16 @@ import json
 import httpx
 import pytest
 from internscout import console_log
-from internscout.sources import common, houseai, uhn
+from internscout.sources import (
+    common,
+    github_lists,
+    greenhouse,
+    houseai,
+    lever,
+    nyc_jobs,
+    uhn,
+    usajobs,
+)
 
 
 @pytest.fixture(params=[None, "json"])
@@ -113,3 +122,65 @@ def test_unavailable_json_console_does_not_interrupt_source_fallback(monkeypatch
     assert len(attempted) == 1
     assert attempted[0][0] == ("[sources] robots lookup failed",)
     assert attempted[0][1]["exception_type"] == "TimeoutError"
+
+
+@pytest.mark.parametrize(
+    ("source", "fetch", "category"),
+    [
+        (github_lists, github_lists.fetch_github_lists, "list fetch failed"),
+        (greenhouse, greenhouse.fetch_greenhouse, "board fetch failed"),
+        (lever, lever.fetch_lever, "board fetch failed"),
+        (nyc_jobs, nyc_jobs.fetch_nyc_jobs, "failed"),
+        (usajobs, usajobs.fetch_usajobs, "failed"),
+    ],
+)
+def test_source_failure_logs_only_safe_fields(
+    monkeypatch, capsys, log_format, source, fetch, category
+):
+    requests = []
+    if source is github_lists:
+        args = (
+            [
+                {
+                    "url": "https://provider.example.test/failing",
+                    "source": "synthetic private list",
+                },
+                {"url": "https://provider.example.test/next", "source": "next", "cycle_years": {}},
+            ],
+        )
+    elif source in (greenhouse, lever):
+        args = (
+            [
+                {"name": "synthetic private board", "ats_token": "synthetic-private-board"},
+                {"name": "next", "ats_token": "next"},
+            ],
+        )
+    elif source is usajobs:
+        args = ("synthetic-key", "synthetic@example.test")
+    else:
+        args = ()
+    single_request = source in (nyc_jobs, usajobs)
+
+    def respond(request):
+        requests.append(request.url.path)
+        if len(requests) == 1:
+            raise RuntimeError("synthetic private provider detail")
+        assert not single_request and len(requests) == 2
+        payload = {"jobs": [], "meta": {"total": 0}} if source is greenhouse else []
+        return httpx.Response(200, json=payload)
+
+    transport = httpx.MockTransport(respond)
+    monkeypatch.setattr(source, "client", lambda: httpx.Client(transport=transport))
+    assert fetch(*args) == []
+    assert len(requests) == (1 if single_request else 2)
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    name = source.__name__.rsplit(".", 1)[-1]
+    error = f"[{name}] {category}: RuntimeError"
+    messages = [{"level": "WARNING", "message": error, "exception_type": "RuntimeError"}]
+    if source is usajobs:
+        messages.append({"level": "INFO", "message": f"[{name}] 0 student postings"})
+    if log_format is None:
+        assert captured.out == "".join(line["message"] + "\n" for line in messages)
+    else:
+        assert [json.loads(line) for line in captured.out.splitlines()] == messages
