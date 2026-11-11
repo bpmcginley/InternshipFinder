@@ -60,3 +60,4 @@ import "./session-copy-fence.test.js";
 import "./topup-session-copy-integration.test.js";
 import "./topup-checkout-service.test.js";
 import "./topup-checkout-http.test.js";
+import "./funded-run-admission.test.js";
