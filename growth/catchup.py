@@ -22,11 +22,16 @@ Standard library only.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from internscout.console_log import console  # noqa: E402
 
 REPO = os.environ.get("GITHUB_REPOSITORY") or "bpmcginley/InternshipFinder"
 API = f"https://api.github.com/repos/{REPO}/actions"
@@ -220,8 +225,11 @@ def main(argv: list[str]) -> int:
     if "--guard" in argv:
         file = argv[argv.index("--guard") + 1]
         skip = guard(file, now)
-        print(
-            f"[catchup] {file}: "
+        label = file
+        if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json" and file not in FORCE_INPUT:
+            label = "guard"
+        console(
+            f"[catchup] {label}: "
             + ("another run already did this slot's work; skipping" if skip else "go")
         )
         if os.environ.get("GITHUB_OUTPUT"):
@@ -233,26 +241,38 @@ def main(argv: list[str]) -> int:
         try:
             if overdue(runs(file), job, every, now):
                 dispatch(file)
-                print(f"[catchup] {file}: overdue, started")
+                console(f"[catchup] {file}: overdue, started")
             else:
-                print(f"[catchup] {file}: on time")
+                console(f"[catchup] {file}: on time")
         except Exception as e:  # one API hiccup must not stop the other jobs' checks
             failed = True
-            print(f"[catchup] {file}: check failed ({type(e).__name__})")
+            console(
+                f"[catchup] {file}: check failed ({type(e).__name__})",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
     try:
         if digest_due(runs("digest.yml"), now):
             dispatch("digest.yml")
-            print("[catchup] digest.yml: this Monday's email had not started, started")
+            console("[catchup] digest.yml: this Monday's email had not started, started")
     except Exception as e:
         failed = True
-        print(f"[catchup] digest.yml: check failed ({type(e).__name__})")
+        console(
+            f"[catchup] digest.yml: check failed ({type(e).__name__})",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
     try:
         if post_due(runs("social.yml"), now):
             dispatch("social.yml")
-            print("[catchup] social.yml: today's post had not started, started")
+            console("[catchup] social.yml: today's post had not started, started")
     except Exception as e:
         failed = True
-        print(f"[catchup] social.yml: check failed ({type(e).__name__})")
+        console(
+            f"[catchup] social.yml: check failed ({type(e).__name__})",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
     return 1 if failed else 0
 
 

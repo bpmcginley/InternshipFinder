@@ -38,7 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          sparse-checkout: growth
+          sparse-checkout: |
+            growth
+            backend/internscout
       - id: guard
         env:
           GITHUB_TOKEN: ${{ github.token }}
