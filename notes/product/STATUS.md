@@ -111,9 +111,9 @@ Clean baseline `9f739770`: all 244 site tests passed, no skips; `python scripts/
 
 The golden harness now covers static assets as well as generated pages. Each site PR refreshes both manifest and archive from the integrated tree, identifies intentional path changes, and preserves other packages' outputs. New public paths also require exact site-allowlist entries. P-1.5b intentionally changed 555 generated HTML files and page-content metadata for navigation and narrow-screen tables; listing data and other static assets were preserved.
 
-## P-2.1i active claim
+## P-2.1i dormant scope progress
 
-Stable confirmed-scope identity and matching-watermark prerequisites are claimed on `codex/product-p2.1i-scope-progress`, based on exact #261. Migration 0009 reserved; implementation/testing in progress, needs-bruce. No queue, producer, sending, activation or retention changes.
+P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is built on exact #261 `e29eb17cf736b8e16f233781fe6c93c0eab4b4e7`: stable confirmed-scope identity, persisted matching watermark and bounded single-subscriber read only. Migration 0009 and the rerunnable legacy schema are both exercised in actual local D1. Local validation: 394 Node tests, 30 D1 tests, zero JavaScript lint errors/warnings. [Contract and evidence](P-2.1i-scope-progress.md). Independent review and PR CI are pending. No queue transaction, sender, producer, activation or retention change; #266 is excluded and #255 integration remains separate. Needs-bruce; parent integration and owner merge/deployment gates remain.
 
 ## Waiting for Bruce
 
@@ -121,6 +121,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.1i dormant scope progress worker merge | [Draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274), stacked on #261. Local migration and legacy-schema checks pass; independent review, PR checks, parent integration and owner merge remain pending. No queue, sender or deployment is enabled. | - |
 | 2026-11-10 | Pause paid Meta campaigns; decide whether to keep Zeely | Owner action; no campaign changes by this session. | - |
 | 2026-11-10 | P-0.2 worker deployment and disclosure | [PR #175](https://github.com/bpmcginley/InternshipFinder/pull/175) merged. Approve/publish disclosure before deployment; no deployment by this product session. | - |
 | 2026-11-10 | P-1.2 plan-text relocation and merge | Approved by Bruce; [#187](https://github.com/bpmcginley/InternshipFinder/pull/187) merged as `2cacbea6`. Remaining children integrate sequentially after accepted parent publication and fresh checks; no deployment or release authorization is implied. | Resolved |

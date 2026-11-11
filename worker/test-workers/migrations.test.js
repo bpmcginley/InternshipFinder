@@ -9,6 +9,7 @@ const migrationNames = [
   "0002_follow_lifecycle.sql",
   "0003_follow_digest_outbox.sql",
   "0007_follow_request_deletion.sql",
+  "0009_follow_scope_progress.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -63,7 +64,7 @@ it("the deduplicated migration creates the complete legacy schema, including con
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(48);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(49);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(25);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(7);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
