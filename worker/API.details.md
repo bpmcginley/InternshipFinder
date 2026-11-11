@@ -342,6 +342,16 @@ Body:
 ### `POST /demand` (auth)
 Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (max 60). Replaces the user's row. Returns `{ "ok": true }`.
 
+### Optional organic employer posting counts (default off)
+
+The existing `POST /hit` accepts only `{e:"employer_posting_open",c:canonicalKey}` for this optional branch. It requires `EMPLOYER_POSTING_COUNTS_ENABLED` exactly `"1"` and `EMPLOYER_POSTING_CATALOG`, an operator-reviewed JSON object with exactly `url`, `version` and `sha256`. The URL must be `https://internscout.org/data/employer-posting-keys.json`, version a 40-character lowercase hexadecimal public release identity, and SHA-256 the 64-character lowercase digest of that release's exact uncompressed catalog bytes. No descriptor or enablement is configured here.
+
+Catalog GETs append `?v=<version>`, forbid redirects and credentials, require an exact response URL and status 200, and bound streamed bytes to 256 KiB before checking the pin and existing canonical parser. The request-owned refresh has the existing five-second deadline and five-minute hard cache lifetime. Configuration changes invalidate the old parsed generation. Wrong pins, malformed data, unknown keys, unavailable refreshes and stale results cannot authorize counts. The version label alone does not prove publication: the operator must verify catalog/annotations against one exact release and update the pin with each publication. A changed mutable catalog fails closed until its pin matches.
+
+Legacy hits keep their existing admission and 204 response. Organic abuse admission stays separate and precedes fetch/DB work. The request checks the current UTC retention/cap invariant atomically and cannot bootstrap a day cap or clean rows. The existing maintenance schedule is unchanged. **Do not enable collection until separate maintenance is integrated and verified across UTC rollover and independent requests.** The current daily 07:17 UTC schedule alone leaves the midnight-to-cleanup gap. Physical deletion must continue after disabling collection.
+
+The existing authenticated owner-only `GET /admin/employer-metrics` retains `no-store` and existing paid/funnel fields. With valid enabled configuration it adds the reviewed completed-day organic report and cursor. When the switch is `"1"`, it also adds `organic_posting_readiness: {catalog_configured, retention}`. Retention is `not_checked`, `ready`, `blocked` or `unavailable`. `ready` describes the current database invariant only, not cleanup history, remaining count capacity, or verified/fetched catalog freshness. Health performs no catalog GET, cleanup or bootstrap. Missing/invalid descriptor leaves organic report reads off. With the switch absent the response is unchanged. No public totals or new storage are introduced.
+
 ### `POST /hit` (site only, no auth)
 One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
 `{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email", "c": "weekly-2026w44", "t": "search-card" }` (path, referring

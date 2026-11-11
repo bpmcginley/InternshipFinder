@@ -12,7 +12,8 @@ import { admitAiLifecycle, respondFundedAi } from "./ai-lifecycle.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
-import { employerMetrics } from "./employer-metrics.js";
+import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
+const employerPostingRuntime = createEmployerPostingRuntime();
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
@@ -198,9 +199,9 @@ const safeRouteHandlers = {
 
   // One page load on the site (docs/js/count.js, sent with sendBeacon): adds one to the day's exact
   // visit totals (visits.js). No sign-in, nothing about the visitor kept.
-  "POST /hit": async ({ request, db, now }) => {
+  "POST /hit": async ({ request, env, db, now, d }) => {
     const { body } = await readJson(request, 2_000);
-    await countHit(db, request, body, now);
+    await countHit(db, request, body, now, employerPostingRuntime.service(env, db, d.fetch, d.now));
     return new Response(null, { status: 204 });
   },
 
@@ -216,10 +217,7 @@ const safeRouteHandlers = {
   }),
 
   // 2026-10-23: aggregate employer funnel for the owner's terminal. Revert: remove this route.
-  "GET /admin/employer-metrics": withAdmin(async ({ request, db, now }) => {
-    return json(await employerMetrics(db, Number(new URL(request.url).searchParams.get("days") || 28), now),
-      200, { "Cache-Control": "no-store" });
-  }),
+  "GET /admin/employer-metrics": withAdmin(employerPostingReport),
 
   "GET /demand": async ({ request, env, db, d, now }) => {
     const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
