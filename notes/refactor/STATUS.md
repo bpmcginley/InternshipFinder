@@ -556,6 +556,7 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 
 - Employer entry and posting-link tests use the shared fixtures and canonical rendering. The paid box still uses the sponsored link without organic posting annotations. Role-detail builds preserve sitemap and publication order. The widget case runs the canonical publisher with the same fixed date and complete listing input while page and feed writers are stubbed.
 - The offline comparison matched all 109 assertions, 1,106 ordered page records across eight builds, three publication snapshots, 127 ordered writes, all 61 final fixture files, paid markup, console output and widget inputs. All 52 cases passed with root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 92 focused tests included both Golden checks against all 836 artifacts.
+- The generated distribution and phone migration at `df978c48` and the dated opening-count migration at `5ec2bbba` passed their exact Pages runs. Each 4,996-file publication matched the [#419 artifact](https://github.com/bpmcginley/InternshipFinder/pull/419) byte-for-byte, and all 141 listing files matched data commit `fa207ade`. [#428 Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43092791350) · [#431 Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43093185735).
 
 ## WP-3.3 listing test follow-up
 
