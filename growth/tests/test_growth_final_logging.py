@@ -187,7 +187,7 @@ def test_metrics_keeps_raw_snapshot_first(monkeypatch, capsys, json_mode, write_
         status(tail[0], json_mode, "[metrics] nothing written: no CLOUDFLARE_API_TOKEN")
     elif write_outcome == "error":
         assert len(writes) == 1 and len(tail) == 2
-        assert tail[0] == "[metrics] write failed: fixture write failure"
+        status(tail[0], json_mode, "[metrics] write failed: RuntimeError", "RuntimeError")
         status(
             tail[1],
             json_mode,

@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -187,17 +188,28 @@ def payload(d: dict, postal_address: str | None, public_archive: bool = False) -
 # ---------------------------------------------------------------- Buttondown
 
 
-def _explain(method: str, path: str, status: int, raw: bytes) -> str:
-    text = raw.decode("utf-8", "replace")[:500]
-    hint = ""
+def _provider_hint(status: int, text: str) -> str:
     if status in (401, 403):
-        hint = f" Check {KEY_ENV}: the key needs email_access and sending_access set to write."
-    elif "email_duplicate" in text:
-        hint = (
+        return f" Check {KEY_ENV}: the key needs email_access and sending_access set to write."
+    if "email_duplicate" in text:
+        return (
             " Buttondown took this for a duplicate email. Its docs don't say what counts as one, so "
             "look in the dashboard for an email with the same subject before running this again."
         )
-    return f"Buttondown refused {method} {path} ({status}): {text}{hint}"
+    return ""
+
+
+def _explain(method: str, path: str, status: int, raw: bytes) -> str:
+    text = raw.decode("utf-8", "replace")[:500]
+    return f"Buttondown refused {method} {path} ({status}): {text}{_provider_hint(status, text)}"
+
+
+def _log_provider_failure(action: str, error: ProviderError) -> None:
+    error_type = type(error).__name__
+    hint = _provider_hint(error.status, str(error)) if error.status is not None else ""
+    console(
+        f"[digest] {action} {error_type}.{hint}", level=logging.WARNING, exception_type=error_type
+    )
 
 
 def call(
@@ -320,7 +332,7 @@ def check(key: str, send: bool) -> int:
     try:
         earlier = same_week(key, "")
     except ProviderError as e:
-        print(f"[digest] Check failed: {e}")
+        _log_provider_failure("Check failed:", e)
         return EXIT_PROVIDER
     console(
         f"[digest] {KEY_ENV} works: Buttondown answered the same-week check (API version {API_VERSION}). "
@@ -487,8 +499,8 @@ def main(argv: list[str]) -> int:
         try:
             earlier = same_week(key, email["subject"])
         except ProviderError as e:
-            print(
-                f"[digest] Not sent: could not check Buttondown for an email already sent this week. {e}"
+            _log_provider_failure(
+                "Not sent: could not check Buttondown for an email already sent this week.", e
             )
             return EXIT_PROVIDER
         if earlier:
@@ -509,7 +521,7 @@ def main(argv: list[str]) -> int:
     try:
         email_id = create_draft(key, email)
     except ProviderError as e:
-        print(f"[digest] Not sent. {e}")
+        _log_provider_failure("Not sent: could not make a Buttondown draft.", e)
         return EXIT_PROVIDER
     print(f"[digest] Made Buttondown draft {email_id}: {email['subject']}")
     try:

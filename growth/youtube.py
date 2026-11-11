@@ -40,6 +40,7 @@ workflow step runs whatever Instagram did, so neither channel stops the other.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import time
@@ -334,8 +335,10 @@ def send_file(
         except (YouTubeError, OSError) as e:  # URLError and timeouts are OSErrors
             if (isinstance(e, YouTubeError) and not e.retryable) or attempt == tries:
                 raise
-            print(
-                f"[youtube] upload interrupted ({type(e).__name__}: {e}); resuming, try {attempt + 1} of {tries}"
+            console(
+                f"[youtube] upload interrupted ({type(e).__name__}); resuming, try {attempt + 1} of {tries}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
             )
             sleep(2**attempt)
             try:
@@ -378,7 +381,7 @@ def advice(error: str) -> str:
             "the token can't upload: check the YouTube Data API v3 is enabled in the Google Cloud project "
             "and that growth/youtube_auth.py was run with its scopes (growth/README.md, YouTube)"
         )
-    return "see Google's message above (growth/README.md, YouTube)"
+    return "see the YouTube troubleshooting steps (growth/README.md)"
 
 
 def main(argv: list[str]) -> int:
@@ -414,8 +417,10 @@ def main(argv: list[str]) -> int:
             done = already_posted(token, meta["snippet"]["title"])
         except (YouTubeError, OSError, KeyError, ValueError) as e:
             # The check is a courtesy; a token that can't read the channel may still upload.
-            print(
-                f"[youtube] couldn't check the channel's recent uploads ({type(e).__name__}: {e}); uploading"
+            console(
+                f"[youtube] couldn't check the channel's recent uploads ({type(e).__name__}); uploading",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
             )
             done = None
         if done:
@@ -434,8 +439,11 @@ def main(argv: list[str]) -> int:
             )
         return 0
     except (YouTubeError, OSError, KeyError, ValueError) as e:
-        # Google's message only: never a token, a header or the session URI.
-        print(f"[youtube] failed: {type(e).__name__}: {e}")
+        console(
+            f"[youtube] failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
         print(f"[youtube] {advice(str(e))}")
         return 1
 
