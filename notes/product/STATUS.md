@@ -67,6 +67,8 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | E | P-4.3 Share cards | Unassigned | - | - | Queued | Matching pages, build-time images, build cost check. |
 | E | P-4.4 Advisor edition | Unassigned | - | - | Queued | Subscription/email work needs Bruce; no outreach. |
 
+| D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | Draft claim | In progress; dormant; needs-bruce | Exact #310 base, #327 archive contract; injected bounded reader only. No route/scheduler/provider/publication. |
+
 ## Verified findings
 
 Evidence references use `9f739770` unless noted. Source findings are not claims about production settings or observed browser behavior.
@@ -141,6 +143,8 @@ P-2.1i [draft #274](https://github.com/bpmcginley/InternshipFinder/pull/274) is 
 [Draft #310](https://github.com/bpmcginley/InternshipFinder/pull/310) is based on exact #302 `4456afbc`. One D1 batch binds exact snapshot consent and lease, existing daily marker, durable attempt and shared cap. Cap denial preserves a reclaimable pre-attempt lease without debit or marker. Independent review and fresh CI remain pending. [Contract](P-2.1o-budgeted-attempt.md). No transport, route or deployment.
 
 ## Waiting for Bruce
+
+P-2.1s dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
 
