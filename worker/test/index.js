@@ -55,3 +55,4 @@ import "./topup-account-deletion.test.js";
 import "./topup-attempt-recovery.test.js";
 import "./topup-payment-bounds.test.js";
 import "./topup-purchase-recovery.test.js";
+import "./topup-checkout-bounds.test.js";

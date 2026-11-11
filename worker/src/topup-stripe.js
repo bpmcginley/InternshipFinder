@@ -41,12 +41,118 @@ function checkoutUrl(value, id) {
     throw unavailable();
   return url.href;
 }
-export async function prepareTopupStripe(env, callbacks, fetchImpl) {
+export const TOPUP_CHECKOUT_BOUNDS = Object.freeze({ timeoutMs: 10000, bodyBytes: 262144 });
+
+// One request per operation. A timed-out POST is ambiguous, never retried here.
+async function boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs) {
+  const controller = new AbortController(),
+    deadline = performance.now() + timeoutMs;
+  let stopped = false,
+    timer;
+  const live = () => {
+    if (stopped || performance.now() >= deadline) throw unavailable();
+  };
+  const cancel = (body) => {
+    try {
+      void body?.cancel().catch(() => {});
+    } catch {
+      /* Best effort, never await cancellation. */
+    }
+  };
+  const bodyText = async (response) => {
+    const length = response.headers?.get?.("Content-Length");
+    if (
+      length != null &&
+      (!/^\d+$/.test(length) || Number(length) > TOPUP_CHECKOUT_BOUNDS.bodyBytes)
+    ) {
+      cancel(response.body);
+      throw unavailable();
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw unavailable();
+    const abort = () => cancel(reader);
+    controller.signal.addEventListener("abort", abort, { once: true });
+    let bytes = 0,
+      text = "";
+    // Match Response.text's UTF-8 decoding, including replacement of malformed bytes.
+    const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        live();
+        const chunk = await reader.read();
+        live();
+        if (chunk.done) break;
+        if (!(chunk.value instanceof Uint8Array)) throw unavailable();
+        bytes += chunk.value.byteLength;
+        if (bytes > TOPUP_CHECKOUT_BOUNDS.bodyBytes) throw unavailable();
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+      return text + decoder.decode();
+    } finally {
+      abort();
+      controller.signal.removeEventListener("abort", abort);
+      reader.releaseLock();
+    }
+  };
+  const run = async () => {
+    live();
+    const result = await stripe(
+      config,
+      path,
+      form,
+      async (url, options) => {
+        const response = await fetchImpl(url, {
+          ...options,
+          redirect: "error",
+          signal: controller.signal,
+        });
+        if (stopped || performance.now() >= deadline || response.ok !== true) {
+          cancel(response.body);
+          throw unavailable();
+        }
+        // Only bounded successful content reaches the existing parser, never private error bodies.
+        return { ok: true, text: () => bodyText(response) };
+      },
+      key,
+      method,
+    );
+    live();
+    return result;
+  };
+  try {
+    return await Promise.race([
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          stopped = true;
+          controller.abort();
+          reject(unavailable());
+        }, timeoutMs);
+      }),
+      run(),
+    ]);
+  } catch {
+    throw unavailable();
+  } finally {
+    stopped = true;
+    clearTimeout(timer);
+    controller.abort();
+  }
+}
+
+export async function prepareTopupStripe(
+  env,
+  callbacks,
+  fetchImpl,
+  timeoutMs = TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+) {
   if (
     !env ||
     env.TOPUPS_ENABLED !== "1" ||
     !paymentsOn(env) ||
     typeof fetchImpl !== "function" ||
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > TOPUP_CHECKOUT_BOUNDS.timeoutMs ||
     typeof env.STRIPE_PRICE_TOPUP !== "string" ||
     !/^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
   )
@@ -55,22 +161,8 @@ export async function prepareTopupStripe(env, callbacks, fetchImpl) {
   const config = { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
     priceId = env.STRIPE_PRICE_TOPUP,
     managed = managedPayments(env);
-  const safeFetch = async (...args) => {
-    try {
-      const r = await fetchImpl(args[0], { ...args[1], redirect: "error" });
-      if (!r.ok) throw unavailable();
-      return r;
-    } catch {
-      throw unavailable();
-    }
-  };
-  const request = async (path, form = {}, key = null, method = "GET") => {
-    try {
-      return await stripe(config, path, form, safeFetch, key, method);
-    } catch {
-      throw unavailable();
-    }
-  };
+  const request = (path, form = {}, key = null, method = "GET") =>
+    boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs);
   let success, cancel, price;
   try {
     const site = new URL(siteUrl(env));
