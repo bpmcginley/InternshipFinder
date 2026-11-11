@@ -334,6 +334,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - Three phone table tests and five synthetic structured-data tests call the canonical table, escape, FAQ and JSON-LD helpers. All four callable identities and the normalized non-import test AST match the legacy references. The tracker and footer calls, generated structured-data build, root fixtures and monkeypatches still exercise the existing integrations.
 - The focused phone, structured-data and distribution tests and both Golden checks passed offline, 33 tests total. All 830 App-era Golden artifacts matched.
 
+## WP-6.2 Canadian page tests
+
+- The Canadian suite uses the canonical geography and freshness helpers and builds pages with explicit `BuildState(near_on=False)`. The legacy and canonical runs matched all 19 ordered page records, six fixture files, and every assertion. The module opts in to the published standalone fixture so its 41 tests run with the legacy facade blocked.
+- All 41 Canadian tests passed with root safety fixtures, strict markers and sockets blocked. The focused Canadian, distribution and Golden run passed 49 tests. Both Golden checks matched 830 artifacts.
+
 ## WP-6.2 standalone test fixture
 
 - The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
