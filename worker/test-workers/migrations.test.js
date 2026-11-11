@@ -2,8 +2,13 @@
 import { env } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
 import { beforeEach, expect, it } from "vitest";
+import {
+  createCachedEmployerPostingCounter,
+  EMPLOYER_POSTING_EVENT,
+} from "../src/employer-posting-counts.js";
 
 const baselineName = "0001_baseline.sql";
+const migrationNames = [baselineName, "0011_employer_posting_counts.sql"];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
 const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
@@ -33,12 +38,14 @@ async function initialize() {
 async function schema(db) {
   const objects = (
     await rows(db, "SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name")
-  ).filter(
-    (row) =>
-      !row.name.startsWith("sqlite_") &&
-      !row.name.startsWith("_cf_") &&
-      row.name !== "d1_migrations",
-  );
+  )
+    .filter(
+      (row) =>
+        !row.name.startsWith("sqlite_") &&
+        !row.name.startsWith("_cf_") &&
+        row.name !== "d1_migrations",
+    )
+    .map((row) => ({ ...row, sql: row.sql?.replaceAll("\r\n", "\n") ?? null }));
   const tables = {};
   for (const name of tableNames) {
     tables[name] = {
@@ -50,15 +57,77 @@ async function schema(db) {
   return { objects, tables };
 }
 
-it("the deduplicated migration creates the complete legacy schema, including constraints and triggers", async () => {
-  expect(env.TEST_MIGRATIONS.map((migration) => migration.name)).toEqual([baselineName]);
+it("migrations create the complete legacy schema, including constraints and triggers", async () => {
+  expect(env.TEST_MIGRATIONS.map((migration) => migration.name)).toEqual(migrationNames);
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(42);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(44);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(22);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(6);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
+});
+
+it("employer count tables accept only aggregates on fresh and upgraded local D1", async () => {
+  const upgraded = env.MIGRATION_DB;
+  await applyD1Migrations(
+    upgraded,
+    env.TEST_MIGRATIONS.filter(({ name }) => name === baselineName),
+  );
+  await upgraded
+    .prepare("INSERT INTO event_counts (day,event,page,n) VALUES (?,?,?,?)")
+    .bind("2026-11-09", "posting_click", "dashboard", 7)
+    .run();
+  await initialize();
+  expect(await rows(upgraded, "SELECT day,event,page,n FROM event_counts")).toEqual([
+    { day: "2026-11-09", event: "posting_click", page: "dashboard", n: 7 },
+  ]);
+
+  const company = "é".repeat(100);
+  for (const db of databases) {
+    expect(await rows(db, "SELECT * FROM employer_posting_counts")).toEqual([]);
+    expect(await rows(db, "SELECT * FROM employer_posting_day_caps")).toEqual([]);
+    const insert = (day, key, n) =>
+      db.prepare("INSERT INTO employer_posting_counts VALUES (?,?,?)").bind(day, key, n).run();
+    await expect(insert("2026-02-30", "bad-day", 1)).rejects.toThrow(/CHECK constraint failed/);
+    await expect(insert("2026-11-10", "é".repeat(101), 1)).rejects.toThrow(
+      /CHECK constraint failed/,
+    );
+    await expect(insert("2026-11-10", "fraction", 1.5)).rejects.toThrow(/CHECK constraint failed/);
+    await expect(insert("2026-11-10", "over-cap", 1001)).rejects.toThrow(/CHECK constraint failed/);
+    await expect(
+      db
+        .prepare("INSERT INTO employer_posting_day_caps VALUES (?,?)")
+        .bind("2026-11-10", 50001)
+        .run(),
+    ).rejects.toThrow(/CHECK constraint failed/);
+
+    let now = new Date("2026-11-10T23:59:59Z");
+    const counter = createCachedEmployerPostingCounter({
+      db,
+      load: () => new Response(JSON.stringify([company])),
+      maxBytes: 1024,
+      now: () => now,
+    });
+    expect(await counter.cleanup()).toBe(true);
+    expect(await counter.count({ e: EMPLOYER_POSTING_EVENT, c: company }, "192.0.2.111")).toBe(
+      true,
+    );
+    expect(await rows(db, "SELECT * FROM employer_posting_counts")).toEqual([
+      { day: "2026-11-10", company, n: 1 },
+    ]);
+    expect(await rows(db, "SELECT * FROM employer_posting_day_caps")).toEqual([
+      { day: "2026-11-10", n: 1 },
+    ]);
+    now = new Date("2026-11-11T00:00:00Z");
+    expect(await counter.cleanup()).toBe(true);
+    expect(await rows(db, "SELECT * FROM employer_posting_day_caps")).toEqual([
+      { day: "2026-11-11", n: 0 },
+    ]);
+    expect(await rows(db, "SELECT * FROM employer_posting_counts")).toEqual([
+      { day: "2026-11-10", company, n: 1 },
+    ]);
+  }
 });
 
 async function historicalRows(db) {
@@ -109,7 +178,7 @@ it("historical account and inviter backfills match the legacy path and fixed-dat
   expect(await backfillRows(env.MIGRATION_DB)).toEqual(expected);
   await initialize();
   for (const db of databases) expect(await backfillRows(db)).toEqual(expected);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 
 async function triggerOutcomes(db) {
@@ -189,5 +258,5 @@ it("migration bookkeeping skips an applied baseline and rolls back a failed migr
       "SELECT name FROM sqlite_schema WHERE name='migration_failure_probe'",
     ),
   ).toEqual([]);
-  expect(await ledger()).toEqual([{ name: baselineName }]);
+  expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
