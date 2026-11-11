@@ -1,3 +1,4 @@
+import { createTestApp, readAppSource } from "./app-fixture.mjs";
 // Paid listings ("placements") on the dashboard (2026-10-14, B2 plan section 5.4; rows S5 and S6). The rule
 // these tests hold the code to: payment never changes any score, order, filter, count or what Auto-Apply
 // does. The Core factory and classic placements/app scripts use a stand-in `window`.
@@ -11,7 +12,7 @@ import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs
 
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const PLACE_SRC = read("docs/js/placements.js");
-const APP_SRC = read("docs/js/app.js");
+const APP_SRC = readAppSource();
 
 function context(extra = {}) {
   const store = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
@@ -193,9 +194,8 @@ function uiHarness() {
   const ctx = context({ React: react, CONFIG: {} });
   installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
-  vm.runInContext(APP_SRC.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-    'window.components = { ListTable, Row, Why, factsLine, matchControl, companyRuns };'), ctx);
-  return { c: ctx.components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
+  const components = createTestApp(ctx);
+  return { c: components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
     render(component, props) { cursor = 0; pending = []; const tree = component(props); pending.forEach(fn => fn()); return tree; },
     reset() { slots.length = 0; } };
 }
@@ -464,11 +464,12 @@ test("load: one same-origin fetch, nothing on a missing or bad file, and none at
   assert.match(read("docs/index.html"), /placements: true,/);
 });
 
-test("index.html loads placements.js between core.js and app.js, deferred", () => {
+test("index.html loads placements and share between the deferred Core and App entries", () => {
   const html = read("docs/index.html");
   const srcs = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map(m => m[0]);
   const at = s => srcs.findIndex(t => t.includes(s));
-  assert.ok(at("js/core/entry.mjs") < at("js/placements.js") && at("js/placements.js") < at("js/app.js"));
+  assert.ok(at("js/core/entry.mjs") < at("js/placements.js") && at("js/placements.js") < at("js/share.js") &&
+    at("js/share.js") < at("js/app/entry.mjs"));
   assert.match(srcs[at("js/placements.js")], /\sdefer\b/);
 });
 

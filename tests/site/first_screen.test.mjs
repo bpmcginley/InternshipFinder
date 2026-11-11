@@ -1,3 +1,4 @@
+import { readAppSource } from "./app-fixture.mjs";
 // The first-screen file (P2) and deferred React (P1). data/first.json is written by the backend export
 // (export_static.first_screen); the dashboard paints from it before the state files arrive.
 import { installCore } from "./core-fixture.mjs";
@@ -127,7 +128,7 @@ test("no first-screen file, or one that fails, changes nothing", async () => {
 });
 
 test("the dashboard uses the first-screen file only for the list it was written for", () => {
-  const app = read("docs/js/app.js");
+  const app = readAppSource();
   assert.match(
     app,
     /const prime = !p && !everything && scope\.all && !qKeys\.length && f\.sort === "new";/,
@@ -138,21 +139,23 @@ test("the dashboard uses the first-screen file only for the list it was written 
   );
 });
 
-test("React is deferred, ahead of core.js and app.js, so the static hero paints first (P1)", () => {
+test("React is deferred ahead of Core and App, so the static hero paints first (P1)", () => {
   const html = read("docs/index.html");
   const tags = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map((m) => ({
     src: m[1],
     tag: m[0],
   }));
   const at = (s) => tags.findIndex((t) => t.src.includes(s));
-  for (const s of ["react.production", "react-dom.production", "js/app.js"])
+  for (const s of ["react.production", "react-dom.production"])
     assert.match(tags[at(s)].tag, /\sdefer\b/, s);
   assert.match(tags[at("js/core/entry.mjs")].tag, /type="module"/);
   assert.doesNotMatch(tags[at("js/core/entry.mjs")].tag, /\sasync\b/);
+  assert.match(tags[at("js/app/entry.mjs")].tag, /type="module"/);
+  assert.doesNotMatch(tags[at("js/app/entry.mjs")].tag, /\sasync\b/);
   assert.ok(
     at("/react@") < at("/react-dom@") &&
       at("/react-dom@") < at("js/core/entry.mjs") &&
-      at("js/core/entry.mjs") < at("js/app.js"),
+      at("js/core/entry.mjs") < at("js/app/entry.mjs"),
   );
   // No inline script may call React before the deferred ones have run.
   const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]

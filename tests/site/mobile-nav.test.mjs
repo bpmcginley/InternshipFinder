@@ -1,8 +1,7 @@
+import { createTestApp } from "./app-fixture.mjs";
 import { installCore } from "./core-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
 function harness() {
   const storage = new Map(),
@@ -83,17 +82,9 @@ function harness() {
     document,
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
   installCore(ctx);
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  vm.runInContext(
-    app.replace(
-      'ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-      "window.components = { SiteNav };",
-    ),
-    ctx,
-  );
-  const tree = ctx.components.SiteNav({ children: "links" }),
+  const components = createTestApp(ctx);
+  const tree = components.SiteNav({ children: "links" }),
     cleanup = effects[0]();
   return { tree, cleanup, document, summary, link, destination, details, box, mq };
 }

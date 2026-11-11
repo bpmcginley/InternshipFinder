@@ -1,10 +1,9 @@
+import { clearTrackerAction, createSetAppState, createToggleSaved, showMyListAction, useManualAppState } from "../../docs/js/app/tracker.mjs";
+import { createTestApp } from "./app-fixture.mjs";
 import { installCore } from "./core-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
-const APP = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
 const plain = (x) => JSON.parse(JSON.stringify(x));
 function harness() {
   const storage = new Map(),
@@ -38,22 +37,15 @@ function harness() {
     },
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
   installCore(ctx);
-  vm.runInContext(
-    APP.replace(
-      'ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-      "window.parts = { readMyList, publicRole, savedRoleRows, sinceVisit, resolveSavedRoles, writeLocal, Row };",
-    ),
-    ctx,
-  );
+  const components = createTestApp(ctx);
   return {
-    ...ctx.parts,
+    ...components,
     ctx,
     storage,
     focus,
     render(props) {
-      const tree = ctx.parts.Row({
+      const tree = components.Row({
         r: role("a"),
         sc: { score: 0, parts: {} },
         ctx: { p: null },
@@ -355,9 +347,7 @@ test("real application-status updater preserves explicit unsaves for queue and r
   ctx.keepRoleBook = (next) => {
     ctx.roleBookRef.current = next;
   };
-  const start = APP.indexOf("    const setAppState ="),
-    end = APP.indexOf("    // Queue updates", start);
-  vm.runInContext(APP.slice(start, end) + "globalThis.updateStatus = setAppState;", ctx);
+  ctx.updateStatus = createSetAppState(ctx);
   ctx.updateStatus("a", "applied");
   assert.equal(ctx.states.a, "applied");
   assert.equal(ctx.roleBookRef.current.roles.a.saved, false);
@@ -397,12 +387,11 @@ test("batched status then Save retains the latest history and delete/reset clear
   };
   const counts = [];
   ctx.IS.count = (...args) => counts.push(args);
-  let start = APP.indexOf("    const setAppState ="),
-    end = APP.indexOf("    const upd =", start);
-  vm.runInContext(APP.slice(start, end) + "globalThis.updateStatus = setAppState;", ctx);
-  start = APP.indexOf("    const myListRef =");
-  end = APP.indexOf("    const showMyList =", start);
-  vm.runInContext(APP.slice(start, end) + "globalThis.toggle = toggleSaved;", ctx);
+  ctx.updateStatus = createSetAppState(ctx);
+  ctx.setAppState = ctx.updateStatus;
+  ctx.setManualAppState = useManualAppState(ctx);
+  const myListRef = { current: ctx.myList };
+  ctx.toggle = createToggleSaved({ ...ctx, myListRef, browser: ctx });
   ctx.updateStatus("a", "applied");
   ctx.toggle(role("a"));
   let states = {};
@@ -423,9 +412,7 @@ test("batched status then Save retains the latest history and delete/reset clear
     ctx.myList = on;
   };
   ctx.setMyLoad = () => {};
-  start = APP.indexOf("    const showMyList =");
-  end = APP.indexOf('    // "More filters"', start);
-  vm.runInContext(APP.slice(start, end) + "globalThis.showList = showMyList;", ctx);
+  ctx.showList = on => showMyListAction(ctx, on);
   ctx.showList(true);
   ctx.showList(true);
   ctx.showList(false);
@@ -438,9 +425,7 @@ test("batched status then Save retains the latest history and delete/reset clear
   ctx.updateStatus("a", "none");
   assert.equal(ctx.appStatesRef.current.a, undefined);
   ctx.updateStatus("a", "offer");
-  start = APP.indexOf("    function clearTracker()");
-  end = APP.indexOf("    function deleteTracker()", start);
-  vm.runInContext(APP.slice(start, end) + "globalThis.clear = clearTracker;", ctx);
+  ctx.clear = () => clearTrackerAction(ctx);
   ctx.clear();
   assert.deepEqual(plain(ctx.appStatesRef.current), {});
   assert.deepEqual(plain(ctx.roleBookRef.current.roles), {});
