@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import logging
 import os
 import re
 import sys
@@ -32,6 +33,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
 from . import near_metros
+from .console_log import console
 
 SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
@@ -652,9 +654,10 @@ def load(site_dir: str) -> dict:
                 g["metro"] = m
                 x["keys"].add(m)
     if bad:
-        print(
+        console(
             f"[seo] warning: skipped {bad} malformed listing rows (see well_formed)",
             file=sys.stderr,
+            level=logging.WARNING,
         )
     listings = list(by_id.values())
     return {
@@ -1550,17 +1553,16 @@ def tracker_page(
     for day, exact, name, path, k in rows:
         who = f"<a href=\"{esc(path)}\">{esc(name)}</a>" if path else esc(name)
         when = short_day(day) if exact else f"By {short_day(day)}"
-        trs.append(
-            f"<tr><td>{who}</td><td class=\"num\">{when}</td><td class=\"num\">{k:,}</td></tr>"
-        )
+        trs.append([who, when, f"{k:,}"])
     body = (
         f"<p class=\"lede\">{lead}</p><p class=\"more\">{honest}</p>"
         f"<a class=\"cta\" href=\"{term_path}\">See every {esc(term)} role</a>"
-        + tablewrap(f"Employers with {term} roles")
-        + "<table class=\"data\"><thead><tr><th>Employer</th><th>Opened</th>"
-        f"<th>{esc(term)} roles</th></tr></thead><tbody>"
-        + "".join(trs)
-        + "</tbody></table></div>"
+        + table(
+            ["Employer", "Opened", f"{esc(term)} roles"],
+            trs,
+            cls="data tracker",
+            label=f"Employers with {term} roles",
+        )
         + floor_note
         + "<p class=\"follow\">Roles found in the last week, whatever the term: "
         "<a href=\"/internships/new/\">new internships this week</a>. "
@@ -1792,6 +1794,8 @@ padding:22px 0 14px;border-bottom:1px solid var(--ink)}
 .mark{font:600 var(--fs-6)/1 var(--serif);color:var(--ink);text-decoration:none}
 nav{display:flex;gap:4px 14px;flex-wrap:wrap}
 nav a{color:var(--ink2);font-size:var(--fs-3);text-decoration:none;transition:color 140ms ease-out}nav a:hover{color:var(--ink)}
+.mobile-digest{display:none}
+@media(max-width:560px){header nav{gap:4px 14px}header nav a{display:inline-flex;align-items:center;min-height:44px}header nav .nav-extra{display:none}.mobile-digest{display:inline}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .crumbs{font-size:var(--fs-3);color:var(--ink3);margin:22px 0 0}.crumbs a{color:var(--ink3)}
 h1{font:600 var(--fs-8)/1.2 var(--serif);margin:10px 0 8px}
@@ -1821,7 +1825,10 @@ background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}.
 section.faq h2{font:600 var(--fs-5)/1.3 var(--serif);margin:28px 0 6px}section.faq p{margin:0;color:var(--ink2)}
 @media (max-width:560px){.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}.n{color:var(--ink3);font-size:var(--fs-2)}
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:var(--fs-3)}
-footer a{color:var(--ink2)}@media (max-width:560px){h1{font-size:var(--fs-7)}section.rel ul{columns:1}
+footer a{color:var(--ink2)}
+.distribution-links{gap:8px 24px;margin-bottom:16px}
+.distribution-links a,.widget-follow a{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline;text-underline-offset:3px}
+@media (max-width:560px){h1{font-size:var(--fs-7)}section.rel ul{columns:1}
 .job{grid-template-columns:1fr}.acts{grid-column:1;grid-row:auto;margin-top:var(--s2)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
 .tablewrap{overflow-x:auto;margin:16px 0 8px}table.data{width:100%;border-collapse:collapse;font-size:var(--fs-3)}
@@ -1829,6 +1836,15 @@ table.data th,table.data td{text-align:left;vertical-align:top;padding:9px 14px 
 table.data thead th{border-bottom:1px solid var(--ink);font-weight:600}table.data td.num{white-space:nowrap}
 section.prose h2{font:600 var(--fs-6)/1.3 var(--serif);margin:34px 0 6px}.src{color:var(--ink3);font-size:var(--fs-3)}
 table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:var(--fs-3)}table.data th,table.data td{padding-right:10px}}
+table.tracker tbody th{font-weight:400}.cell-label{display:none}
+@media(max-width:560px){
+table.data,table.data tbody{display:block;min-width:0;width:100%}
+table.data thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+table.data tbody tr{display:block;padding:12px 0;border-bottom:1px solid var(--rule)}
+table.data tbody th{display:block;padding:0 0 8px;border:0;font-weight:600;overflow-wrap:anywhere}
+table.data tbody td{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:4px 0;border:0;white-space:normal;overflow-wrap:anywhere}
+.cell-label{display:block;color:var(--ink3);font-weight:500}.cell-value{min-width:0}
+}
 .aa-card{margin:18px 0 0;padding:14px 18px 6px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
 .aa-card p{margin:0;color:var(--ink2)}.aa-card .cta{margin:10px 0 8px}
 figure.chart{margin:8px 0 18px}figure.chart img{display:block;max-width:100%;height:auto}
@@ -2045,6 +2061,14 @@ def ld_script(obj) -> str:
     return f'<script type="application/ld+json">{ld_json}</script>'
 
 
+def widget_follow(field: str) -> str:
+    """Link a field's canonical tag to the existing snippet builder, not its page slug."""
+    return (
+        f'<p class="follow widget-follow"><a href="/widget/builder.html?field={esc(quote(field, safe=""))}" '
+        'data-distribution="widget">Put these internships on your club or department site</a></p>'
+    )
+
+
 def footer_browse() -> str:
     """The footer's links to the employer index and the soonest summer's tracker (2026-10-07): every
     page then links both, so a crawler reaches every employer page in two steps from any page."""
@@ -2119,8 +2143,14 @@ def page(
     # A landing visitor can find the optional digest before scrolling through the listings.
     # Reuse the existing nav link counter; the lower form keeps its landing placement.
     digest_nav = (
-        '<a href="/digest/" data-digest-placement="nav">Free Monday email</a>'
+        '<a class="nav-extra" href="/digest/" data-digest-placement="nav">Free Monday email</a>'
         if DIGEST_FORM and path.startswith("/internships/")
+        else ""
+    )
+    digest_footer = (
+        '<span class="mobile-digest"> · <a href="/digest/" '
+        'data-digest-placement="footer">Free Monday email</a></span>'
+        if digest_nav
         else ""
     )
     return f"""<!DOCTYPE html>
@@ -2147,13 +2177,16 @@ def page(
 </head>
 <body>
 <div class="wrap">
-<header><a class="mark" href="/">InternScout</a><nav><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a href="/pricing/">Pricing</a><a href="/compare/">Compare</a><a href="/about/">About</a><a href="/employers/" data-employer-entry="nav">Hire interns</a></nav></header>
+<header><a class="mark" href="/">InternScout</a><nav aria-label="Primary"><a href="/">Dashboard</a><a href="/internships/">Browse</a>{digest_nav}<a href="/install.html">Auto-Apply (free)</a><a class="nav-extra" href="/pricing/">Pricing</a><a class="nav-extra" href="/compare/">Compare</a><a class="nav-extra" href="/about/">About</a><a class="nav-extra" href="/employers/" data-employer-entry="nav">Hire interns</a></nav></header>
 <main>
 {crumb_html}<h1>{esc(h1)}</h1>
 {body}
 <p class="updated">Updated {esc(updated)}. Listings are collected from public job boards several times a day; always check the posting on the employer's site before applying.</p>
 </main>
-<footer><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+<footer><nav class="distribution-links" aria-label="More ways to use InternScout">
+<a href="https://github.com/bpmcginley/internships-every-major" data-distribution="list">Internships for every major on GitHub</a>
+<a href="/widget/builder.html" data-distribution="widget">Put live internships on your club or department site</a>
+</nav><strong>{SLOGAN}</strong> InternScout is a free internship search made by a UMass Amherst student. Not affiliated with UMass Amherst. {footer_browse()}<a href="/about/">About</a> · <a href="/pricing/">Pricing</a> · <a href="/compare/">Compare</a> · <a href="/employers/" data-employer-entry="footer">For employers</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>{digest_footer}</footer>
 </div>
 {BEACON}
 {OFFER_TAG if OFFER_MARK in body else ""}
@@ -2694,11 +2727,12 @@ def employer_offer(name: str) -> str:
     """
     key = quote(employer_key(name), safe="")
     return (
-        f'<section class="prose employer-offer"><h2>Hiring for {esc(name)}?</h2>'
+        f'<section class="prose employer-offer"><h2><a href="/employers/buy/?company={key}" '
+        f'data-employer-entry="employer">Work at {esc(name)}? See how students find your roles, '
+        'and feature them.</a></h2>'
         '<p>Promote an eligible open role in a clearly labeled paid listing. '
         'One role costs $29 for 30 days. Payment never changes organic search rankings.</p>'
-        f'<p><a href="/employers/buy/?company={key}" data-employer-entry="employer">Choose a role</a>'
-        ' or <a href="/employers/">see how paid listings work</a>. '
+        '<p><a href="/employers/">See how paid listings work</a>. '
         '<a href="/employers/#free-help">Board additions and corrections are free</a>.</p></section>'
     )
 
@@ -3255,19 +3289,27 @@ def table(
 ) -> str:
     """An HTML table; cells are HTML already. Columns from num_from on hold figures and don't wrap.
     label: what the table is, for the scrolling box's name (tablewrap)."""
-    th = "".join(f"<th scope=\"col\">{h}</th>" for h in head)
+    # Explicit roles retain table relationships when narrow-screen CSS stacks the rows.
+    # Repeated visible labels are decorative; the real column headers stay in the accessibility tree.
+    th = "".join(f'<th scope="col" role="columnheader">{h}</th>' for h in head)
     body = "".join(
-        "<tr>"
+        '<tr role="row">'
         + "".join(
-            f"<td class=\"num\">{c}</td>"
-            if i >= num_from
-            else (f"<th scope=\"row\">{c}</th>" if i == 0 else f"<td>{c}</td>")
+            f'<th scope="row" role="rowheader">{c}</th>'
+            if i == 0 and i < num_from
+            else f'<td class="{"num" if i >= num_from else ""}" role="cell">'
+            f'<span class="cell-label" aria-hidden="true">{head[i] if i < len(head) else ""}</span>'
+            f'<span class="cell-value">{c}</span></td>'
             for i, c in enumerate(r)
         )
         + "</tr>"
         for r in rows
     )
-    return f"{tablewrap(label)}<table class=\"{cls}\"><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>"
+    return (
+        f'{tablewrap(label)}<table class="{cls}" role="table">'
+        f'<thead role="rowgroup"><tr role="row">{th}</tr></thead>'
+        f'<tbody role="rowgroup">{body}</tbody></table></div>'
+    )
 
 
 def pay_page(
@@ -5054,6 +5096,7 @@ def build(
         #      f"{n} open {name} internships and co-ops for college students, updated {updated}. Employers
         #      include {emp}. Free search, no sign-up."
         co_ops = any("co_op" in (x.get("stage") or []) for x in items)
+        related += widget_follow(t)
         add(
             path,
             listing_title([f"{name} Internships", f"{field_short(t)} Internships"], len(items)),
@@ -6205,6 +6248,7 @@ def main(argv: list[str]) -> None:
         kept, dropped = placements.resolve(
             placements.read(placements_path), {str(x["id"]): x for x in LISTINGS}, today
         )
+        # GitHub Actions annotations must remain raw even in JSON log mode.
         for line in placements.warnings(kept, dropped):
             print(line)
         write_placements(site_dir, kept, today)
@@ -6217,14 +6261,14 @@ def main(argv: list[str]) -> None:
             except OSError:
                 print("::warning::placements report not written")
         pages = add_paid_boxes(pages, kept, today)
-        print(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
+        console(f"[seo] placements: {len(kept)} kept, {len(dropped)} dropped")
     write(site_dir, pages)
     # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
     # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.
     from . import role_index  # role_index imports this module, so not at the top
 
     shards = role_index.write(site_dir, LISTINGS, GENERATED or datetime.now(timezone.utc), today)
-    print(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
+    console(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
     from . import feeds  # feeds imports this module, so not at the top
 
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
@@ -6235,7 +6279,10 @@ def main(argv: list[str]) -> None:
     from . import widget_data
 
     widget_data.write(site_dir, LISTINGS, GENERATED, today_utc())
-    print(f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt into {site_dir}")
+    message = f"[seo] wrote {len(pages)} pages, sitemap.xml and robots.txt"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+        message += f" into {site_dir}"
+    console(message)
 
 
 if __name__ == "__main__":
