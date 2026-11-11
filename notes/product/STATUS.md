@@ -73,6 +73,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
 | 0 | P-0.1 Tracker | product lead | `codex/product-p0.1-tracker` | [#173](https://github.com/bpmcginley/InternshipFinder/pull/173) | Merged; Pages green | Independent review and all CI passed; Pages 42865303436. |
 | 0 | P-0.2 Counter names | Refactor lead (integration) | `codex/product-p0.2-counters` | [#175](https://github.com/bpmcginley/InternshipFinder/pull/175) | Merged; disclosure published; owner deploy pending | Approved disclosure [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) published as `ab86541e`; Pages 42933686331 and exact backend succeeded. Worker deployment remains an owner action; none performed by this session. |
 | 0 | P-0.2 Counter disclosure | audit_growth_generated | `codex/product-p0.2-disclosure` | [#225](https://github.com/bpmcginley/InternshipFinder/pull/225) | Merged; published | Merge `ab86541e`; independent review/all nine checks passed. Pages 42933686331 passed build/deploy/notify and exact-commit backend succeeded. Approved conditional disclosure is live; worker deployment remains owner-controlled. |
@@ -215,6 +216,8 @@ Clean baseline `9f739770`: all 244 site tests passed, no skips; `python scripts/
 The golden harness now covers static assets as well as generated pages. Each site PR refreshes both manifest and archive from the integrated tree, identifies intentional path changes, and preserves other packages' outputs. New public paths also require exact site-allowlist entries. P-1.5b intentionally changed 555 generated HTML files and page-content metadata for navigation and narrow-screen tables; listing data and other static assets were preserved.
 
 ## Waiting for Bruce
+
+P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
 
