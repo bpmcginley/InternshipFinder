@@ -62,3 +62,4 @@ import "./topup-checkout-service.test.js";
 import "./topup-checkout-http.test.js";
 import "./funded-run-admission.test.js";
 import "./funded-run-callbacks.test.js";
+import "./funded-run-sibling.test.js";
