@@ -35,6 +35,7 @@ scripts/eval/node_modules/
 !scripts/eval/package-lock.json
 # Public listings and mutable ingest state are stored on the data branch.
 /docs/data/
+/docs/.listing-install-*/
 /backend/data/ats_registry.json
 /backend/data/dropped_boards.json
 /backend/data/geocache.json
