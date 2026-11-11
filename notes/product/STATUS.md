@@ -111,6 +111,10 @@ Clean baseline `9f739770`: all 244 site tests passed, no skips; `python scripts/
 
 The golden harness now covers static assets as well as generated pages. Each site PR refreshes both manifest and archive from the integrated tree, identifies intentional path changes, and preserves other packages' outputs. New public paths also require exact site-allowlist entries. P-1.5b intentionally changed 555 generated HTML files and page-content metadata for navigation and narrow-screen tables; listing data and other static assets were preserved.
 
+## P-2.1i active claim
+
+Stable confirmed-scope identity and matching-watermark prerequisites are claimed on `codex/product-p2.1i-scope-progress`, based on exact #261. Migration 0009 reserved; implementation/testing in progress, needs-bruce. No queue, producer, sending, activation or retention changes.
+
 ## Waiting for Bruce
 
 Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
