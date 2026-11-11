@@ -70,6 +70,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Page-build logging | wp14_pages_logging | `refactor/wp-1.4-logging-page-build` | [#220](https://github.com/bpmcginley/InternshipFinder/pull/220) | Merged | Merged as `f358eefa`. Pages 42922011172, 42922021386 and backend verified. Plain console output and GitHub annotations preserved. JSON omits the output path. |
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | In review | Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
+| 4 | WP-1.4 Growth preview status logging | wp14_logging | `refactor/wp-1.4-logging-growth-status` | - | Prepared locally | Eight preflight or local-render summaries. Provider and payload paths remain separate. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
 | 4 | WP-2.4 Config: Worker | Lead | `refactor/wp-2.4-worker-config` | [#223](https://github.com/bpmcginley/InternshipFinder/pull/223) | Merged | Merged as `e3822e4f`. Pages 42934103714 and backend verified. The generated Worker module supplies orders and the placement CLI. Both environment overrides remain evaluated at call time. |
@@ -417,6 +418,20 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Audited open Product PRs and the growth CLI and workflow call sites at `aa9070c4`. The Flyer, Glass Flyer and campaign prose diagnostics preserve their exact default text and streams. Opt-in JSON omits output paths, Glass Flyer URLs and spot labels, and campaign titles and matched lint text.
 - Cards and Reels keep their bare artifact-path stdout. The raw local ffmpeg diagnostic in campaign is unchanged, as are rendering, artifact content, exit codes, workflows and provider/publishing paths. Flyer scripts use a temporary checkout import path so direct invocation still works without installing the project.
 - Focused campaign/card/Reel tests passed 42 with one local ffmpeg skip. An offline comparison matched complete default streams, both reproducible Flyer PDFs byte for byte, and all four mocked Glass Flyer render calls and HTML. A campaign run with deterministic render stubs matched default streams and all nine artifact bytes. JSON omits the expected paths and data. Both golden checks and Ruff passed. After integrating main `789e72f0`, the authored code and tests stayed byte-identical and the combined focused and golden run passed 44 with the same ffmpeg skip.
+
+## WP-1.4 growth preview and refusal diagnostics
+
+- At `add6dc3d`, checked open Product paths and separated human diagnostics from payloads, annotations and credentials. This slice converts three digest preflight refusals, two social local-render statuses, and three YouTube pre-upload statuses. Plain console output stays exact. JSON drops the social output directory and carries only fixed messages or setting names. Existing preview payloads remain raw.
+
+| Module | Human diagnostics | Outputs and decisions kept separate |
+|---|---|---|
+| `growth/digest_send.py` | Three fixed preflight refusals migrate. Read-only check success and duplicate-free status could follow with mocks. | Keep the dry-run body, envelope and request plan raw. Leave recipient and postal details, provider IDs and subjects, and the raw errors and unknown-send recovery text in their existing paths. |
+| `growth/social.py` | No selection and local render success migrate. Existing class-only channel failure and aggregate outcome lines could follow with mocks. | Keep raw post/tagged-copy previews, raw renderer errors, dynamic stale-export reasons and provider return values. Preserve status, cleanup and send order. |
+| `growth/instagram.py` | Fixed skip outcomes exist, but token refresh and posting branches stay outside this slice. | Keep the raw Actions warning/error annotations, preview captions, media paths and status artifact protocol. Leave provider IDs and raw fallback/error messages separate. |
+| `growth/youtube.py` | Two fixed no-Reel skips and the missing-setting names migrate. | Keep raw title/description and media-path previews, provider links and values, retry detail and advice. |
+| `growth/youtube_auth.py` | Interactive authorization instructions stay together. | Existing credential output requires a separate secure-channel decision. Authorization URL, channel selection, credential output and raw failures stay outside this logger. |
+
+- All three syntax trees match main after removing the eight diagnostic changes and their imports. Tests exercise default and JSON modes without provider access. Existing provider flow tests use fake requests, and a socket audit hook rejects any accidental network call. All 129 focused and golden tests passed with one existing OAuth loopback test deselected because it requires a local socket. Ruff passed.
 
 ## WP-1.4 page-build logging
 
