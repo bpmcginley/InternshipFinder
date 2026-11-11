@@ -468,6 +468,10 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Compared moved AST bodies after accounting for explicit dependency names, and checked the unchanged SEO state and write sequence. An isolated installed wheel includes all three new modules and loads the leaves without loading either legacy facade. Ruff passed, and targeted Pyright matched all 12 baseline diagnostics with no new diagnostics.
 - The SEO, feeds, page dates, role, link and growth selection passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks passed, including the one-character mutation, against all 695 unchanged expected files. External sockets were denied while the existing loopback-only test could use localhost.
 
+## WP-3.2 discovery test follow-up
+
+- Move four sitemap, robots, feed discovery and LLMS tests into `test_site_discovery.py` and keep their shared site and listing fixtures in `test_seo_pages.py`. The four test bodies and the private robots parser match their original source. Backend collection retained all 1,166 tests, with only the four moved module paths changing. All 164 focused tests and Ruff passed.
+
 ## WP-1.4 growth asset logging
 
 - Audited open Product PRs and the growth CLI and workflow call sites at `aa9070c4`. The Flyer, Glass Flyer and campaign prose diagnostics preserve their exact default text and streams. Opt-in JSON omits output paths, Glass Flyer URLs and spot labels, and campaign titles and matched lint text.
