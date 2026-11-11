@@ -4,15 +4,16 @@ from urllib.parse import parse_qs, urlsplit
 import re
 
 from internscout import seo_pages
+from internscout.site.runtime import employer_key, employer_offer
 from test_seo_pages import _row, _site
 
 
 def test_public_company_key_prefill_is_escaped_and_never_places_an_order():
     name = 'North & South <Research> "Hiring"'
-    out = seo_pages.employer_offer(name)
+    out = employer_offer(name)
     link = re.search(r'href="([^"]+)" data-employer-entry="employer"', out).group(1)
     assert urlsplit(link).path == '/employers/buy/'
-    assert parse_qs(urlsplit(link).query) == {'company': [seo_pages.employer_key(name)]}
+    assert parse_qs(urlsplit(link).query) == {'company': [employer_key(name)]}
     assert '<Research>' not in out and '&lt;Research&gt;' in out
     assert 'Payment never changes organic search rankings.' in out
     assert 'Board additions and corrections are free' in out

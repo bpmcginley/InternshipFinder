@@ -304,6 +304,11 @@ Product [#266](https://github.com/bpmcginley/InternshipFinder/pull/266) is held 
 
 Track ingest and Pages through the G3 observation using the public commit, tree and upstream run markers. Keep #329 in draft until seven clean days are verified and the lead releases it. The browser decision Q2 still gates the site module conversion, and Q3 still covers financial routing changes beyond file moves.
 
+## WP-6.2 employer entry test imports
+
+- On `e43c1ea4`, open Product claims covered neither employer-entry test file. Four pure employer CTA cases now call the existing site runtime helpers directly, with the same copy, escaping, company-only prefill and disclosure assertions. The generated employer-page case still exercises the legacy build entry and its shared fixtures.
+- The two test files and the Golden build and mutation checks passed all seven cases against the 699-file fixture. Three standalone CTA cases also passed with legacy facade imports and sockets blocked. Runtime, fixtures and publishing entry points have the same bytes.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
