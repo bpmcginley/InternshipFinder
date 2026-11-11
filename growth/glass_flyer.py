@@ -33,6 +33,7 @@ import argparse
 import html
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -43,6 +44,14 @@ from pathlib import Path
 import segno
 
 ROOT = Path(__file__).resolve().parents[1]
+# The checkout script also works without an editable install.
+sys.path.insert(0, str(ROOT / "backend"))
+try:
+    from internscout.console_log import console
+    from internscout.public_data import public_data_dir
+finally:
+    sys.path.pop(0)
+
 OUT_PDF = ROOT / "output" / "pdf"
 OUT_PNG = ROOT / "output" / "flyer-preview"
 SITE = "https://internscout.org/"
@@ -62,7 +71,8 @@ CHROMES = [
 def facts() -> dict:
     """Open roles and employers as of the last export, rounded down so the flyer stays true for weeks
     while counts move (14,316 -> "14,000+")."""
-    stats = json.loads((ROOT / "docs" / "data" / "stats.json").read_text(encoding="utf-8"))
+    stats_path = Path(public_data_dir(ROOT / "docs")) / "stats.json"
+    stats = json.loads(stats_path.read_text(encoding="utf-8"))
     open_ = int(stats["open"])
     return {"roles": f"{open_ // 1000 * 1000:,}+", "employers": "1,700+"}
 
@@ -288,12 +298,20 @@ def main(argv: list[str]) -> int:
         dated = "-" + re.sub(r"[^0-9A-Za-z]+", "-", args.posted).strip("-") if args.posted else ""
         pdf = OUT_PDF / f"internscout-glass-{spot}{dated}.pdf"
         render(document(front(f, qr, args.posted, code) + back(f, qr, args.posted, code)), pdf=pdf)
-        print(f"{pdf.relative_to(ROOT)}  [{code}]  ->  {url}")
+        message = f"{pdf.relative_to(ROOT)}  [{code}]  ->  {url}"
+        console(
+            "Wrote glass flyer" if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json" else message
+        )
         if not args.no_preview and spot == spots[0]:
             fp, bp = OUT_PNG / f"front{dated}.png", OUT_PNG / f"back{dated}.png"
             render(document(front(f, qr, args.posted, code)), png=fp)
             render(document(back(f, qr, args.posted, code)), png=bp)
-            print(f"previews: {fp.relative_to(ROOT)}, {bp.relative_to(ROOT)}")
+            message = f"previews: {fp.relative_to(ROOT)}, {bp.relative_to(ROOT)}"
+            console(
+                "Wrote glass flyer previews"
+                if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json"
+                else message
+            )
     return 0
 
 

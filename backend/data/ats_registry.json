@@ -889,6 +889,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "formulary": {
+   "name": "Formulary Financial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "forus": {
    "name": "Forus",
    "quant": false,
@@ -2283,6 +2289,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "shield": {
+   "name": "Shield AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "sierra": {
    "name": "Sierra",
    "quant": false,
@@ -2720,6 +2732,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-30"
+  },
+  "whoop": {
+   "name": "Whoop",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   },
   "windborne-systems": {
    "name": "WindBorne Systems",
@@ -3248,9 +3266,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -5804,6 +5821,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "minitab": {
+   "name": "Minitab",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "mobilityware": {
    "name": "Mobilityware",
    "quant": false,
@@ -8252,6 +8275,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-14"
+  },
+  "careers.international.com": {
+   "name": "International",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   },
   "careers.jhuapl.edu": {
    "name": "Johns Hopkins Applied Physics Laboratory",
@@ -12063,8 +12092,9 @@
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-11"
   },
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",
@@ -12127,6 +12157,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-06"
+  },
+  "bask-health-1": {
+   "name": "Bask Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   },
   "bassett-healthcare-network": {
    "name": "Bassett Healthcare Network",
@@ -13563,9 +13599,8 @@
   "bakerhughes|wd5|BakerHughes": {
    "name": "Baker Hughes",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "bakertilly|wd5|BTCareers": {
    "name": "Baker Tilly",
@@ -16454,9 +16489,8 @@
   "invesco|wd1|IVZ": {
    "name": "Invesco",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "invesco|wd1|IVZearlycareers": {
    "name": "Invesco",

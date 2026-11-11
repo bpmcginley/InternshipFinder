@@ -9,7 +9,7 @@ requires-python = ">=3.10"
 dynamic = ["dependencies"]
 
 [tool.setuptools]
-packages = ["internscout", "internscout.sources", "growth"]
+packages = ["internscout", "internscout.sources", "internscout.site", "internscout.site.render", "growth"]
 include-package-data = false
 
 [tool.setuptools.package-dir]
@@ -17,7 +17,7 @@ internscout = "backend/internscout"
 growth = "growth"
 
 [tool.setuptools.package-data]
-internscout = ["top_degree_fields.json", "us_top50_metros.json"]
+internscout = ["top_degree_fields.json", "us_top50_metros.json", "vocabulary.json"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["backend/requirements.txt"]}

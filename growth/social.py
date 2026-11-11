@@ -33,6 +33,7 @@ Run from the repo root:  python growth/social.py [docs] [--out=DIR] [--send]
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -44,7 +45,14 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import rules as site_rules  # noqa: E402
+from internscout.site import digest as digest_model  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
+from internscout.console_log import console  # noqa: E402
+from internscout.public_data import public_data_dir  # noqa: E402
 import digest  # noqa: E402
 if __package__:
     from .public_config import WORKER_URL
@@ -58,7 +66,7 @@ STALE = timedelta(
 )  # the ingest runs several times a day; an export older than this has stalled
 
 
-fresh = sp.fresh  # found this week, and not an old posting a scan only just reached
+fresh = site_source.fresh  # found this week, and not an old posting a scan only just reached
 
 # The weekly email's sign-up page (2026-10-06). Once the sign-up form has an address, every post ends
 # with a line pointing there. The address is read from the one place it is pasted, CONFIG.digest.
@@ -66,7 +74,7 @@ fresh = sp.fresh  # found this week, and not an old posting a scan only just rea
 # a form), so the line can't go out before people can sign up. Each channel's link names the channel
 # in utm_source, as the Worker spells them (worker/src/visits.js UTM_SOCIAL), with utm_medium=social,
 # the way growth/digest.py tags its own links (this file's links carried no tag before).
-DIGEST_URL = sp.SITE + sp.DIGEST_PATH
+DIGEST_URL = site_assets.SITE + digest_model.DIGEST_PATH
 SIGNUP = "Every Monday by email:"
 
 
@@ -80,20 +88,20 @@ def signup_line(channel: str) -> str:
 
 def digest_live(site_dir: str) -> bool:
     """Whether the weekly email's sign-up form has an address, so its page has a form."""
-    return bool(sp.digest_form_action(site_dir))
+    return bool(digest_model.digest_form_action(site_dir))
 
 
 def candidates(site_dir: str) -> tuple[list[tuple[str, list[dict]]], datetime, Counter]:
     """(fields ranked by new nearby roles, the export's time, open roles per field)."""
-    d = sp.load(site_dir)
-    now = sp._when(d["generated_at"]) or datetime.now(timezone.utc)
+    d = site_source.load(site_dir)
+    now = site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
     by_field: dict[str, list[dict]] = {}
-    # was: for x in d["listings"]: if x["keys"] & sp.HOME_STATES and fresh(x, now, d["baseline"]):
+    # was: for x in d["listings"]: if x["keys"] & site_source.HOME_STATES and fresh(x, now, d["baseline"]):
     # New roles are counted as the digest counts them (digest.new_roles: one row per role within each
     # employer), so a post and the week's email never give two numbers for the same thing.
     for x in digest.new_roles(d, now):
-        if x["keys"] & sp.HOME_STATES:
-            for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS:
+        if x["keys"] & site_source.HOME_STATES:
+            for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS:
                 by_field.setdefault(t, []).append(x)
     ranked = sorted(
         ((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW),
@@ -101,7 +109,7 @@ def candidates(site_dir: str) -> tuple[list[tuple[str, list[dict]]], datetime, C
     )
     # Open roles per field, counted as seo_pages.build counts them, to know whether the field has a page.
     open_by_field = Counter(
-        t for x in d["listings"] for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS
+        t for x in d["listings"] for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS
     )
     return ranked, now, open_by_field
 
@@ -111,17 +119,17 @@ def link(field: str, open_count: int) -> str:
     a slug that isn't a state's), else the dashboard filtered to the field. A post's link can't be
     changed once it's out, so it must never point at a page that isn't there."""
     if digest.has_page(field, open_count):
-        return f"{sp.SITE}/internships/{sp.field_slug(field)}/"
-    return f"{sp.SITE}/?field={quote(field)}"
+        return f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(field)}/"
+    return f"{site_assets.SITE}/?field={quote(field)}"
 
 
 def compose(field: str, items: list[dict], open_count: int, signup: str = "") -> tuple[str, str]:
     """(text, url). The text ends with the url, and fits in LIMIT. With `signup` (signup_line, once the
     weekly email is live) that line follows the url, and employers' names are dropped first to make
     room for it; only a post too long even with none goes out without it."""
-    # was: url = f"{sp.SITE}/internships/{sp.field_slug(field)}/", which 404s for a field with no page.
+    # was: url = f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(field)}/", which 404s for a field with no page.
     url = link(field, open_count)
-    name = sp.lower_name(sp.field_title(field))
+    name = site_text.lower_name(site_taxonomy.field_title(field))
     head = f"{len(items)} new {name} internships in the Northeast and remote this week"
     employers = [
         c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c
@@ -277,13 +285,13 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
     field, items = chosen
     text, url = compose(field, items, open_by_field[field])
     live = digest_live(site_dir)
-    title = sp.field_title(field)
-    name = sp.lower_name(title)
+    title = site_taxonomy.field_title(field)
+    name = site_text.lower_name(title)
     employers = [
         c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c
     ]
     today = today or datetime.now(timezone.utc)
-    slug = sp.field_slug(field)
+    slug = site_taxonomy.field_slug(field)
     tags = " ".join(
         t
         for t in (
@@ -328,7 +336,7 @@ def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
         if co and co not in seen and x.get("title"):
             seen.add(co)
             roles.append(
-                {"company": co, "title": x["title"], "place": sp.place(x), "pay": sp.pay_text(x)}
+                {"company": co, "title": x["title"], "place": site_source.place(x), "pay": site_source.pay_text(x)}
             )
     return {
         "field": field,
@@ -365,8 +373,8 @@ def carousel(site_dir: str, out_dir: str, today: datetime) -> dict:
     about 900 for practical slideshows (growth/SOCIAL_PLAYBOOK.md). was: the card on every non-Reel day."""
     import campaign
 
-    d = sp.load(site_dir)
-    export = sp._when(d["generated_at"]) or today
+    d = site_source.load(site_dir)
+    export = site_source._when(d["generated_at"]) or today
     pick = campaign.search_pick(d["listings"], export)
     if not pick:
         return {}
@@ -376,7 +384,7 @@ def carousel(site_dir: str, out_dir: str, today: datetime) -> dict:
     )["instagram"]
     if campaign.lint(caption) or any(campaign.lint(" ".join(s)) for s in slides):
         return {}
-    stem = f"{today:%Y-%m-%d}-search-{sp.field_slug(pick['field'])}"
+    stem = f"{today:%Y-%m-%d}-search-{site_taxonomy.field_slug(pick['field'])}"
     names = []
     for i, slide in enumerate(slides, 1):
         name = f"{stem}-{i}.jpg"
@@ -463,9 +471,10 @@ def save_drafts(data: dict, token: str, card_path: str | None = None) -> None:
 def stale(site_dir: str, now: datetime | None = None) -> str | None:
     """Why the export is too old to post from, or None. An export with no readable time counts as
     stale: candidates would fall back to the clock, and the post would claim a week it can't see."""
-    with open(os.path.join(site_dir, "data", "listings", "index.json"), encoding="utf-8") as f:
+    index_path = os.path.join(public_data_dir(site_dir), "listings", "index.json")
+    with open(index_path, encoding="utf-8") as f:
         stamp = json.load(f).get("generated_at")
-    made = sp._when(stamp)
+    made = site_source._when(stamp)
     now = now or datetime.now(timezone.utc)
     if made is None:
         return "the data export has no generated_at time"
@@ -486,7 +495,7 @@ def main(argv: list[str]) -> int:
         return 0
     pick_ = chosen(site_dir)
     if not pick_:
-        print("[social] no field gained enough new nearby listings this week; nothing to post")
+        console("[social] no field gained enough new nearby listings this week; nothing to post")
         return 0
     text, url = compose(*pick_)
     print(text)
@@ -508,7 +517,10 @@ def main(argv: list[str]) -> int:
         try:
             data = write_out(site_dir, out_dir)
             if data:
-                print(f"[social] card and captions written to {out_dir}")
+                message = "[social] card and captions written"
+                if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+                    message += f" to {out_dir}"
+                console(message)
         except Exception as e:
             print(f"[social] card failed: {type(e).__name__}: {e}")
             failed.append("card")
@@ -522,9 +534,13 @@ def main(argv: list[str]) -> int:
     if data and os.environ.get("CLOUDFLARE_API_TOKEN"):
         try:
             save_drafts(data, os.environ["CLOUDFLARE_API_TOKEN"], os.path.join(out_dir, "card.jpg"))
-            print("[social] LinkedIn draft saved for the analytics page")
+            console("[social] LinkedIn draft saved for the analytics page")
         except Exception as e:
-            print(f"[social] LinkedIn draft failed: {type(e).__name__}")
+            console(
+                f"[social] LinkedIn draft failed: {type(e).__name__}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
             failed.append("LinkedIn draft")
     for name, needs, send in CHANNELS:
         if not all(os.environ.get(k) for k in needs):
@@ -533,11 +549,15 @@ def main(argv: list[str]) -> int:
             print(f"[social] {name}: {send(texts[name], url)}")
         except Exception as e:  # one account failing must not stop the others
             # Only the type: an HTTPError's text can carry the webhook URL or the instance's answer.
-            print(f"[social] {name} failed: {type(e).__name__}")
+            console(
+                f"[social] {name} failed: {type(e).__name__}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
             failed.append(name)
     # was: return 0, whatever failed, so a revoked app password left the Actions run green for weeks.
     if failed:
-        print(
+        console(
             f"[social] {len(failed)} account(s) failed: {', '.join(failed)}. Check their secrets."
         )
         return 1

@@ -14,6 +14,8 @@ import re
 import threading
 import time
 from .config import DATA_DIR
+from .console_log import console_exception
+from .vocabulary import CANADIAN_PROVINCES, US_PLACE_LABELS
 
 REMOTE_RE = re.compile(r"\b(remote|anywhere|work from home|wfh|virtual)\b", re.I)
 _US_STATES = {
@@ -75,60 +77,9 @@ _US_STATES = {
 # shard. It is read by name and as a whole "San Juan, PR" piece, never by the loose capitals pass
 # below, where "PR" is as likely to mean public relations.
 _US_STATES.add("pr")
-STATE_NAMES = {
-    "alabama": "AL",
-    "alaska": "AK",
-    "arizona": "AZ",
-    "arkansas": "AR",
-    "california": "CA",
-    "colorado": "CO",
-    "connecticut": "CT",
-    "delaware": "DE",
-    "florida": "FL",
-    "georgia": "GA",
-    "hawaii": "HI",
-    "idaho": "ID",
-    "illinois": "IL",
-    "indiana": "IN",
-    "iowa": "IA",
-    "kansas": "KS",
-    "kentucky": "KY",
-    "louisiana": "LA",
-    "maine": "ME",
-    "maryland": "MD",
-    "massachusetts": "MA",
-    "michigan": "MI",
-    "minnesota": "MN",
-    "mississippi": "MS",
-    "missouri": "MO",
-    "montana": "MT",
-    "nebraska": "NE",
-    "nevada": "NV",
-    "new hampshire": "NH",
-    "new jersey": "NJ",
-    "new mexico": "NM",
-    "new york": "NY",
-    "north carolina": "NC",
-    "north dakota": "ND",
-    "ohio": "OH",
-    "oklahoma": "OK",
-    "oregon": "OR",
-    "pennsylvania": "PA",
-    "rhode island": "RI",
-    "south carolina": "SC",
-    "south dakota": "SD",
-    "tennessee": "TN",
-    "texas": "TX",
-    "utah": "UT",
-    "vermont": "VT",
-    "virginia": "VA",
-    "washington": "WA",
-    "west virginia": "WV",
-    "wisconsin": "WI",
-    "wyoming": "WY",
-    "district of columbia": "DC",
-    "puerto rico": "PR",
-}
+STATE_NAMES = {name.lower(): code for code, name in US_PLACE_LABELS if code not in {"DC", "PR"}}
+_US_PLACE_NAMES = dict(US_PLACE_LABELS)
+STATE_NAMES.update((_US_PLACE_NAMES[code].lower(), code) for code in ("DC", "PR"))
 _STATE_NAME_RE = re.compile(
     r"\b(" + "|".join(sorted(STATE_NAMES, key=len, reverse=True)) + r")\b", re.I
 )
@@ -297,21 +248,7 @@ def looks_us(loc: str) -> bool:
 # 2026-09-30 they are kept, filed by province, for Canadian students and for US students near the
 # border. None of the 13 province and territory codes is also a US state code, so a province code
 # can sit in the same "state" field and the same per-state listing files as a US state.
-PROVINCES = {
-    "AB": "Alberta",
-    "BC": "British Columbia",
-    "MB": "Manitoba",
-    "NB": "New Brunswick",
-    "NL": "Newfoundland and Labrador",
-    "NS": "Nova Scotia",
-    "NT": "Northwest Territories",
-    "NU": "Nunavut",
-    "ON": "Ontario",
-    "PE": "Prince Edward Island",
-    "QC": "Quebec",
-    "SK": "Saskatchewan",
-    "YT": "Yukon",
-}
+PROVINCES = dict(sorted(CANADIAN_PROVINCES))
 _PROVINCE_NAMES = {n.lower(): c for c, n in PROVINCES.items()}
 _PROVINCE_NAMES.update({"québec": "QC", "newfoundland": "NL"})
 _PROVINCE_NAME_RE = re.compile(
@@ -966,8 +903,9 @@ def _nominatim(city: str, st: str):
             data = r.json()
             if data:
                 coords = [round(float(data[0]["lat"]), 4), round(float(data[0]["lon"]), 4)]
-        except Exception:
+        except Exception as error:
             _last_call = time.monotonic()
+            console_exception("[geo] geocoding request failed", type(error).__name__)
             return None  # network trouble: don't cache, try again next run
         _last_call = time.monotonic()
         cache[key] = coords
