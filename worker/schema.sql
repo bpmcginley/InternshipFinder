@@ -880,6 +880,20 @@ BEGIN
   DELETE FROM follow_pending_progress WHERE job_id=NEW.id;
 END;
 
+-- Aggregate organic posting activations. No migration backfill or identity columns.
+CREATE TABLE IF NOT EXISTS employer_posting_counts (
+  day TEXT NOT NULL CHECK (length(day) = 10 AND date(day, '+0 days') IS day),
+  company TEXT NOT NULL CHECK (typeof(company) = 'text' AND length(CAST(company AS BLOB)) BETWEEN 1 AND 200),
+  n INTEGER NOT NULL CHECK (typeof(n) = 'integer' AND n BETWEEN 1 AND 1000),
+  PRIMARY KEY (day, company)
+);
+
+-- The active UTC-day limit survives process restarts and removal of company totals.
+CREATE TABLE IF NOT EXISTS employer_posting_day_caps (
+  day TEXT PRIMARY KEY NOT NULL CHECK (length(day) = 10 AND date(day, '+0 days') IS day),
+  n INTEGER NOT NULL CHECK (typeof(n) = 'integer' AND n BETWEEN 0 AND 50000)
+);
+
 -- A bounded validation view, not new retained data. Invalid pending data is never guessed.
 CREATE VIEW IF NOT EXISTS follow_valid_pending AS
 SELECT p.job_id,p.snapshot_at,p.advances

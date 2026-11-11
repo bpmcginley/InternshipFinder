@@ -1,3 +1,4 @@
+import "./employer-retention.test.js";
 // Lets `node --test worker/test/` run the whole folder (Node resolves a directory to index.js).
 import "./auth.test.js";
 import "./billing.test.js";
@@ -28,6 +29,8 @@ import "./social-video.test.js";
 // 2026-10-23: directory runs resolve this entry point; new sprint regressions must run in CI too.
 import "./employer-funnel.test.js";
 import "./employer-metrics.test.js";
+import "./employer-metrics-response.test.js";
+import "./employer-posting-report.test.js";
 import "./campaign-reports.test.js";
 import "./employer-revenue-cron.test.js";
 
@@ -71,3 +74,7 @@ import "./session-copy-fence.test.js";
 import "./topup-session-copy-integration.test.js";
 import "./topup-checkout-service.test.js";
 import "./topup-checkout-http.test.js";
+
+import "./employer-catalog-cache.test.js";
+import "./employer-posting-counts.test.js";
+import "./employer-request-safe.test.js";
