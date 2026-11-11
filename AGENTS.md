@@ -25,9 +25,8 @@ Read `notes/product-review/CONTEXT.md` before resuming the October 2026 product 
 - Keep secrets, private service identifiers and personal data out of code, logs, PRs and notes. Preserve user-visible text, privacy policy, pricing and data collection. Keep `extension/agent/guard.js` and its protected tests unchanged.
 - Preserve old import paths until the compatibility-removal package. Pause only an affected package when behavior changes, golden differences or hand-off stop conditions need a decision; record the question and continue independent work.
 
-## Model and credential boundaries
-The user selected Gemini 4 Argon through the Gemini app using their existing Google AI Pro subscription. Do not switch Codex's active provider or use billable Gemini API calls for this work without a new user instruction.
-Antigravity CLI is installed and authenticated, but Argon was absent from this account's CLI model list on 2026-10-13. Do not silently substitute another model or claim a CLI/backend switch occurred.
+## Credential and provider boundaries
+Do not switch the selected model or provider, or make billable provider calls, without a new user instruction.
 Never put API keys, tokens, OTPs, personal profile/resume data, or passwords in repository files or handoff documents.
 
 ## Verification
