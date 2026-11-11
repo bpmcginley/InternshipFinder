@@ -18,14 +18,15 @@
 // Off until ordersOn(env). While off every /employer/* route answers 404, except GET /employer/config,
 // which says enabled: false so the buy page can say buying on the site is not open yet.
 import { HttpError } from "./http.js";
-import { DAYS, FIELD_CAP, MAX_START_DAYS, PRICES } from "./orders/shared.js";
+import { DAYS, FIELD_CAP, MAX_START_DAYS, PRICES, TERMS_VERSION } from "./orders/shared.js";
 import { ordersOn } from "./orders/access.js";
 
 export { listOrders } from "./orders/admin.js";
 export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
 export { readShard, shardOf } from "./orders/roles.js";
 export { availability, notePlacementFields } from "./orders/capacity.js";
-export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_START_DAYS, PRICES, UNVERIFIED_DAYS } from "./orders/shared.js";
+export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_START_DAYS, PRICES, TERMS_BOX, TERMS_VERSION,
+  UNVERIFIED_DAYS } from "./orders/shared.js";
 export { TERMS_ARCHIVE, reviewSig } from "./orders/templates.js";
 export { listingEvent } from "./orders/settlement.js";
 export { CLOSE_REASONS, dropUnverifiedOrders, ordersCron } from "./orders/cron.js";
@@ -34,11 +35,6 @@ export { MAX_FORM_BYTES, reviewDecision, reviewPage } from "./orders/review.js";
 export { ALL_PER_DAY, PER_ADDRESS_PER_DAY, TOKEN_HOURS, WEBMAIL, checkoutForm, confirmOrder, takeOrder } from "./orders/checkout.js";
 export { newToken, ordersOn, tokenHash } from "./orders/access.js";
 
-// The terms an order accepts: docs/terms.html's "Last updated" day (tests/site/buy.test.mjs holds the two
-// together), and the clickwrap box exactly as docs/employers/buy/ shows it, stored on every order (legal
-// review round 4, 2026-10-19). was: "2026-10-19", and only the version was stored.
-export const TERMS_VERSION = "2026-10-20";
-export const TERMS_BOX = "I have read and accept the InternScout terms, including the section for employers, on behalf of my company, and I am authorized to accept them for it.";
 export const MAX_ORDER_BYTES = 4_000;
 
 const notFound = () => new HttpError(404, "not_found", "No such endpoint");

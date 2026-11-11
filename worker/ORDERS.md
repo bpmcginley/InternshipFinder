@@ -129,7 +129,7 @@ list.
 5. `npm run deploy`, then `node scripts/placement.mjs pilot-code --note "first pilot"` for each pilot.
 6. Only after the lawyer has approved the terms and privacy changes on the same PR (done 2026-10-19,
    round 4).
-7. On the day the terms change goes live, `TERMS_VERSION` in `src/orders.js` must equal the terms page's
+7. On the day the terms change goes live, `TERMS_VERSION` in `src/orders/shared.js` must equal the terms page's
    "Last updated" day (a site test fails otherwise), and that version is tagged so the link in the
    "received" email works: `git tag terms-YYYY-MM-DD <merge commit>` and `git push origin terms-YYYY-MM-DD`.
 
