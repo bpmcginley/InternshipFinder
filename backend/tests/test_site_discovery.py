@@ -4,12 +4,13 @@ import os
 
 from internscout import seo_pages
 from tests.seo_fixture_data import _row, _site
+from tests.site_publish_fixture import write_site
 from test_seo_pages import _pay_site
 
 
 def test_sitemap_and_robots(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    seo_pages.write(site, seo_pages.build(site))
+    write_site(site)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert "<loc>https://internscout.org/internships/massachusetts/</loc>" in sitemap
     assert "<loc>https://internscout.org/privacy</loc>" in sitemap
@@ -52,9 +53,8 @@ def test_google_and_bing_skip_the_feeds_and_everyone_else_is_unchanged(tmp_path)
     from internscout import feeds
 
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    pages = seo_pages.build(site)
-    seo_pages.write(site, pages)
-    feeds.write_all(site, pages, seo_pages.GENERATED)
+    pages, state = write_site(site)
+    feeds.write_all(site, pages, state.generated)
     groups = _robots_groups(open(os.path.join(site, "robots.txt"), encoding="utf-8").read())
     assert groups["*"] == ["Allow: /"]
     for bot in ("Googlebot", "Bingbot"):
@@ -78,7 +78,7 @@ def test_live_paths_reads_the_previous_sitemap(tmp_path):
 
 def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
     site = _pay_site(tmp_path)
-    seo_pages.write(site, seo_pages.build(site))
+    write_site(site)
     short = open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
     full = open(os.path.join(site, "llms-full.txt"), encoding="utf-8").read()
     # llmstxt.org: an H1 name, a blockquote summary, then sections of markdown links.
