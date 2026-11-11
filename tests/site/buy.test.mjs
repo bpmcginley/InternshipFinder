@@ -545,7 +545,7 @@ test("buy page: noindex, labelled fields, the honeypot, the terms box and live s
   assert.match(PAGE, /<ul id="co-list" role="listbox"/);
   for (const id of ["pick-msg", "co-msg", "avail", "run"]) assert.match(PAGE, new RegExp(`id="${id}"[^>]*aria-live="polite"`), id);
   assert.match(PAGE, /id="status" role="alert"/);
-  assert.match(PAGE, /<script defer src="\/js\/buy\.js\?v=\d{8}[^"]*"><\/script>/);
+  assert.match(PAGE, /<script defer src="\/js\/buy\.js"><\/script>/);
   assert.match(PAGE, /<script defer src="\/js\/count\.js"><\/script>/);
 });
 

@@ -8,7 +8,7 @@ import { getToken, authStatus, authBridge, trustedDashboard, signIn, signOut, en
 import { syncNow, noteEdit, flushPending, isLocalEdit, setCloudSync, forgetSynced, deleteSyncedAccount } from "../lib/sync.js";
 import { spend } from "../lib/usage.js";
 import { ISEval } from "./evalrec.js";
-import { noteFilled, answerReview, loadReview, webLineOk, FILLED, FEEDBACK_URL } from "../lib/review.js";
+import { noteFilled, answerReview, loadReview, webLineOk, fillTransition, FEEDBACK_URL } from "../lib/review.js";
 
 // For the model comparison in scripts/eval, from this service worker's console only (evalrec.js).
 self.ISEval = ISEval;
@@ -391,7 +391,7 @@ onQueueChange((q) => {
       if (prev && (j.status === "needs_you" || j.status === "ready_to_submit")) notify(j);
       // An application just finished filling: count it for the review card (lib/review.js). Only a real
       // change seen by this worker counts (prev is set), and each job counts once however often it does.
-      if (prev && FILLED.has(j.status)) noteFilled(j.id, Object.values(q.jobs)).catch(() => {});
+      if (fillTransition(prev, j.status)) noteFilled(j.id, Object.values(q.jobs)).catch(() => {});
     }
     if (j.tabId) chrome.tabs.sendMessage(j.tabId, { type: "overlay", job: publicJob(j) }, { frameId: 0 }).catch(() => {});
   }
