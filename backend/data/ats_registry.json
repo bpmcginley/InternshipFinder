@@ -3248,9 +3248,9 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "last_fail": "2026-11-11"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -8252,6 +8252,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-14"
+  },
+  "careers.international.com": {
+   "name": "International",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   },
   "careers.jhuapl.edu": {
    "name": "Johns Hopkins Applied Physics Laboratory",
@@ -13563,9 +13569,8 @@
   "bakerhughes|wd5|BakerHughes": {
    "name": "Baker Hughes",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "bakertilly|wd5|BTCareers": {
    "name": "Baker Tilly",
@@ -16454,9 +16459,8 @@
   "invesco|wd1|IVZ": {
    "name": "Invesco",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-10"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "invesco|wd1|IVZearlycareers": {
    "name": "Invesco",
