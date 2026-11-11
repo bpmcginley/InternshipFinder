@@ -2283,6 +2283,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "shield": {
+   "name": "Shield AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "sierra": {
    "name": "Sierra",
    "quant": false,
@@ -2720,6 +2726,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-30"
+  },
+  "whoop": {
+   "name": "Whoop",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   },
   "windborne-systems": {
    "name": "WindBorne Systems",
@@ -5802,6 +5814,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "minitab": {
+   "name": "Minitab",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   },
   "mobilityware": {
    "name": "Mobilityware",
@@ -12133,6 +12151,12 @@
    "fails": 0,
    "added": "2026-11-06"
   },
+  "bask-health-1": {
+   "name": "Bask Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "bassett-healthcare-network": {
    "name": "Bassett Healthcare Network",
    "quant": false,
@@ -15093,9 +15117,8 @@
   "elekta|wd3|Elekta_Careers": {
    "name": "Elekta",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-11"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "elementfleet|wd3|External_Career_Site": {
    "name": "Element Fleet Management",
