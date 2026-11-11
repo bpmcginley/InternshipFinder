@@ -234,6 +234,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.3m Employer release staging | Product session | `codex/product-p2.3m-employer-staging` | [#371](https://github.com/bpmcginley/InternshipFinder/pull/371) | Draft needs-bruce | Dormant complete-export annotations and matching 43,509-byte catalog verified against public export `b0abd45a`. Pages, dashboard, renderers and live collection remain separate. |
 | C | P-2.3n Optional generated posting keys | audit_site | `codex/product-p2.3n-generated-links` | [#386](https://github.com/bpmcginley/InternshipFinder/pull/386) | Draft needs-bruce | Optional same-release ID/key/URL bindings for generated Open posting and highest-paying rows. Default output unchanged; 1280/375 light/dark synthetic pairs identical. No emitter or publication activation; digest examples remain separate after #373. |
+| C | P-2.3o Default-off employer browser capture | audit_site | `codex/product-p2.3o-browser-capture` | [#392](https://github.com/bpmcginley/InternshipFinder/pull/392) | Draft needs-bruce | Explicit absent-by-default script attribute; exact event/key payload on trusted organic activation, once per employer per page load. Synthetic browser exclusions verified. #390 fixture release preserves its 808 paths; only counter code and count-script stamps change. No collection activation. |
 
 ## Waiting for Bruce
 

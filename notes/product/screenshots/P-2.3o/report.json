@@ -1,0 +1,178 @@
+[
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 1280,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 1280,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 1280,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 1280,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 375,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 375,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 375,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 375,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 0,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 1280,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 1280,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 1280,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 1280,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 375,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 375,
+    "theme": "light",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 375,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 375,
+    "theme": "dark",
+    "noEmployerOnLoad": true,
+    "employerAfterKeyboard": 1,
+    "externalPageRequestsAllowed": 0
+  },
+  {
+    "exclusion": "missing flag",
+    "employerEvents": 0
+  },
+  {
+    "exclusion": "webdriver",
+    "employerEvents": 0
+  },
+  {
+    "exclusion": "nocount",
+    "employerEvents": 0
+  },
+  {
+    "exclusion": "widget",
+    "employerEvents": 0
+  },
+  {
+    "exclusion": "iframe",
+    "employerEvents": 0
+  },
+  {
+    "delegatedDynamicLinks": true,
+    "nestedTarget": true,
+    "htmlEntityDecodedKey": true,
+    "excludedPaidPlacementSponsoredAutoApplySavedOnlyExplicitSyntheticInvalid": true,
+    "perEmployerDeduplication": true,
+    "middleAndModifiedClicks": true,
+    "payloadFields": [
+      "e",
+      "c"
+    ]
+  }
+]
